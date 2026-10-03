@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@noble/ciphers": "2.4.0",
     "@noble/curves": "1.8.0",
     "@noble/hashes": "1.7.0",
     "@scure/base": "1.2.4",

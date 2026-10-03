@@ -16,7 +16,9 @@ export function canonicalizeJson(obj: unknown): string {
     return `[${obj.map(item => canonicalizeJson(item)).join(',')}]`;
   }
 
-  const sortedKeys = Object.keys(obj as Record<string, unknown>).sort();
+  const sortedKeys = Object.keys(obj as Record<string, unknown>)
+    .filter(key => (obj as Record<string, unknown>)[key] !== undefined)
+    .sort();
   const pairs = sortedKeys.map(key => {
     const value = (obj as Record<string, unknown>)[key];
     return `${JSON.stringify(key)}:${canonicalizeJson(value)}`;
@@ -24,6 +26,8 @@ export function canonicalizeJson(obj: unknown): string {
 
   return `{${pairs.join(',')}}`;
 }
+
+export { canonicalizeJson as serializeCanonicalJson };
 
 export interface CanonicalSerializer {
   serializeUnsignedEvent(event: UnsignedSovraEvent): string;

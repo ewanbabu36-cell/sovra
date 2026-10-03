@@ -8,11 +8,12 @@ import {
   randomBytes as nobleRandomBytes,
 } from '@noble/hashes/utils';
 import { base58 } from '@scure/base';
+import { chacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { CryptoError, InvalidSignatureError } from './errors.js';
 
 /**
  * High-performance, audited cryptographic primitives.
- * Strictly wraps @noble/curves, @noble/hashes, and @scure/base.
+ * Strictly wraps @noble/curves, @noble/hashes, @scure/base, and @noble/ciphers.
  * Custom cryptography is strictly forbidden.
  */
 
@@ -159,4 +160,46 @@ export function diffieHellmanX25519(
     throw new CryptoError('X25519 keys must be exactly 32 bytes');
   }
   return x25519.getSharedSecret(privateKey, remotePublicKey);
+}
+
+// ==========================================
+// 5. Authenticated Encryption (AEAD)
+// ==========================================
+
+export function encryptChaCha20Poly1305(
+  key: Uint8Array,
+  nonce: Uint8Array,
+  plaintext: Uint8Array,
+  associatedData?: Uint8Array,
+): Uint8Array {
+  if (key.length !== 32) {
+    throw new CryptoError('ChaCha20-Poly1305 key must be exactly 32 bytes');
+  }
+  if (nonce.length !== 12) {
+    throw new CryptoError('ChaCha20-Poly1305 nonce must be exactly 12 bytes');
+  }
+  const cipher = chacha20poly1305(key, nonce, associatedData);
+  return cipher.encrypt(plaintext);
+}
+
+export function decryptChaCha20Poly1305(
+  key: Uint8Array,
+  nonce: Uint8Array,
+  ciphertext: Uint8Array,
+  associatedData?: Uint8Array,
+): Uint8Array {
+  if (key.length !== 32) {
+    throw new CryptoError('ChaCha20-Poly1305 key must be exactly 32 bytes');
+  }
+  if (nonce.length !== 12) {
+    throw new CryptoError('ChaCha20-Poly1305 nonce must be exactly 12 bytes');
+  }
+  try {
+    const cipher = chacha20poly1305(key, nonce, associatedData);
+    return cipher.decrypt(ciphertext);
+  } catch (err) {
+    throw new CryptoError('Failed to decrypt or authenticate ciphertext', 'ERR_AEAD_AUTH_FAILED', {
+      cause: err instanceof Error ? err.message : String(err),
+    });
+  }
 }

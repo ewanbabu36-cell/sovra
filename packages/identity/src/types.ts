@@ -7,6 +7,7 @@ import { RecoveryPlan } from './recovery.js';
 
 export type { PublicIdentity } from './model.js';
 export type { DeviceDelegationAssertion } from './delegation.js';
+export type DeviceDelegation = DeviceDelegationAssertion;
 export type { RecoveryPlan } from './recovery.js';
 
 export interface DeviceRegistrationRequest {

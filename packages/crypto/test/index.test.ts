@@ -17,6 +17,8 @@ import {
   hexToBytes,
   encodeBase58Btc,
   decodeBase58Btc,
+  encryptChaCha20Poly1305,
+  decryptChaCha20Poly1305,
 } from '../src/index.js';
 
 describe('@sovra/crypto Primitives & Vetted Libraries', () => {
@@ -121,5 +123,31 @@ describe('@sovra/crypto Primitives & Vetted Libraries', () => {
     const decoded = decodeBase58Btc(encoded);
 
     expect(constantTimeEquals(raw, decoded)).toBe(true);
+  });
+
+  it('performs ChaCha20-Poly1305 AEAD authenticated encryption and decryption', () => {
+    const key = secureRandomBytes(32);
+    const nonce = secureRandomBytes(12);
+    const plaintext = new TextEncoder().encode('Confidential P2P transport frame');
+    const aad = new TextEncoder().encode('frame:stream:1');
+
+    const ciphertext = encryptChaCha20Poly1305(key, nonce, plaintext, aad);
+    expect(ciphertext.length).toBe(plaintext.length + 16); // 16-byte Poly1305 tag
+
+    const decrypted = decryptChaCha20Poly1305(key, nonce, ciphertext, aad);
+    expect(constantTimeEquals(plaintext, decrypted)).toBe(true);
+
+    // Tampering with ciphertext fails decryption
+    const tamperedCiphertext = new Uint8Array(ciphertext);
+    tamperedCiphertext[0] = (tamperedCiphertext[0] ?? 0) ^ 0x01;
+    expect(() => decryptChaCha20Poly1305(key, nonce, tamperedCiphertext, aad)).toThrowError(
+      /Failed to decrypt/,
+    );
+
+    // Tampering with associated data fails authentication
+    const tamperedAad = new TextEncoder().encode('frame:stream:2');
+    expect(() => decryptChaCha20Poly1305(key, nonce, ciphertext, tamperedAad)).toThrowError(
+      /Failed to decrypt/,
+    );
   });
 });

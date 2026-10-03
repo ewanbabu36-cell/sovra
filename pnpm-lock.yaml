@@ -356,6 +356,9 @@ importers:
 
   packages/crypto:
     dependencies:
+      '@noble/ciphers':
+        specifier: 2.4.0
+        version: 2.4.0
       '@noble/curves':
         specifier: 1.8.0
         version: 1.8.0
@@ -441,6 +444,9 @@ importers:
       '@sovra/identity':
         specifier: workspace:*
         version: link:../identity
+      '@sovra/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@sovra/shared':
         specifier: workspace:*
         version: link:../shared
@@ -804,6 +810,10 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
+
+  '@noble/ciphers@2.4.0':
+    resolution: {integrity: sha512-AnjFn0Jv92laAkvMrghlFZq4qQCIN/4DxFV/eooqtC2YTjB7kBeLMS2T9KJX4Dn+ZVXLOwK0lSgqDtx9gvxtiw==}
+    engines: {node: '>= 20.19.0'}
 
   '@noble/curves@1.8.0':
     resolution: {integrity: sha512-j84kjAbzEnQHaSIhRPUmB3/eVXu2k3dKPl2LOrR8fSOIL+89U+7lV117EWHtq/GHM3ReGHM46iRBdZfpc4HRUQ==}
@@ -1757,6 +1767,8 @@ snapshots:
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
+
+  '@noble/ciphers@2.4.0': {}
 
   '@noble/curves@1.8.0':
     dependencies:

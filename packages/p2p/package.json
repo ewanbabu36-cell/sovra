@@ -19,6 +19,7 @@
   "dependencies": {
     "@sovra/crypto": "workspace:*",
     "@sovra/identity": "workspace:*",
+    "@sovra/protocol": "workspace:*",
     "@sovra/shared": "workspace:*"
   },
   "devDependencies": {
