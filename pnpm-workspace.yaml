@@ -1,0 +1,8 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'nodes/*'
+  - 'services/*'
+
+allowBuilds:
+  esbuild: true
