@@ -1,28 +1,19 @@
 import { Result } from '@sovra/shared';
 import { VerificationKey } from '@sovra/crypto';
 import { IdentityKey, DeviceKey } from './keys.js';
+import { PublicIdentity } from './model.js';
+import { DeviceDelegationAssertion } from './delegation.js';
+import { RecoveryPlan } from './recovery.js';
 
-export interface PublicIdentity {
-  readonly did: string;
-  readonly primaryPublicKey: VerificationKey;
-  readonly activeDevices: readonly DeviceKey[];
-  readonly createdAt: number;
-  readonly version: number;
-}
+export type { PublicIdentity } from './model.js';
+export type { DeviceDelegationAssertion } from './delegation.js';
+export type { RecoveryPlan } from './recovery.js';
 
 export interface DeviceRegistrationRequest {
   readonly deviceId: string;
   readonly deviceName: string;
   readonly devicePublicKey: VerificationKey;
   readonly validUntil: number;
-}
-
-export interface DeviceDelegationAssertion {
-  readonly did: string;
-  readonly deviceId: string;
-  readonly devicePublicKeyHex: string;
-  readonly validUntil: number;
-  readonly parentSignature: Uint8Array;
 }
 
 export interface KeyRotationRequest {
@@ -38,22 +29,10 @@ export interface KeyRevocationAssertion {
   readonly signature: Uint8Array;
 }
 
-/**
- * Social / Threshold Recovery Strategy Interface.
- * Note: Centralized key escrow is strictly prohibited.
- * Recovery requires M-of-N cryptographic guardian threshold shares.
- */
 export interface GuardianRecoveryShare {
   readonly guardianDid: string;
   readonly shareId: string;
   readonly encryptedShareBytes: Uint8Array;
-}
-
-export interface RecoveryPlan {
-  readonly did: string;
-  readonly requiredThreshold: number;
-  readonly totalGuardians: number;
-  readonly guardianDids: readonly string[];
 }
 
 export interface IdentityService {

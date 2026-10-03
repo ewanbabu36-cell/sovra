@@ -17,6 +17,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@noble/curves": "1.8.0",
+    "@noble/hashes": "1.7.0",
+    "@scure/base": "1.2.4",
     "@sovra/shared": "workspace:*"
   },
   "devDependencies": {
