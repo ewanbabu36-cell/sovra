@@ -1406,6 +1406,9 @@ function renderHtml(
       .mobile-chat-back-btn {
         display: inline-flex !important;
       }
+      .e2ee-shield-badge {
+        display: none !important;
+      }
       .reels-stage {
         gap: 0;
       }
