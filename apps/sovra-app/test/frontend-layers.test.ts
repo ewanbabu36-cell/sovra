@@ -412,5 +412,38 @@ describe('Frontend Client Architecture (React/Next.js Technical Roadmap)', () =>
       expect(wipeRes.ok).toBe(true);
       expect(accountHook.profile).toBeNull();
     });
+
+    it('manages 1-click remote logout of lost device and processes emergency wipe', async () => {
+      const hookMaster = createAccountLifecycleManager();
+      await hookMaster.createAccount('rahul_desk', 'Rahul Pro', 'desktop');
+
+      // Add secondary tablet
+      const tabletKeyHex = '11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff';
+      hookMaster.registerAuthorizedDevice({
+        deviceId: 'dev_tablet_01',
+        deviceName: "Rahul's iPad (Stolen in Metro)",
+        publicKeyHex: tabletKeyHex,
+        authorizedAt: Math.floor(Date.now() / 1000),
+        isCurrentDevice: false,
+        platform: 'ios',
+      });
+
+      expect(hookMaster.authorizedDevices.length).toBe(2);
+
+      // 1-Click Remote Logout of stolen tablet
+      const remoteRes = hookMaster.remoteRevokeDevice(tabletKeyHex, 'device_lost');
+      expect(remoteRes.ok).toBe(true);
+      expect(hookMaster.authorizedDevices.length).toBe(1);
+
+      // Now on the stolen tablet side: receives revocation
+      const hookStolen = createAccountLifecycleManager();
+      await hookStolen.createAccount('tablet_user', 'Tablet', 'ios');
+      expect(hookStolen.profile).not.toBeNull();
+
+      // Tablet receives its revocation
+      const wipeOutcome = hookStolen.processIncomingRevocation(remoteRes.value!);
+      expect(wipeOutcome.ok).toBe(true);
+      expect(wipeOutcome.value?.handled).toBe(true);
+    });
   });
 });

@@ -112,4 +112,83 @@ describe('Account Lifecycle & Onboarding Engine Suite (@sovra/identity)', () => 
     expect(plan.targetDid).toBe(engine.profile?.did);
     expect(engine.recoveryPlan).toBeDefined();
   });
+
+  it('tracks authorized devices and executes 1-click remote revocation of lost secondary device', async () => {
+    // Master device: Laptop
+    const engineMaster = new AccountLifecycleEngine();
+    await engineMaster.createAccount('rahul_secure', 'Rahul', 'desktop');
+
+    const devicesInitial = engineMaster.listAuthorizedDevices();
+    expect(devicesInitial.length).toBe(1);
+    expect(devicesInitial[0].isCurrentDevice).toBe(true);
+
+    // Rahul pairs a secondary phone (Phone B)
+    const phoneBKey = SovraIdentityKey.generate();
+    engineMaster.registerAuthorizedDevice({
+      deviceId: 'dev_phone_b',
+      deviceName: "Rahul's Pixel 8 (Stolen Phone)",
+      publicKeyHex: phoneBKey.publicKeyHex,
+      authorizedAt: Math.floor(Date.now() / 1000),
+      isCurrentDevice: false,
+      platform: 'android',
+    });
+
+    expect(engineMaster.listAuthorizedDevices().length).toBe(2);
+
+    // Phone B is lost/stolen! Rahul issues 1-click Remote Logout from Laptop:
+    const remoteRevokeRes = engineMaster.remoteRevokeDevice(phoneBKey.publicKeyHex, 'device_lost');
+    expect(remoteRevokeRes.ok).toBe(true);
+    if (!remoteRevokeRes.ok) return;
+
+    const revocationAssertion = remoteRevokeRes.value;
+    expect(revocationAssertion.revokedKeyHex).toBe(phoneBKey.publicKeyHex);
+    expect(revocationAssertion.reason).toBe('device_lost');
+
+    // Phone B is now removed from active authorized devices
+    expect(engineMaster.listAuthorizedDevices().length).toBe(1);
+    expect(engineMaster.revocationRegistry.isRevoked(phoneBKey.publicKeyHex)).toBe(true);
+  });
+
+  it('triggers instant emergency wipe on lost device upon receiving network revocation assertion', async () => {
+    // Phone B: Active device running on user's phone
+    const enginePhoneB = new AccountLifecycleEngine();
+    const phoneBRes = await enginePhoneB.createAccount('rahul_phone', 'Rahul Mobile', 'android');
+    expect(phoneBRes.ok).toBe(true);
+    if (!phoneBRes.ok) return;
+
+    expect(enginePhoneB.profile).toBeDefined();
+    expect(enginePhoneB.profile?.handle).toBe('@rahul_phone');
+
+    // Laptop (holds Root Master Identity) issues a signed revocation for Phone B's device key
+    const masterIdKey = SovraIdentityKey.generate();
+    // Simulate Phone B having been delegated by masterIdKey
+    const revocationAssertion = {
+      version: 1 as const,
+      targetDid: masterIdKey.did,
+      revokedKeyHex: phoneBRes.value.deviceKey.publicKeyHex,
+      revokedKeyRole: 'device' as const,
+      reason: 'device_lost' as const,
+      revocationSequence: 1,
+      timestamp: Math.floor(Date.now() / 1000),
+      nonce: 'abcd1234ef567890abcd1234ef567890',
+    };
+    const { canonicalizeToBytes } = await import('../src/canonical.js');
+    const signatureHex = masterIdKey.signHex(canonicalizeToBytes(revocationAssertion));
+
+    const signedAssertion = {
+      ...revocationAssertion,
+      signature: signatureHex,
+    };
+
+    // Phone B receives the revocation over the P2P network (or on reconnect)
+    const incomingRes = enginePhoneB.processIncomingRevocation(signedAssertion);
+    expect(incomingRes.ok).toBe(true);
+    expect(incomingRes.value?.isCurrentDeviceRevoked).toBe(true);
+    expect(incomingRes.value?.localWiped).toBe(true);
+
+    // 🚨 Verify that Phone B is 100% wiped: zero keys, null profile, thieves cannot access anything!
+    expect(enginePhoneB.profile).toBeNull();
+    expect(enginePhoneB.isLocked).toBe(false);
+    expect(enginePhoneB.listAuthorizedDevices().length).toBe(0);
+  });
 });

@@ -24,7 +24,13 @@ import { SovraIdentityKey, SovraDeviceKey } from './keypair.js';
 import { createDeviceDelegation, DeviceDelegationAssertion } from './delegation.js';
 import { PasskeyManager, WebAuthnPasskeyCredential } from './passkey.js';
 import { createRecoveryPlan, RecoveryPlan } from './recovery.js';
-import { RevocationRegistry, createRevocationAssertion } from './revocation.js';
+import {
+  RevocationRegistry,
+  createRevocationAssertion,
+  verifyRevocationAssertion,
+  type RevocationAssertion,
+  type RevocationReason,
+} from './revocation.js';
 
 export interface UserAccountProfile {
   readonly did: string;
@@ -58,12 +64,29 @@ export interface AccountCreationResult {
   readonly passkeyCredential: WebAuthnPasskeyCredential;
 }
 
+export interface AuthorizedDevice {
+  readonly deviceId: string;
+  readonly deviceName: string;
+  readonly publicKeyHex: string;
+  readonly authorizedAt: number;
+  readonly isCurrentDevice: boolean;
+  readonly platform: 'android' | 'ios' | 'web' | 'desktop';
+}
+
+export interface RemoteRevocationOutcome {
+  readonly handled: boolean;
+  readonly isCurrentDeviceRevoked: boolean;
+  readonly localWiped: boolean;
+  readonly reason: RevocationReason;
+}
+
 export class AccountLifecycleEngine {
   private activeIdentityKey: SovraIdentityKey | null = null;
   private activeDeviceKey: SovraDeviceKey | null = null;
   private activeProfile: UserAccountProfile | null = null;
   private isSessionLocked = false;
   private activeRecoveryPlan: RecoveryPlan | null = null;
+  private readonly authorizedDevices = new Map<string, AuthorizedDevice>();
 
   public readonly passkeyManager = new PasskeyManager();
   public readonly revocationRegistry = new RevocationRegistry();
@@ -137,6 +160,15 @@ export class AccountLifecycleEngine {
       isLocked: false,
     };
 
+    this.authorizedDevices.set(devKey.publicKeyHex.toLowerCase(), {
+      deviceId: devId,
+      deviceName: `${displayName}'s Device`,
+      publicKeyHex: devKey.publicKeyHex,
+      authorizedAt: now,
+      isCurrentDevice: true,
+      platform,
+    });
+
     return ok({
       profile: this.activeProfile,
       identityKey: idKey,
@@ -200,6 +232,7 @@ export class AccountLifecycleEngine {
     this.activeProfile = null;
     this.activeRecoveryPlan = null;
     this.isSessionLocked = false;
+    this.authorizedDevices.clear();
 
     return ok({ deviceRevoked: true });
   }
@@ -269,4 +302,117 @@ export class AccountLifecycleEngine {
     this.activeRecoveryPlan = plan;
     return ok(plan);
   }
+
+  /**
+   * Returns list of currently authorized devices for this identity.
+   */
+  public listAuthorizedDevices(): readonly AuthorizedDevice[] {
+    return Array.from(this.authorizedDevices.values()).filter(
+      (d) => !this.revocationRegistry.isRevoked(d.publicKeyHex),
+    );
+  }
+
+  /**
+   * Registers a secondary paired device (e.g. tablet or laptop authorized via QR).
+   */
+  public registerAuthorizedDevice(device: AuthorizedDevice): Result<void> {
+    if (!this.activeIdentityKey) {
+      return err(new ValidationError('Active identity required to register devices'));
+    }
+    if (this.revocationRegistry.isRevoked(device.publicKeyHex)) {
+      return err(new ValidationError('Cannot register revoked device key'));
+    }
+    this.authorizedDevices.set(device.publicKeyHex.toLowerCase(), {
+      ...device,
+      isCurrentDevice: false,
+    });
+    return ok(undefined);
+  }
+
+  /**
+   * ⚡ Remote Logout / Device Revocation (Phone Kho Jane Par):
+   * 1-Click remote revocation of another device using the Master Root Identity key.
+   * Generates a signed revocation assertion and registers it on the network.
+   */
+  public remoteRevokeDevice(
+    targetPublicKeyHex: string,
+    reason: RevocationReason = 'device_lost',
+  ): Result<RevocationAssertion> {
+    if (!this.activeIdentityKey) {
+      return err(new ValidationError('Root identity key required for remote revocation'));
+    }
+
+    const cleanHex = targetPublicKeyHex.toLowerCase();
+    const nextSeq = this.revocationRegistry.getLatestSequence(this.activeIdentityKey.did) + 1;
+
+    const assertion = createRevocationAssertion(
+      this.activeIdentityKey,
+      cleanHex,
+      'device',
+      reason,
+      nextSeq,
+    );
+
+    const registered = this.revocationRegistry.registerRevocation(assertion);
+    if (!registered) {
+      return err(new ValidationError('Failed to register revocation in local registry'));
+    }
+
+    this.authorizedDevices.delete(cleanHex);
+
+    // If target happened to be this device itself, wipe local state
+    if (this.activeDeviceKey && this.activeDeviceKey.publicKeyHex.toLowerCase() === cleanHex) {
+      this.logoutAndWipeDevice();
+    }
+
+    return ok(assertion);
+  }
+
+  /**
+   * ⚡ Inbound Network Revocation Handler (Emergency Remote Wipe):
+   * When this phone receives a signed revocation assertion from the P2P mesh:
+   * If the assertion matches THIS device's key (e.g. phone was stolen and user revoked it remotely from laptop),
+   * this device IMMEDIATELY AND IRREVERSIBLY WIPES ALL PRIVATE KEYS, SESSIONS & CHATS!
+   */
+  public processIncomingRevocation(
+    assertion: RevocationAssertion,
+  ): Result<RemoteRevocationOutcome> {
+    const verified = verifyRevocationAssertion(assertion);
+    if (!verified) {
+      return err(new ValidationError('Cryptographic revocation signature verification failed'));
+    }
+
+    this.revocationRegistry.registerRevocation(assertion);
+
+    const revokedKey = assertion.revokedKeyHex.toLowerCase();
+    this.authorizedDevices.delete(revokedKey);
+
+    const isCurrentDeviceRevoked =
+      this.activeDeviceKey?.publicKeyHex.toLowerCase() === revokedKey;
+
+    if (isCurrentDeviceRevoked) {
+      // 🚨 EMERGENCY REMOTE WIPE: Wipe device completely, protecting user's privacy from thieves!
+      this.activeIdentityKey = null;
+      this.activeDeviceKey = null;
+      this.activeProfile = null;
+      this.activeRecoveryPlan = null;
+      this.isSessionLocked = false;
+      this.authorizedDevices.clear();
+
+      return ok({
+        handled: true,
+        isCurrentDeviceRevoked: true,
+        localWiped: true,
+        reason: assertion.reason,
+      });
+    }
+
+    return ok({
+      handled: true,
+      isCurrentDeviceRevoked: false,
+      localWiped: false,
+      reason: assertion.reason,
+    });
+  }
 }
+
