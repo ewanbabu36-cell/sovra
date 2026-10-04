@@ -5988,7 +5988,7 @@ function renderHtml(
       if (navigator.clipboard) {
         navigator.clipboard.writeText(cid).catch(function() {});
       }
-      alert('📦 Content ID (CID) Copied!\n\n' + cid + '\n\nAnnounced to BitSwap Swarm: 14 Connected Seeders');
+      alert('📦 Content ID (CID) Copied!\\n\\n' + cid + '\\n\\nAnnounced to BitSwap Swarm: 14 Connected Seeders');
     }
 
     function toggleSaveFeedPost(postId) {
@@ -5998,9 +5998,9 @@ function renderHtml(
       const btn = document.getElementById('btn-save-' + postId);
       if (btn) btn.innerText = post.isSaved ? '🔖' : '🏷️';
       if (post.isSaved) {
-        alert('Pinned to Local Merkle DAG Blockstore!\nCID: ' + post.mediaCid);
+        alert('Pinned to Local Merkle DAG Blockstore!\\nCID: ' + post.mediaCid);
       } else {
-        alert('Unpinned from Local Blockstore.\nTombstone scheduled for GC.');
+        alert('Unpinned from Local Blockstore.\\nTombstone scheduled for GC.');
       }
     }
 
@@ -6009,7 +6009,7 @@ function renderHtml(
       if (navigator.clipboard) {
         navigator.clipboard.writeText(did).catch(function() {});
       }
-      alert('🔑 Decentralized Identifier (DID) Copied!\n\n' + did + '\n\nVerified with Ed25519 public key.');
+      alert('🔑 Decentralized Identifier (DID) Copied!\\n\\n' + did + '\\n\\nVerified with Ed25519 public key.');
     }
 
     function switchProfileGridTab(tab) {
@@ -6032,7 +6032,7 @@ function renderHtml(
       var html = '';
       if (tab === 'posts') {
         html = feedPostsData.map(function(p) {
-          return '<div class="media-grid-item" style="background: ' + p.mediaGradient + ';" onclick="switchTab(\'feed\'); var c = document.getElementById(\'card-' + p.id + '\'); if(c) c.scrollIntoView({ behavior: \'smooth\' });">' +
+          return '<div class="media-grid-item" style="background: ' + p.mediaGradient + ';" onclick="switchTab(&quot;feed&quot;); var c = document.getElementById(&quot;card-' + p.id + '&quot;); if(c) c.scrollIntoView({ behavior: &quot;smooth&quot; });">' +
             '<div style="font-size: 2.2rem; pointer-events: none;">' + p.mediaEmoji + '</div>' +
             '<div class="media-hover-overlay">' +
               '<span>❤️ ' + p.likesCount + '</span>' +
@@ -6042,7 +6042,7 @@ function renderHtml(
         }).join('');
       } else if (tab === 'reels') {
         html = reelsData.map(function(r, idx) {
-          return '<div class="media-grid-item" style="background: ' + r.bgGradient + ';" onclick="switchTab(\'reels\'); currentReelIndex = ' + idx + '; renderCurrentReel();">' +
+          return '<div class="media-grid-item" style="background: ' + r.bgGradient + ';" onclick="switchTab(&quot;reels&quot;); currentReelIndex = ' + idx + '; renderCurrentReel();">' +
             '<div style="font-size: 2.2rem; pointer-events: none;">🎬</div>' +
             '<div class="media-hover-overlay">' +
               '<span>❤️ ' + r.likesCount + '</span>' +
@@ -6060,7 +6060,7 @@ function renderHtml(
           { emoji: '📊', name: 'CRDT Ledger', size: '1.2 MB', seeders: 12 }
         ];
         html = pinItems.map(function(pin) {
-          return '<div class="media-grid-item" style="background: linear-gradient(135deg, #1e1b4b, #312e81);" onclick="alert(\'Pinned Merkle DAG Block: ' + pin.name + '\\nSize: ' + pin.size + '\\nActive Seeders: ' + pin.seeders + '\')">' +
+          return '<div class="media-grid-item" style="background: linear-gradient(135deg, #1e1b4b, #312e81);" onclick="alert(&quot;Pinned Merkle DAG Block: ' + pin.name + '\\nSize: ' + pin.size + '\\nActive Seeders: ' + pin.seeders + '&quot;)">' +
             '<div style="text-align: center; pointer-events: none; padding: 0.5rem;">' +
               '<div style="font-size: 2rem;">' + pin.emoji + '</div>' +
               '<div style="font-size: 0.72rem; color: #cbd5e1; font-weight: 700; margin-top: 4px;">' + pin.name + '</div>' +
@@ -6088,7 +6088,7 @@ function renderHtml(
       if (sovEl) sovEl.innerText = walletBalanceSov.toFixed(2) + ' SOV';
       var fiatEl = document.getElementById('walletBalanceFiatDisplay');
       if (fiatEl) fiatEl.innerText = '≈ $' + (walletBalanceSov * 3.0).toFixed(2) + ' USD';
-      alert('Withdrawal Successful!\n\nTransferred ' + num.toFixed(2) + ' SOV to DID recipient.\nSigned with Ed25519 Device Key.\nRemaining Balance: ' + walletBalanceSov.toFixed(2) + ' SOV');
+      alert('Withdrawal Successful!\\n\\nTransferred ' + num.toFixed(2) + ' SOV to DID recipient.\\nSigned with Ed25519 Device Key.\\nRemaining Balance: ' + walletBalanceSov.toFixed(2) + ' SOV');
     }
 
     // ==========================================
@@ -6513,11 +6513,11 @@ function renderHtml(
               '<div class="sheet-comment-sub">' +
                 '<span>' + c.timeAgo + '</span>' +
                 '<span id="likes-' + c.id + '">' + c.likes + ' likes</span>' +
-                '<span style="color: #60a5fa; cursor: pointer;" onclick="appendCommentEmoji(\'❤️ \')">Reply</span>' +
+                '<span style="color: #60a5fa; cursor: pointer;" onclick="appendCommentEmoji(&quot;❤️ &quot;)">Reply</span>' +
                 '<span style="color: #34d399; font-size: 0.65rem;">● Ed25519 Verified</span>' +
               '</div>' +
             '</div>' +
-            '<button style="background: none; border: none; color: rgba(255,255,255,0.6); font-size: 0.85rem; cursor: pointer;" onclick="likeComment(\'' + c.id + '\')">🤍</button>' +
+            '<button style="background: none; border: none; color: rgba(255,255,255,0.6); font-size: 0.85rem; cursor: pointer;" onclick="likeComment(&quot;' + c.id + '&quot;)">🤍</button>' +
           '</div>'
         ).join('');
       }
@@ -6612,7 +6612,7 @@ function renderHtml(
       const hlContainer = document.getElementById('profileSheetHighlights');
       if (hlContainer) {
         hlContainer.innerHTML = p.highlights.map(h => 
-          '<div class="highlight-item" onclick="openStory(\'' + p.name + '\', \'Viewing highlight ' + h.name + '\', \'' + p.avatarBg + '\')">' +
+          '<div class="highlight-item" onclick="openStory(&quot;' + p.name + '&quot;, &quot;Viewing highlight ' + h.name + '&quot;, &quot;' + p.avatarBg + '&quot;)">' +
             '<div class="highlight-ring">' +
               '<div class="highlight-avatar">' + h.emoji + '</div>' +
             '</div>' +
@@ -6625,7 +6625,7 @@ function renderHtml(
       const gridContainer = document.getElementById('profileSheetGrid');
       if (gridContainer) {
         gridContainer.innerHTML = p.reels.map(gr => 
-          '<div class="profile-grid-tile" style="background: ' + gr.gradient + ';" onclick="closeReelsSheet(\'profileSheetOverlay\'); selectReelById(\'' + gr.id + '\')">' +
+          '<div class="profile-grid-tile" style="background: ' + gr.gradient + ';" onclick="closeReelsSheet(&quot;profileSheetOverlay&quot;); selectReelById(&quot;' + gr.id + '&quot;)">' +
             '<div class="tile-views-pill">▶ ' + gr.views + '</div>' +
           '</div>'
         ).join('');
@@ -6651,7 +6651,7 @@ function renderHtml(
       const r = reelsData[currentReelIndex];
       const link = 'https://sovra.network/@' + (r ? r.creatorHandle : 'creator');
       navigator.clipboard.writeText(link);
-      alert('Creator profile link copied to clipboard:\n' + link);
+      alert('Creator profile link copied to clipboard:\\n' + link);
     }
 
     function openReelShareSheet() {
@@ -6671,7 +6671,7 @@ function renderHtml(
       navigator.clipboard.writeText('ipfs://' + r.cid);
       r.sharesCount++;
       document.getElementById('reelShareCount').innerText = r.sharesCount;
-      alert('Decentralized CID copied to clipboard:\nipfs://' + r.cid);
+      alert('Decentralized CID copied to clipboard:\\nipfs://' + r.cid);
       closeReelsSheet('shareSheetOverlay');
     }
 
@@ -7040,9 +7040,9 @@ function renderHtml(
           
           bodyHtml = '<div class="voice-note-card" id="player-' + m.id + '">' +
             '<div class="voice-avatar-mic">🎙️</div>' +
-            '<button class="voice-play-btn" onclick="event.stopPropagation(); playVoiceWaveform(this, \'' + m.id + '\')">▶</button>' +
+            '<button class="voice-play-btn" onclick="event.stopPropagation(); playVoiceWaveform(this, &quot;' + m.id + '&quot;)">▶</button>' +
             '<div class="voice-waveform-bars" id="bars-' + m.id + '">' + barsHtml + '</div>' +
-            '<button class="voice-speed-pill" id="speed-' + m.id + '" onclick="event.stopPropagation(); cycleVoiceSpeed(this, \'' + m.id + '\')">1x</button>' +
+            '<button class="voice-speed-pill" id="speed-' + m.id + '" onclick="event.stopPropagation(); cycleVoiceSpeed(this, &quot;' + m.id + '&quot;)">1x</button>' +
             '<span style="font-size: 0.72rem; color: #cbd5e1; font-family: monospace;" id="time-' + m.id + '">' + m.audioDurationSec.toFixed(1) + 's</span>' +
             '</div>';
         } else {
@@ -7051,25 +7051,25 @@ function renderHtml(
 
         // Reaction dock on hover
         const reactionsDock = '<div class="bubble-reactions-bar" onclick="event.stopPropagation()">' +
-          '<button class="reaction-emoji-btn" onclick="reactToMessage(\'' + m.id + '\', \'❤️\')">❤️</button>' +
-          '<button class="reaction-emoji-btn" onclick="reactToMessage(\'' + m.id + '\', \'👍\')">👍</button>' +
-          '<button class="reaction-emoji-btn" onclick="reactToMessage(\'' + m.id + '\', \'😂\')">😂</button>' +
-          '<button class="reaction-emoji-btn" onclick="reactToMessage(\'' + m.id + '\', \'😮\')">😮</button>' +
-          '<button class="reaction-emoji-btn" onclick="reactToMessage(\'' + m.id + '\', \'😢\')">😢</button>' +
-          '<button class="reaction-emoji-btn" onclick="reactToMessage(\'' + m.id + '\', \'🙏\')">🙏</button>' +
+          '<button class="reaction-emoji-btn" onclick="reactToMessage(&quot;' + m.id + '&quot;, &quot;❤️&quot;)">❤️</button>' +
+          '<button class="reaction-emoji-btn" onclick="reactToMessage(&quot;' + m.id + '&quot;, &quot;👍&quot;)">👍</button>' +
+          '<button class="reaction-emoji-btn" onclick="reactToMessage(&quot;' + m.id + '&quot;, &quot;😂&quot;)">😂</button>' +
+          '<button class="reaction-emoji-btn" onclick="reactToMessage(&quot;' + m.id + '&quot;, &quot;😮&quot;)">😮</button>' +
+          '<button class="reaction-emoji-btn" onclick="reactToMessage(&quot;' + m.id + '&quot;, &quot;😢&quot;)">😢</button>' +
+          '<button class="reaction-emoji-btn" onclick="reactToMessage(&quot;' + m.id + '&quot;, &quot;🙏&quot;)">🙏</button>' +
           '</div>';
 
         // Attached reaction pill
         let reactionPill = '';
         if (m.reactions && m.reactions.length > 0) {
           const topEmoji = m.reactions[0].emoji;
-          reactionPill = '<div class="bubble-reaction-pill" onclick="event.stopPropagation(); removeReaction(\'' + m.id + '\')">' +
+          reactionPill = '<div class="bubble-reaction-pill" onclick="event.stopPropagation(); removeReaction(&quot;' + m.id + '&quot;)">' +
             topEmoji + ' ' + m.reactions.length + '</div>';
         }
 
         const timeStr = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        return '<div class="' + bubbleClass + '" id="bubble-' + m.id + '" onclick="openMessageInfoModal(\'' + m.id + '\')">' +
+        return '<div class="' + bubbleClass + '" id="bubble-' + m.id + '" onclick="openMessageInfoModal(&quot;' + m.id + '&quot;)">' +
           reactionsDock +
           bodyHtml +
           '<div class="bubble-meta">' +
@@ -7957,7 +7957,7 @@ function renderHtml(
       if (!v) return;
       const link = 'ipfs://' + v.cid;
       navigator.clipboard.writeText(link);
-      alert('Decentralized 4K Video CID copied to clipboard:\n' + link + '\n\nCan be retrieved on any Sovra or IPFS BitSwap node worldwide.');
+      alert('Decentralized 4K Video CID copied to clipboard:\\n' + link + '\\n\\nCan be retrieved on any Sovra or IPFS BitSwap node worldwide.');
     }
 
     function pinVideoToLocalBlockstore() {
@@ -8052,20 +8052,20 @@ function renderHtml(
         container.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">' +
           '<span style="font-weight: 700; color: #fff;">Videos (4)</span>' +
           '<div style="display: flex; gap: 0.35rem;">' +
-            '<button class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="alert(\'Sorted by Latest (HLC order)\')">Latest</button>' +
-            '<button class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="alert(\'Sorted by Popular (BitSwap swarm seeds)\')">Popular</button>' +
+            '<button class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="alert(&quot;Sorted by Latest (HLC order)&quot;)">Latest</button>' +
+            '<button class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="alert(&quot;Sorted by Popular (BitSwap swarm seeds)&quot;)">Popular</button>' +
           '</div>' +
         '</div>' +
         '<div style="display: flex; flex-direction: column; gap: 0.4rem;">' +
-          '<div style="background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeYtModal(\'channelProfileModal\'); renderYtVideo(0, true);">' +
+          '<div style="background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeYtModal(&quot;channelProfileModal&quot;); renderYtVideo(0, true);">' +
             '<span>🎬 4K HLS Master Stream</span>' +
             '<span style="color: #34d399; font-size: 0.72rem;">284K views &bull; 4K UHD</span>' +
           '</div>' +
-          '<div style="background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeYtModal(\'channelProfileModal\'); renderYtVideo(1, true);">' +
+          '<div style="background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeYtModal(&quot;channelProfileModal&quot;); renderYtVideo(1, true);">' +
             '<span>⚡ Cell Carrier NAT Penetration</span>' +
             '<span style="color: #34d399; font-size: 0.72rem;">92K views &bull; 1080p60</span>' +
           '</div>' +
-          '<div style="background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeYtModal(\'channelProfileModal\'); renderYtVideo(2, true);">' +
+          '<div style="background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeYtModal(&quot;channelProfileModal&quot;); renderYtVideo(2, true);">' +
             '<span>🎵 Spatial Multi-Track Audio Master</span>' +
             '<span style="color: #34d399; font-size: 0.72rem;">64K views &bull; FLAC 24-bit</span>' +
           '</div>' +
@@ -8271,14 +8271,14 @@ function renderHtml(
                 '</div>' +
                 '<div style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.35; margin-top: 0.15rem;">' + r.text + '</div>' +
                 '<div style="display: flex; align-items: center; gap: 0.65rem; font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">' +
-                  '<span style="cursor: pointer;" onclick="likeNestedReply(\'' + c.id + '\', \'' + r.id + '\')">👍 ' + r.likes + '</span>' +
+                  '<span style="cursor: pointer;" onclick="likeNestedReply(&quot;' + c.id + '&quot;, &quot;' + r.id + '&quot;)">👍 ' + r.likes + '</span>' +
                   '<span style="color: #34d399; font-size: 0.65rem;">● Ed25519 Verified</span>' +
                 '</div>' +
               '</div>' +
             '</div>'
           ).join('');
 
-          repliesHtml = '<button class="btn-toggle-replies" onclick="toggleRepliesThread(\'' + c.id + '\')" id="btn-toggle-' + c.id + '">' +
+          repliesHtml = '<button class="btn-toggle-replies" onclick="toggleRepliesThread(&quot;' + c.id + '&quot;)" id="btn-toggle-' + c.id + '">' +
             '▾ ' + c.replies.length + (c.replies.length === 1 ? ' reply' : ' replies') +
             '</button>' +
             '<div class="yt-replies-list" id="replies-list-' + c.id + '" style="display: block;">' +
@@ -8297,17 +8297,17 @@ function renderHtml(
               '</div>' +
               '<div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.4; margin-top: 0.25rem;">' + c.text + '</div>' +
               '<div style="display: flex; align-items: center; gap: 0.85rem; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">' +
-                '<span style="cursor: pointer;" onclick="likeYtComment(\'' + c.id + '\')">👍 <span id="like-cnt-' + c.id + '">' + c.likes + '</span></span>' +
+                '<span style="cursor: pointer;" onclick="likeYtComment(&quot;' + c.id + '&quot;)">👍 <span id="like-cnt-' + c.id + '">' + c.likes + '</span></span>' +
                 '<span style="cursor: pointer;">👎</span>' +
-                '<span style="cursor: pointer; font-weight: 700; color: #38bdf8;" onclick="toggleReplyBox(\'' + c.id + '\')">Reply</span>' +
+                '<span style="cursor: pointer; font-weight: 700; color: #38bdf8;" onclick="toggleReplyBox(&quot;' + c.id + '&quot;)">Reply</span>' +
               '</div>' +
             '</div>' +
           '</div>' +
           '<div class="reply-composer-box" id="reply-box-' + c.id + '">' +
             '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
-              '<input type="text" id="reply-input-' + c.id + '" class="chat-text-input" placeholder="Add a public reply..." style="flex: 1;" onkeydown="if(event.key===\'Enter\') submitNestedReply(\'' + c.id + '\')">' +
-              '<button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="toggleReplyBox(\'' + c.id + '\')">Cancel</button>' +
-              '<button class="btn btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.75rem;" onclick="submitNestedReply(\'' + c.id + '\')">Reply</button>' +
+              '<input type="text" id="reply-input-' + c.id + '" class="chat-text-input" placeholder="Add a public reply..." style="flex: 1;" onkeydown="if(event.key===&quot;Enter&quot;) submitNestedReply(&quot;' + c.id + '&quot;)">' +
+              '<button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="toggleReplyBox(&quot;' + c.id + '&quot;)">Cancel</button>' +
+              '<button class="btn btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.75rem;" onclick="submitNestedReply(&quot;' + c.id + '&quot;)">Reply</button>' +
             '</div>' +
           '</div>' +
           repliesHtml +
