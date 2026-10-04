@@ -8,6 +8,7 @@ import {
 } from '@sovra/storage';
 
 export type { VideoResolution };
+export * from './pipeline.js';
 
 export interface TranscodeJob {
   readonly jobId: string;

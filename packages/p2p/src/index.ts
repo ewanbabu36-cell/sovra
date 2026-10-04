@@ -19,3 +19,5 @@ export * from './relay-v2.js';
 export * from './light-client.js';
 export * from './chameleon.js';
 export * from './delay-skew.js';
+export * from './bootstrap-seeds.js';
+
