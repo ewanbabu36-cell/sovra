@@ -1,0 +1,44 @@
+# ============================================================
+#   SOVRA GLOBAL BOOTSTRAP SEED NODE DOCKERFILE
+# ============================================================
+
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+# Install pnpm & dependencies
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/ ./packages/
+COPY nodes/ ./nodes/
+COPY services/ ./services/
+COPY apps/ ./apps/
+COPY scripts/ ./scripts/
+
+RUN pnpm install --frozen-lockfile
+RUN pnpm -r run build
+
+# Production Runtime Image
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY --from=builder /app /app
+
+ENV NODE_ENV=production
+ENV SOVRA_P2P_PORT=4001
+ENV SOVRA_P2P_HOST=0.0.0.0
+ENV SOVRA_HTTP_PORT=8080
+ENV SOVRA_DATA_DIR=/app/data
+
+VOLUME ["/app/data"]
+
+EXPOSE 4001 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/health || exit 1
+
+CMD ["node", "--experimental-strip-types", "scripts/bootstrap-node.ts"]

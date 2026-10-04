@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  sovra-seed:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.seed
+    container_name: sovra-bootstrap-seed
+    restart: unless-stopped
+    ports:
+      - "4001:4001"      # Noise_XX TCP Port
+      - "8080:8080"      # HTTP Health & Prometheus Metrics
+    environment:
+      - SOVRA_P2P_PORT=4001
+      - SOVRA_P2P_HOST=0.0.0.0
+      - SOVRA_HTTP_PORT=8080
+      - SOVRA_DATA_DIR=/app/data
+      - SOVRA_PUBLIC_IP=${PUBLIC_IP:-127.0.0.1}
+    volumes:
+      - sovra-seed-data:/app/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  sovra-seed-data:
+    driver: local
