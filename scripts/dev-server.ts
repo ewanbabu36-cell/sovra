@@ -1294,13 +1294,27 @@ function renderHtml(
     
     .container {
       max-width: 1200px;
-      margin: 2rem auto;
+      margin: 1.5rem auto 5rem auto;
       padding: 0 1rem;
       width: 100%;
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .feed-container {
+      max-width: 630px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .admin-layout {
       display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: 2rem;
+      grid-template-columns: 320px 1fr;
+      gap: 1.5rem;
+      width: 100%;
     }
     .mobile-chat-back-btn {
       display: none;
@@ -1322,14 +1336,16 @@ function renderHtml(
     }
     @media (max-width: 860px) {
       .container {
-        grid-template-columns: 1fr;
         margin: 0 auto 5rem auto;
         padding: 0;
         gap: 0;
         max-width: 100%;
       }
+      .admin-layout {
+        grid-template-columns: 1fr;
+      }
       .sidebar {
-        display: none !important;
+        width: 100%;
       }
       .nav-tabs {
         display: none !important;
@@ -3965,98 +3981,6 @@ function renderHtml(
   </header>
 
   <div class="container">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="card">
-        <div class="card-title">Cryptographic Identity</div>
-        <div class="key-val">
-          <span class="key-label">Decentralized DID</span>
-          <span class="key-data">${masterKey.did}</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Peer ID (libp2p)</span>
-          <span class="key-data">${binding.peerId}</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Device Key (Ed25519)</span>
-          <span class="key-data">${binding.devicePublicKeyHex.substring(0, 24)}...</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Transport Protocol</span>
-          <span class="key-data">Noise_XX + Yamux (TCP)</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Creator Mode</div>
-        <div style="font-size: 0.8rem; color: var(--text-muted);">
-          Enable Creator Mode directly inside this app. No secondary identity required.
-        </div>
-        <div class="toggle-row">
-          <span style="font-weight: 600; font-size: 0.85rem;" id="creatorStatusText">${isCreatorModeActive ? 'Studio Active' : 'Consumer Mode'}</span>
-          <label class="switch">
-            <input type="checkbox" id="creatorToggle" ${isCreatorModeActive ? 'checked' : ''} onchange="toggleCreatorMode(this.checked)">
-            <span class="slider"></span>
-          </label>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Digital Wellbeing</div>
-        <div class="key-val">
-          <span class="key-label">Daily Screen-Time Limit</span>
-          <span class="key-data">${screenTimeLimitMinutes} mins / day</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Quiet Hours (Protected)</span>
-          <span class="key-data">22:00 — 07:00</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Distributed Storage & BitSwap</div>
-        <div class="key-val">
-          <span class="key-label">Storage Topology</span>
-          <span class="key-data">UnixFS Merkle DAG</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Block Addressing</span>
-          <span class="key-data">Deterministic CIDv1</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Wire Protocol</span>
-          <span class="key-data">/sovra/bitswap/1.2.0</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Local Blockstore</span>
-          <span class="key-data">${storageDaemon.getStats().totalBlocks} Blocks (${storageDaemon.getStats().pinnedCount} Pinned)</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-          <span>Social Graph (Phase 5)</span>
-          <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">LWW ACID SQLite</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Following</span>
-          <span class="key-data" id="followingCount" style="color: #60a5fa; font-weight: bold;">${socialGraph.getFollowing(masterKey.did).length}</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Locally Blocked</span>
-          <span class="key-data" id="blockedCount" style="color: #f87171; font-weight: bold;">${socialGraph.getBlockedUsers(masterKey.did).length}</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Locally Muted</span>
-          <span class="key-data" id="mutedCount" style="color: #fbbf24; font-weight: bold;">${socialGraph.getMutedUsers(masterKey.did).length}</span>
-        </div>
-        <div class="key-val">
-          <span class="key-label">Feed Neutrality</span>
-          <span class="key-data" style="color: #34d399;">100% Chronological</span>
-        </div>
-      </div>
-    </aside>
-
     <!-- Tab 1: Instagram Main Feed (Stories, Photo Stream, Double-Tap Hearts) -->
     <main class="main-content" id="feed-view" style="display: flex;">
       <div class="feed-container">
@@ -5428,43 +5352,140 @@ function renderHtml(
       </div>
     </main>
 
-    <!-- Main Section: Product B (Admin Console) -->
-    <main class="main-content admin-view" id="admin-view">
-      <div class="notice-banner">
-        🛡️ <strong>Decentralized Independence Notice:</strong> This company operations console is an auxiliary tool for Sovra company staff. The Sovra decentralized mesh, end-user messaging, creator studio, and identity layers continue operating autonomously with <strong>zero runtime dependency</strong> on this admin console.
-      </div>
+    <!-- Main Section: Product B (Admin Console & Node Ops) -->
+    <main class="main-content admin-view" id="admin-view" style="display: none; width: 100%;">
+      <div class="admin-layout">
+        <!-- Technical Node & Identity Sidebar -->
+        <aside class="sidebar">
+          <div class="card">
+            <div class="card-title">Cryptographic Identity</div>
+            <div class="key-val">
+              <span class="key-label">Decentralized DID</span>
+              <span class="key-data">${masterKey.did}</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Peer ID (libp2p)</span>
+              <span class="key-data">${binding.peerId}</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Device Key (Ed25519)</span>
+              <span class="key-data">${binding.devicePublicKeyHex.substring(0, 24)}...</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Transport Protocol</span>
+              <span class="key-data">Noise_XX + Yamux (TCP)</span>
+            </div>
+          </div>
 
-      <div class="admin-grid">
-        <div class="stat-card">
-          <div class="card-title">Connected Peers</div>
-          <div class="stat-val">1 Local Direct</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">Autonomous Kademlia DHT routing table</div>
-        </div>
-        <div class="stat-card">
-          <div class="card-title">P2P PubSub Topics</div>
-          <div class="stat-val">2 Active</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">GossipSub v1.2 mesh active</div>
-        </div>
-        <div class="stat-card">
-          <div class="card-title">Security & Crypto</div>
-          <div class="stat-val">Noise_XX</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">ChaCha20-Poly1305 + 12-byte Yamux</div>
-        </div>
-        <div class="stat-card">
-          <div class="card-title">Admin Decoupling</div>
-          <div class="stat-val" style="color: #10b981;">100% Isolated</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">P2P protocol has zero admin dependencies</div>
-        </div>
-      </div>
+          <div class="card">
+            <div class="card-title">Creator Mode</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+              Enable Creator Mode directly inside this app. No secondary identity required.
+            </div>
+            <div class="toggle-row">
+              <span style="font-weight: 600; font-size: 0.85rem;" id="creatorStatusText">${isCreatorModeActive ? 'Studio Active' : 'Consumer Mode'}</span>
+              <label class="switch">
+                <input type="checkbox" id="creatorToggle" ${isCreatorModeActive ? 'checked' : ''} onchange="toggleCreatorMode(this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
 
-      <div class="card">
-        <div class="card-title">Internal Operations & RBAC Audit Stream</div>
-        <div style="font-family: monospace; font-size: 0.8rem; line-height: 1.8; color: #9ca3af;">
-          <div>[INFO] Decentralized P2P node bound to OS TCP port :${tcpPort}</div>
-          <div>[INFO] Cryptographic identity generated: ${masterKey.did}</div>
-          <div>[INFO] Noise_XX mutual authentication cipher state initialized</div>
-          <div>[INFO] Kademlia DHT bucket routing engine active (alpha=3)</div>
-          <div>[INFO] GossipSub v1.2 heartbeat loop healthy (D=6, 4<=D<=12)</div>
+          <div class="card">
+            <div class="card-title">Digital Wellbeing</div>
+            <div class="key-val">
+              <span class="key-label">Daily Screen-Time Limit</span>
+              <span class="key-data">${screenTimeLimitMinutes} mins / day</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Quiet Hours (Protected)</span>
+              <span class="key-data">22:00 — 07:00</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Distributed Storage & BitSwap</div>
+            <div class="key-val">
+              <span class="key-label">Storage Topology</span>
+              <span class="key-data">UnixFS Merkle DAG</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Block Addressing</span>
+              <span class="key-data">Deterministic CIDv1</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Wire Protocol</span>
+              <span class="key-data">/sovra/bitswap/1.2.0</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Local Blockstore</span>
+              <span class="key-data">${storageDaemon.getStats().totalBlocks} Blocks (${storageDaemon.getStats().pinnedCount} Pinned)</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Social Graph (Phase 5)</span>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">LWW ACID SQLite</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Following</span>
+              <span class="key-data" id="followingCount" style="color: #60a5fa; font-weight: bold;">${socialGraph.getFollowing(masterKey.did).length}</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Locally Blocked</span>
+              <span class="key-data" id="blockedCount" style="color: #f87171; font-weight: bold;">${socialGraph.getBlockedUsers(masterKey.did).length}</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Locally Muted</span>
+              <span class="key-data" id="mutedCount" style="color: #fbbf24; font-weight: bold;">${socialGraph.getMutedUsers(masterKey.did).length}</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Feed Neutrality</span>
+              <span class="key-data" style="color: #34d399;">100% Chronological</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Ops Console Main Metrics & Audit Stream -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; flex: 1;">
+          <div class="notice-banner">
+            🛡️ <strong>Decentralized Independence Notice:</strong> This company operations console is an auxiliary tool for Sovra company staff. The Sovra decentralized mesh, end-user messaging, creator studio, and identity layers continue operating autonomously with <strong>zero runtime dependency</strong> on this admin console.
+          </div>
+
+          <div class="admin-grid">
+            <div class="stat-card">
+              <div class="card-title">Connected Peers</div>
+              <div class="stat-val">1 Local Direct</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">Autonomous Kademlia DHT routing table</div>
+            </div>
+            <div class="stat-card">
+              <div class="card-title">P2P PubSub Topics</div>
+              <div class="stat-val">2 Active</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">GossipSub v1.2 mesh active</div>
+            </div>
+            <div class="stat-card">
+              <div class="card-title">Security & Crypto</div>
+              <div class="stat-val">Noise_XX</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">ChaCha20-Poly1305 + 12-byte Yamux</div>
+            </div>
+            <div class="stat-card">
+              <div class="card-title">Admin Decoupling</div>
+              <div class="stat-val" style="color: #10b981;">100% Isolated</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">P2P protocol has zero admin dependencies</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Internal Operations & RBAC Audit Stream</div>
+            <div style="font-family: monospace; font-size: 0.8rem; line-height: 1.8; color: #9ca3af;">
+              <div>[INFO] Decentralized P2P node bound to OS TCP port :${tcpPort}</div>
+              <div>[INFO] Cryptographic identity generated: ${masterKey.did}</div>
+              <div>[INFO] Noise_XX mutual authentication cipher state initialized</div>
+              <div>[INFO] Kademlia DHT bucket routing engine active (alpha=3)</div>
+              <div>[INFO] GossipSub v1.2 heartbeat loop healthy (D=6, 4<=D<=12)</div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
