@@ -1316,6 +1316,18 @@ function renderHtml(
       gap: 1.5rem;
       width: 100%;
     }
+    .profile-settings-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      width: 100%;
+    }
+    @media (max-width: 960px) {
+      .profile-settings-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     .mobile-chat-back-btn {
       display: none;
       background: none;
@@ -5228,6 +5240,71 @@ function renderHtml(
           </div>
         </div>
 
+        <!-- Settings & Cryptographic Identity Cards (Relocated from Feed to Me Profile) -->
+        <div class="profile-settings-grid" id="profileSettingsGrid">
+          <!-- Card 1: Cryptographic Identity -->
+          <div class="card" style="border-radius: 14px;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>🔑 Cryptographic Identity</span>
+              <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Noise_XX</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Decentralized DID</span>
+              <span class="key-data" style="cursor: pointer;" onclick="copyProfileDid()" title="Click to copy">${masterKey.did}</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Peer ID (libp2p)</span>
+              <span class="key-data">${binding.peerId}</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Device Key (Ed25519)</span>
+              <span class="key-data">${binding.devicePublicKeyHex.substring(0, 24)}...</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Transport Protocol</span>
+              <span class="key-data">Noise_XX + Yamux (TCP)</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Creator Mode Toggle -->
+          <div class="card" style="border-radius: 14px;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>🎨 Creator Mode</span>
+              <span class="badge badge-creator" id="creatorStatusBadge">${isCreatorModeActive ? 'Studio Active' : 'Consumer Mode'}</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              Enable Creator Studio &amp; BitSwap seeding tools directly in this app.
+            </div>
+            <div class="toggle-row">
+              <span style="font-weight: 600; font-size: 0.85rem;" id="creatorStatusText">${isCreatorModeActive ? 'Studio Active' : 'Consumer Mode'}</span>
+              <label class="switch">
+                <input type="checkbox" id="creatorToggle" ${isCreatorModeActive ? 'checked' : ''} onchange="toggleCreatorMode(this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Card 3: Digital Wellbeing & Screen Limit -->
+          <div class="card" style="border-radius: 14px;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>⏳ Digital Wellbeing</span>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Protected</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Daily Screen-Time Limit</span>
+              <span class="key-data">${screenTimeLimitMinutes} mins / day</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Quiet Hours (Protected)</span>
+              <span class="key-data">22:00 — 07:00</span>
+            </div>
+            <div class="key-val">
+              <span class="key-label">Screen Time Today</span>
+              <span class="key-data" style="color: #34d399;">18 mins (42 mins remaining)</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Sovereign Bandwidth & Creator Wallet Card -->
         <div class="sovereign-wallet-card">
           <div class="wallet-header">
@@ -5312,7 +5389,7 @@ function renderHtml(
         </div>
 
         <!-- Creator Studio & Merkle DAG Ingestion Section -->
-        <div class="card" style="padding: 1.25rem; border-radius: 16px; border-color: rgba(99, 102, 241, 0.35);">
+        <div class="card" id="creatorStudioSection" style="padding: 1.25rem; border-radius: 16px; border-color: rgba(99, 102, 241, 0.35); display: ${isCreatorModeActive ? 'block' : 'none'};">
           <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
             <span style="display: flex; align-items: center; gap: 0.5rem;">✨ <span>Creator Studio &amp; Storage Daemon</span></span>
             <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">BitSwap + Merkle DAG Active</span>
@@ -5355,54 +5432,8 @@ function renderHtml(
     <!-- Main Section: Product B (Admin Console & Node Ops) -->
     <main class="main-content admin-view" id="admin-view" style="display: none; width: 100%;">
       <div class="admin-layout">
-        <!-- Technical Node & Identity Sidebar -->
+        <!-- Technical Node Infrastructure Sidebar -->
         <aside class="sidebar">
-          <div class="card">
-            <div class="card-title">Cryptographic Identity</div>
-            <div class="key-val">
-              <span class="key-label">Decentralized DID</span>
-              <span class="key-data">${masterKey.did}</span>
-            </div>
-            <div class="key-val">
-              <span class="key-label">Peer ID (libp2p)</span>
-              <span class="key-data">${binding.peerId}</span>
-            </div>
-            <div class="key-val">
-              <span class="key-label">Device Key (Ed25519)</span>
-              <span class="key-data">${binding.devicePublicKeyHex.substring(0, 24)}...</span>
-            </div>
-            <div class="key-val">
-              <span class="key-label">Transport Protocol</span>
-              <span class="key-data">Noise_XX + Yamux (TCP)</span>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Creator Mode</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">
-              Enable Creator Mode directly inside this app. No secondary identity required.
-            </div>
-            <div class="toggle-row">
-              <span style="font-weight: 600; font-size: 0.85rem;" id="creatorStatusText">${isCreatorModeActive ? 'Studio Active' : 'Consumer Mode'}</span>
-              <label class="switch">
-                <input type="checkbox" id="creatorToggle" ${isCreatorModeActive ? 'checked' : ''} onchange="toggleCreatorMode(this.checked)">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Digital Wellbeing</div>
-            <div class="key-val">
-              <span class="key-label">Daily Screen-Time Limit</span>
-              <span class="key-data">${screenTimeLimitMinutes} mins / day</span>
-            </div>
-            <div class="key-val">
-              <span class="key-label">Quiet Hours (Protected)</span>
-              <span class="key-data">22:00 — 07:00</span>
-            </div>
-          </div>
-
           <div class="card">
             <div class="card-title">Distributed Storage & BitSwap</div>
             <div class="key-val">
