@@ -1190,6 +1190,239 @@ async function bootstrapLocalNode() {
   };
 }
 
+const SOVRA_SVG_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="sovraBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f19"/>
+      <stop offset="50%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+    <linearGradient id="sovraGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <linearGradient id="sovraAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <filter id="p2pGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#sovraBg)"/>
+  <rect width="510" height="510" x="1" y="1" rx="111" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="rgba(99,102,241,0.22)" stroke-width="3" stroke-dasharray="8 12"/>
+  <circle cx="256" cy="96" r="14" fill="#6366f1" filter="url(#p2pGlow)"/>
+  <circle cx="394" cy="176" r="12" fill="#8b5cf6"/>
+  <circle cx="394" cy="336" r="14" fill="#10b981" filter="url(#p2pGlow)"/>
+  <circle cx="256" cy="416" r="12" fill="#06b6d4"/>
+  <circle cx="118" cy="336" r="14" fill="#ec4899" filter="url(#p2pGlow)"/>
+  <circle cx="118" cy="176" r="12" fill="#6366f1"/>
+  <path d="M 335 175 C 335 175 220 160 200 220 C 180 275 330 255 315 320 C 300 375 190 355 180 345" 
+        fill="none" stroke="url(#sovraGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" filter="url(#p2pGlow)"/>
+  <circle cx="256" cy="256" r="20" fill="url(#sovraAccent)" filter="url(#p2pGlow)"/>
+</svg>`;
+
+const SOVRA_PWA_MANIFEST = {
+  name: 'Sovra — Sovereign Social Network',
+  short_name: 'Sovra',
+  description: 'Decentralized, Peer-to-Peer Sovereign Social & Creator Platform',
+  start_url: '/',
+  id: '/',
+  scope: '/',
+  display: 'standalone',
+  background_color: '#090d16',
+  theme_color: '#090d16',
+  orientation: 'portrait-primary',
+  categories: ['social', 'entertainment', 'news'],
+  icons: [
+    {
+      src: '/icon.svg',
+      sizes: 'any',
+      type: 'image/svg+xml',
+      purpose: 'any',
+    },
+    {
+      src: '/icon-192.png',
+      sizes: '192x192',
+      type: 'image/svg+xml',
+      purpose: 'any',
+    },
+    {
+      src: '/icon-512.png',
+      sizes: '512x512',
+      type: 'image/svg+xml',
+      purpose: 'any',
+    },
+    {
+      src: '/icon-maskable.png',
+      sizes: '512x512',
+      type: 'image/svg+xml',
+      purpose: 'maskable',
+    },
+  ],
+  shortcuts: [
+    {
+      name: 'Home Feed',
+      short_name: 'Feed',
+      description: 'Open real-time decentralized feed',
+      url: '/#feed',
+      icons: [{ src: '/icon.svg', sizes: '96x96' }],
+    },
+    {
+      name: 'Reels & Watch',
+      short_name: 'Watch',
+      description: 'Watch decentralized 4K P2P videos',
+      url: '/#watch',
+      icons: [{ src: '/icon.svg', sizes: '96x96' }],
+    },
+    {
+      name: 'P2P Encrypted Chats',
+      short_name: 'Chats',
+      description: 'Open end-to-end encrypted direct chats',
+      url: '/#chats',
+      icons: [{ src: '/icon.svg', sizes: '96x96' }],
+    },
+  ],
+};
+
+const SOVRA_SERVICE_WORKER_SCRIPT = `const CACHE_NAME = 'sovra-pwa-v1';
+const STATIC_ASSETS = [
+  '/',
+  '/manifest.webmanifest',
+  '/manifest.json',
+  '/icon.svg',
+  '/icon-192.png',
+  '/icon-512.png'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_ASSETS).catch((err) => {
+        console.warn('[SW] Cache addAll warning:', err);
+      });
+    })
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  if (req.method !== 'GET') {
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(req).catch(() => {
+        return new Response(
+          JSON.stringify({ ok: false, offline: true, error: 'Offline mode active - peer connected via local cache' }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      })
+    );
+    return;
+  }
+
+  if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(req)
+        .then((networkRes) => {
+          if (networkRes && networkRes.status === 200) {
+            const resClone = networkRes.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/', resClone));
+          }
+          return networkRes;
+        })
+        .catch(async () => {
+          const cached = await caches.match('/');
+          if (cached) return cached;
+          return new Response('<!DOCTYPE html><html><head><title>Sovra Offline</title></head><body style="background:#090d16;color:#fff;font-family:sans-serif;text-align:center;padding:50px;"><h1>⚡ Sovra Mesh Offline</h1><p>Operating in disconnected local mode. Please reconnect or check local peers.</p></body></html>', {
+            headers: { 'Content-Type': 'text/html' }
+          });
+        })
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) {
+        return cached;
+      }
+      return fetch(req).then((networkRes) => {
+        if (networkRes && networkRes.status === 200) {
+          const resClone = networkRes.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
+        }
+        return networkRes;
+      }).catch(() => {
+        return new Response('', { status: 404 });
+      });
+    })
+  );
+});
+
+self.addEventListener('push', (event) => {
+  let payload = { title: 'Sovra Network', body: 'New peer activity on GossipSub' };
+  try {
+    if (event.data) {
+      payload = event.data.json();
+    }
+  } catch {
+    if (event.data) payload.body = event.data.text();
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: '/icon.svg',
+      badge: '/icon.svg',
+      vibrate: [100, 50, 100],
+      data: { url: payload.url || '/' }
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(event.notification.data?.url || '/');
+      }
+    })
+  );
+});
+`;
+
 function renderHtml(
   binding: PeerIdentityBinding,
   masterKey: SovraIdentityKey,
@@ -1203,8 +1436,18 @@ function renderHtml(
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Sovra — Decentralized Social Platform</title>
+  <meta name="theme-color" content="#090d16">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sovra">
+  <meta name="application-name" content="Sovra">
+  <meta name="description" content="Decentralized Sovereign Social Network & Creator Platform">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/icon.svg">
   <style>
     :root {
       --bg: #090d16;
@@ -5543,6 +5786,9 @@ function renderHtml(
             <button class="btn btn-secondary" style="border-color: rgba(255,255,255,0.2); border-radius: 8px; padding: 0.65rem 1.25rem;" onclick="openOmniSearch()">
               🔍 Omni-Search
             </button>
+            <button id="pwaMeInstallBtn" class="btn btn-secondary" style="border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.12); color: #a5b4fc; border-radius: 8px; padding: 0.65rem 1.25rem; font-weight: 700;" onclick="triggerPwaInstall()">
+              📱 Install App (PWA)
+            </button>
           </div>
         </div>
 
@@ -6267,6 +6513,26 @@ function renderHtml(
           <button onclick="submitSafetyReport()" class="action-pill-btn action-pill-danger" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.85rem;">Submit Ticket 🚨</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 📱 PWA OFFLINE INDICATOR PILL -->
+  <div id="offlineIndicatorPill" style="display: none; position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 10000; background: rgba(239, 68, 68, 0.95); backdrop-filter: blur(8px); color: #fff; padding: 6px 14px; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.5); align-items: center; gap: 6px;">
+    <span>⚡</span> <span>Offline Mode — Browsing Cached Mesh</span>
+  </div>
+
+  <!-- 📱 PWA INSTALL FLOATING BANNER -->
+  <div id="pwaInstallBanner" style="display: none; position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 480px; z-index: 9999; background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(17, 24, 39, 0.98)); backdrop-filter: blur(12px); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 14px; padding: 12px 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 20px rgba(99, 102, 241, 0.2); align-items: center; justify-content: space-between; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; color: #fff; flex-shrink: 0; box-shadow: 0 2px 8px rgba(99,102,241,0.4);">S</div>
+      <div>
+        <div style="font-weight: 700; font-size: 0.85rem; color: #fff;">Install Sovra App</div>
+        <div style="font-size: 0.72rem; color: #94a3b8;">Fast, P2P &amp; 100% Offline Capable</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button id="pwaInstallDismissBtn" onclick="dismissPwaPrompt()" style="background: rgba(255, 255, 255, 0.08); border: none; color: #cbd5e1; font-size: 0.75rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; cursor: pointer;">Later</button>
+      <button id="pwaInstallActionBtn" onclick="triggerPwaInstall()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; font-size: 0.75rem; font-weight: 700; padding: 6px 14px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);">Install</button>
     </div>
   </div>
 
@@ -9582,6 +9848,89 @@ function renderHtml(
       closeSafetyReportModal();
       alert('✅ Cryptographic Report #' + ticketId + ' registered on the Mesh Dispute Ledger!\nReason: ' + reason.toUpperCase() + '\nA jury of 5 neutral high-reputation nodes has been assigned.');
     }
+
+    // ==========================================
+    // 📱 PROGRESSIVE WEB APP (PWA) & SERVICE WORKER ENGINE
+    // ==========================================
+    let deferredInstallPrompt = null;
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function(reg) {
+            console.log('[PWA] Service Worker registered successfully! Scope:', reg.scope);
+          })
+          .catch(function(err) {
+            console.warn('[PWA] Service Worker registration failed:', err);
+          });
+      });
+    }
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner && !sessionStorage.getItem('pwa_dismissed')) {
+        banner.style.display = 'flex';
+      }
+      const pwaMeBtn = document.getElementById('pwaMeInstallBtn');
+      if (pwaMeBtn) pwaMeBtn.style.display = 'inline-flex';
+    });
+
+    window.addEventListener('appinstalled', function() {
+      deferredInstallPrompt = null;
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner) banner.style.display = 'none';
+      const pwaMeBtn = document.getElementById('pwaMeInstallBtn');
+      if (pwaMeBtn) {
+        pwaMeBtn.innerText = '✓ App Installed';
+        pwaMeBtn.disabled = true;
+      }
+      console.log('[PWA] Sovra successfully installed on device!');
+    });
+
+    function triggerPwaInstall() {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.then(function(choiceResult) {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('[PWA] User accepted the install prompt');
+          } else {
+            console.log('[PWA] User dismissed the install prompt');
+          }
+          deferredInstallPrompt = null;
+          const banner = document.getElementById('pwaInstallBanner');
+          if (banner) banner.style.display = 'none';
+        });
+      } else {
+        alert('📱 To install Sovra on your device:\n1. Tap the Share or 3-dots menu in your browser.\n2. Select "Add to Home screen" or "Install App".');
+      }
+    }
+
+    function dismissPwaPrompt() {
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner) banner.style.display = 'none';
+      sessionStorage.setItem('pwa_dismissed', '1');
+    }
+
+    function updateOnlineStatus() {
+      const pill = document.getElementById('offlineIndicatorPill');
+      if (!pill) return;
+      if (!navigator.onLine) {
+        pill.style.display = 'flex';
+        pill.style.background = 'rgba(239, 68, 68, 0.95)';
+        pill.innerHTML = '<span>⚡</span> <span>Offline Mode — Browsing Cached Mesh</span>';
+      } else {
+        pill.style.background = 'rgba(16, 185, 129, 0.95)';
+        pill.innerHTML = '<span>🌐</span> <span>Connected to Mesh Swarm</span>';
+        setTimeout(function() {
+          if (navigator.onLine) pill.style.display = 'none';
+        }, 3000);
+      }
+    }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
   </script>
 </body>
 </html>`;
@@ -10243,6 +10592,42 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
         }
       });
+      return;
+    }
+
+    // PWA: Web App Manifest
+    if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
+      res.writeHead(200, {
+        'Content-Type': 'application/manifest+json; charset=utf-8',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(JSON.stringify(SOVRA_PWA_MANIFEST, null, 2));
+      return;
+    }
+
+    // PWA: Service Worker
+    if (url.pathname === '/sw.js') {
+      res.writeHead(200, {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Service-Worker-Allowed': '/',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(SOVRA_SERVICE_WORKER_SCRIPT);
+      return;
+    }
+
+    // PWA: App Icons
+    if (
+      url.pathname === '/icon.svg' ||
+      url.pathname === '/icon-192.png' ||
+      url.pathname === '/icon-512.png' ||
+      url.pathname === '/icon-maskable.png'
+    ) {
+      res.writeHead(200, {
+        'Content-Type': 'image/svg+xml',
+        'Cache-Control': 'public, max-age=86400',
+      });
+      res.end(SOVRA_SVG_ICON);
       return;
     }
 
