@@ -1302,8 +1302,94 @@ function renderHtml(
       grid-template-columns: 280px 1fr;
       gap: 2rem;
     }
+    .mobile-chat-back-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: #e9edef;
+      font-size: 1.35rem;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 0.2rem 0.6rem;
+      margin-right: 0.35rem;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.15s;
+    }
+    .mobile-chat-back-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
     @media (max-width: 860px) {
-      .container { grid-template-columns: 1fr; }
+      .container {
+        grid-template-columns: 1fr;
+        margin: 0 auto 5rem auto;
+        padding: 0;
+        gap: 0;
+        max-width: 100%;
+      }
+      .sidebar {
+        display: none !important;
+      }
+      .nav-tabs {
+        display: none !important;
+      }
+      .header {
+        padding: 0.75rem 1rem;
+      }
+      .header p {
+        display: none;
+      }
+      .main-content {
+        padding: 0;
+        width: 100%;
+      }
+      .feed-container {
+        max-width: 100%;
+        padding: 0.5rem;
+      }
+      .whatsapp-container {
+        height: calc(100vh - 128px) !important;
+        min-height: 480px;
+        border-radius: 0 !important;
+        border: none !important;
+        width: 100% !important;
+      }
+      .chat-sidebar {
+        width: 100% !important;
+        flex: 1 !important;
+      }
+      .chat-main {
+        width: 100% !important;
+        flex: 1 !important;
+      }
+      .whatsapp-container.show-chat .chat-sidebar {
+        display: none !important;
+      }
+      .whatsapp-container.show-chat .chat-main {
+        display: flex !important;
+      }
+      .whatsapp-container:not(.show-chat) .chat-sidebar {
+        display: flex !important;
+      }
+      .whatsapp-container:not(.show-chat) .chat-main {
+        display: none !important;
+      }
+      .mobile-chat-back-btn {
+        display: inline-flex !important;
+      }
+      .reels-stage {
+        gap: 0;
+      }
+      .reels-phone {
+        width: 100%;
+        max-width: 420px;
+        height: calc(100vh - 130px);
+        border-radius: 16px;
+      }
+      .reels-nav-controls {
+        display: none !important;
+      }
     }
     
     .sidebar {
@@ -4468,6 +4554,7 @@ function renderHtml(
         <section class="chat-main">
           <!-- Chat Top Header -->
           <div class="chat-header">
+            <button class="mobile-chat-back-btn" onclick="closeMobileChat()" title="Back to chats list">←</button>
             <div class="chat-header-user" onclick="openSafetyNumbersModal()" title="View Safety Numbers & Encryption Details">
               <div class="contact-avatar" style="background: #10b981;" id="activePeerAvatar">A</div>
               <div>
@@ -5899,6 +5986,10 @@ function renderHtml(
       }
 
       if (tab === 'chat') {
+        const wCont = document.querySelector('.whatsapp-container');
+        if (wCont && window.innerWidth <= 860) {
+          wCont.classList.remove('show-chat');
+        }
         renderChatBubbles();
       } else if (tab === 'reels') {
         renderCurrentReel();
@@ -6932,6 +7023,9 @@ function renderHtml(
 
     function selectContact(did) {
       activeContactDid = did;
+      const wCont = document.querySelector('.whatsapp-container');
+      if (wCont) wCont.classList.add('show-chat');
+
       const contact = contactsData.find(function(c) { return c.did === did; });
       if (contact) {
         const avatarEl = document.getElementById('activePeerAvatar');
@@ -6962,6 +7056,11 @@ function renderHtml(
       if (activeEl) activeEl.classList.add('active');
 
       renderChatBubbles();
+    }
+
+    function closeMobileChat() {
+      const wCont = document.querySelector('.whatsapp-container');
+      if (wCont) wCont.classList.remove('show-chat');
     }
 
     function updateHeaderTimerDisplay(sec) {
