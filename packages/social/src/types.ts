@@ -4,18 +4,18 @@ import { SovraEvent } from '@sovra/protocol';
 export interface FollowPayload {
   readonly targetPubkey: string;
   readonly isUnfollow: boolean;
-  readonly relayHints?: readonly string[];
+  readonly relayHints?: readonly string[] | undefined;
 }
 
 export interface BlockPayload {
   readonly targetPubkey: string;
-  readonly reason?: string;
+  readonly reason?: string | undefined;
   readonly isUnblock: boolean;
 }
 
 export interface MutePayload {
   readonly targetPubkey: string;
-  readonly durationSeconds?: number; // 0 or undefined for indefinite
+  readonly durationSeconds?: number | undefined; // 0 or undefined for indefinite
   readonly isUnmute: boolean;
 }
 
@@ -28,7 +28,7 @@ export interface ReactionPayload {
 export interface RepostPayload {
   readonly originalEventId: string;
   readonly originalAuthorPubkey: string;
-  readonly commentary?: string;
+  readonly commentary?: string | undefined;
 }
 
 export interface CommunityMembershipPayload {
@@ -62,6 +62,17 @@ export interface LocalFeedEngine {
     userPubkey: string,
     limit: number,
     beforeTimestamp?: number,
+  ): readonly SovraEvent[];
+  getGlobalFeed(
+    userPubkey: string,
+    limit: number,
+    beforeTimestamp?: number,
+  ): readonly SovraEvent[];
+  getRankedDiscoveryFeed(
+    userPubkey: string,
+    limit?: number,
+    beforeTimestamp?: number,
+    authorReputations?: Readonly<Record<string, number>>,
   ): readonly SovraEvent[];
   filterSuppressedEvents(
     events: readonly SovraEvent[],

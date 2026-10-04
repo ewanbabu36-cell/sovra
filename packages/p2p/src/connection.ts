@@ -1,3 +1,4 @@
+import * as net from 'node:net';
 import { Result, ok, err } from '@sovra/shared';
 import { PeerConnectionStatus, PeerInfo, ResourceLimits } from './types.js';
 import { PeerConnectionError, ResourceExceededError } from './errors.js';
@@ -6,9 +7,9 @@ import { StreamMultiplexer } from './multiplex.js';
 
 export const DEFAULT_RESOURCE_LIMITS: ResourceLimits = {
   maxConnections: 100,
-  maxStreamsPerConnection: 32,
+  maxStreamsPerConnection: 64,
   maxMessageSizeBytes: 1024 * 1024, // 1MB
-  maxPendingRequests: 50,
+  maxPendingRequests: 100,
   maxSubscriptions: 100,
   rateLimitMsgsPerSec: 50,
 };
@@ -19,19 +20,33 @@ export interface ActivePeerConnection {
   status: PeerConnectionStatus;
   channel?: SecureChannel;
   multiplexer?: StreamMultiplexer;
+  socket?: net.Socket;
   lastActive: number;
   retryCount: number;
   nextRetryTime?: number;
+}
+
+/**
+ * Extracts IPv4 subnet /24 prefix from a multiaddr.
+ */
+function extractIpSubnetPrefix(multiaddr: string): string | null {
+  const match = multiaddr.match(/\/ip4\/(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+  if (match && match[1] && match[2] && match[3]) {
+    return `${match[1]}.${match[2]}.${match[3]}.0/24`;
+  }
+  return null;
 }
 
 export class ConnectionManager {
   private connections = new Map<string, ActivePeerConnection>();
   private peerInfos = new Map<string, PeerInfo>();
   private reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private subnetCounts = new Map<string, number>();
 
   constructor(
     public readonly limits: ResourceLimits = DEFAULT_RESOURCE_LIMITS,
     private readonly dialFn?: (multiaddr: string) => Promise<ActivePeerConnection>,
+    private readonly maxPerSubnet = 10, // Max connections per /24 prefix (mitigates Sybil/Eclipse)
   ) {}
 
   public get activeCount(): number {
@@ -65,6 +80,10 @@ export class ConnectionManager {
     return result;
   }
 
+  public getAllConnections(): readonly ActivePeerConnection[] {
+    return Array.from(this.connections.values());
+  }
+
   public registerPeerInfo(info: PeerInfo): void {
     this.peerInfos.set(info.id.peerId, info);
   }
@@ -89,6 +108,19 @@ export class ConnectionManager {
       );
     }
 
+    // Subnet diversity check for non-localhost addresses
+    const subnet = extractIpSubnetPrefix(multiaddr);
+    if (subnet && !subnet.startsWith('127.')) {
+      const currentInSubnet = this.subnetCounts.get(subnet) ?? 0;
+      if (currentInSubnet >= this.maxPerSubnet) {
+        return err(
+          new ResourceExceededError(
+            `Max active connections for IP subnet ${subnet} reached (${this.maxPerSubnet})`,
+          ),
+        );
+      }
+    }
+
     const existing = this.connections.get(peerId);
     if (existing && (existing.status === 'connected' || existing.status === 'relayed')) {
       return ok(existing);
@@ -102,6 +134,10 @@ export class ConnectionManager {
       retryCount: 0,
     };
     this.connections.set(peerId, activeConn);
+
+    if (subnet) {
+      this.subnetCounts.set(subnet, (this.subnetCounts.get(subnet) ?? 0) + 1);
+    }
 
     if (this.dialFn) {
       try {
@@ -122,9 +158,16 @@ export class ConnectionManager {
       }
     }
 
-    // Direct mock/simulation path
     activeConn.status = multiaddr.includes('/p2p-circuit/') ? 'relayed' : 'connected';
     return ok(activeConn);
+  }
+
+  public registerEstablishedConnection(conn: ActivePeerConnection): void {
+    this.connections.set(conn.peerId, conn);
+    const subnet = extractIpSubnetPrefix(conn.multiaddr);
+    if (subnet) {
+      this.subnetCounts.set(subnet, (this.subnetCounts.get(subnet) ?? 0) + 1);
+    }
   }
 
   public disconnect(peerId: string): void {
@@ -138,15 +181,21 @@ export class ConnectionManager {
     if (conn) {
       conn.status = 'closing';
       conn.multiplexer?.closeAll();
+      if (conn.socket && !conn.socket.destroyed) {
+        conn.socket.destroy();
+      }
       conn.status = 'disconnected';
       this.connections.delete(peerId);
+
+      const subnet = extractIpSubnetPrefix(conn.multiaddr);
+      if (subnet) {
+        const count = this.subnetCounts.get(subnet) ?? 1;
+        if (count <= 1) this.subnetCounts.delete(subnet);
+        else this.subnetCounts.set(subnet, count - 1);
+      }
     }
   }
 
-  /**
-   * Exponential backoff reconnect with jitter and maximum retry cap (default 5 attempts).
-   * Prevents infinite reconnect loops and reconnect storms.
-   */
   public scheduleReconnect(conn: ActivePeerConnection, maxRetries = 5, baseDelayMs = 200): void {
     if (conn.retryCount >= maxRetries) {
       conn.status = 'failed';
@@ -169,9 +218,6 @@ export class ConnectionManager {
     this.reconnectTimers.set(conn.peerId, timer);
   }
 
-  /**
-   * Cleans up idle connections that have had no traffic for longer than idleTimeoutMs
-   */
   public pruneIdleConnections(idleTimeoutMs = 300000): number {
     const now = Date.now();
     let pruned = 0;
@@ -197,4 +243,39 @@ export class ConnectionManager {
       this.disconnect(peerId);
     }
   }
+
+  /**
+   * Pillar 1: Zero-Handshake Connection Migration across Wi-Fi and 5G Cellular handoffs.
+   */
+  public migratePeerConnection(
+    peerId: string,
+    newMultiaddr: string,
+    maxTokenAgeMs = 300000,
+    issuedAt = Date.now(),
+  ): Result<boolean> {
+    const conn = this.connections.get(peerId);
+    if (!conn) {
+      return err(new PeerConnectionError('Cannot migrate connection: peer not found', { peerId }));
+    }
+    if (Date.now() - issuedAt > maxTokenAgeMs) {
+      return err(new PeerConnectionError('Session migration token expired', { peerId }));
+    }
+
+    const oldSubnet = extractIpSubnetPrefix(conn.multiaddr);
+    if (oldSubnet) {
+      const count = this.subnetCounts.get(oldSubnet) ?? 1;
+      if (count <= 1) this.subnetCounts.delete(oldSubnet);
+      else this.subnetCounts.set(oldSubnet, count - 1);
+    }
+
+    (conn as { multiaddr: string }).multiaddr = newMultiaddr;
+    conn.lastActive = Date.now();
+    const newSubnet = extractIpSubnetPrefix(newMultiaddr);
+    if (newSubnet) {
+      this.subnetCounts.set(newSubnet, (this.subnetCounts.get(newSubnet) ?? 0) + 1);
+    }
+
+    return ok(true);
+  }
 }
+

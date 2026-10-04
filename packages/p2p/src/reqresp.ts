@@ -1,5 +1,5 @@
 import { Result, ok, err } from '@sovra/shared';
-import { secureRandomBytes, bytesToHex } from '@sovra/crypto';
+import { secureRandomBytes, bytesToHex, hexToBytes } from '@sovra/crypto';
 import { RequestResponseProtocol } from './types.js';
 import { RequestTimeoutError, ResourceExceededError, P2PError } from './errors.js';
 
@@ -35,12 +35,15 @@ export class RequestResponseManager implements RequestResponseProtocol {
       resolve: (data: Uint8Array) => void;
       reject: (err: Error) => void;
       timer: ReturnType<typeof setTimeout>;
+      peerId: string;
     }
   >();
+  private activePeerRequestCounts = new Map<string, number>();
 
   constructor(
     private readonly sendRawFn?: (peerId: string, serializedMsg: Uint8Array) => Promise<void>,
-    private readonly maxPendingRequests = 50,
+    private readonly maxPendingRequests = 100,
+    private readonly maxRequestsPerPeer = 10,
     private readonly maxPayloadBytes = 1024 * 1024, // 1MB
   ) {}
 
@@ -67,10 +70,19 @@ export class RequestResponseManager implements RequestResponseProtocol {
 
     if (this.pendingRequests.size >= this.maxPendingRequests) {
       return err(
-        new ResourceExceededError('Maximum pending concurrent requests exceeded', {
+        new ResourceExceededError('Maximum global pending concurrent requests exceeded', {
           current: this.pendingRequests.size,
           max: this.maxPendingRequests,
         }),
+      );
+    }
+
+    const currentPeerActive = this.activePeerRequestCounts.get(peerId) ?? 0;
+    if (currentPeerActive >= this.maxRequestsPerPeer) {
+      return err(
+        new ResourceExceededError(
+          `Maximum concurrent requests to peer ${peerId} exceeded (${this.maxRequestsPerPeer})`,
+        ),
       );
     }
 
@@ -122,8 +134,22 @@ export class RequestResponseManager implements RequestResponseProtocol {
     return new Promise((resolve, reject) => {
       const requestId = bytesToHex(secureRandomBytes(16));
 
-      const timer = setTimeout(() => {
+      // Increment per-peer active counter
+      const currentCount = this.activePeerRequestCounts.get(peerId) ?? 0;
+      this.activePeerRequestCounts.set(peerId, currentCount + 1);
+
+      const cleanup = () => {
+        const count = this.activePeerRequestCounts.get(peerId) ?? 1;
+        if (count <= 1) {
+          this.activePeerRequestCounts.delete(peerId);
+        } else {
+          this.activePeerRequestCounts.set(peerId, count - 1);
+        }
         this.pendingRequests.delete(requestId);
+      };
+
+      const timer = setTimeout(() => {
+        cleanup();
         reject(
           new RequestTimeoutError(`Request ${requestId} timed out after ${timeoutMs}ms`, {
             requestId,
@@ -135,12 +161,23 @@ export class RequestResponseManager implements RequestResponseProtocol {
       if (signal) {
         signal.addEventListener('abort', () => {
           clearTimeout(timer);
-          this.pendingRequests.delete(requestId);
+          cleanup();
           reject(new P2PError('Request aborted by caller', 'ERR_REQUEST_ABORTED'));
         });
       }
 
-      this.pendingRequests.set(requestId, { resolve, reject, timer });
+      this.pendingRequests.set(requestId, {
+        resolve: data => {
+          cleanup();
+          resolve(data);
+        },
+        reject: err => {
+          cleanup();
+          reject(err);
+        },
+        timer,
+        peerId,
+      });
 
       const wireReq: WireRequest = {
         requestId,
@@ -153,15 +190,14 @@ export class RequestResponseManager implements RequestResponseProtocol {
       if (this.sendRawFn) {
         this.sendRawFn(peerId, encoded).catch(errSend => {
           clearTimeout(timer);
-          this.pendingRequests.delete(requestId);
+          cleanup();
           reject(errSend);
         });
       } else {
-        // If no network function is bound, handler can be simulated locally
         const handler = this.handlers.get(protocolId);
         if (!handler) {
           clearTimeout(timer);
-          this.pendingRequests.delete(requestId);
+          cleanup();
           reject(new P2PError(`Protocol handler not found for ${protocolId}`));
           return;
         }
@@ -169,12 +205,12 @@ export class RequestResponseManager implements RequestResponseProtocol {
         handler(peerId, request)
           .then(res => {
             clearTimeout(timer);
-            this.pendingRequests.delete(requestId);
+            cleanup();
             resolve(res);
           })
           .catch(errHandler => {
             clearTimeout(timer);
-            this.pendingRequests.delete(requestId);
+            cleanup();
             reject(errHandler);
           });
       }
@@ -191,15 +227,13 @@ export class RequestResponseManager implements RequestResponseProtocol {
     try {
       const parsed = JSON.parse(new TextDecoder().decode(rawBytes));
 
-      // Check if it is a response to our pending request
+      // Handle response to a pending request
       if (parsed.requestId && parsed.success !== undefined) {
         const wireRes = parsed as WireResponse;
         const pending = this.pendingRequests.get(wireRes.requestId);
         if (pending) {
           clearTimeout(pending.timer);
-          this.pendingRequests.delete(wireRes.requestId);
           if (wireRes.success && wireRes.payloadHex) {
-            const { hexToBytes } = await import('@sovra/crypto');
             pending.resolve(hexToBytes(wireRes.payloadHex));
           } else {
             pending.reject(new P2PError(wireRes.error ?? 'Remote peer returned error'));
@@ -208,11 +242,10 @@ export class RequestResponseManager implements RequestResponseProtocol {
         return undefined;
       }
 
-      // Check if it is an inbound request
+      // Handle inbound request
       if (parsed.requestId && parsed.protocolId && parsed.payloadHex) {
         const wireReq = parsed as WireRequest;
         const handler = this.handlers.get(wireReq.protocolId);
-        const { hexToBytes } = await import('@sovra/crypto');
         const reqPayload = hexToBytes(wireReq.payloadHex);
 
         if (!handler) {
@@ -242,7 +275,7 @@ export class RequestResponseManager implements RequestResponseProtocol {
         }
       }
     } catch {
-      // Malformed json
+      // Malformed json safely ignored
     }
     return undefined;
   }

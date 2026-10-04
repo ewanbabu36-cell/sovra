@@ -13,7 +13,7 @@ export type PeerConnectionStatus =
 
 export type ConnectionType = 'direct' | 'relayed' | 'unreachable';
 
-export type NatStatus = 'direct' | 'relayed' | 'unreachable';
+export type NatStatus = 'direct' | 'cone_nat' | 'symmetric_nat' | 'relayed' | 'unreachable';
 
 export interface PeerIdentity {
   readonly peerId: string; // e.g. "12D3KooW..."

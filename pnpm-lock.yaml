@@ -337,6 +337,9 @@ importers:
 
   nodes/storage-node:
     dependencies:
+      '@sovra/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@sovra/p2p':
         specifier: workspace:*
         version: link:../../packages/p2p
@@ -488,6 +491,9 @@ importers:
 
   packages/social:
     dependencies:
+      '@sovra/crypto':
+        specifier: workspace:*
+        version: link:../crypto
       '@sovra/identity':
         specifier: workspace:*
         version: link:../identity
@@ -510,6 +516,9 @@ importers:
       '@sovra/crypto':
         specifier: workspace:*
         version: link:../crypto
+      '@sovra/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@sovra/shared':
         specifier: workspace:*
         version: link:../shared

@@ -2,6 +2,7 @@
   "name": "sovra-monorepo",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Sovra — Decentralized Social Platform & Operations Console",
   "packageManager": "pnpm@12.8.1",
   "engines": {
@@ -10,6 +11,7 @@
   },
   "scripts": {
     "build": "pnpm -r run build",
+    "dev": "node --experimental-strip-types scripts/dev-server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:architecture": "vitest run tests/security/dependency-boundaries.test.ts",

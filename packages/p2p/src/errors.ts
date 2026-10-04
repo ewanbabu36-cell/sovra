@@ -14,6 +14,13 @@ export class PeerConnectionError extends P2PError {
   }
 }
 
+export class TransportError extends P2PError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'ERR_P2P_TRANSPORT', context);
+    this.name = 'TransportError';
+  }
+}
+
 export class RelayUnavailableError extends P2PError {
   constructor(message = 'No reachable circuit relays found', context?: Record<string, unknown>) {
     super(message, 'ERR_P2P_RELAY_UNAVAILABLE', context);

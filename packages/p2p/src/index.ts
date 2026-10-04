@@ -14,3 +14,8 @@ export * from './reqresp.js';
 export * from './connection.js';
 export * from './metrics.js';
 export * from './node.js';
+export * from './websocket.js';
+export * from './relay-v2.js';
+export * from './light-client.js';
+export * from './chameleon.js';
+export * from './delay-skew.js';

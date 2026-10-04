@@ -16,6 +16,7 @@ export default defineConfig({
       '@sovra/ui': path.resolve(__dirname, 'packages/ui/src/index.ts'),
       '@sovra/app': path.resolve(__dirname, 'apps/sovra-app/src/index.ts'),
       '@sovra/admin': path.resolve(__dirname, 'apps/sovra-admin/src/index.ts'),
+      '@sovra/storage-node': path.resolve(__dirname, 'nodes/storage-node/src/index.ts'),
     },
   },
   test: {

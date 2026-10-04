@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sovra/crypto": "workspace:*",
     "@sovra/p2p": "workspace:*",
     "@sovra/shared": "workspace:*",
     "@sovra/storage": "workspace:*"

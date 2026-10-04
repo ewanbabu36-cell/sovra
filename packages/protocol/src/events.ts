@@ -29,6 +29,8 @@ export enum EventKind {
   Follow = 2, // Follow / Unfollow relationship assertion
   Reaction = 3, // Like, emoji reaction to an event
   Comment = 4, // Threaded reply
+  Block = 5, // Local block enforcement assertion
+  Mute = 6, // Local mute enforcement assertion
   VideoPublication = 10, // Multi-resolution HLS video publication
   CommunityManifest = 20, // Community creation / governance rule update
   ModerationAssertion = 30, // Signed node or moderator quarantine flag
@@ -40,7 +42,7 @@ export interface ContentReference {
   readonly mimeType: string;
   readonly byteLength: number;
   readonly sha256Hash: string;
-  readonly variants?: readonly string[]; // e.g. ["360p", "720p", "1080p"]
+  readonly variants?: readonly string[] | undefined; // e.g. ["360p", "720p", "1080p"]
 }
 
 export type EventTag = readonly [string, ...string[]];
@@ -79,12 +81,22 @@ export interface SovraEvent<T = string> {
   /**
    * Optional content-addressed media attachments
    */
-  readonly media?: readonly ContentReference[];
+  readonly media?: readonly ContentReference[] | undefined;
 
   /**
    * Hex-encoded Ed25519 digital signature covering the event ID
    */
   readonly sig: string;
+
+  /**
+   * Optional Anti-Sybil Hashcash Proof-of-Work nonce
+   */
+  readonly powNonce?: string | undefined;
+
+  /**
+   * Number of leading zero bits proven by powNonce
+   */
+  readonly powDifficulty?: number | undefined;
 }
 
 export interface UnsignedSovraEvent<T = string> {
@@ -93,5 +105,7 @@ export interface UnsignedSovraEvent<T = string> {
   readonly kind: EventKind | number;
   readonly tags: readonly EventTag[];
   readonly content: T;
-  readonly media?: readonly ContentReference[];
+  readonly media?: readonly ContentReference[] | undefined;
+  readonly powNonce?: string | undefined;
+  readonly powDifficulty?: number | undefined;
 }

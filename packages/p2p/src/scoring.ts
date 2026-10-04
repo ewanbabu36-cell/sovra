@@ -97,3 +97,68 @@ export class PeerScoringEngine {
     this.history.delete(peerId);
   }
 }
+
+export interface NodeSlaMetrics {
+  readonly uptimeRatio: number; // 0.0 to 1.0
+  readonly successfulBytesRelayed: number;
+  readonly totalRequestsCount: number;
+  readonly avgLatencyMs: number;
+}
+
+/**
+ * Pillar 10: Data-Driven Node Health & Infrastructure SLA Scoring Formula.
+ * Evaluates node performance on 0-100 scale based on:
+ * - 40% Uptime consistency
+ * - 40% Bandwidth relay delivery success
+ * - 20% Latency responsiveness
+ */
+export function calculateNodeHealthScore(metrics: NodeSlaMetrics): number {
+  const uptimeWeight = Math.min(1.0, Math.max(0, metrics.uptimeRatio)) * 40;
+  const relaySuccessRatio =
+    metrics.totalRequestsCount > 0
+      ? Math.min(1.0, metrics.successfulBytesRelayed / (metrics.totalRequestsCount * 1024))
+      : 0.5;
+  const deliveryWeight = relaySuccessRatio * 40;
+  const latencyClamped = Math.max(10, metrics.avgLatencyMs);
+  const latencyWeight = Math.min(20, (100 / latencyClamped) * 20);
+
+  return Math.round(uptimeWeight + deliveryWeight + latencyWeight);
+}
+
+export interface PeakWeightedSlaInputs {
+  readonly peakHoursUptimeRatio: number; // 0.0 to 1.0 (peak demand hours)
+  readonly offPeakHoursUptimeRatio: number; // 0.0 to 1.0
+  readonly auditFailureRate: number; // 0.0 to 1.0 (Proof of Retrievability failure rate)
+}
+
+/**
+ * Pillar 10: Dynamic Peak-Weighted SLA Scoring Equation:
+ * SLA = 100 * ((Uptime_peak * 2 + Uptime_offpeak) / 3) * (1 - AuditFailureRate)^3
+ */
+export function calculatePeakWeightedNodeSla(inputs: PeakWeightedSlaInputs): number {
+  const peak = Math.max(0, Math.min(1.0, inputs.peakHoursUptimeRatio));
+  const offPeak = Math.max(0, Math.min(1.0, inputs.offPeakHoursUptimeRatio));
+  const failure = Math.max(0, Math.min(1.0, inputs.auditFailureRate));
+
+  const weightedUptime = (peak * 2 + offPeak) / 3;
+  const auditIntegrity = Math.pow(1 - failure, 3);
+
+  const rawScore = 100 * weightedUptime * auditIntegrity;
+  return Math.max(0, Math.min(100, Math.round(rawScore)));
+}
+
+/**
+ * Pillar 10: Automatic Eviction Rule.
+ * If node SLA falls below 65 for 3 or more consecutive audit cycles,
+ * the swarm marks it for immediate eviction and triggers replica migration.
+ */
+export function shouldEvictNodeFromSwarm(
+  currentSlaScore: number,
+  consecutiveLowScoreCycles: number,
+  slaThreshold = 65,
+  minFailCycles = 3,
+): boolean {
+  return currentSlaScore < slaThreshold && consecutiveLowScoreCycles >= minFailCycles;
+}
+
+

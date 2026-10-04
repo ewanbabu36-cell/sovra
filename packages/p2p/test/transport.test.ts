@@ -54,116 +54,114 @@ describe('P2P Secure Transport & Noise Handshake Suite', () => {
     };
   }
 
-  it('executes mutual authenticated handshake establishing encrypted session with forward secrecy', () => {
+  it('executes mutual authenticated Noise_XX handshake establishing encrypted session with forward secrecy', () => {
     const { aliceDevice, aliceBinding, bobDevice, bobBinding } = setupTestPeers();
 
-    // 1. Alice initiates
-    const { message1, ephemeralKeyPair: aliceEphemeral } = SecureTransportHandshake.initiate();
+    // 1. Alice initiates: -> e
+    const aliceInit = SecureTransportHandshake.initiate();
 
-    // 2. Bob responds
-    const {
-      message2,
-      ephemeralKeyPair: bobEphemeral,
-      initiatorEphemeralPub,
-    } = SecureTransportHandshake.respond(message1, bobDevice, bobBinding);
-
-    // 3. Alice verifies Bob and creates Message 3
-    const { message3, channel: aliceChannel } =
-      SecureTransportHandshake.processMessage2AndCreateMessage3(
-        message1,
-        message2,
-        aliceEphemeral.privateKey,
-        aliceDevice,
-        aliceBinding,
-      );
-
-    // 4. Bob finalizes
-    const bobChannel = SecureTransportHandshake.finalizeResponder(
-      message1,
-      message2,
-      message3,
-      bobEphemeral.privateKey,
-      initiatorEphemeralPub,
+    // 2. Bob responds: <- e, ee, s, es
+    const bobResp = SecureTransportHandshake.respond(
+      aliceInit.message1,
+      bobDevice,
+      bobBinding,
     );
 
-    expect(aliceChannel.remotePeerId).toBe(bobBinding.peerId);
-    expect(bobChannel.remotePeerId).toBe(aliceBinding.peerId);
+    // 3. Alice processes Message 2 and creates Message 3: -> s, se
+    const aliceFinal = SecureTransportHandshake.processMessage2AndCreateMessage3(
+      bobResp.message2,
+      aliceInit.symmetricState,
+      aliceInit.ephemeralKeyPair.privateKey,
+      aliceDevice,
+      aliceBinding,
+    );
+
+    // 4. Bob finalizes session
+    const bobFinal = SecureTransportHandshake.finalizeResponder(
+      aliceFinal.message3,
+      bobResp.symmetricState,
+      bobResp.ephemeralKeyPair.privateKey,
+    );
+
+    expect(aliceFinal.channel.remotePeerId).toBe(bobBinding.peerId);
+    expect(bobFinal.channel.remotePeerId).toBe(aliceBinding.peerId);
 
     // 5. Encrypted data transmission Alice -> Bob
     const plainMsg1 = new TextEncoder().encode('Hello Bob from Alice via ChaCha20-Poly1305');
-    const encryptedByAlice = aliceChannel.encrypt(plainMsg1);
-    const decryptedByBob = bobChannel.decrypt(encryptedByAlice);
+    const encryptedByAlice = aliceFinal.channel.encrypt(plainMsg1);
+    const decryptedByBob = bobFinal.channel.decrypt(encryptedByAlice);
     expect(constantTimeEquals(plainMsg1, decryptedByBob)).toBe(true);
 
     // 6. Encrypted data transmission Bob -> Alice
-    const plainMsg2 = new TextEncoder().encode('Hello Alice from Bob! Verified.');
-    const encryptedByBob = bobChannel.encrypt(plainMsg2);
-    const decryptedByAlice = aliceChannel.decrypt(encryptedByBob);
+    const plainMsg2 = new TextEncoder().encode('Hello Alice from Bob! Verified Noise_XX.');
+    const encryptedByBob = bobFinal.channel.encrypt(plainMsg2);
+    const decryptedByAlice = aliceFinal.channel.decrypt(encryptedByBob);
     expect(constantTimeEquals(plainMsg2, decryptedByAlice)).toBe(true);
   });
 
-  it('rejects tampered handshake messages or transcript signatures', () => {
+  it('rejects tampered handshake messages or ciphertexts', () => {
     const { aliceDevice, aliceBinding, bobDevice, bobBinding } = setupTestPeers();
 
-    const { message1, ephemeralKeyPair: aliceEphemeral } = SecureTransportHandshake.initiate();
-    const { message2 } = SecureTransportHandshake.respond(message1, bobDevice, bobBinding);
+    const aliceInit = SecureTransportHandshake.initiate();
+    const bobResp = SecureTransportHandshake.respond(
+      aliceInit.message1,
+      bobDevice,
+      bobBinding,
+    );
 
-    // Tamper with message2 signature
-    const tamperedSig = message2.signatureHex.slice(0, -2) + 'ff';
-    const tamperedMessage2 = { ...message2, signatureHex: tamperedSig };
+    // Tamper with message2 ciphertext bytes
+    const tamperedBytes = new Uint8Array(bobResp.message2.rawBytes);
+    tamperedBytes[tamperedBytes.length - 1]! ^= 0x55;
+    const tamperedMessage2 = { rawBytes: tamperedBytes };
 
     expect(() =>
       SecureTransportHandshake.processMessage2AndCreateMessage3(
-        message1,
         tamperedMessage2,
-        aliceEphemeral.privateKey,
+        aliceInit.symmetricState,
+        aliceInit.ephemeralKeyPair.privateKey,
         aliceDevice,
         aliceBinding,
       ),
-    ).toThrowError(/signature is invalid/);
+    ).toThrow();
   });
 
   it('rejects replay of encrypted frame with lower sequence number', () => {
     const { aliceDevice, aliceBinding, bobDevice, bobBinding } = setupTestPeers();
 
-    const { message1, ephemeralKeyPair: aliceEphemeral } = SecureTransportHandshake.initiate();
-    const {
-      message2,
-      ephemeralKeyPair: bobEphemeral,
-      initiatorEphemeralPub,
-    } = SecureTransportHandshake.respond(message1, bobDevice, bobBinding);
-    const { message3, channel: aliceChannel } =
-      SecureTransportHandshake.processMessage2AndCreateMessage3(
-        message1,
-        message2,
-        aliceEphemeral.privateKey,
-        aliceDevice,
-        aliceBinding,
-      );
-    const bobChannel = SecureTransportHandshake.finalizeResponder(
-      message1,
-      message2,
-      message3,
-      bobEphemeral.privateKey,
-      initiatorEphemeralPub,
+    const aliceInit = SecureTransportHandshake.initiate();
+    const bobResp = SecureTransportHandshake.respond(
+      aliceInit.message1,
+      bobDevice,
+      bobBinding,
+    );
+    const aliceFinal = SecureTransportHandshake.processMessage2AndCreateMessage3(
+      bobResp.message2,
+      aliceInit.symmetricState,
+      aliceInit.ephemeralKeyPair.privateKey,
+      aliceDevice,
+      aliceBinding,
+    );
+    const bobFinal = SecureTransportHandshake.finalizeResponder(
+      aliceFinal.message3,
+      bobResp.symmetricState,
+      bobResp.ephemeralKeyPair.privateKey,
     );
 
-    const frame0 = aliceChannel.encrypt(new TextEncoder().encode('Message 0'));
-    const frame1 = aliceChannel.encrypt(new TextEncoder().encode('Message 1'));
+    const frame0 = aliceFinal.channel.encrypt(new TextEncoder().encode('Message 0'));
+    const frame1 = aliceFinal.channel.encrypt(new TextEncoder().encode('Message 1'));
 
     // Bob processes frame 0 then frame 1
-    bobChannel.decrypt(frame0);
-    bobChannel.decrypt(frame1);
+    bobFinal.channel.decrypt(frame0);
+    bobFinal.channel.decrypt(frame1);
 
     // Attacker replays frame 0
-    expect(() => bobChannel.decrypt(frame0)).toThrowError(/Replay attack detected/);
+    expect(() => bobFinal.channel.decrypt(frame0)).toThrowError(/Replay attack detected/);
   });
 
   it('rejects handshake if remote peer device key is revoked', () => {
     const { aliceDevice, aliceBinding, bobMaster, bobDevice, bobBinding } = setupTestPeers();
 
     const registry = new RevocationRegistry();
-    // Revoke Bob's device key
     const revocation = createRevocationAssertion(
       bobMaster,
       bobDevice.publicKeyHex,
@@ -173,17 +171,21 @@ describe('P2P Secure Transport & Noise Handshake Suite', () => {
     );
     registry.registerRevocation(revocation);
 
-    const { message1, ephemeralKeyPair: aliceEphemeral } = SecureTransportHandshake.initiate();
-    const { message2 } = SecureTransportHandshake.respond(message1, bobDevice, bobBinding);
+    const aliceInit = SecureTransportHandshake.initiate();
+    const bobResp = SecureTransportHandshake.respond(
+      aliceInit.message1,
+      bobDevice,
+      bobBinding,
+    );
 
-    // Alice checks against registry with revoked Bob
     expect(() =>
       SecureTransportHandshake.processMessage2AndCreateMessage3(
-        message1,
-        message2,
-        aliceEphemeral.privateKey,
+        bobResp.message2,
+        aliceInit.symmetricState,
+        aliceInit.ephemeralKeyPair.privateKey,
         aliceDevice,
         aliceBinding,
+        undefined,
         registry,
       ),
     ).toThrowError(/invalid or revoked/);

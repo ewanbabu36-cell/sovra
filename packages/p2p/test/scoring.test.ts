@@ -64,4 +64,43 @@ describe('P2P Defensive Peer Scoring Engine Suite', () => {
     scoring.decayScores(0.5);
     expect(scoring.getScore(peerId)).toBe(-10);
   });
+
+  it('calculates peak-weighted SLA penalizing flapping and lazy nodes', async () => {
+    const { calculatePeakWeightedNodeSla, shouldEvictNodeFromSwarm } = await import('../src/scoring.js');
+
+    // 1. High performance node: 99% peak, 98% off-peak, 0% PoR failure
+    const reliableSla = calculatePeakWeightedNodeSla({
+      peakHoursUptimeRatio: 0.99,
+      offPeakHoursUptimeRatio: 0.98,
+      auditFailureRate: 0.0,
+    });
+    // ((0.99*2 + 0.98) / 3) * 100 = (2.96 / 3) * 100 = 98.67 -> 99
+    expect(reliableSla).toBeGreaterThanOrEqual(98);
+    expect(shouldEvictNodeFromSwarm(reliableSla, 0)).toBe(false);
+
+    // 2. Flapping node gaming off-peak (40% peak uptime, 100% off-peak uptime)
+    const flappingSla = calculatePeakWeightedNodeSla({
+      peakHoursUptimeRatio: 0.40,
+      offPeakHoursUptimeRatio: 1.00,
+      auditFailureRate: 0.0,
+    });
+    // ((0.40*2 + 1.00) / 3) * 100 = 1.80/3 * 100 = 60
+    expect(flappingSla).toBe(60);
+    expect(flappingSla).toBeLessThan(65);
+
+    // After 3 consecutive cycles below 65, swarm triggers automatic replica eviction
+    expect(shouldEvictNodeFromSwarm(flappingSla, 3)).toBe(true);
+    // 1 cycle does not trigger immediate premature eviction
+    expect(shouldEvictNodeFromSwarm(flappingSla, 1)).toBe(false);
+
+    // 3. Lazy node outsourcing or failing PoR disk audit challenges (25% failure)
+    const lazySla = calculatePeakWeightedNodeSla({
+      peakHoursUptimeRatio: 0.95,
+      offPeakHoursUptimeRatio: 0.95,
+      auditFailureRate: 0.25, // 25% failed challenges
+    });
+    // 100 * 0.95 * (1 - 0.25)^3 = 95 * 0.421875 = 40.07 -> 40
+    expect(lazySla).toBeLessThan(50);
+    expect(shouldEvictNodeFromSwarm(lazySla, 3)).toBe(true);
+  });
 });
