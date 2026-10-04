@@ -10,7 +10,11 @@ import {
   getTickIcon,
   renderStoriesCarouselHtml,
   DEFAULT_REELS_GESTURE_CONFIG,
+  createWebRtcCallSession,
+  renderCallModalHtml,
 } from '../src/index.js';
+import { generateEd25519KeyPair } from '@sovra/crypto';
+import { SovraIdentityKey } from '@sovra/identity';
 import type { ReelDescriptor } from '@sovra/storage';
 import type { VirtualChannelHop } from '@sovra/protocol';
 
@@ -330,6 +334,49 @@ describe('Frontend Client Architecture (React/Next.js Technical Roadmap)', () =>
       expect(html).toContain('story-alice');
       expect(html).toContain('story-bob');
       expect(html).toContain('Your Story');
+    });
+
+    it('coordinates WebRTC Live Calling session with media toggles & renders CallModal UI', () => {
+      const aliceKp = generateEd25519KeyPair();
+      const aliceId = new SovraIdentityKey(aliceKp.privateKey);
+
+      const callHook = createWebRtcCallSession(
+        aliceId.did,
+        aliceKp.privateKey,
+        aliceKp.publicKey,
+      );
+
+      expect(callHook.isInCall).toBe(false);
+      expect(callHook.isRinging).toBe(false);
+
+      const offerMsg = callHook.startCall(
+        'did:key:z6MksBobBroadcaster',
+        'Bob (5G Telecom)',
+        'video',
+      );
+      expect(offerMsg.type).toBe('CALL_OFFER');
+      expect(callHook.isRinging).toBe(true);
+      expect(callHook.session?.peerName).toBe('Bob (5G Telecom)');
+
+      // Toggle audio and video mute
+      expect(callHook.toggleAudio()).toBe(true);
+      expect(callHook.session?.isAudioMuted).toBe(true);
+
+      // Render CallModal HTML
+      if (callHook.session) {
+        const modalHtml = renderCallModalHtml({
+          session: callHook.session,
+          metrics: callHook.metrics,
+        });
+        expect(modalHtml).toContain('Bob (5G Telecom)');
+        expect(modalHtml).toContain('btnEndCall');
+        expect(modalHtml).toContain('btnMuteAudio');
+      }
+
+      // End Call
+      const hangup = callHook.endCall('normal');
+      expect(hangup?.type).toBe('CALL_HANGUP');
+      expect(callHook.isInCall).toBe(false);
     });
   });
 });

@@ -79,4 +79,10 @@ describe('Sovra Mobile App & APK Readiness Suite', () => {
       expect(msg.senderDid).toMatch(/^did:key:/);
     }
   });
+
+  it('verifies WebRTC CallScreen is available for 1-on-1 video & voice calling', async () => {
+    const { CallScreen } = await import('../src/screens/CallScreen.js');
+    expect(CallScreen).toBeDefined();
+    expect(typeof CallScreen).toBe('function');
+  });
 });

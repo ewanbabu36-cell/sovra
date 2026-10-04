@@ -14,6 +14,8 @@
 
 import React, { useState } from 'react';
 import type { MobileChatMessage } from '../types.js';
+import type { CallMediaType } from '@sovra/messaging';
+import { CallScreen } from './CallScreen.js';
 
 export const INITIAL_MESSAGES: MobileChatMessage[] = [
   {
@@ -58,6 +60,7 @@ export function ChatsScreen(): React.JSX.Element {
   const [messages, setMessages] = useState<MobileChatMessage[]>(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState('');
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [activeCall, setActiveCall] = useState<CallMediaType | null>(null);
 
   const sendMessage = () => {
     if (!inputText.trim()) return;
@@ -134,11 +137,20 @@ export function ChatsScreen(): React.JSX.Element {
           <div style={{ fontSize: 11, color: '#34d399' }}>● E2EE Double Ratchet Active</div>
         </div>
         <div style={{ display: 'flex', gap: 18, fontSize: 18 }}>
-          <span>📹</span>
-          <span>📞</span>
+          <span onClick={() => setActiveCall('video')} style={{ cursor: 'pointer' }} title="Video Call">📹</span>
+          <span onClick={() => setActiveCall('audio')} style={{ cursor: 'pointer' }} title="Voice Call">📞</span>
           <span>⋮</span>
         </div>
       </div>
+
+      {activeCall && (
+        <CallScreen
+          peerName="Alice (P2P Architect)"
+          peerDid="did:key:z6MksAliceP2P"
+          mediaType={activeCall}
+          onEndCall={() => setActiveCall(null)}
+        />
+      )}
 
       {/* Disappearing Messages & E2EE Info Pill */}
       <div style={{ padding: '8px 16px', display: 'flex', justifyContent: 'center' }}>
