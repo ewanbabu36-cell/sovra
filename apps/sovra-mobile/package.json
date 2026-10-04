@@ -1,0 +1,29 @@
+{
+  "name": "@sovra/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "App.tsx",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "build:apk": "eas build -p android --profile preview",
+    "build:bundle": "eas build -p android --profile production",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sovra/app": "workspace:*",
+    "@sovra/crypto": "workspace:*",
+    "@sovra/identity": "workspace:*",
+    "@sovra/messaging": "workspace:*",
+    "@sovra/protocol": "workspace:*",
+    "@sovra/social": "workspace:*",
+    "@sovra/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.7"
+  }
+}

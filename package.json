@@ -22,10 +22,12 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
     "@typescript-eslint/eslint-plugin": "^8.25.0",
     "@typescript-eslint/parser": "^8.25.0",
     "eslint": "^9.21.0",
     "prettier": "^3.5.3",
+    "react": "^19.3.0",
     "turbo": "^2.4.4",
     "typescript": "^5.8.2",
     "vitest": "^3.0.7"
