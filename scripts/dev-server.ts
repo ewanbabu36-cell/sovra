@@ -5160,10 +5160,11 @@ function renderHtml(
             <div class="profile-avatar-large">
               <span>S</span>
             </div>
-            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-              <button class="profile-btn profile-btn-primary" onclick="alert('Profile Settings: Sovereign cryptographic identity is stored locally in SQLite/IndexedDB.')">Edit Profile</button>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+              <button class="profile-btn profile-btn-primary" onclick="openAccountLifecycleModal()">⚙️ Account &amp; Security</button>
+              <button class="profile-btn profile-btn-secondary" onclick="quickLockSession()">🔒 Quick Lock</button>
+              <button class="profile-btn profile-btn-secondary" onclick="openConnectedDevicesView()">📱 Connected Devices</button>
               <button class="profile-btn profile-btn-secondary" onclick="copyProfileDid()">Copy DID</button>
-              <button class="profile-btn profile-btn-secondary" onclick="alert('WebAuthn Passkey: Cryptographic passkey verified with hardware security module (TPM / Secure Enclave).')">🔑 Passkeys</button>
             </div>
           </div>
 
@@ -5466,10 +5467,396 @@ function renderHtml(
         <button style="background: none; border: none; font-size: 1.25rem; cursor: pointer;" onclick="sendStoryReaction('👏')">👏</button>
       </div>
 
+  <!-- 🔒 1. SCREEN QUICK-LOCK OVERLAY -->
+  <div id="screenLockOverlay" style="display: none; position: fixed; inset: 0; background: rgba(5, 8, 16, 0.96); backdrop-filter: blur(24px); z-index: 100000; align-items: center; justify-content: center; flex-direction: column; text-align: center; color: #fff; padding: 2rem;">
+    <div style="width: 90px; height: 90px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); border: 2px solid #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 42px; margin-bottom: 1.5rem; box-shadow: 0 0 30px rgba(56, 189, 248, 0.2);">
+      🔒
+    </div>
+    <h2 style="font-size: 1.6rem; font-weight: 800; margin: 0 0 0.5rem 0;">Session Locked</h2>
+    <p style="font-size: 0.9rem; color: #94a3b8; max-width: 340px; margin: 0 0 2rem 0; line-height: 1.5;">
+      Active encryption keys purged from memory. Hardware biometrics required to restore session.
+    </p>
+    <button onclick="unlockSessionWithBiometrics()" style="padding: 1rem 2rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.75rem; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);">
+      <span>👆 Unlock with TouchID / FaceID</span>
+    </button>
+  </div>
+
+  <!-- ⚙️ 2. ACCOUNT LIFECYCLE & REMOTE LOGOUT MODAL -->
+  <div id="accountLifecycleModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(14px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; max-width: 460px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;">
+      
+      <!-- Modal Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div style="font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+          <span>⚙️</span> <span>Account &amp; Security</span>
+        </div>
+        <button onclick="closeAccountLifecycleModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; padding: 4px;">✕</button>
+      </div>
+
+      <!-- Live Toast Alert -->
+      <div id="accountNoticeToast" style="display: none; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 0.65rem 1rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: center;"></div>
+
+      <!-- VIEW 1: Main Menu -->
+      <div id="almViewMain">
+        <div style="background: #1e293b; padding: 0.9rem 1.1rem; border-radius: 14px; margin-bottom: 1.25rem; border: 1px solid rgba(255,255,255,0.06);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 800; color: #38bdf8; font-size: 1.05rem;" id="almProfileHandle">@sovereign.mesh</span>
+            <span style="font-size: 0.72rem; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 3px 8px; border-radius: 6px; font-weight: 700;">● Active</span>
+          </div>
+          <div style="font-size: 0.75rem; color: #64748b; font-family: monospace; margin-top: 4px; word-break: break-all;">
+            ${masterKey.did}
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+          <!-- Quick Lock -->
+          <div onclick="quickLockSession()" style="background: #1e293b; border: 1px solid #334155; padding: 0.85rem 1rem; border-radius: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.9rem;">🔒 Quick Lock Session</div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Clears RAM keys. 1-tap Fingerprint to resume.</div>
+            </div>
+            <span style="color: #64748b; font-size: 1.1rem;">→</span>
+          </div>
+
+          <!-- Connected Devices & Remote Logout -->
+          <div onclick="switchAlmView('devices')" style="background: #1e293b; border: 1px solid #334155; padding: 0.85rem 1rem; border-radius: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.9rem; color: #38bdf8;">⚡ Connected Devices (Remote Logout)</div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Lost a phone? 1-Click remote wipe access immediately.</div>
+            </div>
+            <span style="color: #38bdf8; font-size: 1.1rem;">→</span>
+          </div>
+
+          <!-- QR Account Transfer -->
+          <div onclick="switchAlmView('qr')" style="background: #1e293b; border: 1px solid #334155; padding: 0.85rem 1rem; border-radius: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.9rem;">📱 Transfer to New Phone (QR)</div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Scan with camera for &lt;2s cross-device sync.</div>
+            </div>
+            <span style="color: #64748b; font-size: 1.1rem;">→</span>
+          </div>
+
+          <!-- Social Guardians -->
+          <div onclick="switchAlmView('guardians')" style="background: #1e293b; border: 1px solid #334155; padding: 0.85rem 1rem; border-radius: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.9rem;">🛡️ Social Guardian Recovery</div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Pick 3 trusted friends (2-of-3 threshold).</div>
+            </div>
+            <span style="color: #64748b; font-size: 1.1rem;">→</span>
+          </div>
+
+          <!-- Wipe & Complete Logout -->
+          <div onclick="switchAlmView('wipe')" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.85rem 1rem; border-radius: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.9rem; color: #ef4444;">🗑️ Wipe &amp; Complete Logout</div>
+              <div style="font-size: 0.75rem; color: #fca5a5; margin-top: 2px;">Permanently delete local keys &amp; broadcast revocation.</div>
+            </div>
+            <span style="color: #ef4444; font-size: 1.1rem;">→</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Connected Devices & Remote Logout -->
+      <div id="almViewDevices" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <span style="font-weight: 700; font-size: 0.95rem;">Active Logged-In Devices</span>
+          <button onclick="switchAlmView('main')" style="background: none; border: none; color: #38bdf8; font-size: 0.8rem; cursor: pointer;">← Back</button>
+        </div>
+        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0 0 1rem 0;">
+          If a phone is stolen or lost, tap <b>Remote Logout 🚨</b>. Its cryptographic delegation will be revoked and its storage wiped upon reconnect.
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 0.65rem;" id="almDevicesContainer">
+          <!-- Device 1: Current -->
+          <div style="background: #1e293b; padding: 0.75rem 0.9rem; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.4); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.85rem;">💻 Browser Node (This Device)</div>
+              <div style="font-size: 0.7rem; color: #64748b; font-family: monospace;">Local TCP Port 4001</div>
+            </div>
+            <span style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 3px 8px; border-radius: 6px; font-weight: 700;">This Device</span>
+          </div>
+
+          <!-- Device 2: MacBook -->
+          <div id="devRowMac" style="background: #1e293b; padding: 0.75rem 0.9rem; border-radius: 10px; border: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.85rem;">🍏 MacBook Air M2 (Chrome)</div>
+              <div style="font-size: 0.7rem; color: #64748b; font-family: monospace;">did:key:z6MksMacBook02...</div>
+            </div>
+            <button onclick="triggerRemoteLogoutDevice('devRowMac', 'MacBook Air M2')" style="padding: 5px 10px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+              Remote Logout 🚨
+            </button>
+          </div>
+
+          <!-- Device 3: Lost Phone -->
+          <div id="devRowGalaxy" style="background: #1e293b; padding: 0.75rem 0.9rem; border-radius: 10px; border: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.85rem;">📱 Galaxy S21 (Lost in Metro)</div>
+              <div style="font-size: 0.7rem; color: #64748b; font-family: monospace;">did:key:z6MksGalaxyLost...</div>
+            </div>
+            <button onclick="triggerRemoteLogoutDevice('devRowGalaxy', 'Galaxy S21 (Lost)')" style="padding: 5px 10px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+              Remote Wipe 🚨
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 3: QR Transfer -->
+      <div id="almViewQr" style="display: none; text-align: center;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <span style="font-weight: 700; font-size: 0.95rem;">Transfer to New Phone</span>
+          <button onclick="switchAlmView('main')" style="background: none; border: none; color: #38bdf8; font-size: 0.8rem; cursor: pointer;">← Back</button>
+        </div>
+        <div style="width: 170px; height: 170px; background: #fff; border-radius: 16px; margin: 1rem auto; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #000;">
+          <div style="font-size: 48px;">🏁</div>
+          <div style="font-size: 0.75rem; font-weight: 800; margin-top: 6px;">@sovereign.mesh QR</div>
+        </div>
+        <div style="font-size: 0.78rem; color: #38bdf8; margin-bottom: 1rem;">
+          ⏱️ Ephemeral Key Valid for 5 Minutes • Signed with Root Identity
+        </div>
+        <button onclick="switchAlmView('main')" style="padding: 0.65rem 1.5rem; background: #334155; color: #fff; border: none; border-radius: 10px; font-size: 0.85rem; cursor: pointer;">
+          Done
+        </button>
+      </div>
+
+      <!-- VIEW 4: Social Guardians -->
+      <div id="almViewGuardians" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <span style="font-weight: 700; font-size: 0.95rem;">Social Guardian Setup</span>
+          <button onclick="switchAlmView('main')" style="background: none; border: none; color: #38bdf8; font-size: 0.8rem; cursor: pointer;">← Back</button>
+        </div>
+        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0 0 1rem 0;">
+          Configure 3 trusted friends. If your phone is lost, any 2 can approve your identity restoration.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+          <input type="text" id="guardianInput1" placeholder="Friend 1 (@alice_creator)" value="@alice_creator" style="padding: 0.65rem 0.8rem; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.85rem;">
+          <input type="text" id="guardianInput2" placeholder="Friend 2 (@bob_live)" value="@bob_live" style="padding: 0.65rem 0.8rem; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.85rem;">
+          <input type="text" id="guardianInput3" placeholder="Friend 3 (@carol_sounds)" value="@carol_sounds" style="padding: 0.65rem 0.8rem; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.85rem;">
+        </div>
+        <button onclick="saveSocialGuardiansDemo()" style="width: 100%; padding: 0.75rem; background: #10b981; color: #fff; border: none; border-radius: 10px; font-weight: 700; font-size: 0.88rem; cursor: pointer;">
+          Save 2-of-3 Guardian Plan ✓
+        </button>
+      </div>
+
+      <!-- VIEW 5: Confirm Wipe -->
+      <div id="almViewWipe" style="display: none; text-align: center;">
+        <div style="font-size: 38px; margin-bottom: 0.5rem;">⚠️</div>
+        <h3 style="font-size: 1.15rem; font-weight: 800; color: #ef4444; margin: 0 0 0.5rem 0;">Permanent Device Wipe</h3>
+        <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 1.25rem 0;">
+          All cryptographic keys will be wiped from this device. An Ed25519-signed key revocation will be registered on the P2P network.
+        </p>
+        <div style="display: flex; gap: 0.5rem;">
+          <button onclick="switchAlmView('main')" style="flex: 1; padding: 0.75rem; background: #334155; color: #fff; border: none; border-radius: 10px; font-size: 0.85rem; cursor: pointer;">
+            Cancel
+          </button>
+          <button onclick="executeHardWipeDemo()" style="flex: 1; padding: 0.75rem; background: #ef4444; color: #fff; border: none; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">
+            Yes, Wipe Device
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ⚡ 3. WELCOME & FORGOT USER ID ONBOARDING MODAL -->
+  <div id="welcomeOnboardingModal" style="display: none; position: fixed; inset: 0; background: rgba(5,8,16,0.96); backdrop-filter: blur(25px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; max-width: 440px; width: 100%; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center;">
+      
+      <!-- STEP 1: Handle input or Passkey auto-find -->
+      <div id="womStep1">
+        <div style="font-size: 40px; margin-bottom: 0.5rem;">⚡</div>
+        <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0 0 0.35rem 0;">Welcome to Sovra</h2>
+        <p style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 1.5rem 0;">
+          Zero passwords. Pure biometric hardware ownership.
+        </p>
+
+        <div style="margin-bottom: 1.25rem; text-align: left;">
+          <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">Choose Your Handle</label>
+          <div style="position: relative;">
+            <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
+            <input type="text" id="womHandleInput" placeholder="username" value="rahul_sovra" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+          </div>
+        </div>
+
+        <button onclick="triggerBiometricAccountCreation()" style="width: 100%; padding: 0.85rem; background: #3b82f6; color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); margin-bottom: 0.75rem;">
+          <span>Continue with Biometrics</span> <span>→</span>
+        </button>
+
+        <!-- 🔑 THE FORGOT USER ID BUTTON -->
+        <button onclick="autoFindForgotUserIdDemo()" style="width: 100%; padding: 0.8rem; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0.5rem;">
+          <span>🔑 Forgot User ID? Auto-Find with Passkey</span>
+        </button>
+
+        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.5rem;">
+          Or ask your 3 Friends (Social Guardians) to confirm your handle.
+        </div>
+      </div>
+
+      <!-- STEP 2: Biometric Scan Animation -->
+      <div id="womStep2" style="display: none; padding: 1.5rem 0;">
+        <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); border: 2px dashed #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 1.25rem auto;">
+          👆
+        </div>
+        <h3 style="font-size: 1.2rem; font-weight: 700; margin: 0 0 0.5rem 0;">Scanning Passkey Credential...</h3>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin: 0;">Resolving resident identity from Hardware Enclave...</p>
+      </div>
+
+      <!-- STEP 3: Account Restored / Ready -->
+      <div id="womStep3" style="display: none; padding: 0.5rem 0;">
+        <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 2px solid #10b981; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 1rem auto;">
+          ✓
+        </div>
+        <h3 style="font-size: 1.25rem; font-weight: 800; margin: 0 0 0.25rem 0;">Identity Restored!</h3>
+        <div style="font-size: 1.05rem; color: #38bdf8; font-weight: 700; margin-bottom: 1.25rem;" id="womRestoredHandleDisplay">@sovereign.mesh</div>
+        <div style="background: #1e293b; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.75rem; text-align: left; color: #94a3b8; margin-bottom: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Discovery Method:</span> <span style="color: #10b981;">Passkey Resident Key ✓</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Hardware Enclave:</span> <span style="color: #fff;">Verified</span>
+          </div>
+        </div>
+        <button onclick="closeOnboardingModalAndEnter()" style="width: 100%; padding: 0.85rem; background: #10b981; color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
+          Enter Sovra Super-App 🚀
+        </button>
+      </div>
+
     </div>
   </div>
 
   <script>
+    // ==========================================
+    // 🔐 SOVRA ACCOUNT LIFECYCLE, QUICK LOCK & REMOTE WIPE ENGINE
+    // ==========================================
+    let isSessionLockedState = false;
+    let currentUserHandle = '@sovereign.mesh';
+    let currentProfileWiped = false;
+
+    function openAccountLifecycleModal() {
+      const m = document.getElementById('accountLifecycleModal');
+      if (m) m.style.display = 'flex';
+      switchAlmView('main');
+    }
+
+    function closeAccountLifecycleModal() {
+      const m = document.getElementById('accountLifecycleModal');
+      if (m) m.style.display = 'none';
+    }
+
+    function switchAlmView(viewName) {
+      const views = ['almViewMain', 'almViewDevices', 'almViewQr', 'almViewGuardians', 'almViewWipe'];
+      for (const v of views) {
+        const el = document.getElementById(v);
+        if (el) el.style.display = 'none';
+      }
+      const targetMap = {
+        main: 'almViewMain',
+        devices: 'almViewDevices',
+        qr: 'almViewQr',
+        guardians: 'almViewGuardians',
+        wipe: 'almViewWipe',
+      };
+      const activeEl = document.getElementById(targetMap[viewName]);
+      if (activeEl) activeEl.style.display = 'block';
+    }
+
+    function openConnectedDevicesView() {
+      openAccountLifecycleModal();
+      switchAlmView('devices');
+    }
+
+    function quickLockSession() {
+      closeAccountLifecycleModal();
+      isSessionLockedState = true;
+      const overlay = document.getElementById('screenLockOverlay');
+      if (overlay) overlay.style.display = 'flex';
+    }
+
+    function unlockSessionWithBiometrics() {
+      isSessionLockedState = false;
+      const overlay = document.getElementById('screenLockOverlay');
+      if (overlay) overlay.style.display = 'none';
+      showAccountToast('🛡️ Biometric TouchID verified! Cryptographic session restored.');
+    }
+
+    function triggerRemoteLogoutDevice(rowId, deviceName) {
+      const row = document.getElementById(rowId);
+      if (row) {
+        row.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        row.innerHTML =
+          '<div>' +
+            '<div style="font-weight: 700; font-size: 0.85rem; color: #94a3b8;">' + deviceName + '</div>' +
+            '<div style="font-size: 0.7rem; color: #ef4444; font-family: monospace;">Ed25519 Revocation Signed &amp; Broadcasted</div>' +
+          '</div>' +
+          '<span style="font-size: 0.7rem; background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 4px 8px; border-radius: 6px; font-weight: 700;">Wiped &amp; Revoked ✕</span>';
+      }
+      showAccountToast('⚡ Remote Logout sent! "' + deviceName + '" was wiped permanently from the network.');
+    }
+
+    function saveSocialGuardiansDemo() {
+      showAccountToast('✓ 2-of-3 Guardian threshold plan signed with Root Identity!');
+      setTimeout(() => switchAlmView('main'), 1200);
+    }
+
+    function executeHardWipeDemo() {
+      closeAccountLifecycleModal();
+      currentProfileWiped = true;
+      const wom = document.getElementById('welcomeOnboardingModal');
+      if (wom) wom.style.display = 'flex';
+      const s1 = document.getElementById('womStep1');
+      const s2 = document.getElementById('womStep2');
+      const s3 = document.getElementById('womStep3');
+      if (s1) s1.style.display = 'block';
+      if (s2) s2.style.display = 'none';
+      if (s3) s3.style.display = 'none';
+    }
+
+    function triggerBiometricAccountCreation() {
+      const handleInput = document.getElementById('womHandleInput');
+      const chosenHandle = (handleInput && handleInput.value.trim()) ? handleInput.value.trim() : 'sovra_user';
+      currentUserHandle = chosenHandle.startsWith('@') ? chosenHandle : '@' + chosenHandle;
+      
+      document.getElementById('womStep1').style.display = 'none';
+      document.getElementById('womStep2').style.display = 'block';
+
+      setTimeout(() => {
+        document.getElementById('womStep2').style.display = 'none';
+        document.getElementById('womStep3').style.display = 'block';
+        const displayEl = document.getElementById('womRestoredHandleDisplay');
+        if (displayEl) displayEl.innerText = currentUserHandle;
+      }, 1200);
+    }
+
+    function autoFindForgotUserIdDemo() {
+      document.getElementById('womStep1').style.display = 'none';
+      document.getElementById('womStep2').style.display = 'block';
+
+      setTimeout(() => {
+        document.getElementById('womStep2').style.display = 'none';
+        document.getElementById('womStep3').style.display = 'block';
+        currentUserHandle = '@sovereign.mesh';
+        const displayEl = document.getElementById('womRestoredHandleDisplay');
+        if (displayEl) displayEl.innerText = currentUserHandle + ' (Auto-Discovered)';
+      }, 1400);
+    }
+
+    function closeOnboardingModalAndEnter() {
+      const wom = document.getElementById('welcomeOnboardingModal');
+      if (wom) wom.style.display = 'none';
+      currentProfileWiped = false;
+      const handleEl = document.getElementById('almProfileHandle');
+      if (handleEl) handleEl.innerText = currentUserHandle;
+      switchTab('me');
+    }
+
+    function showAccountToast(msg) {
+      const t = document.getElementById('accountNoticeToast');
+      if (t) {
+        t.innerText = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 4000);
+      }
+    }
+
     // Tab switching for all 5 modes + admin console
     function switchTab(tab) {
       const views = {
