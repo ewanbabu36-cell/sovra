@@ -1411,15 +1411,51 @@ function renderHtml(
       }
       .reels-stage {
         gap: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        height: calc(100vh - 128px);
       }
       .reels-phone {
-        width: 100%;
-        max-width: 420px;
-        height: calc(100vh - 130px);
-        border-radius: 16px;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: calc(100vh - 128px) !important;
+        border-radius: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
       }
       .reels-nav-controls {
         display: none !important;
+      }
+      #reels-view {
+        width: 100%;
+        padding: 0;
+        margin: 0;
+      }
+      #youtube-view {
+        width: 100%;
+        padding: 0;
+        margin: 0;
+      }
+      .youtube-container {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+        width: 100% !important;
+        padding: 0 !important;
+      }
+      .yt-ambient-wrapper {
+        margin: 0 !important;
+        width: 100% !important;
+      }
+      .yt-ambient-glow {
+        display: none !important;
+      }
+      .yt-player-box {
+        border-radius: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+        width: 100% !important;
+        box-shadow: none !important;
       }
     }
     
@@ -4134,36 +4170,8 @@ function renderHtml(
       </div>
     </main>
 
-    <!-- Main Section: Instagram Reels & Stories -->
+    <!-- Main Section: Instagram Reels (Immersive Full Screen View) -->
     <main class="main-content" id="reels-view" style="display: none;">
-      <!-- Stories Bar -->
-      <section class="card" style="padding: 0.75rem 1rem;">
-        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
-          <span>⚡ 24h Ephemeral Stories (RAM Zero-Disk Ring Buffer)</span>
-          <span style="color: #f43f5e;">● Live P2P Swarm</span>
-        </div>
-        <div class="stories-bar" id="storiesBarList">
-          <div class="story-item" onclick="alert('Create Story: Select a photo/video to sign with Ed25519 and publish to the RAM zero-disk ring buffer.')">
-            <div class="story-ring seen">
-              <div class="story-avatar" style="background: #1e293b; color: #38bdf8; font-size: 1.3rem;">+</div>
-            </div>
-            <div class="story-username">Your Story</div>
-          </div>
-          ${multiSegmentStories
-            .map(
-              (s, idx) => `
-            <div class="story-item" onclick="launchStoryViewer(${idx})" id="story-item-${s.creatorHandle}">
-              <div class="story-ring ${s.seen ? 'seen' : ''}">
-                <div class="story-avatar" style="background: ${s.creatorAvatarBg};">${s.creatorAvatar}</div>
-              </div>
-              <div class="story-username">${s.creatorName}</div>
-            </div>
-          `,
-            )
-            .join('')}
-        </div>
-      </section>
-
       <!-- Reels Player Stage -->
       <div class="reels-stage">
         <!-- Phone Mockup Container with 60fps Gesture Physics -->
@@ -6859,7 +6867,7 @@ function renderHtml(
       storiesData[creatorIdx].seen = true;
 
       // Update story ring in the stories tray
-      const storyRingEl = document.querySelector('#story-item-' + storiesData[creatorIdx].creatorHandle + ' .story-ring');
+      const storyRingEl = document.querySelector('#feed-story-' + storiesData[creatorIdx].creatorHandle + ' .story-ring') || document.querySelector('#story-item-' + storiesData[creatorIdx].creatorHandle + ' .story-ring');
       if (storyRingEl) storyRingEl.classList.add('seen');
 
       const overlay = document.getElementById('storyModalOverlay');
