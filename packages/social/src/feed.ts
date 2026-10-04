@@ -33,7 +33,11 @@ export class DefaultLocalFeedEngine implements LocalFeedEngine {
       : {
           pubkey: userPubkey,
           followingSet: new Set(),
+          friendsSet: new Set(),
+          pendingFriendRequests: new Set(),
+          sentFriendRequests: new Set(),
           blockedSet: new Set(),
+          restrictedSet: new Set(),
           mutedSet: new Set(),
           joinedCommunities: new Set(),
         };
@@ -89,7 +93,11 @@ export class DefaultLocalFeedEngine implements LocalFeedEngine {
       : {
           pubkey: userPubkey,
           followingSet: new Set(),
+          friendsSet: new Set(),
+          pendingFriendRequests: new Set(),
+          sentFriendRequests: new Set(),
           blockedSet: new Set(),
+          restrictedSet: new Set(),
           mutedSet: new Set(),
           joinedCommunities: new Set(),
         };

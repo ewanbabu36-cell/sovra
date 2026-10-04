@@ -7,6 +7,8 @@ import {
   BlockPayload,
   MutePayload,
   ReactionPayload,
+  FriendRequestPayload,
+  RestrictPayload,
 } from './types.js';
 
 interface FollowOp {
@@ -38,6 +40,18 @@ interface ReactionOp {
   readonly active: boolean;
 }
 
+interface FriendOp {
+  readonly createdAt: number;
+  readonly eventId: string;
+  readonly status: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'removed';
+}
+
+interface RestrictOp {
+  readonly createdAt: number;
+  readonly eventId: string;
+  readonly active: boolean;
+}
+
 export interface SocialGraphEngineOptions {
   readonly dbPath?: string | undefined;
   readonly strictSignatureVerification?: boolean | undefined;
@@ -53,6 +67,8 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
   private readonly blockOps = new Map<string, Map<string, BlockOp>>();
   private readonly muteOps = new Map<string, Map<string, MuteOp>>();
   private readonly reactionOps = new Map<string, Map<string, ReactionOp>>();
+  private readonly friendOps = new Map<string, Map<string, FriendOp>>();
+  private readonly restrictOps = new Map<string, Map<string, RestrictOp>>();
   private sqliteDb: any = null;
   private readonly strictSignatures: boolean;
 
@@ -109,6 +125,24 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
           event_id TEXT NOT NULL,
           PRIMARY KEY (target_event_id, author_pubkey, emoji)
         );
+
+        CREATE TABLE IF NOT EXISTS social_friends (
+          user_a TEXT NOT NULL,
+          user_b TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          event_id TEXT NOT NULL,
+          PRIMARY KEY (user_a, user_b)
+        );
+
+        CREATE TABLE IF NOT EXISTS social_restricts (
+          user_pubkey TEXT NOT NULL,
+          target_pubkey TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          is_active INTEGER NOT NULL,
+          event_id TEXT NOT NULL,
+          PRIMARY KEY (user_pubkey, target_pubkey)
+        );
       `);
 
       this.loadFromSqlite();
@@ -160,6 +194,24 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
         active: Boolean(row.is_active),
       });
     }
+
+    const friends = this.sqliteDb.prepare('SELECT * FROM social_friends').all();
+    for (const row of friends as any[]) {
+      this.setFriendOpMemory(row.user_a, row.user_b, {
+        createdAt: row.created_at,
+        eventId: row.event_id,
+        status: row.status as any,
+      });
+    }
+
+    const restricts = this.sqliteDb.prepare('SELECT * FROM social_restricts').all();
+    for (const row of restricts as any[]) {
+      this.setRestrictOpMemory(row.user_pubkey, row.target_pubkey, {
+        createdAt: row.created_at,
+        eventId: row.event_id,
+        active: Boolean(row.is_active),
+      });
+    }
   }
 
   public async processEvent(event: SovraEvent): Promise<Result<void>> {
@@ -179,6 +231,8 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
         return this.processMuteEvent(event);
       case EventKind.Reaction:
         return this.processReactionEvent(event);
+      case EventKind.FriendRequest:
+        return this.processFriendRequestEvent(event);
       case EventKind.ModerationAssertion:
         return this.processModerationAssertion(event);
       default:
@@ -253,13 +307,21 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
     this.setBlockOpMemory(author, target, op);
 
     if (op.active) {
-      // Blocking immediately severs follow relationship
+      // Blocking immediately severs follow and friendship relationships
       const followTombstone: FollowOp = {
         createdAt: event.createdAt,
         eventId: event.id,
         active: false,
       };
       this.setFollowOpMemory(author, target, followTombstone);
+
+      const friendSeverOp: FriendOp = {
+        createdAt: event.createdAt,
+        eventId: event.id,
+        status: 'removed',
+      };
+      this.setFriendOpMemory(author, target, friendSeverOp);
+      this.setFriendOpMemory(target, author, friendSeverOp);
 
       if (this.sqliteDb) {
         this.sqliteDb
@@ -272,6 +334,28 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
                event_id = excluded.event_id`,
           )
           .run(author, target, event.createdAt, event.id);
+
+        this.sqliteDb
+          .prepare(
+            `INSERT INTO social_friends (user_a, user_b, status, created_at, event_id)
+             VALUES (?, ?, 'removed', ?, ?)
+             ON CONFLICT(user_a, user_b) DO UPDATE SET
+               status = 'removed',
+               created_at = excluded.created_at,
+               event_id = excluded.event_id`,
+          )
+          .run(author, target, event.createdAt, event.id);
+
+        this.sqliteDb
+          .prepare(
+            `INSERT INTO social_friends (user_a, user_b, status, created_at, event_id)
+             VALUES (?, ?, 'removed', ?, ?)
+             ON CONFLICT(user_a, user_b) DO UPDATE SET
+               status = 'removed',
+               created_at = excluded.created_at,
+               event_id = excluded.event_id`,
+          )
+          .run(target, author, event.createdAt, event.id);
       }
     }
 
@@ -287,6 +371,67 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
              event_id = excluded.event_id`,
         )
         .run(author, target, event.createdAt, op.active ? 1 : 0, payload.reason ?? null, event.id);
+    }
+
+    return ok(undefined);
+  }
+
+  private processFriendRequestEvent(event: SovraEvent): Result<void> {
+    const payload = this.extractFriendRequestPayload(event);
+    if (!payload) {
+      return err(new Error(`Malformed FriendRequest event content in ${event.id}`));
+    }
+
+    const author = event.pubkey;
+    const target = payload.targetPubkey;
+
+    if (this.isBlocked(author, target) || this.isBlocked(target, author)) {
+      return ok(undefined);
+    }
+
+    const action = payload.action;
+    if (action === 'send') {
+      const op: FriendOp = { createdAt: event.createdAt, eventId: event.id, status: 'pending' };
+      this.setFriendOpMemory(target, author, op);
+    } else if (action === 'accept') {
+      const op: FriendOp = { createdAt: event.createdAt, eventId: event.id, status: 'accepted' };
+      this.setFriendOpMemory(author, target, op);
+      this.setFriendOpMemory(target, author, op);
+
+      const followOp: FollowOp = { createdAt: event.createdAt, eventId: event.id, active: true };
+      this.setFollowOpMemory(author, target, followOp);
+      this.setFollowOpMemory(target, author, followOp);
+    } else if (action === 'decline' || action === 'cancel' || action === 'remove') {
+      const op: FriendOp = { createdAt: event.createdAt, eventId: event.id, status: 'removed' };
+      this.setFriendOpMemory(author, target, op);
+      this.setFriendOpMemory(target, author, op);
+    }
+
+    if (this.sqliteDb) {
+      const status = action === 'send' ? 'pending' : action === 'accept' ? 'accepted' : 'removed';
+      this.sqliteDb
+        .prepare(
+          `INSERT INTO social_friends (user_a, user_b, status, created_at, event_id)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(user_a, user_b) DO UPDATE SET
+             status = excluded.status,
+             created_at = excluded.created_at,
+             event_id = excluded.event_id`,
+        )
+        .run(target, author, status, event.createdAt, event.id);
+
+      if (action === 'accept' || action === 'remove' || action === 'decline' || action === 'cancel') {
+        this.sqliteDb
+          .prepare(
+            `INSERT INTO social_friends (user_a, user_b, status, created_at, event_id)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(user_a, user_b) DO UPDATE SET
+               status = excluded.status,
+               created_at = excluded.created_at,
+               event_id = excluded.event_id`,
+          )
+          .run(author, target, status, event.createdAt, event.id);
+      }
     }
 
     return ok(undefined);
@@ -500,6 +645,27 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
     return null;
   }
 
+  private extractFriendRequestPayload(event: SovraEvent): FriendRequestPayload | null {
+    if (typeof event.content === 'object' && event.content !== null) {
+      return event.content as unknown as FriendRequestPayload;
+    }
+    if (typeof event.content === 'string' && event.content.startsWith('{')) {
+      try {
+        return JSON.parse(event.content);
+      } catch {}
+    }
+    const pTag = event.tags.find(t => t[0] === 'p');
+    if (pTag && pTag[1]) {
+      const actionTag = event.tags.find(t => t[0] === 'action');
+      const action = (actionTag?.[1] as any) ?? 'send';
+      return {
+        targetPubkey: pTag[1],
+        action,
+      };
+    }
+    return null;
+  }
+
   // --- LWW Conflict Resolution Helper ---
   private isSuperseded(
     existingCreatedAt: number,
@@ -566,6 +732,32 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
     return this.reactionOps.get(targetEventId)?.get(`${author}:${emoji}`);
   }
 
+  private setFriendOpMemory(userA: string, userB: string, op: FriendOp): void {
+    let map = this.friendOps.get(userA);
+    if (!map) {
+      map = new Map();
+      this.friendOps.set(userA, map);
+    }
+    map.set(userB, op);
+  }
+
+  private getFriendOp(userA: string, userB: string): FriendOp | undefined {
+    return this.friendOps.get(userA)?.get(userB);
+  }
+
+  private setRestrictOpMemory(user: string, target: string, op: RestrictOp): void {
+    let map = this.restrictOps.get(user);
+    if (!map) {
+      map = new Map();
+      this.restrictOps.set(user, map);
+    }
+    map.set(target, op);
+  }
+
+  private getRestrictOp(user: string, target: string): RestrictOp | undefined {
+    return this.restrictOps.get(user)?.get(target);
+  }
+
   // --- Public Query API ---
   public isFollowing(followerPubkey: string, targetPubkey: string): boolean {
     return this.getFollowOp(followerPubkey, targetPubkey)?.active ?? false;
@@ -582,6 +774,80 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
       return false;
     }
     return true;
+  }
+
+  public isFriend(userPubkey: string, targetPubkey: string): boolean {
+    return this.getFriendOp(userPubkey, targetPubkey)?.status === 'accepted';
+  }
+
+  public hasPendingFriendRequestFrom(userPubkey: string, requesterPubkey: string): boolean {
+    return this.getFriendOp(userPubkey, requesterPubkey)?.status === 'pending';
+  }
+
+  public getFriends(userPubkey: string): readonly string[] {
+    const map = this.friendOps.get(userPubkey);
+    if (!map) return [];
+    const friends: string[] = [];
+    for (const [target, op] of map.entries()) {
+      if (op.status === 'accepted') friends.push(target);
+    }
+    return friends;
+  }
+
+  public getPendingFriendRequests(userPubkey: string): readonly string[] {
+    const map = this.friendOps.get(userPubkey);
+    if (!map) return [];
+    const pending: string[] = [];
+    for (const [requester, op] of map.entries()) {
+      if (op.status === 'pending') pending.push(requester);
+    }
+    return pending;
+  }
+
+  public getSentFriendRequests(userPubkey: string): readonly string[] {
+    const sent: string[] = [];
+    for (const [target, targetMap] of this.friendOps.entries()) {
+      const op = targetMap.get(userPubkey);
+      if (op && op.status === 'pending') {
+        sent.push(target);
+      }
+    }
+    return sent;
+  }
+
+  public restrictUser(userPubkey: string, targetPubkey: string, isUnrestrict = false): void {
+    const op: RestrictOp = {
+      createdAt: Math.floor(Date.now() / 1000),
+      eventId: 'local-restrict',
+      active: !isUnrestrict,
+    };
+    this.setRestrictOpMemory(userPubkey, targetPubkey, op);
+    if (this.sqliteDb) {
+      this.sqliteDb
+        .prepare(
+          `INSERT INTO social_restricts (user_pubkey, target_pubkey, created_at, is_active, event_id)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(user_pubkey, target_pubkey) DO UPDATE SET
+             created_at = excluded.created_at,
+             is_active = excluded.is_active,
+             event_id = excluded.event_id`,
+        )
+        .run(userPubkey, targetPubkey, op.createdAt, op.active ? 1 : 0, op.eventId);
+    }
+  }
+
+  public isRestricted(userPubkey: string, targetPubkey: string): boolean {
+    return this.getRestrictOp(userPubkey, targetPubkey)?.active ?? false;
+  }
+
+  public getRestrictedUsers(userPubkey: string): readonly string[] {
+    const map = this.restrictOps.get(userPubkey);
+    if (!map) return [];
+    const active: string[] = [];
+    for (const [target, op] of map.entries()) {
+      if (op.active) active.push(target);
+    }
+    return active;
   }
 
   public getFollowing(userPubkey: string): readonly string[] {
@@ -629,14 +895,22 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
 
   public getState(userPubkey: string): SocialGraphState {
     const followingSet = new Set(this.getFollowing(userPubkey));
+    const friendsSet = new Set(this.getFriends(userPubkey));
+    const pendingFriendRequests = new Set(this.getPendingFriendRequests(userPubkey));
+    const sentFriendRequests = new Set(this.getSentFriendRequests(userPubkey));
     const blockedSet = new Set(this.getBlockedUsers(userPubkey));
+    const restrictedSet = new Set(this.getRestrictedUsers(userPubkey));
     const mutedSet = new Set(this.getMutedUsers(userPubkey));
     const joinedCommunities = new Set<string>();
 
     return {
       pubkey: userPubkey,
       followingSet,
+      friendsSet,
+      pendingFriendRequests,
+      sentFriendRequests,
       blockedSet,
+      restrictedSet,
       mutedSet,
       joinedCommunities,
     };

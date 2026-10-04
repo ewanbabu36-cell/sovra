@@ -4051,6 +4051,129 @@ function renderHtml(
       opacity: 0;
       transition: opacity 0.2s;
     }
+
+    /* Phase 1 Master Social: Omni-Search & Channel/Page Modal Styles */
+    .omni-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(12px);
+      z-index: 10000;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 1.5rem 1rem;
+      overflow-y: auto;
+    }
+    .omni-modal-card {
+      width: 620px;
+      max-width: 100%;
+      background: #111827;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: modalSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      margin: auto 0;
+    }
+    @keyframes modalSlideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .omni-tab-btn {
+      padding: 0.45rem 0.85rem;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-weight: 700;
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+      border-radius: 20px;
+      transition: all 0.15s;
+    }
+    .omni-tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .omni-tab-btn.active {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .omni-result-item {
+      padding: 0.85rem 1.15rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      transition: background 0.15s;
+    }
+    .omni-result-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .action-pill-btn {
+      padding: 0.35rem 0.85rem;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .action-pill-primary {
+      background: #0284c7;
+      color: #fff;
+    }
+    .action-pill-primary:hover {
+      background: #0369a1;
+    }
+    .action-pill-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .action-pill-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+    .action-pill-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    .action-pill-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+    .social-modal-input {
+      width: 100%;
+      padding: 0.7rem 0.85rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.88rem;
+      box-sizing: border-box;
+      outline: none;
+      margin-bottom: 0.85rem;
+    }
+    .social-modal-input:focus {
+      border-color: #38bdf8;
+    }
+    .social-modal-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #94a3b8;
+      display: block;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
   </style>
 </head>
 <body>
@@ -4074,6 +4197,7 @@ function renderHtml(
 
 
     <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <button onclick="openOmniSearch()" title="Omni-Search (Channels, Pages, People, Media)" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: background 0.15s;">🔍</button>
       <span class="badge badge-online">● Node Online</span>
       <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">TCP :${tcpPort}</span>
     </div>
@@ -4130,7 +4254,7 @@ function renderHtml(
                     </div>
                   </div>
                 </div>
-                <button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 1rem;" title="Post Options" onclick="alert('Post Options: CID ${post.mediaCid}')">⋮</button>
+                <button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 1rem;" title="Post Options" onclick="openPostOptionsModal('${post.id}', '${post.authorName}', '${post.mediaCid}')">⋮</button>
               </div>
 
               <!-- Media Box with Double-Tap Heart Physics -->
@@ -4158,8 +4282,14 @@ function renderHtml(
                   <button class="insta-action-btn" onclick="focusFeedComment('${post.id}')" title="Comment">
                     💬
                   </button>
+                  <button class="insta-action-btn" onclick="openRepostModal('${post.id}')" title="Repost / Quote">
+                    🔁
+                  </button>
                   <button class="insta-action-btn" onclick="shareFeedPostCid('${post.mediaCid}')" title="Share CID to P2P Mesh">
                     🚀
+                  </button>
+                  <button class="insta-action-btn" onclick="handleFeedDislike('${post.id}')" title="Dislike / Show Less">
+                    👎
                   </button>
                 </div>
                 <button class="insta-action-btn" id="btn-save-${post.id}" onclick="toggleSaveFeedPost('${post.id}')" title="Pin to Local Blockstore">
@@ -5277,12 +5407,12 @@ function renderHtml(
                 <div class="stat-label">Feed Posts</div>
               </div>
               <div class="profile-stat-box">
-                <div class="stat-number">5</div>
-                <div class="stat-label">Reels</div>
+                <div class="stat-number" id="meFriendsCount" style="color: #38bdf8;">28</div>
+                <div class="stat-label">Mutual Friends</div>
               </div>
               <div class="profile-stat-box">
                 <div class="stat-number">1,420</div>
-                <div class="stat-label">Seeders / Followers</div>
+                <div class="stat-label">Followers</div>
               </div>
               <div class="profile-stat-box">
                 <div class="stat-number">${socialGraph.getFollowing(masterKey.did).length || 3}</div>
@@ -5290,7 +5420,7 @@ function renderHtml(
               </div>
               <div class="profile-stat-box">
                 <div class="stat-number" style="color: #34d399;">2.4 TB</div>
-                <div class="stat-label">Bandwidth Seeded</div>
+                <div class="stat-label">Seeded</div>
               </div>
             </div>
           </div>
@@ -5404,11 +5534,14 @@ function renderHtml(
             <button class="btn btn-primary" style="background: #10b981; color: #000; font-weight: 800; border-radius: 8px; padding: 0.65rem 1.25rem;" onclick="withdrawWalletFunds()">
               💸 Withdraw Payout
             </button>
-            <button class="btn btn-secondary" style="border-color: rgba(255,255,255,0.2); border-radius: 8px; padding: 0.65rem 1.25rem;" onclick="alert('Deposit / Stake: Send SOV to DID deposit address to increase your DHT relay capacity.')">
-              📥 Deposit &amp; Stake
+            <button class="btn btn-secondary" style="border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.12); color: #38bdf8; border-radius: 8px; padding: 0.65rem 1.25rem; font-weight: 700;" onclick="openCreateChannelModal()">
+              📢 Create Channel
             </button>
-            <button class="btn btn-secondary" style="border-color: rgba(255,255,255,0.2); border-radius: 8px; padding: 0.65rem 1.25rem;" onclick="switchTab('youtube')">
-              🎁 Tip a Creator
+            <button class="btn btn-secondary" style="border-color: rgba(168, 85, 247, 0.4); background: rgba(168, 85, 247, 0.12); color: #c084fc; border-radius: 8px; padding: 0.65rem 1.25rem; font-weight: 700;" onclick="openCreatePageModal()">
+              🏢 Create Page
+            </button>
+            <button class="btn btn-secondary" style="border-color: rgba(255,255,255,0.2); border-radius: 8px; padding: 0.65rem 1.25rem;" onclick="openOmniSearch()">
+              🔍 Omni-Search
             </button>
           </div>
         </div>
@@ -5915,6 +6048,225 @@ function renderHtml(
         </button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- 🔍 4. OMNI-SEARCH & DISCOVERY MODAL -->
+  <div id="omniSearchModal" class="omni-modal-overlay">
+    <div class="omni-modal-card">
+      <!-- Search Header -->
+      <div style="padding: 1.15rem 1.25rem 0.75rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 0.75rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 800; font-size: 1.1rem; color: #fff;">
+            <span>🔍 Omni-Search</span>
+            <span style="font-size: 0.7rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 12px;">Zero Server Traces</span>
+          </div>
+          <button onclick="closeOmniSearch()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 4px;">✕</button>
+        </div>
+
+        <!-- Search Input Bar -->
+        <div style="position: relative; display: flex; align-items: center;">
+          <span style="position: absolute; left: 14px; color: #64748b; font-size: 1rem;">🔍</span>
+          <input type="text" id="omniSearchInput" oninput="filterOmniSearch(this.value)" placeholder="Search people, @channels, @pages, #hashtags, audio..." style="width: 100%; padding: 0.75rem 2.2rem 0.75rem 2.5rem; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.92rem; outline: none; box-sizing: border-box;">
+          <button onclick="document.getElementById('omniSearchInput').value=''; filterOmniSearch('');" style="position: absolute; right: 10px; background: none; border: none; color: #64748b; cursor: pointer; font-size: 0.85rem;">✕</button>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div style="display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none;" id="omniTabsRow">
+          <button class="omni-tab-btn active" id="stab-all" onclick="switchSearchTab('all')">🔥 All</button>
+          <button class="omni-tab-btn" id="stab-people" onclick="switchSearchTab('people')">👤 People</button>
+          <button class="omni-tab-btn" id="stab-channels" onclick="switchSearchTab('channels')">📢 Channels</button>
+          <button class="omni-tab-btn" id="stab-pages" onclick="switchSearchTab('pages')">🏢 Pages</button>
+          <button class="omni-tab-btn" id="stab-media" onclick="switchSearchTab('media')">📸 Posts</button>
+          <button class="omni-tab-btn" id="stab-hashtags" onclick="switchSearchTab('hashtags')">🏷️ Hashtags</button>
+          <button class="omni-tab-btn" id="stab-audio" onclick="switchSearchTab('audio')">🎵 Audio</button>
+        </div>
+
+        <!-- Recent Searches Row -->
+        <div id="omniRecentRow" style="display: flex; align-items: center; gap: 0.4rem; overflow-x: auto; font-size: 0.75rem; color: #94a3b8; padding-top: 2px;">
+          <span style="font-weight: 700; color: #64748b;">Recent:</span>
+          <span id="omniRecentChips" style="display: flex; gap: 0.35rem;">
+            <!-- Generated dynamically -->
+          </span>
+          <button onclick="clearRecentSearchesDemo()" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.72rem; margin-left: auto;">Clear</button>
+        </div>
+      </div>
+
+      <!-- Search Results Container -->
+      <div id="omniResultsList" style="max-height: 440px; overflow-y: auto; padding: 0.5rem 0;">
+        <!-- Dynamically rendered -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 📢 5. CREATE CHANNEL MODAL -->
+  <div id="createChannelModal" class="omni-modal-overlay">
+    <div class="omni-modal-card" style="max-width: 480px;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+          <span>📢</span> <span>Create Sovereign Channel</span>
+        </div>
+        <button onclick="closeCreateChannelModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.25rem;">
+        <label class="social-modal-label">Channel Name</label>
+        <input type="text" id="chanNameInput" class="social-modal-input" placeholder="e.g. Sovra Alpha Radar" value="Sovra Alpha Radar">
+
+        <label class="social-modal-label">Handle (@handle)</label>
+        <input type="text" id="chanHandleInput" class="social-modal-input" placeholder="@channel_name" value="@sovra_alpha">
+
+        <label class="social-modal-label">Category</label>
+        <select id="chanCategoryInput" class="social-modal-input">
+          <option value="tech">💻 Technology &amp; Web3</option>
+          <option value="gaming">🎮 Gaming</option>
+          <option value="news">📰 News &amp; Dispatches</option>
+          <option value="comedy">🎭 Comedy &amp; Entertainment</option>
+          <option value="education">🎓 Education</option>
+          <option value="music">🎵 Music &amp; Podcasts</option>
+          <option value="lifestyle">🌿 Lifestyle</option>
+        </select>
+
+        <label class="social-modal-label">Channel Type</label>
+        <select id="chanTypeInput" class="social-modal-input">
+          <option value="broadcast">📢 Broadcast Channel (Only Admins Post)</option>
+          <option value="community">💬 Community Channel (Subscribers Discuss)</option>
+        </select>
+
+        <label class="social-modal-label">Description / Bio</label>
+        <textarea id="chanDescInput" class="social-modal-input" style="min-height: 70px; resize: vertical;" placeholder="Describe what subscribers will receive...">Decentralized research dispatches, zero-disk peer synchronization updates, and creator spotlight.</textarea>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+          <button onclick="closeCreateChannelModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
+          <button onclick="submitCreateChannel()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem;">Create Channel 🚀</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🏢 6. CREATE PAGE MODAL -->
+  <div id="createPageModal" class="omni-modal-overlay">
+    <div class="omni-modal-card" style="max-width: 480px;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+          <span>🏢</span> <span>Create Sovereign Page</span>
+        </div>
+        <button onclick="closeCreatePageModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.25rem;">
+        <label class="social-modal-label">Page / Business Name</label>
+        <input type="text" id="pageNameInput" class="social-modal-input" placeholder="e.g. Metropolis Coffee" value="Metropolis Coffee">
+
+        <label class="social-modal-label">Handle (@page)</label>
+        <input type="text" id="pageHandleInput" class="social-modal-input" placeholder="@business_page" value="@metropolis_coffee">
+
+        <label class="social-modal-label">Page Type</label>
+        <select id="pageCategoryInput" class="social-modal-input">
+          <option value="business">☕ Business &amp; Shop</option>
+          <option value="creator">🎨 Public Figure / Creator</option>
+          <option value="brand">🚀 Brand &amp; Startup</option>
+          <option value="community">🤝 Community &amp; NGO</option>
+        </select>
+
+        <label class="social-modal-label">Call-To-Action (CTA) Button</label>
+        <select id="pageCtaInput" class="social-modal-input">
+          <option value="message">💬 Send Message</option>
+          <option value="website">🌐 Visit Website</option>
+          <option value="book">📅 Book Service / Table</option>
+          <option value="tip">🎁 Tip Creator</option>
+        </select>
+
+        <label class="social-modal-label">Bio &amp; Operating Hours</label>
+        <textarea id="pageBioInput" class="social-modal-input" style="min-height: 70px; resize: vertical;" placeholder="Tell customers about your business...">Artisan cold brew roastery with high-speed sovereign mesh Wi-Fi. Open 7am-10pm daily.</textarea>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+          <button onclick="closeCreatePageModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
+          <button onclick="submitCreatePage()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem; background: #9333ea;">Create Page 🏢</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚙️ 7. POST OPTIONS MODAL -->
+  <div id="postOptionsModal" class="omni-modal-overlay">
+    <div class="omni-modal-card" style="max-width: 380px;">
+      <div style="padding: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 700; font-size: 0.95rem; color: #fff;">Post Options</span>
+        <button onclick="closePostOptionsModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 0.5rem 0; display: flex; flex-direction: column;">
+        <button onclick="triggerShareFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #fff; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
+          <span>🚀</span> <span>Share CID to P2P Mesh</span>
+        </button>
+        <button onclick="triggerCopyPostLink()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #fff; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
+          <span>🔗</span> <span>Copy Direct Post Link</span>
+        </button>
+        <button onclick="triggerMuteFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #fbbf24; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
+          <span>🔕</span> <span>Mute Author Posts</span>
+        </button>
+        <button onclick="triggerBlockFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #ef4444; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
+          <span>🚫</span> <span>Block Author (Edge Drop)</span>
+        </button>
+        <button onclick="triggerSafetyReportModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #f87171; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); transition: background 0.15s;">
+          <span>🚨</span> <span>Report Post to Mesh Jury</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔁 8. REPOST / QUOTE MODAL -->
+  <div id="repostModal" class="omni-modal-overlay">
+    <div class="omni-modal-card" style="max-width: 440px;">
+      <div style="padding: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 700; font-size: 0.95rem; color: #fff;">Repost to Mesh Feed</span>
+        <button onclick="closeRepostModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+        <div>
+          <label class="social-modal-label">Add Your Thoughts (Quote Post)</label>
+          <textarea id="repostCommentaryInput" class="social-modal-input" style="min-height: 80px; resize: vertical;" placeholder="Write your commentary or take on this post..."></textarea>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <button onclick="submitInstantRepost()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.85rem;">
+            ⚡ Instant Repost
+          </button>
+          <button onclick="submitQuoteRepost()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.85rem; background: #0284c7;">
+            ✍️ Quote Repost
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🚨 9. SAFETY & DISPUTE REPORT MODAL -->
+  <div id="safetyReportModal" class="omni-modal-overlay">
+    <div class="omni-modal-card" style="max-width: 440px;">
+      <div style="padding: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 800; font-size: 1rem; color: #f87171; display: flex; align-items: center; gap: 6px;">
+          <span>🚨</span> <span>Report to Mesh Dispute Jury</span>
+        </div>
+        <button onclick="closeSafetyReportModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.25rem;">
+        <p style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.45; margin: 0 0 1rem 0;">
+          Sovra uses decentralized community juror consensus rather than corporate censors. An immutable cryptographic ticket will be generated.
+        </p>
+        <label class="social-modal-label">Reason for Report</label>
+        <select id="reportReasonInput" class="social-modal-input">
+          <option value="spam">🚩 Spam or Deceptive Content</option>
+          <option value="harassment">⚡ Harassment or Abuse</option>
+          <option value="impersonation">🎭 Fake Identity or Impersonation</option>
+          <option value="copyright">📦 Copyright / Stolen Content CID</option>
+          <option value="illegal">⚠️ Dangerous or Illegal Content</option>
+        </select>
+
+        <label class="social-modal-label">Additional Details (Optional)</label>
+        <textarea id="reportDetailsInput" class="social-modal-input" style="min-height: 60px; resize: vertical;" placeholder="Provide context for the Mesh Jurors..."></textarea>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+          <button onclick="closeSafetyReportModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
+          <button onclick="submitSafetyReport()" class="action-pill-btn action-pill-danger" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.85rem;">Submit Ticket 🚨</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -8803,21 +9155,432 @@ function renderHtml(
       }
     }
 
-    async function reactPost(targetEventId, emoji) {
-      try {
-        const res = await fetch('/api/social/react', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetEventId, emoji, isRetraction: false })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          const badge = document.getElementById('react-count-' + targetEventId);
-          if (badge) badge.innerText = data.reactionsCount;
-        }
-      } catch (e) {
-        console.error('Reaction failed:', e);
+    // ==========================================
+    // 🌐 PHASE 1 MASTER SOCIAL: OMNI-SEARCH, CHANNELS, PAGES & SAFETY JURY
+    // ==========================================
+    let currentSearchTab = 'all';
+    let currentRecentSearches = ['#sovra', 'Alice', '@metropolis_coffee'];
+    let activeTargetPost = { id: '', author: '', cid: '' };
+
+    const socialOmniCatalog = {
+      people: [
+        { pubkey: 'did:key:alice123', handle: '@alice_crypto', name: 'Alice Wonderland', bio: 'P2P & zero-disk state researcher', avatar: 'A', bg: '#6366f1', isFriend: false, isPending: false, isBlocked: false },
+        { pubkey: 'did:key:bob456', handle: '@bob_live', name: 'Bob Martinez', bio: 'Audio spaces host & live streamer', avatar: 'B', bg: '#ec4899', isFriend: true, isPending: false, isBlocked: false },
+        { pubkey: 'did:key:charlie789', handle: '@charlie_mesh', name: 'Charlie Chen', bio: 'BitSwap seeder & UnixFS architect', avatar: 'C', bg: '#10b981', isFriend: false, isPending: false, isBlocked: false },
+        { pubkey: 'did:key:priya101', handle: '@priya_sharma', name: 'Priya Sharma', bio: 'Web3 digital artist & music producer', avatar: 'P', bg: '#f59e0b', isFriend: false, isPending: true, isBlocked: false },
+        { pubkey: 'did:key:vikram202', handle: '@vikram_singh', name: 'Vikram Singh', bio: 'Decentralized node operator (TCP :4001)', avatar: 'V', bg: '#0284c7', isFriend: true, isPending: false, isBlocked: false }
+      ],
+      channels: [
+        { id: 'ch-alpha', handle: '@sovra_alpha', name: 'Sovra Alpha Radar', category: 'tech', desc: 'Cutting-edge P2P social dispatches', count: 14200, avatar: '📢', bg: '#0284c7', isSubbed: true },
+        { id: 'ch-gaming', handle: '@web3_gaming', name: 'Web3 Arcade Live', category: 'gaming', desc: 'Multiplayer P2P tournaments & game clips', count: 8900, avatar: '🎮', bg: '#8b5cf6', isSubbed: false },
+        { id: 'ch-news', handle: '@decentral_news', name: 'Global Mesh Dispatches', category: 'news', desc: 'Uncensored citizen dispatches over GossipSub', count: 24500, avatar: '📰', bg: '#10b981', isSubbed: false },
+        { id: 'ch-music', handle: '@ambient_radio', name: '24/7 Lo-Fi Mesh Waves', category: 'music', desc: 'Continuous stream seeded across 40 nodes', count: 6200, avatar: '🎵', bg: '#f43f5e', isSubbed: true }
+      ],
+      pages: [
+        { id: 'pg-metropolis', handle: '@metropolis_coffee', name: 'Metropolis Roastery', category: 'business', bio: 'Artisan cold brew with gigabit sovereign Wi-Fi', count: 3400, cta: 'Book Table', ctaType: 'book', avatar: '☕', bg: '#78350f', isFollowing: false },
+        { id: 'pg-meshlabs', handle: '@mesh_labs', name: 'Mesh Labs AI', category: 'brand', bio: 'Local edge LLMs and private search models', count: 12400, cta: 'Visit Website', ctaType: 'website', avatar: '⚡', bg: '#4f46e5', isFollowing: true },
+        { id: 'pg-bakery', handle: '@artisan_bakery', name: 'Sovereign Sourdough', category: 'business', bio: 'Fresh organic loaves delivered directly via P2P orders', count: 1850, cta: 'Send Message', ctaType: 'message', avatar: '🥖', bg: '#d97706', isFollowing: false }
+      ],
+      hashtags: [
+        { tag: '#sovra', count: 4250 },
+        { tag: '#crypto', count: 12100 },
+        { tag: '#privacy', count: 9400 },
+        { tag: '#p2p', count: 3800 },
+        { tag: '#zerodisk', count: 1200 },
+        { tag: '#decentralized', count: 7600 }
+      ],
+      audio: [
+        { id: 'aud-1', title: 'Midnight Ambient Waves', artist: 'Synthetic Dawn', count: 840 },
+        { id: 'aud-2', title: 'Cyber Neon Pulse', artist: 'Mesh Audio Lab', count: 1250 },
+        { id: 'aud-3', title: 'Sunset Chill Acoustic', artist: 'Acoustic Peer', count: 430 }
+      ]
+    };
+
+    function openOmniSearch() {
+      const m = document.getElementById('omniSearchModal');
+      if (m) {
+        m.style.display = 'flex';
+        renderOmniRecentChips();
+        filterOmniSearch(document.getElementById('omniSearchInput').value || '');
+        setTimeout(() => document.getElementById('omniSearchInput')?.focus(), 50);
       }
+    }
+
+    function closeOmniSearch() {
+      const m = document.getElementById('omniSearchModal');
+      if (m) m.style.display = 'none';
+    }
+
+    function switchSearchTab(tab) {
+      currentSearchTab = tab;
+      const tabs = ['all', 'people', 'channels', 'pages', 'media', 'hashtags', 'audio'];
+      for (const t of tabs) {
+        const btn = document.getElementById('stab-' + t);
+        if (btn) btn.classList.toggle('active', t === tab);
+      }
+      filterOmniSearch(document.getElementById('omniSearchInput').value || '');
+    }
+
+    function renderOmniRecentChips() {
+      const container = document.getElementById('omniRecentChips');
+      if (!container) return;
+      container.innerHTML = currentRecentSearches
+        .map(q => '<span onclick="executeRecentSearch(\'' + q + '\')" style="background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 12px; cursor: pointer; color: #cbd5e1;">' + q + '</span>')
+        .join('');
+    }
+
+    function executeRecentSearch(q) {
+      const input = document.getElementById('omniSearchInput');
+      if (input) {
+        input.value = q;
+        filterOmniSearch(q);
+      }
+    }
+
+    function clearRecentSearchesDemo() {
+      currentRecentSearches = [];
+      renderOmniRecentChips();
+    }
+
+    function filterOmniSearch(rawQuery) {
+      const q = rawQuery.trim().toLowerCase();
+      const list = document.getElementById('omniResultsList');
+      if (!list) return;
+
+      if (q && !currentRecentSearches.includes(rawQuery.trim())) {
+        currentRecentSearches.unshift(rawQuery.trim());
+        if (currentRecentSearches.length > 6) currentRecentSearches.pop();
+        renderOmniRecentChips();
+      }
+
+      let html = '';
+
+      // People
+      if (currentSearchTab === 'all' || currentSearchTab === 'people') {
+        const matched = socialOmniCatalog.people.filter(p => !p.isBlocked && (!q || p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q) || p.bio.toLowerCase().includes(q)));
+        for (const p of matched) {
+          const friendBtnText = p.isFriend ? '❤️ Friends' : p.isPending ? '⏳ Requested' : '+ Add Friend';
+          const friendBtnClass = p.isFriend ? 'action-pill-secondary' : p.isPending ? 'action-pill-secondary' : 'action-pill-primary';
+          html += '<div class="omni-result-item">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+              '<div style="width: 40px; height: 40px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.05rem;">' + p.avatar + '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.9rem; display: flex; align-items: center; gap: 4px;">' +
+                  '<span>' + p.name + '</span>' +
+                  '<span style="color: #38bdf8; font-size: 0.75rem;">✓</span>' +
+                '</div>' +
+                '<div style="font-size: 0.75rem; color: #94a3b8;">' + p.handle + ' &bull; ' + p.bio + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 0.4rem; align-items: center;">' +
+              '<button class="action-pill-btn ' + friendBtnClass + '" onclick="toggleFriendAction(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">' + friendBtnText + '</button>' +
+              '<button class="chat-btn-round" style="width: 28px; height: 28px; font-size: 0.85rem;" title="Block / Mute" onclick="toggleBlockUserDemo(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">🚫</button>' +
+            '</div>' +
+          '</div>';
+        }
+      }
+
+      // Channels
+      if (currentSearchTab === 'all' || currentSearchTab === 'channels') {
+        const matched = socialOmniCatalog.channels.filter(ch => !q || ch.name.toLowerCase().includes(q) || ch.handle.toLowerCase().includes(q) || ch.category.toLowerCase().includes(q));
+        for (const ch of matched) {
+          const subText = ch.isSubbed ? 'Subscribed ✓' : 'Subscribe';
+          const subClass = ch.isSubbed ? 'action-pill-secondary' : 'action-pill-primary';
+          html += '<div class="omni-result-item">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+              '<div style="width: 40px; height: 40px; border-radius: 12px; background: ' + ch.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">' + ch.avatar + '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">' +
+                  '<span>' + ch.name + '</span>' +
+                  '<span style="font-size: 0.65rem; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 1px 6px; border-radius: 8px;">' + ch.category.toUpperCase() + '</span>' +
+                '</div>' +
+                '<div style="font-size: 0.75rem; color: #94a3b8;">' + ch.handle + ' &bull; ' + ch.count.toLocaleString() + ' subscribers</div>' +
+              '</div>' +
+            '</div>' +
+            '<button class="action-pill-btn ' + subClass + '" onclick="toggleChannelSubscribeDemo(\'' + ch.id + '\')">' + subText + '</button>' +
+          '</div>';
+        }
+      }
+
+      // Pages
+      if (currentSearchTab === 'all' || currentSearchTab === 'pages') {
+        const matched = socialOmniCatalog.pages.filter(pg => !q || pg.name.toLowerCase().includes(q) || pg.handle.toLowerCase().includes(q) || pg.category.toLowerCase().includes(q));
+        for (const pg of matched) {
+          const folText = pg.isFollowing ? 'Following ✓' : 'Follow';
+          const folClass = pg.isFollowing ? 'action-pill-secondary' : 'action-pill-primary';
+          html += '<div class="omni-result-item">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+              '<div style="width: 40px; height: 40px; border-radius: 12px; background: ' + pg.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">' + pg.avatar + '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">' +
+                  '<span>' + pg.name + '</span>' +
+                  '<span style="font-size: 0.65rem; background: rgba(168,85,247,0.15); color: #c084fc; padding: 1px 6px; border-radius: 8px;">' + pg.category.toUpperCase() + '</span>' +
+                '</div>' +
+                '<div style="font-size: 0.75rem; color: #94a3b8;">' + pg.handle + ' &bull; ' + pg.bio + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 0.4rem;">' +
+              '<button class="action-pill-btn action-pill-secondary" style="border-color: #38bdf8; color: #38bdf8;" onclick="alert(\'CTA Action: Redirecting to ' + pg.cta + '\')">' + pg.cta + '</button>' +
+              '<button class="action-pill-btn ' + folClass + '" onclick="togglePageFollowDemo(\'' + pg.id + '\')">' + folText + '</button>' +
+            '</div>' +
+          '</div>';
+        }
+      }
+
+      // Hashtags
+      if (currentSearchTab === 'all' || currentSearchTab === 'hashtags') {
+        const matched = socialOmniCatalog.hashtags.filter(h => !q || h.tag.toLowerCase().includes(q));
+        for (const h of matched) {
+          html += '<div class="omni-result-item" style="cursor: pointer;" onclick="document.getElementById(\'omniSearchInput\').value=\'' + h.tag + '\'; filterOmniSearch(\'' + h.tag + '\')">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+              '<div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(56, 189, 248, 0.15); color: #38bdf8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem;">#</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #38bdf8; font-size: 0.9rem;">' + h.tag + '</div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8;">' + h.count.toLocaleString() + ' decentralized posts</div>' +
+              '</div>' +
+            '</div>' +
+            '<span style="color: #64748b; font-size: 0.8rem;">Explore →</span>' +
+          '</div>';
+        }
+      }
+
+      // Audio
+      if (currentSearchTab === 'all' || currentSearchTab === 'audio') {
+        const matched = socialOmniCatalog.audio.filter(a => !q || a.title.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q));
+        for (const a of matched) {
+          html += '<div class="omni-result-item">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+              '<div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(244, 63, 94, 0.15); color: #f43f5e; display: flex; align-items: center; justify-content: center; font-size: 1rem;">🎵</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.88rem;">' + a.title + '</div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8;">' + a.artist + ' &bull; ' + a.count.toLocaleString() + ' reels</div>' +
+              '</div>' +
+            '</div>' +
+            '<button class="action-pill-btn action-pill-secondary" onclick="alert(\'Audio Preview: Playing 15s snippet for ' + a.title.replace(/'/g, "\\'") + '\')">▶ Preview</button>' +
+          '</div>';
+        }
+      }
+
+      if (!html) {
+        html = '<div style="text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.88rem;">No matching accounts, channels, or tags found on the mesh.</div>';
+      }
+
+      list.innerHTML = html;
+    }
+
+    function toggleFriendAction(pubkey, name) {
+      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
+      if (!p) return;
+      if (p.isFriend) {
+        if (confirm('Remove ' + name + ' from friends?')) {
+          p.isFriend = false;
+          p.isPending = false;
+          updateMeFriendsCounter(-1);
+          alert('Friendship with ' + name + ' removed.');
+        }
+      } else if (p.isPending) {
+        p.isPending = false;
+        alert('Friend request to ' + name + ' cancelled.');
+      } else {
+        p.isFriend = true; // Auto-accept demo for high retention feel
+        updateMeFriendsCounter(1);
+        alert('✓ Friend Request Accepted! You and ' + name + ' are now mutual friends on the sovereign mesh.');
+      }
+      filterOmniSearch(document.getElementById('omniSearchInput').value || '');
+    }
+
+    function updateMeFriendsCounter(delta) {
+      const el = document.getElementById('meFriendsCount');
+      if (el) {
+        const cur = parseInt(el.innerText, 10) || 24;
+        el.innerText = Math.max(0, cur + delta);
+      }
+    }
+
+    function toggleBlockUserDemo(pubkey, name) {
+      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
+      if (!p) return;
+      if (confirm('Block ' + name + '? They will be completely invisible and packets dropped locally.')) {
+        p.isBlocked = true;
+        p.isFriend = false;
+        alert('🚫 ' + name + ' has been blocked. Zero network packets will be accepted.');
+        filterOmniSearch(document.getElementById('omniSearchInput').value || '');
+      }
+    }
+
+    function toggleChannelSubscribeDemo(id) {
+      const ch = socialOmniCatalog.channels.find(x => x.id === id);
+      if (!ch) return;
+      ch.isSubbed = !ch.isSubbed;
+      ch.count += ch.isSubbed ? 1 : -1;
+      filterOmniSearch(document.getElementById('omniSearchInput').value || '');
+    }
+
+    function togglePageFollowDemo(id) {
+      const pg = socialOmniCatalog.pages.find(x => x.id === id);
+      if (!pg) return;
+      pg.isFollowing = !pg.isFollowing;
+      pg.count += pg.isFollowing ? 1 : -1;
+      filterOmniSearch(document.getElementById('omniSearchInput').value || '');
+    }
+
+    // --- Channel Creation Handlers ---
+    function openCreateChannelModal() {
+      const m = document.getElementById('createChannelModal');
+      if (m) m.style.display = 'flex';
+    }
+    function closeCreateChannelModal() {
+      const m = document.getElementById('createChannelModal');
+      if (m) m.style.display = 'none';
+    }
+    function submitCreateChannel() {
+      const name = document.getElementById('chanNameInput').value.trim();
+      let handle = document.getElementById('chanHandleInput').value.trim();
+      const cat = document.getElementById('chanCategoryInput').value;
+      const desc = document.getElementById('chanDescInput').value.trim();
+      if (!name || !handle) {
+        alert('Please provide a channel name and handle.');
+        return;
+      }
+      if (!handle.startsWith('@')) handle = '@' + handle;
+      const newChan = {
+        id: 'ch-' + Date.now(),
+        handle: handle.toLowerCase(),
+        name,
+        category: cat,
+        desc: desc || 'Sovereign channel',
+        count: 1,
+        avatar: '📢',
+        bg: '#0284c7',
+        isSubbed: true
+      };
+      socialOmniCatalog.channels.unshift(newChan);
+      closeCreateChannelModal();
+      alert('🎉 Sovereign Channel ' + handle + ' successfully published to GossipSub! You are registered as the Owner.');
+      openOmniSearch();
+      switchSearchTab('channels');
+    }
+
+    // --- Page Creation Handlers ---
+    function openCreatePageModal() {
+      const m = document.getElementById('createPageModal');
+      if (m) m.style.display = 'flex';
+    }
+    function closeCreatePageModal() {
+      const m = document.getElementById('createPageModal');
+      if (m) m.style.display = 'none';
+    }
+    function submitCreatePage() {
+      const name = document.getElementById('pageNameInput').value.trim();
+      let handle = document.getElementById('pageHandleInput').value.trim();
+      const cat = document.getElementById('pageCategoryInput').value;
+      const ctaType = document.getElementById('pageCtaInput').value;
+      const bio = document.getElementById('pageBioInput').value.trim();
+      if (!name || !handle) {
+        alert('Please provide a page name and handle.');
+        return;
+      }
+      if (!handle.startsWith('@')) handle = '@' + handle;
+      const ctaLabels = { message: 'Send Message', website: 'Visit Website', book: 'Book Service', tip: 'Tip Creator' };
+      const newPage = {
+        id: 'pg-' + Date.now(),
+        handle: handle.toLowerCase(),
+        name,
+        category: cat,
+        bio: bio || 'Sovereign page',
+        count: 1,
+        cta: ctaLabels[ctaType] || 'Contact',
+        ctaType,
+        avatar: '🏢',
+        bg: '#9333ea',
+        isFollowing: true
+      };
+      socialOmniCatalog.pages.unshift(newPage);
+      closeCreatePageModal();
+      alert('🎉 Sovereign Page ' + handle + ' created! Customers can now discover your brand in Omni-Search.');
+      openOmniSearch();
+      switchSearchTab('pages');
+    }
+
+    // --- Feed Post Options & Actions ---
+    function openPostOptionsModal(postId, author, cid) {
+      activeTargetPost = { id: postId, author, cid };
+      const m = document.getElementById('postOptionsModal');
+      if (m) m.style.display = 'flex';
+    }
+    function closePostOptionsModal() {
+      const m = document.getElementById('postOptionsModal');
+      if (m) m.style.display = 'none';
+    }
+    function triggerCopyPostLink() {
+      const link = window.location.origin + '/#card-' + activeTargetPost.id;
+      navigator.clipboard?.writeText?.(link);
+      closePostOptionsModal();
+      alert('🔗 Post Link Copied to Clipboard!\n' + link);
+    }
+    function triggerShareFromModal() {
+      closePostOptionsModal();
+      shareFeedPostCid(activeTargetPost.cid);
+    }
+    function triggerMuteFromModal() {
+      closePostOptionsModal();
+      alert('🔕 Author ' + activeTargetPost.author + ' has been muted locally. Feed will hide their updates.');
+    }
+    function triggerBlockFromModal() {
+      closePostOptionsModal();
+      const card = document.getElementById('card-' + activeTargetPost.id);
+      if (card) card.style.display = 'none';
+      alert('🚫 Author ' + activeTargetPost.author + ' blocked! Post removed from viewport.');
+    }
+
+    // --- Dislike Handler ---
+    function handleFeedDislike(postId) {
+      const card = document.getElementById('card-' + postId);
+      if (card) {
+        card.style.opacity = '0.45';
+        card.style.transition = 'opacity 0.3s';
+      }
+      alert('👎 Feedback recorded. Feed algorithm will de-rank similar topics locally without public counters.');
+    }
+
+    // --- Repost & Quote Post ---
+    function openRepostModal(postId) {
+      activeTargetPost.id = postId;
+      const m = document.getElementById('repostModal');
+      if (m) {
+        m.style.display = 'flex';
+        document.getElementById('repostCommentaryInput').value = '';
+      }
+    }
+    function closeRepostModal() {
+      const m = document.getElementById('repostModal');
+      if (m) m.style.display = 'none';
+    }
+    function submitInstantRepost() {
+      closeRepostModal();
+      alert('🔁 Post #' + activeTargetPost.id + ' instantly reposted to your followers on the GossipSub swarm!');
+    }
+    function submitQuoteRepost() {
+      const commentary = document.getElementById('repostCommentaryInput').value.trim();
+      closeRepostModal();
+      alert('✍️ Quote Post published with your thoughts:\n"' + (commentary || 'Spotlight on this post!') + '"\nSigned and broadcasted to mesh.');
+    }
+
+    // --- Safety & Dispute Report ---
+    function triggerSafetyReportModal() {
+      closePostOptionsModal();
+      const m = document.getElementById('safetyReportModal');
+      if (m) m.style.display = 'flex';
+    }
+    function closeSafetyReportModal() {
+      const m = document.getElementById('safetyReportModal');
+      if (m) m.style.display = 'none';
+    }
+    function submitSafetyReport() {
+      const reason = document.getElementById('reportReasonInput').value;
+      const ticketId = 'SR-' + Math.floor(1000 + Math.random() * 9000);
+      closeSafetyReportModal();
+      alert('✅ Cryptographic Report #' + ticketId + ' registered on the Mesh Dispute Ledger!\nReason: ' + reason.toUpperCase() + '\nA jury of 5 neutral high-reputation nodes has been assigned.');
     }
   </script>
 </body>

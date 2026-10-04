@@ -10,6 +10,7 @@ import {
   BlockPayload,
   MutePayload,
   ReactionPayload,
+  FriendRequestPayload,
 } from './types.js';
 
 export function createSignedFollowEvent(
@@ -163,3 +164,33 @@ export function createSignedShortPost(
     authorPrivateKey,
   );
 }
+
+export function createSignedFriendRequestEvent(
+  authorPubkey: string,
+  authorPrivateKey: Uint8Array,
+  targetPubkey: string,
+  action: 'send' | 'accept' | 'decline' | 'cancel' | 'remove',
+  createdAt = Math.floor(Date.now() / 1000),
+): SovraEvent {
+  const payload: FriendRequestPayload = {
+    targetPubkey,
+    action,
+  };
+
+  const tags: EventTag[] = [
+    ['p', targetPubkey],
+    ['action', action],
+  ];
+
+  return createSignedSovraEvent(
+    {
+      pubkey: authorPubkey,
+      createdAt,
+      kind: EventKind.FriendRequest,
+      tags,
+      content: JSON.stringify(payload),
+    },
+    authorPrivateKey,
+  );
+}
+

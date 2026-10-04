@@ -31,10 +31,15 @@ export enum EventKind {
   Comment = 4, // Threaded reply
   Block = 5, // Local block enforcement assertion
   Mute = 6, // Local mute enforcement assertion
+  FriendRequest = 7, // Bilateral friend request (send, accept, decline, remove)
+  ChannelPublication = 8, // Channel creation / update / publication
+  PagePublication = 9, // Page creation / update / publication
   VideoPublication = 10, // Multi-resolution HLS video publication
+  Repost = 11, // Repost or quote-post pointer
   CommunityManifest = 20, // Community creation / governance rule update
   ModerationAssertion = 30, // Signed node or moderator quarantine flag
   CreatorSubscription = 40, // Creator tier subscription assertion
+  DisputeAssertion = 50, // Mesh dispute or safety violation assertion
 }
 
 export interface ContentReference {
