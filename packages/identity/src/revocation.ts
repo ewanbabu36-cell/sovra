@@ -120,6 +120,10 @@ export class RevocationRegistry {
     return this.revokedKeys.has(keyHex.toLowerCase());
   }
 
+  public isRevoked(keyHex: string): boolean {
+    return this.isKeyRevoked(keyHex);
+  }
+
   public getLatestSequence(did: string): number {
     return this.didMaxSequence.get(did) ?? 0;
   }

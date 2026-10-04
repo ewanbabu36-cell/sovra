@@ -12,6 +12,7 @@ import {
   DEFAULT_REELS_GESTURE_CONFIG,
   createWebRtcCallSession,
   renderCallModalHtml,
+  createAccountLifecycleManager,
 } from '../src/index.js';
 import { generateEd25519KeyPair } from '@sovra/crypto';
 import { SovraIdentityKey } from '@sovra/identity';
@@ -377,6 +378,39 @@ describe('Frontend Client Architecture (React/Next.js Technical Roadmap)', () =>
       const hangup = callHook.endCall('normal');
       expect(hangup?.type).toBe('CALL_HANGUP');
       expect(callHook.isInCall).toBe(false);
+    });
+
+    it('manages complete user account lifecycle: 3-step biometric onboarding, quick lock & wipe', async () => {
+      const accountHook = createAccountLifecycleManager();
+      expect(accountHook.profile).toBeNull();
+      expect(accountHook.isLocked).toBe(false);
+
+      // Step 1-3 Onboarding
+      const created = await accountHook.createAccount('priya_delhi', 'Priya', 'android');
+      expect(created.ok).toBe(true);
+      expect(accountHook.profile?.handle).toBe('@priya_delhi');
+      expect(accountHook.profile?.displayName).toBe('Priya');
+      expect(accountHook.isLocked).toBe(false);
+
+      // Soft Logout (Lock)
+      accountHook.lockSession();
+      expect(accountHook.isLocked).toBe(true);
+      expect(accountHook.profile?.isLocked).toBe(true);
+
+      // Biometric Unlock
+      const unlockRes = accountHook.unlockWithBiometrics();
+      expect(unlockRes.ok).toBe(true);
+      expect(accountHook.isLocked).toBe(false);
+
+      // QR Transfer payload
+      const qrPayload = accountHook.generateQrPairingPayload('aabbccddeeff0011223344556677889900aabbccddeeff001122334455667788');
+      expect(qrPayload.ok).toBe(true);
+      expect(qrPayload.value?.handle).toBe('@priya_delhi');
+
+      // Hard Logout & Device Wipe
+      const wipeRes = accountHook.logoutAndWipeDevice();
+      expect(wipeRes.ok).toBe(true);
+      expect(accountHook.profile).toBeNull();
     });
   });
 });

@@ -11,3 +11,5 @@ export * from './service.js';
 export * from './types.js';
 export * from './passkey.js';
 export * from './guardian-liveness.js';
+export * from './onboarding.js';
+

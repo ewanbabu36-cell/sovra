@@ -85,4 +85,20 @@ describe('Sovra Mobile App & APK Readiness Suite', () => {
     expect(CallScreen).toBeDefined();
     expect(typeof CallScreen).toBe('function');
   });
+
+  it('verifies OnboardingModal, AccountSettingsModal and MeScreen lifecycle', async () => {
+    const { OnboardingModal } = await import('../src/screens/OnboardingModal.js');
+    const { AccountSettingsModal } = await import('../src/screens/AccountSettingsModal.js');
+    const { MeScreen } = await import('../src/screens/MeScreen.js');
+
+    expect(OnboardingModal).toBeDefined();
+    expect(typeof OnboardingModal).toBe('function');
+
+    expect(AccountSettingsModal).toBeDefined();
+    expect(typeof AccountSettingsModal).toBe('function');
+
+    expect(MeScreen).toBeDefined();
+    expect(typeof MeScreen).toBe('function');
+  });
 });
+
