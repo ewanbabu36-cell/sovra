@@ -77,6 +77,14 @@ export class PasskeyManager {
     return this.credentials.get(credentialId);
   }
 
+  public listCredentials(): readonly WebAuthnPasskeyCredential[] {
+    return Array.from(this.credentials.values());
+  }
+
+  public findCredentialByDid(userHandleDid: string): WebAuthnPasskeyCredential | undefined {
+    return Array.from(this.credentials.values()).find((c) => c.userHandleDid === userHandleDid);
+  }
+
   /**
    * Verifies hardware biometric assertion proof and increments monotonic replay counter.
    */

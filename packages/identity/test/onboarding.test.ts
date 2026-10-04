@@ -191,4 +191,28 @@ describe('Account Lifecycle & Onboarding Engine Suite (@sovra/identity)', () => 
     expect(enginePhoneB.isLocked).toBe(false);
     expect(enginePhoneB.listAuthorizedDevices().length).toBe(0);
   });
+
+  it('auto-discovers account identity when user forgets User ID completely via biometric Passkey', async () => {
+    const engine = new AccountLifecycleEngine();
+
+    // User initially creates account with biometric passkey
+    const createRes = await engine.createAccount('forgotten_user', 'Aman Verma', 'android');
+    expect(createRes.ok).toBe(true);
+    const initialDid = createRes.value!.profile.did;
+
+    // Simulate session lock or app re-launch where user forgot their handle
+    engine.lockSession();
+    expect(engine.isLocked).toBe(true);
+
+    // User taps "Forgot User ID? Auto-Find with Passkey"
+    const restoreRes = engine.restoreAccountWithBiometrics();
+    expect(restoreRes.ok).toBe(true);
+    if (!restoreRes.ok) return;
+
+    const restoredProfile = restoreRes.value;
+    expect(restoredProfile.did).toBe(initialDid);
+    expect(restoredProfile.isLocked).toBe(false);
+    expect(engine.profile).toBeDefined();
+    expect(engine.isLocked).toBe(false);
+  });
 });

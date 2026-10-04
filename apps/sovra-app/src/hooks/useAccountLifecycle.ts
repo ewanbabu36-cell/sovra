@@ -38,6 +38,7 @@ export interface UseAccountLifecycleReturn {
   ): Promise<Result<AccountCreationResult>>;
   lockSession(): void;
   unlockWithBiometrics(credentialId?: string): Result<UserAccountProfile>;
+  restoreAccountWithBiometrics(credentialId?: string): Result<UserAccountProfile>;
   logoutAndWipeDevice(): Result<{ deviceRevoked: boolean }>;
   listAuthorizedDevices(): readonly AuthorizedDevice[];
   registerAuthorizedDevice(device: AuthorizedDevice): Result<void>;
@@ -77,6 +78,9 @@ export function createAccountLifecycleManager(): UseAccountLifecycleReturn {
     },
     unlockWithBiometrics(credentialId?: string) {
       return engine.unlockWithBiometrics(credentialId);
+    },
+    restoreAccountWithBiometrics(credentialId?: string) {
+      return engine.restoreAccountWithBiometrics(credentialId);
     },
     logoutAndWipeDevice() {
       return engine.logoutAndWipeDevice();

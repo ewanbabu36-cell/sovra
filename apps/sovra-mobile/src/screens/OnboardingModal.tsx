@@ -65,6 +65,26 @@ export function OnboardingModal({
     }
   };
 
+  const handleAutoRestoreWithPasskey = () => {
+    setIsProcessing(true);
+    setErrorMsg(null);
+    try {
+      const engine = new AccountLifecycleEngine();
+      const res = engine.restoreAccountWithBiometrics();
+      if (res.ok) {
+        setCreatedProfile(res.value);
+        setIsProcessing(false);
+        setStep(3);
+      } else {
+        setErrorMsg('No biometric Passkeys discovered in Keychain/Titan Enclave. Please enter your handle or ask friends.');
+        setIsProcessing(false);
+      }
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Passkey recovery failed');
+      setIsProcessing(false);
+    }
+  };
+
   const handleFinish = () => {
     if (createdProfile) {
       onAccountCreated(createdProfile);
@@ -224,10 +244,32 @@ export function OnboardingModal({
             </button>
 
             <button
+              onClick={handleAutoRestoreWithPasskey}
+              style={{
+                width: '100%',
+                marginTop: 10,
+                padding: '12px',
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                borderRadius: 12,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <span>🔑 Forgot User ID? Auto-Find with Passkey</span>
+            </button>
+
+            <button
               onClick={() => setStep('qr_scan')}
               style={{
                 width: '100%',
-                marginTop: 12,
+                marginTop: 8,
                 padding: '10px',
                 backgroundColor: 'transparent',
                 color: '#94a3b8',
