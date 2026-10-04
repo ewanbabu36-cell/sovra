@@ -1231,12 +1231,14 @@ function renderHtml(
     header {
       background-color: var(--surface);
       border-bottom: 1px solid var(--surface-border);
-      padding: 1rem 2rem;
+      padding: 0.65rem 1.5rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
       gap: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     .brand {
       display: flex;
@@ -1362,11 +1364,28 @@ function renderHtml(
       .nav-tabs {
         display: none !important;
       }
-      .header {
-        padding: 0.75rem 1rem;
+      header {
+        padding: 0.45rem 1rem !important;
+        height: 52px;
+        flex-wrap: nowrap !important;
       }
-      .header p {
-        display: none;
+      .brand-subtitle {
+        display: none !important;
+      }
+      .tcp-port-badge {
+        display: none !important;
+      }
+      .badge-online {
+        padding: 0.2rem 0.55rem;
+        font-size: 0.7rem;
+      }
+      .stories-tray {
+        gap: 0.85rem !important;
+        padding: 0.35rem 0.25rem 0.65rem 0.25rem !important;
+      }
+      .story-ring {
+        width: 52px !important;
+        height: 52px !important;
       }
       .main-content {
         padding: 0;
@@ -1636,15 +1655,24 @@ function renderHtml(
     }
     .stat-val { font-size: 1.75rem; font-weight: 700; color: #a5b4fc; margin-top: 0.25rem; }
 
-    /* Instagram Reels & Stories UI Styles */
-    .stories-bar {
+    /* Instagram Seamless Stories Tray Styles */
+    .stories-tray {
+      width: 100%;
+      padding: 0.5rem 0.25rem 0.75rem 0.25rem;
       display: flex;
-      gap: 1.25rem;
-      padding: 0.75rem 0.5rem;
+      gap: 1.15rem;
       overflow-x: auto;
       scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 0.75rem;
+    }
+    .stories-tray::-webkit-scrollbar { display: none; }
+    .stories-bar {
+      display: flex;
+      gap: 1.15rem;
       align-items: center;
-      margin-bottom: 0.5rem;
+      width: 100%;
     }
     .story-item {
       display: flex;
@@ -1653,10 +1681,11 @@ function renderHtml(
       gap: 0.35rem;
       cursor: pointer;
       user-select: none;
+      flex-shrink: 0;
     }
     .story-ring {
-      width: 62px;
-      height: 62px;
+      width: 58px;
+      height: 58px;
       border-radius: 50%;
       padding: 2.5px;
       background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
@@ -1664,6 +1693,7 @@ function renderHtml(
       align-items: center;
       justify-content: center;
       transition: transform 0.2s;
+      position: relative;
     }
     .story-ring:hover { transform: scale(1.06); }
     .story-ring.seen { background: #374151; }
@@ -1676,17 +1706,35 @@ function renderHtml(
       align-items: center;
       justify-content: center;
       font-weight: 700;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       color: #f1f5f9;
       border: 2px solid #090d16;
+    }
+    .story-plus-badge {
+      position: absolute;
+      bottom: -1px;
+      right: -1px;
+      width: 18px;
+      height: 18px;
+      background: #0284c7;
+      color: #fff;
+      border-radius: 50%;
+      border: 2px solid #090d16;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 800;
+      line-height: 1;
     }
     .story-username {
       font-size: 0.72rem;
       color: var(--text-muted);
-      max-width: 64px;
+      max-width: 62px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      text-align: center;
     }
 
     .reels-stage {
@@ -4011,7 +4059,7 @@ function renderHtml(
       <div class="brand-logo">S</div>
       <div>
         <div class="brand-title">SOVRA</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted);">Decentralized Social Platform & Operations Console</div>
+        <div class="brand-subtitle" style="font-size: 0.75rem; color: var(--text-muted);">Decentralized Social Platform & Operations Console</div>
       </div>
     </div>
 
@@ -4027,7 +4075,7 @@ function renderHtml(
 
     <div style="display: flex; gap: 0.5rem; align-items: center;">
       <span class="badge badge-online">● Node Online</span>
-      <span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">TCP :${tcpPort}</span>
+      <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">TCP :${tcpPort}</span>
     </div>
   </header>
 
@@ -4035,16 +4083,13 @@ function renderHtml(
     <!-- Tab 1: Instagram Main Feed (Stories, Photo Stream, Double-Tap Hearts) -->
     <main class="main-content" id="feed-view" style="display: flex;">
       <div class="feed-container">
-        <!-- Stories Bar (RAM Zero-Disk Ring Buffer) -->
-        <section class="card" style="padding: 0.75rem 1rem; border-radius: 16px;">
-          <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
-            <span>⚡ Ephemeral Stories &bull; P2P Zero-Disk Ring Buffer</span>
-            <span style="color: #ec4899;">● 24h Expiry</span>
-          </div>
+        <!-- Stories Tray (Borderless Instagram Style) -->
+        <div class="stories-tray">
           <div class="stories-bar">
             <div class="story-item" onclick="alert('Create Story: Pick a media asset to sign and distribute to edge peers without writing to disk.')">
               <div class="story-ring seen">
-                <div class="story-avatar" style="background: #1e293b; color: #38bdf8; font-size: 1.3rem;">+</div>
+                <div class="story-avatar" style="background: #1e293b; color: #fff;">S</div>
+                <div class="story-plus-badge">+</div>
               </div>
               <div class="story-username">Your Story</div>
             </div>
@@ -4061,7 +4106,7 @@ function renderHtml(
               )
               .join('')}
           </div>
-        </section>
+        </div>
 
         <!-- Instagram Feed Cards Stream -->
         <div id="feedPostsStream" style="display: flex; flex-direction: column; gap: 1.5rem;">
