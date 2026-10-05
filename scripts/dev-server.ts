@@ -31,6 +31,14 @@ import {
   createSignedShortPost,
 } from '../packages/social/dist/index.js';
 import { renderAdminHtml } from './admin-console.ts';
+import {
+  sovraDb,
+  type UserRecord,
+  type ContactPeerRecord,
+  type ChatMessageRecord as DbChatMessageRecord,
+  type FeedPostRecord as DbFeedPostRecord,
+  type FriendRelationshipRecord,
+} from './database-engine.ts';
 
 interface PostRecord {
   id: string;
@@ -595,41 +603,18 @@ export interface DynamicSocialState {
   chatMessages: ChatMessageRecord[];
 }
 
-const DYNAMIC_STATE_PATH = './.sovra-storage-dev/dynamic-social-state.json';
-
 function loadDynamicSocialState(): DynamicSocialState {
-  try {
-    if (fs.existsSync(DYNAMIC_STATE_PATH)) {
-      const raw = fs.readFileSync(DYNAMIC_STATE_PATH, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.posts) && Array.isArray(parsed.channels) && Array.isArray(parsed.pages)) {
-        if (!Array.isArray(parsed.chatMessages)) parsed.chatMessages = [];
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn('[DynamicStore] Error loading saved dynamic state, initializing defaults:', e);
-  }
-
-  const initial: DynamicSocialState = {
-    posts: initialFeedPosts,
-    channels: initialChannels,
-    pages: initialPages,
-    chatMessages: initialChatMessages,
+  const dbState = sovraDb.load();
+  return {
+    posts: dbState.posts as unknown as FeedPostRecord[],
+    channels: dbState.channels,
+    pages: dbState.pages,
+    chatMessages: dbState.chatMessages as unknown as ChatMessageRecord[],
   };
-  saveDynamicSocialState(initial);
-  return initial;
 }
 
-function saveDynamicSocialState(state: DynamicSocialState): void {
-  try {
-    if (!fs.existsSync('./.sovra-storage-dev')) {
-      fs.mkdirSync('./.sovra-storage-dev', { recursive: true });
-    }
-    fs.writeFileSync(DYNAMIC_STATE_PATH, JSON.stringify(state, null, 2), 'utf-8');
-  } catch (e) {
-    console.error('[DynamicStore] Error saving dynamic state to disk:', e);
-  }
+function saveDynamicSocialState(_state?: DynamicSocialState): void {
+  sovraDb.save();
 }
 
 const dynamicSocialStore = loadDynamicSocialState();
@@ -7331,6 +7316,21 @@ function renderHtml(
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <!-- PHOTO UPLOAD & PREVIEW ROW -->
+        <div style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: #1e293b; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+          <div id="editProfileAvatarPreview" style="width: 58px; height: 58px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800; overflow: hidden; border: 2px solid #38bdf8; flex-shrink: 0;">
+            <span id="editProfileAvatarLetter">S</span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #f8fafc; margin-bottom: 2px;">Profile Photo</div>
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 6px;">Auto-compressed locally to &lt; 50KB</div>
+            <button type="button" onclick="document.getElementById('editProfilePhotoInput').click()" style="padding: 0.4rem 0.85rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 8px; color: #38bdf8; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+              <span>📷</span> <span>Choose Photo</span>
+            </button>
+            <input type="file" id="editProfilePhotoInput" accept="image/*" style="display: none;" onchange="handleEditProfilePhotoSelect(event)">
+          </div>
+        </div>
+
         <div>
           <label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 4px;">DISPLAY NAME</label>
           <input type="text" id="editProfileNameInput" placeholder="e.g. Rahul Sharma" style="width: 100%; padding: 0.75rem 1rem; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box;" />
@@ -7862,14 +7862,63 @@ function renderHtml(
 
     let currentUserHandle = myProfile ? myProfile.handle : (isMobileDevice ? '@phone_user' : '@laptop_host');
 
+    function compressImage(file, maxDimension, quality, callback) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          callback(compressedDataUrl);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    let selectedEditAvatarDataUrl = null;
+
+    function handleEditProfilePhotoSelect(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      compressImage(file, 256, 0.85, function(compressedUrl) {
+        selectedEditAvatarDataUrl = compressedUrl;
+        const preview = document.getElementById('editProfileAvatarPreview');
+        if (preview) {
+          preview.innerHTML = '<img src="' + compressedUrl + '" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block;" />';
+        }
+      });
+    }
+
     function updateUserDisplayInUI() {
       if (!myProfile) return;
       currentUserHandle = myProfile.handle;
+
       const avatarEl = document.getElementById('currentUserAvatar');
       if (avatarEl) {
-        avatarEl.innerText = myProfile.avatar || 'S';
-        avatarEl.style.background = myProfile.avatarBg || '#6366f1';
+        if (myProfile.avatarDataUrl) {
+          avatarEl.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
+        } else {
+          avatarEl.innerText = myProfile.avatar || 'S';
+          avatarEl.style.background = myProfile.avatarBg || '#6366f1';
+        }
       }
+
       const handleEl = document.getElementById('currentUserHandleText');
       if (handleEl) handleEl.innerText = myProfile.handle || '@you';
 
@@ -7879,11 +7928,16 @@ function renderHtml(
       const profileName = document.getElementById('meProfileName') || document.querySelector('.profile-name');
       if (profileName) profileName.innerText = myProfile.name;
 
-      const profileAvatarText = document.getElementById('meProfileAvatarText') || document.querySelector('.profile-avatar-large span');
-      if (profileAvatarText) profileAvatarText.innerText = myProfile.avatar || 'S';
-
       const profileAvatarDiv = document.getElementById('meProfileAvatarContainer') || document.querySelector('.profile-avatar-large');
-      if (profileAvatarDiv && myProfile.avatarBg) profileAvatarDiv.style.background = myProfile.avatarBg;
+      const profileAvatarText = document.getElementById('meProfileAvatarText') || document.querySelector('.profile-avatar-large span');
+      if (profileAvatarDiv) {
+        if (myProfile.avatarBg) profileAvatarDiv.style.background = myProfile.avatarBg;
+        if (myProfile.avatarDataUrl) {
+          profileAvatarDiv.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
+        } else if (profileAvatarText) {
+          profileAvatarText.innerText = myProfile.avatar || 'S';
+        }
+      }
 
       const profileHandle = document.getElementById('meProfileHandle');
       if (profileHandle) profileHandle.innerHTML = myProfile.handle + ' &bull; libp2p Peer: <code>' + (myProfile.did ? myProfile.did.substring(0, 16) : 'peer') + '...</code>';
@@ -7896,14 +7950,22 @@ function renderHtml(
 
       const composerAvatar = document.querySelector('.composer-avatar');
       if (composerAvatar) {
-        composerAvatar.innerText = myProfile.avatar || 'S';
-        if (myProfile.avatarBg) composerAvatar.style.background = myProfile.avatarBg;
+        if (myProfile.avatarDataUrl) {
+          composerAvatar.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
+        } else {
+          composerAvatar.innerText = myProfile.avatar || 'S';
+          if (myProfile.avatarBg) composerAvatar.style.background = myProfile.avatarBg;
+        }
       }
 
       const myStoryAvatar = document.getElementById('myStoryAvatar');
       if (myStoryAvatar) {
-        myStoryAvatar.innerText = myProfile.avatar || 'S';
-        if (myProfile.avatarBg) myStoryAvatar.style.background = myProfile.avatarBg;
+        if (myProfile.avatarDataUrl) {
+          myStoryAvatar.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
+        } else {
+          myStoryAvatar.innerText = myProfile.avatar || 'S';
+          if (myProfile.avatarBg) myStoryAvatar.style.background = myProfile.avatarBg;
+        }
       }
 
       updateProfileDynamicStats();
@@ -7923,11 +7985,21 @@ function renderHtml(
       const nameInput = document.getElementById('editProfileNameInput');
       const handleInput = document.getElementById('editProfileHandleInput');
       const bioInput = document.getElementById('editProfileBioInput');
+      const preview = document.getElementById('editProfileAvatarPreview');
       if (myProfile) {
         if (nameInput) nameInput.value = myProfile.name || '';
         if (handleInput) handleInput.value = myProfile.handle || '';
         if (bioInput) bioInput.value = myProfile.bio || '';
         selectedEditAvatarBg = myProfile.avatarBg || '#6366f1';
+        selectedEditAvatarDataUrl = myProfile.avatarDataUrl || null;
+        if (preview) {
+          if (myProfile.avatarDataUrl) {
+            preview.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block;" />';
+          } else {
+            preview.innerHTML = '<span id="editProfileAvatarLetter">' + (myProfile.avatar || 'S') + '</span>';
+            preview.style.background = myProfile.avatarBg || '#6366f1';
+          }
+        }
       }
     }
 
@@ -7952,6 +8024,7 @@ function renderHtml(
           handle: rawHandle,
           name: newName,
           avatar: newName.charAt(0).toUpperCase(),
+          avatarDataUrl: selectedEditAvatarDataUrl || undefined,
           avatarBg: selectedEditAvatarBg,
           bio: newBio,
           device: isMobileDevice ? 'Mobile' : 'Desktop',
@@ -7961,6 +8034,7 @@ function renderHtml(
         myProfile.name = newName;
         myProfile.handle = rawHandle;
         myProfile.avatar = newName.charAt(0).toUpperCase();
+        if (selectedEditAvatarDataUrl) myProfile.avatarDataUrl = selectedEditAvatarDataUrl;
         myProfile.avatarBg = selectedEditAvatarBg;
         myProfile.bio = newBio;
       }
@@ -7968,6 +8042,13 @@ function renderHtml(
       try {
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
       } catch (e) {}
+
+      // Persist to user table in server database
+      fetch('/api/user/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(myProfile)
+      }).catch(function() {});
 
       fetch('/api/peers/register', {
         method: 'POST',
@@ -7977,7 +8058,7 @@ function renderHtml(
 
       updateUserDisplayInUI();
       closeEditProfileModal();
-      showAccountToast('✅ Profile updated and announced to peer mesh!');
+      showAccountToast('✅ Profile saved to database and announced to peer mesh!');
     }
 
     // Auto-check onboarding on first visit
@@ -8118,6 +8199,12 @@ function renderHtml(
       try {
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
       } catch (e) {}
+
+      fetch('/api/user/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(myProfile)
+      }).catch(function() {});
 
       fetch('/api/peers/register', {
         method: 'POST',
@@ -8488,17 +8575,15 @@ function renderHtml(
     function handleFeedPhotoSelected(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        selectedFeedPhotoDataUrl = e.target.result;
+      compressImage(file, 1200, 0.82, function(compressedUrl) {
+        selectedFeedPhotoDataUrl = compressedUrl;
         const previewContainer = document.getElementById('feedPhotoPreviewContainer');
         const previewImg = document.getElementById('feedPhotoPreviewImg');
         if (previewImg && previewContainer) {
           previewImg.src = selectedFeedPhotoDataUrl;
           previewContainer.style.display = 'block';
         }
-      };
-      reader.readAsDataURL(file);
+      });
     }
 
     function clearFeedSelectedPhoto() {
@@ -8535,6 +8620,7 @@ function renderHtml(
           authorName: myProfile ? myProfile.name : 'You (Sovereign Peer)',
           authorAvatar: myProfile ? myProfile.avatar : 'S',
           authorAvatarBg: myProfile ? myProfile.avatarBg : '#6366f1',
+          authorAvatarDataUrl: myProfile ? myProfile.avatarDataUrl : undefined,
           authorDid: myProfile ? myProfile.did : 'did:sovra:self',
         })
       })
@@ -8639,7 +8725,9 @@ function renderHtml(
       card.innerHTML = 
         '<div class="insta-post-header">' +
           '<div class="insta-author-info">' +
-            '<div class="insta-author-avatar" style="background: ' + post.authorAvatarBg + ';">' + post.authorAvatar + '</div>' +
+            '<div class="insta-author-avatar" style="background: ' + post.authorAvatarBg + '; overflow: hidden;">' +
+              (post.authorAvatarDataUrl ? '<img src="' + post.authorAvatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : post.authorAvatar) +
+            '</div>' +
             '<div>' +
               '<div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 4px;">' +
                 '<span>' + post.authorName + '</span>' +
@@ -9716,9 +9804,9 @@ function renderHtml(
     // ==========================================
     // 2. WHATSAPP E2EE CHAT SCRIPT ENGINE
     // ==========================================
-    const contactsData = ${JSON.stringify(contactsStore)};
+    const contactsData = ${JSON.stringify(sovraDb.getAllPeers())};
     let bitchatPeersData = ${JSON.stringify(bitchatPeersStore)};
-    let chatMessages = ${JSON.stringify(chatMessagesStore)};
+    let chatMessages = ${JSON.stringify(sovraDb.getState().chatMessages)};
     let bitchatModeActive = true;
     let activeContactDid = 'channel:local_mesh';
     let isRecordingVoice = false;
@@ -9824,8 +9912,8 @@ function renderHtml(
             const isActive = p.did === activeContactDid;
             const hopLabel = p.hops === 1 ? '1 Hop Direct' : p.hops + ' Hops Relay';
             html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + p.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + p.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
-              '<div class="contact-avatar" style="background: ' + p.avatarBg + ';">' +
-                p.avatar +
+              '<div class="contact-avatar" style="background: ' + p.avatarBg + '; overflow: hidden;">' +
+                (p.avatarDataUrl ? '<img src="' + p.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : p.avatar) +
                 '<div class="online-dot" style="background: ' + (p.isDirect ? '#10b981' : '#f59e0b') + ';"></div>' +
               '</div>' +
               '<div class="contact-info">' +
@@ -9857,8 +9945,8 @@ function renderHtml(
         for (const c of filteredContacts) {
           const isActive = c.did === activeContactDid;
           html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + c.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
-            '<div class="contact-avatar" style="background: ' + c.avatarBg + ';">' +
-              c.avatar +
+            '<div class="contact-avatar" style="background: ' + c.avatarBg + '; overflow: hidden;">' +
+              (c.avatarDataUrl ? '<img src="' + c.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : c.avatar) +
               (c.isOnline ? '<div class="online-dot"></div>' : '') +
               (c.disappearingDurationSec > 0 ? '<div class="contact-clock-badge" title="Disappearing Messages Active">⏱️</div>' : '') +
             '</div>' +
@@ -9904,8 +9992,12 @@ function renderHtml(
 
       if (bcPeer) {
         if (avatarEl) {
-          avatarEl.innerText = bcPeer.avatar;
-          avatarEl.style.background = bcPeer.avatarBg;
+          if (bcPeer.avatarDataUrl) {
+            avatarEl.innerHTML = '<img src="' + bcPeer.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />';
+          } else {
+            avatarEl.innerText = bcPeer.avatar;
+            avatarEl.style.background = bcPeer.avatarBg;
+          }
         }
         if (nameEl) nameEl.innerText = bcPeer.name;
         if (badgeEl) badgeEl.style.display = 'none';
@@ -9932,8 +10024,12 @@ function renderHtml(
         }
       } else if (contact) {
         if (avatarEl) {
-          avatarEl.innerText = contact.avatar;
-          avatarEl.style.background = contact.avatarBg;
+          if (contact.avatarDataUrl) {
+            avatarEl.innerHTML = '<img src="' + contact.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />';
+          } else {
+            avatarEl.innerText = contact.avatar;
+            avatarEl.style.background = contact.avatarBg;
+          }
         }
         if (nameEl) nameEl.innerText = contact.name;
         if (badgeEl) badgeEl.style.display = contact.isVerified ? 'inline-block' : 'none';
@@ -10213,15 +10309,22 @@ function renderHtml(
             const myDid = myProfile ? myProfile.did : 'self';
             data.peers.forEach(function(p) {
               if (p.did !== myDid) {
-                if (!contactsData.some(function(c) { return c.did === p.did; })) {
+                const exIdx = contactsData.findIndex(function(c) { return c.did === p.did; });
+                if (exIdx === -1) {
                   contactsData.unshift(p);
                   changed = true;
+                } else if (contactsData[exIdx].avatarDataUrl !== p.avatarDataUrl || contactsData[exIdx].name !== p.name || contactsData[exIdx].avatarBg !== p.avatarBg) {
+                  Object.assign(contactsData[exIdx], p);
+                  changed = true;
                 }
-                if (!bitchatPeersData.some(function(bp) { return bp.did === p.did; })) {
+
+                const bpIdx = bitchatPeersData.findIndex(function(bp) { return bp.did === p.did; });
+                if (bpIdx === -1) {
                   bitchatPeersData.push({
                     did: p.did,
                     name: p.name,
                     avatar: p.avatar,
+                    avatarDataUrl: p.avatarDataUrl,
                     avatarBg: p.avatarBg,
                     role: p.role || 'Local Mesh Peer',
                     rssi: -40,
@@ -10229,6 +10332,12 @@ function renderHtml(
                     hops: 1,
                     isDirect: true
                   });
+                  changed = true;
+                } else if (bitchatPeersData[bpIdx].avatarDataUrl !== p.avatarDataUrl || bitchatPeersData[bpIdx].name !== p.name) {
+                  bitchatPeersData[bpIdx].avatarDataUrl = p.avatarDataUrl;
+                  bitchatPeersData[bpIdx].name = p.name;
+                  bitchatPeersData[bpIdx].avatar = p.avatar;
+                  bitchatPeersData[bpIdx].avatarBg = p.avatarBg;
                   changed = true;
                 }
               }
@@ -12655,6 +12764,18 @@ async function startDevServer() {
   console.log(`[DID] Identity DID: ${masterKey.did}`);
   console.log(`[PEER] libp2p Peer ID: ${binding.peerId}`);
 
+  // Ensure host node identity is registered in disk-backed database
+  sovraDb.upsertUser({
+    did: masterKey.did,
+    handle: '@laptop_host',
+    displayName: 'Host Node (Laptop)',
+    avatar: '💻',
+    avatarBg: '#6366f1',
+    bio: 'Root Mesh Relay & Seeder',
+    deviceType: 'Desktop',
+    publicKey: binding.devicePublicKeyHex,
+  });
+
   const HTTP_PORT = parseInt(process.env.PORT ?? '3001', 10);
   const startTime = Date.now();
 
@@ -13317,6 +13438,145 @@ async function startDevServer() {
     // ==========================================
     // API: PEER DISCOVERY & WHATSAPP E2EE CHAT
     // ==========================================
+    // ==========================================
+    // 👤 CORE USER & IDENTITY DATABASE ENDPOINTS
+    // ==========================================
+    if (url.pathname === '/api/user/register' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.did || !parsed.handle) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'DID and handle are required' }));
+            return;
+          }
+          const user = sovraDb.upsertUser({
+            did: String(parsed.did),
+            handle: String(parsed.handle),
+            displayName: String(parsed.name || parsed.displayName || 'Sovereign Peer'),
+            avatar: String(parsed.avatar || 'P'),
+            avatarDataUrl: parsed.avatarDataUrl ? String(parsed.avatarDataUrl) : undefined,
+            avatarBg: String(parsed.avatarBg || '#6366f1'),
+            bio: String(parsed.bio || ''),
+            deviceType: parsed.device === 'Mobile' || parsed.deviceType === 'Mobile' ? 'Mobile' : 'Desktop',
+            publicKey: parsed.publicKey ? String(parsed.publicKey) : undefined,
+          });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, user }));
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/user/update' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.did) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'DID is required' }));
+            return;
+          }
+          const user = sovraDb.upsertUser({
+            did: String(parsed.did),
+            handle: String(parsed.handle || '@user'),
+            displayName: String(parsed.name || parsed.displayName || 'Sovereign Peer'),
+            avatar: String(parsed.avatar || 'P'),
+            avatarDataUrl: parsed.avatarDataUrl ? String(parsed.avatarDataUrl) : undefined,
+            avatarBg: String(parsed.avatarBg || '#6366f1'),
+            bio: String(parsed.bio || ''),
+            deviceType: parsed.device === 'Mobile' || parsed.deviceType === 'Mobile' ? 'Mobile' : 'Desktop',
+          });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, user }));
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/user/me' && req.method === 'GET') {
+      const did = url.searchParams.get('did') || '';
+      const handle = url.searchParams.get('handle') || '';
+      const user = did ? sovraDb.findUserByDid(did) : (handle ? sovraDb.findUserByHandle(handle) : null);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, user }));
+      return;
+    }
+
+    if (url.pathname === '/api/user/list' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, users: sovraDb.getAllUsers() }));
+      return;
+    }
+
+    // ==========================================
+    // 🤝 FRIEND RELATIONSHIP & BILATERAL HANDSHAKE ENDPOINTS
+    // ==========================================
+    if (url.pathname === '/api/friends/request' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.fromDid || !parsed.toDid) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'fromDid and toDid are required' }));
+            return;
+          }
+          const rel = sovraDb.sendFriendRequest(String(parsed.fromDid), String(parsed.toDid));
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, relationship: rel }));
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/friends/respond' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const rel = sovraDb.respondFriendRequest(String(parsed.fromDid), String(parsed.toDid), parsed.status);
+          if (rel) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, relationship: rel }));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Friend request not found' }));
+          }
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/friends/list' && req.method === 'GET') {
+      const userDid = url.searchParams.get('userDid') || '';
+      const rels = sovraDb.getFriendRelationships(userDid);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, relationships: rels }));
+      return;
+    }
+
+    // ==========================================
+    // 📡 PEER DISCOVERY & WHATSAPP E2EE CHAT
+    // ==========================================
     if (url.pathname === '/api/peers/register' && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => (body += chunk));
@@ -13324,27 +13584,20 @@ async function startDevServer() {
         try {
           const peer = JSON.parse(body);
           if (peer && peer.did) {
-            const idx = dynamicPeersStore.findIndex(p => p.did === peer.did);
-            const record: ContactRecord = {
-              did: peer.did,
-              name: peer.name || 'Sovereign Peer',
-              avatar: peer.avatar || String(peer.name || 'P')[0].toUpperCase(),
-              avatarBg: peer.avatarBg || '#3b82f6',
-              role: peer.device ? `${peer.device} Peer (Local Mesh)` : 'Local Mesh Peer',
-              isOnline: true,
-              lastSeen: 'Online',
-              disappearingDurationSec: 0,
-              safetyNumbers: '28471 90432 18942 ' + peer.did.slice(-12),
-              isVerified: true,
-            };
-            if (idx >= 0) {
-              dynamicPeersStore[idx] = record;
-            } else {
-              dynamicPeersStore.push(record);
-            }
+            sovraDb.upsertUser({
+              did: String(peer.did),
+              handle: String(peer.handle || peer.name || 'peer'),
+              displayName: String(peer.name || peer.displayName || 'Sovereign Peer'),
+              avatar: String(peer.avatar || 'P'),
+              avatarDataUrl: peer.avatarDataUrl ? String(peer.avatarDataUrl) : undefined,
+              avatarBg: String(peer.avatarBg || '#6366f1'),
+              bio: String(peer.bio || ''),
+              deviceType: peer.device === 'Mobile' || peer.deviceType === 'Mobile' ? 'Mobile' : 'Desktop',
+            });
           }
+          const peers = sovraDb.getAllPeers();
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, peersCount: dynamicPeersStore.length }));
+          res.end(JSON.stringify({ ok: true, peersCount: peers.length, peers }));
         } catch {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Invalid peer JSON' }));
@@ -13355,23 +13608,32 @@ async function startDevServer() {
 
     if (url.pathname === '/api/peers/list' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, peers: dynamicPeersStore }));
+      res.end(JSON.stringify({ ok: true, peers: sovraDb.getAllPeers() }));
       return;
     }
 
     if (url.pathname === '/api/chat/contacts' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, contacts: [...contactsStore, ...dynamicPeersStore] }));
+      res.end(JSON.stringify({ ok: true, contacts: sovraDb.getAllPeers() }));
       return;
     }
 
     if (url.pathname === '/api/chat/messages' && req.method === 'GET') {
       const since = Number(url.searchParams.get('since') || 0);
-      const messages = since > 0 
-        ? chatMessagesStore.filter(m => (m.timestamp || 0) > since)
-        : chatMessagesStore;
+      const userDid = url.searchParams.get('userDid') || undefined;
+      const threadId = url.searchParams.get('threadId') || undefined;
+      let messages = sovraDb.getState().chatMessages;
+      if (since > 0) {
+        messages = messages.filter(m => (m.timestamp || 0) > since);
+      }
+      if (userDid) {
+        messages = messages.filter(m => m.recipientDid.startsWith('channel:') || m.senderDid === userDid || m.recipientDid === userDid);
+      }
+      if (threadId) {
+        messages = messages.filter(m => m.threadId === threadId);
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, messages: messages }));
+      res.end(JSON.stringify({ ok: true, messages }));
       return;
     }
 
@@ -13381,14 +13643,28 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          if (!parsed.id) parsed.id = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
-          if (!parsed.timestamp) parsed.timestamp = Date.now();
-          if (!chatMessagesStore.some(m => m.id === parsed.id)) {
-            chatMessagesStore.push(parsed);
-            saveDynamicSocialState(dynamicSocialStore);
+          if (!parsed.text && !parsed.isAudio) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Message text or audio required' }));
+            return;
           }
+          const record = sovraDb.appendMessage({
+            id: parsed.id,
+            senderDid: String(parsed.senderDid || 'self'),
+            recipientDid: String(parsed.recipientDid || 'channel:local_mesh'),
+            senderName: String(parsed.senderName || 'Peer'),
+            text: String(parsed.text || ''),
+            isAudio: Boolean(parsed.isAudio),
+            audioDurationSec: Number(parsed.audioDurationSec || 0),
+            waveformBars: Array.isArray(parsed.waveformBars) ? parsed.waveformBars : undefined,
+            status: parsed.status || 'sent',
+            disappearingDurationSec: Number(parsed.disappearingDurationSec || 0),
+            isBitChat: Boolean(parsed.isBitChat),
+            hopCount: Number(parsed.hopCount || 1),
+            route: Array.isArray(parsed.route) ? parsed.route : undefined,
+          });
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, message: parsed }));
+          res.end(JSON.stringify({ ok: true, message: record }));
         } catch {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
@@ -13403,11 +13679,12 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          const c = contactsStore.find(x => x.did === parsed.peerDid);
-          if (c) {
-            c.disappearingDurationSec = Number(parsed.durationSec || 0);
+          const peer = sovraDb.getState().contacts_and_peers.find(x => x.did === parsed.peerDid);
+          if (peer) {
+            peer.disappearingDurationSec = Number(parsed.durationSec || 0);
+            sovraDb.save();
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, peerDid: c.did, disappearingDurationSec: c.disappearingDurationSec }));
+            res.end(JSON.stringify({ ok: true, peerDid: peer.did, disappearingDurationSec: peer.disappearingDurationSec }));
           } else {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: false, error: 'Contact not found' }));
@@ -13426,10 +13703,11 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          const msg = chatMessagesStore.find(x => x.id === parsed.messageId);
+          const msg = sovraDb.getState().chatMessages.find(x => x.id === parsed.messageId);
           if (msg) {
             if (!msg.reactions) msg.reactions = [];
-            const existingIdx = msg.reactions.findIndex(r => r.senderDid === 'self');
+            const userDid = String(parsed.senderDid || 'self');
+            const existingIdx = msg.reactions.findIndex(r => r.senderDid === userDid);
             if (existingIdx >= 0) {
               if (msg.reactions[existingIdx].emoji === parsed.emoji) {
                 msg.reactions.splice(existingIdx, 1);
@@ -13437,9 +13715,9 @@ async function startDevServer() {
                 msg.reactions[existingIdx].emoji = parsed.emoji;
               }
             } else {
-              msg.reactions.push({ emoji: parsed.emoji, senderDid: 'self' });
+              msg.reactions.push({ emoji: parsed.emoji, senderDid: userDid });
             }
-            saveDynamicSocialState(dynamicSocialStore);
+            sovraDb.save();
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, reactions: msg.reactions }));
           } else {
@@ -13460,14 +13738,10 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          const msg = chatMessagesStore.find(x => x.id === parsed.messageId);
-          if (msg) {
-            msg.status = parsed.status;
-            if (parsed.status === 'delivered') msg.deliveredAt = Date.now();
-            if (parsed.status === 'read') msg.readAt = Date.now();
-            saveDynamicSocialState(dynamicSocialStore);
+          const success = sovraDb.updateMessageReceipt(String(parsed.messageId), parsed.status);
+          if (success) {
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, messageId: msg.id, status: msg.status }));
+            res.end(JSON.stringify({ ok: true, messageId: parsed.messageId, status: parsed.status }));
           } else {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: false, error: 'Message not found' }));
