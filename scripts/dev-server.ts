@@ -8498,11 +8498,11 @@ function renderHtml(
       }
 
       const mediaBoxHtml = post.mediaImage ?
-        '<div class="insta-media-box" id="media-' + post.id + '" style="position: relative; overflow: hidden; max-height: 480px; background: #000; display: flex; align-items: center; justify-content: center;" ondblclick="handleFeedDoubleTap(\'' + post.id + '\', event)">' +
+        '<div class="insta-media-box" id="media-' + post.id + '" style="position: relative; overflow: hidden; max-height: 480px; background: #000; display: flex; align-items: center; justify-content: center;">' +
           '<img src="' + post.mediaImage + '" alt="Feed media" style="width: 100%; height: auto; max-height: 480px; object-fit: contain; display: block;" />' +
           '<div id="heart-pop-' + post.id + '"></div>' +
         '</div>' :
-        '<div class="insta-media-box" id="media-' + post.id + '" style="background: ' + post.mediaGradient + ';" ondblclick="handleFeedDoubleTap(\'' + post.id + '\', event)">' +
+        '<div class="insta-media-box" id="media-' + post.id + '" style="background: ' + post.mediaGradient + ';">' +
           '<div style="text-align: center; pointer-events: none; z-index: 2; padding: 2rem;">' +
             '<div style="font-size: 4rem; margin-bottom: 0.75rem;">' + post.mediaEmoji + '</div>' +
             '<div style="font-size: 1.15rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); line-height: 1.35;">' + post.mediaTitle + '</div>' +
@@ -8515,7 +8515,7 @@ function renderHtml(
 
       card.innerHTML = 
         '<div class="insta-post-header">' +
-          '<div class="insta-author-info" onclick="openCreatorProfile(\'' + post.authorName.split(' ')[0].toLowerCase() + '\')">' +
+          '<div class="insta-author-info">' +
             '<div class="insta-author-avatar" style="background: ' + post.authorAvatarBg + ';">' + post.authorAvatar + '</div>' +
             '<div>' +
               '<div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 4px;">' +
@@ -8525,20 +8525,20 @@ function renderHtml(
               '<div style="font-size: 0.72rem; color: #94a3b8;"><span>' + post.audioTrack + '</span></div>' +
             '</div>' +
           '</div>' +
-          '<button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 1rem;" title="Post Options" onclick="openPostOptionsModal(\'' + post.id + '\', \'' + post.authorName + '\', \'' + post.mediaCid + '\')">⋮</button>' +
+          '<button class="chat-btn-round btn-opt-' + post.id + '" style="width: 32px; height: 32px; font-size: 1rem;" title="Post Options">⋮</button>' +
         '</div>' +
 
         mediaBoxHtml +
 
         '<div class="insta-actions-row">' +
           '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
-            '<button class="insta-action-btn" id="btn-like-' + post.id + '" onclick="triggerFeedPostLike(\'' + post.id + '\')" title="Like Post">' + (post.isLiked ? '❤️' : '🤍') + '</button>' +
-            '<button class="insta-action-btn" onclick="focusFeedComment(\'' + post.id + '\')" title="Comment">💬</button>' +
-            '<button class="insta-action-btn" onclick="openRepostModal(\'' + post.id + '\')" title="Repost / Quote">🔁</button>' +
-            '<button class="insta-action-btn" onclick="shareFeedPostCid(\'' + post.mediaCid + '\')" title="Share CID to P2P Mesh">🚀</button>' +
-            '<button class="insta-action-btn" onclick="handleFeedDislike(\'' + post.id + '\')" title="Dislike / Show Less">👎</button>' +
+            '<button class="insta-action-btn" id="btn-like-' + post.id + '" title="Like Post">' + (post.isLiked ? '❤️' : '🤍') + '</button>' +
+            '<button class="insta-action-btn btn-comment-' + post.id + '" title="Comment">💬</button>' +
+            '<button class="insta-action-btn btn-repost-' + post.id + '" title="Repost / Quote">🔁</button>' +
+            '<button class="insta-action-btn btn-share-' + post.id + '" title="Share CID to P2P Mesh">🚀</button>' +
+            '<button class="insta-action-btn btn-dislike-' + post.id + '" title="Dislike / Show Less">👎</button>' +
           '</div>' +
-          '<button class="insta-action-btn" id="btn-save-' + post.id + '" onclick="toggleSaveFeedPost(\'' + post.id + '\')" title="Pin to Local Blockstore">' + (post.isSaved ? '🔖' : '🏷️') + '</button>' +
+          '<button class="insta-action-btn" id="btn-save-' + post.id + '" title="Pin to Local Blockstore">' + (post.isSaved ? '🔖' : '🏷️') + '</button>' +
         '</div>' +
 
         '<div class="insta-likes-text">' +
@@ -8556,9 +8556,32 @@ function renderHtml(
         '</div>' +
 
         '<div class="insta-comment-input-row">' +
-          '<input type="text" id="input-comment-' + post.id + '" placeholder="Add a comment to GossipSub swarm..." onkeydown="if(event.key===\'Enter\') submitFeedComment(\'' + post.id + '\')">' +
-          '<button onclick="submitFeedComment(\'' + post.id + '\')">Post</button>' +
+          '<input type="text" id="input-comment-' + post.id + '" placeholder="Add a comment to GossipSub swarm...">' +
+          '<button class="btn-sub-comment-' + post.id + '">Post</button>' +
         '</div>';
+
+      const authorInfo = card.querySelector('.insta-author-info');
+      if (authorInfo) authorInfo.onclick = function() { openCreatorProfile(post.authorName.split(' ')[0].toLowerCase()); };
+      const mBox = card.querySelector('.insta-media-box');
+      if (mBox) mBox.ondblclick = function(e) { handleFeedDoubleTap(post.id, e); };
+      const btnOpt = card.querySelector('.btn-opt-' + post.id);
+      if (btnOpt) btnOpt.onclick = function() { openPostOptionsModal(post.id, post.authorName, post.mediaCid); };
+      const btnLike = card.querySelector('#btn-like-' + post.id);
+      if (btnLike) btnLike.onclick = function() { triggerFeedPostLike(post.id); };
+      const btnComm = card.querySelector('.btn-comment-' + post.id);
+      if (btnComm) btnComm.onclick = function() { focusFeedComment(post.id); };
+      const btnRep = card.querySelector('.btn-repost-' + post.id);
+      if (btnRep) btnRep.onclick = function() { openRepostModal(post.id); };
+      const btnShare = card.querySelector('.btn-share-' + post.id);
+      if (btnShare) btnShare.onclick = function() { shareFeedPostCid(post.mediaCid); };
+      const btnDis = card.querySelector('.btn-dislike-' + post.id);
+      if (btnDis) btnDis.onclick = function() { handleFeedDislike(post.id); };
+      const btnSav = card.querySelector('#btn-save-' + post.id);
+      if (btnSav) btnSav.onclick = function() { toggleSaveFeedPost(post.id); };
+      const commentInput = card.querySelector('#input-comment-' + post.id);
+      if (commentInput) commentInput.onkeydown = function(e) { if (e.key === 'Enter') submitFeedComment(post.id); };
+      const btnSubComm = card.querySelector('.btn-sub-comment-' + post.id);
+      if (btnSubComm) btnSubComm.onclick = function() { submitFeedComment(post.id); };
 
       container.insertBefore(card, container.firstChild);
     }
@@ -9654,7 +9677,7 @@ function renderHtml(
           html += '<div class="bitchat-section-title">✨ Hyperlocal Mesh Channels</div>';
           for (const c of channels) {
             const isActive = c.did === activeContactDid;
-            html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" onclick="selectContact(\'' + c.did + '\')" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
+            html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + c.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
               '<div class="contact-avatar" style="background: ' + c.avatarBg + ';">' +
                 c.avatar +
                 '<div class="online-dot" style="background: #38bdf8;"></div>' +
@@ -9677,7 +9700,7 @@ function renderHtml(
           for (const p of directPeers) {
             const isActive = p.did === activeContactDid;
             const hopLabel = p.hops === 1 ? '1 Hop Direct' : p.hops + ' Hops Relay';
-            html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" onclick="selectContact(\'' + p.did + '\')" id="contact-' + p.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
+            html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + p.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + p.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
               '<div class="contact-avatar" style="background: ' + p.avatarBg + ';">' +
                 p.avatar +
                 '<div class="online-dot" style="background: ' + (p.isDirect ? '#10b981' : '#f59e0b') + ';"></div>' +
@@ -9710,7 +9733,7 @@ function renderHtml(
         let html = '';
         for (const c of filteredContacts) {
           const isActive = c.did === activeContactDid;
-          html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" onclick="selectContact(\'' + c.did + '\')" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
+          html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + c.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
             '<div class="contact-avatar" style="background: ' + c.avatarBg + ';">' +
               c.avatar +
               (c.isOnline ? '<div class="online-dot"></div>' : '') +
@@ -9808,7 +9831,7 @@ function renderHtml(
     }
 
     function executeBitChatPanicWipe() {
-      if (!confirm('🚨 EMERGENCY PANIC WIPE (BitChat Stealth Security):\n\nThis will immediately zeroize all local BitChat mesh packets, in-memory encryption keys, and peer session routing tables.\n\nAre you sure you want to proceed?')) {
+      if (!confirm('🚨 EMERGENCY PANIC WIPE (BitChat Stealth Security):\\n\\nThis will immediately zeroize all local BitChat mesh packets, in-memory encryption keys, and peer session routing tables.\\n\\nAre you sure you want to proceed?')) {
         return;
       }
       chatMessages = chatMessages.filter(function(m) { return !m.isBitChat; });
@@ -11602,7 +11625,7 @@ function renderHtml(
       const container = document.getElementById('omniRecentChips');
       if (!container) return;
       container.innerHTML = currentRecentSearches
-        .map(q => '<span onclick="executeRecentSearch(\'' + q + '\')" style="background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 12px; cursor: pointer; color: #cbd5e1;">' + q + '</span>')
+        .map(q => '<span data-query="' + q.replace(/"/g, '&quot;') + '" onclick="executeRecentSearch(this.dataset.query)" style="background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 12px; cursor: pointer; color: #cbd5e1;">' + q + '</span>')
         .join('');
     }
 
@@ -11650,8 +11673,8 @@ function renderHtml(
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.4rem; align-items: center;">' +
-              '<button class="action-pill-btn ' + friendBtnClass + '" onclick="toggleFriendAction(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">' + friendBtnText + '</button>' +
-              '<button class="chat-btn-round" style="width: 28px; height: 28px; font-size: 0.85rem;" title="Block / Mute" onclick="toggleBlockUserDemo(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">🚫</button>' +
+              '<button class="action-pill-btn ' + friendBtnClass + '" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="toggleFriendAction(this.dataset.pubkey, this.dataset.name)">' + friendBtnText + '</button>' +
+              '<button class="chat-btn-round" style="width: 28px; height: 28px; font-size: 0.85rem;" title="Block / Mute" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="toggleBlockUserDemo(this.dataset.pubkey, this.dataset.name)">🚫</button>' +
             '</div>' +
           '</div>';
         }
@@ -11674,7 +11697,7 @@ function renderHtml(
                 '<div style="font-size: 0.75rem; color: #94a3b8;">' + ch.handle + ' &bull; ' + ch.count.toLocaleString() + ' subscribers</div>' +
               '</div>' +
             '</div>' +
-            '<button class="action-pill-btn ' + subClass + '" onclick="toggleChannelSubscribeDemo(\'' + ch.id + '\')">' + subText + '</button>' +
+            '<button class="action-pill-btn ' + subClass + '" data-channel-id="' + ch.id + '" onclick="toggleChannelSubscribeDemo(this.dataset.channelId)">' + subText + '</button>' +
           '</div>';
         }
       }
@@ -11697,8 +11720,8 @@ function renderHtml(
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.4rem;">' +
-              '<button class="action-pill-btn action-pill-secondary" style="border-color: #38bdf8; color: #38bdf8;" onclick="alert(\'CTA Action: Redirecting to ' + pg.cta + '\')">' + pg.cta + '</button>' +
-              '<button class="action-pill-btn ' + folClass + '" onclick="togglePageFollowDemo(\'' + pg.id + '\')">' + folText + '</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="border-color: #38bdf8; color: #38bdf8;" data-cta="' + pg.cta.replace(/"/g, '&quot;') + '" onclick="alert(&quot;CTA Action: Redirecting to &quot; + this.dataset.cta)">' + pg.cta + '</button>' +
+              '<button class="action-pill-btn ' + folClass + '" data-page-id="' + pg.id + '" onclick="togglePageFollowDemo(this.dataset.pageId)">' + folText + '</button>' +
             '</div>' +
           '</div>';
         }
@@ -11708,7 +11731,7 @@ function renderHtml(
       if (currentSearchTab === 'all' || currentSearchTab === 'hashtags') {
         const matched = socialOmniCatalog.hashtags.filter(h => !q || h.tag.toLowerCase().includes(q));
         for (const h of matched) {
-          html += '<div class="omni-result-item" style="cursor: pointer;" onclick="document.getElementById(\'omniSearchInput\').value=\'' + h.tag + '\'; filterOmniSearch(\'' + h.tag + '\')">' +
+          html += '<div class="omni-result-item" style="cursor: pointer;" data-tag="' + h.tag + '" onclick="document.getElementById(&quot;omniSearchInput&quot;).value=this.dataset.tag; filterOmniSearch(this.dataset.tag)">' +
             '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
               '<div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(56, 189, 248, 0.15); color: #38bdf8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem;">#</div>' +
               '<div>' +
@@ -11733,7 +11756,7 @@ function renderHtml(
                 '<div style="font-size: 0.72rem; color: #94a3b8;">' + a.artist + ' &bull; ' + a.count.toLocaleString() + ' reels</div>' +
               '</div>' +
             '</div>' +
-            '<button class="action-pill-btn action-pill-secondary" onclick="alert(\'Audio Preview: Playing 15s snippet for ' + a.title.replace(/'/g, "\\'") + '\')">▶ Preview</button>' +
+            '<button class="action-pill-btn action-pill-secondary" data-title="' + a.title.replace(/"/g, '&quot;') + '" onclick="alert(&quot;Audio Preview: Playing 15s snippet for &quot; + this.dataset.title)">▶ Preview</button>' +
           '</div>';
         }
       }
@@ -11907,8 +11930,8 @@ function renderHtml(
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
-              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="acceptFriendRequest(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">✓ Confirm</button>' +
-              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem;" onclick="rejectFriendRequest(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">✕ Delete</button>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="acceptFriendRequest(this.dataset.pubkey, this.dataset.name)">✓ Confirm</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem;" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="rejectFriendRequest(this.dataset.pubkey, this.dataset.name)">✕ Delete</button>' +
             '</div>' +
           '</div>';
         }
@@ -11933,8 +11956,8 @@ function renderHtml(
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.4rem; align-items: center;">' +
-              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="sendFriendRequest(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">+ Add Friend</button>' +
-              '<button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 0.85rem;" title="Block" onclick="toggleBlockUserDemo(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">🚫</button>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="sendFriendRequest(this.dataset.pubkey, this.dataset.name)">+ Add Friend</button>' +
+              '<button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 0.85rem;" title="Block" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="toggleBlockUserDemo(this.dataset.pubkey, this.dataset.name)">🚫</button>' +
             '</div>' +
           '</div>';
         }
@@ -11966,8 +11989,8 @@ function renderHtml(
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
-              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700; background: #6366f1; color: #fff;" onclick="messageFriend(\'' + (p.contactDid || p.pubkey) + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">💬 Message</button>' +
-              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.75rem; color: #f87171; border-color: rgba(239, 68, 68, 0.3);" title="Remove Friend" onclick="unfriendUser(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">✕</button>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700; background: #6366f1; color: #fff;" data-did="' + (p.contactDid || p.pubkey) + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="messageFriend(this.dataset.did, this.dataset.name)">💬 Message</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.75rem; color: #f87171; border-color: rgba(239, 68, 68, 0.3);" title="Remove Friend" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="unfriendUser(this.dataset.pubkey, this.dataset.name)">✕</button>' +
             '</div>' +
           '</div>';
         }
@@ -12087,7 +12110,7 @@ function renderHtml(
           const statusText = p.isFriend ? '❤️ Friends' : p.isPending ? '⏳ Requested' : '+ Add';
           const statusBg = p.isFriend ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)';
           const statusColor = p.isFriend ? '#f87171' : '#38bdf8';
-          html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'transparent\'" onclick="switchTab(\'friends\'); filterFriendsView(\'' + p.name.replace(/'/g, "\\'") + '\'); document.getElementById(\'headerSearchDropdown\').style.display=\'none\';">' +
+          html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background=&quot;rgba(255,255,255,0.06)&quot;" onmouseout="this.style.background=&quot;transparent&quot;" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="switchTab(&quot;friends&quot;); filterFriendsView(this.dataset.name); document.getElementById(&quot;headerSearchDropdown&quot;).style.display=&quot;none&quot;;">' +
             '<div style="display: flex; align-items: center; gap: 8px;">' +
               '<div style="width: 28px; height: 28px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;">' + p.avatar + '</div>' +
               '<div>' +
@@ -12104,7 +12127,7 @@ function renderHtml(
       if (matchedChannels.length > 0) {
         html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 8px 4px 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">📡 Channels</div>';
         for (const c of matchedChannels.slice(0, 2)) {
-          html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'transparent\'" onclick="openOmniSearch(); switchSearchTab(\'channels\'); document.getElementById(\'headerSearchDropdown\').style.display=\'none\';">' +
+          html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background=&quot;rgba(255,255,255,0.06)&quot;" onmouseout="this.style.background=&quot;transparent&quot;" onclick="openOmniSearch(); switchSearchTab(&quot;channels&quot;); document.getElementById(&quot;headerSearchDropdown&quot;).style.display=&quot;none&quot;;">' +
             '<div style="display: flex; align-items: center; gap: 8px;">' +
               '<div style="width: 26px; height: 26px; border-radius: 6px; background: ' + c.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">' + c.avatar + '</div>' +
               '<div>' +
@@ -12121,7 +12144,7 @@ function renderHtml(
       if (matchedTags.length > 0) {
         html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 8px 4px 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">🔥 Hashtags</div>';
         for (const h of matchedTags.slice(0, 2)) {
-          html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 8px; cursor: pointer;" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'transparent\'" onclick="searchHashtag(\'' + h.tag + '\');">' +
+          html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 8px; cursor: pointer;" onmouseover="this.style.background=&quot;rgba(255,255,255,0.06)&quot;" onmouseout="this.style.background=&quot;transparent&quot;" data-tag="' + h.tag + '" onclick="searchHashtag(this.dataset.tag);">' +
             '<span style="font-size: 0.82rem; font-weight: 700; color: #38bdf8;">' + h.tag + '</span>' +
             '<span style="font-size: 0.7rem; color: #64748b;">' + (h.posts || 0) + ' posts</span>' +
           '</div>';
@@ -12133,8 +12156,8 @@ function renderHtml(
       }
 
       html += '<div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 6px; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">' +
-        '<button onclick="switchTab(\'friends\'); filterFriendsView(\'' + q.replace(/'/g, "\\'") + '\'); document.getElementById(\'headerSearchDropdown\').style.display=\'none\';" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px;">👥 Friends Hub →</button>' +
-        '<button onclick="openOmniSearch(); const oi=document.getElementById(\'omniSearchInput\'); if(oi){oi.value=\'' + q.replace(/'/g, "\\'") + '\'; filterOmniSearch(\'' + q.replace(/'/g, "\\'") + '\');} document.getElementById(\'headerSearchDropdown\').style.display=\'none\';" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 6px; color: #a5b4fc; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px 8px;">🔍 Deep Omni-Search (Ctrl+K) →</button>' +
+        '<button onclick="switchTab(&quot;friends&quot;); filterFriendsView(document.getElementById(&quot;headerFriendSearchInput&quot;)?.value || &quot;&quot;); document.getElementById(&quot;headerSearchDropdown&quot;).style.display=&quot;none&quot;;" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px;">👥 Friends Hub →</button>' +
+        '<button onclick="openOmniSearch(); const oi=document.getElementById(&quot;omniSearchInput&quot;); if(oi){oi.value=document.getElementById(&quot;headerFriendSearchInput&quot;)?.value || &quot;&quot;; filterOmniSearch(oi.value);} document.getElementById(&quot;headerSearchDropdown&quot;).style.display=&quot;none&quot;;" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 6px; color: #a5b4fc; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px 8px;">🔍 Deep Omni-Search (Ctrl+K) →</button>' +
       '</div>';
 
       dropdown.innerHTML = html;
@@ -12209,7 +12232,7 @@ function renderHtml(
               '<div style="font-size: 0.72rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + p.handle + '</div>' +
             '</div>' +
           '</div>' +
-          '<button class="action-pill-btn action-pill-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;" onclick="sendFriendRequest(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\'); renderRightRailSuggestions();">+ Add</button>' +
+          '<button class="action-pill-btn action-pill-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="sendFriendRequest(this.dataset.pubkey, this.dataset.name); renderRightRailSuggestions();">+ Add</button>' +
         '</div>';
       }).join('');
     }
@@ -12324,7 +12347,7 @@ function renderHtml(
       const link = window.location.origin + '/#card-' + activeTargetPost.id;
       navigator.clipboard?.writeText?.(link);
       closePostOptionsModal();
-      alert('🔗 Post Link Copied to Clipboard!\n' + link);
+      alert('🔗 Post Link Copied to Clipboard!\\n' + link);
     }
     function triggerShareFromModal() {
       closePostOptionsModal();
@@ -12389,7 +12412,7 @@ function renderHtml(
     function submitQuoteRepost() {
       const commentary = document.getElementById('repostCommentaryInput').value.trim();
       closeRepostModal();
-      alert('✍️ Quote Post published with your thoughts:\n"' + (commentary || 'Spotlight on this post!') + '"\nSigned and broadcasted to mesh.');
+      alert('✍️ Quote Post published with your thoughts:\\n"' + (commentary || 'Spotlight on this post!') + '"\\nSigned and broadcasted to mesh.');
     }
 
     // --- Safety & Dispute Report ---
@@ -12406,7 +12429,7 @@ function renderHtml(
       const reason = document.getElementById('reportReasonInput').value;
       const ticketId = 'SR-' + Math.floor(1000 + Math.random() * 9000);
       closeSafetyReportModal();
-      alert('✅ Cryptographic Report #' + ticketId + ' registered on the Mesh Dispute Ledger!\nReason: ' + reason.toUpperCase() + '\nA jury of 5 neutral high-reputation nodes has been assigned.');
+      alert('✅ Cryptographic Report #' + ticketId + ' registered on the Mesh Dispute Ledger!\\nReason: ' + reason.toUpperCase() + '\\nA jury of 5 neutral high-reputation nodes has been assigned.');
     }
 
     // ==========================================
@@ -12463,7 +12486,7 @@ function renderHtml(
           if (banner) banner.style.display = 'none';
         });
       } else {
-        alert('📱 To install Sovra on your device:\n1. Tap the Share or 3-dots menu in your browser.\n2. Select "Add to Home screen" or "Install App".');
+        alert('📱 To install Sovra on your device:\\n1. Tap the Share or 3-dots menu in your browser.\\n2. Select "Add to Home screen" or "Install App".');
       }
     }
 
