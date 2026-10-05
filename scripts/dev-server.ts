@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import {
   generateEd25519KeyPair,
   bytesToHex,
@@ -8245,6 +8246,7 @@ function renderHtml(
           }
         }, 1200);
       }
+      setTimeout(function() { if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships(); }, 400);
     });
 
     function openAccountLifecycleModal() {
@@ -8581,6 +8583,7 @@ function renderHtml(
       } else if (tab === 'me') {
         renderProfileGrid(currentProfileGridTab || 'posts');
       } else if (tab === 'friends') {
+        if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
         renderFriendsDiscoveryView();
       }
     }
@@ -12415,75 +12418,110 @@ function renderHtml(
       filterFriendsView('');
     }
 
+    function syncFriendsRelationships(callback) {
+      const myDid = myProfile ? myProfile.did : 'did:sovra:self';
+      fetch('/api/friends/list?userDid=' + encodeURIComponent(myDid))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok) {
+            friendsData = data;
+
+            // Total counters
+            const totalPending = data.counts ? data.counts.pendingIncoming : (data.incoming ? data.incoming.length : 0);
+            const totalFriends = data.counts ? data.counts.friends : (data.friends ? data.friends.length : 0);
+
+            const fBadge = document.getElementById('friendsTotalBadge');
+            if (fBadge) fBadge.innerText = totalFriends + ' Friends';
+
+            const rCountEl = document.getElementById('ffilterRequestsCount');
+            if (rCountEl) {
+              rCountEl.innerText = totalPending;
+              rCountEl.style.display = totalPending > 0 ? 'inline' : 'none';
+            }
+
+            const bnavBadge = document.getElementById('bnavFriendsBadge');
+            if (bnavBadge) {
+              bnavBadge.innerText = totalPending;
+              bnavBadge.style.display = totalPending > 0 ? 'flex' : 'none';
+            }
+
+            const railBadge = document.getElementById('railFriendsBadge');
+            if (railBadge) {
+              railBadge.innerText = totalPending;
+              railBadge.style.display = totalPending > 0 ? 'inline' : 'none';
+            }
+
+            const meFriendsCount = document.getElementById('meFriendsCount');
+            if (meFriendsCount) meFriendsCount.innerText = totalFriends.toString();
+
+            if (document.body.dataset.activeTab === 'friends') {
+              renderFriendsDiscoveryView();
+            }
+            if (callback) callback();
+          }
+        })
+        .catch(function() {});
+    }
+    setInterval(syncFriendsRelationships, 2500);
+
     function renderFriendsDiscoveryView() {
       const container = document.getElementById('friendsViewContent');
       if (!container) return;
 
       const q = friendsViewSearchQuery;
-      const matched = socialOmniCatalog.people.filter(function(p) {
-        if (p.isBlocked) return false;
+
+      // Filter incoming requests
+      const incomingList = (friendsData.incoming || []).filter(function(r) {
         if (!q) return true;
-        return (p.name && p.name.toLowerCase().includes(q)) ||
-               (p.handle && p.handle.toLowerCase().includes(q)) ||
-               (p.bio && p.bio.toLowerCase().includes(q)) ||
-               (p.pubkey && p.pubkey.toLowerCase().includes(q));
+        const u = r.user || {};
+        return (u.name && u.name.toLowerCase().includes(q)) || (u.handle && u.handle.toLowerCase().includes(q));
       });
 
-      const pendingRequests = matched.filter(p => p.isPending);
-      const myFriends = matched.filter(p => p.isFriend);
-      const suggestions = matched.filter(p => !p.isFriend && !p.isPending);
+      // Filter mutual friends
+      const friendsList = (friendsData.friends || []).filter(function(f) {
+        if (!q) return true;
+        return (f.name && f.name.toLowerCase().includes(q)) || (f.handle && f.handle.toLowerCase().includes(q));
+      });
 
-      // Total counters
-      const totalPending = socialOmniCatalog.people.filter(p => !p.isBlocked && p.isPending).length;
-      const totalFriends = socialOmniCatalog.people.filter(p => !p.isBlocked && p.isFriend).length;
-
-      const fBadge = document.getElementById('friendsTotalBadge');
-      if (fBadge) fBadge.innerText = totalFriends + ' Friends';
-
-      const rCountEl = document.getElementById('ffilterRequestsCount');
-      if (rCountEl) {
-        rCountEl.innerText = totalPending;
-        rCountEl.style.display = totalPending > 0 ? 'inline' : 'none';
-      }
-
-      const bnavBadge = document.getElementById('bnavFriendsBadge');
-      if (bnavBadge) {
-        bnavBadge.innerText = totalPending;
-        bnavBadge.style.display = totalPending > 0 ? 'flex' : 'none';
-      }
-
-      const railBadge = document.getElementById('railFriendsBadge');
-      if (railBadge) {
-        railBadge.innerText = totalPending;
-        railBadge.style.display = totalPending > 0 ? 'inline' : 'none';
-      }
+      // Filter suggestions (peers discovered on mesh that are not friends and not self)
+      const suggestionsList = (friendsData.suggestions || []).filter(function(p) {
+        if (p.relationshipStatus === 'friends') return false;
+        if (!q) return true;
+        return (p.name && p.name.toLowerCase().includes(q)) || (p.handle && p.handle.toLowerCase().includes(q)) || (p.role && p.role.toLowerCase().includes(q));
+      });
 
       let html = '';
 
-      // 1. Pending Requests Section
-      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'requests') && pendingRequests.length > 0) {
+      // 1. Pending Incoming Requests Section
+      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'requests') && incomingList.length > 0) {
         html += '<div>' +
-          '<div class="friends-section-title"><span>📩</span> <span>Pending Friend Requests (' + pendingRequests.length + ')</span></div>' +
+          '<div class="friends-section-title"><span>📩</span> <span>Pending Friend Requests (' + incomingList.length + ')</span></div>' +
           '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
-        for (const p of pendingRequests) {
-          html += '<div class="friend-card">' +
+        for (const req of incomingList) {
+          const u = req.user || {};
+          const avatarHtml = u.avatarDataUrl ?
+            '<img src="' + u.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" />' :
+            (u.avatar || 'P');
+
+          html += '<div class="friend-card" id="freq-card-' + req.id + '">' +
             '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
               '<div style="position: relative;">' +
-                '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(255,255,255,0.15);">' + p.avatar + '</div>' +
+                '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + (u.avatarBg || '#6366f1') + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(255,255,255,0.15); overflow: hidden;">' + avatarHtml + '</div>' +
                 '<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: #f59e0b; border: 2px solid #111827;" title="Pending Handshake"></div>' +
               '</div>' +
               '<div>' +
                 '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
-                  '<span>' + p.name + '</span>' +
+                  '<span>' + u.name + '</span>' +
                   '<span style="color: #38bdf8; font-size: 0.75rem;">✓</span>' +
+                  '<span style="font-size: 0.68rem; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 6px; border-radius: 8px;">' + (u.device || 'Mesh') + '</span>' +
                 '</div>' +
-                '<div style="font-size: 0.78rem; color: #94a3b8;">' + p.handle + '</div>' +
-                '<div style="font-size: 0.75rem; color: #10b981; margin-top: 2px; font-weight: 600;">⚡ ' + (p.mutuals || 4) + ' mutual connections on mesh</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8;">' + u.handle + '</div>' +
+                '<div style="font-size: 0.72rem; color: #10b981; margin-top: 2px; font-weight: 600;">⚡ Incoming bilateral friend request on Wi-Fi/P2P</div>' +
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
-              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="acceptFriendRequest(this.dataset.pubkey, this.dataset.name)">✓ Confirm</button>' +
-              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem;" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="rejectFriendRequest(this.dataset.pubkey, this.dataset.name)">✕ Delete</button>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="acceptFriendRequest(&quot;' + req.id + '&quot;, &quot;' + u.name.replace(/"/g, '&quot;') + '&quot;)">✓ Accept</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem;" onclick="rejectFriendRequest(&quot;' + req.id + '&quot;, &quot;' + u.name.replace(/"/g, '&quot;') + '&quot;)">✕ Reject</button>' +
             '</div>' +
           '</div>';
         }
@@ -12491,25 +12529,41 @@ function renderHtml(
       }
 
       // 2. People You May Know / Suggested Section
-      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'suggestions') && suggestions.length > 0) {
+      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'suggestions') && suggestionsList.length > 0) {
         html += '<div>' +
-          '<div class="friends-section-title"><span>✨</span> <span>People You May Know (' + suggestions.length + ')</span></div>' +
+          '<div class="friends-section-title"><span>✨</span> <span>Discovered Peers on Mesh (' + suggestionsList.length + ')</span></div>' +
           '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
-        for (const p of suggestions) {
+        for (const p of suggestionsList) {
+          const avatarHtml = p.avatarDataUrl ?
+            '<img src="' + p.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" />' :
+            (p.avatar || 'P');
+
+          let actionBtnHtml = '';
+          if (p.relationshipStatus === 'pending_sent') {
+            actionBtnHtml = '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem; color: #f59e0b; border-color: rgba(245,158,11,0.4);" disabled>⏳ Requested</button>';
+          } else if (p.relationshipStatus === 'pending_received') {
+            actionBtnHtml = '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 0.85rem;" onclick="setFriendsFilter(&quot;requests&quot;)">Respond 📩</button>';
+          } else {
+            actionBtnHtml = '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="sendFriendRequest(&quot;' + p.did + '&quot;, &quot;' + p.name.replace(/"/g, '&quot;') + '&quot;)">+ Add Friend</button>';
+          }
+
           html += '<div class="friend-card">' +
             '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
-              '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(255,255,255,0.1);">' + p.avatar + '</div>' +
+              '<div style="position: relative;">' +
+                '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + (p.avatarBg || '#6366f1') + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(255,255,255,0.1); overflow: hidden;">' + avatarHtml + '</div>' +
+                '<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: ' + (p.isOnline ? '#10b981' : '#64748b') + '; border: 2px solid #111827;"></div>' +
+              '</div>' +
               '<div>' +
                 '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
                   '<span>' + p.name + '</span>' +
+                  '<span style="font-size: 0.68rem; background: rgba(99,102,241,0.2); color: #a5b4fc; padding: 2px 6px; border-radius: 8px;">' + (p.device || 'Peer') + '</span>' +
                 '</div>' +
-                '<div style="font-size: 0.78rem; color: #94a3b8;">' + p.handle + ' &bull; ' + p.bio + '</div>' +
-                '<div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">⚡ ' + (p.mutuals || 3) + ' mutual friends</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8;">' + p.handle + ' &bull; ' + (p.isOnline ? '<span style="color:#10b981;">Online</span>' : 'Offline') + '</div>' +
+                '<div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">⚡ Discovered via Wi-Fi Multicast / GossipSub</div>' +
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.4rem; align-items: center;">' +
-              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="sendFriendRequest(this.dataset.pubkey, this.dataset.name)">+ Add Friend</button>' +
-              '<button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 0.85rem;" title="Block" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="toggleBlockUserDemo(this.dataset.pubkey, this.dataset.name)">🚫</button>' +
+              actionBtnHtml +
             '</div>' +
           '</div>';
         }
@@ -12517,32 +12571,34 @@ function renderHtml(
       }
 
       // 3. My Connected Friends Section
-      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'friends') && myFriends.length > 0) {
+      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'friends') && friendsList.length > 0) {
         html += '<div>' +
-          '<div class="friends-section-title"><span>🤝</span> <span>My Connected Friends (' + myFriends.length + ')</span></div>' +
+          '<div class="friends-section-title"><span>🤝</span> <span>My Connected Friends (' + friendsList.length + ')</span></div>' +
           '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
-        for (const p of myFriends) {
-          const statusDot = p.isOnline
-            ? '<span style="color: #10b981; font-size: 0.75rem;">● Online on Mesh</span>'
-            : '<span style="color: #64748b; font-size: 0.75rem;">○ Offline (25m ago)</span>';
+        for (const f of friendsList) {
+          const avatarHtml = f.avatarDataUrl ?
+            '<img src="' + f.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" />' :
+            (f.avatar || 'F');
+
           html += '<div class="friend-card">' +
             '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
               '<div style="position: relative;">' +
-                '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(16, 185, 129, 0.4);">' + p.avatar + '</div>' +
-                '<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: ' + (p.isOnline ? '#10b981' : '#64748b') + '; border: 2px solid #111827;"></div>' +
+                '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + (f.avatarBg || '#10b981') + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(16, 185, 129, 0.4); overflow: hidden;">' + avatarHtml + '</div>' +
+                '<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: ' + (f.isOnline ? '#10b981' : '#64748b') + '; border: 2px solid #111827;"></div>' +
               '</div>' +
               '<div>' +
                 '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
-                  '<span>' + p.name + '</span>' +
+                  '<span>' + f.name + '</span>' +
                   '<span style="color: #10b981; font-size: 0.75rem;">❤️</span>' +
+                  '<span style="font-size: 0.68rem; background: rgba(16,185,129,0.15); color: #10b981; padding: 2px 6px; border-radius: 8px;">' + (f.device || 'Friend') + '</span>' +
                 '</div>' +
-                '<div style="font-size: 0.78rem; color: #94a3b8;">' + p.handle + ' &bull; ' + statusDot + '</div>' +
-                '<div style="font-size: 0.72rem; color: #6ee7b7; margin-top: 2px;">⚡ Verified Bilateral Key Exchange</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8;">' + f.handle + ' &bull; ' + (f.isOnline ? '<span style="color:#10b981;">Online on Mesh</span>' : '<span style="color:#64748b;">Offline</span>') + '</div>' +
+                '<div style="font-size: 0.72rem; color: #6ee7b7; margin-top: 2px;">⚡ Verified Mutual Friend on Sovra Mesh</div>' +
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
-              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700; background: #6366f1; color: #fff;" data-did="' + (p.contactDid || p.pubkey) + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="messageFriend(this.dataset.did, this.dataset.name)">💬 Message</button>' +
-              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.75rem; color: #f87171; border-color: rgba(239, 68, 68, 0.3);" title="Remove Friend" data-pubkey="' + p.pubkey + '" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="unfriendUser(this.dataset.pubkey, this.dataset.name)">✕</button>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700; background: #6366f1; color: #fff;" onclick="messageFriend(&quot;' + f.did + '&quot;, &quot;' + f.name.replace(/"/g, '&quot;') + '&quot;)">💬 Message</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.75rem; color: #f87171; border-color: rgba(239, 68, 68, 0.3);" title="Remove Friend" onclick="unfriendUser(&quot;' + f.did + '&quot;, &quot;' + f.name.replace(/"/g, '&quot;') + '&quot;)">✕</button>' +
             '</div>' +
           '</div>';
         }
@@ -12552,8 +12608,7 @@ function renderHtml(
       if (!html) {
         html = '<div style="text-align: center; padding: 3rem 1rem; color: #64748b; font-size: 0.9rem;">' +
           '<div style="font-size: 2.2rem; margin-bottom: 0.5rem;">👥</div>' +
-          'No friends or people found matching "' + (q ? q.replace(/</g, '&lt;') : '') + '".<br>' +
-          '<span style="font-size: 0.8rem; color: #475569;">Try searching by different handle or keywords.</span>' +
+          (q ? ('No peers or friends found matching "' + q.replace(/</g, '&lt;') + '".') : 'No peers or friend requests in this view yet.<br><span style="color: #94a3b8; font-size: 0.8rem;">Open app on Phone (http://10.96.44.224:3001) to connect over LAN!</span>') +
         '</div>';
       }
 
@@ -12561,41 +12616,75 @@ function renderHtml(
       renderRightRailSuggestions();
     }
 
-    function acceptFriendRequest(pubkey, name) {
-      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
-      if (!p) return;
-      p.isPending = false;
-      p.isFriend = true;
-      updateMeFriendsCounter(1);
-      renderFriendsDiscoveryView();
-      alert('✓ Friend Request Accepted! You and ' + name + ' are now mutual friends on the sovereign mesh.');
+    function sendFriendRequest(targetDid, name) {
+      if (!myProfile || !myProfile.did) return;
+      fetch('/api/friends/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromDid: myProfile.did, toDid: targetDid })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          syncFriendsRelationships(function() {
+            showAccountToast('📨 Friend request sent to ' + name + '!');
+          });
+        }
+      })
+      .catch(function(err) { alert('Could not send friend request: ' + err.message); });
     }
 
-    function rejectFriendRequest(pubkey, name) {
-      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
-      if (!p) return;
-      p.isPending = false;
-      renderFriendsDiscoveryView();
-      alert('Friend request from ' + name + ' removed.');
+    function acceptFriendRequest(requestId, name) {
+      fetch('/api/friends/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: requestId, status: 'accepted' })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          syncFriendsRelationships(function() {
+            showAccountToast('🤝 You and ' + name + ' are now mutual friends!');
+          });
+        }
+      })
+      .catch(function(err) { alert('Could not accept friend request: ' + err.message); });
     }
 
-    function sendFriendRequest(pubkey, name) {
-      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
-      if (!p) return;
-      p.isPending = true;
-      renderFriendsDiscoveryView();
-      alert('📨 Friend request sent to ' + name + ' over Noise_XX encrypted P2P handshake.');
+    function rejectFriendRequest(requestId, name) {
+      fetch('/api/friends/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: requestId, status: 'rejected' })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          syncFriendsRelationships(function() {
+            showAccountToast('Friend request from ' + name + ' removed.');
+          });
+        }
+      })
+      .catch(function(err) { alert('Could not reject request: ' + err.message); });
     }
 
-    function unfriendUser(pubkey, name) {
-      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
-      if (!p) return;
+    function unfriendUser(targetDid, name) {
+      if (!myProfile || !myProfile.did) return;
       if (confirm('Remove ' + name + ' from your friends list?')) {
-        p.isFriend = false;
-        p.isPending = false;
-        updateMeFriendsCounter(-1);
-        renderFriendsDiscoveryView();
-        alert('Friendship with ' + name + ' removed.');
+        fetch('/api/friends/remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userDid: myProfile.did, targetDid: targetDid })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok) {
+            syncFriendsRelationships(function() {
+              showAccountToast('Friendship with ' + name + ' removed.');
+            });
+          }
+        })
+        .catch(function(err) { alert('Could not unfriend: ' + err.message); });
       }
     }
 
@@ -13945,7 +14034,7 @@ async function startDevServer() {
     if (url.pathname === '/api/friends/request' && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => (body += chunk));
-      req.on('end', () => {
+      req.on('end', async () => {
         try {
           const parsed = JSON.parse(body);
           if (!parsed.fromDid || !parsed.toDid) {
@@ -13954,6 +14043,12 @@ async function startDevServer() {
             return;
           }
           const rel = sovraDb.sendFriendRequest(String(parsed.fromDid), String(parsed.toDid));
+
+          // Notify P2P mesh topic
+          try {
+            await node.pubsub.publish('sovra/social/friends', new TextEncoder().encode(JSON.stringify({ type: 'friend_request', rel })));
+          } catch {}
+
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, relationship: rel }));
         } catch {
@@ -13967,11 +14062,24 @@ async function startDevServer() {
     if (url.pathname === '/api/friends/respond' && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => (body += chunk));
-      req.on('end', () => {
+      req.on('end', async () => {
         try {
           const parsed = JSON.parse(body);
-          const rel = sovraDb.respondFriendRequest(String(parsed.fromDid), String(parsed.toDid), parsed.status);
+          let rel: FriendRelationshipRecord | null = null;
+          const status = parsed.status === 'accept' ? 'accepted' : (parsed.status === 'reject' ? 'rejected' : parsed.status);
+
+          if (parsed.requestId) {
+            rel = sovraDb.respondFriendRequestById(String(parsed.requestId), status);
+          } else if (parsed.fromDid && parsed.toDid) {
+            rel = sovraDb.respondFriendRequest(String(parsed.fromDid), String(parsed.toDid), status);
+          }
+
           if (rel) {
+            // Notify P2P mesh topic
+            try {
+              await node.pubsub.publish('sovra/social/friends', new TextEncoder().encode(JSON.stringify({ type: 'friend_respond', rel })));
+            } catch {}
+
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, relationship: rel }));
           } else {
@@ -13986,11 +14094,140 @@ async function startDevServer() {
       return;
     }
 
+    if (url.pathname === '/api/friends/remove' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed.userDid && parsed.targetDid) {
+            sovraDb.removeFriendship(String(parsed.userDid), String(parsed.targetDid));
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true }));
+          } else {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'userDid and targetDid required' }));
+          }
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
     if (url.pathname === '/api/friends/list' && req.method === 'GET') {
       const userDid = url.searchParams.get('userDid') || '';
-      const rels = sovraDb.getFriendRelationships(userDid);
+      const allRels = sovraDb.getFriendRelationships(userDid);
+      const allUsers = sovraDb.getAllUsers();
+      const allPeers = sovraDb.getAllPeers(userDid);
+
+      const userMap = new Map<string, UserRecord>();
+      for (const u of allUsers) {
+        userMap.set(u.did, u);
+      }
+
+      const incoming = allRels
+        .filter(r => r.toDid === userDid && r.status === 'pending')
+        .map(r => {
+          const fromUser = userMap.get(r.fromDid);
+          const peer = allPeers.find(p => p.did === r.fromDid);
+          return {
+            id: r.id,
+            fromDid: r.fromDid,
+            toDid: r.toDid,
+            createdAt: r.createdAt,
+            user: {
+              did: r.fromDid,
+              name: fromUser ? fromUser.displayName : (peer ? peer.name : 'Sovereign Peer'),
+              handle: fromUser ? fromUser.handle : (peer ? peer.handle : '@peer'),
+              avatar: fromUser ? fromUser.avatar : (peer ? peer.avatar : 'P'),
+              avatarDataUrl: fromUser?.avatarDataUrl || peer?.avatarDataUrl,
+              avatarBg: fromUser ? fromUser.avatarBg : (peer ? peer.avatarBg : '#6366f1'),
+              device: fromUser ? fromUser.deviceType : (peer ? peer.device : 'Mesh Device'),
+            },
+          };
+        });
+
+      const outgoing = allRels
+        .filter(r => r.fromDid === userDid && r.status === 'pending')
+        .map(r => {
+          const toUser = userMap.get(r.toDid);
+          const peer = allPeers.find(p => p.did === r.toDid);
+          return {
+            id: r.id,
+            fromDid: r.fromDid,
+            toDid: r.toDid,
+            createdAt: r.createdAt,
+            user: {
+              did: r.toDid,
+              name: toUser ? toUser.displayName : (peer ? peer.name : 'Sovereign Peer'),
+              handle: toUser ? toUser.handle : (peer ? peer.handle : '@peer'),
+              avatar: toUser ? toUser.avatar : (peer ? peer.avatar : 'P'),
+              avatarDataUrl: toUser?.avatarDataUrl || peer?.avatarDataUrl,
+              avatarBg: toUser ? toUser.avatarBg : (peer ? peer.avatarBg : '#6366f1'),
+              device: toUser ? toUser.deviceType : (peer ? peer.device : 'Mesh Device'),
+            },
+          };
+        });
+
+      const friends = allRels
+        .filter(r => r.status === 'accepted')
+        .map(r => {
+          const otherDid = r.fromDid === userDid ? r.toDid : r.fromDid;
+          const otherUser = userMap.get(otherDid);
+          const peer = allPeers.find(p => p.did === otherDid);
+          return {
+            id: r.id,
+            did: otherDid,
+            name: otherUser ? otherUser.displayName : (peer ? peer.name : 'Sovereign Friend'),
+            handle: otherUser ? otherUser.handle : (peer ? peer.handle : '@friend'),
+            avatar: otherUser ? otherUser.avatar : (peer ? peer.avatar : 'F'),
+            avatarDataUrl: otherUser?.avatarDataUrl || peer?.avatarDataUrl,
+            avatarBg: otherUser ? otherUser.avatarBg : (peer ? peer.avatarBg : '#10b981'),
+            device: otherUser ? otherUser.deviceType : (peer ? peer.device : 'Mesh Peer'),
+            isOnline: peer ? peer.isOnline : true,
+            lastSeen: peer ? peer.lastSeen : 'Online',
+          };
+        });
+
+      // Discovered peers for suggestions
+      const suggestions = allPeers.map(p => {
+        let status: 'none' | 'pending_sent' | 'pending_received' | 'friends' = 'none';
+        let reqId: string | undefined;
+
+        const rel = allRels.find(
+          r => (r.fromDid === userDid && r.toDid === p.did) || (r.fromDid === p.did && r.toDid === userDid)
+        );
+
+        if (rel) {
+          reqId = rel.id;
+          if (rel.status === 'accepted') {
+            status = 'friends';
+          } else if (rel.status === 'pending') {
+            status = rel.fromDid === userDid ? 'pending_sent' : 'pending_received';
+          }
+        }
+
+        return {
+          ...p,
+          relationshipStatus: status,
+          requestId: reqId,
+        };
+      });
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, relationships: rels }));
+      res.end(JSON.stringify({
+        ok: true,
+        incoming,
+        outgoing,
+        friends,
+        suggestions,
+        counts: {
+          pendingIncoming: incoming.length,
+          friends: friends.length,
+        },
+      }));
       return;
     }
 
@@ -14484,14 +14721,27 @@ async function startDevServer() {
 
   server.listen(HTTP_PORT, '0.0.0.0', () => {
     console.log('[2/2] HTTP Server Bound!');
+    const interfaces = os.networkInterfaces();
+    let lanIp = '10.96.44.224';
+    for (const name of Object.keys(interfaces)) {
+      for (const net of interfaces[name] || []) {
+        if (net.family === 'IPv4' && !net.internal && !net.address.startsWith('169.254')) {
+          lanIp = net.address;
+          break;
+        }
+      }
+    }
+
     console.log(`\n============================================================`);
-    console.log(`  🌐 Sovra Localhost Server is LIVE at:`);
-    console.log(`     👉 http://localhost:${HTTP_PORT}`);
+    console.log(`  🌐 Sovra Mesh Node is LIVE on LAN & Localhost:`);
+    console.log(`     💻 Laptop Browser: 👉 http://localhost:${HTTP_PORT}`);
+    console.log(`     📱 Phone (Wi-Fi LAN): 👉 http://${lanIp}:${HTTP_PORT}`);
     console.log(`============================================================\n`);
-    console.log(`  - Product A (Sovra End-User Social App):          http://localhost:${HTTP_PORT}`);
-    console.log(`  - Product B (Sovra Company Operations Console):   http://localhost:${HTTP_PORT}/admin`);
-    console.log(`  - JSON Node Health Status:                      http://localhost:${HTTP_PORT}/api/status`);
-    console.log(`  - P2P Noise_XX TCP Port:                         127.0.0.1:${tcpPort}`);
+    console.log(`  - Product A (Sovra Social & Friends):   http://localhost:${HTTP_PORT}`);
+    console.log(`  - Phone Access (Same Wi-Fi Network):    http://${lanIp}:${HTTP_PORT}`);
+    console.log(`  - Product B (Sovra Ops Console):        http://localhost:${HTTP_PORT}/admin`);
+    console.log(`  - JSON Node Health Status:              http://localhost:${HTTP_PORT}/api/status`);
+    console.log(`  - P2P Noise_XX TCP Port:                127.0.0.1:${tcpPort}`);
     console.log(`\nPress Ctrl+C to terminate the local node.`);
   });
 }

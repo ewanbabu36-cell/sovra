@@ -590,6 +590,29 @@ class SovraDatabaseEngine {
     return rel;
   }
 
+  public respondFriendRequestById(requestId: string, status: 'accepted' | 'rejected' | 'blocked'): FriendRelationshipRecord | null {
+    this.load();
+    const rel = this.db.friend_relationships.find(r => r.id === requestId);
+    if (!rel) return null;
+    rel.status = status;
+    rel.updatedAt = Date.now();
+    this.save();
+    return rel;
+  }
+
+  public removeFriendship(userDidA: string, userDidB: string): boolean {
+    this.load();
+    const idx = this.db.friend_relationships.findIndex(
+      r => (r.fromDid === userDidA && r.toDid === userDidB) || (r.fromDid === userDidB && r.toDid === userDidA)
+    );
+    if (idx >= 0) {
+      this.db.friend_relationships.splice(idx, 1);
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
   public getFriendRelationships(userDid: string): FriendRelationshipRecord[] {
     this.load();
     return this.db.friend_relationships.filter(r => r.fromDid === userDid || r.toDid === userDid);
