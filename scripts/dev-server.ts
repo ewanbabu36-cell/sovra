@@ -1719,6 +1719,8 @@ function renderHtml(
       gap: 0.35rem;
       flex: 1;
       overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
     }
     .rail-nav-item {
       display: flex;
@@ -5536,7 +5538,7 @@ function renderHtml(
               <div class="insta-media-box" id="media-${post.id}" 
                    style="position: relative; overflow: hidden; max-height: 520px; background: ${post.mediaGradient || '#0f172a'}; display: flex; align-items: center; justify-content: center;"
                    ondblclick="handleFeedDoubleTap('${post.id}', event)">
-                <img src="${post.mediaImage}" alt="Feed photo" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" onerror="this.style.display='none'; var fb=document.getElementById('fallback-media-${post.id}'); if(fb) fb.style.display='flex';" />
+                <img src="${post.mediaImage}" alt="Feed photo" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" onerror="handleMediaError(this, '${post.id}')" />
                 <div id="fallback-media-${post.id}" style="display: none; width: 100%; min-height: 240px; text-align: center; pointer-events: none; z-index: 2; padding: 2rem; flex-direction: column; align-items: center; justify-content: center;">
                   <div style="font-size: 3.5rem; margin-bottom: 0.5rem;">${post.mediaEmoji || '🌐'}</div>
                   <div style="font-size: 1.15rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); line-height: 1.35;">${post.mediaTitle || 'P2P Merkle DAG Synced Post'}</div>
@@ -8095,6 +8097,7 @@ function renderHtml(
           myStoryAvatar.innerText = myProfile.avatar || 'S';
           if (myProfile.avatarBg) myStoryAvatar.style.background = myProfile.avatarBg;
         }
+      }
       if (typeof myProfile.balanceSov === 'number') {
         walletBalanceSov = myProfile.balanceSov;
         const sovEl = document.getElementById('walletBalanceSovDisplay');
@@ -8801,6 +8804,13 @@ function renderHtml(
       .catch(function(err) { console.warn('[Feed] Like sync warning:', err); });
     }
 
+    function handleMediaError(imgEl, postId) {
+      if (!imgEl) return;
+      imgEl.style.display = 'none';
+      var fb = document.getElementById('fallback-media-' + postId);
+      if (fb) fb.style.display = 'flex';
+    }
+
     function handleFeedDoubleTap(postId, event) {
       const post = feedPostsData.find(function(p) { return p.id === postId; });
       if (!post) return;
@@ -9053,8 +9063,8 @@ function renderHtml(
       }
 
       const mediaBoxHtml = post.mediaImage ?
-        '<div class="insta-media-box" id="media-' + post.id + '" style="position: relative; overflow: hidden; max-height: 520px; background: ' + (post.mediaGradient || '#0f172a') + '; display: flex; align-items: center; justify-content: center;" ondblclick="handleFeedDoubleTap(\'' + post.id + '\', event)">' +
-          '<img src="' + post.mediaImage + '" alt="Feed media" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" onerror="this.style.display=\'none\'; var fb=document.getElementById(\'fallback-media-' + post.id + '\'); if(fb) fb.style.display=\'flex\';" />' +
+        '<div class="insta-media-box" id="media-' + post.id + '" style="position: relative; overflow: hidden; max-height: 520px; background: ' + (post.mediaGradient || '#0f172a') + '; display: flex; align-items: center; justify-content: center;" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)">' +
+          '<img src="' + post.mediaImage + '" alt="Feed media" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" onerror="handleMediaError(this, &quot;' + post.id + '&quot;)" />' +
           '<div id="fallback-media-' + post.id + '" style="display: none; width: 100%; min-height: 240px; text-align: center; pointer-events: none; z-index: 2; padding: 2rem; flex-direction: column; align-items: center; justify-content: center;">' +
             '<div style="font-size: 3.5rem; margin-bottom: 0.5rem;">' + (post.mediaEmoji || '🌐') + '</div>' +
             '<div style="font-size: 1.15rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); line-height: 1.35;">' + (post.mediaTitle || 'P2P Merkle DAG Synced Post') + '</div>' +
