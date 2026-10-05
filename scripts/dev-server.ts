@@ -1,5 +1,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import {
   generateEd25519KeyPair,
   bytesToHex,
@@ -5390,10 +5391,10 @@ function renderHtml(
       </button>
 
       <div class="rail-user-profile" onclick="switchTab('me')">
-        <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #ec4899); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; color: #fff;">S</div>
+        <div id="railUserAvatar" style="width: 38px; height: 38px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; color: #fff; overflow: hidden; flex-shrink: 0;">S</div>
         <div style="flex: 1; min-width: 0;">
-          <div style="font-weight: 700; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">sovra-local</div>
-          <div style="font-size: 0.72rem; color: #34d399;">● Online Node</div>
+          <div id="railUserName" style="font-weight: 700; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sovereign Node</div>
+          <div id="railUserHandle" style="font-size: 0.72rem; color: #38bdf8;">@you</div>
         </div>
       </div>
 
@@ -7554,11 +7555,24 @@ function renderHtml(
           Zero passwords. Pure biometric hardware ownership.
         </p>
 
+        <!-- Live Validation Alert -->
+        <div id="womErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
+
+        <!-- Full Name Input -->
+        <div style="margin-bottom: 1rem; text-align: left;">
+          <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">Your Full Name</label>
+          <input type="text" id="womNameInput" placeholder="e.g. Rahul Sharma" style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+        </div>
+
+        <!-- Handle Input with Live Duplicate Check -->
         <div style="margin-bottom: 1.25rem; text-align: left;">
-          <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">Choose Your Handle</label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Choose Sovereign Handle</label>
+            <span id="womHandleFeedback" style="font-size: 0.72rem; color: #94a3b8;">Checked on P2P Mesh</span>
+          </div>
           <div style="position: relative;">
             <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-            <input type="text" id="womHandleInput" placeholder="username" value="rahul_sovra" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+            <input type="text" id="womHandleInput" placeholder="username" oninput="validateWomHandleLive(this.value)" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
           </div>
         </div>
 
@@ -7572,7 +7586,7 @@ function renderHtml(
         </button>
 
         <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.5rem;">
-          Or ask your 3 Friends (Social Guardians) to confirm your handle.
+          Cryptographic DID &amp; hardware session saved permanently on device.
         </div>
       </div>
 
@@ -7919,6 +7933,20 @@ function renderHtml(
         }
       }
 
+      const railAvatar = document.getElementById('railUserAvatar');
+      if (railAvatar) {
+        if (myProfile.avatarDataUrl) {
+          railAvatar.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
+        } else {
+          railAvatar.innerText = myProfile.avatar || 'S';
+          railAvatar.style.background = myProfile.avatarBg || '#6366f1';
+        }
+      }
+      const railName = document.getElementById('railUserName');
+      if (railName) railName.innerText = myProfile.name || 'Sovereign Node';
+      const railHandle = document.getElementById('railUserHandle');
+      if (railHandle) railHandle.innerText = myProfile.handle || '@you';
+
       const handleEl = document.getElementById('currentUserHandleText');
       if (handleEl) handleEl.innerText = myProfile.handle || '@you';
 
@@ -8008,7 +8036,7 @@ function renderHtml(
       if (m) m.style.display = 'none';
     }
 
-    function saveEditedProfile() {
+    async function saveEditedProfile() {
       const nameInput = document.getElementById('editProfileNameInput');
       const handleInput = document.getElementById('editProfileHandleInput');
       const bioInput = document.getElementById('editProfileBioInput');
@@ -8018,70 +8046,167 @@ function renderHtml(
       if (!rawHandle.startsWith('@')) rawHandle = '@' + rawHandle;
       const newBio = bioInput ? bioInput.value.trim() : '';
 
-      if (!myProfile) {
-        myProfile = {
-          did: 'did:sovra:user_' + Math.random().toString(36).substring(2, 7),
-          handle: rawHandle,
-          name: newName,
-          avatar: newName.charAt(0).toUpperCase(),
-          avatarDataUrl: selectedEditAvatarDataUrl || undefined,
-          avatarBg: selectedEditAvatarBg,
-          bio: newBio,
-          device: isMobileDevice ? 'Mobile' : 'Desktop',
-          created: Date.now()
-        };
-      } else {
-        myProfile.name = newName;
-        myProfile.handle = rawHandle;
-        myProfile.avatar = newName.charAt(0).toUpperCase();
-        if (selectedEditAvatarDataUrl) myProfile.avatarDataUrl = selectedEditAvatarDataUrl;
-        myProfile.avatarBg = selectedEditAvatarBg;
-        myProfile.bio = newBio;
-      }
+      const updatedPayload = {
+        did: myProfile ? myProfile.did : ('did:sovra:user_' + Math.random().toString(36).substring(2, 8)),
+        handle: rawHandle,
+        name: newName,
+        displayName: newName,
+        avatar: newName.charAt(0).toUpperCase(),
+        avatarDataUrl: selectedEditAvatarDataUrl !== null ? selectedEditAvatarDataUrl : (myProfile ? myProfile.avatarDataUrl : undefined),
+        avatarBg: selectedEditAvatarBg,
+        bio: newBio,
+        device: isMobileDevice ? 'Mobile' : 'Desktop'
+      };
 
       try {
-        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-      } catch (e) {}
+        const res = await fetch('/api/user/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedPayload)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          alert('Could not update profile: ' + (data.error || 'Server error'));
+          return;
+        }
 
-      // Persist to user table in server database
-      fetch('/api/user/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(myProfile)
-      }).catch(function() {});
+        myProfile = data.user;
+        currentUserHandle = myProfile.handle;
+        try {
+          localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+          if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
+        } catch (e) {}
 
-      fetch('/api/peers/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(myProfile)
-      }).catch(function() {});
-
-      updateUserDisplayInUI();
-      closeEditProfileModal();
-      showAccountToast('✅ Profile saved to database and announced to peer mesh!');
-    }
-
-    // Auto-check onboarding on first visit
-    window.addEventListener('DOMContentLoaded', function() {
-      if (!myProfile) {
-        setTimeout(function() {
-          const wom = document.getElementById('welcomeOnboardingModal');
-          if (wom) {
-            wom.style.display = 'flex';
-            const handleInput = document.getElementById('womHandleInput');
-            if (handleInput) {
-              handleInput.value = isMobileDevice ? 'rahul_phone' : 'host_laptop';
-            }
-          }
-        }, 120);
-      } else {
-        updateUserDisplayInUI();
-        // Register heartbeat with server
         fetch('/api/peers/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(myProfile)
         }).catch(function() {});
+
+        updateUserDisplayInUI();
+        closeEditProfileModal();
+        showAccountToast('✅ Profile saved to database and announced to peer mesh!');
+      } catch (err) {
+        alert('Network error while updating profile: ' + err);
+      }
+    }
+
+    let womHandleCheckTimer = null;
+    function validateWomHandleLive(rawHandle) {
+      if (womHandleCheckTimer) clearTimeout(womHandleCheckTimer);
+      const feedback = document.getElementById('womHandleFeedback');
+      const errorBox = document.getElementById('womErrorMsg');
+      if (errorBox) errorBox.style.display = 'none';
+      if (!feedback) return;
+
+      const trimmed = (rawHandle || '').trim().replace(/^@/, '');
+      if (!trimmed) {
+        feedback.innerText = 'Checked on P2P Mesh';
+        feedback.style.color = '#94a3b8';
+        return;
+      }
+
+      feedback.innerText = 'Checking...';
+      feedback.style.color = '#38bdf8';
+
+      womHandleCheckTimer = setTimeout(() => {
+        fetch('/api/user/check-handle?handle=' + encodeURIComponent('@' + trimmed))
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              if (data.isAvailable) {
+                feedback.innerText = '✓ Available';
+                feedback.style.color = '#10b981';
+              } else {
+                feedback.innerText = '✕ Already Taken';
+                feedback.style.color = '#f87171';
+              }
+            }
+          })
+          .catch(() => {
+            feedback.innerText = 'Checked on P2P Mesh';
+            feedback.style.color = '#94a3b8';
+          });
+      }, 250);
+    }
+
+    // Auto-check onboarding on first visit & restore session from server
+    window.addEventListener('DOMContentLoaded', function() {
+      const sessionToken = localStorage.getItem('sovra_session_token');
+
+      function showOnboardingModal() {
+        setTimeout(function() {
+          const wom = document.getElementById('welcomeOnboardingModal');
+          if (wom) {
+            wom.style.display = 'flex';
+            const handleInput = document.getElementById('womHandleInput');
+            if (handleInput && !handleInput.value) {
+              handleInput.value = isMobileDevice ? 'rahul_phone' : 'host_laptop';
+              validateWomHandleLive(handleInput.value);
+            }
+            const nameInput = document.getElementById('womNameInput');
+            if (nameInput && !nameInput.value) {
+              nameInput.value = isMobileDevice ? 'Rahul Sharma' : 'Host Node';
+            }
+          }
+        }, 120);
+      }
+
+      if (sessionToken) {
+        fetch('/api/user/me?sessionToken=' + encodeURIComponent(sessionToken))
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok && data.user) {
+              myProfile = data.user;
+              currentUserHandle = myProfile.handle;
+              try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
+              updateUserDisplayInUI();
+              // Register heartbeat with server
+              fetch('/api/peers/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(myProfile)
+              }).catch(function() {});
+            } else if (!myProfile) {
+              showOnboardingModal();
+            } else {
+              updateUserDisplayInUI();
+            }
+          })
+          .catch(() => {
+            if (myProfile) updateUserDisplayInUI();
+            else showOnboardingModal();
+          });
+      } else if (myProfile && myProfile.did) {
+        // Sync with server by DID
+        fetch('/api/user/me?did=' + encodeURIComponent(myProfile.did))
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok && data.user) {
+              myProfile = data.user;
+              currentUserHandle = myProfile.handle;
+              if (data.user.sessionToken) localStorage.setItem('sovra_session_token', data.user.sessionToken);
+              localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+              updateUserDisplayInUI();
+            } else {
+              // Register current profile with server
+              fetch('/api/user/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(myProfile)
+              }).then(r => r.json()).then(regData => {
+                if (regData.ok && regData.sessionToken) {
+                  localStorage.setItem('sovra_session_token', regData.sessionToken);
+                  myProfile = regData.user;
+                  localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+                }
+                updateUserDisplayInUI();
+              }).catch(() => updateUserDisplayInUI());
+            }
+          })
+          .catch(() => updateUserDisplayInUI());
+      } else {
+        showOnboardingModal();
       }
 
       if (isMobileDevice) {
@@ -8175,52 +8300,74 @@ function renderHtml(
       if (s3) s3.style.display = 'none';
     }
 
-    function triggerBiometricAccountCreation() {
+    async function triggerBiometricAccountCreation() {
+      const nameInput = document.getElementById('womNameInput');
       const handleInput = document.getElementById('womHandleInput');
-      const chosen = (handleInput && handleInput.value.trim()) ? handleInput.value.trim() : (isMobileDevice ? 'phone_user' : 'laptop_user');
-      const cleanHandle = chosen.replace(/^@/, '');
-      currentUserHandle = '@' + cleanHandle;
-      const peerName = cleanHandle.charAt(0).toUpperCase() + cleanHandle.slice(1);
-      const avatarChar = cleanHandle.charAt(0).toUpperCase();
-      const peerColors = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
-      const avatarBg = peerColors[Math.floor(Math.random() * peerColors.length)];
-      const uniqueDid = 'did:sovra:' + cleanHandle.toLowerCase() + '_' + Math.random().toString(36).substring(2, 7);
+      const errorBox = document.getElementById('womErrorMsg');
 
-      myProfile = {
-        did: uniqueDid,
-        handle: currentUserHandle,
-        name: peerName + (isMobileDevice ? ' (Phone)' : ' (Laptop)'),
-        avatar: avatarChar,
-        avatarBg: avatarBg,
-        device: isMobileDevice ? 'Mobile' : 'Desktop',
-        created: Date.now()
-      };
+      const nameVal = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : '';
+      const handleVal = (handleInput && handleInput.value.trim()) ? handleInput.value.trim().replace(/^@/, '') : '';
+
+      if (!handleVal) {
+        if (errorBox) {
+          errorBox.innerText = 'Please choose a sovereign handle.';
+          errorBox.style.display = 'block';
+        }
+        return;
+      }
+
+      const fullName = nameVal || (handleVal.charAt(0).toUpperCase() + handleVal.slice(1));
+      const cleanHandle = '@' + handleVal.toLowerCase();
 
       try {
-        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-      } catch (e) {}
+        const res = await fetch('/api/user/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            handle: cleanHandle,
+            name: fullName,
+            device: isMobileDevice ? 'Mobile' : 'Desktop'
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          if (errorBox) {
+            errorBox.innerText = data.error || 'Registration failed. Handle may already be taken.';
+            errorBox.style.display = 'block';
+          }
+          return;
+        }
 
-      fetch('/api/user/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(myProfile)
-      }).catch(function() {});
+        if (errorBox) errorBox.style.display = 'none';
+        myProfile = data.user;
+        currentUserHandle = myProfile.handle;
 
-      fetch('/api/peers/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(myProfile)
-      }).catch(function() {});
+        try {
+          localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+          if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
+        } catch (e) {}
 
-      document.getElementById('womStep1').style.display = 'none';
-      document.getElementById('womStep2').style.display = 'block';
+        fetch('/api/peers/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(myProfile)
+        }).catch(function() {});
 
-      setTimeout(() => {
-        document.getElementById('womStep2').style.display = 'none';
-        document.getElementById('womStep3').style.display = 'block';
-        const displayEl = document.getElementById('womRestoredHandleDisplay');
-        if (displayEl) displayEl.innerText = currentUserHandle;
-      }, 1000);
+        document.getElementById('womStep1').style.display = 'none';
+        document.getElementById('womStep2').style.display = 'block';
+
+        setTimeout(() => {
+          document.getElementById('womStep2').style.display = 'none';
+          document.getElementById('womStep3').style.display = 'block';
+          const displayEl = document.getElementById('womRestoredHandleDisplay');
+          if (displayEl) displayEl.innerText = currentUserHandle;
+        }, 1000);
+      } catch (err) {
+        if (errorBox) {
+          errorBox.innerText = 'Network connection failed: ' + err;
+          errorBox.style.display = 'block';
+        }
+      }
     }
 
     function autoFindForgotUserIdDemo() {
@@ -8231,19 +8378,26 @@ function renderHtml(
         document.getElementById('womStep2').style.display = 'none';
         document.getElementById('womStep3').style.display = 'block';
         const rawHandle = isMobileDevice ? 'recovered_phone' : 'recovered_laptop';
-        currentUserHandle = '@' + rawHandle;
+        const cleanHandle = '@' + rawHandle;
+        currentUserHandle = cleanHandle;
         const uniqueDid = 'did:sovra:' + rawHandle + '_' + Math.random().toString(36).substring(2, 7);
-        myProfile = {
-          did: uniqueDid,
-          handle: currentUserHandle,
-          name: (isMobileDevice ? 'Phone Peer' : 'Laptop Peer') + ' (Recovered)',
-          avatar: isMobileDevice ? '📱' : '💻',
-          avatarBg: '#10b981',
-          device: isMobileDevice ? 'Mobile' : 'Desktop',
-          created: Date.now()
-        };
-        try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e){}
-        fetch('/api/peers/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(myProfile)}).catch(function(){});
+        const peerName = (isMobileDevice ? 'Phone Peer' : 'Laptop Peer') + ' (Recovered)';
+        fetch('/api/user/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            did: uniqueDid,
+            handle: cleanHandle,
+            name: peerName,
+            device: isMobileDevice ? 'Mobile' : 'Desktop'
+          })
+        }).then(r => r.json()).then(data => {
+          if (data.ok && data.user) {
+            myProfile = data.user;
+            if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
+            localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+          }
+        }).catch(() => {});
         const displayEl = document.getElementById('womRestoredHandleDisplay');
         if (displayEl) displayEl.innerText = currentUserHandle + ' (Hardware Enclave Auto-Discovered)';
       }, 1100);
@@ -13447,27 +13601,44 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          if (!parsed.did || !parsed.handle) {
+          let handle = String(parsed.handle || '').trim();
+          if (!handle) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'DID and handle are required' }));
+            res.end(JSON.stringify({ ok: false, error: 'Handle is required' }));
             return;
           }
+          if (!handle.startsWith('@')) handle = '@' + handle;
+
+          // Check if handle is already taken by a different DID
+          if (sovraDb.isHandleTaken(handle, parsed.did)) {
+            res.writeHead(409, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: `Handle ${handle} is already taken by another peer. Please choose a different handle.` }));
+            return;
+          }
+
+          const did = parsed.did && String(parsed.did).startsWith('did:sovra:')
+            ? String(parsed.did)
+            : 'did:sovra:user_' + crypto.randomBytes(8).toString('hex');
+          const sessionToken = parsed.sessionToken ? String(parsed.sessionToken) : ('stk_' + crypto.randomBytes(16).toString('hex'));
+          const displayName = String(parsed.name || parsed.displayName || handle.replace('@', '')).trim();
+
           const user = sovraDb.upsertUser({
-            did: String(parsed.did),
-            handle: String(parsed.handle),
-            displayName: String(parsed.name || parsed.displayName || 'Sovereign Peer'),
-            avatar: String(parsed.avatar || 'P'),
+            did,
+            handle,
+            displayName: displayName || 'Sovereign Peer',
+            avatar: String(parsed.avatar || displayName.charAt(0).toUpperCase() || 'S'),
             avatarDataUrl: parsed.avatarDataUrl ? String(parsed.avatarDataUrl) : undefined,
             avatarBg: String(parsed.avatarBg || '#6366f1'),
             bio: String(parsed.bio || ''),
             deviceType: parsed.device === 'Mobile' || parsed.deviceType === 'Mobile' ? 'Mobile' : 'Desktop',
             publicKey: parsed.publicKey ? String(parsed.publicKey) : undefined,
+            sessionToken,
           });
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, user }));
-        } catch {
+          res.end(JSON.stringify({ ok: true, user, sessionToken: user.sessionToken }));
+        } catch (err: any) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+          res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
         }
       });
       return;
@@ -13484,32 +13655,69 @@ async function startDevServer() {
             res.end(JSON.stringify({ ok: false, error: 'DID is required' }));
             return;
           }
+          if (parsed.handle) {
+            let handle = String(parsed.handle).trim();
+            if (!handle.startsWith('@')) handle = '@' + handle;
+            if (sovraDb.isHandleTaken(handle, String(parsed.did))) {
+              res.writeHead(409, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: `Handle ${handle} is already in use by another peer.` }));
+              return;
+            }
+          }
+          const existingUser = sovraDb.findUserByDid(String(parsed.did));
+          const cleanHandle = parsed.handle ? (String(parsed.handle).startsWith('@') ? String(parsed.handle).trim() : '@' + String(parsed.handle).trim()) : (existingUser?.handle || '@user');
           const user = sovraDb.upsertUser({
             did: String(parsed.did),
-            handle: String(parsed.handle || '@user'),
-            displayName: String(parsed.name || parsed.displayName || 'Sovereign Peer'),
-            avatar: String(parsed.avatar || 'P'),
-            avatarDataUrl: parsed.avatarDataUrl ? String(parsed.avatarDataUrl) : undefined,
-            avatarBg: String(parsed.avatarBg || '#6366f1'),
-            bio: String(parsed.bio || ''),
-            deviceType: parsed.device === 'Mobile' || parsed.deviceType === 'Mobile' ? 'Mobile' : 'Desktop',
+            handle: cleanHandle,
+            displayName: String(parsed.name || parsed.displayName || existingUser?.displayName || 'Sovereign Peer'),
+            avatar: String(parsed.avatar || existingUser?.avatar || 'S'),
+            avatarDataUrl: parsed.avatarDataUrl !== undefined ? (parsed.avatarDataUrl ? String(parsed.avatarDataUrl) : undefined) : existingUser?.avatarDataUrl,
+            avatarBg: String(parsed.avatarBg || existingUser?.avatarBg || '#6366f1'),
+            bio: String(parsed.bio !== undefined ? parsed.bio : (existingUser?.bio || '')),
+            deviceType: parsed.device === 'Mobile' || parsed.deviceType === 'Mobile' ? 'Mobile' : (existingUser?.deviceType || 'Desktop'),
+            sessionToken: existingUser?.sessionToken,
+            publicKey: parsed.publicKey ? String(parsed.publicKey) : existingUser?.publicKey,
           });
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, user }));
-        } catch {
+        } catch (err: any) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+          res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
         }
       });
       return;
     }
 
+    if (url.pathname === '/api/user/check-handle' && req.method === 'GET') {
+      const handle = url.searchParams.get('handle') || '';
+      const excludeDid = url.searchParams.get('excludeDid') || undefined;
+      if (!handle) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Handle query param is required' }));
+        return;
+      }
+      const isTaken = sovraDb.isHandleTaken(handle, excludeDid);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, handle, isAvailable: !isTaken }));
+      return;
+    }
+
     if (url.pathname === '/api/user/me' && req.method === 'GET') {
+      const sessionToken = url.searchParams.get('sessionToken') || '';
       const did = url.searchParams.get('did') || '';
       const handle = url.searchParams.get('handle') || '';
-      const user = did ? sovraDb.findUserByDid(did) : (handle ? sovraDb.findUserByHandle(handle) : null);
+      let user: any = null;
+      if (sessionToken) {
+        user = sovraDb.findUserBySessionToken(sessionToken);
+      }
+      if (!user && did) {
+        user = sovraDb.findUserByDid(did);
+      }
+      if (!user && handle) {
+        user = sovraDb.findUserByHandle(handle);
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, user }));
+      res.end(JSON.stringify({ ok: true, user: user || null }));
       return;
     }
 

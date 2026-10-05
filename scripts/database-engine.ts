@@ -30,6 +30,7 @@ export interface UserRecord {
   bio: string;
   deviceType: 'Mobile' | 'Desktop';
   publicKey?: string;
+  sessionToken?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -262,6 +263,19 @@ class SovraDatabaseEngine {
     return this.db.users.find(u => u.handle.toLowerCase() === cleanHandle);
   }
 
+  public findUserBySessionToken(token: string): UserRecord | undefined {
+    this.load();
+    if (!token) return undefined;
+    return this.db.users.find(u => u.sessionToken === token);
+  }
+
+  public isHandleTaken(handle: string, excludeDid?: string): boolean {
+    this.load();
+    let cleanHandle = handle.trim().toLowerCase();
+    if (!cleanHandle.startsWith('@')) cleanHandle = '@' + cleanHandle;
+    return this.db.users.some(u => u.handle.toLowerCase() === cleanHandle && u.did !== excludeDid);
+  }
+
   public upsertUser(user: Partial<UserRecord> & { did: string; handle: string; displayName: string }): UserRecord {
     this.load();
     let cleanHandle = user.handle.trim();
@@ -280,6 +294,7 @@ class SovraDatabaseEngine {
       bio: user.bio || '',
       deviceType: user.deviceType || 'Desktop',
       publicKey: user.publicKey,
+      sessionToken: user.sessionToken || (existingIdx >= 0 ? this.db.users[existingIdx]!.sessionToken : 'stk_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36)),
       createdAt: existingIdx >= 0 ? this.db.users[existingIdx]!.createdAt : now,
       updatedAt: now,
     };
