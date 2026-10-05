@@ -8544,6 +8544,8 @@ function renderHtml(
         if (wCont && window.innerWidth <= 860) {
           wCont.classList.remove('show-chat');
         }
+        if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
+        if (typeof syncChatMessages === 'function') syncChatMessages();
         renderChatContactsList();
         renderChatBubbles();
       } else if (tab === 'reels') {
@@ -9958,7 +9960,7 @@ function renderHtml(
     // ==========================================
     // 2. WHATSAPP E2EE CHAT SCRIPT ENGINE
     // ==========================================
-    const contactsData = ${JSON.stringify(sovraDb.getAllPeers())};
+    let contactsData = ${JSON.stringify(sovraDb.getAllPeers())};
     let bitchatPeersData = ${JSON.stringify(bitchatPeersStore)};
     let chatMessages = ${JSON.stringify(sovraDb.getState().chatMessages)};
     let bitchatModeActive = true;
@@ -10060,15 +10062,36 @@ function renderHtml(
           }
         }
 
-        if (directPeers.length > 0) {
-          html += '<div class="bitchat-section-title">📡 Nearby Discovered Peers (' + directPeers.length + ')</div>';
-          for (const p of directPeers) {
+        // Include real registered peers into direct mesh list
+        const allDirectPeers = [...directPeers];
+        const myDid = myProfile ? myProfile.did : 'self';
+        contactsData.forEach(function(c) {
+          if (c.did !== myDid && !allDirectPeers.some(function(p) { return p.did === c.did; })) {
+            allDirectPeers.push({
+              did: c.did,
+              name: c.name,
+              avatar: c.avatar,
+              avatarDataUrl: c.avatarDataUrl,
+              avatarBg: c.avatarBg || '#6366f1',
+              role: c.role || 'P2P Mesh Peer',
+              rssi: -35,
+              distanceMeters: 1.8,
+              hops: 1,
+              isDirect: true,
+              isOnline: c.isOnline
+            });
+          }
+        });
+
+        if (allDirectPeers.length > 0) {
+          html += '<div class="bitchat-section-title">📡 Nearby Discovered Peers (' + allDirectPeers.length + ')</div>';
+          for (const p of allDirectPeers) {
             const isActive = p.did === activeContactDid;
             const hopLabel = p.hops === 1 ? '1 Hop Direct' : p.hops + ' Hops Relay';
             html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + p.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + p.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
               '<div class="contact-avatar" style="background: ' + p.avatarBg + '; overflow: hidden;">' +
                 (p.avatarDataUrl ? '<img src="' + p.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : p.avatar) +
-                '<div class="online-dot" style="background: ' + (p.isDirect ? '#10b981' : '#f59e0b') + ';"></div>' +
+                '<div class="online-dot" style="background: ' + (p.isOnline !== false ? '#10b981' : '#64748b') + ';"></div>' +
               '</div>' +
               '<div class="contact-info">' +
                 '<div class="contact-top-row">' +
@@ -10084,23 +10107,54 @@ function renderHtml(
           }
         }
 
-        if (filteredPeers.length === 0) {
-          html = '<div style="text-align: center; padding: 2rem 1rem; color: #64748b; font-size: 0.82rem;">No BitChat peers found in 2.4GHz range.</div>';
+        if (allDirectPeers.length === 0 && channels.length === 0) {
+          html = '<div style="text-align: center; padding: 2rem 1rem; color: #64748b; font-size: 0.82rem;">No BitChat peers found in range.</div>';
         }
 
         container.innerHTML = html;
       } else {
+        const myDid = myProfile ? myProfile.did : 'self';
         const filteredContacts = contactsData.filter(function(c) {
+          if (c.did === myDid) return false;
           if (!q) return true;
-          return c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q);
+          return (c.name || '').toLowerCase().includes(q) || (c.handle || '').toLowerCase().includes(q) || (c.role || '').toLowerCase().includes(q);
         });
 
         let html = '';
         for (const c of filteredContacts) {
           const isActive = c.did === activeContactDid;
+
+          // Time formatting
+          let timeDisplay = c.isOnline ? 'Online' : (c.lastSeen || 'Offline');
+          if (c.lastMessageTimestamp && c.lastMessageTimestamp > 0) {
+            const msgDate = new Date(c.lastMessageTimestamp);
+            const now = new Date();
+            if (msgDate.toDateString() === now.toDateString()) {
+              timeDisplay = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else {
+              timeDisplay = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            }
+          }
+
+          // Tick icon for preview
+          let previewTick = '';
+          if (c.lastMessageIsOutgoing) {
+            if (c.lastMessageStatus === 'read') {
+              previewTick = '<span style="color: #53bdeb; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
+            } else if (c.lastMessageStatus === 'delivered') {
+              previewTick = '<span style="color: #94a3b8; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
+            } else {
+              previewTick = '<span style="color: #94a3b8; margin-right: 4px; font-size: 0.78rem;">✓</span>';
+            }
+          }
+
+          const unreadBadgeHtml = (c.unreadCount && c.unreadCount > 0)
+            ? '<span class="contact-unread-badge" style="background: #22c55e; color: #0b141a; font-size: 0.7rem; font-weight: 800; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; margin-left: auto;">' + c.unreadCount + '</span>'
+            : '';
+
           html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + c.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
-            '<div class="contact-avatar" style="background: ' + c.avatarBg + '; overflow: hidden;">' +
-              (c.avatarDataUrl ? '<img src="' + c.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : c.avatar) +
+            '<div class="contact-avatar" style="background: ' + (c.avatarBg || '#6366f1') + '; overflow: hidden;">' +
+              (c.avatarDataUrl ? '<img src="' + c.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : (c.avatar || 'P')) +
               (c.isOnline ? '<div class="online-dot"></div>' : '') +
               (c.disappearingDurationSec > 0 ? '<div class="contact-clock-badge" title="Disappearing Messages Active">⏱️</div>' : '') +
             '</div>' +
@@ -10110,20 +10164,22 @@ function renderHtml(
                   c.name +
                   (c.isVerified ? '<span class="verified-shield-icon" title="Safety Numbers Verified">🛡️</span>' : '') +
                 '</span>' +
-                '<span class="contact-time">' + (c.isOnline ? 'Online' : c.lastSeen) + '</span>' +
+                '<span class="contact-time" style="' + (c.unreadCount > 0 ? 'color: #22c55e; font-weight: 700;' : '') + '">' + timeDisplay + '</span>' +
               '</div>' +
-              '<div class="contact-preview-row">' +
-                '<span style="color: #53bdeb; font-weight: bold;">✓✓</span>' +
-                '<span id="preview-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' + c.role + '</span>' +
+              '<div class="contact-preview-row" style="display: flex; align-items: center;">' +
+                previewTick +
+                '<span id="preview-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; ' + (c.unreadCount > 0 ? 'color: #f1f5f9; font-weight: 600;' : '') + '">' + (c.lastMessage || c.role || 'Ready to chat') + '</span>' +
+                unreadBadgeHtml +
               '</div>' +
             '</div>' +
           '</div>';
         }
+
         if (filteredContacts.length === 0) {
           html = '<div style="text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">' +
             '<div style="font-size: 2rem; margin-bottom: 0.5rem;">👥</div>' +
-            '<div style="font-weight: 600; color: #cbd5e1; margin-bottom: 0.25rem;">No P2P Contacts Connected Yet</div>' +
-            '<div>Connect other devices on Wi-Fi or switch to Mesh Mode to discover peers!</div>' +
+            '<div style="font-weight: 600; color: #cbd5e1; margin-bottom: 0.25rem;">No Other Registered Peers Yet</div>' +
+            '<div>Connect other devices (mobile or laptop) on the network to begin messaging!</div>' +
           '</div>';
         }
         container.innerHTML = html;
@@ -10134,6 +10190,25 @@ function renderHtml(
       activeContactDid = did;
       const wCont = document.querySelector('.whatsapp-container');
       if (wCont) wCont.classList.add('show-chat');
+
+      // Acknowledge read receipt for all unread messages from this contact
+      const myDid = myProfile ? myProfile.did : 'self';
+      const unreadIds = [];
+      chatMessages.forEach(function(m) {
+        if (m.senderDid === did && (m.recipientDid === myDid || m.recipientDid === 'self') && m.status !== 'read') {
+          m.status = 'read';
+          unreadIds.push(m.id);
+        }
+      });
+      if (unreadIds.length > 0) {
+        fetch('/api/chat/receipt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messageIds: unreadIds, status: 'read' })
+        }).catch(function() {});
+        const c = contactsData.find(function(x) { return x.did === did; });
+        if (c) c.unreadCount = 0;
+      }
 
       const bcPeer = bitchatPeersData.find(function(p) { return p.did === did; });
       const contact = contactsData.find(function(c) { return c.did === did; });
@@ -10181,14 +10256,14 @@ function renderHtml(
           if (contact.avatarDataUrl) {
             avatarEl.innerHTML = '<img src="' + contact.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />';
           } else {
-            avatarEl.innerText = contact.avatar;
-            avatarEl.style.background = contact.avatarBg;
+            avatarEl.innerText = contact.avatar || 'P';
+            avatarEl.style.background = contact.avatarBg || '#6366f1';
           }
         }
         if (nameEl) nameEl.innerText = contact.name;
         if (badgeEl) badgeEl.style.display = contact.isVerified ? 'inline-block' : 'none';
         if (statusEl) {
-          statusEl.innerText = (contact.isOnline ? '● Online' : 'Last seen ' + contact.lastSeen) + ' • Double Ratchet Active';
+          statusEl.innerText = (contact.isOnline ? '● Online' : 'Last seen ' + (contact.lastSeen || 'recently')) + ' • Double Ratchet Active';
         }
         if (routeEl) routeEl.style.display = 'none';
         updateHeaderTimerDisplay(contact.disappearingDurationSec || 0);
@@ -10200,6 +10275,7 @@ function renderHtml(
       const activeEl = document.getElementById('contact-' + did.replace(/[^a-zA-Z0-9]/g, '_'));
       if (activeEl) activeEl.classList.add('active');
 
+      renderChatContactsList();
       renderChatBubbles();
     }
 
@@ -10383,7 +10459,7 @@ function renderHtml(
       const myName = myProfile ? myProfile.name : 'You';
 
       const newMsg = {
-        id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 6),
+        id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 7),
         senderDid: myDid,
         recipientDid: activeContactDid,
         senderName: myName,
@@ -10392,7 +10468,7 @@ function renderHtml(
         audioDurationSec: 0,
         timestamp: now,
         sentAt: now,
-        status: 'sent', // Single tick until peer sync
+        status: 'sent', // Single grey tick initially
         signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),
         disappearingDurationSec: timerSec,
         expiresAt: timerSec > 0 ? now + timerSec * 1000 : undefined,
@@ -10405,45 +10481,90 @@ function renderHtml(
 
       chatMessages.push(newMsg);
       input.value = '';
-      renderChatBubbles();
 
-      fetch('/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newMsg)
-      }).catch(function(err) { console.warn('[Chat] Send sync warning:', err); });
+      if (contact) {
+        contact.lastMessage = text;
+        contact.lastMessageTimestamp = now;
+        contact.lastMessageStatus = 'sent';
+        contact.lastMessageIsOutgoing = true;
+      }
+
+      renderChatBubbles();
+      renderChatContactsList();
+
+      try {
+        const res = await fetch('/api/chat/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newMsg)
+        });
+        const data = await res.json();
+        if (data && data.ok && data.message) {
+          const idx = chatMessages.findIndex(function(m) { return m.id === newMsg.id; });
+          if (idx !== -1) {
+            chatMessages[idx] = data.message;
+            renderChatBubbles();
+          }
+        }
+      } catch (err) {
+        console.warn('[Chat] Send sync warning:', err);
+      }
     }
 
     let lastChatSyncTimestamp = 0;
     function syncChatMessages() {
-      fetch('/api/chat/messages?since=' + lastChatSyncTimestamp)
+      const myDid = myProfile ? myProfile.did : 'self';
+      fetch('/api/chat/messages?since=' + lastChatSyncTimestamp + '&userDid=' + encodeURIComponent(myDid))
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data && data.ok && Array.isArray(data.messages) && data.messages.length > 0) {
             let hasNew = false;
-            const myDid = myProfile ? myProfile.did : 'self';
+            const deliveredIds = [];
+            const readIds = [];
+
             data.messages.forEach(function(msg) {
               if (msg.timestamp > lastChatSyncTimestamp) {
                 lastChatSyncTimestamp = msg.timestamp;
               }
-              const existing = chatMessages.find(function(m) { return m.id === msg.id; });
-              if (!existing) {
+              const existingIdx = chatMessages.findIndex(function(m) { return m.id === msg.id; });
+              if (existingIdx === -1) {
                 chatMessages.push(msg);
                 hasNew = true;
-                if (msg.senderDid !== myDid) {
+
+                // Acknowledge incoming messages
+                if (msg.senderDid !== myDid && msg.senderDid !== 'self') {
                   if (activeContactDid === msg.senderDid || activeContactDid === msg.recipientDid) {
-                    fetch('/api/chat/receipt', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ messageId: msg.id, status: 'read' })
-                    }).catch(function() {});
+                    msg.status = 'read';
+                    readIds.push(msg.id);
+                  } else if (msg.status === 'sent') {
+                    msg.status = 'delivered';
+                    deliveredIds.push(msg.id);
                   }
                 }
-              } else if (existing.status !== msg.status) {
-                existing.status = msg.status;
+              } else if (chatMessages[existingIdx].status !== msg.status) {
+                chatMessages[existingIdx].status = msg.status;
                 hasNew = true;
               }
             });
+
+            // Send delivered acknowledgments to server so sender gets grey double tick (✓✓)
+            if (deliveredIds.length > 0) {
+              fetch('/api/chat/receipt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messageIds: deliveredIds, status: 'delivered' })
+              }).catch(function() {});
+            }
+
+            // Send read acknowledgments to server so sender gets blue double tick (✓✓)
+            if (readIds.length > 0) {
+              fetch('/api/chat/receipt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messageIds: readIds, status: 'read' })
+              }).catch(function() {});
+            }
+
             if (hasNew) {
               renderChatBubbles();
               renderChatContactsList();
@@ -10452,58 +10573,21 @@ function renderHtml(
         })
         .catch(function() {});
     }
-    setInterval(syncChatMessages, 1200);
+    setInterval(syncChatMessages, 1000);
 
     function syncPeersAndContacts() {
-      fetch('/api/peers/list')
+      const myDid = myProfile ? myProfile.did : 'self';
+      fetch('/api/chat/contacts?userDid=' + encodeURIComponent(myDid))
         .then(function(r) { return r.json(); })
         .then(function(data) {
-          if (data && data.ok && Array.isArray(data.peers)) {
-            let changed = false;
-            const myDid = myProfile ? myProfile.did : 'self';
-            data.peers.forEach(function(p) {
-              if (p.did !== myDid) {
-                const exIdx = contactsData.findIndex(function(c) { return c.did === p.did; });
-                if (exIdx === -1) {
-                  contactsData.unshift(p);
-                  changed = true;
-                } else if (contactsData[exIdx].avatarDataUrl !== p.avatarDataUrl || contactsData[exIdx].name !== p.name || contactsData[exIdx].avatarBg !== p.avatarBg) {
-                  Object.assign(contactsData[exIdx], p);
-                  changed = true;
-                }
-
-                const bpIdx = bitchatPeersData.findIndex(function(bp) { return bp.did === p.did; });
-                if (bpIdx === -1) {
-                  bitchatPeersData.push({
-                    did: p.did,
-                    name: p.name,
-                    avatar: p.avatar,
-                    avatarDataUrl: p.avatarDataUrl,
-                    avatarBg: p.avatarBg,
-                    role: p.role || 'Local Mesh Peer',
-                    rssi: -40,
-                    distanceMeters: 2.5,
-                    hops: 1,
-                    isDirect: true
-                  });
-                  changed = true;
-                } else if (bitchatPeersData[bpIdx].avatarDataUrl !== p.avatarDataUrl || bitchatPeersData[bpIdx].name !== p.name) {
-                  bitchatPeersData[bpIdx].avatarDataUrl = p.avatarDataUrl;
-                  bitchatPeersData[bpIdx].name = p.name;
-                  bitchatPeersData[bpIdx].avatar = p.avatar;
-                  bitchatPeersData[bpIdx].avatarBg = p.avatarBg;
-                  changed = true;
-                }
-              }
-            });
-            if (changed) {
-              renderChatContactsList();
-            }
+          if (data && data.ok && Array.isArray(data.contacts)) {
+            contactsData = data.contacts;
+            renderChatContactsList();
           }
         })
         .catch(function() {});
     }
-    setInterval(syncPeersAndContacts, 2500);
+    setInterval(syncPeersAndContacts, 1800);
 
     // Voice recording handlers
     function toggleVoiceRecord() {
@@ -13821,8 +13905,49 @@ async function startDevServer() {
     }
 
     if (url.pathname === '/api/chat/contacts' && req.method === 'GET') {
+      const userDid = url.searchParams.get('userDid') || url.searchParams.get('excludeDid') || '';
+      const allPeers = sovraDb.getAllPeers(userDid || undefined);
+      const allMessages = sovraDb.getState().chatMessages;
+
+      const contactsWithThreads = allPeers.map(peer => {
+        let threadMessages: any[] = [];
+        if (userDid) {
+          const threadId = sovraDb.getThreadId(userDid, peer.did);
+          threadMessages = allMessages.filter(m => m.threadId === threadId || (m.senderDid === peer.did && m.recipientDid === userDid) || (m.senderDid === userDid && m.recipientDid === peer.did));
+        } else {
+          threadMessages = allMessages.filter(m => m.senderDid === peer.did || m.recipientDid === peer.did);
+        }
+
+        const lastMsg = threadMessages.length > 0 ? threadMessages[threadMessages.length - 1] : null;
+        const unreadCount = userDid
+          ? threadMessages.filter(m => m.senderDid === peer.did && (m.recipientDid === userDid || m.recipientDid === 'self') && m.status !== 'read').length
+          : 0;
+
+        let lastMessageText = peer.role || 'Ready to chat';
+        if (lastMsg) {
+          if (lastMsg.isDisappeared) {
+            lastMessageText = '💨 Message disappeared';
+          } else if (lastMsg.isAudio) {
+            lastMessageText = '🎙️ Voice note (' + (lastMsg.audioDurationSec || 0).toFixed(1) + 's)';
+          } else {
+            lastMessageText = lastMsg.text;
+          }
+        }
+
+        return {
+          ...peer,
+          lastMessage: lastMessageText,
+          lastMessageTimestamp: lastMsg ? lastMsg.timestamp : (peer.lastSeenTimestamp || 0),
+          lastMessageStatus: lastMsg ? lastMsg.status : null,
+          lastMessageIsOutgoing: lastMsg && userDid ? (lastMsg.senderDid === userDid || lastMsg.senderDid === 'self') : false,
+          unreadCount,
+        };
+      });
+
+      contactsWithThreads.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, contacts: sovraDb.getAllPeers() }));
+      res.end(JSON.stringify({ ok: true, contacts: contactsWithThreads }));
       return;
     }
 
@@ -13865,7 +13990,7 @@ async function startDevServer() {
             isAudio: Boolean(parsed.isAudio),
             audioDurationSec: Number(parsed.audioDurationSec || 0),
             waveformBars: Array.isArray(parsed.waveformBars) ? parsed.waveformBars : undefined,
-            status: parsed.status || 'sent',
+            status: 'sent',
             disappearingDurationSec: Number(parsed.disappearingDurationSec || 0),
             isBitChat: Boolean(parsed.isBitChat),
             hopCount: Number(parsed.hopCount || 1),
@@ -13873,9 +13998,9 @@ async function startDevServer() {
           });
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, message: record }));
-        } catch {
+        } catch (err: any) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+          res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
         }
       });
       return;
@@ -13946,17 +14071,23 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          const success = sovraDb.updateMessageReceipt(String(parsed.messageId), parsed.status);
-          if (success) {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, messageId: parsed.messageId, status: parsed.status }));
-          } else {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Message not found' }));
+          const status = parsed.status === 'read' ? 'read' : 'delivered';
+          const messageIds: string[] = Array.isArray(parsed.messageIds)
+            ? parsed.messageIds
+            : (parsed.messageId ? [String(parsed.messageId)] : []);
+
+          if (messageIds.length === 0) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'messageId or messageIds array required' }));
+            return;
           }
-        } catch {
+
+          const updatedCount = sovraDb.updateMessagesReceipt(messageIds, status);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, updatedCount, status, messageIds }));
+        } catch (err: any) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+          res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
         }
       });
       return;

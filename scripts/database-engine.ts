@@ -439,24 +439,38 @@ class SovraDatabaseEngine {
     });
   }
 
-  public updateMessageReceipt(messageId: string, status: 'delivered' | 'read', timestamp = Date.now()): boolean {
+  public updateMessagesReceipt(messageIds: string[], status: 'delivered' | 'read', timestamp = Date.now()): number {
     this.load();
-    const msg = this.db.chatMessages.find(m => m.id === messageId);
-    if (!msg) return false;
+    let updatedCount = 0;
+    for (const messageId of messageIds) {
+      const msg = this.db.chatMessages.find(m => m.id === messageId);
+      if (!msg) continue;
 
-    if (status === 'delivered') {
-      msg.status = 'delivered';
-      msg.deliveredAt = timestamp;
-    } else if (status === 'read') {
-      msg.status = 'read';
-      msg.readAt = timestamp;
-      if (msg.disappearingDurationSec && msg.disappearingDurationSec > 0 && !msg.expiresAt) {
-        msg.expiresAt = timestamp + (msg.disappearingDurationSec * 1000);
+      if (status === 'delivered') {
+        if (msg.status !== 'read') {
+          msg.status = 'delivered';
+          msg.deliveredAt = timestamp;
+          updatedCount++;
+        }
+      } else if (status === 'read') {
+        msg.status = 'read';
+        msg.readAt = timestamp;
+        if (!msg.deliveredAt) msg.deliveredAt = timestamp;
+        if (msg.disappearingDurationSec && msg.disappearingDurationSec > 0 && !msg.expiresAt) {
+          msg.expiresAt = timestamp + (msg.disappearingDurationSec * 1000);
+        }
+        updatedCount++;
       }
     }
 
-    this.save();
-    return true;
+    if (updatedCount > 0) {
+      this.save();
+    }
+    return updatedCount;
+  }
+
+  public updateMessageReceipt(messageId: string, status: 'delivered' | 'read', timestamp = Date.now()): boolean {
+    return this.updateMessagesReceipt([messageId], status, timestamp) > 0;
   }
 
   // ==========================================
