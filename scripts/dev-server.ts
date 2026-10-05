@@ -1613,19 +1613,159 @@ function renderHtml(
       gap: 4px;
     }
     .tab-btn {
-      padding: 0.5rem 1rem;
+      padding: 0.5rem 0.85rem;
       border: none;
       background: none;
       color: var(--text-muted);
       border-radius: 6px;
       font-weight: 600;
-      font-size: 0.875rem;
+      font-size: 0.85rem;
       cursor: pointer;
       transition: all 0.2s;
+      white-space: nowrap;
     }
     .tab-btn.active {
       background-color: var(--primary);
       color: #fff;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+    }
+
+    /* Top Prominent Search Bar */
+    .header-search-wrap {
+      flex: 1;
+      max-width: 320px;
+      position: relative;
+    }
+    .header-search-bar {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 20px;
+      padding: 0.35rem 0.85rem;
+      gap: 0.5rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .header-search-bar:focus-within {
+      background: rgba(17, 24, 39, 0.95);
+      border-color: #38bdf8;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+    }
+    .header-search-input {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 0.84rem;
+      outline: none;
+      width: 100%;
+    }
+    .header-search-input::placeholder {
+      color: #94a3b8;
+    }
+    .header-search-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      background: rgba(15, 23, 42, 0.98);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 0.5rem;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85);
+      z-index: 1000;
+      max-height: 380px;
+      overflow-y: auto;
+    }
+
+    /* Friends & People Discovery View Styles */
+    .friends-container {
+      max-width: 680px;
+      margin: 0 auto 5rem auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      width: 100%;
+    }
+    .friends-search-hero {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 20px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    .friends-search-input-box {
+      display: flex;
+      align-items: center;
+      background: rgba(11, 20, 26, 0.85);
+      border: 1.5px solid rgba(99, 102, 241, 0.35);
+      border-radius: 14px;
+      padding: 0.65rem 1rem;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      transition: all 0.2s;
+    }
+    .friends-search-input-box:focus-within {
+      border-color: #38bdf8;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+    }
+    .friends-search-input {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 0.92rem;
+      outline: none;
+      width: 100%;
+    }
+    .friends-filter-pills {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .friends-filter-pill {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #94a3b8;
+      padding: 0.4rem 0.9rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .friends-filter-pill.active {
+      background: #6366f1;
+      border-color: #818cf8;
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4);
+    }
+    .friends-section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .friend-card {
+      background: #111827;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      transition: transform 0.15s, border-color 0.15s;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+    .friend-card:hover {
+      border-color: rgba(99, 102, 241, 0.3);
+      transform: translateY(-1px);
     }
     
     .container {
@@ -1697,6 +1837,26 @@ function renderHtml(
       }
       .nav-tabs {
         display: none !important;
+      }
+      .header-search-wrap {
+        max-width: 180px;
+      }
+      .mobile-bottom-nav {
+        bottom: 8px !important;
+        width: calc(100% - 16px) !important;
+        height: 60px !important;
+        border-radius: 18px !important;
+      }
+      .bnav-icon {
+        font-size: 1.15rem !important;
+      }
+      .bnav-label {
+        font-size: 0.62rem !important;
+      }
+      .bottom-nav-create {
+        width: 38px !important;
+        height: 38px !important;
+        font-size: 1.15rem !important;
       }
       header {
         padding: 0.45rem 1rem !important;
@@ -3981,21 +4141,26 @@ function renderHtml(
       0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
       100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
     }
-    /* Unified 5-Tab Mobile & Responsive Bottom Navigation */
+    /* Unified Desktop & Mobile Synchronized Floating Glassmorphic Bottom Navigation */
     .mobile-bottom-nav {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 64px;
-      background: rgba(11, 20, 26, 0.96);
-      backdrop-filter: blur(14px);
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 24px);
+      max-width: 680px;
+      height: 66px;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 22px;
       display: flex;
-      justify-content: space-around;
+      justify-content: space-evenly;
       align-items: center;
       z-index: 999;
-      box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.7);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      padding: 0 4px;
     }
     .bottom-nav-item {
       display: flex;
@@ -4006,10 +4171,12 @@ function renderHtml(
       border: none;
       color: #94a3b8;
       cursor: pointer;
-      padding: 6px 12px;
+      padding: 6px 4px;
       border-radius: 12px;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
+      flex: 1;
+      min-width: 0;
     }
     .bottom-nav-item:hover {
       color: #e2e8f0;
@@ -4017,29 +4184,68 @@ function renderHtml(
     }
     .bottom-nav-item.active {
       color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
     }
     .bottom-nav-item.active .bnav-icon {
-      transform: scale(1.18);
+      transform: scale(1.15);
       filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
     }
     .bottom-nav-item.active::after {
       content: '';
       position: absolute;
-      bottom: 2px;
-      width: 16px;
+      bottom: 3px;
+      width: 14px;
       height: 3px;
       background: #38bdf8;
       border-radius: 2px;
       box-shadow: 0 0 6px #38bdf8;
     }
+    .bottom-nav-create {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      font-weight: 700;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.5);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      flex-shrink: 0;
+      margin: 0 2px;
+    }
+    .bottom-nav-create:hover {
+      transform: scale(1.12);
+    }
     .bnav-icon {
-      font-size: 1.3rem;
+      font-size: 1.2rem;
       transition: transform 0.2s;
     }
     .bnav-label {
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       font-weight: 600;
       margin-top: 2px;
+      white-space: nowrap;
+    }
+    .bnav-badge {
+      position: absolute;
+      top: 3px;
+      right: calc(50% - 14px);
+      background: #ef4444;
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 700;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid #0f172a;
     }
 
     /* Tab 1: Instagram Feed Styles */
@@ -4520,15 +4726,25 @@ function renderHtml(
       </div>
     </div>
 
+    <!-- Prominent Top Friend Search Bar -->
+    <div class="header-search-wrap">
+      <div class="header-search-bar">
+        <span style="font-size: 0.9rem; color: #38bdf8;">🔍</span>
+        <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, @handle, people..." oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
+        <button id="headerSearchClearBtn" onclick="clearHeaderSearch()" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.8rem;">✕</button>
+      </div>
+      <div id="headerSearchDropdown" class="header-search-dropdown" style="display: none;"></div>
+    </div>
+
     <div class="nav-tabs">
       <button class="tab-btn active" id="tab-feed" onclick="switchTab('feed')">📷 Feed</button>
+      <button class="tab-btn" id="tab-friends" onclick="switchTab('friends')">👥 Friends</button>
       <button class="tab-btn" id="tab-reels" onclick="switchTab('reels')">🎬 Reels</button>
       <button class="tab-btn" id="tab-youtube" onclick="switchTab('youtube')">📺 Watch</button>
       <button class="tab-btn" id="tab-chat" onclick="switchTab('chat')">💬 Chats</button>
       <button class="tab-btn" id="tab-me" onclick="switchTab('me')">👤 Me</button>
       <button class="tab-btn" id="tab-admin" onclick="switchTab('admin')" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15);">⚙️ Ops Console</button>
     </div>
-
 
     <div style="display: flex; gap: 0.5rem; align-items: center;">
       <button onclick="openOmniSearch()" title="Omni-Search (Channels, Pages, People, Media)" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: background 0.15s;">🔍</button>
@@ -4704,6 +4920,51 @@ function renderHtml(
           `,
             )
             .join('')}
+        </div>
+      </div>
+    </main>
+
+    <!-- Tab: Dedicated Friends & People Discovery View -->
+    <main class="main-content" id="friends-view" style="display: none; width: 100%; flex-direction: column; align-items: center;">
+      <div class="friends-container">
+        <!-- Friends Search & Discovery Hero -->
+        <div class="friends-search-hero">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap;">
+            <div>
+              <div style="font-size: 1.35rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <span>👥</span> <span>Friends & People Discovery</span>
+              </div>
+              <div style="font-size: 0.82rem; color: #94a3b8; margin-top: 0.35rem; line-height: 1.4;">
+                Find & add friends, verify bilateral cryptographic handshakes, and explore decentralized peers.
+              </div>
+            </div>
+            <div style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 0.4rem 0.85rem; text-align: right;">
+              <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Connected Mesh</div>
+              <div style="font-size: 1rem; font-weight: 800; color: #38bdf8;" id="friendsTotalBadge">2 Friends</div>
+            </div>
+          </div>
+
+          <!-- Dedicated Friends Search Bar Input -->
+          <div class="friends-search-input-box">
+            <span style="font-size: 1.1rem; color: #38bdf8;">🔍</span>
+            <input type="text" id="friendsViewSearchInput" class="friends-search-input" placeholder="Search friends by name, @handle, bio or peer DID..." oninput="filterFriendsView(this.value)" />
+            <button id="friendsSearchClearBtn" onclick="clearFriendsViewSearch()" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 2px 6px; font-size: 0.9rem;">✕</button>
+          </div>
+
+          <!-- Filter Navigation Tabs / Pills -->
+          <div class="friends-filter-pills">
+            <button class="friends-filter-pill active" id="ffilter-all" onclick="setFriendsFilter('all')">All People</button>
+            <button class="friends-filter-pill" id="ffilter-requests" onclick="setFriendsFilter('requests')">
+              Requests <span id="ffilterRequestsCount" style="background: #ef4444; color: #fff; padding: 1px 6px; border-radius: 10px; font-size: 0.68rem; margin-left: 4px;">1</span>
+            </button>
+            <button class="friends-filter-pill" id="ffilter-friends" onclick="setFriendsFilter('friends')">My Friends</button>
+            <button class="friends-filter-pill" id="ffilter-suggestions" onclick="setFriendsFilter('suggestions')">Suggestions</button>
+          </div>
+        </div>
+
+        <!-- Dynamic Friends Content Area -->
+        <div id="friendsViewContent" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
+          <!-- Rendered dynamically by renderFriendsDiscoveryView() -->
         </div>
       </div>
     </main>
@@ -6081,11 +6342,19 @@ function renderHtml(
     Sovra Protocol & Monorepo Foundation &bull; Production P2P Stack &bull; Localhost Dev Runner
   </footer>
 
-  <!-- Fixed Mobile / Responsive Bottom Navigation Bar -->
+  <!-- Fixed Mobile & Desktop Synchronized Glassmorphic Bottom Navigation Bar -->
   <nav class="mobile-bottom-nav">
     <button class="bottom-nav-item active" id="bnav-feed" onclick="switchTab('feed')" title="Feed">
       <span class="bnav-icon">📷</span>
       <span class="bnav-label">Feed</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-friends" onclick="switchTab('friends')" title="Friends & Search">
+      <span class="bnav-icon">👥</span>
+      <span class="bnav-label">Friends</span>
+      <span class="bnav-badge" id="bnavFriendsBadge">1</span>
+    </button>
+    <button class="bottom-nav-create" onclick="triggerBottomCreateAction()" title="Create Post or Story">
+      <span>+</span>
     </button>
     <button class="bottom-nav-item" id="bnav-reels" onclick="switchTab('reels')" title="Reels">
       <span class="bnav-icon">🎬</span>
@@ -6098,10 +6367,15 @@ function renderHtml(
     <button class="bottom-nav-item" id="bnav-chat" onclick="switchTab('chat')" title="Chats">
       <span class="bnav-icon">💬</span>
       <span class="bnav-label">Chats</span>
+      <span class="bnav-badge" style="background: #3b82f6;">2</span>
     </button>
     <button class="bottom-nav-item" id="bnav-me" onclick="switchTab('me')" title="Profile">
       <span class="bnav-icon">👤</span>
       <span class="bnav-label">Me</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-admin" onclick="switchTab('admin')" title="Ops Console">
+      <span class="bnav-icon">⚙️</span>
+      <span class="bnav-label">Ops</span>
     </button>
   </nav>
 
@@ -6790,10 +7064,11 @@ function renderHtml(
       }
     }
 
-    // Tab switching for all 5 modes + admin console
+    // Tab switching for all modes + admin console + friends discovery
     function switchTab(tab) {
       const views = {
         feed: document.getElementById('feed-view'),
+        friends: document.getElementById('friends-view'),
         reels: document.getElementById('reels-view'),
         youtube: document.getElementById('youtube-view'),
         chat: document.getElementById('chat-view'),
@@ -6802,6 +7077,7 @@ function renderHtml(
       };
       const tabs = {
         feed: document.getElementById('tab-feed'),
+        friends: document.getElementById('tab-friends'),
         reels: document.getElementById('tab-reels'),
         youtube: document.getElementById('tab-youtube'),
         chat: document.getElementById('tab-chat'),
@@ -6810,10 +7086,12 @@ function renderHtml(
       };
       const bnavs = {
         feed: document.getElementById('bnav-feed'),
+        friends: document.getElementById('bnav-friends'),
         reels: document.getElementById('bnav-reels'),
         youtube: document.getElementById('bnav-youtube'),
         chat: document.getElementById('bnav-chat'),
         me: document.getElementById('bnav-me'),
+        admin: document.getElementById('bnav-admin'),
       };
 
       for (const key of Object.keys(views)) {
@@ -6843,6 +7121,8 @@ function renderHtml(
         renderYtVideo(activeYtVideoIndex, false);
       } else if (tab === 'me') {
         renderProfileGrid(currentProfileGridTab || 'posts');
+      } else if (tab === 'friends') {
+        renderFriendsDiscoveryView();
       }
     }
 
@@ -9704,11 +9984,12 @@ function renderHtml(
 
     const socialOmniCatalog = {
       people: [
-        { pubkey: 'did:key:alice123', handle: '@alice_crypto', name: 'Alice Wonderland', bio: 'P2P & zero-disk state researcher', avatar: 'A', bg: '#6366f1', isFriend: false, isPending: false, isBlocked: false },
-        { pubkey: 'did:key:bob456', handle: '@bob_live', name: 'Bob Martinez', bio: 'Audio spaces host & live streamer', avatar: 'B', bg: '#ec4899', isFriend: true, isPending: false, isBlocked: false },
-        { pubkey: 'did:key:charlie789', handle: '@charlie_mesh', name: 'Charlie Chen', bio: 'BitSwap seeder & UnixFS architect', avatar: 'C', bg: '#10b981', isFriend: false, isPending: false, isBlocked: false },
-        { pubkey: 'did:key:priya101', handle: '@priya_sharma', name: 'Priya Sharma', bio: 'Web3 digital artist & music producer', avatar: 'P', bg: '#f59e0b', isFriend: false, isPending: true, isBlocked: false },
-        { pubkey: 'did:key:vikram202', handle: '@vikram_singh', name: 'Vikram Singh', bio: 'Decentralized node operator (TCP :4001)', avatar: 'V', bg: '#0284c7', isFriend: true, isPending: false, isBlocked: false }
+        { pubkey: 'did:key:alice123', handle: '@alice_crypto', name: 'Alice Wonderland', bio: 'P2P & zero-disk state researcher', avatar: 'A', bg: '#6366f1', isFriend: false, isPending: false, isBlocked: false, mutuals: 3, isOnline: true, contactDid: 'did:sovra:alice_peer' },
+        { pubkey: 'did:key:bob456', handle: '@bob_live', name: 'Bob Martinez', bio: 'Audio spaces host & live streamer', avatar: 'B', bg: '#ec4899', isFriend: true, isPending: false, isBlocked: false, mutuals: 8, isOnline: true, contactDid: 'did:sovra:bob_5g_seeder' },
+        { pubkey: 'did:key:charlie789', handle: '@charlie_mesh', name: 'Charlie Chen', bio: 'BitSwap seeder & UnixFS architect', avatar: 'C', bg: '#10b981', isFriend: false, isPending: false, isBlocked: false, mutuals: 6, isOnline: false, contactDid: 'did:sovra:dave_edge_relay' },
+        { pubkey: 'did:key:priya101', handle: '@priya_sharma', name: 'Priya Sharma', bio: 'Web3 digital artist & music producer', avatar: 'P', bg: '#f59e0b', isFriend: false, isPending: true, isBlocked: false, mutuals: 4, isOnline: true, contactDid: 'did:sovra:carol_musician' },
+        { pubkey: 'did:key:vikram202', handle: '@vikram_singh', name: 'Vikram Singh', bio: 'Decentralized node operator (TCP :4001)', avatar: 'V', bg: '#0284c7', isFriend: true, isPending: false, isBlocked: false, mutuals: 11, isOnline: true, contactDid: 'did:sovra:alice_peer' },
+        { pubkey: 'did:key:neha303', handle: '@neha_verma', name: 'Neha Verma', bio: 'Decentralized UX architect & Flutter developer', avatar: 'N', bg: '#8b5cf6', isFriend: false, isPending: false, isBlocked: false, mutuals: 5, isOnline: true, contactDid: 'did:sovra:bob_5g_seeder' }
       ],
       channels: [
         { id: 'ch-alpha', handle: '@sovra_alpha', name: 'Sovra Alpha Radar', category: 'tech', desc: 'Cutting-edge P2P social dispatches', count: 14200, avatar: '📢', bg: '#0284c7', isSubbed: true },
@@ -9973,6 +10254,302 @@ function renderHtml(
         body: JSON.stringify({ pageId: id })
       }).catch(function(err) { console.warn('[Page] Follow sync warning:', err); });
     }
+
+    // ==========================================
+    // 👥 DEDICATED FRIENDS DISCOVERY & SEARCH ENGINE
+    // ==========================================
+    let currentFriendsFilter = 'all';
+    let friendsViewSearchQuery = '';
+
+    function setFriendsFilter(filter) {
+      currentFriendsFilter = filter;
+      const pills = ['all', 'requests', 'friends', 'suggestions'];
+      for (const p of pills) {
+        const btn = document.getElementById('ffilter-' + p);
+        if (btn) btn.classList.toggle('active', p === filter);
+      }
+      renderFriendsDiscoveryView();
+    }
+
+    function filterFriendsView(query) {
+      friendsViewSearchQuery = (query || '').toLowerCase().trim();
+      const clearBtn = document.getElementById('friendsSearchClearBtn');
+      if (clearBtn) clearBtn.style.display = friendsViewSearchQuery ? 'inline' : 'none';
+      renderFriendsDiscoveryView();
+    }
+
+    function clearFriendsViewSearch() {
+      const input = document.getElementById('friendsViewSearchInput');
+      if (input) input.value = '';
+      filterFriendsView('');
+    }
+
+    function renderFriendsDiscoveryView() {
+      const container = document.getElementById('friendsViewContent');
+      if (!container) return;
+
+      const q = friendsViewSearchQuery;
+      const matched = socialOmniCatalog.people.filter(function(p) {
+        if (p.isBlocked) return false;
+        if (!q) return true;
+        return (p.name && p.name.toLowerCase().includes(q)) ||
+               (p.handle && p.handle.toLowerCase().includes(q)) ||
+               (p.bio && p.bio.toLowerCase().includes(q)) ||
+               (p.pubkey && p.pubkey.toLowerCase().includes(q));
+      });
+
+      const pendingRequests = matched.filter(p => p.isPending);
+      const myFriends = matched.filter(p => p.isFriend);
+      const suggestions = matched.filter(p => !p.isFriend && !p.isPending);
+
+      // Total counters
+      const totalPending = socialOmniCatalog.people.filter(p => !p.isBlocked && p.isPending).length;
+      const totalFriends = socialOmniCatalog.people.filter(p => !p.isBlocked && p.isFriend).length;
+
+      const fBadge = document.getElementById('friendsTotalBadge');
+      if (fBadge) fBadge.innerText = totalFriends + ' Friends';
+
+      const rCountEl = document.getElementById('ffilterRequestsCount');
+      if (rCountEl) {
+        rCountEl.innerText = totalPending;
+        rCountEl.style.display = totalPending > 0 ? 'inline' : 'none';
+      }
+
+      const bnavBadge = document.getElementById('bnavFriendsBadge');
+      if (bnavBadge) {
+        bnavBadge.innerText = totalPending;
+        bnavBadge.style.display = totalPending > 0 ? 'flex' : 'none';
+      }
+
+      let html = '';
+
+      // 1. Pending Requests Section
+      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'requests') && pendingRequests.length > 0) {
+        html += '<div>' +
+          '<div class="friends-section-title"><span>📩</span> <span>Pending Friend Requests (' + pendingRequests.length + ')</span></div>' +
+          '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
+        for (const p of pendingRequests) {
+          html += '<div class="friend-card">' +
+            '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
+              '<div style="position: relative;">' +
+                '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(255,255,255,0.15);">' + p.avatar + '</div>' +
+                '<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: #f59e0b; border: 2px solid #111827;" title="Pending Handshake"></div>' +
+              '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
+                  '<span>' + p.name + '</span>' +
+                  '<span style="color: #38bdf8; font-size: 0.75rem;">✓</span>' +
+                '</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8;">' + p.handle + '</div>' +
+                '<div style="font-size: 0.75rem; color: #10b981; margin-top: 2px; font-weight: 600;">⚡ ' + (p.mutuals || 4) + ' mutual connections on mesh</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="acceptFriendRequest(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">✓ Confirm</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem;" onclick="rejectFriendRequest(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">✕ Delete</button>' +
+            '</div>' +
+          '</div>';
+        }
+        html += '</div></div>';
+      }
+
+      // 2. People You May Know / Suggested Section
+      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'suggestions') && suggestions.length > 0) {
+        html += '<div>' +
+          '<div class="friends-section-title"><span>✨</span> <span>People You May Know (' + suggestions.length + ')</span></div>' +
+          '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
+        for (const p of suggestions) {
+          html += '<div class="friend-card">' +
+            '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
+              '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(255,255,255,0.1);">' + p.avatar + '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
+                  '<span>' + p.name + '</span>' +
+                '</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8;">' + p.handle + ' &bull; ' + p.bio + '</div>' +
+                '<div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">⚡ ' + (p.mutuals || 3) + ' mutual friends</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 0.4rem; align-items: center;">' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="sendFriendRequest(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">+ Add Friend</button>' +
+              '<button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 0.85rem;" title="Block" onclick="toggleBlockUserDemo(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">🚫</button>' +
+            '</div>' +
+          '</div>';
+        }
+        html += '</div></div>';
+      }
+
+      // 3. My Connected Friends Section
+      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'friends') && myFriends.length > 0) {
+        html += '<div>' +
+          '<div class="friends-section-title"><span>🤝</span> <span>My Connected Friends (' + myFriends.length + ')</span></div>' +
+          '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
+        for (const p of myFriends) {
+          const statusDot = p.isOnline
+            ? '<span style="color: #10b981; font-size: 0.75rem;">● Online on Mesh</span>'
+            : '<span style="color: #64748b; font-size: 0.75rem;">○ Offline (25m ago)</span>';
+          html += '<div class="friend-card">' +
+            '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
+              '<div style="position: relative;">' +
+                '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(16, 185, 129, 0.4);">' + p.avatar + '</div>' +
+                '<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: ' + (p.isOnline ? '#10b981' : '#64748b') + '; border: 2px solid #111827;"></div>' +
+              '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
+                  '<span>' + p.name + '</span>' +
+                  '<span style="color: #10b981; font-size: 0.75rem;">❤️</span>' +
+                '</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8;">' + p.handle + ' &bull; ' + statusDot + '</div>' +
+                '<div style="font-size: 0.72rem; color: #6ee7b7; margin-top: 2px;">⚡ Verified Bilateral Key Exchange</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700; background: #6366f1; color: #fff;" onclick="messageFriend(\'' + (p.contactDid || p.pubkey) + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">💬 Message</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.75rem; color: #f87171; border-color: rgba(239, 68, 68, 0.3);" title="Remove Friend" onclick="unfriendUser(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\')">✕</button>' +
+            '</div>' +
+          '</div>';
+        }
+        html += '</div></div>';
+      }
+
+      if (!html) {
+        html = '<div style="text-align: center; padding: 3rem 1rem; color: #64748b; font-size: 0.9rem;">' +
+          '<div style="font-size: 2.2rem; margin-bottom: 0.5rem;">👥</div>' +
+          'No friends or people found matching "' + (q ? q.replace(/</g, '&lt;') : '') + '".<br>' +
+          '<span style="font-size: 0.8rem; color: #475569;">Try searching by different handle or keywords.</span>' +
+        '</div>';
+      }
+
+      container.innerHTML = html;
+    }
+
+    function acceptFriendRequest(pubkey, name) {
+      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
+      if (!p) return;
+      p.isPending = false;
+      p.isFriend = true;
+      updateMeFriendsCounter(1);
+      renderFriendsDiscoveryView();
+      alert('✓ Friend Request Accepted! You and ' + name + ' are now mutual friends on the sovereign mesh.');
+    }
+
+    function rejectFriendRequest(pubkey, name) {
+      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
+      if (!p) return;
+      p.isPending = false;
+      renderFriendsDiscoveryView();
+      alert('Friend request from ' + name + ' removed.');
+    }
+
+    function sendFriendRequest(pubkey, name) {
+      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
+      if (!p) return;
+      p.isPending = true;
+      renderFriendsDiscoveryView();
+      alert('📨 Friend request sent to ' + name + ' over Noise_XX encrypted P2P handshake.');
+    }
+
+    function unfriendUser(pubkey, name) {
+      const p = socialOmniCatalog.people.find(x => x.pubkey === pubkey);
+      if (!p) return;
+      if (confirm('Remove ' + name + ' from your friends list?')) {
+        p.isFriend = false;
+        p.isPending = false;
+        updateMeFriendsCounter(-1);
+        renderFriendsDiscoveryView();
+        alert('Friendship with ' + name + ' removed.');
+      }
+    }
+
+    function messageFriend(didOrPubkey, name) {
+      switchTab('chat');
+      const contact = contactsData.find(c => c.did === didOrPubkey || c.name.toLowerCase().includes(name.toLowerCase()));
+      if (contact) {
+        selectContact(contact.did);
+      } else {
+        selectContact(contactsData[0]?.did || 'did:sovra:alice_peer');
+      }
+    }
+
+    function triggerBottomCreateAction() {
+      switchTab('feed');
+      const composer = document.querySelector('.feed-container .card');
+      if (composer) {
+        composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input = composer.querySelector('textarea') || composer.querySelector('input');
+        if (input) input.focus();
+        showAccountToast('✍️ Composer ready: create Photo, Video, Reel, or Story!');
+      }
+    }
+
+    // Top Header Search Live Engine
+    function handleHeaderFriendSearch(query) {
+      const q = (query || '').toLowerCase().trim();
+      const dropdown = document.getElementById('headerSearchDropdown');
+      const clearBtn = document.getElementById('headerSearchClearBtn');
+      if (clearBtn) clearBtn.style.display = q ? 'inline' : 'none';
+      if (!dropdown) return;
+
+      if (!q) {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      dropdown.style.display = 'block';
+      const matchedPeople = socialOmniCatalog.people.filter(p => !p.isBlocked && (p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q) || (p.bio && p.bio.toLowerCase().includes(q))));
+      
+      let html = '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 4px 8px; margin-bottom: 4px;">People & Friends</div>';
+      if (matchedPeople.length === 0) {
+        html += '<div style="padding: 8px; color: #64748b; font-size: 0.8rem; text-align: center;">No users matching "' + query.replace(/</g, '&lt;') + '"</div>';
+      } else {
+        for (const p of matchedPeople.slice(0, 5)) {
+          const statusText = p.isFriend ? '❤️ Friends' : p.isPending ? '⏳ Requested' : '+ Add';
+          const statusBg = p.isFriend ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)';
+          const statusColor = p.isFriend ? '#f87171' : '#38bdf8';
+          html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'transparent\'" onclick="switchTab(\'friends\'); filterFriendsView(\'' + p.name.replace(/'/g, "\\'") + '\'); document.getElementById(\'headerSearchDropdown\').style.display=\'none\';">' +
+            '<div style="display: flex; align-items: center; gap: 8px;">' +
+              '<div style="width: 28px; height: 28px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;">' + p.avatar + '</div>' +
+              '<div>' +
+                '<div style="font-size: 0.82rem; font-weight: 700; color: #fff;">' + p.name + '</div>' +
+                '<div style="font-size: 0.7rem; color: #94a3b8;">' + p.handle + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<span style="font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: ' + statusBg + '; color: ' + statusColor + ';">' + statusText + '</span>' +
+          '</div>';
+        }
+      }
+
+      html += '<div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 6px; padding-top: 6px; text-align: center;">' +
+        '<button onclick="switchTab(\'friends\'); filterFriendsView(\'' + q.replace(/'/g, "\\'") + '\'); document.getElementById(\'headerSearchDropdown\').style.display=\'none\';" style="background: none; border: none; color: #38bdf8; font-size: 0.78rem; font-weight: 700; cursor: pointer; padding: 4px;">👥 Open Friends Hub for "' + query.replace(/</g, '&lt;') + '" →</button>' +
+      '</div>';
+
+      dropdown.innerHTML = html;
+    }
+
+    function showHeaderSearchDropdown() {
+      const input = document.getElementById('headerFriendSearchInput');
+      if (input && input.value.trim()) {
+        handleHeaderFriendSearch(input.value);
+      }
+    }
+
+    function clearHeaderSearch() {
+      const input = document.getElementById('headerFriendSearchInput');
+      if (input) input.value = '';
+      const clearBtn = document.getElementById('headerSearchClearBtn');
+      if (clearBtn) clearBtn.style.display = 'none';
+      const dropdown = document.getElementById('headerSearchDropdown');
+      if (dropdown) dropdown.style.display = 'none';
+    }
+
+    // Close header search dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      const wrap = document.querySelector('.header-search-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        const dd = document.getElementById('headerSearchDropdown');
+        if (dd) dd.style.display = 'none';
+      }
+    });
 
     // --- Channel Creation Handlers ---
     function openCreateChannelModal() {
