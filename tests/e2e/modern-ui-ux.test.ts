@@ -56,4 +56,22 @@ describe('Modern UI/UX Design System & Smart Omnibar E2E Suite', () => {
     expect(content).toContain('--glass-bg: rgba(15, 23, 42, 0.82);');
     expect(content).toContain('--glass-border: rgba(255, 255, 255, 0.12);');
   });
+
+  it('verifies ambient cinema glow lighting for YouTube and Reels', () => {
+    expect(content).toContain('id="ytAmbientGlow"');
+    expect(content).toContain('id="btnAmbientGlow"');
+    expect(content).toContain('toggleYtAmbientGlow');
+    expect(content).toContain('id="reelAmbientCinemaGlow"');
+    expect(content).toContain('class="reels-phone-wrapper"');
+    expect(content).toContain('.reel-ambient-cinema-glow');
+  });
+
+  it('verifies physics particle explosion engine and holographic story rings', () => {
+    expect(content).toContain('spawnParticleBurst');
+    expect(content).toContain('particle-heart-spring');
+    expect(content).toContain('particle-floating-dopamine');
+    expect(content).toContain('physics-micro-particle');
+    expect(content).toContain('heart-bounce-pop');
+    expect(content).toContain('storyHolographicGlow');
+  });
 });

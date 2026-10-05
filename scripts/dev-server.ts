@@ -2535,6 +2535,11 @@ function renderHtml(
         width: 100% !important;
       }
       .yt-ambient-glow {
+        filter: blur(35px) !important;
+        opacity: 0.45 !important;
+        inset: -10px !important;
+      }
+      .reel-ambient-cinema-glow {
         display: none !important;
       }
       .yt-player-box {
@@ -2760,11 +2765,24 @@ function renderHtml(
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.2s;
+      transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease;
       position: relative;
     }
-    .story-ring:hover { transform: scale(1.06); }
-    .story-ring.seen { background: #374151; }
+    .story-ring:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 16px rgba(236, 72, 153, 0.55);
+    }
+    .story-ring:not(.seen) {
+      animation: storyHolographicGlow 5s linear infinite;
+    }
+    @keyframes storyHolographicGlow {
+      0% { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(360deg); }
+    }
+    .story-ring.seen {
+      background: #374151;
+      animation: none;
+    }
     .story-avatar {
       width: 100%;
       height: 100%;
@@ -2813,6 +2831,22 @@ function renderHtml(
       margin: 0 auto;
       gap: 1.5rem;
     }
+    .reels-phone-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .reel-ambient-cinema-glow {
+      position: absolute;
+      inset: -32px;
+      border-radius: 48px;
+      filter: blur(65px);
+      opacity: 0.7;
+      z-index: 0;
+      pointer-events: none;
+      transition: background 0.8s ease, opacity 0.5s ease;
+    }
     .reels-phone {
       width: 380px;
       height: 640px;
@@ -2825,6 +2859,7 @@ function renderHtml(
       display: flex;
       flex-direction: column;
       user-select: none;
+      z-index: 1;
     }
     .reels-header-pill {
       position: absolute;
@@ -5021,6 +5056,15 @@ function renderHtml(
       cursor: pointer;
       user-select: none;
     }
+    .insta-post-card {
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s ease;
+      position: relative;
+    }
+    .insta-post-card:hover {
+      border-color: rgba(99, 102, 241, 0.35);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 28px rgba(99, 102, 241, 0.16);
+      transform: translateY(-2px);
+    }
     .insta-heart-pop {
       position: absolute;
       font-size: 5rem;
@@ -5035,6 +5079,74 @@ function renderHtml(
       70% { transform: scale(1.0); opacity: 0.9; }
       100% { transform: scale(1.4) translateY(-30px); opacity: 0; }
     }
+
+    /* Particle Physics Emitter */
+    .particle-heart-spring {
+      position: absolute;
+      font-size: 4.8rem;
+      pointer-events: none;
+      z-index: 120;
+      filter: drop-shadow(0 0 22px rgba(239, 68, 68, 0.9));
+      animation: heartSpringBurst 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      user-select: none;
+    }
+    @keyframes heartSpringBurst {
+      0% { transform: scale(0.2); opacity: 0; }
+      40% { transform: scale(1.35); opacity: 1; }
+      70% { transform: scale(1.05); opacity: 0.95; }
+      100% { transform: scale(1.5) translateY(-35px); opacity: 0; }
+    }
+    .particle-floating-dopamine {
+      position: absolute;
+      background: linear-gradient(135deg, #ef4444, #ec4899);
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 3px 12px;
+      border-radius: 9999px;
+      pointer-events: none;
+      z-index: 121;
+      box-shadow: 0 4px 16px rgba(239, 68, 68, 0.6);
+      animation: dopamineGlide 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      white-space: nowrap;
+      user-select: none;
+    }
+    @keyframes dopamineGlide {
+      0% { transform: scale(0.4) translateY(0); opacity: 0; }
+      25% { transform: scale(1.15) translateY(-10px); opacity: 1; }
+      70% { transform: scale(1) translateY(-30px); opacity: 0.95; }
+      100% { transform: scale(0.9) translateY(-60px); opacity: 0; }
+    }
+    .physics-micro-particle {
+      position: absolute;
+      font-size: 1.15rem;
+      pointer-events: none;
+      z-index: 119;
+      animation: particleRadialBurst 0.75s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+      user-select: none;
+    }
+    @keyframes particleRadialBurst {
+      0% {
+        transform: translate(0, 0) scale(0.6) rotate(0deg);
+        opacity: 1;
+      }
+      50% {
+        opacity: 1;
+      }
+      100% {
+        transform: translate(var(--tx), var(--ty)) scale(1.2) rotate(var(--rot));
+        opacity: 0;
+      }
+    }
+    .heart-bounce-pop {
+      animation: heartButtonBounce 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes heartButtonBounce {
+      0% { transform: scale(1); }
+      35% { transform: scale(1.4); }
+      70% { transform: scale(0.88); }
+      100% { transform: scale(1); }
+    }
     .insta-actions-row {
       display: flex;
       align-items: center;
@@ -5048,10 +5160,13 @@ function renderHtml(
       font-size: 1.4rem;
       cursor: pointer;
       padding: 0.2rem;
-      transition: transform 0.15s, color 0.15s;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.15s;
     }
     .insta-action-btn:hover {
-      transform: scale(1.2);
+      transform: scale(1.25);
+    }
+    .insta-action-btn:active {
+      transform: scale(0.9);
     }
     .insta-likes-text {
       padding: 0 1rem;
@@ -5757,8 +5872,10 @@ function renderHtml(
     <main class="main-content" id="reels-view" style="display: none;">
       <!-- Reels Player Stage -->
       <div class="reels-stage">
-        <!-- Phone Mockup Container with 60fps Gesture Physics -->
-        <div class="reels-phone" id="reelsPhone" 
+        <div class="reels-phone-wrapper">
+          <div class="reel-ambient-cinema-glow" id="reelAmbientCinemaGlow" style="background: ${reelsStore[0]!.bgGradient};"></div>
+          <!-- Phone Mockup Container with 60fps Gesture Physics -->
+          <div class="reels-phone" id="reelsPhone" 
              onpointerdown="handleReelPointerDown(event)" 
              onpointermove="handleReelPointerMove(event)" 
              onpointerup="handleReelPointerUp(event)"
@@ -6024,6 +6141,7 @@ function renderHtml(
             </div>
           </div>
         </div>
+      </div>
 
         <!-- Snap Navigation Controls (Keyboard & Click Alternatives) -->
         <div class="reels-nav-controls">
@@ -6433,6 +6551,11 @@ function renderHtml(
                         <option value="360p">360p (600k • Edge)</option>
                       </select>
                     </div>
+
+                    <!-- Ambient Cinema Glow Toggle -->
+                    <button class="yt-btn" id="btnAmbientGlow" onclick="toggleYtAmbientGlow()" title="Toggle Dynamic Ambient Cinema Glow" style="color: #38bdf8; display: flex; align-items: center; gap: 4px; font-size: 0.78rem;">
+                      <span>✨</span> <span id="ambientStatusText">Ambient</span>
+                    </button>
 
                     <!-- Theater Mode Toggle -->
                     <button class="yt-btn" id="btnTheaterMode" onclick="toggleTheaterMode()" title="Theater Mode (t)">🔲</button>
@@ -8058,6 +8181,54 @@ function renderHtml(
     let currentProfileGridTab = 'posts';
     let walletBalanceSov = 420.50;
 
+    // Unified Physics Particle Emitter (Spring Hearts, Floating Dopamine, Radial Micro-Particles)
+    function spawnParticleBurst(x, y, container, badgeText) {
+      if (!container) return;
+      if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+      }
+
+      // 1. Center pulsing spring heart
+      const mainHeart = document.createElement('div');
+      mainHeart.className = 'particle-heart-spring';
+      mainHeart.innerHTML = '❤️';
+      mainHeart.style.left = (x - 38) + 'px';
+      mainHeart.style.top = (y - 38) + 'px';
+      container.appendChild(mainHeart);
+      setTimeout(function() { mainHeart.remove(); }, 900);
+
+      // 2. Floating dopamine badge (+1 ❤️, +10 SOV, etc.)
+      if (badgeText) {
+        const dopamine = document.createElement('div');
+        dopamine.className = 'particle-floating-dopamine';
+        dopamine.innerText = badgeText;
+        dopamine.style.left = (x - 24) + 'px';
+        dopamine.style.top = (y - 55) + 'px';
+        container.appendChild(dopamine);
+        setTimeout(function() { dopamine.remove(); }, 950);
+      }
+
+      // 3. Radial micro particles (confetti, stars, sparks)
+      const particleChars = ['❤️', '💖', '✨', '⭐', '🔥'];
+      for (let i = 0; i < 10; i++) {
+        const p = document.createElement('div');
+        p.className = 'physics-micro-particle';
+        p.innerText = particleChars[Math.floor(Math.random() * particleChars.length)];
+        const angle = (i / 10) * 2 * Math.PI + (Math.random() * 0.4 - 0.2);
+        const dist = 45 + Math.random() * 55;
+        const targetX = Math.cos(angle) * dist;
+        const targetY = Math.sin(angle) * dist - 25;
+        const rot = (Math.random() - 0.5) * 60;
+        p.style.left = x + 'px';
+        p.style.top = y + 'px';
+        p.style.setProperty('--tx', targetX + 'px');
+        p.style.setProperty('--ty', targetY + 'px');
+        p.style.setProperty('--rot', rot + 'deg');
+        container.appendChild(p);
+        setTimeout(function() { p.remove(); }, 750);
+      }
+    }
+
     function triggerFeedPostLike(postId) {
       const post = feedPostsData.find(function(p) { return p.id === postId; });
       if (!post) return;
@@ -8070,7 +8241,19 @@ function renderHtml(
       const countEl = document.getElementById('likes-count-' + postId);
       if (countEl) countEl.innerText = post.likesCount.toLocaleString();
       const btnEl = document.getElementById('btn-like-' + postId);
-      if (btnEl) btnEl.innerText = post.isLiked ? '❤️' : '🤍';
+      if (btnEl) {
+        btnEl.innerText = post.isLiked ? '❤️' : '🤍';
+        if (post.isLiked) {
+          btnEl.classList.remove('heart-bounce-pop');
+          void btnEl.offsetWidth;
+          btnEl.classList.add('heart-bounce-pop');
+          const mediaBox = document.getElementById('media-' + postId);
+          if (mediaBox) {
+            const rect = mediaBox.getBoundingClientRect();
+            spawnParticleBurst(rect.width / 2, rect.height / 2, mediaBox, '+1 ❤️');
+          }
+        }
+      }
 
       // Persist to backend dynamic store
       fetch('/api/feed/like', {
@@ -8089,7 +8272,12 @@ function renderHtml(
         const countEl = document.getElementById('likes-count-' + postId);
         if (countEl) countEl.innerText = post.likesCount.toLocaleString();
         const btnEl = document.getElementById('btn-like-' + postId);
-        if (btnEl) btnEl.innerText = '❤️';
+        if (btnEl) {
+          btnEl.innerText = '❤️';
+          btnEl.classList.remove('heart-bounce-pop');
+          void btnEl.offsetWidth;
+          btnEl.classList.add('heart-bounce-pop');
+        }
 
         // Persist to backend dynamic store
         fetch('/api/feed/like', {
@@ -8099,20 +8287,13 @@ function renderHtml(
         }).catch(function(err) { console.warn('[Feed] Like sync warning:', err); });
       }
 
-      // Heart dopamine burst
-      const popContainer = document.getElementById('heart-pop-' + postId);
-      if (popContainer) {
-        const heart = document.createElement('div');
-        heart.innerHTML = '❤️';
-        heart.style.position = 'absolute';
-        heart.style.fontSize = '5rem';
-        heart.style.pointerEvents = 'none';
-        heart.style.zIndex = '100';
-        heart.style.animation = 'heartDopamine 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
-        heart.style.left = 'calc(50% - 2.5rem)';
-        heart.style.top = 'calc(50% - 2.5rem)';
-        popContainer.appendChild(heart);
-        setTimeout(function() { heart.remove(); }, 900);
+      // Heart dopamine & particle explosion
+      const mediaBox = document.getElementById('media-' + postId);
+      if (mediaBox) {
+        const rect = mediaBox.getBoundingClientRect();
+        const x = (event && event.clientX) ? (event.clientX - rect.left) : (rect.width / 2);
+        const y = (event && event.clientY) ? (event.clientY - rect.top) : (rect.height / 2);
+        spawnParticleBurst(x, y, mediaBox, '+1 ❤️');
       }
     }
 
@@ -8404,6 +8585,9 @@ function renderHtml(
       const ambientBg = document.getElementById('reelAmbientBg');
       if (ambientBg) ambientBg.style.background = r.bgGradient;
 
+      const cinemaGlow = document.getElementById('reelAmbientCinemaGlow');
+      if (cinemaGlow) cinemaGlow.style.background = r.bgGradient;
+
       const cidEl = document.getElementById('reelCidDisplay');
       if (cidEl) cidEl.innerText = 'CID: ' + r.cid.substring(0, 18) + '...';
 
@@ -8587,42 +8771,8 @@ function renderHtml(
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      // 1. 3D Pop Heart Burst
-      const heart = document.createElement('div');
-      heart.className = 'heart-burst';
-      heart.innerText = '❤️';
-      heart.style.left = (x - 36) + 'px';
-      heart.style.top = (y - 36) + 'px';
-      wrapper.appendChild(heart);
-      setTimeout(() => heart.remove(), 850);
-
-      // 2. Floating Dopamine Badge (+1 ❤️)
-      const dopamine = document.createElement('div');
-      dopamine.className = 'floating-dopamine';
-      dopamine.innerText = '+1 ❤️';
-      dopamine.style.left = (x - 22) + 'px';
-      dopamine.style.top = (y - 50) + 'px';
-      wrapper.appendChild(dopamine);
-      setTimeout(() => dopamine.remove(), 900);
-
-      // 3. Sparkle Confetti Elements
-      for (let i = 0; i < 6; i++) {
-        const sparkle = document.createElement('div');
-        sparkle.style.position = 'absolute';
-        sparkle.style.pointerEvents = 'none';
-        sparkle.style.fontSize = '0.9rem';
-        sparkle.innerText = '✨';
-        sparkle.style.left = (x - 10 + (Math.random() - 0.5) * 70) + 'px';
-        sparkle.style.top = (y - 10 + (Math.random() - 0.5) * 70) + 'px';
-        sparkle.style.transition = 'all 0.55s ease-out';
-        sparkle.style.zIndex = '35';
-        wrapper.appendChild(sparkle);
-        setTimeout(() => {
-          sparkle.style.opacity = '0';
-          sparkle.style.transform = 'scale(1.4) translateY(-25px)';
-        }, 15);
-        setTimeout(() => sparkle.remove(), 600);
-      }
+      // Unified 3D Pop Heart Burst, Floating Dopamine Badge & Radial Particles
+      spawnParticleBurst(x, y, wrapper, '+1 ❤️');
 
       // Mark like
       if (!likedReelsSet.has(reelsData[currentReelIndex].id)) {
@@ -10420,6 +10570,23 @@ function renderHtml(
           bufferBadge.style.background = 'rgba(16, 185, 129, 0.25)';
           bufferBadge.style.color = '#34d399';
         }
+      }
+    }
+
+    let ytAmbientGlowActive = true;
+    function toggleYtAmbientGlow() {
+      ytAmbientGlowActive = !ytAmbientGlowActive;
+      const glow = document.getElementById('ytAmbientGlow');
+      const text = document.getElementById('ambientStatusText');
+      const btn = document.getElementById('btnAmbientGlow');
+      if (glow) {
+        glow.style.opacity = ytAmbientGlowActive ? '0.65' : '0';
+      }
+      if (text) {
+        text.innerText = ytAmbientGlowActive ? 'Ambient' : 'Ambient (Off)';
+      }
+      if (btn) {
+        btn.style.color = ytAmbientGlowActive ? '#38bdf8' : '#64748b';
       }
     }
 
