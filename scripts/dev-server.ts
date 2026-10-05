@@ -535,6 +535,7 @@ export interface FeedPostRecord {
   authorName: string;
   authorAvatar: string;
   authorAvatarBg: string;
+  authorAvatarDataUrl?: string;
   audioTrack: string;
   mediaGradient: string;
   mediaEmoji: string;
@@ -546,7 +547,7 @@ export interface FeedPostRecord {
   caption: string;
   tags: string;
   timestamp: number;
-  comments: { author: string; text: string }[];
+  comments: { id?: string; author: string; text: string; authorDid?: string; authorAvatar?: string; timestamp?: number }[];
   mediaImage?: string;
   likedByDids?: string[];
 }
@@ -5540,8 +5541,8 @@ function renderHtml(
               <!-- Post Header -->
               <div class="insta-post-header">
                 <div class="insta-author-info" onclick="openCreatorProfile('${post.authorName.split(' ')[0].toLowerCase()}')">
-                  <div class="insta-author-avatar" style="background: ${post.authorAvatarBg};">
-                    ${post.authorAvatar}
+                  <div class="insta-author-avatar" style="background: ${post.authorAvatarBg}; overflow: hidden;">
+                    ${post.authorAvatarDataUrl ? `<img src="${post.authorAvatarDataUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />` : post.authorAvatar}
                   </div>
                   <div>
                     <div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 4px;">
@@ -5559,9 +5560,12 @@ function renderHtml(
               <!-- Media Box with Double-Tap Heart Physics -->
               ${post.mediaImage ? `
               <div class="insta-media-box" id="media-${post.id}" 
-                   style="position: relative; overflow: hidden; max-height: 480px; background: #000; display: flex; align-items: center; justify-content: center;"
+                   style="position: relative; overflow: hidden; max-height: 520px; background: #000; display: flex; align-items: center; justify-content: center;"
                    ondblclick="handleFeedDoubleTap('${post.id}', event)">
-                <img src="${post.mediaImage}" alt="Feed photo" style="width: 100%; height: auto; max-height: 480px; object-fit: contain; display: block;" />
+                <img src="${post.mediaImage}" alt="Feed photo" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" />
+                <div style="position: absolute; bottom: 8px; left: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(15,23,42,0.85); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">
+                  <span>📦 CID:</span> <span>${(post.mediaCid || 'bafybei...').substring(0, 14)}...</span>
+                </div>
                 <div id="heart-pop-${post.id}"></div>
               </div>
               ` : `
@@ -7877,6 +7881,8 @@ function renderHtml(
     let currentUserHandle = myProfile ? myProfile.handle : (isMobileDevice ? '@phone_user' : '@laptop_host');
 
     function compressImage(file, maxDimension, quality, callback) {
+      maxDimension = maxDimension || 1200;
+      quality = quality || 0.82;
       const reader = new FileReader();
       reader.onload = function(e) {
         const img = new Image();
@@ -7896,8 +7902,28 @@ function renderHtml(
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+          }
+
+          // Prefer WebP, fallback to JPEG
+          let format = 'image/webp';
+          let compressedDataUrl = canvas.toDataURL(format, quality);
+          if (!compressedDataUrl.startsWith('data:image/webp')) {
+            format = 'image/jpeg';
+            compressedDataUrl = canvas.toDataURL(format, quality);
+          }
+
+          // Guard against payload overflow (> 250KB binary is ~340KB Base64)
+          if (compressedDataUrl.length > 340000 && quality > 0.5) {
+            compressedDataUrl = canvas.toDataURL(format, 0.65);
+          }
+          if (compressedDataUrl.length > 340000) {
+            compressedDataUrl = canvas.toDataURL('image/jpeg', 0.55);
+          }
+
           callback(compressedDataUrl);
         };
         img.src = e.target.result;
@@ -8630,18 +8656,26 @@ function renderHtml(
     function triggerFeedPostLike(postId) {
       const post = feedPostsData.find(function(p) { return p.id === postId; });
       if (!post) return;
-      post.isLiked = !post.isLiked;
-      if (post.isLiked) {
-        post.likesCount++;
+      if (!Array.isArray(post.likedByDids)) post.likedByDids = [];
+
+      const myDid = myProfile ? myProfile.did : 'did:sovra:self';
+      const myIdx = post.likedByDids.indexOf(myDid);
+      const isNowLiked = myIdx === -1;
+
+      if (isNowLiked) {
+        post.likedByDids.push(myDid);
       } else {
-        post.likesCount = Math.max(0, post.likesCount - 1);
+        post.likedByDids.splice(myIdx, 1);
       }
+      post.isLiked = isNowLiked;
+      post.likesCount = post.likedByDids.length;
+
       const countEl = document.getElementById('likes-count-' + postId);
       if (countEl) countEl.innerText = post.likesCount.toLocaleString();
       const btnEl = document.getElementById('btn-like-' + postId);
       if (btnEl) {
-        btnEl.innerText = post.isLiked ? '❤️' : '🤍';
-        if (post.isLiked) {
+        btnEl.innerText = isNowLiked ? '❤️' : '🤍';
+        if (isNowLiked) {
           btnEl.classList.remove('heart-bounce-pop');
           void btnEl.offsetWidth;
           btnEl.classList.add('heart-bounce-pop');
@@ -8657,16 +8691,28 @@ function renderHtml(
       fetch('/api/feed/like', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: postId, isLiked: post.isLiked })
-      }).catch(function(err) { console.warn('[Feed] Like sync warning:', err); });
+        body: JSON.stringify({ postId: postId, userDid: myDid, isLiked: isNowLiked })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res && res.ok) {
+          post.likesCount = res.likesCount;
+          if (countEl) countEl.innerText = res.likesCount.toLocaleString();
+        }
+      })
+      .catch(function(err) { console.warn('[Feed] Like sync warning:', err); });
     }
 
     function handleFeedDoubleTap(postId, event) {
       const post = feedPostsData.find(function(p) { return p.id === postId; });
       if (!post) return;
-      if (!post.isLiked) {
+      if (!Array.isArray(post.likedByDids)) post.likedByDids = [];
+
+      const myDid = myProfile ? myProfile.did : 'did:sovra:self';
+      if (!post.likedByDids.includes(myDid)) {
+        post.likedByDids.push(myDid);
         post.isLiked = true;
-        post.likesCount++;
+        post.likesCount = post.likedByDids.length;
         const countEl = document.getElementById('likes-count-' + postId);
         if (countEl) countEl.innerText = post.likesCount.toLocaleString();
         const btnEl = document.getElementById('btn-like-' + postId);
@@ -8681,8 +8727,16 @@ function renderHtml(
         fetch('/api/feed/like', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postId: postId, isLiked: true })
-        }).catch(function(err) { console.warn('[Feed] Like sync warning:', err); });
+          body: JSON.stringify({ postId: postId, userDid: myDid, isLiked: true })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res && res.ok) {
+            post.likesCount = res.likesCount;
+            if (countEl) countEl.innerText = res.likesCount.toLocaleString();
+          }
+        })
+        .catch(function(err) { console.warn('[Feed] Like sync warning:', err); });
       }
 
       // Heart dopamine & particle explosion
@@ -8706,15 +8760,20 @@ function renderHtml(
       const text = input.value.trim();
       input.value = '';
 
+      const myName = myProfile ? myProfile.name : 'You (Me)';
+      const myDid = myProfile ? myProfile.did : 'did:sovra:self';
+      const myAvatar = myProfile ? myProfile.avatar : 'Y';
+
       const post = feedPostsData.find(function(p) { return p.id === postId; });
       if (post) {
-        post.comments.push({ author: 'You (Me)', text: text });
+        if (!Array.isArray(post.comments)) post.comments = [];
+        post.comments.push({ author: myName, text: text, authorDid: myDid, authorAvatar: myAvatar, timestamp: Date.now() });
       }
 
       const commentsBox = document.getElementById('comments-box-' + postId);
       if (commentsBox) {
         const commentDiv = document.createElement('div');
-        commentDiv.innerHTML = '<strong style="color: #38bdf8; font-size: 0.82rem;">You (Me)</strong> <span style="color: #cbd5e1; font-size: 0.82rem;">' + text + '</span>';
+        commentDiv.innerHTML = '<strong style="color: #38bdf8; font-size: 0.82rem;">' + myName + '</strong> <span style="color: #cbd5e1; font-size: 0.82rem;">' + text + '</span>';
         commentsBox.appendChild(commentDiv);
       }
 
@@ -8722,7 +8781,13 @@ function renderHtml(
       fetch('/api/feed/comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: postId, text: text, author: myProfile ? myProfile.name : 'You (Me)' })
+        body: JSON.stringify({
+          postId: postId,
+          text: text,
+          author: myName,
+          authorDid: myDid,
+          authorAvatar: myAvatar
+        })
       }).catch(function(err) { console.warn('[Feed] Comment sync warning:', err); });
     }
 
@@ -8805,6 +8870,8 @@ function renderHtml(
         .then(function(data) {
           if (data && data.ok && Array.isArray(data.posts)) {
             let hasNew = false;
+            const myDid = myProfile ? myProfile.did : 'did:sovra:self';
+
             for (let i = data.posts.length - 1; i >= 0; i--) {
               const p = data.posts[i];
               const existing = feedPostsData.find(function(ex) { return ex.id === p.id; });
@@ -8813,10 +8880,15 @@ function renderHtml(
                 renderDynamicPostCard(p, true);
                 hasNew = true;
               } else {
-                if (existing.likesCount !== p.likesCount) {
+                if (existing.likesCount !== p.likesCount || JSON.stringify(existing.likedByDids) !== JSON.stringify(p.likedByDids)) {
                   existing.likesCount = p.likesCount;
+                  existing.likedByDids = p.likedByDids || [];
                   const countEl = document.getElementById('likes-count-' + p.id);
                   if (countEl) countEl.innerText = p.likesCount.toLocaleString();
+
+                  const isLikedByMe = Array.isArray(p.likedByDids) ? p.likedByDids.includes(myDid) : Boolean(p.isLiked);
+                  const btnLike = document.getElementById('btn-like-' + p.id);
+                  if (btnLike) btnLike.innerText = isLikedByMe ? '❤️' : '🤍';
                 }
                 if (Array.isArray(p.comments) && p.comments.length !== (existing.comments || []).length) {
                   existing.comments = p.comments;
@@ -8824,7 +8896,9 @@ function renderHtml(
                   if (commentsBox) {
                     let cHtml = '<div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">View all ' + p.comments.length + ' comments &bull; Verified on DHT</div>';
                     p.comments.forEach(function(c) {
-                      cHtml += '<div><strong style="color: #cbd5e1; font-size: 0.82rem;">' + c.author + '</strong> <span style="color: #94a3b8; font-size: 0.82rem;">' + c.text + '</span></div>';
+                      const isMe = (c.authorDid && c.authorDid === myDid) || c.author === (myProfile ? myProfile.name : 'You (Me)');
+                      const authorColor = isMe ? '#38bdf8' : '#cbd5e1';
+                      cHtml += '<div><strong style="color: ' + authorColor + '; font-size: 0.82rem;">' + c.author + '</strong> <span style="color: #94a3b8; font-size: 0.82rem;">' + c.text + '</span></div>';
                     });
                     commentsBox.innerHTML = cHtml;
                   }
@@ -8845,6 +8919,9 @@ function renderHtml(
       const emptyNotice = document.getElementById('emptyFeedNotice');
       if (emptyNotice) emptyNotice.remove();
 
+      const myDid = myProfile ? myProfile.did : 'did:sovra:self';
+      const isLikedByMe = Array.isArray(post.likedByDids) ? post.likedByDids.includes(myDid) : Boolean(post.isLiked);
+
       const card = document.createElement('article');
       card.className = 'insta-post-card';
       card.id = 'card-' + post.id;
@@ -8858,13 +8935,18 @@ function renderHtml(
       if (post.comments && post.comments.length) {
         for (var i = 0; i < post.comments.length; i++) {
           var c = post.comments[i];
-          commentsHtml += '<div><strong style="color: #cbd5e1; font-size: 0.82rem;">' + c.author + '</strong> <span style="color: #94a3b8; font-size: 0.82rem;">' + c.text + '</span></div>';
+          var isMe = (c.authorDid && c.authorDid === myDid) || c.author === (myProfile ? myProfile.name : 'You (Me)');
+          var authorColor = isMe ? '#38bdf8' : '#cbd5e1';
+          commentsHtml += '<div><strong style="color: ' + authorColor + '; font-size: 0.82rem;">' + c.author + '</strong> <span style="color: #94a3b8; font-size: 0.82rem;">' + c.text + '</span></div>';
         }
       }
 
       const mediaBoxHtml = post.mediaImage ?
-        '<div class="insta-media-box" id="media-' + post.id + '" style="position: relative; overflow: hidden; max-height: 480px; background: #000; display: flex; align-items: center; justify-content: center;">' +
-          '<img src="' + post.mediaImage + '" alt="Feed media" style="width: 100%; height: auto; max-height: 480px; object-fit: contain; display: block;" />' +
+        '<div class="insta-media-box" id="media-' + post.id + '" style="position: relative; overflow: hidden; max-height: 520px; background: #000; display: flex; align-items: center; justify-content: center;">' +
+          '<img src="' + post.mediaImage + '" alt="Feed media" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" />' +
+          '<div style="position: absolute; bottom: 8px; left: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(15,23,42,0.85); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">' +
+            '<span>📦 CID:</span> <span>' + (post.mediaCid ? post.mediaCid.substring(0, 14) + '...' : 'bafybei...') + '</span>' +
+          '</div>' +
           '<div id="heart-pop-' + post.id + '"></div>' +
         '</div>' :
         '<div class="insta-media-box" id="media-' + post.id + '" style="background: ' + post.mediaGradient + ';">' +
@@ -8899,7 +8981,7 @@ function renderHtml(
 
         '<div class="insta-actions-row">' +
           '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
-            '<button class="insta-action-btn" id="btn-like-' + post.id + '" title="Like Post">' + (post.isLiked ? '❤️' : '🤍') + '</button>' +
+            '<button class="insta-action-btn" id="btn-like-' + post.id + '" title="Like Post">' + (isLikedByMe ? '❤️' : '🤍') + '</button>' +
             '<button class="insta-action-btn btn-comment-' + post.id + '" title="Comment">💬</button>' +
             '<button class="insta-action-btn btn-repost-' + post.id + '" title="Repost / Quote">🔁</button>' +
             '<button class="insta-action-btn btn-share-' + post.id + '" title="Share CID to P2P Mesh">🚀</button>' +
@@ -13348,9 +13430,9 @@ async function startDevServer() {
         try {
           const parsed = JSON.parse(body);
           const caption = String(parsed.caption || '').trim();
-          if (!caption) {
+          if (!caption && !parsed.mediaImage) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Caption is required' }));
+            res.end(JSON.stringify({ ok: false, error: 'Caption or photo is required' }));
             return;
           }
 
@@ -13364,7 +13446,32 @@ async function startDevServer() {
 
           const selectedTheme = themes[parsed.theme || 'mesh'] || themes.mesh;
           const newPostId = 'feed-' + Date.now();
-          const mockCid = 'bafybei' + Math.random().toString(36).substring(2, 12) + Math.random().toString(36).substring(2, 12);
+
+          // Real storage ingestion & deterministic CID generation
+          let realCid = '';
+          let imageBuffer: Buffer | null = null;
+
+          if (parsed.mediaImage && typeof parsed.mediaImage === 'string') {
+            try {
+              const commaIdx = parsed.mediaImage.indexOf(',');
+              const base64Data = commaIdx >= 0 ? parsed.mediaImage.slice(commaIdx + 1) : parsed.mediaImage;
+              imageBuffer = Buffer.from(base64Data, 'base64');
+              const cidObj = CID.create('raw', imageBuffer, false, 'sha2-256');
+              realCid = cidObj.toString('base32');
+
+              // Ingest into local blockstore
+              if (storageDaemon && storageDaemon.blockstore) {
+                await storageDaemon.blockstore.put(cidObj, imageBuffer);
+              }
+            } catch (cidErr) {
+              console.warn('[StorageDaemon] Local blockstore ingestion warning:', cidErr);
+            }
+          }
+
+          if (!realCid) {
+            const seed = Buffer.from((caption || 'post') + ':' + Date.now());
+            realCid = CID.create('raw', seed, false, 'sha2-256').toString('base32');
+          }
 
           const newPost: FeedPostRecord = {
             id: newPostId,
@@ -13372,15 +13479,16 @@ async function startDevServer() {
             authorName: String(parsed.authorName || 'Sovereign Peer'),
             authorAvatar: String(parsed.authorAvatar || 'S'),
             authorAvatarBg: String(parsed.authorAvatarBg || '#6366f1'),
+            authorAvatarDataUrl: parsed.authorAvatarDataUrl ? String(parsed.authorAvatarDataUrl) : undefined,
             audioTrack: String(parsed.audioTrack || 'Original Audio • Sovra Mesh'),
             mediaGradient: selectedTheme.gradient,
             mediaEmoji: selectedTheme.emoji,
             mediaTitle: selectedTheme.title,
-            mediaCid: mockCid,
+            mediaCid: realCid,
             likesCount: 0,
             isLiked: false,
             isSaved: false,
-            caption,
+            caption: caption || 'Photo update from sovereign peer',
             tags: String(parsed.tags || '#sovra #p2p #mesh'),
             timestamp: Date.now(),
             comments: [],
@@ -13401,7 +13509,16 @@ async function startDevServer() {
             sig: 'ed25519_sig_dynamic_' + newPost.id,
           });
 
-          await node.pubsub.publish('sovra/feed/main', new TextEncoder().encode(JSON.stringify(newPost)));
+          // Safe GossipSub publish: transmit lightweight event to prevent GossipSub packet size overflow
+          try {
+            const gossipEvent = {
+              ...newPost,
+              mediaImage: undefined, // peers retrieve media via CID from Blockstore/Bitswap
+            };
+            await node.pubsub.publish('sovra/feed/main', new TextEncoder().encode(JSON.stringify(gossipEvent)));
+          } catch (pubErr) {
+            console.warn('[GossipSub] Publish warning:', pubErr);
+          }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, post: newPost }));
@@ -13435,7 +13552,7 @@ async function startDevServer() {
             post.isLiked = isLiked;
             saveDynamicSocialState(dynamicSocialStore);
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, isLiked: post.isLiked, likesCount: post.likesCount }));
+            res.end(JSON.stringify({ ok: true, isLiked: post.isLiked, likesCount: post.likesCount, likedByDids: post.likedByDids }));
           } else {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: false, error: 'Post not found' }));
@@ -13457,14 +13574,25 @@ async function startDevServer() {
           const parsed = JSON.parse(body);
           const post = dynamicSocialStore.posts.find(p => p.id === parsed.postId);
           if (post) {
+            const text = String(parsed.text || '').trim();
+            if (!text) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Empty comment' }));
+              return;
+            }
             const comment = {
+              id: 'cmt-' + Date.now(),
               author: String(parsed.author || 'You (Me)'),
-              text: String(parsed.text || ''),
+              authorDid: parsed.authorDid ? String(parsed.authorDid) : undefined,
+              authorAvatar: parsed.authorAvatar ? String(parsed.authorAvatar) : undefined,
+              text,
+              timestamp: Date.now(),
             };
+            if (!Array.isArray(post.comments)) post.comments = [];
             post.comments.push(comment);
             saveDynamicSocialState(dynamicSocialStore);
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, comment }));
+            res.end(JSON.stringify({ ok: true, comment, commentsCount: post.comments.length }));
           } else {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: false, error: 'Post not found' }));
