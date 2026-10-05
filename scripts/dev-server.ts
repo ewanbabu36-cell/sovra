@@ -1679,16 +1679,22 @@ function renderHtml(
   <link rel="apple-touch-icon" href="/icon.svg">
   <style>
     :root {
-      --bg: #090d16;
-      --surface: #111827;
-      --surface-border: #1f2937;
+      --bg: #080d14;
+      --surface: #0f172a;
+      --surface-card: rgba(17, 24, 39, 0.75);
+      --surface-border: rgba(255, 255, 255, 0.08);
+      --surface-border-hover: rgba(99, 102, 241, 0.4);
       --primary: #6366f1;
       --primary-hover: #4f46e5;
       --accent: #10b981;
+      --accent-cyan: #38bdf8;
       --accent-creator: #f59e0b;
-      --text: #f9fafb;
-      --text-muted: #9ca3af;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-subtle: #64748b;
       --danger: #ef4444;
+      --glass-bg: rgba(15, 23, 42, 0.82);
+      --glass-border: rgba(255, 255, 255, 0.12);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -1763,6 +1769,203 @@ function renderHtml(
       background: rgba(255, 255, 255, 0.15);
       color: #fff;
       border-color: #38bdf8;
+    }
+
+    /* Modern Node Status Pill */
+    .node-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 0.32rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: default;
+      user-select: none;
+    }
+    .node-status-pill:hover {
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.22);
+    }
+    .status-pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: statusBlink 2s infinite ease-in-out;
+    }
+    @keyframes statusBlink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+    .status-text {
+      color: #cbd5e1;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+
+    /* Keyboard Shortcut Pill */
+    .search-kbd-shortcut {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      font-family: inherit;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+      line-height: 1.2;
+      margin-left: auto;
+      letter-spacing: 0.04em;
+    }
+    .search-kbd-shortcut:hover {
+      background: rgba(99, 102, 241, 0.25);
+      border-color: rgba(99, 102, 241, 0.5);
+      color: #e0e7ff;
+    }
+
+    /* Streamlined Minimalist Post Composer */
+    .feed-composer-card {
+      margin-bottom: 1.5rem;
+      padding: 1.1rem 1.25rem;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.95));
+      backdrop-filter: blur(16px);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .feed-composer-card:focus-within {
+      border-color: rgba(99, 102, 241, 0.45);
+      box-shadow: 0 8px 30px rgba(99, 102, 241, 0.18);
+    }
+    .composer-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: #fff;
+      flex-shrink: 0;
+      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+    }
+    .composer-textarea {
+      width: 100%;
+      min-height: 58px;
+      max-height: 240px;
+      background: transparent;
+      border: none;
+      color: #fff;
+      padding: 0.25rem 0.1rem;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+    }
+    .composer-textarea::placeholder {
+      color: #64748b;
+    }
+    .composer-actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      padding-top: 0.65rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .composer-media-tray {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+    .composer-media-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #94a3b8;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .composer-media-btn:hover {
+      background: rgba(99, 102, 241, 0.15);
+      color: #c7d2fe;
+      border-color: rgba(99, 102, 241, 0.3);
+      transform: translateY(-1px);
+    }
+    .composer-theme-select {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      padding: 5px 8px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      outline: none;
+      cursor: pointer;
+    }
+    .composer-theme-select option {
+      background: #111827;
+      color: #fff;
+    }
+    .composer-tags-input {
+      width: 120px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #94a3b8;
+      padding: 5px 8px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      outline: none;
+      transition: all 0.15s;
+    }
+    .composer-tags-input:focus {
+      width: 160px;
+      border-color: #6366f1;
+      color: #fff;
+    }
+    .composer-publish-btn {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border: none;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.82rem;
+      padding: 6px 18px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+      transition: all 0.15s ease;
+    }
+    .composer-publish-btn:hover {
+      transform: translateY(-1px) scale(1.02);
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.5);
     }
 
     /* ==========================================
@@ -5301,10 +5504,11 @@ function renderHtml(
 
         <!-- Prominent Wide Friend & Mesh Search Bar -->
         <div class="header-search-wrap">
-          <div class="header-search-bar">
+          <div class="header-search-bar" onclick="document.getElementById('headerFriendSearchInput').focus()">
             <span style="font-size: 0.95rem; color: #38bdf8;">🔍</span>
-            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, @handle, channels, hashtags..." oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
-            <button id="headerSearchClearBtn" onclick="clearHeaderSearch()" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.8rem;">✕</button>
+            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, @handle, channels, hashtags... (Ctrl+K)" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
+            <kbd class="search-kbd-shortcut" onclick="openOmniSearch(); event.stopPropagation();" title="Omni-Search (Ctrl+K)">Ctrl K</kbd>
+            <button id="headerSearchClearBtn" onclick="clearHeaderSearch(); event.stopPropagation();" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.8rem;">✕</button>
           </div>
           <div id="headerSearchDropdown" class="header-search-dropdown" style="display: none;"></div>
         </div>
@@ -5313,9 +5517,11 @@ function renderHtml(
           <button id="navModeToggleBtn" onclick="toggleNavLayoutMode()" class="nav-mode-btn" title="Toggle Navigation Layout (Auto Responsive / Mobile Dock / Desktop Top)">
             <span id="navModeIcon">⚡</span> <span id="navModeLabel" class="nav-mode-text">Auto</span>
           </button>
-          <button onclick="openOmniSearch()" title="Omni-Search (Channels, Pages, People, Media)" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #fff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.95rem; transition: background 0.15s;">🔍</button>
-          <span class="badge badge-online">● Node Online</span>
-          <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">TCP :${tcpPort}</span>
+          <div class="node-status-pill" title="Sovra Mesh Online • TCP :${tcpPort} • LibP2P Noise_XX Active">
+            <span class="status-pulse-dot"></span>
+            <span class="status-text">Online</span>
+            <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); font-size: 0.72rem; padding: 2px 7px; border-radius: 8px;">:${tcpPort}</span>
+          </div>
         </div>
       </header>
 
@@ -5348,30 +5554,42 @@ function renderHtml(
           </div>
         </div>
 
-        <!-- ✍️ DYNAMIC FEED POST COMPOSER (INSTA / TWITTER STYLE) -->
-        <div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.25); background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.95)); box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
-          <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-            <div style="width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; color: #fff; flex-shrink: 0; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);">
+        <!-- ✍️ DYNAMIC FEED POST COMPOSER (STREAMLINED THREADS / TWITTER MINIMALISM) -->
+        <div class="card feed-composer-card">
+          <div style="display: flex; gap: 0.85rem; align-items: flex-start;">
+            <div class="composer-avatar">
               S
             </div>
-            <div style="flex: 1;">
-              <textarea id="dynamicPostCaption" placeholder="What's happening on the mesh? Share photo, update or thought..." style="width: 100%; min-height: 65px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; color: #fff; padding: 0.65rem 0.85rem; font-size: 0.88rem; resize: vertical; outline: none; font-family: inherit; transition: border-color 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'"></textarea>
+            <div style="flex: 1; min-width: 0;">
+              <textarea id="dynamicPostCaption" class="composer-textarea" placeholder="What's happening on the mesh? Share photo, update or thought..." oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';"></textarea>
               
-              <!-- Format & Theme Selector -->
-              <div style="display: flex; gap: 0.5rem; margin-top: 0.65rem; flex-wrap: wrap; align-items: center;">
-                <select id="dynamicPostTheme" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; padding: 6px 10px; border-radius: 8px; font-size: 0.78rem; outline: none; cursor: pointer;">
-                  <option value="mesh">🚀 P2P GossipSub Swarm</option>
-                  <option value="dag">📦 Merkle DAG Block</option>
-                  <option value="5g">⚡ 5G CGNAT Traversal</option>
-                  <option value="audio">🎵 Spatial Audio Stem</option>
-                  <option value="creator">💎 95/5 Creator Split</option>
-                </select>
+              <!-- Bottom Attachment Bar & Actions -->
+              <div class="composer-actions-bar">
+                <div class="composer-media-tray">
+                  <button type="button" class="composer-media-btn" title="Add Photo" onclick="const c=document.getElementById('dynamicPostCaption'); c.value += (c.value ? ' ' : '') + '📷 [Photo: ipfs://bafy...photo.jpg]'; c.focus();">
+                    <span>📷</span> <span class="media-btn-label">Photo</span>
+                  </button>
+                  <button type="button" class="composer-media-btn" title="Add Video Reel" onclick="const c=document.getElementById('dynamicPostCaption'); c.value += (c.value ? ' ' : '') + '🎬 [Reel: ipfs://bafy...reel.mp4]'; c.focus();">
+                    <span>🎬</span> <span class="media-btn-label">Reel</span>
+                  </button>
+                  <button type="button" class="composer-media-btn" title="Pin Merkle DAG Block" onclick="const c=document.getElementById('dynamicPostCaption'); c.value += (c.value ? ' ' : '') + '📦 [DAG Pin: z6Mkt...dag]'; c.focus();">
+                    <span>📦</span> <span class="media-btn-label">DAG Pin</span>
+                  </button>
+                  <select id="dynamicPostTheme" class="composer-theme-select" title="Broadcast Channel Protocol">
+                    <option value="mesh">🚀 P2P Swarm</option>
+                    <option value="dag">📦 Merkle DAG</option>
+                    <option value="5g">⚡ 5G Traversal</option>
+                    <option value="audio">🎵 Spatial Audio</option>
+                    <option value="creator">💎 95/5 Split</option>
+                  </select>
+                </div>
 
-                <input id="dynamicPostTags" type="text" placeholder="#sovra #p2p #mesh" value="#sovra #p2p #decentralized" style="flex: 1; min-width: 140px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; padding: 6px 10px; border-radius: 8px; font-size: 0.78rem; outline: none;">
-                
-                <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; font-weight: 700; font-size: 0.82rem; padding: 6px 18px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4); transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
-                  <span>🚀 Post to Mesh</span>
-                </button>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <input id="dynamicPostTags" type="text" placeholder="#sovra #p2p" value="#sovra #p2p #mesh" class="composer-tags-input" />
+                  <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" class="composer-publish-btn">
+                    <span>🚀 Post</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -11435,13 +11653,16 @@ function renderHtml(
       }
 
       dropdown.style.display = 'block';
-      const matchedPeople = socialOmniCatalog.people.filter(p => !p.isBlocked && (p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q) || (p.bio && p.bio.toLowerCase().includes(q))));
-      
-      let html = '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 4px 8px; margin-bottom: 4px;">People & Friends</div>';
-      if (matchedPeople.length === 0) {
-        html += '<div style="padding: 8px; color: #64748b; font-size: 0.8rem; text-align: center;">No users matching "' + query.replace(/</g, '&lt;') + '"</div>';
-      } else {
-        for (const p of matchedPeople.slice(0, 5)) {
+      const matchedPeople = (socialOmniCatalog.people || []).filter(p => !p.isBlocked && (p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q) || (p.bio && p.bio.toLowerCase().includes(q))));
+      const matchedChannels = (socialOmniCatalog.channels || []).filter(c => c.name.toLowerCase().includes(q) || c.handle.toLowerCase().includes(q));
+      const matchedTags = (socialOmniCatalog.hashtags || []).filter(h => h.tag.toLowerCase().includes(q));
+
+      let html = '';
+
+      // Section 1: People & Friends
+      if (matchedPeople.length > 0) {
+        html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 4px 8px; margin-bottom: 4px;">👥 People & Friends</div>';
+        for (const p of matchedPeople.slice(0, 4)) {
           const statusText = p.isFriend ? '❤️ Friends' : p.isPending ? '⏳ Requested' : '+ Add';
           const statusBg = p.isFriend ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)';
           const statusColor = p.isFriend ? '#f87171' : '#38bdf8';
@@ -11458,8 +11679,41 @@ function renderHtml(
         }
       }
 
-      html += '<div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 6px; padding-top: 6px; text-align: center;">' +
-        '<button onclick="switchTab(\'friends\'); filterFriendsView(\'' + q.replace(/'/g, "\\'") + '\'); document.getElementById(\'headerSearchDropdown\').style.display=\'none\';" style="background: none; border: none; color: #38bdf8; font-size: 0.78rem; font-weight: 700; cursor: pointer; padding: 4px;">👥 Open Friends Hub for "' + query.replace(/</g, '&lt;') + '" →</button>' +
+      // Section 2: Channels
+      if (matchedChannels.length > 0) {
+        html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 8px 4px 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">📡 Channels</div>';
+        for (const c of matchedChannels.slice(0, 2)) {
+          html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'transparent\'" onclick="openOmniSearch(); switchSearchTab(\'channels\'); document.getElementById(\'headerSearchDropdown\').style.display=\'none\';">' +
+            '<div style="display: flex; align-items: center; gap: 8px;">' +
+              '<div style="width: 26px; height: 26px; border-radius: 6px; background: ' + c.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">' + c.avatar + '</div>' +
+              '<div>' +
+                '<div style="font-size: 0.82rem; font-weight: 700; color: #fff;">' + c.name + '</div>' +
+                '<div style="font-size: 0.68rem; color: #38bdf8;">' + c.handle + ' • ' + (c.count || 0).toLocaleString() + ' peers</div>' +
+              '</div>' +
+            '</div>' +
+            '<span style="font-size: 0.7rem; color: #818cf8; font-weight: 600;">View →</span>' +
+          '</div>';
+        }
+      }
+
+      // Section 3: Hashtags
+      if (matchedTags.length > 0) {
+        html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 8px 4px 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">🔥 Hashtags</div>';
+        for (const h of matchedTags.slice(0, 2)) {
+          html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 8px; cursor: pointer;" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'transparent\'" onclick="searchHashtag(\'' + h.tag + '\');">' +
+            '<span style="font-size: 0.82rem; font-weight: 700; color: #38bdf8;">' + h.tag + '</span>' +
+            '<span style="font-size: 0.7rem; color: #64748b;">' + (h.posts || 0) + ' posts</span>' +
+          '</div>';
+        }
+      }
+
+      if (!html) {
+        html = '<div style="padding: 10px; color: #64748b; font-size: 0.82rem; text-align: center;">No matches for "' + query.replace(/</g, '&lt;') + '"</div>';
+      }
+
+      html += '<div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 6px; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">' +
+        '<button onclick="switchTab(\'friends\'); filterFriendsView(\'' + q.replace(/'/g, "\\'") + '\'); document.getElementById(\'headerSearchDropdown\').style.display=\'none\';" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px;">👥 Friends Hub →</button>' +
+        '<button onclick="openOmniSearch(); const oi=document.getElementById(\'omniSearchInput\'); if(oi){oi.value=\'' + q.replace(/'/g, "\\'") + '\'; filterOmniSearch(\'' + q.replace(/'/g, "\\'") + '\');} document.getElementById(\'headerSearchDropdown\').style.display=\'none\';" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 6px; color: #a5b4fc; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px 8px;">🔍 Deep Omni-Search (Ctrl+K) →</button>' +
       '</div>';
 
       dropdown.innerHTML = html;
@@ -11472,7 +11726,8 @@ function renderHtml(
       }
     }
 
-    function clearHeaderSearch() {
+    function clearHeaderSearch(event) {
+      if (event && event.stopPropagation) event.stopPropagation();
       const input = document.getElementById('headerFriendSearchInput');
       if (input) input.value = '';
       const clearBtn = document.getElementById('headerSearchClearBtn');
@@ -11485,6 +11740,18 @@ function renderHtml(
     document.addEventListener('click', function(e) {
       const wrap = document.querySelector('.header-search-wrap');
       if (wrap && !wrap.contains(e.target)) {
+        const dd = document.getElementById('headerSearchDropdown');
+        if (dd) dd.style.display = 'none';
+      }
+    });
+
+    // Global Keyboard Shortcuts (Ctrl+K / Cmd+K for Omni-Search, Esc to dismiss modals)
+    document.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        openOmniSearch();
+      } else if (e.key === 'Escape') {
+        closeOmniSearch();
         const dd = document.getElementById('headerSearchDropdown');
         if (dd) dd.style.display = 'none';
       }
