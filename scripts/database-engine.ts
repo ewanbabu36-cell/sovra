@@ -262,7 +262,7 @@ export interface DatabaseSchema {
 // 2. ATOMIC DISK PERSISTENCE ENGINE
 // ==========================================
 
-const STORAGE_DIR = './.sovra-storage-dev';
+const STORAGE_DIR = process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev';
 const DATABASE_FILE_PATH = path.join(STORAGE_DIR, 'dynamic-social-state.json');
 const DATABASE_TEMP_PATH = path.join(STORAGE_DIR, 'dynamic-social-state.json.tmp');
 
@@ -619,12 +619,12 @@ class SovraDatabaseEngine {
   // COLLECTION 4: POSTS & COMMENTS
   // ==========================================
 
-  public createPost(post: Omit<FeedPostRecord, 'id' | 'timestamp' | 'likesCount' | 'likedByDids' | 'comments'>): FeedPostRecord {
+  public createPost(post: Omit<FeedPostRecord, 'timestamp' | 'likesCount' | 'likedByDids' | 'comments'> & { id?: string }): FeedPostRecord {
     this.load();
     const now = Date.now();
     const record: FeedPostRecord = {
       ...post,
-      id: 'feed-' + now,
+      id: post.id || ('feed-' + now),
       timestamp: now,
       likesCount: 0,
       likedByDids: [],
@@ -689,6 +689,18 @@ class SovraDatabaseEngine {
     post.comments.push(record);
     this.save();
     return record;
+  }
+
+  public deletePost(postId: string): boolean {
+    this.load();
+    const idx = this.db.posts.findIndex(p => p.id === postId);
+    if (idx !== -1) {
+      const removed = this.db.posts.splice(idx, 1)[0];
+      this.logActivity('POST_DELETED', removed.authorDid, removed.authorName, `Deleted post: ${(removed.caption || '').substring(0, 36)}...`);
+      this.save();
+      return true;
+    }
+    return false;
   }
 
   // ==========================================

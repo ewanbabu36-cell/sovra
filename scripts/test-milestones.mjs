@@ -323,6 +323,16 @@ async function runMilestoneTests() {
   assert.ok(statusData.peerId);
   console.log(`      ✅ Node status: ${statusData.status}, Peer ID: ${statusData.peerId}`);
 
+  // Step 4.3: Isolated Test Teardown (Clean test post from live user feed)
+  console.log(`   [4.3] Isolating test run & cleaning test post from live feed...`);
+  const delPostRes = await fetch(`${BASE_URL}/api/feed/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ postId: createdPostId }),
+  });
+  assert.strictEqual(delPostRes.status, 200);
+  console.log(`      ✅ Test post (${createdPostId}) cleanly removed to maintain pristine live feed.`);
+
   console.log('\n=========================================================');
   console.log('  🏆 ALL 4 MILESTONES SUCCESSFULLY IMPLEMENTED & VERIFIED!');
   console.log('     Milestone 1: Persistent DB + Registration + Photo Upload ✅');

@@ -66,7 +66,7 @@ function getDirectorySize(dirPath: string): number {
   return size;
 }
 
-const STORAGE_DIR = path.resolve('./.sovra-storage-dev');
+const STORAGE_DIR = path.resolve(process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev');
 const REELS_DIR = path.join(STORAGE_DIR, 'reels');
 if (!fs.existsSync(REELS_DIR)) {
   try {
@@ -1077,7 +1077,7 @@ async function bootstrapLocalNode() {
 
   // Initialize Storage Node Daemon
   const storageDaemon = new StorageNodeDaemon({
-    storagePath: './.sovra-storage-dev',
+    storagePath: STORAGE_DIR,
     maxCapacityBytes: 53687091200n, // 50 GB
     enableBitswap: true,
     p2pNode: node,
@@ -1086,7 +1086,7 @@ async function bootstrapLocalNode() {
 
   // Initialize Decentralized Social Graph and Local Feed Engines
   const socialGraph = new DefaultSocialGraphEngine({
-    dbPath: './.sovra-storage-dev/social-graph.sqlite',
+    dbPath: path.join(STORAGE_DIR, 'social-graph.sqlite'),
   });
   const localFeed = new DefaultLocalFeedEngine(socialGraph);
 
@@ -13950,7 +13950,7 @@ async function startDevServer() {
             realCid = CID.create('raw', seed, false, 'sha2-256').toString('base32');
           }
 
-          const newPost: FeedPostRecord = {
+          const newPost = sovraDb.createPost({
             id: newPostId,
             authorDid: String(parsed.authorDid || masterKey.did),
             authorName: String(parsed.authorName || 'Sovereign Peer'),
@@ -13962,40 +13962,12 @@ async function startDevServer() {
             mediaEmoji: selectedTheme.emoji,
             mediaTitle: selectedTheme.title,
             mediaCid: realCid,
-            likesCount: 0,
-            isLiked: false,
-            isSaved: false,
             caption: caption || 'Photo update from sovereign peer',
             tags: String(parsed.tags || '#sovra #p2p #mesh'),
-            timestamp: Date.now(),
-            comments: [],
             mediaImage: parsed.mediaImage ? String(parsed.mediaImage) : undefined,
-            likedByDids: [],
-          };
+          });
 
-          dynamicSocialStore.posts.unshift(newPost);
-          saveDynamicSocialState(dynamicSocialStore);
-          try {
-            sovraDb.createPost({
-              authorDid: newPost.authorDid,
-              authorName: newPost.authorName,
-              authorAvatar: newPost.authorAvatar,
-              authorAvatarBg: newPost.authorAvatarBg,
-              authorAvatarDataUrl: newPost.authorAvatarDataUrl,
-              audioTrack: newPost.audioTrack,
-              mediaGradient: newPost.mediaGradient,
-              mediaEmoji: newPost.mediaEmoji,
-              mediaTitle: newPost.mediaTitle,
-              mediaCid: newPost.mediaCid,
-              caption: newPost.caption,
-              tags: newPost.tags,
-              mediaImage: newPost.mediaImage,
-              isLiked: false,
-              isSaved: false,
-            });
-          } catch (dbErr) {
-            console.warn('[SovraDB] createPost sync warning:', dbErr);
-          }
+          dynamicSocialStore.posts = sovraDb.getAllPosts();
 
           localFeed.appendEvent({
             id: newPost.id,
@@ -14139,6 +14111,7 @@ async function startDevServer() {
           if (idx !== -1) {
             dynamicSocialStore.posts.splice(idx, 1);
             saveDynamicSocialState(dynamicSocialStore);
+            try { sovraDb.deletePost(parsed.postId); } catch(e) {}
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true }));
           } else {
