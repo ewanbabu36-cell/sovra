@@ -426,6 +426,21 @@ interface ContactRecord {
   isVerified?: boolean;
 }
 
+const dynamicPeersStore: ContactRecord[] = [
+  {
+    did: 'did:sovra:laptop_host',
+    name: 'Host Node (Laptop)',
+    avatar: '💻',
+    avatarBg: '#6366f1',
+    role: 'Root Mesh Relay & Seeder',
+    isOnline: true,
+    lastSeen: 'Online',
+    disappearingDurationSec: 0,
+    safetyNumbers: '28471 90432 18942 09182 39182 48192 19283 48192 48192 01928 38192 49182',
+    isVerified: true,
+  },
+];
+
 const contactsStore: ContactRecord[] = [
   {
     did: 'did:sovra:alice_peer',
@@ -5631,6 +5646,13 @@ function renderHtml(
         </div>
 
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0;">
+          <button id="pwaInstallBtn" onclick="triggerPwaInstall()" style="display: none; align-items: center; gap: 0.35rem; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer;" title="Install Sovra App on Phone">
+            <span>📲 Install</span>
+          </button>
+          <div id="currentUserPill" onclick="switchTab('me')" style="display: flex; align-items: center; gap: 0.35rem; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 3px 8px; cursor: pointer;" title="Your Sovereign Profile">
+            <span id="currentUserAvatar" style="width: 20px; height: 20px; border-radius: 50%; background: #6366f1; color: #fff; font-size: 0.7rem; font-weight: bold; display: flex; align-items: center; justify-content: center;">S</span>
+            <span id="currentUserHandleText" style="font-size: 0.75rem; font-weight: 700; color: #cbd5e1;">@you</span>
+          </div>
           <button id="navModeToggleBtn" onclick="toggleNavLayoutMode()" class="nav-mode-btn" title="Toggle Navigation Layout (Auto Responsive / Mobile Dock / Desktop Top)">
             <span id="navModeIcon">⚡</span> <span id="navModeLabel" class="nav-mode-text">Auto</span>
           </button>
@@ -7938,9 +7960,75 @@ function renderHtml(
     // ==========================================
     // 🔐 SOVRA ACCOUNT LIFECYCLE, QUICK LOCK & REMOTE WIPE ENGINE
     // ==========================================
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
     let isSessionLockedState = false;
-    let currentUserHandle = '@sovereign.mesh';
     let currentProfileWiped = false;
+    let myProfile = null;
+    try {
+      const saved = localStorage.getItem('sovra_user_profile');
+      if (saved) myProfile = JSON.parse(saved);
+    } catch (e) {}
+
+    let currentUserHandle = myProfile ? myProfile.handle : (isMobileDevice ? '@phone_user' : '@laptop_host');
+
+    function updateUserDisplayInUI() {
+      if (!myProfile) return;
+      currentUserHandle = myProfile.handle;
+      const avatarEl = document.getElementById('currentUserAvatar');
+      if (avatarEl) {
+        avatarEl.innerText = myProfile.avatar || 'S';
+        avatarEl.style.background = myProfile.avatarBg || '#6366f1';
+      }
+      const handleEl = document.getElementById('currentUserHandleText');
+      if (handleEl) handleEl.innerText = myProfile.handle || '@you';
+
+      const almHandle = document.getElementById('almProfileHandle');
+      if (almHandle) almHandle.innerText = myProfile.handle;
+
+      const profileName = document.querySelector('.profile-name');
+      if (profileName) profileName.innerText = myProfile.name;
+
+      const profileAvatar = document.querySelector('.profile-avatar-large span');
+      if (profileAvatar) profileAvatar.innerText = myProfile.avatar || 'S';
+
+      const profileAvatarDiv = document.querySelector('.profile-avatar-large');
+      if (profileAvatarDiv && myProfile.avatarBg) profileAvatarDiv.style.background = myProfile.avatarBg;
+    }
+
+    // Auto-check onboarding on first visit
+    window.addEventListener('DOMContentLoaded', function() {
+      if (!myProfile) {
+        setTimeout(function() {
+          const wom = document.getElementById('welcomeOnboardingModal');
+          if (wom) {
+            wom.style.display = 'flex';
+            const handleInput = document.getElementById('womHandleInput');
+            if (handleInput) {
+              handleInput.value = isMobileDevice ? 'rahul_phone' : 'host_laptop';
+            }
+          }
+        }, 120);
+      } else {
+        updateUserDisplayInUI();
+        // Register heartbeat with server
+        fetch('/api/peers/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(myProfile)
+        }).catch(function() {});
+      }
+
+      if (isMobileDevice) {
+        setTimeout(function() {
+          const topBtn = document.getElementById('pwaInstallBtn');
+          if (topBtn) topBtn.style.display = 'inline-flex';
+          const banner = document.getElementById('pwaInstallBanner');
+          if (banner && !sessionStorage.getItem('pwa_dismissed')) {
+            banner.style.display = 'flex';
+          }
+        }, 1200);
+      }
+    });
 
     function openAccountLifecycleModal() {
       const m = document.getElementById('accountLifecycleModal');
@@ -8023,9 +8111,35 @@ function renderHtml(
 
     function triggerBiometricAccountCreation() {
       const handleInput = document.getElementById('womHandleInput');
-      const chosenHandle = (handleInput && handleInput.value.trim()) ? handleInput.value.trim() : 'sovra_user';
-      currentUserHandle = chosenHandle.startsWith('@') ? chosenHandle : '@' + chosenHandle;
-      
+      const chosen = (handleInput && handleInput.value.trim()) ? handleInput.value.trim() : (isMobileDevice ? 'phone_user' : 'laptop_user');
+      const cleanHandle = chosen.replace(/^@/, '');
+      currentUserHandle = '@' + cleanHandle;
+      const peerName = cleanHandle.charAt(0).toUpperCase() + cleanHandle.slice(1);
+      const avatarChar = cleanHandle.charAt(0).toUpperCase();
+      const peerColors = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
+      const avatarBg = peerColors[Math.floor(Math.random() * peerColors.length)];
+      const uniqueDid = 'did:sovra:' + cleanHandle.toLowerCase() + '_' + Math.random().toString(36).substring(2, 7);
+
+      myProfile = {
+        did: uniqueDid,
+        handle: currentUserHandle,
+        name: peerName + (isMobileDevice ? ' (Phone)' : ' (Laptop)'),
+        avatar: avatarChar,
+        avatarBg: avatarBg,
+        device: isMobileDevice ? 'Mobile' : 'Desktop',
+        created: Date.now()
+      };
+
+      try {
+        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+      } catch (e) {}
+
+      fetch('/api/peers/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(myProfile)
+      }).catch(function() {});
+
       document.getElementById('womStep1').style.display = 'none';
       document.getElementById('womStep2').style.display = 'block';
 
@@ -8034,7 +8148,7 @@ function renderHtml(
         document.getElementById('womStep3').style.display = 'block';
         const displayEl = document.getElementById('womRestoredHandleDisplay');
         if (displayEl) displayEl.innerText = currentUserHandle;
-      }, 1200);
+      }, 1000);
     }
 
     function autoFindForgotUserIdDemo() {
@@ -8044,19 +8158,32 @@ function renderHtml(
       setTimeout(() => {
         document.getElementById('womStep2').style.display = 'none';
         document.getElementById('womStep3').style.display = 'block';
-        currentUserHandle = '@sovereign.mesh';
+        const rawHandle = isMobileDevice ? 'recovered_phone' : 'recovered_laptop';
+        currentUserHandle = '@' + rawHandle;
+        const uniqueDid = 'did:sovra:' + rawHandle + '_' + Math.random().toString(36).substring(2, 7);
+        myProfile = {
+          did: uniqueDid,
+          handle: currentUserHandle,
+          name: (isMobileDevice ? 'Phone Peer' : 'Laptop Peer') + ' (Recovered)',
+          avatar: isMobileDevice ? '📱' : '💻',
+          avatarBg: '#10b981',
+          device: isMobileDevice ? 'Mobile' : 'Desktop',
+          created: Date.now()
+        };
+        try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e){}
+        fetch('/api/peers/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(myProfile)}).catch(function(){});
         const displayEl = document.getElementById('womRestoredHandleDisplay');
-        if (displayEl) displayEl.innerText = currentUserHandle + ' (Auto-Discovered)';
-      }, 1400);
+        if (displayEl) displayEl.innerText = currentUserHandle + ' (Hardware Enclave Auto-Discovered)';
+      }, 1100);
     }
 
     function closeOnboardingModalAndEnter() {
       const wom = document.getElementById('welcomeOnboardingModal');
       if (wom) wom.style.display = 'none';
       currentProfileWiped = false;
-      const handleEl = document.getElementById('almProfileHandle');
-      if (handleEl) handleEl.innerText = currentUserHandle;
-      switchTab('me');
+      updateUserDisplayInUI();
+      switchTab('chats');
+      showAccountToast('🎉 Connected to Mesh as ' + (myProfile ? myProfile.name : currentUserHandle) + '!');
     }
 
     function showAccountToast(msg) {
@@ -8349,7 +8476,11 @@ function renderHtml(
         body: JSON.stringify({
           caption: text,
           tags: tags,
-          theme: theme
+          theme: theme,
+          authorName: myProfile ? myProfile.name : 'You (Sovereign Peer)',
+          authorAvatar: myProfile ? myProfile.avatar : 'S',
+          authorAvatarBg: myProfile ? myProfile.avatarBg : '#6366f1',
+          authorDid: myProfile ? myProfile.did : 'did:sovra:self',
         })
       })
       .then(function(res) { return res.json(); })
@@ -8369,6 +8500,27 @@ function renderHtml(
         alert('Post error: ' + err.message);
       });
     }
+
+    function syncFeedPosts() {
+      fetch('/api/feed/list')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok && Array.isArray(data.posts)) {
+            let hasNew = false;
+            for (let i = data.posts.length - 1; i >= 0; i--) {
+              const p = data.posts[i];
+              if (!feedPostsData.some(function(existing) { return existing.id === p.id; })) {
+                feedPostsData.unshift(p);
+                renderDynamicPostCard(p, true);
+                hasNew = true;
+              }
+            }
+            if (hasNew) updateProfileDynamicStats();
+          }
+        })
+        .catch(function() {});
+    }
+    setInterval(syncFeedPosts, 3500);
 
     function renderDynamicPostCard(post, isNew) {
       const container = document.getElementById('feedPostsStream');
@@ -9646,18 +9798,19 @@ function renderHtml(
       }
 
       // 3. Message Bubbles
+      const myDid = myProfile ? myProfile.did : 'self';
       const filtered = chatMessages.filter(function(m) {
         if (activeContactDid.startsWith('channel:')) {
           return m.recipientDid === activeContactDid;
         }
-        return (m.senderDid === activeContactDid && m.recipientDid === 'self') ||
-               (m.senderDid === 'self' && m.recipientDid === activeContactDid);
+        return (m.senderDid === activeContactDid && (m.recipientDid === myDid || m.recipientDid === 'self')) ||
+               ((m.senderDid === myDid || m.senderDid === 'self') && m.recipientDid === activeContactDid);
       });
 
       const now = Date.now();
 
       html += filtered.map(function(m) {
-        const isOutgoing = m.senderDid === 'self';
+        const isOutgoing = m.senderDid === myDid || m.senderDid === 'self';
         const bubbleClass = isOutgoing ? 'chat-bubble outgoing' : 'chat-bubble incoming';
 
         // Ticks
@@ -9705,6 +9858,12 @@ function renderHtml(
           routeHtml = '<div class="bitchat-mesh-route-box">📶 BLE Mesh &bull; ' + hopText + ' &bull; Noise_XX E2EE</div>';
         }
 
+        // Sender header row for incoming or channel messages
+        let senderNameRow = '';
+        if (!isOutgoing && (activeContactDid.startsWith('channel:') || m.senderName)) {
+          senderNameRow = '<div style="font-size: 0.72rem; font-weight: 700; color: #38bdf8; margin-bottom: 3px;">' + (m.senderName || 'Peer') + '</div>';
+        }
+
         // Reaction dock on hover
         const reactionsDock = '<div class="bubble-reactions-bar" onclick="event.stopPropagation()">' +
           '<button class="reaction-emoji-btn" onclick="reactToMessage(&quot;' + m.id + '&quot;, &quot;❤️&quot;)">❤️</button>' +
@@ -9727,6 +9886,7 @@ function renderHtml(
 
         return '<div class="' + bubbleClass + '" id="bubble-' + m.id + '" onclick="openMessageInfoModal(&quot;' + m.id + '&quot;)">' +
           reactionsDock +
+          senderNameRow +
           bodyHtml +
           routeHtml +
           '<div class="bubble-meta">' +
@@ -9752,12 +9912,19 @@ function renderHtml(
       const timerSec = contact ? (contact.disappearingDurationSec || 0) : 0;
       const now = Date.now();
       const isBc = Boolean(bcPeer || bitchatModeActive);
+      const myDid = myProfile ? myProfile.did : 'self';
+      const myName = myProfile ? myProfile.name : 'You';
+
+      const isRealHumanPeer = activeContactDid.startsWith('did:sovra:peer_') || 
+                              activeContactDid.startsWith('did:sovra:laptop_') || 
+                              activeContactDid.startsWith('did:sovra:phone_') || 
+                              activeContactDid.startsWith('channel:');
 
       const newMsg = {
-        id: 'msg-' + now,
-        senderDid: 'self',
+        id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 6),
+        senderDid: myDid,
         recipientDid: activeContactDid,
-        senderName: 'You',
+        senderName: myName,
         text: text,
         isAudio: false,
         audioDurationSec: 0,
@@ -9771,7 +9938,7 @@ function renderHtml(
         reactions: [],
         isBitChat: isBc,
         hopCount: 1,
-        route: ['self', activeContactDid]
+        route: [myDid, activeContactDid]
       };
 
       chatMessages.push(newMsg);
@@ -9784,70 +9951,142 @@ function renderHtml(
         body: JSON.stringify(newMsg)
       }).catch(function(err) { console.warn('[Chat] Send sync warning:', err); });
 
-      // Progression 1: Delivered (Double grey ticks) after 350ms
-      setTimeout(function() {
-        newMsg.status = 'delivered';
-        newMsg.deliveredAt = Date.now();
-        renderChatBubbles();
-      }, 350);
+      if (!isRealHumanPeer) {
+        // Progression 1: Delivered (Double grey ticks) after 350ms
+        setTimeout(function() {
+          newMsg.status = 'delivered';
+          newMsg.deliveredAt = Date.now();
+          renderChatBubbles();
+        }, 350);
 
-      // Progression 2: Read (Double blue ticks) after 800ms
-      setTimeout(function() {
-        newMsg.status = 'read';
-        newMsg.readAt = Date.now();
-        renderChatBubbles();
-      }, 800);
+        // Progression 2: Read (Double blue ticks) after 800ms
+        setTimeout(function() {
+          newMsg.status = 'read';
+          newMsg.readAt = Date.now();
+          renderChatBubbles();
+        }, 800);
 
-      // Progression 3: Simulated Peer / Mesh response after 1500ms
-      setTimeout(function() {
-        const peerName = bcPeer ? bcPeer.name : (contact ? contact.name.split(' ')[0] : 'Peer');
-        const replyNow = Date.now();
-        let replyText = '✓ Received & verified via Signal Double Ratchet chain. Zero server footprint! 🔒';
+        // Progression 3: Simulated Peer / Mesh response after 1500ms
+        setTimeout(function() {
+          const peerName = bcPeer ? bcPeer.name : (contact ? contact.name.split(' ')[0] : 'Peer');
+          const replyNow = Date.now();
+          let replyText = '✓ Received & verified via Signal Double Ratchet chain. Zero server footprint! 🔒';
 
-        if (bcPeer) {
-          if (bcPeer.isChannel) {
-            replyText = '📶 [Mesh Swarm Relay] Peer relayed: "' + (text.length > 25 ? text.substring(0, 25) + '...' : text) + '" on 2.4GHz BLE spectrum.';
-          } else {
-            replyText = '📶 [BitChat BLE Link] Received packet via ' + (bcPeer.hops === 1 ? 'direct Bluetooth link' : bcPeer.hops + '-hop mesh relay') + ' without internet.';
+          if (bcPeer) {
+            if (bcPeer.isChannel) {
+              replyText = '📶 [Mesh Swarm Relay] Peer relayed: "' + (text.length > 25 ? text.substring(0, 25) + '...' : text) + '" on 2.4GHz BLE spectrum.';
+            } else {
+              replyText = '📶 [BitChat BLE Link] Received packet via ' + (bcPeer.hops === 1 ? 'direct Bluetooth link' : bcPeer.hops + '-hop mesh relay') + ' without internet.';
+            }
+          } else if (timerSec > 0) {
+            replyText = '✓ Decrypted via Double Ratchet! ⏱️ Disappearing in ' + timerSec + 's. Ephemeral RAM zero-write active.';
           }
-        } else if (timerSec > 0) {
-          replyText = '✓ Decrypted via Double Ratchet! ⏱️ Disappearing in ' + timerSec + 's. Ephemeral RAM zero-write active.';
-        }
 
-        const replyMsg = {
-          id: 'reply-' + replyNow,
-          senderDid: activeContactDid,
-          recipientDid: activeContactDid.startsWith('channel:') ? activeContactDid : 'self',
-          senderName: peerName,
-          text: replyText,
-          isAudio: false,
-          audioDurationSec: 0,
-          timestamp: replyNow,
-          sentAt: replyNow,
-          deliveredAt: replyNow,
-          readAt: replyNow,
-          status: 'read',
-          signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),
-          disappearingDurationSec: timerSec,
-          expiresAt: timerSec > 0 ? replyNow + timerSec * 1000 : undefined,
-          isDisappeared: false,
-          reactions: [],
-          isBitChat: isBc,
-          hopCount: bcPeer ? bcPeer.hops : 1,
-          route: bcPeer ? [activeContactDid, 'self'] : undefined,
-        };
-        chatMessages.push(replyMsg);
-        renderChatBubbles();
-      }, 1500);
-
-      try {
-        await fetch('/api/chat/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newMsg)
-        });
-      } catch (e) {}
+          const replyMsg = {
+            id: 'reply-' + replyNow,
+            senderDid: activeContactDid,
+            recipientDid: myDid,
+            senderName: peerName,
+            text: replyText,
+            isAudio: false,
+            audioDurationSec: 0,
+            timestamp: replyNow,
+            sentAt: replyNow,
+            deliveredAt: replyNow,
+            readAt: replyNow,
+            status: 'read',
+            signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),
+            disappearingDurationSec: timerSec,
+            expiresAt: timerSec > 0 ? replyNow + timerSec * 1000 : undefined,
+            isDisappeared: false,
+            reactions: [],
+            isBitChat: isBc,
+            hopCount: bcPeer ? bcPeer.hops : 1,
+            route: bcPeer ? [activeContactDid, myDid] : undefined,
+          };
+          chatMessages.push(replyMsg);
+          renderChatBubbles();
+        }, 1500);
+      }
     }
+
+    let lastChatSyncTimestamp = 0;
+    function syncChatMessages() {
+      fetch('/api/chat/messages?since=' + lastChatSyncTimestamp)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok && Array.isArray(data.messages) && data.messages.length > 0) {
+            let hasNew = false;
+            const myDid = myProfile ? myProfile.did : 'self';
+            data.messages.forEach(function(msg) {
+              if (msg.timestamp > lastChatSyncTimestamp) {
+                lastChatSyncTimestamp = msg.timestamp;
+              }
+              const existing = chatMessages.find(function(m) { return m.id === msg.id; });
+              if (!existing) {
+                chatMessages.push(msg);
+                hasNew = true;
+                if (msg.senderDid !== myDid) {
+                  if (activeContactDid === msg.senderDid || activeContactDid === msg.recipientDid) {
+                    fetch('/api/chat/receipt', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ messageId: msg.id, status: 'read' })
+                    }).catch(function() {});
+                  }
+                }
+              } else if (existing.status !== msg.status) {
+                existing.status = msg.status;
+                hasNew = true;
+              }
+            });
+            if (hasNew) {
+              renderChatBubbles();
+              renderChatContactsList();
+            }
+          }
+        })
+        .catch(function() {});
+    }
+    setInterval(syncChatMessages, 1200);
+
+    function syncPeersAndContacts() {
+      fetch('/api/peers/list')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok && Array.isArray(data.peers)) {
+            let changed = false;
+            const myDid = myProfile ? myProfile.did : 'self';
+            data.peers.forEach(function(p) {
+              if (p.did !== myDid) {
+                if (!contactsData.some(function(c) { return c.did === p.did; })) {
+                  contactsData.unshift(p);
+                  changed = true;
+                }
+                if (!bitchatPeersData.some(function(bp) { return bp.did === p.did; })) {
+                  bitchatPeersData.push({
+                    did: p.did,
+                    name: p.name,
+                    avatar: p.avatar,
+                    avatarBg: p.avatarBg,
+                    role: p.role || 'Local Mesh Peer',
+                    rssi: -40,
+                    distanceMeters: 2.5,
+                    hops: 1,
+                    isDirect: true
+                  });
+                  changed = true;
+                }
+              }
+            });
+            if (changed) {
+              renderChatContactsList();
+            }
+          }
+        })
+        .catch(function() {});
+    }
+    setInterval(syncPeersAndContacts, 2500);
 
     // Voice recording handlers
     function toggleVoiceRecord() {
@@ -12611,10 +12850,10 @@ async function startDevServer() {
 
           const newPost: FeedPostRecord = {
             id: newPostId,
-            authorDid: masterKey.did,
-            authorName: 'You (Sovereign Peer)',
-            authorAvatar: 'S',
-            authorAvatarBg: '#6366f1',
+            authorDid: String(parsed.authorDid || masterKey.did),
+            authorName: String(parsed.authorName || 'Sovereign Peer'),
+            authorAvatar: String(parsed.authorAvatar || 'S'),
+            authorAvatarBg: String(parsed.authorAvatarBg || '#6366f1'),
             audioTrack: String(parsed.audioTrack || 'Original Audio • Sovra Mesh'),
             mediaGradient: selectedTheme.gradient,
             mediaEmoji: selectedTheme.emoji,
@@ -12910,17 +13149,63 @@ async function startDevServer() {
     }
 
     // ==========================================
-    // API: WHATSAPP E2EE CHAT
+    // API: PEER DISCOVERY & WHATSAPP E2EE CHAT
     // ==========================================
+    if (url.pathname === '/api/peers/register' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const peer = JSON.parse(body);
+          if (peer && peer.did) {
+            const idx = dynamicPeersStore.findIndex(p => p.did === peer.did);
+            const record: ContactRecord = {
+              did: peer.did,
+              name: peer.name || 'Sovereign Peer',
+              avatar: peer.avatar || String(peer.name || 'P')[0].toUpperCase(),
+              avatarBg: peer.avatarBg || '#3b82f6',
+              role: peer.device ? `${peer.device} Peer (Local Mesh)` : 'Local Mesh Peer',
+              isOnline: true,
+              lastSeen: 'Online',
+              disappearingDurationSec: 0,
+              safetyNumbers: '28471 90432 18942 ' + peer.did.slice(-12),
+              isVerified: true,
+            };
+            if (idx >= 0) {
+              dynamicPeersStore[idx] = record;
+            } else {
+              dynamicPeersStore.push(record);
+            }
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, peersCount: dynamicPeersStore.length }));
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid peer JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/peers/list' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, peers: dynamicPeersStore }));
+      return;
+    }
+
     if (url.pathname === '/api/chat/contacts' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, contacts: contactsStore }));
+      res.end(JSON.stringify({ ok: true, contacts: [...contactsStore, ...dynamicPeersStore] }));
       return;
     }
 
     if (url.pathname === '/api/chat/messages' && req.method === 'GET') {
+      const since = Number(url.searchParams.get('since') || 0);
+      const messages = since > 0 
+        ? chatMessagesStore.filter(m => (m.timestamp || 0) > since)
+        : chatMessagesStore;
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, messages: chatMessagesStore }));
+      res.end(JSON.stringify({ ok: true, messages: messages }));
       return;
     }
 
@@ -12930,7 +13215,11 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          chatMessagesStore.push(parsed);
+          if (!parsed.id) parsed.id = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+          if (!parsed.timestamp) parsed.timestamp = Date.now();
+          if (!chatMessagesStore.some(m => m.id === parsed.id)) {
+            chatMessagesStore.push(parsed);
+          }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, message: parsed }));
         } catch {
@@ -13255,7 +13544,7 @@ async function startDevServer() {
     res.end('Not Found');
   });
 
-  server.listen(HTTP_PORT, '127.0.0.1', () => {
+  server.listen(HTTP_PORT, '0.0.0.0', () => {
     console.log('[2/2] HTTP Server Bound!');
     console.log(`\n============================================================`);
     console.log(`  🌐 Sovra Localhost Server is LIVE at:`);
