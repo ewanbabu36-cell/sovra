@@ -1845,6 +1845,9 @@ function renderHtml(
       min-width: 0;
       border-right: 1px solid rgba(255, 255, 255, 0.08);
       min-height: 100vh;
+      box-sizing: border-box;
+      overflow-x: clip;
+      transition: max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .app-top-header {
       position: sticky;
@@ -1873,6 +1876,7 @@ function renderHtml(
       padding: 0 1rem;
       width: 100%;
       box-sizing: border-box;
+      align-items: stretch;
     }
 
     /* Column 3: Right Discovery Rail */
@@ -1889,6 +1893,45 @@ function renderHtml(
       border-left: 1px solid rgba(255, 255, 255, 0.08);
       box-sizing: border-box;
       flex-shrink: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    /* Dynamic Stage Modes: Dedicated Wide Stage for Watch (YouTube), Chat, & Admin */
+    body.tab-active-youtube .app-center-stage {
+      max-width: 1400px !important;
+      border-right: none;
+    }
+    body.tab-active-chat .app-center-stage {
+      max-width: 1300px !important;
+      border-right: none;
+    }
+    body.tab-active-admin .app-center-stage {
+      max-width: 1250px !important;
+      border-right: none;
+    }
+    body.tab-active-me .app-center-stage {
+      max-width: 920px !important;
+    }
+
+    body.tab-active-youtube .app-right-rail,
+    body.tab-active-chat .app-right-rail,
+    body.tab-active-admin .app-right-rail {
+      display: none !important;
+    }
+
+    body.tab-active-youtube .container,
+    body.tab-active-chat .container,
+    body.tab-active-admin .container {
+      max-width: 100% !important;
+      padding: 0 1.25rem !important;
+    }
+
+    #youtube-view,
+    #chat-view,
+    #admin-view {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     .nav-tabs {
@@ -2059,7 +2102,8 @@ function renderHtml(
       flex: 1;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      align-items: stretch;
+      box-sizing: border-box;
     }
     .feed-container {
       max-width: 630px;
@@ -3965,15 +4009,18 @@ function renderHtml(
     /* YouTube Watch Player Styles */
     .youtube-container {
       display: grid;
-      grid-template-columns: 1fr 380px;
+      grid-template-columns: minmax(0, 1fr) 380px;
       gap: 1.5rem;
       position: relative;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .youtube-container.theater-mode {
       grid-template-columns: 1fr;
     }
-    @media (max-width: 1024px) {
-      .youtube-container { grid-template-columns: 1fr; }
+    @media (max-width: 1150px) {
+      .youtube-container { grid-template-columns: 1fr !important; }
     }
     
     /* YouTube Ambient Glow Backdrop */
@@ -4134,11 +4181,14 @@ function renderHtml(
       align-items: center;
       color: #fff;
       font-size: 0.85rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
     .yt-left-controls, .yt-right-controls {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.65rem;
+      flex-wrap: wrap;
     }
     .yt-btn {
       background: none;
@@ -4188,6 +4238,8 @@ function renderHtml(
       font-weight: 700;
       color: #f8fafc;
       line-height: 1.35;
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
 
     /* Video Actions Pill Group */
@@ -6518,7 +6570,7 @@ function renderHtml(
         </div>
 
         <!-- Right Recommendations & Autoplay Queue Sidebar -->
-        <aside style="display: flex; flex-direction: column; gap: 0.85rem;">
+        <aside class="yt-sidebar-recommendations" style="display: flex; flex-direction: column; gap: 0.85rem; min-width: 0;">
           <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.25rem;">
             <span style="font-weight: 700; color: #cbd5e1; font-size: 0.95rem;">
               Up Next &bull; P2P Swarms
@@ -8085,7 +8137,7 @@ function renderHtml(
       if (wom) wom.style.display = 'none';
       currentProfileWiped = false;
       updateUserDisplayInUI();
-      switchTab('chats');
+      switchTab('chat');
       showAccountToast('🎉 Connected to Mesh as ' + (myProfile ? myProfile.name : currentUserHandle) + '!');
     }
 
@@ -8137,6 +8189,8 @@ function renderHtml(
       applyNavLayoutMode();
     }
 
+    document.body.classList.add('tab-active-feed');
+    document.body.dataset.activeTab = 'feed';
     setTimeout(applyNavLayoutMode, 10);
     setTimeout(renderRightRailSuggestions, 50);
     setTimeout(function() {
@@ -8145,6 +8199,7 @@ function renderHtml(
 
     // Tab switching for all modes + admin console + friends discovery
     function switchTab(tab) {
+      if (tab === 'chats') tab = 'chat';
       const views = {
         feed: document.getElementById('feed-view'),
         friends: document.getElementById('friends-view'),
@@ -8188,6 +8243,31 @@ function renderHtml(
         }
       }
 
+      // Update body active tab classes
+      const allTabNames = ['feed', 'friends', 'reels', 'youtube', 'chat', 'me', 'admin'];
+      allTabNames.forEach(t => document.body.classList.remove('tab-active-' + t));
+      document.body.classList.add('tab-active-' + tab);
+      document.body.dataset.activeTab = tab;
+
+      // Dynamic layout adjustments for wide views (Watch, Chat, Admin)
+      const rightRail = document.querySelector('.app-right-rail');
+      const centerStage = document.querySelector('.app-center-stage');
+      if (tab === 'youtube' || tab === 'chat' || tab === 'admin') {
+        if (rightRail) rightRail.style.display = 'none';
+        if (centerStage) {
+          centerStage.style.maxWidth = tab === 'youtube' ? '1400px' : (tab === 'chat' ? '1300px' : '1250px');
+          centerStage.style.width = '100%';
+        }
+      } else {
+        if (rightRail) {
+          rightRail.style.display = window.innerWidth > 1250 ? 'flex' : 'none';
+        }
+        if (centerStage) {
+          centerStage.style.maxWidth = tab === 'me' ? '920px' : '720px';
+          centerStage.style.width = '';
+        }
+      }
+
       if (tab === 'chat') {
         const wCont = document.querySelector('.whatsapp-container');
         if (wCont && window.innerWidth <= 860) {
@@ -8205,6 +8285,19 @@ function renderHtml(
         renderFriendsDiscoveryView();
       }
     }
+
+    // Responsive window resize listener for layout rails
+    window.addEventListener('resize', function() {
+      const curTab = document.body.dataset.activeTab || 'feed';
+      const rRail = document.querySelector('.app-right-rail');
+      if (curTab === 'youtube' || curTab === 'chat' || curTab === 'admin') {
+        if (rRail) rRail.style.display = 'none';
+      } else {
+        if (rRail) {
+          rRail.style.display = window.innerWidth > 1250 ? 'flex' : 'none';
+        }
+      }
+    });
 
     // ==========================================
     // 0. INSTAGRAM FEED & PROFILE SCRIPT ENGINE
