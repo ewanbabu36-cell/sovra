@@ -441,56 +441,13 @@ const dynamicPeersStore: ContactRecord[] = [
   },
 ];
 
-const contactsStore: ContactRecord[] = [
-  {
-    did: 'did:sovra:alice_peer',
-    name: 'Alice (Storage Seeder)',
-    avatar: 'A',
-    avatarBg: '#10b981',
-    role: 'UnixFS Cluster Seeder',
-    isOnline: true,
-    lastSeen: 'Online',
-    disappearingDurationSec: 0,
-    safetyNumbers: '28471 90432 18942 09182 39182 48192 19283 48192 48192 01928 38192 49182',
-    isVerified: true,
-  },
-  {
-    did: 'did:sovra:bob_5g_seeder',
-    name: 'Bob (5G Carrier Seeder)',
-    avatar: 'B',
-    avatarBg: '#f59e0b',
-    role: 'UDP QUIC Relay',
-    isOnline: true,
-    lastSeen: 'Online',
-    disappearingDurationSec: 5,
-    safetyNumbers: '49182 39102 84719 20194 85719 30192 84729 10492 83719 40192 48192 84719',
-    isVerified: false,
-  },
-  {
-    did: 'did:sovra:carol_musician',
-    name: 'Carol (Spatial Audio)',
-    avatar: 'C',
-    avatarBg: '#ec4899',
-    role: 'Creator & Musician',
-    isOnline: false,
-    lastSeen: '25m ago',
-    disappearingDurationSec: 0,
-    safetyNumbers: '84719 20391 48291 94019 28471 39102 48192 39102 84729 10492 38192 59182',
-    isVerified: false,
-  },
-  {
-    did: 'did:sovra:dave_edge_relay',
-    name: 'Dave (ICE Edge Relay)',
-    avatar: 'D',
-    avatarBg: '#6366f1',
-    role: 'Bandwidth Voucher Node',
-    isOnline: true,
-    lastSeen: 'Online',
-    disappearingDurationSec: 0,
-    safetyNumbers: '19283 48192 39102 84729 10492 48192 01928 38192 49182 28471 90432 18942',
-    isVerified: false,
-  },
-];
+const contactsStore: ContactRecord[] = [];
+
+// BitChat zero-internet mesh peer model reference (Direct BLE and multi-hop relay nodes: did:sovra:alice_ble, did:sovra:bob_ble):
+export const BITCHAT_REFERENCE_MODELS = {
+  directBlePeer: { did: 'did:sovra:alice_ble', name: 'Alice (Direct BLE)', role: 'Direct BLE Peer (-42 dBm, 2.5m)', hops: 1, isDirect: true },
+  relayPeer: { did: 'did:sovra:bob_ble', name: 'Bob (2 Hops Relay)', role: 'Relayed via Alice (-68 dBm, 12m)', hops: 2, isDirect: false }
+};
 
 interface BitChatPeerRecord {
   did: string;
@@ -534,52 +491,6 @@ const bitchatPeersStore: BitChatPeerRecord[] = [
     channel: '#emergency-sos',
     isChannel: true,
   },
-  {
-    did: 'did:sovra:alice_ble',
-    name: 'Alice (Direct BLE)',
-    avatar: 'A',
-    avatarBg: '#10b981',
-    role: 'Direct BLE Peer (-42 dBm, 2.5m)',
-    rssi: -42,
-    distanceMeters: 2.5,
-    hops: 1,
-    isDirect: true,
-  },
-  {
-    did: 'did:sovra:bob_ble',
-    name: 'Bob (2 Hops Relay)',
-    avatar: 'B',
-    avatarBg: '#f59e0b',
-    role: 'Relayed via Alice (-68 dBm, 12m)',
-    rssi: -68,
-    distanceMeters: 12.0,
-    hops: 2,
-    relayVia: 'Alice',
-    isDirect: false,
-  },
-  {
-    did: 'did:sovra:charlie_ble',
-    name: 'Charlie (Direct BLE)',
-    avatar: 'C',
-    avatarBg: '#ec4899',
-    role: 'Direct BLE Peer (-51 dBm, 4.2m)',
-    rssi: -51,
-    distanceMeters: 4.2,
-    hops: 1,
-    isDirect: true,
-  },
-  {
-    did: 'did:sovra:elena_ble',
-    name: 'Elena (3 Hops Relay)',
-    avatar: 'E',
-    avatarBg: '#8b5cf6',
-    role: 'Relayed via Bob (-82 dBm, 28m)',
-    rssi: -82,
-    distanceMeters: 28.0,
-    hops: 3,
-    relayVia: 'Bob',
-    isDirect: false,
-  },
 ];
 
 interface ChatMessageRecord {
@@ -606,101 +517,7 @@ interface ChatMessageRecord {
   route?: string[];
 }
 
-const initialChatMessages: ChatMessageRecord[] = [
-  {
-    id: 'msg-1',
-    senderDid: 'did:sovra:alice_peer',
-    recipientDid: 'self',
-    senderName: 'Alice (Storage Seeder)',
-    text: 'Hey! Did you verify the HLS segment 0 on TCP port 4001?',
-    isAudio: false,
-    audioDurationSec: 0,
-    timestamp: Date.now() - 180000,
-    sentAt: Date.now() - 180000,
-    deliveredAt: Date.now() - 179500,
-    readAt: Date.now() - 175000,
-    status: 'read',
-    signatureHex: 'ed25519_sig_9f43ab2c88',
-    reactions: [{ emoji: '👍', senderDid: 'self' }],
-  },
-  {
-    id: 'msg-2',
-    senderDid: 'self',
-    recipientDid: 'did:sovra:alice_peer',
-    senderName: 'You',
-    text: 'Yes! Hash matches perfectly. Streaming smoothly without buffer stalls.',
-    isAudio: false,
-    audioDurationSec: 0,
-    timestamp: Date.now() - 120000,
-    sentAt: Date.now() - 120000,
-    deliveredAt: Date.now() - 119400,
-    readAt: Date.now() - 115000,
-    status: 'read',
-    signatureHex: 'ed25519_sig_4e81fa21bc',
-    reactions: [{ emoji: '❤️', senderDid: 'did:sovra:alice_peer' }],
-  },
-  {
-    id: 'msg-3',
-    senderDid: 'did:sovra:alice_peer',
-    recipientDid: 'self',
-    senderName: 'Alice (Storage Seeder)',
-    text: '🎙️ Voice note from storage cluster node (4.2s)',
-    isAudio: true,
-    audioDurationSec: 4.2,
-    waveformBars: [25, 45, 80, 60, 95, 40, 70, 30, 85, 50, 65, 90, 40, 75, 30],
-    timestamp: Date.now() - 60000,
-    sentAt: Date.now() - 60000,
-    deliveredAt: Date.now() - 59200,
-    readAt: Date.now() - 50000,
-    status: 'read',
-    signatureHex: 'ed25519_sig_71bc88ef22',
-  },
-  {
-    id: 'msg-bitchat-1',
-    senderDid: 'did:sovra:alice_ble',
-    recipientDid: 'channel:local_mesh',
-    senderName: 'Alice (Direct BLE)',
-    text: '📶 [BitChat Mesh] Hello neighbors! Zero-Internet offline beacon active in 50m radius.',
-    isAudio: false,
-    audioDurationSec: 0,
-    timestamp: Date.now() - 300000,
-    status: 'read',
-    signatureHex: 'ed25519_bitchat_sig_1',
-    isBitChat: true,
-    hopCount: 1,
-    route: ['did:sovra:alice_ble'],
-  },
-  {
-    id: 'msg-bitchat-2',
-    senderDid: 'did:sovra:bob_ble',
-    recipientDid: 'channel:local_mesh',
-    senderName: 'Bob (2 Hops Relay)',
-    text: 'Relayed this packet through Alice without internet or cell towers! Mesh hopping working!',
-    isAudio: false,
-    audioDurationSec: 0,
-    timestamp: Date.now() - 150000,
-    status: 'read',
-    signatureHex: 'ed25519_bitchat_sig_2',
-    isBitChat: true,
-    hopCount: 2,
-    route: ['did:sovra:bob_ble', 'did:sovra:alice_ble'],
-  },
-  {
-    id: 'msg-bitchat-3',
-    senderDid: 'did:sovra:alice_ble',
-    recipientDid: 'self',
-    senderName: 'Alice (Direct BLE)',
-    text: 'Direct BLE message received with -42 dBm signal strength. Zero cloud dependency!',
-    isAudio: false,
-    audioDurationSec: 0,
-    timestamp: Date.now() - 60000,
-    status: 'read',
-    signatureHex: 'ed25519_bitchat_sig_3',
-    isBitChat: true,
-    hopCount: 1,
-    route: ['did:sovra:alice_ble'],
-  },
-];
+const initialChatMessages: ChatMessageRecord[] = [];
 
 export interface FeedPostRecord {
   id: string;
@@ -720,96 +537,12 @@ export interface FeedPostRecord {
   tags: string;
   timestamp: number;
   comments: { author: string; text: string }[];
+  mediaImage?: string;
+  likedByDids?: string[];
 }
 
-const initialFeedPosts: FeedPostRecord[] = [
-  {
-    id: 'feed-1',
-    authorDid: 'did:sovra:alice_peer',
-    authorName: 'Alice (Storage Seeder)',
-    authorAvatar: 'A',
-    authorAvatarBg: '#10b981',
-    audioTrack: 'Original Audio • UnixFS Swarm',
-    mediaGradient: 'radial-gradient(circle at center, #064e3b 0%, #022c22 100%)',
-    mediaEmoji: '📦',
-    mediaTitle: '512KB UnixFS Merkle DAG Swarm Verified across 20 Nodes',
-    mediaCid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
-    likesCount: 2410,
-    isLiked: false,
-    isSaved: false,
-    caption: 'Zero central servers. 20 real OS TCP nodes initialized, executed Noise_XX handshakes, and pinned UnixFS blocks with cryptographic proof.',
-    tags: '#p2p #unixfs #decentralized #sovra #merkle',
-    timestamp: Date.now() - 3600000,
-    comments: [
-      { author: 'bob_seeder', text: 'Confirmed! Bitswap throughput hit 42 MB/s on local loop.' },
-      { author: 'dev_builder', text: 'Zero packet drops on cellular 5G handovers.' },
-    ],
-  },
-  {
-    id: 'feed-2',
-    authorDid: 'did:sovra:bob_5g_seeder',
-    authorName: 'Bob (5G Carrier Seeder)',
-    authorAvatar: 'B',
-    authorAvatarBg: '#f59e0b',
-    audioTrack: 'Original Sound • ICE 4-Tier Traversal',
-    mediaGradient: 'radial-gradient(circle at center, #78350f 0%, #451a03 100%)',
-    mediaEmoji: '⚡',
-    mediaTitle: 'Birthday Paradox Port Prediction Traversal vs Symmetric NAT',
-    mediaCid: 'bafybeicgnattraversal4tierportpredictionbirthdayparadox88',
-    likesCount: 1894,
-    isLiked: false,
-    isSaved: false,
-    caption: 'Why TURN servers are obsolete: Birthday paradox mathematical collision heuristic yields 92% punch success across Jio and Airtel CGNAT.',
-    tags: '#telecom #nat #quic #birthdayparadox #networking',
-    timestamp: Date.now() - 7200000,
-    comments: [
-      { author: 'alice_peer', text: 'Sub-50ms IPv6 traversal works effortlessly!' },
-    ],
-  },
-  {
-    id: 'feed-3',
-    authorDid: 'did:sovra:carol_musician',
-    authorName: 'Carol (Spatial Audio)',
-    authorAvatar: 'C',
-    authorAvatarBg: '#ec4899',
-    audioTrack: 'Binaural Master • 48kHz Lossless FLAC',
-    mediaGradient: 'radial-gradient(circle at center, #831843 0%, #4a044e 100%)',
-    mediaEmoji: '🎵',
-    mediaTitle: 'Spatial Audio Multi-Track Master Uploaded to Edge Swarm',
-    mediaCid: 'bafybeidoubleratchetchacha20poly1305signalkdfkeys44',
-    likesCount: 3120,
-    isLiked: false,
-    isSaved: false,
-    caption: 'New immersive ambient soundscape rendered in spatial audio. Pinned to IPFS blockstore with zero compression artifacts.',
-    tags: '#spatialaudio #binaural #creatoreconomy #music',
-    timestamp: Date.now() - 14400000,
-    comments: [
-      { author: 'sovralab', text: 'Streaming cleanly in the 4K HLS player!' },
-    ],
-  },
-  {
-    id: 'feed-4',
-    authorDid: 'did:sovra:creator_studio_broadcast',
-    authorName: 'Sovra Protocol Lab',
-    authorAvatar: 'S',
-    authorAvatarBg: '#6366f1',
-    audioTrack: 'Original Audio • Sovereign 95/5 Split',
-    mediaGradient: 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)',
-    mediaEmoji: '💎',
-    mediaTitle: 'Dynamic 95/5 Creator Split: 0% Platform Middleman Tax',
-    mediaCid: 'bafybeicreatoreconomics95splitvouchersoffchainmerkle12',
-    likesCount: 4890,
-    isLiked: true,
-    isSaved: true,
-    caption: 'YouTube takes 45%, Twitch takes 50%. Sovra delivers 95% straight to creators and 5% to the bandwidth seeders. The middleman tax is dead.',
-    tags: '#creatoreconomy #sovereignty #micropayments #web3',
-    timestamp: Date.now() - 28800000,
-    comments: [
-      { author: 'dave_relay', text: 'Proof-of-delivery receipts settled on-chain!' },
-      { author: 'alice_peer', text: 'Peer-to-peer is the only sustainable future.' },
-    ],
-  },
-];
+const initialFeedPosts: FeedPostRecord[] = [];
+
 
 export interface ChannelRecord {
   id: string;
@@ -869,6 +602,7 @@ function loadDynamicSocialState(): DynamicSocialState {
       const raw = fs.readFileSync(DYNAMIC_STATE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.posts) && Array.isArray(parsed.channels) && Array.isArray(parsed.pages)) {
+        if (!Array.isArray(parsed.chatMessages)) parsed.chatMessages = [];
         return parsed;
       }
     }
@@ -5671,9 +5405,10 @@ function renderHtml(
         <!-- Stories Tray (Borderless Instagram Style) -->
         <div class="stories-tray">
           <div class="stories-bar">
-            <div class="story-item" onclick="alert('Create Story: Pick a media asset to sign and distribute to edge peers without writing to disk.')">
-              <div class="story-ring seen">
-                <div class="story-avatar" style="background: #1e293b; color: #fff;">S</div>
+            <input type="file" id="realStoryFileInput" accept="image/*" style="display: none;" onchange="handleRealStoryUpload(event)">
+            <div class="story-item" onclick="document.getElementById('realStoryFileInput').click()" title="Add your Story (Camera or Gallery)">
+              <div class="story-ring" id="myStoryRing">
+                <div class="story-avatar" id="myStoryAvatar" style="background: #1e293b; color: #fff;">S</div>
                 <div class="story-plus-badge">+</div>
               </div>
               <div class="story-username">Your Story</div>
@@ -5702,10 +5437,17 @@ function renderHtml(
             <div style="flex: 1; min-width: 0;">
               <textarea id="dynamicPostCaption" class="composer-textarea" placeholder="What's happening on the mesh? Share photo, update or thought..." oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';"></textarea>
               
+              <!-- Real Photo Preview Box -->
+              <input type="file" id="realFeedFileInput" accept="image/*" style="display: none;" onchange="handleFeedPhotoSelected(event)">
+              <div id="feedPhotoPreviewContainer" style="display: none; position: relative; margin-top: 0.75rem; border-radius: 12px; overflow: hidden; max-height: 280px; background: #000; border: 1px solid var(--glass-border);">
+                <img id="feedPhotoPreviewImg" src="" alt="Selected photo" style="width: 100%; max-height: 280px; object-fit: contain; display: block;" />
+                <button type="button" onclick="clearFeedSelectedPhoto()" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold;">✕</button>
+              </div>
+
               <!-- Bottom Attachment Bar & Actions -->
               <div class="composer-actions-bar">
                 <div class="composer-media-tray">
-                  <button type="button" class="composer-media-btn" title="Add Photo" onclick="const c=document.getElementById('dynamicPostCaption'); c.value += (c.value ? ' ' : '') + '📷 [Photo: ipfs://bafy...photo.jpg]'; c.focus();">
+                  <button type="button" class="composer-media-btn" title="Add Photo" onclick="document.getElementById('realFeedFileInput').click();">
                     <span>📷</span> <span class="media-btn-label">Photo</span>
                   </button>
                   <button type="button" class="composer-media-btn" title="Add Video Reel" onclick="const c=document.getElementById('dynamicPostCaption'); c.value += (c.value ? ' ' : '') + '🎬 [Reel: ipfs://bafy...reel.mp4]'; c.focus();">
@@ -5736,7 +5478,18 @@ function renderHtml(
 
         <!-- Instagram Feed Cards Stream -->
         <div id="feedPostsStream" style="display: flex; flex-direction: column; gap: 1.5rem;">
-          ${feedPostsStore
+          ${feedPostsStore.length === 0 ? `
+            <div id="emptyFeedNotice" style="text-align: center; padding: 3rem 1.5rem; background: var(--bg-card); border-radius: var(--radius-lg); border: 1px dashed var(--glass-border);">
+              <div style="font-size: 3rem; margin-bottom: 0.75rem;">🛰️</div>
+              <div style="font-weight: 700; font-size: 1.1rem; color: #fff; margin-bottom: 0.5rem;">Sovereign Mesh Feed is Clean</div>
+              <div style="color: var(--text-secondary); font-size: 0.85rem; max-width: 420px; margin: 0 auto 1.25rem;">
+                Zero corporate algorithms or ads. Be the first sovereign peer to broadcast a photo, update, or thought to local peers!
+              </div>
+              <button onclick="document.getElementById('dynamicPostCaption').focus()" class="badge badge-accent" style="padding: 0.6rem 1.2rem; cursor: pointer; font-size: 0.85rem;">
+                ✍️ Create First Post
+              </button>
+            </div>
+          ` : feedPostsStore
             .map(
               post => `
             <article class="insta-post-card" id="card-${post.id}">
@@ -5760,6 +5513,14 @@ function renderHtml(
               </div>
 
               <!-- Media Box with Double-Tap Heart Physics -->
+              ${post.mediaImage ? `
+              <div class="insta-media-box" id="media-${post.id}" 
+                   style="position: relative; overflow: hidden; max-height: 480px; background: #000; display: flex; align-items: center; justify-content: center;"
+                   ondblclick="handleFeedDoubleTap('${post.id}', event)">
+                <img src="${post.mediaImage}" alt="Feed photo" style="width: 100%; height: auto; max-height: 480px; object-fit: contain; display: block;" />
+                <div id="heart-pop-${post.id}"></div>
+              </div>
+              ` : `
               <div class="insta-media-box" id="media-${post.id}" 
                    style="background: ${post.mediaGradient};"
                    ondblclick="handleFeedDoubleTap('${post.id}', event)">
@@ -5769,11 +5530,12 @@ function renderHtml(
                     ${post.mediaTitle}
                   </div>
                   <div style="margin-top: 0.85rem; display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-family: monospace; color: #a5b4fc;">
-                    <span>📦 CID:</span> <span>${post.mediaCid.substring(0, 16)}...</span>
+                    <span>📦 CID:</span> <span>${(post.mediaCid || 'bafybei...').substring(0, 16)}...</span>
                   </div>
                 </div>
                 <div id="heart-pop-${post.id}"></div>
               </div>
+              `}
 
               <!-- Actions Row -->
               <div class="insta-actions-row">
@@ -5814,7 +5576,7 @@ function renderHtml(
               <!-- Comments Preview -->
               <div class="insta-comments-preview" id="comments-box-${post.id}">
                 <div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">
-                  View all ${post.comments.length + 12} comments &bull; Verified on DHT
+                  View all ${post.comments.length} comments &bull; Verified on DHT
                 </div>
                 ${post.comments
                   .map(
@@ -6213,7 +5975,7 @@ function renderHtml(
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 0.74rem; font-weight: 700; color: #e2e8f0; display: flex; justify-content: space-between;">
                 <span>2.4GHz BLE Spectrum Scan</span>
-                <span style="color: #34d399; font-weight: 700;" id="bitchatPeersCountBadge">4 peers online</span>
+                <span style="color: #34d399; font-weight: 700;" id="bitchatPeersCountBadge">2 channels active</span>
               </div>
               <div style="font-size: 0.68rem; color: #64748b;">Ad-hoc multi-hop forwarding active (TTL: 7 hops)</div>
             </div>
@@ -6231,7 +5993,7 @@ function renderHtml(
             ${contactsStore
               .map(
                 c => `
-              <div class="contact-item ${c.did === 'did:sovra:alice_peer' ? 'active' : ''}" onclick="selectContact('${c.did}')" id="contact-${c.did.replace(/[^a-zA-Z0-9]/g, '_')}">
+              <div class="contact-item" onclick="selectContact('${c.did}')" id="contact-${c.did.replace(/[^a-zA-Z0-9]/g, '_')}">
                 <div class="contact-avatar" style="background: ${c.avatarBg};">
                   ${c.avatar}
                   ${c.isOnline ? '<div class="online-dot"></div>' : ''}
@@ -6263,13 +6025,13 @@ function renderHtml(
           <div class="chat-header">
             <button class="mobile-chat-back-btn" onclick="closeMobileChat()" title="Back to chats list">←</button>
             <div class="chat-header-user" onclick="openSafetyNumbersModal()" title="View Safety Numbers & Encryption Details">
-              <div class="contact-avatar" style="background: #10b981;" id="activePeerAvatar">A</div>
+              <div class="contact-avatar" style="background: #0284c7;" id="activePeerAvatar">📶</div>
               <div>
                 <div style="font-weight: 600; color: #e9edef; display: flex; align-items: center; gap: 4px;">
-                  <span id="activePeerName">Alice (Storage Seeder)</span>
-                  <span id="activePeerVerifiedBadge" style="color: #22c55e; font-size: 0.85rem;" title="Safety Numbers Verified">🛡️</span>
+                  <span id="activePeerName">#local-mesh</span>
+                  <span id="activePeerVerifiedBadge" style="display: none; color: #22c55e; font-size: 0.85rem;" title="Safety Numbers Verified">🛡️</span>
                 </div>
-                <div style="font-size: 0.72rem; color: #8696a0;" id="activePeerStatus">● Online &bull; Double Ratchet Active</div>
+                <div style="font-size: 0.72rem; color: #8696a0;" id="activePeerStatus">● Zero-Internet Local Mesh Swarm &bull; 50m Radius Broadcast</div>
               </div>
             </div>
             
@@ -6959,11 +6721,12 @@ function renderHtml(
 
           <!-- Avatar & Action Buttons Row -->
           <div class="profile-avatar-row">
-            <div class="profile-avatar-large">
-              <span>S</span>
+            <div class="profile-avatar-large" id="meProfileAvatarContainer">
+              <span id="meProfileAvatarText">S</span>
             </div>
             <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
-              <button class="profile-btn profile-btn-primary" onclick="openAccountLifecycleModal()">⚙️ Account &amp; Security</button>
+              <button class="profile-btn profile-btn-primary" onclick="openEditProfileModal()">✏️ Edit Profile</button>
+              <button class="profile-btn profile-btn-secondary" onclick="openAccountLifecycleModal()">⚙️ Account &amp; Security</button>
               <button class="profile-btn profile-btn-secondary" onclick="quickLockSession()">🔒 Quick Lock</button>
               <button class="profile-btn profile-btn-secondary" onclick="openConnectedDevicesView()">📱 Connected Devices</button>
               <button class="profile-btn profile-btn-secondary" onclick="copyProfileDid()">Copy DID</button>
@@ -6973,19 +6736,19 @@ function renderHtml(
           <!-- Profile Details Body -->
           <div class="profile-info-body">
             <div class="profile-name-row">
-              <span>Sovereign Node</span>
+              <span id="meProfileName">Sovereign Node</span>
               <span style="color: #38bdf8; font-size: 1.1rem;" title="Cryptographically Verified DID">✓</span>
               <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.4); font-size: 0.7rem;">Creator &amp; Seeder</span>
             </div>
-            <div class="profile-handle">@sovereign.mesh &bull; libp2p Peer: <code>${binding.peerId.substring(0, 12)}...</code></div>
+            <div class="profile-handle" id="meProfileHandle">@sovereign.mesh &bull; libp2p Peer: <code>${binding.peerId.substring(0, 12)}...</code></div>
             
             <div class="profile-did-badge" onclick="copyProfileDid()" title="Click to copy full Decentralized Identifier">
               <span>🔑 DID:</span>
-              <span>${masterKey.did}</span>
+              <span id="meProfileDid">${masterKey.did}</span>
               <span style="opacity: 0.7;">📋</span>
             </div>
 
-            <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.5; margin-bottom: 0.75rem;">
+            <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.5; margin-bottom: 0.75rem;" id="meProfileBio">
               Decentralized Sovereign Node &bull; Zero middleman servers &bull; BitSwap Seeder &amp; Content Creator &bull; Signal-grade Double Ratchet active.
             </div>
 
@@ -6996,23 +6759,23 @@ function renderHtml(
             <!-- Stats Row -->
             <div class="profile-stats-row">
               <div class="profile-stat-box">
-                <div class="stat-number">4</div>
+                <div class="stat-number" id="meFeedPostsCount">0</div>
                 <div class="stat-label">Feed Posts</div>
               </div>
               <div class="profile-stat-box">
-                <div class="stat-number" id="meFriendsCount" style="color: #38bdf8;">28</div>
+                <div class="stat-number" id="meFriendsCount" style="color: #38bdf8;">0</div>
                 <div class="stat-label">Mutual Friends</div>
               </div>
               <div class="profile-stat-box">
-                <div class="stat-number">1,420</div>
+                <div class="stat-number" id="meFollowersCount">0</div>
                 <div class="stat-label">Followers</div>
               </div>
               <div class="profile-stat-box">
-                <div class="stat-number">${socialGraph.getFollowing(masterKey.did).length || 3}</div>
+                <div class="stat-number" id="meFollowingCount">0</div>
                 <div class="stat-label">Following</div>
               </div>
               <div class="profile-stat-box">
-                <div class="stat-number" style="color: #34d399;">2.4 TB</div>
+                <div class="stat-number" id="meSeededBytes" style="color: #34d399;">0 MB</div>
                 <div class="stat-label">Seeded</div>
               </div>
             </div>
@@ -7473,6 +7236,52 @@ function renderHtml(
     <button onclick="unlockSessionWithBiometrics()" style="padding: 1rem 2rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.75rem; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);">
       <span>👆 Unlock with TouchID / FaceID</span>
     </button>
+  </div>
+
+  <!-- ✏️ EDIT PROFILE MODAL -->
+  <div id="editProfileModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(14px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; max-width: 440px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div style="font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+          <span>✏️</span> <span>Edit Decentralized Profile</span>
+        </div>
+        <button onclick="closeEditProfileModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; padding: 4px;">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 4px;">DISPLAY NAME</label>
+          <input type="text" id="editProfileNameInput" placeholder="e.g. Rahul Sharma" style="width: 100%; padding: 0.75rem 1rem; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box;" />
+        </div>
+
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 4px;">SOVEREIGN HANDLE</label>
+          <input type="text" id="editProfileHandleInput" placeholder="e.g. @rahul_phone" style="width: 100%; padding: 0.75rem 1rem; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #38bdf8; font-size: 0.95rem; font-weight: 700; box-sizing: border-box;" />
+        </div>
+
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 4px;">BIO / STATUS</label>
+          <textarea id="editProfileBioInput" placeholder="Tell nearby peers about your node..." rows="3" style="width: 100%; padding: 0.75rem 1rem; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.88rem; box-sizing: border-box; resize: vertical;"></textarea>
+        </div>
+
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 6px;">AVATAR COLOR</label>
+          <div style="display: flex; gap: 0.6rem; align-items: center;" id="editProfileColorOptions">
+            <div class="edit-avatar-swatch" style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; cursor: pointer; border: 2px solid #fff;" onclick="selectEditAvatarBg('#6366f1', this)"></div>
+            <div class="edit-avatar-swatch" style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; cursor: pointer;" onclick="selectEditAvatarBg('#10b981', this)"></div>
+            <div class="edit-avatar-swatch" style="width: 32px; height: 32px; border-radius: 50%; background: #f59e0b; cursor: pointer;" onclick="selectEditAvatarBg('#f59e0b', this)"></div>
+            <div class="edit-avatar-swatch" style="width: 32px; height: 32px; border-radius: 50%; background: #ec4899; cursor: pointer;" onclick="selectEditAvatarBg('#ec4899', this)"></div>
+            <div class="edit-avatar-swatch" style="width: 32px; height: 32px; border-radius: 50%; background: #0284c7; cursor: pointer;" onclick="selectEditAvatarBg('#0284c7', this)"></div>
+            <div class="edit-avatar-swatch" style="width: 32px; height: 32px; border-radius: 50%; background: #8b5cf6; cursor: pointer;" onclick="selectEditAvatarBg('#8b5cf6', this)"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem;">
+          <button onclick="closeEditProfileModal()" style="flex: 1; padding: 0.85rem; background: #334155; border: none; border-radius: 12px; color: #cbd5e1; font-weight: 700; cursor: pointer;">Cancel</button>
+          <button onclick="saveEditedProfile()" style="flex: 2; padding: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 12px; color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);">Save &amp; Announce</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ⚙️ 2. ACCOUNT LIFECYCLE & REMOTE LOGOUT MODAL -->
@@ -7985,14 +7794,108 @@ function renderHtml(
       const almHandle = document.getElementById('almProfileHandle');
       if (almHandle) almHandle.innerText = myProfile.handle;
 
-      const profileName = document.querySelector('.profile-name');
+      const profileName = document.getElementById('meProfileName') || document.querySelector('.profile-name');
       if (profileName) profileName.innerText = myProfile.name;
 
-      const profileAvatar = document.querySelector('.profile-avatar-large span');
-      if (profileAvatar) profileAvatar.innerText = myProfile.avatar || 'S';
+      const profileAvatarText = document.getElementById('meProfileAvatarText') || document.querySelector('.profile-avatar-large span');
+      if (profileAvatarText) profileAvatarText.innerText = myProfile.avatar || 'S';
 
-      const profileAvatarDiv = document.querySelector('.profile-avatar-large');
+      const profileAvatarDiv = document.getElementById('meProfileAvatarContainer') || document.querySelector('.profile-avatar-large');
       if (profileAvatarDiv && myProfile.avatarBg) profileAvatarDiv.style.background = myProfile.avatarBg;
+
+      const profileHandle = document.getElementById('meProfileHandle');
+      if (profileHandle) profileHandle.innerHTML = myProfile.handle + ' &bull; libp2p Peer: <code>' + (myProfile.did ? myProfile.did.substring(0, 16) : 'peer') + '...</code>';
+
+      const profileDid = document.getElementById('meProfileDid');
+      if (profileDid && myProfile.did) profileDid.innerText = myProfile.did;
+
+      const profileBio = document.getElementById('meProfileBio');
+      if (profileBio && myProfile.bio) profileBio.innerText = myProfile.bio;
+
+      const composerAvatar = document.querySelector('.composer-avatar');
+      if (composerAvatar) {
+        composerAvatar.innerText = myProfile.avatar || 'S';
+        if (myProfile.avatarBg) composerAvatar.style.background = myProfile.avatarBg;
+      }
+
+      const myStoryAvatar = document.getElementById('myStoryAvatar');
+      if (myStoryAvatar) {
+        myStoryAvatar.innerText = myProfile.avatar || 'S';
+        if (myProfile.avatarBg) myStoryAvatar.style.background = myProfile.avatarBg;
+      }
+
+      updateProfileDynamicStats();
+    }
+
+    let selectedEditAvatarBg = '#6366f1';
+    function selectEditAvatarBg(color, el) {
+      selectedEditAvatarBg = color;
+      document.querySelectorAll('#editProfileColorOptions .edit-avatar-swatch').forEach(s => s.style.border = 'none');
+      if (el) el.style.border = '2px solid #fff';
+    }
+
+    function openEditProfileModal() {
+      const m = document.getElementById('editProfileModal');
+      if (!m) return;
+      m.style.display = 'flex';
+      const nameInput = document.getElementById('editProfileNameInput');
+      const handleInput = document.getElementById('editProfileHandleInput');
+      const bioInput = document.getElementById('editProfileBioInput');
+      if (myProfile) {
+        if (nameInput) nameInput.value = myProfile.name || '';
+        if (handleInput) handleInput.value = myProfile.handle || '';
+        if (bioInput) bioInput.value = myProfile.bio || '';
+        selectedEditAvatarBg = myProfile.avatarBg || '#6366f1';
+      }
+    }
+
+    function closeEditProfileModal() {
+      const m = document.getElementById('editProfileModal');
+      if (m) m.style.display = 'none';
+    }
+
+    function saveEditedProfile() {
+      const nameInput = document.getElementById('editProfileNameInput');
+      const handleInput = document.getElementById('editProfileHandleInput');
+      const bioInput = document.getElementById('editProfileBioInput');
+
+      const newName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : (myProfile ? myProfile.name : 'Sovereign Node');
+      let rawHandle = (handleInput && handleInput.value.trim()) ? handleInput.value.trim() : (myProfile ? myProfile.handle : '@user');
+      if (!rawHandle.startsWith('@')) rawHandle = '@' + rawHandle;
+      const newBio = bioInput ? bioInput.value.trim() : '';
+
+      if (!myProfile) {
+        myProfile = {
+          did: 'did:sovra:user_' + Math.random().toString(36).substring(2, 7),
+          handle: rawHandle,
+          name: newName,
+          avatar: newName.charAt(0).toUpperCase(),
+          avatarBg: selectedEditAvatarBg,
+          bio: newBio,
+          device: isMobileDevice ? 'Mobile' : 'Desktop',
+          created: Date.now()
+        };
+      } else {
+        myProfile.name = newName;
+        myProfile.handle = rawHandle;
+        myProfile.avatar = newName.charAt(0).toUpperCase();
+        myProfile.avatarBg = selectedEditAvatarBg;
+        myProfile.bio = newBio;
+      }
+
+      try {
+        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+      } catch (e) {}
+
+      fetch('/api/peers/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(myProfile)
+      }).catch(function() {});
+
+      updateUserDisplayInUI();
+      closeEditProfileModal();
+      showAccountToast('✅ Profile updated and announced to peer mesh!');
     }
 
     // Auto-check onboarding on first visit
@@ -8453,15 +8356,43 @@ function renderHtml(
       fetch('/api/feed/comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: postId, text: text, author: 'You (Me)' })
+        body: JSON.stringify({ postId: postId, text: text, author: myProfile ? myProfile.name : 'You (Me)' })
       }).catch(function(err) { console.warn('[Feed] Comment sync warning:', err); });
+    }
+
+    let selectedFeedPhotoDataUrl = null;
+
+    function handleFeedPhotoSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        selectedFeedPhotoDataUrl = e.target.result;
+        const previewContainer = document.getElementById('feedPhotoPreviewContainer');
+        const previewImg = document.getElementById('feedPhotoPreviewImg');
+        if (previewImg && previewContainer) {
+          previewImg.src = selectedFeedPhotoDataUrl;
+          previewContainer.style.display = 'block';
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearFeedSelectedPhoto() {
+      selectedFeedPhotoDataUrl = null;
+      const previewContainer = document.getElementById('feedPhotoPreviewContainer');
+      const previewImg = document.getElementById('feedPhotoPreviewImg');
+      const fileInput = document.getElementById('realFeedFileInput');
+      if (previewContainer) previewContainer.style.display = 'none';
+      if (previewImg) previewImg.src = '';
+      if (fileInput) fileInput.value = '';
     }
 
     function submitDynamicPost() {
       const captionEl = document.getElementById('dynamicPostCaption');
       const text = captionEl ? captionEl.value.trim() : '';
-      if (!text) {
-        alert('Please write a caption or message before posting.');
+      if (!text && !selectedFeedPhotoDataUrl) {
+        alert('Please write a caption or choose a photo before posting.');
         return;
       }
 
@@ -8474,9 +8405,10 @@ function renderHtml(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          caption: text,
+          caption: text || 'Photo update from sovereign peer',
           tags: tags,
           theme: theme,
+          mediaImage: selectedFeedPhotoDataUrl,
           authorName: myProfile ? myProfile.name : 'You (Sovereign Peer)',
           authorAvatar: myProfile ? myProfile.avatar : 'S',
           authorAvatarBg: myProfile ? myProfile.avatarBg : '#6366f1',
@@ -8485,9 +8417,10 @@ function renderHtml(
       })
       .then(function(res) { return res.json(); })
       .then(function(data) {
-        if (btn) btn.innerHTML = '<span>🚀 Post to Mesh</span>';
+        if (btn) btn.innerHTML = '<span>🚀 Post</span>';
         if (data.ok && data.post) {
-          captionEl.value = '';
+          if (captionEl) captionEl.value = '';
+          clearFeedSelectedPhoto();
           feedPostsData.unshift(data.post);
           renderDynamicPostCard(data.post, true);
           updateProfileDynamicStats();
@@ -8496,7 +8429,7 @@ function renderHtml(
         }
       })
       .catch(function(err) {
-        if (btn) btn.innerHTML = '<span>🚀 Post to Mesh</span>';
+        if (btn) btn.innerHTML = '<span>🚀 Post</span>';
         alert('Post error: ' + err.message);
       });
     }
@@ -8509,10 +8442,28 @@ function renderHtml(
             let hasNew = false;
             for (let i = data.posts.length - 1; i >= 0; i--) {
               const p = data.posts[i];
-              if (!feedPostsData.some(function(existing) { return existing.id === p.id; })) {
+              const existing = feedPostsData.find(function(ex) { return ex.id === p.id; });
+              if (!existing) {
                 feedPostsData.unshift(p);
                 renderDynamicPostCard(p, true);
                 hasNew = true;
+              } else {
+                if (existing.likesCount !== p.likesCount) {
+                  existing.likesCount = p.likesCount;
+                  const countEl = document.getElementById('likes-count-' + p.id);
+                  if (countEl) countEl.innerText = p.likesCount.toLocaleString();
+                }
+                if (Array.isArray(p.comments) && p.comments.length !== (existing.comments || []).length) {
+                  existing.comments = p.comments;
+                  const commentsBox = document.getElementById('comments-box-' + p.id);
+                  if (commentsBox) {
+                    let cHtml = '<div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">View all ' + p.comments.length + ' comments &bull; Verified on DHT</div>';
+                    p.comments.forEach(function(c) {
+                      cHtml += '<div><strong style="color: #cbd5e1; font-size: 0.82rem;">' + c.author + '</strong> <span style="color: #94a3b8; font-size: 0.82rem;">' + c.text + '</span></div>';
+                    });
+                    commentsBox.innerHTML = cHtml;
+                  }
+                }
               }
             }
             if (hasNew) updateProfileDynamicStats();
@@ -8525,6 +8476,9 @@ function renderHtml(
     function renderDynamicPostCard(post, isNew) {
       const container = document.getElementById('feedPostsStream');
       if (!container) return;
+
+      const emptyNotice = document.getElementById('emptyFeedNotice');
+      if (emptyNotice) emptyNotice.remove();
 
       const card = document.createElement('article');
       card.className = 'insta-post-card';
@@ -8543,6 +8497,22 @@ function renderHtml(
         }
       }
 
+      const mediaBoxHtml = post.mediaImage ?
+        '<div class="insta-media-box" id="media-' + post.id + '" style="position: relative; overflow: hidden; max-height: 480px; background: #000; display: flex; align-items: center; justify-content: center;" ondblclick="handleFeedDoubleTap(\'' + post.id + '\', event)">' +
+          '<img src="' + post.mediaImage + '" alt="Feed media" style="width: 100%; height: auto; max-height: 480px; object-fit: contain; display: block;" />' +
+          '<div id="heart-pop-' + post.id + '"></div>' +
+        '</div>' :
+        '<div class="insta-media-box" id="media-' + post.id + '" style="background: ' + post.mediaGradient + ';" ondblclick="handleFeedDoubleTap(\'' + post.id + '\', event)">' +
+          '<div style="text-align: center; pointer-events: none; z-index: 2; padding: 2rem;">' +
+            '<div style="font-size: 4rem; margin-bottom: 0.75rem;">' + post.mediaEmoji + '</div>' +
+            '<div style="font-size: 1.15rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); line-height: 1.35;">' + post.mediaTitle + '</div>' +
+            '<div style="margin-top: 0.85rem; display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-family: monospace; color: #a5b4fc;">' +
+              '<span>📦 CID:</span> <span>' + (post.mediaCid ? post.mediaCid.substring(0, 16) : 'bafybei...') + '...</span>' +
+            '</div>' +
+          '</div>' +
+          '<div id="heart-pop-' + post.id + '"></div>' +
+        '</div>';
+
       card.innerHTML = 
         '<div class="insta-post-header">' +
           '<div class="insta-author-info" onclick="openCreatorProfile(\'' + post.authorName.split(' ')[0].toLowerCase() + '\')">' +
@@ -8558,16 +8528,7 @@ function renderHtml(
           '<button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 1rem;" title="Post Options" onclick="openPostOptionsModal(\'' + post.id + '\', \'' + post.authorName + '\', \'' + post.mediaCid + '\')">⋮</button>' +
         '</div>' +
 
-        '<div class="insta-media-box" id="media-' + post.id + '" style="background: ' + post.mediaGradient + ';" ondblclick="handleFeedDoubleTap(\'' + post.id + '\', event)">' +
-          '<div style="text-align: center; pointer-events: none; z-index: 2; padding: 2rem;">' +
-            '<div style="font-size: 4rem; margin-bottom: 0.75rem;">' + post.mediaEmoji + '</div>' +
-            '<div style="font-size: 1.15rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); line-height: 1.35;">' + post.mediaTitle + '</div>' +
-            '<div style="margin-top: 0.85rem; display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-family: monospace; color: #a5b4fc;">' +
-              '<span>📦 CID:</span> <span>' + (post.mediaCid ? post.mediaCid.substring(0, 16) : 'bafybei...') + '...</span>' +
-            '</div>' +
-          '</div>' +
-          '<div id="heart-pop-' + post.id + '"></div>' +
-        '</div>' +
+        mediaBoxHtml +
 
         '<div class="insta-actions-row">' +
           '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
@@ -8590,7 +8551,7 @@ function renderHtml(
         '</div>' +
 
         '<div class="insta-comments-preview" id="comments-box-' + post.id + '">' +
-          '<div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">View all comments &bull; Verified on DHT</div>' +
+          '<div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">View all ' + post.comments.length + ' comments &bull; Verified on DHT</div>' +
           commentsHtml +
         '</div>' +
 
@@ -8606,6 +8567,25 @@ function renderHtml(
       const postsCountEl = document.getElementById('profilePostsCount');
       if (postsCountEl) {
         postsCountEl.innerText = feedPostsData.length.toString();
+      }
+      const meFeedPostsCount = document.getElementById('meFeedPostsCount');
+      if (meFeedPostsCount) {
+        meFeedPostsCount.innerText = feedPostsData.length.toString();
+      }
+      const meFriendsCount = document.getElementById('meFriendsCount');
+      if (meFriendsCount) {
+        const peerCount = contactsData ? contactsData.length : 0;
+        meFriendsCount.innerText = peerCount.toString();
+      }
+      const meFollowersCount = document.getElementById('meFollowersCount');
+      if (meFollowersCount) {
+        const peerCount = contactsData ? contactsData.length : 0;
+        meFollowersCount.innerText = peerCount.toString();
+      }
+      const meFollowingCount = document.getElementById('meFollowingCount');
+      if (meFollowingCount) {
+        const peerCount = contactsData ? contactsData.length : 0;
+        meFollowingCount.innerText = peerCount.toString();
       }
     }
 
@@ -8656,15 +8636,22 @@ function renderHtml(
       if (!grid) return;
       var html = '';
       if (tab === 'posts') {
-        html = feedPostsData.map(function(p) {
-          return '<div class="media-grid-item" style="background: ' + p.mediaGradient + ';" onclick="switchTab(&quot;feed&quot;); var c = document.getElementById(&quot;card-' + p.id + '&quot;); if(c) c.scrollIntoView({ behavior: &quot;smooth&quot; });">' +
-            '<div style="font-size: 2.2rem; pointer-events: none;">' + p.mediaEmoji + '</div>' +
-            '<div class="media-hover-overlay">' +
-              '<span>❤️ ' + p.likesCount + '</span>' +
-              '<span>💬 ' + p.comments.length + '</span>' +
-            '</div>' +
-          '</div>';
-        }).join('');
+        if (feedPostsData.length === 0) {
+          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">No posts published yet. Share your first update on the mesh!</div>';
+        } else {
+          html = feedPostsData.map(function(p) {
+            var mediaContent = p.mediaImage ?
+              '<img src="' + p.mediaImage + '" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;" />' :
+              '<div style="font-size: 2.2rem; pointer-events: none;">' + p.mediaEmoji + '</div>';
+            return '<div class="media-grid-item" style="background: ' + (p.mediaGradient || '#1e293b') + '; position: relative; overflow: hidden;" onclick="switchTab(&quot;feed&quot;); var c = document.getElementById(&quot;card-' + p.id + '&quot;); if(c) c.scrollIntoView({ behavior: &quot;smooth&quot; });">' +
+              mediaContent +
+              '<div class="media-hover-overlay">' +
+                '<span>❤️ ' + p.likesCount + '</span>' +
+                '<span>💬 ' + p.comments.length + '</span>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+        }
       } else if (tab === 'reels') {
         html = reelsData.map(function(r, idx) {
           return '<div class="media-grid-item" style="background: ' + r.bgGradient + ';" onclick="switchTab(&quot;reels&quot;); currentReelIndex = ' + idx + '; renderCurrentReel();">' +
@@ -9300,6 +9287,65 @@ function renderHtml(
     let storySegmentProgress = 0;
     let isStoryPaused = false;
 
+    function handleRealStoryUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const dataUrl = e.target.result;
+        const caption = prompt('Add a caption to your 24h story (optional):', 'Live from my sovereign node 🛰️') || '';
+        const myName = myProfile ? myProfile.name : 'You';
+        const myAvatar = myProfile ? myProfile.avatar : 'S';
+        const myBg = myProfile ? myProfile.avatarBg : '#6366f1';
+        const myHandle = myProfile ? myProfile.handle.replace('@', '') : 'you';
+
+        const newSegment = {
+          id: 'story-seg-' + Date.now(),
+          caption: caption,
+          imageUrl: dataUrl,
+          stickerText: '📍 Decentralized Story Swarm',
+          stickerType: 'location',
+          gradient: 'linear-gradient(135deg, #1e1b4b, #312e81)',
+          timeAgo: 'Just now'
+        };
+
+        let userStory = storiesData.find(s => s.creatorHandle === myHandle || s.creatorHandle === 'you');
+        if (userStory) {
+          userStory.segments.unshift(newSegment);
+          userStory.seen = false;
+        } else {
+          userStory = {
+            creatorHandle: myHandle,
+            creatorName: myName,
+            creatorAvatar: myAvatar,
+            creatorAvatarBg: myBg,
+            seen: false,
+            segments: [newSegment]
+          };
+          storiesData.unshift(userStory);
+        }
+
+        const ring = document.getElementById('myStoryRing');
+        if (ring) {
+          ring.className = 'story-ring';
+          ring.style.boxShadow = '0 0 16px rgba(56, 189, 248, 0.8)';
+        }
+        showAccountToast('✨ Story published to mesh! Tap "Your Story" to view.');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleStoryTrayUserClick() {
+      const myHandle = myProfile ? myProfile.handle.replace('@', '') : 'you';
+      const myStoryIdx = storiesData.findIndex(s => s.creatorHandle === myHandle || s.creatorHandle === 'you');
+      if (myStoryIdx >= 0 && storiesData[myStoryIdx].segments.length > 0) {
+        launchStoryViewer(myStoryIdx);
+      } else {
+        const input = document.getElementById('realStoryFileInput');
+        if (input) input.click();
+      }
+    }
+
     function launchStoryViewer(creatorIdx) {
       if (creatorIdx < 0 || creatorIdx >= storiesData.length) return;
       activeStoryCreatorIdx = creatorIdx;
@@ -9355,9 +9401,19 @@ function renderHtml(
       const timeEl = document.getElementById('storyModalTimeAgo');
       if (timeEl) timeEl.innerText = curSeg.timeAgo;
 
-      // Update Content & Gradient
+      // Update Content & Gradient or Real Photo
       const modal = document.getElementById('storyCardModal');
-      if (modal) modal.style.background = curSeg.gradient;
+      if (modal) {
+        if (curSeg.imageUrl) {
+          modal.style.background = '#000';
+          modal.style.backgroundImage = 'linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.65)), url(' + curSeg.imageUrl + ')';
+          modal.style.backgroundSize = 'cover';
+          modal.style.backgroundPosition = 'center';
+        } else {
+          modal.style.backgroundImage = 'none';
+          modal.style.background = curSeg.gradient || '#1e1b4b';
+        }
+      }
 
       const textEl = document.getElementById('storyModalText');
       if (textEl) textEl.innerText = curSeg.caption;
@@ -9569,7 +9625,7 @@ function renderHtml(
           protoBadge.style.color = '#22c55e';
           protoBadge.style.background = 'rgba(34, 197, 94, 0.15)';
         }
-        activeContactDid = contactsData[0]?.did || 'did:sovra:alice_peer';
+        activeContactDid = contactsData[0]?.did || (bitchatPeersData[0]?.did || 'channel:local_mesh');
         showAccountToast('🌐 Global P2P Mode: Connected via DHT & GossipSub internet relays.');
       }
 
@@ -9673,6 +9729,13 @@ function renderHtml(
                 '<span id="preview-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' + c.role + '</span>' +
               '</div>' +
             '</div>' +
+          '</div>';
+        }
+        if (filteredContacts.length === 0) {
+          html = '<div style="text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">' +
+            '<div style="font-size: 2rem; margin-bottom: 0.5rem;">👥</div>' +
+            '<div style="font-weight: 600; color: #cbd5e1; margin-bottom: 0.25rem;">No P2P Contacts Connected Yet</div>' +
+            '<div>Connect other devices on Wi-Fi or switch to Mesh Mode to discover peers!</div>' +
           '</div>';
         }
         container.innerHTML = html;
@@ -9898,6 +9961,14 @@ function renderHtml(
         '</div>';
       }).join('');
 
+      if (filtered.length === 0) {
+        html += '<div style="text-align: center; padding: 3.5rem 1rem; color: #64748b; font-size: 0.85rem;">' +
+          '<div style="font-size: 2.2rem; margin-bottom: 0.5rem;">💬</div>' +
+          '<div style="font-weight: 600; color: #cbd5e1; margin-bottom: 0.25rem;">No messages yet</div>' +
+          '<div>Send a direct zero-trust message or broadcast to the mesh swarm!</div>' +
+        '</div>';
+      }
+
       container.innerHTML = html;
       container.scrollTop = container.scrollHeight;
     }
@@ -9915,11 +9986,6 @@ function renderHtml(
       const myDid = myProfile ? myProfile.did : 'self';
       const myName = myProfile ? myProfile.name : 'You';
 
-      const isRealHumanPeer = activeContactDid.startsWith('did:sovra:peer_') || 
-                              activeContactDid.startsWith('did:sovra:laptop_') || 
-                              activeContactDid.startsWith('did:sovra:phone_') || 
-                              activeContactDid.startsWith('channel:');
-
       const newMsg = {
         id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 6),
         senderDid: myDid,
@@ -9930,7 +9996,7 @@ function renderHtml(
         audioDurationSec: 0,
         timestamp: now,
         sentAt: now,
-        status: 'sent', // Single grey tick
+        status: 'sent', // Single tick until peer sync
         signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),
         disappearingDurationSec: timerSec,
         expiresAt: timerSec > 0 ? now + timerSec * 1000 : undefined,
@@ -9950,64 +10016,6 @@ function renderHtml(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newMsg)
       }).catch(function(err) { console.warn('[Chat] Send sync warning:', err); });
-
-      if (!isRealHumanPeer) {
-        // Progression 1: Delivered (Double grey ticks) after 350ms
-        setTimeout(function() {
-          newMsg.status = 'delivered';
-          newMsg.deliveredAt = Date.now();
-          renderChatBubbles();
-        }, 350);
-
-        // Progression 2: Read (Double blue ticks) after 800ms
-        setTimeout(function() {
-          newMsg.status = 'read';
-          newMsg.readAt = Date.now();
-          renderChatBubbles();
-        }, 800);
-
-        // Progression 3: Simulated Peer / Mesh response after 1500ms
-        setTimeout(function() {
-          const peerName = bcPeer ? bcPeer.name : (contact ? contact.name.split(' ')[0] : 'Peer');
-          const replyNow = Date.now();
-          let replyText = '✓ Received & verified via Signal Double Ratchet chain. Zero server footprint! 🔒';
-
-          if (bcPeer) {
-            if (bcPeer.isChannel) {
-              replyText = '📶 [Mesh Swarm Relay] Peer relayed: "' + (text.length > 25 ? text.substring(0, 25) + '...' : text) + '" on 2.4GHz BLE spectrum.';
-            } else {
-              replyText = '📶 [BitChat BLE Link] Received packet via ' + (bcPeer.hops === 1 ? 'direct Bluetooth link' : bcPeer.hops + '-hop mesh relay') + ' without internet.';
-            }
-          } else if (timerSec > 0) {
-            replyText = '✓ Decrypted via Double Ratchet! ⏱️ Disappearing in ' + timerSec + 's. Ephemeral RAM zero-write active.';
-          }
-
-          const replyMsg = {
-            id: 'reply-' + replyNow,
-            senderDid: activeContactDid,
-            recipientDid: myDid,
-            senderName: peerName,
-            text: replyText,
-            isAudio: false,
-            audioDurationSec: 0,
-            timestamp: replyNow,
-            sentAt: replyNow,
-            deliveredAt: replyNow,
-            readAt: replyNow,
-            status: 'read',
-            signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),
-            disappearingDurationSec: timerSec,
-            expiresAt: timerSec > 0 ? replyNow + timerSec * 1000 : undefined,
-            isDisappeared: false,
-            reactions: [],
-            isBitChat: isBc,
-            hopCount: bcPeer ? bcPeer.hops : 1,
-            route: bcPeer ? [activeContactDid, myDid] : undefined,
-          };
-          chatMessages.push(replyMsg);
-          renderChatBubbles();
-        }, 1500);
-      }
     }
 
     let lastChatSyncTimestamp = 0;
@@ -10133,11 +10141,13 @@ function renderHtml(
         waveform.push(Math.floor(Math.random() * 75) + 25);
       }
 
+      const myDid = myProfile ? myProfile.did : 'self';
+      const myName = myProfile ? myProfile.name : 'You';
       const voiceMsg = {
-        id: 'audio-' + now,
-        senderDid: 'self',
+        id: 'audio-' + now + '-' + Math.random().toString(36).substring(2, 6),
+        senderDid: myDid,
         recipientDid: activeContactDid,
-        senderName: 'You',
+        senderName: myName,
         text: '🎙️ Voice note (' + durationSec.toFixed(1) + 's)',
         isAudio: true,
         audioDurationSec: parseFloat(durationSec.toFixed(1)),
@@ -10154,18 +10164,6 @@ function renderHtml(
 
       chatMessages.push(voiceMsg);
       renderChatBubbles();
-
-      setTimeout(function() {
-        voiceMsg.status = 'delivered';
-        voiceMsg.deliveredAt = Date.now();
-        renderChatBubbles();
-      }, 500);
-
-      setTimeout(function() {
-        voiceMsg.status = 'read';
-        voiceMsg.readAt = Date.now();
-        renderChatBubbles();
-      }, 1200);
 
       try {
         fetch('/api/chat/send', {
@@ -12028,11 +12026,26 @@ function renderHtml(
 
     function messageFriend(didOrPubkey, name) {
       switchTab('chat');
-      const contact = contactsData.find(c => c.did === didOrPubkey || c.name.toLowerCase().includes(name.toLowerCase()));
+      let contact = contactsData.find(c => c.did === didOrPubkey || c.name.toLowerCase().includes(name.toLowerCase()));
       if (contact) {
         selectContact(contact.did);
       } else {
-        selectContact(contactsData[0]?.did || 'did:sovra:alice_peer');
+        const targetDid = didOrPubkey || ('did:sovra:' + name.toLowerCase().replace(/[^a-z0-9]/g, '_'));
+        const newContact = {
+          did: targetDid,
+          name: name,
+          avatar: name ? name.charAt(0).toUpperCase() : 'P',
+          avatarBg: '#6366f1',
+          role: 'P2P Sovereign Peer',
+          isOnline: true,
+          lastSeen: 'Online',
+          disappearingDurationSec: 0,
+          safetyNumbers: '28471 90432 18942 09182 39182 48192 19283 48192 48192 01928 38192 49182',
+          isVerified: true
+        };
+        contactsData.unshift(newContact);
+        renderChatContactsList();
+        selectContact(newContact.did);
       }
     }
 
@@ -12866,6 +12879,8 @@ async function startDevServer() {
             tags: String(parsed.tags || '#sovra #p2p #mesh'),
             timestamp: Date.now(),
             comments: [],
+            mediaImage: parsed.mediaImage ? String(parsed.mediaImage) : undefined,
+            likedByDids: [],
           };
 
           dynamicSocialStore.posts.unshift(newPost);
@@ -12902,12 +12917,17 @@ async function startDevServer() {
           const parsed = JSON.parse(body);
           const post = dynamicSocialStore.posts.find(p => p.id === parsed.postId);
           if (post) {
-            post.isLiked = Boolean(parsed.isLiked);
-            if (post.isLiked) {
-              post.likesCount++;
-            } else {
-              post.likesCount = Math.max(0, post.likesCount - 1);
+            if (!Array.isArray(post.likedByDids)) post.likedByDids = [];
+            const userDid = String(parsed.userDid || 'self');
+            const isLiked = Boolean(parsed.isLiked);
+            const idx = post.likedByDids.indexOf(userDid);
+            if (isLiked && idx === -1) {
+              post.likedByDids.push(userDid);
+            } else if (!isLiked && idx !== -1) {
+              post.likedByDids.splice(idx, 1);
             }
+            post.likesCount = post.likedByDids.length;
+            post.isLiked = isLiked;
             saveDynamicSocialState(dynamicSocialStore);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, isLiked: post.isLiked, likesCount: post.likesCount }));
@@ -13219,6 +13239,7 @@ async function startDevServer() {
           if (!parsed.timestamp) parsed.timestamp = Date.now();
           if (!chatMessagesStore.some(m => m.id === parsed.id)) {
             chatMessagesStore.push(parsed);
+            saveDynamicSocialState(dynamicSocialStore);
           }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, message: parsed }));
@@ -13272,6 +13293,7 @@ async function startDevServer() {
             } else {
               msg.reactions.push({ emoji: parsed.emoji, senderDid: 'self' });
             }
+            saveDynamicSocialState(dynamicSocialStore);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, reactions: msg.reactions }));
           } else {
@@ -13297,6 +13319,7 @@ async function startDevServer() {
             msg.status = parsed.status;
             if (parsed.status === 'delivered') msg.deliveredAt = Date.now();
             if (parsed.status === 'read') msg.readAt = Date.now();
+            saveDynamicSocialState(dynamicSocialStore);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, messageId: msg.id, status: msg.status }));
           } else {
