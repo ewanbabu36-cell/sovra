@@ -26,6 +26,27 @@ export interface AdminConsoleOptions {
     timestamp: number;
     senderName?: string;
   }>;
+  registeredUsersCount?: number;
+  registeredUsers?: Array<{
+    did: string;
+    handle: string;
+    displayName: string;
+    deviceType: string;
+    balanceSov?: number;
+    createdAt: number;
+  }>;
+  chatThreadsCount?: number;
+  chatMessagesVolume?: number;
+  diskStorageBytes?: number;
+  diskStorageMb?: string;
+  auditLogs?: Array<{
+    id: string;
+    type: string;
+    actorDid: string;
+    actorHandle: string;
+    details: string;
+    timestamp: number;
+  }>;
 }
 
 export function renderAdminHtml(opts: AdminConsoleOptions): string {
@@ -40,6 +61,13 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     postsCount,
     connectedPeers,
     vouchers,
+    registeredUsersCount = 0,
+    registeredUsers = [],
+    chatThreadsCount = 0,
+    chatMessagesVolume = 0,
+    diskStorageBytes = 0,
+    diskStorageMb = '0.00 MB',
+    auditLogs = [],
   } = opts;
 
   return `<!DOCTYPE html>
@@ -224,6 +252,24 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       color: #fff;
       transform: scale(1.03);
       box-shadow: 0 4px 16px rgba(244, 63, 94, 0.4);
+    }
+
+    .filter-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--admin-border);
+      color: var(--admin-text-muted);
+      padding: 0.4rem 0.85rem;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+
+    .filter-pill:hover, .filter-pill.active {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: #6366f1;
+      color: #fff;
     }
 
     /* Admin 2-Column Shell */
@@ -640,6 +686,18 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <span class="admin-nav-badge">${vouchers.length}</span>
       </button>
 
+      <button class="admin-nav-item" onclick="switchAdminTab('users-chat')">
+        <span class="admin-nav-icon">👥</span>
+        <span>Users &amp; Chat Mesh</span>
+        <span class="admin-nav-badge" id="sidebarUsersBadge">${registeredUsersCount}</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('audit')">
+        <span class="admin-nav-icon">🛡️</span>
+        <span>Activity Audit Log</span>
+        <span class="admin-nav-badge" id="sidebarAuditBadge" style="background:#38bdf8; color:#000;">${auditLogs.length}</span>
+      </button>
+
       <button class="admin-nav-item" onclick="switchAdminTab('moderation')">
         <span class="admin-nav-icon">⚖️</span>
         <span>Mesh Juror Consensus</span>
@@ -710,6 +768,45 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             </div>
             <div class="ops-card-val" id="uptimeDisplay">${Math.floor(uptimeSeconds / 60)}m ${uptimeSeconds % 60}s</div>
             <div class="ops-card-sub">Zero crashes, memory heap stable</div>
+          </div>
+        </div>
+
+        <!-- Phase 6 Live Dynamic Social Metrics Grid -->
+        <div class="ops-grid" style="margin-top: 1rem;">
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Registered Users</span>
+              <span style="color:#6366f1;">Sovra DID</span>
+            </div>
+            <div class="ops-card-val" id="metricUsersCount">${registeredUsersCount}</div>
+            <div class="ops-card-sub" id="metricUsersSub">${registeredUsers.length} verified accounts in dynamic DB</div>
+          </div>
+
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Chat Messages Volume</span>
+              <span style="color:#10b981;">E2EE Mesh</span>
+            </div>
+            <div class="ops-card-val" id="metricChatVolume">${chatMessagesVolume}</div>
+            <div class="ops-card-sub" id="metricThreadsSub">${chatThreadsCount} active two-way threads</div>
+          </div>
+
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Disk Consumption</span>
+              <span style="color:#f43f5e;">Storage</span>
+            </div>
+            <div class="ops-card-val" id="metricDiskStorage">${diskStorageMb}</div>
+            <div class="ops-card-sub">Local blockstore + Reels + State JSON</div>
+          </div>
+
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Real-Time Audit Log</span>
+              <span style="color:#38bdf8;">Ledger</span>
+            </div>
+            <div class="ops-card-val" id="metricAuditCount">${auditLogs.length}</div>
+            <div class="ops-card-sub">Cryptographic user activities logged</div>
           </div>
         </div>
 
@@ -960,6 +1057,184 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                   <td>${new Date(v.timestamp).toLocaleTimeString()}</td>
                 </tr>
               `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           MODULE 4B: REGISTERED SOVEREIGN USERS & CHAT MESH
+           ============================================== -->
+      <section class="ops-section" id="view-users-chat">
+        <div class="ops-header-card">
+          <div>
+            <div class="ops-header-title">👥 Sovereign Registered Users &amp; Chat Mesh</div>
+            <div class="ops-header-desc">Real persistent identity ledger, cross-device multi-device records, and two-way E2EE chat threads.</div>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-ops btn-ops-user-app" onclick="refreshAdminMetrics()">Sync DB Live</button>
+          </div>
+        </div>
+
+        <div class="ops-grid">
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Total Registered Users</span>
+              <span style="color:#6366f1;">Users DB</span>
+            </div>
+            <div class="ops-card-val" id="usersTabCount">${registeredUsersCount}</div>
+            <div class="ops-card-sub">Anchored in dynamic-social-state.json</div>
+          </div>
+
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Mobile Phone Peers</span>
+              <span style="color:#38bdf8;">LAN / Wi-Fi</span>
+            </div>
+            <div class="ops-card-val" id="usersTabMobileCount">${registeredUsers.filter(u => u.deviceType === 'Mobile').length}</div>
+            <div class="ops-card-sub">Connected via phone IP / browser PWA</div>
+          </div>
+
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Desktop Laptop Peers</span>
+              <span style="color:#10b981;">Localhost</span>
+            </div>
+            <div class="ops-card-val" id="usersTabDesktopCount">${registeredUsers.filter(u => u.deviceType !== 'Mobile').length}</div>
+            <div class="ops-card-sub">Running node host / full desktop browser</div>
+          </div>
+
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>E2EE Message Volume</span>
+              <span style="color:#f59e0b;">Messages</span>
+            </div>
+            <div class="ops-card-val" id="usersTabMsgVolume">${chatMessagesVolume}</div>
+            <div class="ops-card-sub">${chatThreadsCount} active threads</div>
+          </div>
+        </div>
+
+        <!-- Registered Users Table -->
+        <div class="ops-table-card">
+          <div class="ops-table-header">
+            <span class="ops-table-title">👤 Registered Sovereign Accounts</span>
+            <span style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-mono);">Live Database Records</span>
+          </div>
+          <table class="ops-table">
+            <thead>
+              <tr>
+                <th>User / Handle</th>
+                <th>Device</th>
+                <th>Sovereign Balance</th>
+                <th>Cryptographic DID</th>
+                <th>Registered At</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+              ${registeredUsers.length === 0 ? `<tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 2rem;">No users registered yet in database.</td></tr>` : registeredUsers.map(u => `
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 0.65rem;">
+                      <div style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #fff; font-size: 0.85rem;">
+                        ${(u.displayName || u.handle)[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div style="font-weight: 700; color: #fff;">${u.displayName}</div>
+                        <div style="font-size: 0.72rem; color: #38bdf8; font-family: var(--font-mono);">${u.handle}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="code-pill" style="color: ${u.deviceType === 'Mobile' ? '#38bdf8' : '#10b981'};">
+                      ${u.deviceType === 'Mobile' ? '📱 Mobile' : '💻 Desktop'}
+                    </span>
+                  </td>
+                  <td>
+                    <strong style="color: #fbbf24; font-family: var(--font-mono);">${(u.balanceSov ?? 500).toFixed(2)} SOV</strong>
+                  </td>
+                  <td>
+                    <span class="code-pill">${u.did.length > 25 ? u.did.substring(0, 25) + '...' : u.did}</span>
+                    <button class="copy-btn" onclick="copyValue('${u.did}', this)">Copy</button>
+                  </td>
+                  <td style="font-size: 0.75rem; color: #94a3b8;">
+                    ${new Date(u.createdAt).toLocaleDateString()} ${new Date(u.createdAt).toLocaleTimeString()}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           MODULE 4C: REAL-TIME ACTIVITY AUDIT LOG
+           ============================================== -->
+      <section class="ops-section" id="view-audit">
+        <div class="ops-header-card">
+          <div>
+            <div class="ops-header-title">🛡️ Real-Time Activity Audit Log</div>
+            <div class="ops-header-desc">Cryptographically signed user action audit trail: registrations, post publications, reel uploads, chats, and micro-tips.</div>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span class="ops-pill online"><span class="pulse-dot"></span> Live DB Sync</span>
+            <button class="btn-ops btn-ops-user-app" onclick="refreshAdminMetrics()">Refresh Now</button>
+          </div>
+        </div>
+
+        <!-- Audit Stream Filters -->
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button class="filter-pill active" onclick="filterAuditLogs('ALL', this)">All Activities (<span id="auditCountAll">${auditLogs.length}</span>)</button>
+          <button class="filter-pill" onclick="filterAuditLogs('USER', this)">Users</button>
+          <button class="filter-pill" onclick="filterAuditLogs('CHAT', this)">Chats</button>
+          <button class="filter-pill" onclick="filterAuditLogs('POST', this)">Posts &amp; Reels</button>
+          <button class="filter-pill" onclick="filterAuditLogs('TIP', this)">Tipping</button>
+        </div>
+
+        <!-- Audit Table -->
+        <div class="ops-table-card">
+          <div class="ops-table-header">
+            <span class="ops-table-title">📜 Immutable Activity Ledger</span>
+            <span style="font-size: 0.75rem; color: #34d399; font-family: var(--font-mono);">● Real-Time Stream</span>
+          </div>
+          <table class="ops-table">
+            <thead>
+              <tr>
+                <th style="width: 140px;">Timestamp</th>
+                <th style="width: 160px;">Action Type</th>
+                <th style="width: 180px;">Actor</th>
+                <th>Activity Description &amp; Details</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              ${auditLogs.length === 0 ? `<tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 2rem;">No activity recorded yet.</td></tr>` : auditLogs.map(log => {
+                let badgeColor = '#6366f1';
+                let badgeBg = 'rgba(99, 102, 241, 0.15)';
+                if (log.type.includes('USER') || log.type.includes('PROFILE')) { badgeColor = '#38bdf8'; badgeBg = 'rgba(56, 189, 248, 0.15)'; }
+                else if (log.type.includes('CHAT')) { badgeColor = '#10b981'; badgeBg = 'rgba(16, 185, 129, 0.15)'; }
+                else if (log.type.includes('POST') || log.type.includes('REEL')) { badgeColor = '#a855f7'; badgeBg = 'rgba(168, 85, 247, 0.15)'; }
+                else if (log.type.includes('TIP')) { badgeColor = '#fbbf24'; badgeBg = 'rgba(251, 191, 36, 0.15)'; }
+                else if (log.type.includes('FRIEND')) { badgeColor = '#f43f5e'; badgeBg = 'rgba(244, 63, 94, 0.15)'; }
+
+                return `
+                <tr class="audit-row" data-type="${log.type}">
+                  <td style="font-family: var(--font-mono); font-size: 0.75rem; color: #94a3b8;">
+                    ${new Date(log.timestamp).toLocaleTimeString()}
+                  </td>
+                  <td>
+                    <span style="display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; font-family: var(--font-mono); color: ${badgeColor}; background: ${badgeBg}; border: 1px solid ${badgeColor}33;">
+                      ${log.type}
+                    </span>
+                  </td>
+                  <td>
+                    <span style="font-weight: 700; color: #fff;">${log.actorHandle}</span>
+                    <div style="font-size: 0.68rem; color: #64748b; font-family: var(--font-mono);">${log.actorDid.slice(-10)}</div>
+                  </td>
+                  <td>
+                    <span style="color: #e2e8f0;">${log.details}</span>
+                  </td>
+                </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -1224,6 +1499,122 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       const el = document.getElementById('uptimeDisplay');
       if (el) el.innerText = mins + 'm ' + secs + 's';
     }, 1000);
+
+    // Phase 6: Live Dynamic Database Metrics Polling & Audit Stream
+    let currentAuditFilter = 'ALL';
+
+    function filterAuditLogs(category, btn) {
+      currentAuditFilter = category;
+      document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      const rows = document.querySelectorAll('.audit-row');
+      rows.forEach(r => {
+        const type = r.getAttribute('data-type') || '';
+        if (category === 'ALL') {
+          r.style.display = '';
+        } else if (category === 'USER') {
+          r.style.display = (type.includes('USER') || type.includes('PROFILE')) ? '' : 'none';
+        } else if (category === 'CHAT') {
+          r.style.display = type.includes('CHAT') ? '' : 'none';
+        } else if (category === 'POST') {
+          r.style.display = (type.includes('POST') || type.includes('REEL')) ? '' : 'none';
+        } else if (category === 'TIP') {
+          r.style.display = type.includes('TIP') ? '' : 'none';
+        }
+      });
+    }
+
+    async function refreshAdminMetrics() {
+      try {
+        const res = await fetch('/api/admin/metrics');
+        const data = await res.json();
+        if (data.ok) {
+          updateAdminMetricsInDom(data);
+        }
+      } catch (err) {
+        console.error('Failed to sync admin metrics:', err);
+      }
+    }
+
+    function updateAdminMetricsInDom(data) {
+      if (data.registeredUsersCount !== undefined) {
+        const el = document.getElementById('metricUsersCount');
+        if (el) el.innerText = data.registeredUsersCount;
+        const sub = document.getElementById('metricUsersSub');
+        if (sub) sub.innerText = data.registeredUsersCount + ' verified accounts in dynamic DB';
+        const badge = document.getElementById('sidebarUsersBadge');
+        if (badge) badge.innerText = data.registeredUsersCount;
+        const tabCount = document.getElementById('usersTabCount');
+        if (tabCount) tabCount.innerText = data.registeredUsersCount;
+      }
+
+      if (data.chatMessagesVolume !== undefined) {
+        const el = document.getElementById('metricChatVolume');
+        if (el) el.innerText = data.chatMessagesVolume;
+        const sub = document.getElementById('metricThreadsSub');
+        if (sub) sub.innerText = data.chatThreadsCount + ' active two-way threads';
+        const tabVol = document.getElementById('usersTabMsgVolume');
+        if (tabVol) tabVol.innerText = data.chatMessagesVolume;
+      }
+
+      if (data.diskStorageMb) {
+        const el = document.getElementById('metricDiskStorage');
+        if (el) el.innerText = data.diskStorageMb;
+      }
+
+      if (data.auditLogs && Array.isArray(data.auditLogs)) {
+        const el = document.getElementById('metricAuditCount');
+        if (el) el.innerText = data.auditLogs.length;
+        const badge = document.getElementById('sidebarAuditBadge');
+        if (badge) badge.innerText = data.auditLogs.length;
+        const allBadge = document.getElementById('auditCountAll');
+        if (allBadge) allBadge.innerText = data.auditLogs.length;
+
+        const tbody = document.getElementById('auditTableBody');
+        if (tbody) {
+          tbody.innerHTML = data.auditLogs.map(log => {
+            let badgeColor = '#6366f1';
+            let badgeBg = 'rgba(99, 102, 241, 0.15)';
+            if (log.type.includes('USER') || log.type.includes('PROFILE')) { badgeColor = '#38bdf8'; badgeBg = 'rgba(56, 189, 248, 0.15)'; }
+            else if (log.type.includes('CHAT')) { badgeColor = '#10b981'; badgeBg = 'rgba(16, 185, 129, 0.15)'; }
+            else if (log.type.includes('POST') || log.type.includes('REEL')) { badgeColor = '#a855f7'; badgeBg = 'rgba(168, 85, 247, 0.15)'; }
+            else if (log.type.includes('TIP')) { badgeColor = '#fbbf24'; badgeBg = 'rgba(251, 191, 36, 0.15)'; }
+            else if (log.type.includes('FRIEND')) { badgeColor = '#f43f5e'; badgeBg = 'rgba(244, 63, 94, 0.15)'; }
+
+            return '<tr class="audit-row" data-type="' + log.type + '">' +
+              '<td style="font-family: var(--font-mono); font-size: 0.75rem; color: #94a3b8;">' + new Date(log.timestamp).toLocaleTimeString() + '</td>' +
+              '<td><span style="display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; font-family: var(--font-mono); color: ' + badgeColor + '; background: ' + badgeBg + '; border: 1px solid ' + badgeColor + '33;">' + log.type + '</span></td>' +
+              '<td><span style="font-weight: 700; color: #fff;">' + log.actorHandle + '</span><div style="font-size: 0.68rem; color: #64748b; font-family: var(--font-mono);">' + log.actorDid.slice(-10) + '</div></td>' +
+              '<td><span style="color: #e2e8f0;">' + log.details + '</span></td>' +
+            '</tr>';
+          }).join('');
+        }
+      }
+
+      if (data.registeredUsers && Array.isArray(data.registeredUsers)) {
+        const mobCount = document.getElementById('usersTabMobileCount');
+        if (mobCount) mobCount.innerText = data.registeredUsers.filter(u => u.deviceType === 'Mobile').length;
+        const dskCount = document.getElementById('usersTabDesktopCount');
+        if (dskCount) dskCount.innerText = data.registeredUsers.filter(u => u.deviceType !== 'Mobile').length;
+
+        const ubody = document.getElementById('usersTableBody');
+        if (ubody) {
+          ubody.innerHTML = data.registeredUsers.map(u => 
+            '<tr>' +
+              '<td><div style="display: flex; align-items: center; gap: 0.65rem;"><div style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #fff; font-size: 0.85rem;">' + (u.displayName || u.handle)[0].toUpperCase() + '</div><div><div style="font-weight: 700; color: #fff;">' + u.displayName + '</div><div style="font-size: 0.72rem; color: #38bdf8; font-family: var(--font-mono);">' + u.handle + '</div></div></div></td>' +
+              '<td><span class="code-pill" style="color: ' + (u.deviceType === 'Mobile' ? '#38bdf8' : '#10b981') + ';">' + (u.deviceType === 'Mobile' ? '📱 Mobile' : '💻 Desktop') + '</span></td>' +
+              '<td><strong style="color: #fbbf24; font-family: var(--font-mono);">' + (u.balanceSov || 500).toFixed(2) + ' SOV</strong></td>' +
+              '<td><span class="code-pill">' + (u.did.length > 25 ? u.did.substring(0, 25) + '...' : u.did) + '</span></td>' +
+              '<td style="font-size: 0.75rem; color: #94a3b8;">' + new Date(u.createdAt).toLocaleTimeString() + '</td>' +
+            '</tr>'
+          ).join('');
+        }
+      }
+    }
+
+    // Auto-poll admin metrics every 3 seconds for live real-time sync
+    setInterval(refreshAdminMetrics, 3000);
   </script>
 </body>
 </html>`;

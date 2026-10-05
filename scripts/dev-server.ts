@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import os from 'node:os';
+import path from 'node:path';
 import {
   generateEd25519KeyPair,
   bytesToHex,
@@ -40,7 +41,50 @@ import {
   type ChatMessageRecord as DbChatMessageRecord,
   type FeedPostRecord as DbFeedPostRecord,
   type FriendRelationshipRecord,
+  type ReelRecord as DbReelRecord,
+  type ReelCommentRecord as DbReelCommentRecord,
+  type YoutubeCommentRecord as DbYoutubeCommentRecord,
+  type TipVoucherRecord as DbTipVoucherRecord,
+  type AuditLogRecord,
 } from './database-engine.ts';
+
+function getDirectorySize(dirPath: string): number {
+  let size = 0;
+  try {
+    if (fs.existsSync(dirPath)) {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dirPath, entry.name);
+        if (entry.isDirectory()) {
+          size += getDirectorySize(fullPath);
+        } else if (entry.isFile()) {
+          size += fs.statSync(fullPath).size;
+        }
+      }
+    }
+  } catch {}
+  return size;
+}
+
+const STORAGE_DIR = path.resolve('./.sovra-storage-dev');
+const REELS_DIR = path.join(STORAGE_DIR, 'reels');
+if (!fs.existsSync(REELS_DIR)) {
+  try {
+    fs.mkdirSync(REELS_DIR, { recursive: true });
+  } catch {}
+}
+const AVATARS_DIR = path.join(STORAGE_DIR, 'avatars');
+if (!fs.existsSync(AVATARS_DIR)) {
+  try {
+    fs.mkdirSync(AVATARS_DIR, { recursive: true });
+  } catch {}
+}
+const POSTS_DIR = path.join(STORAGE_DIR, 'posts');
+if (!fs.existsSync(POSTS_DIR)) {
+  try {
+    fs.mkdirSync(POSTS_DIR, { recursive: true });
+  } catch {}
+}
 
 interface PostRecord {
   id: string;
@@ -81,6 +125,7 @@ interface ReelRecord {
   creatorDid: string;
   creatorHandle: string;
   creatorName: string;
+  creatorAvatar?: string;
   caption: string;
   tags: string[];
   audioTrack: string;
@@ -92,85 +137,14 @@ interface ReelRecord {
   isLiked?: boolean;
   isSaved?: boolean;
   viewsDisplay?: string;
+  videoUrl?: string;
+  videoPath?: string;
+  videoMimeType?: string;
+  likedByDids?: string[];
+  createdAt?: number;
 }
 
-const reelsStore: ReelRecord[] = [
-  {
-    id: 'reel-1',
-    creatorDid: 'did:key:z6MksAliceCreatorP2P',
-    creatorHandle: 'alice_creator',
-    creatorName: 'Alice ⚡ P2P Architect',
-    caption: 'Zero central servers! Streaming raw UnixFS blocks over pure UDP QUIC. ⚡ 60fps gesture physics & instant pre-warm.',
-    tags: ['#sovra', '#p2p', '#reels', '#privacy', '#zeroalgorithms'],
-    audioTrack: 'Original Audio - alice_creator',
-    likesCount: 2489,
-    commentsCount: 142,
-    sharesCount: 68,
-    bgGradient: 'linear-gradient(180deg, #1e1b4b 0%, #312e81 40%, #0f172a 100%)',
-    cid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
-    viewsDisplay: '2.4M',
-  },
-  {
-    id: 'reel-2',
-    creatorDid: 'did:key:z6MksBobBroadcaster',
-    creatorHandle: 'bob_live',
-    creatorName: 'Bob | 5G Telecom',
-    caption: 'Testing ICE 4-tier hole punching on 5G carrier CGNAT. Sub-300ms video startup! 🔥 No relay bandwidth choked.',
-    tags: ['#telecom', '#5g', '#cgnat', '#web3'],
-    audioTrack: 'P2P Pulse Beats - Sound Collective',
-    likesCount: 1845,
-    commentsCount: 97,
-    sharesCount: 43,
-    bgGradient: 'linear-gradient(180deg, #3b0764 0%, #1e1b4b 50%, #030712 100%)',
-    cid: 'bafybeihkoviema7g3gxyt6la7vd5ho32wuq5z2m4r6z5g3k7r4o6z5m4r6',
-    viewsDisplay: '1.8M',
-  },
-  {
-    id: 'reel-3',
-    creatorDid: 'did:key:z6MksCarolMusician',
-    creatorHandle: 'carol_sounds',
-    creatorName: 'Carol 🎧 Sound Designer',
-    caption: 'Spatial multi-track audio session mixed locally on-device. No lossy compression! 🎧 Stems synced over BitSwap.',
-    tags: ['#spatialaudio', '#lossless', '#creator', '#hifi'],
-    audioTrack: 'Midnight Echoes (Spatial Mix) - Carol',
-    likesCount: 3912,
-    commentsCount: 231,
-    sharesCount: 154,
-    bgGradient: 'linear-gradient(180deg, #064e3b 0%, #0f172a 60%, #022c22 100%)',
-    cid: 'bafybeig7r6z5g3k7r4o6z5m4r6koviema7g3gxyt6la7vd5ho32wuq5z2m',
-    viewsDisplay: '3.9M',
-  },
-  {
-    id: 'reel-4',
-    creatorDid: 'did:key:z6MksAliceCreatorP2P',
-    creatorHandle: 'alice_creator',
-    creatorName: 'Alice ⚡ P2P Architect',
-    caption: 'Noise_XX mutual authentication handshake in 1-RTT. Ephemeral keys rotated after every session. 🔒',
-    tags: ['#cryptography', '#noiseprotocol', '#security', '#ed25519'],
-    audioTrack: 'Cybernetic Pulse - Alice & Core',
-    likesCount: 5120,
-    commentsCount: 308,
-    sharesCount: 279,
-    bgGradient: 'linear-gradient(180deg, #431407 0%, #1e1b4b 55%, #030712 100%)',
-    cid: 'bafybeihkoviema7g3gxyt6la7vd5ho32wuq5z2m4r6z5g3k7r4o6z5m4r7',
-    viewsDisplay: '840K',
-  },
-  {
-    id: 'reel-5',
-    creatorDid: 'did:key:z6MksDaveNode',
-    creatorHandle: 'dave_edge',
-    creatorName: 'Dave | Edge Relay',
-    caption: '10 seeder peers streaming parallel BitSwap chunks simultaneously. 120MB/s swarm throughput on mobile! 🚀',
-    tags: ['#bitswap', '#swarm', '#throughput', '#mesh'],
-    audioTrack: 'Relay Velocity - Dave Edge',
-    likesCount: 4210,
-    commentsCount: 184,
-    sharesCount: 195,
-    bgGradient: 'linear-gradient(180deg, #172554 0%, #1e1b4b 60%, #020617 100%)',
-    cid: 'bafybeihkoviema7g3gxyt6la7vd5ho32wuq5z2m4r6z5g3k7r4o6z5m4r8',
-    viewsDisplay: '1.2M',
-  },
-];
+let reelsStore: ReelRecord[] = sovraDb.getAllReels();
 
 interface CreatorProfile {
   handle: string;
@@ -5487,6 +5461,7 @@ function renderHtml(
               <input type="file" id="realFeedFileInput" accept="image/*" style="display: none;" onchange="handleFeedPhotoSelected(event)">
               <div id="feedPhotoPreviewContainer" style="display: none; position: relative; margin-top: 0.75rem; border-radius: 12px; overflow: hidden; max-height: 280px; background: #000; border: 1px solid var(--glass-border);">
                 <img id="feedPhotoPreviewImg" src="" alt="Selected photo" style="width: 100%; max-height: 280px; object-fit: contain; display: block;" />
+                <span id="feedPhotoCompressBadge" style="position: absolute; bottom: 8px; left: 8px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); color: #38bdf8; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.35);"></span>
                 <button type="button" onclick="clearFeedSelectedPhoto()" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold;">✕</button>
               </div>
 
@@ -5708,7 +5683,7 @@ function renderHtml(
       <!-- Reels Player Stage -->
       <div class="reels-stage">
         <div class="reels-phone-wrapper">
-          <div class="reel-ambient-cinema-glow" id="reelAmbientCinemaGlow" style="background: ${reelsStore[0]!.bgGradient};"></div>
+          <div class="reel-ambient-cinema-glow" id="reelAmbientCinemaGlow" style="background: ${reelsStore[0] ? reelsStore[0].bgGradient : 'linear-gradient(135deg, #1e1b4b, #312e81)'};"></div>
           <!-- Phone Mockup Container with 60fps Gesture Physics -->
           <div class="reels-phone" id="reelsPhone" 
              onpointerdown="handleReelPointerDown(event)" 
@@ -5728,6 +5703,9 @@ function renderHtml(
             <div style="font-size: 0.75rem; color: #fff; font-weight: 700; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); padding: 0.2rem 0.6rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);" id="reelCounterDisplay">
               1 / ${reelsStore.length}
             </div>
+            <button class="btn btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.3rem;" onclick="event.stopPropagation(); openReelUploadModal()">
+              <span>➕</span> Upload Reel
+            </button>
           </div>
 
           <!-- Tap to Play / Pause Center Floating Indicator -->
@@ -5738,13 +5716,15 @@ function renderHtml(
                onclick="handleReelSingleClick(event)" 
                ondblclick="handleReelDoubleTap(event)">
             
-            <div class="reels-ambient-bg" id="reelAmbientBg" style="background: ${reelsStore[0]!.bgGradient};">
+            <video id="reelVideoPlayer" playsinline loop style="width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; display: none; z-index: 1; border-radius: inherit; background: #000;"></video>
+            
+            <div class="reels-ambient-bg" id="reelAmbientBg" style="background: ${reelsStore[0] ? reelsStore[0].bgGradient : 'linear-gradient(135deg, #1e1b4b, #312e81)'};">
               <!-- Visualizer Ripple -->
               <div class="reel-visualizer" id="reelVisualizer">
                 <span style="font-size: 3.2rem;">🎬</span>
               </div>
               <div style="font-size: 0.8rem; color: rgba(255,255,255,0.7); margin-top: 1rem; font-family: monospace;" id="reelCidDisplay">
-                CID: ${reelsStore[0]!.cid.substring(0, 20)}...
+                CID: ${reelsStore[0] ? reelsStore[0].cid.substring(0, 20) : 'bafy...'}...
               </div>
               <div style="font-size: 0.7rem; color: #34d399; margin-top: 0.25rem;">
                 ● 60 FPS BitSwap Stream Loop &bull; Zero Server
@@ -5769,19 +5749,19 @@ function renderHtml(
             <!-- Like Heart Button with Floating Dopamine Pop -->
             <button class="reel-action-btn" onclick="event.stopPropagation(); triggerReelLike(event)">
               <div class="reel-action-icon" id="reelLikeIcon">🤍</div>
-              <span class="reel-action-label" id="reelLikeCount">${reelsStore[0]!.likesCount}</span>
+              <span class="reel-action-label" id="reelLikeCount">${reelsStore[0] ? reelsStore[0].likesCount : 0}</span>
             </button>
 
             <!-- Comments Button -->
             <button class="reel-action-btn" onclick="event.stopPropagation(); openReelCommentsSheet()">
               <div class="reel-action-icon">💬</div>
-              <span class="reel-action-label" id="reelCommentCount">${reelsStore[0]!.commentsCount}</span>
+              <span class="reel-action-label" id="reelCommentCount">${reelsStore[0] ? reelsStore[0].commentsCount : 0}</span>
             </button>
 
             <!-- Share P2P CID Button -->
             <button class="reel-action-btn" onclick="event.stopPropagation(); openReelShareSheet()">
               <div class="reel-action-icon">↗️</div>
-              <span class="reel-action-label" id="reelShareCount">${reelsStore[0]!.sharesCount}</span>
+              <span class="reel-action-label" id="reelShareCount">${reelsStore[0] ? reelsStore[0].sharesCount : 0}</span>
             </button>
 
             <!-- Bookmark / Save Button -->
@@ -5799,16 +5779,16 @@ function renderHtml(
           <!-- Bottom Meta Overlay -->
           <div class="reels-bottom-overlay">
             <div class="reels-creator-row">
-              <span class="reels-handle" id="reelCreatorHandle" onclick="event.stopPropagation(); openCreatorProfile(reelsData[currentReelIndex].creatorHandle)" style="cursor: pointer;">@${reelsStore[0]!.creatorHandle}</span>
+              <span class="reels-handle" id="reelCreatorHandle" onclick="event.stopPropagation(); openCreatorProfile(reelsData[currentReelIndex].creatorHandle)" style="cursor: pointer;">@${reelsStore[0] ? reelsStore[0].creatorHandle : 'you'}</span>
               <span style="color: #60a5fa; font-size: 0.85rem;" title="Verified Sovereign Identity">✓</span>
               <button class="btn-follow-pill" id="reelFollowBtn" onclick="event.stopPropagation(); toggleReelFollow()">Follow</button>
             </div>
             <div class="reels-caption" id="reelCaption">
-              ${reelsStore[0]!.caption}
+              ${reelsStore[0] ? reelsStore[0].caption : 'Welcome to Sovra Reels'}
             </div>
             <div class="reels-audio-track" onclick="event.stopPropagation(); openAudioTrackSheet()">
               <span>🎵</span>
-              <span id="reelAudioTrack">${reelsStore[0]!.audioTrack}</span>
+              <span id="reelAudioTrack">${reelsStore[0] ? reelsStore[0].audioTrack : 'Original Audio'}</span>
               <div class="sound-wave-eq">
                 <div class="sound-bar"></div>
                 <div class="sound-bar"></div>
@@ -5971,6 +5951,61 @@ function renderHtml(
                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
                   <button class="profile-btn profile-btn-primary" onclick="alert('Audio selected for your new Reel!')">Use Audio</button>
                   <button class="profile-btn profile-btn-secondary" onclick="alert('Audio saved to your sovereign audio collection!')">Save Audio</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Sheet 5: Upload Reel Modal / Drawer -->
+          <div class="reels-sheet-overlay" id="uploadReelSheetOverlay" onclick="closeReelsSheet('uploadReelSheetOverlay')">
+            <div class="reels-sheet-content" onclick="event.stopPropagation()" style="max-height: 85vh; overflow-y: auto;">
+              <div class="sheet-handle-bar"></div>
+              <div class="sheet-header">
+                <span style="font-weight: 700; font-size: 1rem; color: #fff; display: flex; align-items: center; gap: 0.4rem;">
+                  <span>🎬</span> Create Sovereign Reel
+                </span>
+                <button style="background: none; border: none; color: #fff; font-size: 1.1rem; cursor: pointer;" onclick="closeReelsSheet('uploadReelSheetOverlay')">✕</button>
+              </div>
+              <div class="sheet-body" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.85rem;">
+                <!-- Video File Dropzone -->
+                <div id="reelDropzone" style="border: 2px dashed rgba(255,255,255,0.25); border-radius: 12px; padding: 1.25rem; text-align: center; cursor: pointer; transition: all 0.2s ease; background: rgba(255,255,255,0.03);" onclick="document.getElementById('reelFileInput').click()">
+                  <input type="file" id="reelFileInput" accept="video/mp4,video/webm,video/quicktime,video/*" style="display: none;" onchange="handleReelFileSelected(event)">
+                  <div id="reelDropzonePrompt">
+                    <div style="font-size: 2.2rem; margin-bottom: 0.35rem;">📹</div>
+                    <div style="font-weight: 600; color: #f8fafc; font-size: 0.9rem;">Select or Drag Vertical 9:16 Video</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">MP4, WebM or MOV up to 50MB &bull; Stored in local blockstore</div>
+                  </div>
+                  <div id="reelFilePreviewBox" style="display: none; flex-direction: column; align-items: center; gap: 0.5rem;">
+                    <video id="reelUploadPreviewVideo" playsinline muted loop style="max-height: 180px; max-width: 120px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.2);"></video>
+                    <div style="font-size: 0.75rem; color: #34d399; font-weight: 600;" id="reelFileNameDisplay">video.mp4</div>
+                    <button type="button" class="btn btn-secondary" style="padding: 0.2rem 0.6rem; font-size: 0.7rem;" onclick="event.stopPropagation(); resetReelFileInput()">Change Video</button>
+                  </div>
+                </div>
+
+                <!-- Caption -->
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Caption & Hashtags</label>
+                  <textarea id="reelUploadCaption" rows="2" class="chat-text-input" style="width: 100%; border-radius: 8px; resize: none; font-size: 0.85rem;" placeholder="What's this reel about? #p2p #sovra"></textarea>
+                </div>
+
+                <!-- Audio Track Name -->
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Audio Track Title</label>
+                  <input type="text" id="reelUploadAudio" class="chat-text-input" style="width: 100%; border-radius: 8px; font-size: 0.85rem;" placeholder="Original Audio — You (or song title)">
+                </div>
+
+                <!-- Tags / Topics -->
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Tags (comma-separated)</label>
+                  <input type="text" id="reelUploadTags" class="chat-text-input" style="width: 100%; border-radius: 8px; font-size: 0.85rem;" placeholder="web3, tech, coding, decentralization">
+                </div>
+
+                <!-- Upload Progress & Status -->
+                <div id="reelUploadStatus" style="display: none; font-size: 0.78rem; text-align: center; color: #60a5fa; padding: 0.25rem;"></div>
+
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+                  <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="closeReelsSheet('uploadReelSheetOverlay')">Cancel</button>
+                  <button type="button" class="btn btn-primary" id="btnSubmitReel" style="flex: 2; font-weight: 700;" onclick="submitReelUpload()">Publish Reel 🚀</button>
                 </div>
               </div>
             </div>
@@ -6500,9 +6535,14 @@ function renderHtml(
                 <span style="font-weight: 700; color: #fbbf24; display: flex; align-items: center; gap: 0.35rem; font-size: 0.9rem;">
                   💰 Sovereign Micro-Tipping (0% Platform Middleman Cut)
                 </span>
-                <span style="font-size: 0.72rem; color: #34d399; background: rgba(16, 185, 129, 0.15); padding: 2px 10px; border-radius: 12px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3);">
-                  95% Creator / 5% Seeder Split
-                </span>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <span style="font-size: 0.76rem; color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 2px 10px; border-radius: 12px; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.25);">
+                    Balance: <b id="ytWalletBalanceDisplay">500.00 SOV</b>
+                  </span>
+                  <span style="font-size: 0.72rem; color: #34d399; background: rgba(16, 185, 129, 0.15); padding: 2px 10px; border-radius: 12px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3);">
+                    95% Creator / 5% Seeder Split
+                  </span>
+                </div>
               </div>
 
               <!-- Split meter bar -->
@@ -6723,6 +6763,11 @@ function renderHtml(
         <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
           <div style="font-size: 0.85rem; color: #cbd5e1;">
             Show your support with a highlighted Super Thanks badge in the comments stream!
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem;">
+            <span style="color: #cbd5e1;">Available Wallet Balance:</span>
+            <span style="color: #38bdf8; font-weight: 700; font-family: monospace;" id="superThanksAvailableBalance">500.00 SOV</span>
           </div>
 
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -7581,6 +7626,20 @@ function renderHtml(
           </div>
         </div>
 
+        <!-- Optional Profile Photo Upload Row -->
+        <div style="display: flex; align-items: center; gap: 0.85rem; padding: 0.65rem 0.85rem; background: #1e293b; border-radius: 12px; border: 1px solid #334155; margin-bottom: 1.25rem; text-align: left;">
+          <div id="womAvatarPreview" style="width: 46px; height: 46px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; overflow: hidden; border: 2px solid #38bdf8; flex-shrink: 0;">
+            <span id="womAvatarLetter">S</span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 2px;">Profile Photo (Optional)</div>
+            <button type="button" onclick="document.getElementById('womPhotoInput').click()" style="padding: 0.3rem 0.65rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; color: #38bdf8; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              <span>📷</span> <span>Choose Photo</span>
+            </button>
+            <input type="file" id="womPhotoInput" accept="image/*" style="display: none;" onchange="handleWomPhotoSelect(event)">
+          </div>
+        </div>
+
         <button onclick="triggerBiometricAccountCreation()" style="width: 100%; padding: 0.85rem; background: #3b82f6; color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); margin-bottom: 0.75rem;">
           <span>Continue with Biometrics</span> <span>→</span>
         </button>
@@ -7946,6 +8005,19 @@ function renderHtml(
       });
     }
 
+    let womSelectedAvatarDataUrl = null;
+    function handleWomPhotoSelect(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      compressImage(file, 256, 0.85, function(compressedUrl) {
+        womSelectedAvatarDataUrl = compressedUrl;
+        const preview = document.getElementById('womAvatarPreview');
+        if (preview) {
+          preview.innerHTML = '<img src="' + compressedUrl + '" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block;" />';
+        }
+      });
+    }
+
     function updateUserDisplayInUI() {
       if (!myProfile) return;
       currentUserHandle = myProfile.handle;
@@ -8021,6 +8093,12 @@ function renderHtml(
           myStoryAvatar.innerText = myProfile.avatar || 'S';
           if (myProfile.avatarBg) myStoryAvatar.style.background = myProfile.avatarBg;
         }
+      if (typeof myProfile.balanceSov === 'number') {
+        walletBalanceSov = myProfile.balanceSov;
+        const sovEl = document.getElementById('walletBalanceSovDisplay');
+        if (sovEl) sovEl.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+        const fiatEl = document.getElementById('walletBalanceFiatDisplay');
+        if (fiatEl) fiatEl.innerText = '≈ $' + (walletBalanceSov * 3.0).toFixed(2) + ' USD';
       }
 
       updateProfileDynamicStats();
@@ -8354,7 +8432,9 @@ function renderHtml(
           body: JSON.stringify({
             handle: cleanHandle,
             name: fullName,
-            device: isMobileDevice ? 'Mobile' : 'Desktop'
+            device: isMobileDevice ? 'Mobile' : 'Desktop',
+            avatar: fullName.charAt(0).toUpperCase(),
+            avatarDataUrl: womSelectedAvatarDataUrl || undefined,
           })
         });
         const data = await res.json();
@@ -8578,8 +8658,21 @@ function renderHtml(
         renderChatBubbles();
       } else if (tab === 'reels') {
         renderCurrentReel();
+        fetch('/api/reels/list')
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok && Array.isArray(data.reels)) {
+              reelsData = data.reels;
+              renderCurrentReel();
+            }
+          })
+          .catch(() => {});
       } else if (tab === 'youtube') {
         renderYtVideo(activeYtVideoIndex, false);
+        const ytBal = document.getElementById('ytWalletBalanceDisplay');
+        if (ytBal && typeof walletBalanceSov === 'number') {
+          ytBal.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+        }
       } else if (tab === 'me') {
         renderProfileGrid(currentProfileGridTab || 'posts');
       } else if (tab === 'friends') {
@@ -8799,13 +8892,22 @@ function renderHtml(
     function handleFeedPhotoSelected(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
+      const origBytes = file.size;
       compressImage(file, 1200, 0.82, function(compressedUrl) {
         selectedFeedPhotoDataUrl = compressedUrl;
         const previewContainer = document.getElementById('feedPhotoPreviewContainer');
         const previewImg = document.getElementById('feedPhotoPreviewImg');
+        const badgeEl = document.getElementById('feedPhotoCompressBadge');
         if (previewImg && previewContainer) {
           previewImg.src = selectedFeedPhotoDataUrl;
           previewContainer.style.display = 'block';
+          if (badgeEl) {
+            const approxBytes = Math.round((compressedUrl.length * 3) / 4);
+            const origKb = Math.round(origBytes / 1024);
+            const compKb = Math.round(approxBytes / 1024);
+            const pct = Math.max(0, Math.round(((origBytes - approxBytes) / origBytes) * 100));
+            badgeEl.innerText = '⚡ WebP Compressed: ' + origKb + 'KB → ' + compKb + 'KB (' + pct + '% saved)';
+          }
         }
       });
     }
@@ -8818,6 +8920,8 @@ function renderHtml(
       if (previewContainer) previewContainer.style.display = 'none';
       if (previewImg) previewImg.src = '';
       if (fileInput) fileInput.value = '';
+      const badgeEl = document.getElementById('feedPhotoCompressBadge');
+      if (badgeEl) badgeEl.innerText = '';
     }
 
     function submitDynamicPost() {
@@ -9181,7 +9285,7 @@ function renderHtml(
     // ==========================================
     // 1. INSTAGRAM REELS & STORIES SCRIPT ENGINE
     // ==========================================
-    const reelsData = ${JSON.stringify(reelsStore)};
+    let reelsData = ${JSON.stringify(reelsStore)};
     const creatorProfilesData = ${JSON.stringify(creatorProfiles)};
     const storiesData = ${JSON.stringify(multiSegmentStories)};
     let reelCommentsData = ${JSON.stringify(reelCommentsStore)};
@@ -9193,10 +9297,147 @@ function renderHtml(
     let reelPlaybackInterval = null;
     let reelNotesInterval = null;
     let reelProgressPct = 0;
+    let selectedReelFile = null;
+
+    function openReelUploadModal() {
+      openReelsSheet('uploadReelSheetOverlay');
+    }
+
+    function handleReelFileSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      selectedReelFile = file;
+
+      const preview = document.getElementById('reelUploadPreviewVideo');
+      if (preview) {
+        preview.src = URL.createObjectURL(file);
+        preview.play().catch(() => {});
+      }
+      const promptEl = document.getElementById('reelDropzonePrompt');
+      if (promptEl) promptEl.style.display = 'none';
+
+      const boxEl = document.getElementById('reelFilePreviewBox');
+      if (boxEl) boxEl.style.display = 'flex';
+
+      const nameEl = document.getElementById('reelFileNameDisplay');
+      if (nameEl) nameEl.innerText = file.name + ' (' + (file.size / (1024 * 1024)).toFixed(2) + ' MB)';
+    }
+
+    function resetReelFileInput() {
+      selectedReelFile = null;
+      const inp = document.getElementById('reelFileInput');
+      if (inp) inp.value = '';
+      const promptEl = document.getElementById('reelDropzonePrompt');
+      if (promptEl) promptEl.style.display = 'block';
+      const boxEl = document.getElementById('reelFilePreviewBox');
+      if (boxEl) boxEl.style.display = 'none';
+      const preview = document.getElementById('reelUploadPreviewVideo');
+      if (preview) {
+        preview.pause();
+        preview.src = '';
+      }
+    }
+
+    async function submitReelUpload() {
+      const captionInp = document.getElementById('reelUploadCaption');
+      const audioInp = document.getElementById('reelUploadAudio');
+      const tagsInp = document.getElementById('reelUploadTags');
+      const statusEl = document.getElementById('reelUploadStatus');
+      const btn = document.getElementById('btnSubmitReel');
+
+      const caption = captionInp ? captionInp.value.trim() : '';
+      const audio = audioInp ? audioInp.value.trim() : '';
+      const tags = tagsInp ? tagsInp.value.trim() : '';
+
+      if (!selectedReelFile && !caption) {
+        alert('Please choose a vertical video file or enter a caption for your Reel.');
+        return;
+      }
+
+      if (btn) btn.disabled = true;
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.innerText = '⏳ Ingesting vertical video into local blockstore...';
+      }
+
+      function doSend(videoDataUrl, mimeType) {
+        fetch('/api/reels/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            caption: caption || 'Decentralized Sovereign Reel #sovra #p2p',
+            audioTrack: audio || ('Original Audio — ' + (myProfile?.handle || '@you')),
+            tags: tags ? tags.split(',').map(s => s.trim()).filter(Boolean) : ['#sovra', '#p2p', '#reels'],
+            videoData: videoDataUrl,
+            mimeType: mimeType || 'video/mp4',
+            creatorDid: myProfile ? myProfile.did : 'did:sovra:self',
+            creatorHandle: myProfile ? myProfile.handle.replace('@', '') : 'you_peer',
+            creatorName: myProfile ? myProfile.name : 'You (Sovereign)',
+            creatorAvatar: myProfile ? myProfile.avatar : 'Y',
+          }),
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (btn) btn.disabled = false;
+          if (statusEl) statusEl.style.display = 'none';
+          if (data.ok && data.reel) {
+            reelsData.unshift(data.reel);
+            currentReelIndex = 0;
+            closeReelsSheet('uploadReelSheetOverlay');
+            resetReelFileInput();
+            if (captionInp) captionInp.value = '';
+            if (audioInp) audioInp.value = '';
+            if (tagsInp) tagsInp.value = '';
+            renderCurrentReel();
+            alert('🎉 Reel published successfully! Pinned to local blockstore with CID: ' + data.reel.cid);
+          } else {
+            alert('Failed to publish reel: ' + (data.error || 'Unknown error'));
+          }
+        })
+        .catch(err => {
+          if (btn) btn.disabled = false;
+          if (statusEl) statusEl.style.display = 'none';
+          alert('Upload network error: ' + err.message);
+        });
+      }
+
+      if (selectedReelFile) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          doSend(e.target.result, selectedReelFile.type);
+        };
+        reader.onerror = function() {
+          if (btn) btn.disabled = false;
+          if (statusEl) statusEl.style.display = 'none';
+          alert('Failed to read video file.');
+        };
+        reader.readAsDataURL(selectedReelFile);
+      } else {
+        doSend(undefined, undefined);
+      }
+    }
 
     function renderCurrentReel() {
       const r = reelsData[currentReelIndex];
       if (!r) return;
+
+      const videoEl = document.getElementById('reelVideoPlayer');
+      if (videoEl) {
+        if (r.videoUrl) {
+          videoEl.style.display = 'block';
+          if (videoEl.getAttribute('data-cid') !== r.cid) {
+            videoEl.src = r.videoUrl;
+            videoEl.setAttribute('data-cid', r.cid);
+            videoEl.load();
+            videoEl.play().catch(() => {});
+          }
+        } else {
+          videoEl.pause();
+          videoEl.style.display = 'none';
+          videoEl.removeAttribute('data-cid');
+          videoEl.src = '';
+        }
+      }
 
       const ambientBg = document.getElementById('reelAmbientBg');
       if (ambientBg) ambientBg.style.background = r.bgGradient;
@@ -9367,6 +9608,14 @@ function renderHtml(
         indicator.classList.add('show');
         setTimeout(() => indicator.classList.remove('show'), 650);
       }
+      const videoEl = document.getElementById('reelVideoPlayer');
+      if (videoEl && videoEl.style.display !== 'none') {
+        if (isReelPlaying) {
+          videoEl.play().catch(() => {});
+        } else {
+          videoEl.pause();
+        }
+      }
       const disc = document.getElementById('reelVinylDisc');
       if (disc) {
         disc.style.animationPlayState = isReelPlaying ? 'running' : 'paused';
@@ -9419,11 +9668,19 @@ function renderHtml(
       document.getElementById('reelLikeCount').innerText = r.likesCount;
 
       try {
-        await fetch('/api/reels/like', {
+        const resp = await fetch('/api/reels/like', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reelId: r.id })
+          body: JSON.stringify({
+            reelId: r.id,
+            userDid: myProfile ? myProfile.did : undefined,
+          }),
         });
+        const data = await resp.json();
+        if (data.ok && typeof data.likesCount === 'number') {
+          r.likesCount = data.likesCount;
+          document.getElementById('reelLikeCount').innerText = r.likesCount;
+        }
       } catch (err) {}
     }
 
@@ -9554,31 +9811,51 @@ function renderHtml(
       if (el) el.classList.remove('active');
     }
 
-    function openReelCommentsSheet() {
+    function renderReelCommentsInSheet() {
+      const listEl = document.getElementById('sheetCommentsList');
+      if (!listEl) return;
+      if (!reelCommentsData || reelCommentsData.length === 0) {
+        listEl.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 2rem;">No comments yet. Be the first to comment on this sovereign Reel!</div>';
+        return;
+      }
+      listEl.innerHTML = reelCommentsData.map(c => 
+        '<div class="sheet-comment-row" id="comment-' + c.id + '">' +
+          '<div class="sheet-comment-avatar">' + (c.authorAvatar || 'P') + '</div>' +
+          '<div class="sheet-comment-meta">' +
+            '<div><b>@' + (c.authorHandle || 'peer') + '</b> ' + c.text + '</div>' +
+            '<div class="sheet-comment-sub">' +
+              '<span>' + (c.timeAgo || 'Just now') + '</span>' +
+              '<span id="likes-' + c.id + '">' + (c.likes || 0) + ' likes</span>' +
+              '<span style="color: #60a5fa; cursor: pointer;" onclick="appendCommentEmoji(&quot;❤️ &quot;)">Reply</span>' +
+              '<span style="color: #34d399; font-size: 0.65rem;">● Ed25519 Verified</span>' +
+            '</div>' +
+          '</div>' +
+          '<button style="background: none; border: none; color: rgba(255,255,255,0.6); font-size: 0.85rem; cursor: pointer;" onclick="likeComment(&quot;' + c.id + '&quot;)">🤍</button>' +
+        '</div>'
+      ).join('');
+    }
+
+    async function openReelCommentsSheet() {
       const r = reelsData[currentReelIndex];
       const countEl = document.getElementById('sheetCommentsCount');
-      if (countEl) countEl.innerText = r ? r.commentsCount : reelCommentsData.length;
-
-      const listEl = document.getElementById('sheetCommentsList');
-      if (listEl) {
-        listEl.innerHTML = reelCommentsData.map(c => 
-          '<div class="sheet-comment-row" id="comment-' + c.id + '">' +
-            '<div class="sheet-comment-avatar">' + c.authorAvatar + '</div>' +
-            '<div class="sheet-comment-meta">' +
-              '<div><b>@' + c.authorHandle + '</b>' + c.text + '</div>' +
-              '<div class="sheet-comment-sub">' +
-                '<span>' + c.timeAgo + '</span>' +
-                '<span id="likes-' + c.id + '">' + c.likes + ' likes</span>' +
-                '<span style="color: #60a5fa; cursor: pointer;" onclick="appendCommentEmoji(&quot;❤️ &quot;)">Reply</span>' +
-                '<span style="color: #34d399; font-size: 0.65rem;">● Ed25519 Verified</span>' +
-              '</div>' +
-            '</div>' +
-            '<button style="background: none; border: none; color: rgba(255,255,255,0.6); font-size: 0.85rem; cursor: pointer;" onclick="likeComment(&quot;' + c.id + '&quot;)">🤍</button>' +
-          '</div>'
-        ).join('');
-      }
+      if (countEl) countEl.innerText = r ? r.commentsCount : 0;
 
       openReelsSheet('commentsSheetOverlay');
+      if (!r) return;
+
+      try {
+        const resp = await fetch('/api/reels/comments?reelId=' + encodeURIComponent(r.id));
+        const data = await resp.json();
+        if (data.ok && Array.isArray(data.comments)) {
+          reelCommentsData = data.comments;
+          if (countEl) countEl.innerText = reelCommentsData.length;
+          renderReelCommentsInSheet();
+        } else {
+          renderReelCommentsInSheet();
+        }
+      } catch (err) {
+        renderReelCommentsInSheet();
+      }
     }
 
     function likeComment(commentId) {
@@ -9598,29 +9875,40 @@ function renderHtml(
       }
     }
 
-    function submitReelComment() {
+    async function submitReelComment() {
       const input = document.getElementById('sheetCommentInput');
       const text = input ? input.value.trim() : '';
       if (!text) return;
 
       const r = reelsData[currentReelIndex];
-      const newComment = {
-        id: 'rc-' + Date.now(),
-        reelId: r ? r.id : 'reel-1',
-        authorHandle: 'you_peer',
-        authorAvatar: 'Y',
-        text: text,
-        timeAgo: 'Just now',
-        likes: 0
-      };
-      reelCommentsData.unshift(newComment);
+      if (!r) return;
+
       input.value = '';
 
-      if (r) {
-        r.commentsCount++;
-        document.getElementById('reelCommentCount').innerText = r.commentsCount;
-      }
-      openReelCommentsSheet();
+      try {
+        const resp = await fetch('/api/reels/comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reelId: r.id,
+            text,
+            authorDid: myProfile ? myProfile.did : 'did:sovra:self',
+            authorHandle: myProfile ? myProfile.handle.replace('@', '') : 'you_peer',
+            authorName: myProfile ? myProfile.name : 'You (Verified Peer)',
+            authorAvatar: myProfile ? myProfile.avatar : 'Y',
+          }),
+        });
+        const data = await resp.json();
+        if (data.ok && data.comment) {
+          reelCommentsData.unshift(data.comment);
+          r.commentsCount = (r.commentsCount || 0) + 1;
+          const countEl = document.getElementById('sheetCommentsCount');
+          if (countEl) countEl.innerText = r.commentsCount;
+          const rCountEl = document.getElementById('reelCommentCount');
+          if (rCountEl) rCountEl.innerText = r.commentsCount;
+          renderReelCommentsInSheet();
+        }
+      } catch (err) {}
     }
 
     function openCreatorProfile(handle) {
@@ -10163,7 +10451,11 @@ function renderHtml(
               distanceMeters: 1.8,
               hops: 1,
               isDirect: true,
-              isOnline: c.isOnline
+              isOnline: c.isOnline,
+              lastMessage: c.lastMessage,
+              lastMessageStatus: c.lastMessageStatus,
+              lastMessageIsOutgoing: c.lastMessageIsOutgoing,
+              unreadCount: c.unreadCount,
             });
           }
         });
@@ -10173,6 +10465,21 @@ function renderHtml(
           for (const p of allDirectPeers) {
             const isActive = p.did === activeContactDid;
             const hopLabel = p.hops === 1 ? '1 Hop Direct' : p.hops + ' Hops Relay';
+
+            let pTick = '';
+            if (p.lastMessageIsOutgoing) {
+              if (p.lastMessageStatus === 'read') {
+                pTick = '<span style="color: #53bdeb; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
+              } else if (p.lastMessageStatus === 'delivered') {
+                pTick = '<span style="color: #94a3b8; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
+              } else {
+                pTick = '<span style="color: #94a3b8; margin-right: 4px; font-size: 0.78rem;">✓</span>';
+              }
+            }
+            const pUnread = (p.unreadCount && p.unreadCount > 0)
+              ? '<span class="contact-unread-badge" style="background: #22c55e; color: #0b141a; font-size: 0.7rem; font-weight: 800; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; margin-left: auto;">' + p.unreadCount + '</span>'
+              : '';
+
             html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + p.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + p.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
               '<div class="contact-avatar" style="background: ' + p.avatarBg + '; overflow: hidden;">' +
                 (p.avatarDataUrl ? '<img src="' + p.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : p.avatar) +
@@ -10183,9 +10490,10 @@ function renderHtml(
                   '<span class="contact-name">' + p.name + '</span>' +
                   '<span class="bitchat-hop-badge">' + hopLabel + '</span>' +
                 '</div>' +
-                '<div class="contact-preview-row">' +
-                  '<span style="color: #38bdf8; font-weight: 700; font-size: 0.72rem;">' + p.rssi + ' dBm</span>' +
-                  '<span style="color: #94a3b8; font-size: 0.72rem;">&bull; ~' + p.distanceMeters + 'm &bull; ' + p.role + '</span>' +
+                '<div class="contact-preview-row" style="display: flex; align-items: center;">' +
+                  (p.lastMessage ? (pTick + '<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; ' + (p.unreadCount > 0 ? 'color: #f1f5f9; font-weight: 600;' : '') + '">' + p.lastMessage + '</span>' + pUnread) :
+                   ('<span style="color: #38bdf8; font-weight: 700; font-size: 0.72rem;">' + p.rssi + ' dBm</span>' +
+                    '<span style="color: #94a3b8; font-size: 0.72rem;">&bull; ~' + p.distanceMeters + 'm &bull; ' + p.role + '</span>')) +
                 '</div>' +
               '</div>' +
             '</div>';
@@ -11207,6 +11515,15 @@ function renderHtml(
       // Render recommendations and comments
       renderYtRecommendations();
       renderYtComments('top');
+      fetch('/api/youtube/video?id=' + encodeURIComponent(v.id))
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok && Array.isArray(data.comments)) {
+            ytCommentsDatabase[v.id] = data.comments;
+            renderYtComments('top');
+          }
+        })
+        .catch(() => {});
 
       if (autoStart) {
         if (!ytIsPlaying) toggleYtPlay();
@@ -11630,6 +11947,10 @@ function renderHtml(
     }
 
     function openSuperThanksModal() {
+      const balEl = document.getElementById('superThanksAvailableBalance');
+      if (balEl && typeof walletBalanceSov === 'number') {
+        balEl.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+      }
       openYtModal('superThanksModal');
       updateSuperThanksSplitPreview(100);
     }
@@ -11692,16 +12013,34 @@ function renderHtml(
       }
 
       try {
-        await fetch('/api/youtube/tip', {
+        const resp = await fetch('/api/youtube/tip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             amount: amount,
             videoId: v.id,
             creatorDid: 'did:sovra:' + v.channelHandle,
-            message: customMessage
-          })
+            message: customMessage,
+            authorName: myProfile ? myProfile.name : 'You (Super Supporter)',
+            fromDid: myProfile ? myProfile.did : undefined,
+          }),
         });
+        const data = await resp.json();
+        if (data.ok) {
+          if (typeof data.newBalance === 'number') {
+            walletBalanceSov = data.newBalance;
+            const sovEl = document.getElementById('walletBalanceSovDisplay');
+            if (sovEl) sovEl.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+            const fiatEl = document.getElementById('walletBalanceFiatDisplay');
+            if (fiatEl) fiatEl.innerText = '≈ $' + (walletBalanceSov * 3.0).toFixed(2) + ' USD';
+            const ytBalEl = document.getElementById('ytWalletBalanceDisplay');
+            if (ytBalEl) ytBalEl.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+            const stBalEl = document.getElementById('superThanksAvailableBalance');
+            if (stBalEl) stBalEl.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+          }
+        } else if (data.error) {
+          alert('Tip failed: ' + data.error);
+        }
       } catch (err) {}
     }
 
@@ -11837,7 +12176,7 @@ function renderHtml(
       if (input) input.value = '';
     }
 
-    function addYtComment() {
+    async function addYtComment() {
       const input = document.getElementById('newCommentInput');
       if (!input) return;
       const text = input.value.trim();
@@ -11845,23 +12184,28 @@ function renderHtml(
 
       const v = ytVideosCatalog[activeYtVideoIndex];
       if (!v) return;
-      if (!ytCommentsDatabase[v.id]) ytCommentsDatabase[v.id] = [];
 
-      const newC = {
-        id: 'yt-c-' + Date.now(),
-        videoId: v.id,
-        authorName: 'You (Verified Peer)',
-        authorAvatar: 'Y',
-        authorHandle: 'you_peer',
-        text: text,
-        timestamp: Date.now(),
-        likes: 1,
-        replies: []
-      };
-
-      ytCommentsDatabase[v.id].unshift(newC);
       input.value = '';
-      renderYtComments('top');
+
+      try {
+        const resp = await fetch('/api/youtube/comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoId: v.id,
+            text,
+            authorName: myProfile ? myProfile.name : 'You (Verified Peer)',
+            authorHandle: myProfile ? myProfile.handle.replace('@', '') : 'you_peer',
+            authorAvatar: myProfile ? myProfile.avatar : 'Y',
+          }),
+        });
+        const data = await resp.json();
+        if (data.ok && data.comment) {
+          if (!ytCommentsDatabase[v.id]) ytCommentsDatabase[v.id] = [];
+          ytCommentsDatabase[v.id].unshift(data.comment);
+          renderYtComments('top');
+        }
+      } catch (err) {}
     }
 
     function toggleReplyBox(commentId) {
@@ -11875,7 +12219,7 @@ function renderHtml(
       }
     }
 
-    function submitNestedReply(commentId) {
+    async function submitNestedReply(commentId) {
       const input = document.getElementById('reply-input-' + commentId);
       if (!input) return;
       const text = input.value.trim();
@@ -11883,24 +12227,34 @@ function renderHtml(
 
       const v = ytVideosCatalog[activeYtVideoIndex];
       if (!v) return;
-      const comments = ytCommentsDatabase[v.id] || [];
-      const parent = comments.find(c => c.id === commentId);
-      if (parent) {
-        if (!parent.replies) parent.replies = [];
-        parent.replies.push({
-          id: 'yt-r-' + Date.now(),
-          commentId: commentId,
-          authorName: 'You (Verified Peer)',
-          authorAvatar: 'Y',
-          authorHandle: 'you_peer',
-          text: text,
-          timestamp: Date.now(),
-          likes: 1
+
+      input.value = '';
+
+      try {
+        const resp = await fetch('/api/youtube/comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoId: v.id,
+            parentCommentId: commentId,
+            text,
+            authorName: myProfile ? myProfile.name : 'You (Verified Peer)',
+            authorHandle: myProfile ? myProfile.handle.replace('@', '') : 'you_peer',
+            authorAvatar: myProfile ? myProfile.avatar : 'Y',
+          }),
         });
-        input.value = '';
-        toggleReplyBox(commentId);
-        renderYtComments('top');
-      }
+        const data = await resp.json();
+        if (data.ok && data.reply) {
+          const comments = ytCommentsDatabase[v.id] || [];
+          const parent = comments.find(c => c.id === commentId);
+          if (parent) {
+            if (!parent.replies) parent.replies = [];
+            parent.replies.push(data.reply);
+          }
+          toggleReplyBox(commentId);
+          renderYtComments('top');
+        }
+      } catch (err) {}
     }
 
     function toggleRepliesThread(commentId) {
@@ -11921,6 +12275,11 @@ function renderHtml(
         c.likes++;
         const el = document.getElementById('like-cnt-' + commentId);
         if (el) el.innerText = c.likes;
+        fetch('/api/youtube/comment/like', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoId: v.id, commentId: commentId }),
+        }).catch(() => {});
       }
     }
 
@@ -11934,6 +12293,11 @@ function renderHtml(
         if (r) {
           r.likes++;
           renderYtComments();
+          fetch('/api/youtube/comment/like', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoId: v.id, commentId: replyId }),
+          }).catch(() => {});
         }
       }
     }
@@ -13552,6 +13916,9 @@ async function startDevServer() {
               if (storageDaemon && storageDaemon.blockstore) {
                 await storageDaemon.blockstore.put(cidObj, imageBuffer);
               }
+              // Save to physical disk in posts directory
+              const postFilePath = path.join(POSTS_DIR, `${realCid}.webp`);
+              fs.writeFileSync(postFilePath, imageBuffer);
             } catch (cidErr) {
               console.warn('[StorageDaemon] Local blockstore ingestion warning:', cidErr);
             }
@@ -13587,6 +13954,27 @@ async function startDevServer() {
 
           dynamicSocialStore.posts.unshift(newPost);
           saveDynamicSocialState(dynamicSocialStore);
+          try {
+            sovraDb.createPost({
+              authorDid: newPost.authorDid,
+              authorName: newPost.authorName,
+              authorAvatar: newPost.authorAvatar,
+              authorAvatarBg: newPost.authorAvatarBg,
+              authorAvatarDataUrl: newPost.authorAvatarDataUrl,
+              audioTrack: newPost.audioTrack,
+              mediaGradient: newPost.mediaGradient,
+              mediaEmoji: newPost.mediaEmoji,
+              mediaTitle: newPost.mediaTitle,
+              mediaCid: newPost.mediaCid,
+              caption: newPost.caption,
+              tags: newPost.tags,
+              mediaImage: newPost.mediaImage,
+              isLiked: false,
+              isSaved: false,
+            });
+          } catch (dbErr) {
+            console.warn('[SovraDB] createPost sync warning:', dbErr);
+          }
 
           localFeed.appendEvent({
             id: newPost.id,
@@ -13619,6 +14007,19 @@ async function startDevServer() {
       return;
     }
 
+    if (url.pathname.startsWith('/api/feed/image/') && req.method === 'GET') {
+      const cid = path.basename(url.pathname);
+      const filePath = path.join(POSTS_DIR, `${cid}.webp`);
+      if (fs.existsSync(filePath)) {
+        res.writeHead(200, { 'Content-Type': 'image/webp' });
+        fs.createReadStream(filePath).pipe(res);
+      } else {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Image not found' }));
+      }
+      return;
+    }
+
     // API: Like / Unlike Feed Post
     if (url.pathname === '/api/feed/like' && req.method === 'POST') {
       let body = '';
@@ -13630,12 +14031,24 @@ async function startDevServer() {
           if (post) {
             if (!Array.isArray(post.likedByDids)) post.likedByDids = [];
             const userDid = String(parsed.userDid || 'self');
-            const isLiked = Boolean(parsed.isLiked);
             const idx = post.likedByDids.indexOf(userDid);
-            if (isLiked && idx === -1) {
-              post.likedByDids.push(userDid);
-            } else if (!isLiked && idx !== -1) {
-              post.likedByDids.splice(idx, 1);
+            let isLiked: boolean;
+            if (typeof parsed.isLiked === 'boolean') {
+              isLiked = parsed.isLiked;
+              if (isLiked && idx === -1) {
+                post.likedByDids.push(userDid);
+              } else if (!isLiked && idx !== -1) {
+                post.likedByDids.splice(idx, 1);
+              }
+            } else {
+              // Default: toggle
+              if (idx >= 0) {
+                post.likedByDids.splice(idx, 1);
+                isLiked = false;
+              } else {
+                post.likedByDids.push(userDid);
+                isLiked = true;
+              }
             }
             post.likesCount = post.likedByDids.length;
             post.isLiked = isLiked;
@@ -13863,7 +14276,171 @@ async function startDevServer() {
     // ==========================================
     if (url.pathname === '/api/reels/list' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, reels: reelsStore }));
+      res.end(JSON.stringify({ ok: true, reels: sovraDb.getAllReels() }));
+      return;
+    }
+
+    if (url.pathname === '/api/reels/create' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body);
+          let cid = '';
+          let videoUrl: string | undefined;
+          let videoPath: string | undefined;
+          let mimeType = parsed.mimeType || 'video/mp4';
+
+          if (parsed.videoData) {
+            let base64Data = String(parsed.videoData);
+            const commaIdx = base64Data.indexOf(',');
+            if (commaIdx !== -1) {
+              const header = base64Data.substring(0, commaIdx);
+              const match = header.match(/data:([^;]+);base64/);
+              if (match) mimeType = match[1];
+              base64Data = base64Data.substring(commaIdx + 1);
+            }
+            const buffer = Buffer.from(base64Data, 'base64');
+            const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+            cid = 'bafy' + hash.substring(0, 32);
+
+            if (!fs.existsSync(REELS_DIR)) {
+              fs.mkdirSync(REELS_DIR, { recursive: true });
+            }
+
+            const ext = mimeType.includes('webm') ? 'webm' : (mimeType.includes('quicktime') || mimeType.includes('mov') ? 'mov' : 'mp4');
+            const fileName = `${cid}.${ext}`;
+            const filePath = path.join(REELS_DIR, fileName);
+            fs.writeFileSync(filePath, buffer);
+
+            videoPath = filePath;
+            videoUrl = `/api/reels/video/${cid}`;
+
+            try {
+              await storageDaemon.putBlock(cid, buffer);
+            } catch {}
+          } else {
+            cid = 'bafy' + crypto.randomBytes(16).toString('hex');
+          }
+
+          let tags = parsed.tags;
+          if (typeof tags === 'string') {
+            tags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+          }
+          if (!Array.isArray(tags) || tags.length === 0) {
+            tags = ['#sovra', '#p2p', '#reels'];
+          }
+
+          const newReel = sovraDb.createReel({
+            creatorDid: String(parsed.creatorDid || masterKey.did),
+            creatorHandle: String(parsed.creatorHandle || 'you_peer').replace('@', ''),
+            creatorName: String(parsed.creatorName || 'You (Sovereign)'),
+            creatorAvatar: parsed.creatorAvatar ? String(parsed.creatorAvatar) : undefined,
+            caption: String(parsed.caption || 'Decentralized Sovereign Reel'),
+            tags,
+            audioTrack: parsed.audioTrack ? String(parsed.audioTrack) : undefined,
+            cid,
+            videoUrl,
+            videoPath,
+            videoMimeType: mimeType,
+          });
+
+          reelsStore = sovraDb.getAllReels();
+
+          try {
+            await node.pubsub.publish('sovra/reels/new', new TextEncoder().encode(JSON.stringify({ type: 'new_reel', reel: newReel })));
+          } catch {}
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, reel: newReel }));
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/reels/video') && req.method === 'GET') {
+      let cid = url.searchParams.get('cid') || '';
+      if (!cid) {
+        const parts = url.pathname.split('/');
+        cid = parts[parts.length - 1] || '';
+      }
+      if (cid.includes('.')) {
+        cid = cid.split('.')[0];
+      }
+
+      if (!cid) {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('Missing CID');
+        return;
+      }
+
+      let foundFilePath = '';
+      let foundMimeType = 'video/mp4';
+      if (fs.existsSync(REELS_DIR)) {
+        const files = fs.readdirSync(REELS_DIR);
+        const target = files.find(f => f.startsWith(cid));
+        if (target) {
+          foundFilePath = path.join(REELS_DIR, target);
+          if (target.endsWith('.webm')) foundMimeType = 'video/webm';
+          else if (target.endsWith('.mov')) foundMimeType = 'video/quicktime';
+          else foundMimeType = 'video/mp4';
+        }
+      }
+
+      if (!foundFilePath) {
+        try {
+          const blk = await storageDaemon.getBlock(cid);
+          if (blk) {
+            res.writeHead(200, {
+              'Content-Type': 'video/mp4',
+              'Content-Length': blk.length,
+              'Accept-Ranges': 'bytes',
+            });
+            res.end(blk);
+            return;
+          }
+        } catch {}
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Video not found');
+        return;
+      }
+
+      const stat = fs.statSync(foundFilePath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        if (start >= fileSize) {
+          res.writeHead(416, {
+            'Content-Range': `bytes */${fileSize}`,
+          });
+          res.end();
+          return;
+        }
+        const chunksize = end - start + 1;
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunksize,
+          'Content-Type': foundMimeType,
+          'Cache-Control': 'public, max-age=3600',
+        });
+        fs.createReadStream(foundFilePath, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': fileSize,
+          'Accept-Ranges': 'bytes',
+          'Content-Type': foundMimeType,
+          'Cache-Control': 'public, max-age=3600',
+        });
+        fs.createReadStream(foundFilePath).pipe(res);
+      }
       return;
     }
 
@@ -13873,11 +14450,54 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          const r = reelsStore.find(x => x.id === parsed.reelId);
-          if (r) {
-            r.likesCount++;
+          const userDid = String(parsed.userDid || masterKey.did);
+          const result = sovraDb.toggleReelLike(parsed.reelId, userDid);
+          if (result) {
+            reelsStore = sovraDb.getAllReels();
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, likesCount: r.likesCount }));
+            res.end(JSON.stringify({ ok: true, likesCount: result.likesCount, isLiked: result.isLiked }));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Reel not found' }));
+          }
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/reels/comments' && req.method === 'GET') {
+      const reelId = url.searchParams.get('reelId') || '';
+      const comments = sovraDb.getReelComments(reelId);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, comments }));
+      return;
+    }
+
+    if (url.pathname === '/api/reels/comment' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.reelId || !parsed.text) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'reelId and text required' }));
+            return;
+          }
+          const comment = sovraDb.addReelComment(parsed.reelId, {
+            authorDid: String(parsed.authorDid || masterKey.did),
+            authorHandle: String(parsed.authorHandle || 'you_peer'),
+            authorName: String(parsed.authorName || 'Verified Peer'),
+            authorAvatar: parsed.authorAvatar ? String(parsed.authorAvatar) : undefined,
+            text: String(parsed.text),
+          });
+          if (comment) {
+            reelsStore = sovraDb.getAllReels();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, comment }));
           } else {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: false, error: 'Reel not found' }));
@@ -13986,6 +14606,65 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
         }
       });
+      return;
+    }
+
+    if (url.pathname === '/api/user/upload-avatar' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const did = String(parsed.did || '').trim();
+          const avatarDataUrl = String(parsed.avatarDataUrl || '').trim();
+          if (!did || !avatarDataUrl) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'did and avatarDataUrl are required' }));
+            return;
+          }
+
+          // Save photo to disk
+          let avatarUrl = '';
+          try {
+            const commaIdx = avatarDataUrl.indexOf(',');
+            const base64Data = commaIdx >= 0 ? avatarDataUrl.slice(commaIdx + 1) : avatarDataUrl;
+            const imgBuffer = Buffer.from(base64Data, 'base64');
+            const safeDid = did.replace(/[^a-zA-Z0-9_]/g, '_');
+            const filename = `avatar_${safeDid}_${Date.now()}.webp`;
+            const filePath = path.join(AVATARS_DIR, filename);
+            fs.writeFileSync(filePath, imgBuffer);
+            avatarUrl = `/api/user/avatar/${filename}`;
+          } catch (writeErr) {
+            console.warn('[Storage] Failed to save avatar file to disk:', writeErr);
+          }
+
+          const user = sovraDb.updateUserAvatar(did, avatarDataUrl);
+          if (!user) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'User not found' }));
+            return;
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, user, avatarUrl }));
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/user/avatar/') && req.method === 'GET') {
+      const filename = path.basename(url.pathname);
+      const filePath = path.join(AVATARS_DIR, filename);
+      if (fs.existsSync(filePath)) {
+        res.writeHead(200, { 'Content-Type': 'image/webp' });
+        fs.createReadStream(filePath).pipe(res);
+      } else {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Avatar not found' }));
+      }
       return;
     }
 
@@ -14470,12 +15149,13 @@ async function startDevServer() {
     if (url.pathname === '/api/youtube/video' && req.method === 'GET') {
       const vidId = url.searchParams.get('id') || currentYoutubeVideo.id;
       const found = longFormVideosCatalog.find(v => v.id === vidId) || currentYoutubeVideo;
+      const comments = sovraDb.getVideoComments(found.id);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
           ok: true,
           video: found,
-          comments: youtubeCommentsStore[found.id] || [],
+          comments,
         }),
       );
       return;
@@ -14511,56 +15191,33 @@ async function startDevServer() {
         try {
           const parsed = JSON.parse(body);
           const amount = Number(parsed.amount ?? 50);
-          const creatorSplit = Math.round(amount * 0.95 * 100) / 100;
-          const seederSplit = Math.round(amount * 0.05 * 100) / 100;
           const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
+          const fromDid = parsed.fromDid || masterKey.did;
+          const toDid = parsed.creatorDid || 'did:sovra:creator_studio_broadcast';
 
-          const voucher: TipVoucherRecord = {
-            voucherId: 'vouch_' + Date.now(),
-            creatorDid: parsed.creatorDid ?? 'did:sovra:creator_studio_broadcast',
-            seederDid: 'did:sovra:edge_seeder_relay',
-            totalAmount: amount.toString(),
-            creatorAmount: creatorSplit.toString(),
-            seederAmount: seederSplit.toString(),
-            platformAmount: '0',
-            timestamp: Date.now(),
-          };
-          tipVouchersStore.push(voucher);
+          const tipResult = sovraDb.processTip({
+            fromDid,
+            toDid,
+            amount,
+            videoId: targetVideoId,
+            senderName: parsed.authorName || 'Super Supporter',
+            message: parsed.message ? String(parsed.message) : undefined,
+          });
 
-          // If a message was sent, add as a Super Thanks comment
-          if (parsed.message) {
-            if (!youtubeCommentsStore[targetVideoId]) {
-              youtubeCommentsStore[targetVideoId] = [];
-            }
-            const stComment: YoutubeCommentRecord = {
-              id: 'yt-st-' + Date.now(),
-              videoId: targetVideoId,
-              authorName: parsed.authorName || 'Super Supporter',
-              authorAvatar: '⭐',
-              authorHandle: 'supporter_' + Math.floor(Math.random() * 900 + 100),
-              text: String(parsed.message),
-              timestamp: Date.now(),
-              likes: 1,
-              isSuperThanks: true,
-              superThanksAmount: '₹' + amount,
-              replies: [],
-            };
-            youtubeCommentsStore[targetVideoId].unshift(stComment);
+          if (tipResult.ok) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(
+              JSON.stringify({
+                ok: true,
+                voucher: tipResult.voucher,
+                split: tipResult.split,
+                newBalance: tipResult.senderBalance,
+              }),
+            );
+          } else {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: tipResult.error || 'Tip failed', senderBalance: tipResult.senderBalance }));
           }
-
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              ok: true,
-              voucher,
-              split: {
-                total: amount,
-                creator: creatorSplit,
-                seeder: seederSplit,
-                platformTake: 0,
-              },
-            }),
-          );
         } catch {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
@@ -14595,52 +15252,99 @@ async function startDevServer() {
         try {
           const parsed = JSON.parse(body);
           const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
-          if (!youtubeCommentsStore[targetVideoId]) {
-            youtubeCommentsStore[targetVideoId] = [];
-          }
 
           if (parsed.parentCommentId) {
             // Nested reply
-            const parentComment = youtubeCommentsStore[targetVideoId].find(c => c.id === parsed.parentCommentId);
-            if (parentComment) {
-              if (!parentComment.replies) parentComment.replies = [];
-              const newReply: YoutubeReplyRecord = {
-                id: 'yt-r-' + Date.now(),
-                commentId: parentComment.id,
-                authorName: parsed.authorName || 'Local Peer',
-                authorAvatar: (parsed.authorName || 'L')[0].toUpperCase(),
-                authorHandle: (parsed.authorName || 'peer').toLowerCase().replace(/\s+/g, '_'),
-                text: String(parsed.text || ''),
-                timestamp: Date.now(),
-                likes: 0,
-              };
-              parentComment.replies.push(newReply);
+            const reply = sovraDb.addVideoReply(targetVideoId, parsed.parentCommentId, {
+              authorName: parsed.authorName || 'Local Peer',
+              authorAvatar: parsed.authorAvatar || (parsed.authorName || 'L')[0].toUpperCase(),
+              authorHandle: parsed.authorHandle || (parsed.authorName || 'peer').toLowerCase().replace(/\s+/g, '_'),
+              text: String(parsed.text || ''),
+            });
+            if (reply) {
               res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ ok: true, reply: newReply, parentCommentId: parentComment.id }));
+              res.end(JSON.stringify({ ok: true, reply, parentCommentId: parsed.parentCommentId }));
+              return;
+            } else {
+              res.writeHead(404, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Parent comment not found' }));
               return;
             }
           }
 
           // Top-level comment
-          const newComment: YoutubeCommentRecord = {
-            id: 'yt-c-' + Date.now(),
-            videoId: targetVideoId,
+          const comment = sovraDb.addVideoComment(targetVideoId, {
             authorName: parsed.authorName ?? 'Verified Peer',
-            authorAvatar: (parsed.authorName ?? 'V')[0].toUpperCase(),
-            authorHandle: (parsed.authorName ?? 'peer').toLowerCase().replace(/\s+/g, '_'),
+            authorAvatar: parsed.authorAvatar ?? (parsed.authorName ?? 'V')[0].toUpperCase(),
+            authorHandle: parsed.authorHandle ?? (parsed.authorName ?? 'peer').toLowerCase().replace(/\s+/g, '_'),
             text: String(parsed.text ?? ''),
-            timestamp: Date.now(),
-            likes: 0,
-            replies: [],
-          };
-          youtubeCommentsStore[targetVideoId].unshift(newComment);
+          });
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, comment: newComment }));
+          res.end(JSON.stringify({ ok: true, comment }));
         } catch {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
         }
       });
+      return;
+    }
+
+    if (url.pathname === '/api/youtube/comment/like' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
+          const targetCommentId = parsed.commentId;
+          if (!targetCommentId) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Missing commentId' }));
+            return;
+          }
+          const newLikes = sovraDb.likeVideoComment(targetVideoId, targetCommentId);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, likes: newLikes }));
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    // ==========================================
+    // 📊 OPERATIONS CONSOLE REAL-TIME METRICS API
+    // ==========================================
+    if (url.pathname === '/api/admin/metrics' && req.method === 'GET') {
+      const diskBytes = getDirectorySize(STORAGE_DIR);
+      const diskMb = Number((diskBytes / (1024 * 1024)).toFixed(2));
+      const allUsers = sovraDb.getAllUsers();
+      const allMsgs = sovraDb.getState().chatMessages;
+      const threadsCount = new Set(allMsgs.map(m => m.threadId)).size;
+      const stats = storageDaemon.getStats();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
+          totalBlocks: stats.totalBlocks,
+          pinnedCount: stats.pinnedCount,
+          postsCount: sovraDb.getState().posts.length,
+          connectedPeers: node.getConnectedPeers(),
+          connectedPeersCount: node.getConnectedPeers().length,
+          vouchers: sovraDb.getState().tip_vouchers || [],
+          registeredUsersCount: allUsers.length,
+          registeredUsers: allUsers,
+          chatThreadsCount: threadsCount,
+          chatMessagesVolume: allMsgs.length,
+          diskStorageBytes: diskBytes,
+          diskStorageMb: diskMb,
+          auditLogs: sovraDb.getAuditLogs(50),
+          reelsCount: sovraDb.getAllReels().length,
+        }),
+      );
       return;
     }
 
@@ -14682,6 +15386,11 @@ async function startDevServer() {
 
     // Product B: Standalone Company Operations Console (Dedicated Admin Panel)
     if (url.pathname === '/admin' || url.pathname === '/admin/' || url.pathname === '/admin/index.html') {
+      const diskBytes = getDirectorySize(STORAGE_DIR);
+      const diskMb = Number((diskBytes / (1024 * 1024)).toFixed(2));
+      const allUsers = sovraDb.getAllUsers();
+      const allMsgs = sovraDb.getState().chatMessages;
+      const threadsCount = new Set(allMsgs.map(m => m.threadId)).size;
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(
         renderAdminHtml({
@@ -14692,9 +15401,16 @@ async function startDevServer() {
           uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
           totalBlocks: storageDaemon.getStats().totalBlocks,
           pinnedCount: storageDaemon.getStats().pinnedCount,
-          postsCount: feedPostsStore.length,
+          postsCount: sovraDb.getState().posts.length,
           connectedPeers: node.getConnectedPeers(),
-          vouchers: tipVouchersStore,
+          vouchers: sovraDb.getState().tip_vouchers || [],
+          registeredUsersCount: allUsers.length,
+          registeredUsers: allUsers,
+          chatThreadsCount: threadsCount,
+          chatMessagesVolume: allMsgs.length,
+          diskStorageBytes: diskBytes,
+          diskStorageMb: diskMb,
+          auditLogs: sovraDb.getAuditLogs(50),
         }),
       );
       return;
