@@ -3459,7 +3459,9 @@ function renderHtml(
       border-radius: 14px;
       overflow: hidden;
       box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
-      /* BitChat Zero-Internet Mesh Mode Styling */
+    }
+
+    /* BitChat Zero-Internet Mesh Mode Styling */
     .bitchat-mode-bar {
       padding: 0.65rem 0.85rem;
       background: linear-gradient(90deg, #09121a, #0f1f2c);
@@ -6750,7 +6752,7 @@ function renderHtml(
     </main>
 
     <!-- Modal 1: YouTube Channel Profile Hub Modal -->
-    <div class="yt-modal-overlay" id="channelProfileModal" onclick="closeYtModal('channelProfileModal')">
+    <div class="yt-modal-overlay" id="channelProfileModal" style="display: none;" onclick="closeYtModal('channelProfileModal')">
       <div class="yt-modal-card" onclick="event.stopPropagation()">
         <div style="height: 100px; background: linear-gradient(135deg, #4f46e5, #9333ea); position: relative;">
           <button style="position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; cursor: pointer;" onclick="closeYtModal('channelProfileModal')">✕</button>
@@ -6817,7 +6819,7 @@ function renderHtml(
     </div>
 
     <!-- Modal 2: YouTube Channel Membership / "Join" Modal -->
-    <div class="yt-modal-overlay" id="membershipModal" onclick="closeYtModal('membershipModal')">
+    <div class="yt-modal-overlay" id="membershipModal" style="display: none;" onclick="closeYtModal('membershipModal')">
       <div class="yt-modal-card" onclick="event.stopPropagation()">
         <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
           <div style="font-weight: 700; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
@@ -6877,7 +6879,7 @@ function renderHtml(
     </div>
 
     <!-- Modal 3: Super Thanks Micro-Tipping Modal -->
-    <div class="yt-modal-overlay" id="superThanksModal" onclick="closeYtModal('superThanksModal')">
+    <div class="yt-modal-overlay" id="superThanksModal" style="display: none;" onclick="closeYtModal('superThanksModal')">
       <div class="yt-modal-card" onclick="event.stopPropagation()">
         <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
           <div style="font-weight: 700; font-size: 1.1rem; color: #fbbf24; display: flex; align-items: center; gap: 0.5rem;">
@@ -7382,7 +7384,7 @@ function renderHtml(
   </nav>
 
   <!-- Multi-Segment Instagram Story Viewer Modal Overlay -->
-  <div class="story-modal-overlay" id="storyModalOverlay" onclick="closeStory(event)">
+  <div class="story-modal-overlay" id="storyModalOverlay" style="display: none;" onclick="closeStory(event)">
     <div class="story-card-modal" id="storyCardModal" onclick="event.stopPropagation()"
          onpointerdown="pauseStoryTimer()" onpointerup="resumeStoryTimer()">
       
@@ -7694,7 +7696,7 @@ function renderHtml(
   </div>
 
   <!-- 🔍 4. OMNI-SEARCH & DISCOVERY MODAL -->
-  <div id="omniSearchModal" class="omni-modal-overlay">
+  <div id="omniSearchModal" class="omni-modal-overlay" style="display: none;">
     <div class="omni-modal-card">
       <!-- Search Header -->
       <div style="padding: 1.15rem 1.25rem 0.75rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 0.75rem;">
@@ -7742,7 +7744,7 @@ function renderHtml(
   </div>
 
   <!-- 📢 5. CREATE CHANNEL MODAL -->
-  <div id="createChannelModal" class="omni-modal-overlay">
+  <div id="createChannelModal" class="omni-modal-overlay" style="display: none;">
     <div class="omni-modal-card" style="max-width: 480px;">
       <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
         <div style="font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 6px;">
@@ -7786,7 +7788,7 @@ function renderHtml(
   </div>
 
   <!-- 🏢 6. CREATE PAGE MODAL -->
-  <div id="createPageModal" class="omni-modal-overlay">
+  <div id="createPageModal" class="omni-modal-overlay" style="display: none;">
     <div class="omni-modal-card" style="max-width: 480px;">
       <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
         <div style="font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 6px;">
@@ -7829,7 +7831,7 @@ function renderHtml(
   </div>
 
   <!-- ⚙️ 7. POST OPTIONS MODAL -->
-  <div id="postOptionsModal" class="omni-modal-overlay">
+  <div id="postOptionsModal" class="omni-modal-overlay" style="display: none;">
     <div class="omni-modal-card" style="max-width: 380px;">
       <div style="padding: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
         <span style="font-weight: 700; font-size: 0.95rem; color: #fff;">Post Options</span>
@@ -7856,7 +7858,7 @@ function renderHtml(
   </div>
 
   <!-- 🔁 8. REPOST / QUOTE MODAL -->
-  <div id="repostModal" class="omni-modal-overlay">
+  <div id="repostModal" class="omni-modal-overlay" style="display: none;">
     <div class="omni-modal-card" style="max-width: 440px;">
       <div style="padding: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
         <span style="font-weight: 700; font-size: 0.95rem; color: #fff;">Repost to Mesh Feed</span>
@@ -7880,7 +7882,7 @@ function renderHtml(
   </div>
 
   <!-- 🚨 9. SAFETY & DISPUTE REPORT MODAL -->
-  <div id="safetyReportModal" class="omni-modal-overlay">
+  <div id="safetyReportModal" class="omni-modal-overlay" style="display: none;">
     <div class="omni-modal-card" style="max-width: 440px;">
       <div style="padding: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
         <div style="font-weight: 800; font-size: 1rem; color: #f87171; display: flex; align-items: center; gap: 6px;">
