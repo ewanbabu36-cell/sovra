@@ -63,4 +63,13 @@ describe('Bottom Navigation & Friend Search Suite', () => {
     expect(content).toContain('messageFriend');
     expect(content).toContain('triggerBottomCreateAction');
   });
+
+  it('proves smart dynamic layout mode eliminates duplicate double navigation', () => {
+    expect(content).toContain('id="navModeToggleBtn"');
+    expect(content).toContain('toggleNavLayoutMode');
+    expect(content).toContain('applyNavLayoutMode');
+    expect(content).toContain('body.nav-mode-auto .mobile-bottom-nav');
+    expect(content).toContain('body.nav-mode-dock .nav-tabs');
+    expect(content).toContain('body.nav-mode-top .mobile-bottom-nav');
+  });
 });

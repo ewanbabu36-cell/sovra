@@ -1578,6 +1578,7 @@ function renderHtml(
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      flex-shrink: 0;
     }
     .brand-logo {
       width: 36px;
@@ -1605,6 +1606,27 @@ function renderHtml(
     .badge-online { background-color: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
     .badge-creator { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
     
+    .nav-mode-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #94a3b8;
+      border-radius: 20px;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .nav-mode-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      border-color: #38bdf8;
+    }
+
     .nav-tabs {
       display: flex;
       background-color: rgba(0, 0, 0, 0.25);
@@ -1633,7 +1655,8 @@ function renderHtml(
     /* Top Prominent Search Bar */
     .header-search-wrap {
       flex: 1;
-      max-width: 320px;
+      min-width: 170px;
+      max-width: 290px;
       position: relative;
     }
     .header-search-bar {
@@ -1822,9 +1845,14 @@ function renderHtml(
     .mobile-chat-back-btn:hover {
       background: rgba(255, 255, 255, 0.1);
     }
+    @media (max-width: 1250px) {
+      .brand-subtitle {
+        display: none !important;
+      }
+    }
     @media (max-width: 860px) {
       .container {
-        margin: 0 auto 5rem auto;
+        margin: 0 auto 5.5rem auto;
         padding: 0;
         gap: 0;
         max-width: 100%;
@@ -1838,8 +1866,15 @@ function renderHtml(
       .nav-tabs {
         display: none !important;
       }
+      .nav-mode-btn .nav-mode-text {
+        display: none;
+      }
+      .nav-mode-btn {
+        padding: 0.3rem 0.5rem;
+      }
       .header-search-wrap {
-        max-width: 180px;
+        max-width: 100%;
+        min-width: 110px;
       }
       .mobile-bottom-nav {
         bottom: 8px !important;
@@ -4155,12 +4190,53 @@ function renderHtml(
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 22px;
-      display: flex;
+      display: none; /* By default hidden on desktop to avoid duplicate double navigation */
       justify-content: space-evenly;
       align-items: center;
       z-index: 999;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05);
       padding: 0 4px;
+    }
+
+    /* Smart Navigation Modes: Auto / Dock / Top */
+    /* 1. Default / Auto Mode */
+    body.nav-mode-auto .mobile-bottom-nav {
+      display: none;
+    }
+    body.nav-mode-auto .nav-tabs {
+      display: flex;
+    }
+    @media (max-width: 860px) {
+      body.nav-mode-auto .nav-tabs {
+        display: none !important;
+      }
+      body.nav-mode-auto .mobile-bottom-nav {
+        display: flex !important;
+      }
+      body.nav-mode-auto .container {
+        margin: 0 auto 5.5rem auto !important;
+      }
+    }
+
+    /* 2. Dock-Only Mode (Only bottom dock is visible, top tabs hidden even on desktop) */
+    body.nav-mode-dock .nav-tabs {
+      display: none !important;
+    }
+    body.nav-mode-dock .mobile-bottom-nav {
+      display: flex !important;
+    }
+    body.nav-mode-dock .container,
+    body.nav-mode-dock .feed-container,
+    body.nav-mode-dock .friends-container {
+      margin-bottom: 5.5rem !important;
+    }
+
+    /* 3. Top-Only Mode (Only top tabs visible, bottom dock hidden even on mobile) */
+    body.nav-mode-top .mobile-bottom-nav {
+      display: none !important;
+    }
+    body.nav-mode-top .nav-tabs {
+      display: flex !important;
     }
     .bottom-nav-item {
       display: flex;
@@ -4716,7 +4792,7 @@ function renderHtml(
     }
   </style>
 </head>
-<body>
+<body class="nav-mode-auto">
   <header>
     <div class="brand">
       <div class="brand-logo">S</div>
@@ -4746,7 +4822,10 @@ function renderHtml(
       <button class="tab-btn" id="tab-admin" onclick="switchTab('admin')" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15);">⚙️ Ops Console</button>
     </div>
 
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
+    <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0;">
+      <button id="navModeToggleBtn" onclick="toggleNavLayoutMode()" class="nav-mode-btn" title="Toggle Navigation Layout (Auto Responsive / Mobile Dock / Desktop Top)">
+        <span id="navModeIcon">⚡</span> <span id="navModeLabel" class="nav-mode-text">Auto</span>
+      </button>
       <button onclick="openOmniSearch()" title="Omni-Search (Channels, Pages, People, Media)" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: background 0.15s;">🔍</button>
       <span class="badge badge-online">● Node Online</span>
       <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">TCP :${tcpPort}</span>
@@ -7063,6 +7142,47 @@ function renderHtml(
         setTimeout(() => { t.style.display = 'none'; }, 4000);
       }
     }
+
+    // ==========================================
+    // ⚡ SMART DYNAMIC NAVIGATION MODE ENGINE
+    // ==========================================
+    let navLayoutMode = localStorage.getItem('sovra_nav_mode') || 'auto';
+
+    function applyNavLayoutMode() {
+      document.body.classList.remove('nav-mode-auto', 'nav-mode-dock', 'nav-mode-top');
+      document.body.classList.add('nav-mode-' + navLayoutMode);
+      const icon = document.getElementById('navModeIcon');
+      const label = document.getElementById('navModeLabel');
+      if (icon && label) {
+        if (navLayoutMode === 'dock') {
+          icon.innerText = '📱';
+          label.innerText = 'Dock';
+        } else if (navLayoutMode === 'top') {
+          icon.innerText = '🖥️';
+          label.innerText = 'Top';
+        } else {
+          icon.innerText = '⚡';
+          label.innerText = 'Auto';
+        }
+      }
+    }
+
+    function toggleNavLayoutMode() {
+      if (navLayoutMode === 'auto') {
+        navLayoutMode = 'dock';
+        showAccountToast('📱 Dock Mode: Floating bottom dock active (Top tabs hidden).');
+      } else if (navLayoutMode === 'dock') {
+        navLayoutMode = 'top';
+        showAccountToast('🖥️ Top Nav Mode: Top navigation active (Bottom dock hidden).');
+      } else {
+        navLayoutMode = 'auto';
+        showAccountToast('⚡ Auto Responsive: Adapts to screen size (No duplicate navigation).');
+      }
+      localStorage.setItem('sovra_nav_mode', navLayoutMode);
+      applyNavLayoutMode();
+    }
+
+    setTimeout(applyNavLayoutMode, 10);
 
     // Tab switching for all modes + admin console + friends discovery
     function switchTab(tab) {
