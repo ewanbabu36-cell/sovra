@@ -477,6 +477,96 @@ const contactsStore: ContactRecord[] = [
   },
 ];
 
+interface BitChatPeerRecord {
+  did: string;
+  name: string;
+  avatar: string;
+  avatarBg: string;
+  role: string;
+  rssi: number;
+  distanceMeters: number;
+  hops: number;
+  relayVia?: string;
+  isDirect: boolean;
+  channel?: string;
+  isChannel?: boolean;
+}
+
+const bitchatPeersStore: BitChatPeerRecord[] = [
+  {
+    did: 'channel:local_mesh',
+    name: '#local-mesh',
+    avatar: '📶',
+    avatarBg: '#0284c7',
+    role: 'Hyperlocal Public Beacon (50m Radius)',
+    rssi: -35,
+    distanceMeters: 5,
+    hops: 1,
+    isDirect: true,
+    channel: '#local-mesh',
+    isChannel: true,
+  },
+  {
+    did: 'channel:emergency_sos',
+    name: '#emergency-sos',
+    avatar: '🚨',
+    avatarBg: '#dc2626',
+    role: 'Zero-Internet SOS Broadcast Swarm',
+    rssi: -30,
+    distanceMeters: 2,
+    hops: 1,
+    isDirect: true,
+    channel: '#emergency-sos',
+    isChannel: true,
+  },
+  {
+    did: 'did:sovra:alice_ble',
+    name: 'Alice (Direct BLE)',
+    avatar: 'A',
+    avatarBg: '#10b981',
+    role: 'Direct BLE Peer (-42 dBm, 2.5m)',
+    rssi: -42,
+    distanceMeters: 2.5,
+    hops: 1,
+    isDirect: true,
+  },
+  {
+    did: 'did:sovra:bob_ble',
+    name: 'Bob (2 Hops Relay)',
+    avatar: 'B',
+    avatarBg: '#f59e0b',
+    role: 'Relayed via Alice (-68 dBm, 12m)',
+    rssi: -68,
+    distanceMeters: 12.0,
+    hops: 2,
+    relayVia: 'Alice',
+    isDirect: false,
+  },
+  {
+    did: 'did:sovra:charlie_ble',
+    name: 'Charlie (Direct BLE)',
+    avatar: 'C',
+    avatarBg: '#ec4899',
+    role: 'Direct BLE Peer (-51 dBm, 4.2m)',
+    rssi: -51,
+    distanceMeters: 4.2,
+    hops: 1,
+    isDirect: true,
+  },
+  {
+    did: 'did:sovra:elena_ble',
+    name: 'Elena (3 Hops Relay)',
+    avatar: 'E',
+    avatarBg: '#8b5cf6',
+    role: 'Relayed via Bob (-82 dBm, 28m)',
+    rssi: -82,
+    distanceMeters: 28.0,
+    hops: 3,
+    relayVia: 'Bob',
+    isDirect: false,
+  },
+];
+
 interface ChatMessageRecord {
   id: string;
   senderDid: string;
@@ -496,6 +586,9 @@ interface ChatMessageRecord {
   expiresAt?: number;
   isDisappeared?: boolean;
   reactions?: { emoji: string; senderDid: string }[];
+  isBitChat?: boolean;
+  hopCount?: number;
+  route?: string[];
 }
 
 const initialChatMessages: ChatMessageRecord[] = [
@@ -546,6 +639,51 @@ const initialChatMessages: ChatMessageRecord[] = [
     readAt: Date.now() - 50000,
     status: 'read',
     signatureHex: 'ed25519_sig_71bc88ef22',
+  },
+  {
+    id: 'msg-bitchat-1',
+    senderDid: 'did:sovra:alice_ble',
+    recipientDid: 'channel:local_mesh',
+    senderName: 'Alice (Direct BLE)',
+    text: '📶 [BitChat Mesh] Hello neighbors! Zero-Internet offline beacon active in 50m radius.',
+    isAudio: false,
+    audioDurationSec: 0,
+    timestamp: Date.now() - 300000,
+    status: 'read',
+    signatureHex: 'ed25519_bitchat_sig_1',
+    isBitChat: true,
+    hopCount: 1,
+    route: ['did:sovra:alice_ble'],
+  },
+  {
+    id: 'msg-bitchat-2',
+    senderDid: 'did:sovra:bob_ble',
+    recipientDid: 'channel:local_mesh',
+    senderName: 'Bob (2 Hops Relay)',
+    text: 'Relayed this packet through Alice without internet or cell towers! Mesh hopping working!',
+    isAudio: false,
+    audioDurationSec: 0,
+    timestamp: Date.now() - 150000,
+    status: 'read',
+    signatureHex: 'ed25519_bitchat_sig_2',
+    isBitChat: true,
+    hopCount: 2,
+    route: ['did:sovra:bob_ble', 'did:sovra:alice_ble'],
+  },
+  {
+    id: 'msg-bitchat-3',
+    senderDid: 'did:sovra:alice_ble',
+    recipientDid: 'self',
+    senderName: 'Alice (Direct BLE)',
+    text: 'Direct BLE message received with -42 dBm signal strength. Zero cloud dependency!',
+    isAudio: false,
+    audioDurationSec: 0,
+    timestamp: Date.now() - 60000,
+    status: 'read',
+    signatureHex: 'ed25519_bitchat_sig_3',
+    isBitChat: true,
+    hopCount: 1,
+    route: ['did:sovra:alice_ble'],
   },
 ];
 
@@ -3083,8 +3221,111 @@ function renderHtml(
       border-radius: 14px;
       overflow: hidden;
       box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
-      position: relative;
+      /* BitChat Zero-Internet Mesh Mode Styling */
+    .bitchat-mode-bar {
+      padding: 0.65rem 0.85rem;
+      background: linear-gradient(90deg, #09121a, #0f1f2c);
+      border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
     }
+    .bitchat-pill-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .bitchat-pill-btn:hover {
+      background: rgba(56, 189, 248, 0.25);
+      transform: scale(1.02);
+    }
+    .panic-wipe-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: rgba(239, 68, 68, 0.18);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #f87171;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .panic-wipe-btn:hover {
+      background: rgba(239, 68, 68, 0.35);
+      color: #fff;
+    }
+    .bitchat-radar-strip {
+      padding: 0.55rem 0.85rem;
+      background: rgba(11, 20, 26, 0.95);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .radar-sweep-icon {
+      font-size: 1.1rem;
+      animation: radarPulse 1.8s infinite ease-in-out;
+      display: inline-block;
+    }
+    @keyframes radarPulse {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.7; }
+    }
+    .radar-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 8px #38bdf8;
+      display: inline-block;
+    }
+    .bitchat-section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.5rem 0.85rem 0.25rem 0.85rem;
+    }
+    .bitchat-hop-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 8px;
+      background: rgba(99, 102, 241, 0.18);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .bitchat-mesh-route-box {
+      font-size: 0.68rem;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px dashed rgba(56, 189, 248, 0.3);
+      border-radius: 6px;
+      padding: 2px 6px;
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
     .chat-sidebar {
       width: 340px;
       background: #111b21;
@@ -5583,13 +5824,48 @@ function renderHtml(
       <div class="whatsapp-container">
         <!-- Contacts Sidebar -->
         <aside class="chat-sidebar">
-          <div class="chat-sidebar-header">
-            <span style="font-weight: 700; color: #e9edef; font-size: 1rem;">💬 Chats</span>
-            <span style="font-size: 0.72rem; color: #22c55e; background: rgba(34, 197, 94, 0.15); padding: 2px 8px; border-radius: 10px; font-weight: 600;">Double Ratchet Active</span>
+          <!-- BitChat Zero-Internet Mesh Mode Bar -->
+          <div class="bitchat-mode-bar" id="bitchatModeBar">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="radar-sweep-icon" style="color: #38bdf8;">📶</span>
+              <div>
+                <div style="font-weight: 800; font-size: 0.85rem; color: #38bdf8; display: flex; align-items: center; gap: 4px;">
+                  <span>BitChat Mesh</span>
+                  <span id="bitchatModeBadge" class="badge" style="font-size: 0.65rem; background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); padding: 1px 5px;">BLE Active</span>
+                </div>
+                <div style="font-size: 0.68rem; color: #94a3b8;" id="bitchatStatusSubtitle">Zero-Internet Local Swarm</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <button id="bitchatModeToggleBtn" onclick="toggleBitChatMode()" class="bitchat-pill-btn" title="Toggle between BitChat Offline Mesh and Global Internet P2P">
+                <span id="bitchatModeDot" class="radar-dot"></span>
+                <span id="bitchatModeText">Mesh Mode</span>
+              </button>
+              <button id="bitchatPanicBtn" onclick="executeBitChatPanicWipe()" class="panic-wipe-btn" title="🚨 Emergency Panic Wipe: Instantly zeroize local keys, offline chats & peer table">
+                🚨 Wipe
+              </button>
+            </div>
+          </div>
+
+          <!-- Radar Spectrum Scanner Strip -->
+          <div id="bitchatRadarContainer" class="bitchat-radar-strip">
+            <div class="radar-sweep-icon" style="font-size: 1.05rem; color: #38bdf8;">📡</div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 0.74rem; font-weight: 700; color: #e2e8f0; display: flex; justify-content: space-between;">
+                <span>2.4GHz BLE Spectrum Scan</span>
+                <span style="color: #34d399; font-weight: 700;" id="bitchatPeersCountBadge">4 peers online</span>
+              </div>
+              <div style="font-size: 0.68rem; color: #64748b;">Ad-hoc multi-hop forwarding active (TTL: 7 hops)</div>
+            </div>
+          </div>
+
+          <div class="chat-sidebar-header" id="chatSidebarHeader">
+            <span style="font-weight: 700; color: #e9edef; font-size: 1rem;" id="chatSidebarTitle">💬 Chats</span>
+            <span style="font-size: 0.72rem; color: #38bdf8; background: rgba(56, 189, 248, 0.15); padding: 2px 8px; border-radius: 10px; font-weight: 600;" id="chatSidebarProtocolBadge">BitChat Mesh Ready</span>
           </div>
           <!-- Search box -->
           <div class="chat-search-box">
-            <input type="text" class="chat-search-input" id="chatSearchInput" placeholder="Search contacts..." oninput="filterChatContacts(this.value)">
+            <input type="text" class="chat-search-input" id="chatSearchInput" placeholder="Search contacts & mesh..." oninput="filterChatContacts(this.value)">
           </div>
           <div class="chat-contacts-list" id="contactsList">
             ${contactsStore
@@ -5638,6 +5914,9 @@ function renderHtml(
             </div>
             
             <div class="chat-header-actions">
+              <!-- BitChat Multi-Hop Routing Indicator -->
+              <span id="bitchatHeaderRoute" class="bitchat-hop-badge" style="display: none;">📶 Direct BLE Link (1 Hop)</span>
+
               <!-- Disappearing messages timer toggle -->
               <button class="disappearing-timer-pill" id="headerDisappearingBtn" onclick="openDisappearingModal()" title="Configure Disappearing Messages Timer">
                 ⏱️ <span id="headerTimerText">Off</span>
@@ -7487,6 +7766,9 @@ function renderHtml(
 
     setTimeout(applyNavLayoutMode, 10);
     setTimeout(renderRightRailSuggestions, 50);
+    setTimeout(function() {
+      if (typeof renderChatContactsList === 'function') renderChatContactsList();
+    }, 60);
 
     // Tab switching for all modes + admin console + friends discovery
     function switchTab(tab) {
@@ -7538,6 +7820,7 @@ function renderHtml(
         if (wCont && window.innerWidth <= 860) {
           wCont.classList.remove('show-chat');
         }
+        renderChatContactsList();
         renderChatBubbles();
       } else if (tab === 'reels') {
         renderCurrentReel();
@@ -8710,8 +8993,10 @@ function renderHtml(
     // 2. WHATSAPP E2EE CHAT SCRIPT ENGINE
     // ==========================================
     const contactsData = ${JSON.stringify(contactsStore)};
+    let bitchatPeersData = ${JSON.stringify(bitchatPeersStore)};
     let chatMessages = ${JSON.stringify(chatMessagesStore)};
-    let activeContactDid = 'did:sovra:alice_peer';
+    let bitchatModeActive = true;
+    let activeContactDid = 'channel:local_mesh';
     let isRecordingVoice = false;
     let voiceRecordStartTime = 0;
     let voiceRecordTimerInterval = null;
@@ -8719,31 +9004,212 @@ function renderHtml(
     let voicePlaybackIntervals = {};
     let callTimerInterval = null;
 
+    function toggleBitChatMode() {
+      bitchatModeActive = !bitchatModeActive;
+      const dot = document.getElementById('bitchatModeDot');
+      const text = document.getElementById('bitchatModeText');
+      const badge = document.getElementById('bitchatModeBadge');
+      const radar = document.getElementById('bitchatRadarContainer');
+      const title = document.getElementById('chatSidebarTitle');
+      const protoBadge = document.getElementById('chatSidebarProtocolBadge');
+
+      if (bitchatModeActive) {
+        if (text) text.innerText = 'Mesh Mode';
+        if (dot) dot.style.background = '#38bdf8';
+        if (badge) {
+          badge.innerText = 'BLE Active';
+          badge.style.background = 'rgba(56, 189, 248, 0.2)';
+          badge.style.color = '#38bdf8';
+          badge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+        }
+        if (radar) radar.style.display = 'flex';
+        if (title) title.innerText = '📶 BitChat Swarm';
+        if (protoBadge) {
+          protoBadge.innerText = 'Multi-Hop Relay Active';
+          protoBadge.style.color = '#38bdf8';
+          protoBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+        }
+        activeContactDid = 'channel:local_mesh';
+        showAccountToast('📶 BitChat Mode Active: Zero-Internet BLE mesh scanning 2.4GHz spectrum.');
+      } else {
+        if (text) text.innerText = 'Global P2P';
+        if (dot) dot.style.background = '#22c55e';
+        if (badge) {
+          badge.innerText = 'Internet P2P';
+          badge.style.background = 'rgba(34, 197, 94, 0.2)';
+          badge.style.color = '#22c55e';
+          badge.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+        }
+        if (radar) radar.style.display = 'none';
+        if (title) title.innerText = '💬 Chats';
+        if (protoBadge) {
+          protoBadge.innerText = 'Double Ratchet Active';
+          protoBadge.style.color = '#22c55e';
+          protoBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+        }
+        activeContactDid = contactsData[0]?.did || 'did:sovra:alice_peer';
+        showAccountToast('🌐 Global P2P Mode: Connected via DHT & GossipSub internet relays.');
+      }
+
+      renderChatContactsList();
+      selectContact(activeContactDid);
+    }
+
+    function renderChatContactsList() {
+      const container = document.getElementById('contactsList');
+      if (!container) return;
+
+      const q = (document.getElementById('chatSearchInput')?.value || '').toLowerCase().trim();
+
+      if (bitchatModeActive) {
+        const filteredPeers = bitchatPeersData.filter(function(p) {
+          if (!q) return true;
+          return p.name.toLowerCase().includes(q) || p.role.toLowerCase().includes(q);
+        });
+
+        const channels = filteredPeers.filter(p => p.isChannel);
+        const directPeers = filteredPeers.filter(p => !p.isChannel);
+
+        let html = '';
+
+        if (channels.length > 0) {
+          html += '<div class="bitchat-section-title">✨ Hyperlocal Mesh Channels</div>';
+          for (const c of channels) {
+            const isActive = c.did === activeContactDid;
+            html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" onclick="selectContact(\'' + c.did + '\')" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
+              '<div class="contact-avatar" style="background: ' + c.avatarBg + ';">' +
+                c.avatar +
+                '<div class="online-dot" style="background: #38bdf8;"></div>' +
+              '</div>' +
+              '<div class="contact-info">' +
+                '<div class="contact-top-row">' +
+                  '<span class="contact-name" style="color: #38bdf8; font-weight: 800;">' + c.name + '</span>' +
+                  '<span class="bitchat-hop-badge">50m Beacon</span>' +
+                '</div>' +
+                '<div class="contact-preview-row">' +
+                  '<span style="color: #94a3b8; font-size: 0.75rem;">' + c.role + '</span>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          }
+        }
+
+        if (directPeers.length > 0) {
+          html += '<div class="bitchat-section-title">📡 Nearby Discovered Peers (' + directPeers.length + ')</div>';
+          for (const p of directPeers) {
+            const isActive = p.did === activeContactDid;
+            const hopLabel = p.hops === 1 ? '1 Hop Direct' : p.hops + ' Hops Relay';
+            html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" onclick="selectContact(\'' + p.did + '\')" id="contact-' + p.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
+              '<div class="contact-avatar" style="background: ' + p.avatarBg + ';">' +
+                p.avatar +
+                '<div class="online-dot" style="background: ' + (p.isDirect ? '#10b981' : '#f59e0b') + ';"></div>' +
+              '</div>' +
+              '<div class="contact-info">' +
+                '<div class="contact-top-row">' +
+                  '<span class="contact-name">' + p.name + '</span>' +
+                  '<span class="bitchat-hop-badge">' + hopLabel + '</span>' +
+                '</div>' +
+                '<div class="contact-preview-row">' +
+                  '<span style="color: #38bdf8; font-weight: 700; font-size: 0.72rem;">' + p.rssi + ' dBm</span>' +
+                  '<span style="color: #94a3b8; font-size: 0.72rem;">&bull; ~' + p.distanceMeters + 'm &bull; ' + p.role + '</span>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          }
+        }
+
+        if (filteredPeers.length === 0) {
+          html = '<div style="text-align: center; padding: 2rem 1rem; color: #64748b; font-size: 0.82rem;">No BitChat peers found in 2.4GHz range.</div>';
+        }
+
+        container.innerHTML = html;
+      } else {
+        const filteredContacts = contactsData.filter(function(c) {
+          if (!q) return true;
+          return c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q);
+        });
+
+        let html = '';
+        for (const c of filteredContacts) {
+          const isActive = c.did === activeContactDid;
+          html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" onclick="selectContact(\'' + c.did + '\')" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
+            '<div class="contact-avatar" style="background: ' + c.avatarBg + ';">' +
+              c.avatar +
+              (c.isOnline ? '<div class="online-dot"></div>' : '') +
+              (c.disappearingDurationSec > 0 ? '<div class="contact-clock-badge" title="Disappearing Messages Active">⏱️</div>' : '') +
+            '</div>' +
+            '<div class="contact-info">' +
+              '<div class="contact-top-row">' +
+                '<span class="contact-name">' +
+                  c.name +
+                  (c.isVerified ? '<span class="verified-shield-icon" title="Safety Numbers Verified">🛡️</span>' : '') +
+                '</span>' +
+                '<span class="contact-time">' + (c.isOnline ? 'Online' : c.lastSeen) + '</span>' +
+              '</div>' +
+              '<div class="contact-preview-row">' +
+                '<span style="color: #53bdeb; font-weight: bold;">✓✓</span>' +
+                '<span id="preview-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' + c.role + '</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+        }
+        container.innerHTML = html;
+      }
+    }
+
     function selectContact(did) {
       activeContactDid = did;
       const wCont = document.querySelector('.whatsapp-container');
       if (wCont) wCont.classList.add('show-chat');
 
+      const bcPeer = bitchatPeersData.find(function(p) { return p.did === did; });
       const contact = contactsData.find(function(c) { return c.did === did; });
-      if (contact) {
-        const avatarEl = document.getElementById('activePeerAvatar');
+
+      const avatarEl = document.getElementById('activePeerAvatar');
+      const nameEl = document.getElementById('activePeerName');
+      const badgeEl = document.getElementById('activePeerVerifiedBadge');
+      const statusEl = document.getElementById('activePeerStatus');
+      const routeEl = document.getElementById('bitchatHeaderRoute');
+
+      if (bcPeer) {
+        if (avatarEl) {
+          avatarEl.innerText = bcPeer.avatar;
+          avatarEl.style.background = bcPeer.avatarBg;
+        }
+        if (nameEl) nameEl.innerText = bcPeer.name;
+        if (badgeEl) badgeEl.style.display = 'none';
+
+        if (statusEl) {
+          if (bcPeer.isChannel) {
+            statusEl.innerHTML = '<span style="color: #38bdf8;">● Zero-Internet Local Mesh Swarm</span> &bull; 50m Radius Broadcast';
+          } else if (bcPeer.isDirect) {
+            statusEl.innerHTML = '<span style="color: #10b981;">● Direct BLE Link</span> &bull; RSSI: ' + bcPeer.rssi + ' dBm (~' + bcPeer.distanceMeters + 'm)';
+          } else {
+            statusEl.innerHTML = '<span style="color: #f59e0b;">● Relayed ' + bcPeer.hops + ' Hops (via ' + (bcPeer.relayVia || 'Swarm') + ')</span> &bull; Multi-hop Mesh';
+          }
+        }
+
+        if (routeEl) {
+          routeEl.style.display = 'inline-flex';
+          if (bcPeer.isChannel) {
+            routeEl.innerText = '📡 Hyperlocal Beacon';
+          } else if (bcPeer.isDirect) {
+            routeEl.innerText = '📶 Direct BLE (1 Hop)';
+          } else {
+            routeEl.innerText = '📶 Route: You → ' + (bcPeer.relayVia || 'Alice') + ' → ' + bcPeer.name.split(' ')[0] + ' (' + bcPeer.hops + ' Hops)';
+          }
+        }
+      } else if (contact) {
         if (avatarEl) {
           avatarEl.innerText = contact.avatar;
           avatarEl.style.background = contact.avatarBg;
         }
-        const nameEl = document.getElementById('activePeerName');
         if (nameEl) nameEl.innerText = contact.name;
-        
-        const badgeEl = document.getElementById('activePeerVerifiedBadge');
-        if (badgeEl) {
-          badgeEl.style.display = contact.isVerified ? 'inline-block' : 'none';
-        }
-
-        const statusEl = document.getElementById('activePeerStatus');
+        if (badgeEl) badgeEl.style.display = contact.isVerified ? 'inline-block' : 'none';
         if (statusEl) {
           statusEl.innerText = (contact.isOnline ? '● Online' : 'Last seen ' + contact.lastSeen) + ' • Double Ratchet Active';
         }
-
+        if (routeEl) routeEl.style.display = 'none';
         updateHeaderTimerDisplay(contact.disappearingDurationSec || 0);
       }
 
@@ -8754,6 +9220,19 @@ function renderHtml(
       if (activeEl) activeEl.classList.add('active');
 
       renderChatBubbles();
+    }
+
+    function executeBitChatPanicWipe() {
+      if (!confirm('🚨 EMERGENCY PANIC WIPE (BitChat Stealth Security):\n\nThis will immediately zeroize all local BitChat mesh packets, in-memory encryption keys, and peer session routing tables.\n\nAre you sure you want to proceed?')) {
+        return;
+      }
+      chatMessages = chatMessages.filter(function(m) { return !m.isBitChat; });
+      bitchatPeersData = [];
+      const badgeCount = document.getElementById('bitchatPeersCountBadge');
+      if (badgeCount) badgeCount.innerText = '0 peers (Wiped)';
+      renderChatContactsList();
+      renderChatBubbles();
+      showAccountToast('🚨 EMERGENCY PANIC WIPE: All local BitChat packets, keys, and peer tables zeroized.');
     }
 
     function closeMobileChat() {
@@ -8798,6 +9277,9 @@ function renderHtml(
 
       // 3. Message Bubbles
       const filtered = chatMessages.filter(function(m) {
+        if (activeContactDid.startsWith('channel:')) {
+          return m.recipientDid === activeContactDid;
+        }
         return (m.senderDid === activeContactDid && m.recipientDid === 'self') ||
                (m.senderDid === 'self' && m.recipientDid === activeContactDid);
       });
@@ -8846,6 +9328,13 @@ function renderHtml(
           bodyHtml = '<div style="word-break: break-word;">' + m.text + '</div>';
         }
 
+        // BitChat Multi-Hop Routing Box
+        let routeHtml = '';
+        if (m.isBitChat) {
+          const hopText = m.hopCount ? (m.hopCount === 1 ? '1 Hop Direct' : m.hopCount + ' Hops Relay') : 'Direct BLE';
+          routeHtml = '<div class="bitchat-mesh-route-box">📶 BLE Mesh &bull; ' + hopText + ' &bull; Noise_XX E2EE</div>';
+        }
+
         // Reaction dock on hover
         const reactionsDock = '<div class="bubble-reactions-bar" onclick="event.stopPropagation()">' +
           '<button class="reaction-emoji-btn" onclick="reactToMessage(&quot;' + m.id + '&quot;, &quot;❤️&quot;)">❤️</button>' +
@@ -8869,6 +9358,7 @@ function renderHtml(
         return '<div class="' + bubbleClass + '" id="bubble-' + m.id + '" onclick="openMessageInfoModal(&quot;' + m.id + '&quot;)">' +
           reactionsDock +
           bodyHtml +
+          routeHtml +
           '<div class="bubble-meta">' +
             disappearingBadge +
             '<span>' + timeStr + '</span>' +
@@ -8887,9 +9377,11 @@ function renderHtml(
       const text = input.value.trim();
       if (!text) return;
 
+      const bcPeer = bitchatPeersData.find(function(p) { return p.did === activeContactDid; });
       const contact = contactsData.find(function(c) { return c.did === activeContactDid; });
       const timerSec = contact ? (contact.disappearingDurationSec || 0) : 0;
       const now = Date.now();
+      const isBc = Boolean(bcPeer || bitchatModeActive);
 
       const newMsg = {
         id: 'msg-' + now,
@@ -8907,6 +9399,9 @@ function renderHtml(
         expiresAt: timerSec > 0 ? now + timerSec * 1000 : undefined,
         isDisappeared: false,
         reactions: [],
+        isBitChat: isBc,
+        hopCount: 1,
+        route: ['self', activeContactDid]
       };
 
       chatMessages.push(newMsg);
@@ -8919,32 +9414,42 @@ function renderHtml(
         body: JSON.stringify(newMsg)
       }).catch(function(err) { console.warn('[Chat] Send sync warning:', err); });
 
-      // Progression 1: Delivered (Double grey ticks) after 450ms
+      // Progression 1: Delivered (Double grey ticks) after 350ms
       setTimeout(function() {
         newMsg.status = 'delivered';
         newMsg.deliveredAt = Date.now();
         renderChatBubbles();
-      }, 450);
+      }, 350);
 
-      // Progression 2: Read (Double blue ticks) after 1100ms
+      // Progression 2: Read (Double blue ticks) after 800ms
       setTimeout(function() {
         newMsg.status = 'read';
         newMsg.readAt = Date.now();
         renderChatBubbles();
-      }, 1100);
+      }, 800);
 
-      // Progression 3: Simulated Peer E2EE Double Ratchet response after 2200ms
+      // Progression 3: Simulated Peer / Mesh response after 1500ms
       setTimeout(function() {
-        const peerName = contact ? contact.name.split(' ')[0] : 'Peer';
+        const peerName = bcPeer ? bcPeer.name : (contact ? contact.name.split(' ')[0] : 'Peer');
         const replyNow = Date.now();
+        let replyText = '✓ Received & verified via Signal Double Ratchet chain. Zero server footprint! 🔒';
+
+        if (bcPeer) {
+          if (bcPeer.isChannel) {
+            replyText = '📶 [Mesh Swarm Relay] Peer relayed: "' + (text.length > 25 ? text.substring(0, 25) + '...' : text) + '" on 2.4GHz BLE spectrum.';
+          } else {
+            replyText = '📶 [BitChat BLE Link] Received packet via ' + (bcPeer.hops === 1 ? 'direct Bluetooth link' : bcPeer.hops + '-hop mesh relay') + ' without internet.';
+          }
+        } else if (timerSec > 0) {
+          replyText = '✓ Decrypted via Double Ratchet! ⏱️ Disappearing in ' + timerSec + 's. Ephemeral RAM zero-write active.';
+        }
+
         const replyMsg = {
           id: 'reply-' + replyNow,
           senderDid: activeContactDid,
-          recipientDid: 'self',
+          recipientDid: activeContactDid.startsWith('channel:') ? activeContactDid : 'self',
           senderName: peerName,
-          text: timerSec > 0 
-            ? '✓ Decrypted via Double Ratchet! ⏱️ Disappearing in ' + timerSec + 's. Ephemeral RAM zero-write active.'
-            : '✓ Received & verified via Signal Double Ratchet chain. Zero server footprint! 🔒',
+          text: replyText,
           isAudio: false,
           audioDurationSec: 0,
           timestamp: replyNow,
@@ -8957,10 +9462,13 @@ function renderHtml(
           expiresAt: timerSec > 0 ? replyNow + timerSec * 1000 : undefined,
           isDisappeared: false,
           reactions: [],
+          isBitChat: isBc,
+          hopCount: bcPeer ? bcPeer.hops : 1,
+          route: bcPeer ? [activeContactDid, 'self'] : undefined,
         };
         chatMessages.push(replyMsg);
         renderChatBubbles();
-      }, 2200);
+      }, 1500);
 
       try {
         await fetch('/api/chat/send', {
