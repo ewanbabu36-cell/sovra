@@ -595,8 +595,9 @@ function saveDynamicSocialState(_state?: DynamicSocialState): void {
 }
 
 const dynamicSocialStore = loadDynamicSocialState();
-const feedPostsStore = dynamicSocialStore.posts;
-const chatMessagesStore = dynamicSocialStore.chatMessages;
+function getLiveFeedPosts(): FeedPostRecord[] {
+  return sovraDb.getAllPosts();
+}
 
 export interface VideoChapter {
   timeSeconds: number;
@@ -1229,9 +1230,8 @@ const SOVRA_PWA_MANIFEST = {
   ],
 };
 
-const SOVRA_SERVICE_WORKER_SCRIPT = `const CACHE_NAME = 'sovra-pwa-v1';
+const SOVRA_SERVICE_WORKER_SCRIPT = `const CACHE_NAME = 'sovra-pwa-v2';
 const STATIC_ASSETS = [
-  '/',
   '/manifest.webmanifest',
   '/manifest.json',
   '/icon.svg',
@@ -1287,23 +1287,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html')) {
+  if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html') || url.pathname === '/' || url.pathname === '/app') {
     event.respondWith(
-      fetch(req)
-        .then((networkRes) => {
-          if (networkRes && networkRes.status === 200) {
-            const resClone = networkRes.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put('/', resClone));
-          }
-          return networkRes;
-        })
-        .catch(async () => {
-          const cached = await caches.match('/');
-          if (cached) return cached;
-          return new Response('<!DOCTYPE html><html><head><title>Sovra Offline</title></head><body style="background:#090d16;color:#fff;font-family:sans-serif;text-align:center;padding:50px;"><h1>⚡ Sovra Mesh Offline</h1><p>Operating in disconnected local mode. Please reconnect or check local peers.</p></body></html>', {
-            headers: { 'Content-Type': 'text/html' }
-          });
-        })
+      fetch(req).catch(() => {
+        return new Response('<!DOCTYPE html><html><head><title>Sovra Offline</title></head><body style="background:#090d16;color:#fff;font-family:sans-serif;text-align:center;padding:50px;"><h1>⚡ Sovra Mesh Offline</h1><p>Operating in disconnected local mode. Please reconnect or check local peers.</p></body></html>', {
+          headers: { 'Content-Type': 'text/html' }
+        });
+      })
     );
     return;
   }
@@ -1373,6 +1363,10 @@ function renderHtml(
   socialGraph: DefaultSocialGraphEngine,
   localFeed: DefaultLocalFeedEngine,
 ): string {
+  const livePosts = sovraDb.getAllPosts();
+  const livePeers = sovraDb.getAllPeers();
+  const liveUsers = sovraDb.getAllUsers();
+  const liveReels = sovraDb.getAllReels();
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5499,7 +5493,7 @@ function renderHtml(
 
         <!-- Instagram Feed Cards Stream -->
         <div id="feedPostsStream" style="display: flex; flex-direction: column; gap: 1.5rem;">
-          ${feedPostsStore.length === 0 ? `
+          ${livePosts.length === 0 ? `
             <div id="emptyFeedNotice" style="text-align: center; padding: 3rem 1.5rem; background: var(--bg-card); border-radius: var(--radius-lg); border: 1px dashed var(--glass-border);">
               <div style="font-size: 3rem; margin-bottom: 0.75rem;">🛰️</div>
               <div style="font-weight: 700; font-size: 1.1rem; color: #fff; margin-bottom: 0.5rem;">Sovereign Mesh Feed is Clean</div>
@@ -5510,7 +5504,7 @@ function renderHtml(
                 ✍️ Create First Post
               </button>
             </div>
-          ` : feedPostsStore
+          ` : livePosts
             .map(
               post => `
             <article class="insta-post-card" id="card-${post.id}">
@@ -7022,7 +7016,7 @@ function renderHtml(
           </div>
 
           <div class="profile-media-grid" id="profileGridContainer">
-            ${feedPostsStore
+            ${livePosts
               .map(
                 (p, idx) => `
               <div class="media-grid-item" style="background: ${p.mediaGradient};" onclick="switchTab('feed'); const c = document.getElementById('card-${p.id}'); if(c) c.scrollIntoView({ behavior: 'smooth' });">
@@ -7594,8 +7588,12 @@ function renderHtml(
 
   <!-- ⚡ 3. WELCOME & FORGOT USER ID ONBOARDING MODAL -->
   <div id="welcomeOnboardingModal" style="display: none; position: fixed; inset: 0; background: rgba(5,8,16,0.96); backdrop-filter: blur(25px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
-    <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; max-width: 440px; width: 100%; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center;">
+    <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; max-width: 440px; width: 100%; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center; position: relative;">
       
+      <div style="display: flex; justify-content: flex-end; margin-bottom: -0.5rem;">
+        <button type="button" onclick="closeOnboardingModal()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;" title="Close modal">✕</button>
+      </div>
+
       <!-- STEP 1: Handle input or Passkey auto-find -->
       <div id="womStep1">
         <div style="font-size: 40px; margin-bottom: 0.5rem;">⚡</div>
@@ -7646,6 +7644,11 @@ function renderHtml(
         <!-- 🔑 THE FORGOT USER ID BUTTON -->
         <button onclick="autoFindForgotUserIdDemo()" style="width: 100%; padding: 0.8rem; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0.5rem;">
           <span>🔑 Forgot User ID? Auto-Find with Passkey</span>
+        </button>
+
+        <!-- Skip / Continue as Node Operator -->
+        <button type="button" onclick="skipOnboardingAsHost()" style="width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 0.5rem;">
+          <span>Skip &amp; Continue as Local Host Node ➔</span>
         </button>
 
         <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.5rem;">
@@ -7934,8 +7937,30 @@ function renderHtml(
     let myProfile = null;
     try {
       const saved = localStorage.getItem('sovra_user_profile');
-      if (saved) myProfile = JSON.parse(saved);
+      if (saved) {
+        myProfile = JSON.parse(saved);
+        if (myProfile) {
+          myProfile.name = myProfile.displayName || myProfile.name || (isMobileDevice ? 'Mobile Peer' : 'Host Node');
+        }
+      }
     } catch (e) {}
+
+    // Auto-seed host profile if none exists so UI is 100% dynamic & immediately interactive
+    if (!myProfile) {
+      myProfile = {
+        did: '${masterKey.did}',
+        handle: isMobileDevice ? '@phone_user' : '@laptop_host',
+        displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
+        name: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
+        avatar: isMobileDevice ? '📱' : '💻',
+        avatarBg: '#6366f1',
+        bio: isMobileDevice ? 'Sovereign Phone Peer' : 'Sovereign P2P Node Operator',
+        deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
+        device: isMobileDevice ? 'Mobile' : 'Desktop',
+        isOnline: true,
+      };
+      try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
+    }
 
     let currentUserHandle = myProfile ? myProfile.handle : (isMobileDevice ? '@phone_user' : '@laptop_host');
 
@@ -8019,7 +8044,8 @@ function renderHtml(
 
     function updateUserDisplayInUI() {
       if (!myProfile) return;
-      currentUserHandle = myProfile.handle;
+      myProfile.name = myProfile.displayName || myProfile.name || 'Sovereign Node';
+      currentUserHandle = myProfile.handle || '@laptop_host';
 
       const avatarEl = document.getElementById('currentUserAvatar');
       if (avatarEl) {
@@ -8102,6 +8128,33 @@ function renderHtml(
       }
 
       updateProfileDynamicStats();
+    }
+
+    function closeOnboardingModal() {
+      const wom = document.getElementById('welcomeOnboardingModal');
+      if (wom) wom.style.display = 'none';
+      try { sessionStorage.setItem('sovra_onboarding_dismissed', 'true'); } catch(e) {}
+    }
+
+    function skipOnboardingAsHost() {
+      closeOnboardingModal();
+      if (!myProfile || !myProfile.did) {
+        myProfile = {
+          did: '${masterKey.did}',
+          handle: isMobileDevice ? '@phone_user' : '@laptop_host',
+          displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
+          name: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
+          avatar: isMobileDevice ? '📱' : '💻',
+          avatarBg: '#6366f1',
+          bio: 'Sovereign P2P Node Operator',
+          deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
+          device: isMobileDevice ? 'Mobile' : 'Desktop',
+          isOnline: true,
+        };
+        try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
+      }
+      currentUserHandle = myProfile.handle;
+      updateUserDisplayInUI();
     }
 
     let selectedEditAvatarBg = '#6366f1';
@@ -8240,6 +8293,8 @@ function renderHtml(
       const sessionToken = localStorage.getItem('sovra_session_token');
 
       function showOnboardingModal() {
+        const dismissed = sessionStorage.getItem('sovra_onboarding_dismissed');
+        if (dismissed) return;
         setTimeout(function() {
           const wom = document.getElementById('welcomeOnboardingModal');
           if (wom) {
@@ -8273,14 +8328,13 @@ function renderHtml(
                 body: JSON.stringify(myProfile)
               }).catch(function() {});
             } else if (!myProfile) {
-              showOnboardingModal();
+              updateUserDisplayInUI();
             } else {
               updateUserDisplayInUI();
             }
           })
           .catch(() => {
             if (myProfile) updateUserDisplayInUI();
-            else showOnboardingModal();
           });
       } else if (myProfile && myProfile.did) {
         // Sync with server by DID
@@ -8311,7 +8365,7 @@ function renderHtml(
           })
           .catch(() => updateUserDisplayInUI());
       } else {
-        showOnboardingModal();
+        updateUserDisplayInUI();
       }
 
       if (isMobileDevice) {
@@ -8709,7 +8763,7 @@ function renderHtml(
     // ==========================================
     // 0. INSTAGRAM FEED & PROFILE SCRIPT ENGINE
     // ==========================================
-    let feedPostsData = ${JSON.stringify(feedPostsStore)};
+    let feedPostsData = ${JSON.stringify(livePosts)};
     let currentProfileGridTab = 'posts';
     let walletBalanceSov = 420.50;
 
@@ -8964,11 +9018,11 @@ function renderHtml(
           tags: tags,
           theme: theme,
           mediaImage: selectedFeedPhotoDataUrl,
-          authorName: myProfile ? myProfile.name : 'You (Sovereign Peer)',
-          authorAvatar: myProfile ? myProfile.avatar : 'S',
-          authorAvatarBg: myProfile ? myProfile.avatarBg : '#6366f1',
+          authorName: myProfile ? (myProfile.displayName || myProfile.name || 'You (Sovereign Peer)') : 'You (Sovereign Peer)',
+          authorAvatar: myProfile ? (myProfile.avatar || 'S') : 'S',
+          authorAvatarBg: myProfile ? (myProfile.avatarBg || '#6366f1') : '#6366f1',
           authorAvatarDataUrl: myProfile ? myProfile.avatarDataUrl : undefined,
-          authorDid: myProfile ? myProfile.did : 'did:sovra:self',
+          authorDid: myProfile ? myProfile.did : '${masterKey.did}',
         })
       })
       .then(function(res) { return res.json(); })
@@ -10980,7 +11034,8 @@ function renderHtml(
 
     let lastChatSyncTimestamp = 0;
     function syncChatMessages() {
-      const myDid = myProfile ? myProfile.did : 'self';
+      if (document.hidden) return;
+      const myDid = myProfile ? myProfile.did : '${masterKey.did}';
       fetch('/api/chat/messages?since=' + lastChatSyncTimestamp + '&userDid=' + encodeURIComponent(myDid))
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -11045,7 +11100,7 @@ function renderHtml(
     let lastContactsSignature = '';
     function syncPeersAndContacts() {
       if (document.hidden) return;
-      const myDid = myProfile ? myProfile.did : 'self';
+      const myDid = myProfile ? myProfile.did : '${masterKey.did}';
       fetch('/api/chat/contacts?userDid=' + encodeURIComponent(myDid))
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -12464,19 +12519,24 @@ function renderHtml(
     }
 
     async function updateStorageStats() {
+      if (document.hidden) return;
       try {
         const res = await fetch('/api/storage/stats');
         const data = await res.json();
-        if (data.quotaUsage) {
+        if (data && data.quotaUsage) {
           const capGB = (Number(BigInt(data.maxCapacityBytes) / 1073741824n)).toFixed(1) + ' GB';
-          document.getElementById('quotaCapacity').innerText = capGB;
-          document.getElementById('quotaUsed').innerText = data.totalSizeBytes + ' B';
-          document.getElementById('quotaPinned').innerText = data.quotaUsage.pinnedBytes + ' B';
-          document.getElementById('activePinsCount').innerText = data.activePinsCount;
+          const capEl = document.getElementById('quotaCapacity');
+          if (capEl) capEl.innerText = capGB;
+          const usedEl = document.getElementById('quotaUsed');
+          if (usedEl) usedEl.innerText = data.totalSizeBytes + ' B';
+          const pinEl = document.getElementById('quotaPinned');
+          if (pinEl) pinEl.innerText = data.quotaUsage.pinnedBytes + ' B';
+          const actEl = document.getElementById('activePinsCount');
+          if (actEl) actEl.innerText = data.activePinsCount;
         }
       } catch {}
     }
-    setInterval(updateStorageStats, 5000);
+    setInterval(updateStorageStats, 10000);
     setTimeout(updateStorageStats, 500);
 
     async function triggerVerifyReplicas() {
@@ -12877,8 +12937,10 @@ function renderHtml(
       filterFriendsView('');
     }
 
+    let lastFriendsSignature = '';
     function syncFriendsRelationships(callback) {
-      const myDid = myProfile ? myProfile.did : 'did:sovra:self';
+      if (document.hidden) return;
+      const myDid = myProfile ? myProfile.did : '${masterKey.did}';
       fetch('/api/friends/list?userDid=' + encodeURIComponent(myDid))
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -12913,44 +12975,54 @@ function renderHtml(
             const meFriendsCount = document.getElementById('meFriendsCount');
             if (meFriendsCount) meFriendsCount.innerText = totalFriends.toString();
 
+            const currentSig = totalPending + ':' + totalFriends + ':' + ((data.suggestions || []).length);
             if (document.body.dataset.activeTab === 'friends') {
               const isTyping = document.activeElement && (document.activeElement.id === 'friendsViewSearchInput');
-              if (!isTyping) {
+              if (!isTyping && currentSig !== lastFriendsSignature) {
+                lastFriendsSignature = currentSig;
                 renderFriendsDiscoveryView();
               }
+            } else {
+              lastFriendsSignature = currentSig;
             }
-            try { renderRightRailSuggestions(); } catch(e) {}
             if (callback) callback();
           }
         })
         .catch(function() {});
     }
-    setInterval(syncFriendsRelationships, 4000);
+    setInterval(syncFriendsRelationships, 8000);
 
     function renderFriendsDiscoveryView() {
       const container = document.getElementById('friendsViewContent');
       if (!container) return;
 
-      const q = friendsViewSearchQuery;
+      const q = (friendsViewSearchQuery || '').toLowerCase();
 
       // Filter incoming requests
       const incomingList = (friendsData.incoming || []).filter(function(r) {
         if (!q) return true;
         const u = r.user || {};
-        return (u.name && u.name.toLowerCase().includes(q)) || (u.handle && u.handle.toLowerCase().includes(q));
+        const uName = (u.displayName || u.name || '').toLowerCase();
+        const uHandle = (u.handle || '').toLowerCase();
+        return uName.includes(q) || uHandle.includes(q);
       });
 
       // Filter mutual friends
       const friendsList = (friendsData.friends || []).filter(function(f) {
         if (!q) return true;
-        return (f.name && f.name.toLowerCase().includes(q)) || (f.handle && f.handle.toLowerCase().includes(q));
+        const fName = (f.displayName || f.name || '').toLowerCase();
+        const fHandle = (f.handle || '').toLowerCase();
+        return fName.includes(q) || fHandle.includes(q);
       });
 
       // Filter suggestions (peers discovered on mesh that are not friends and not self)
       const suggestionsList = (friendsData.suggestions || []).filter(function(p) {
         if (p.relationshipStatus === 'friends') return false;
         if (!q) return true;
-        return (p.name && p.name.toLowerCase().includes(q)) || (p.handle && p.handle.toLowerCase().includes(q)) || (p.role && p.role.toLowerCase().includes(q));
+        const pName = (p.displayName || p.name || '').toLowerCase();
+        const pHandle = (p.handle || '').toLowerCase();
+        const pRole = (p.role || '').toLowerCase();
+        return pName.includes(q) || pHandle.includes(q) || pRole.includes(q);
       });
 
       let html = '';
@@ -12962,6 +13034,8 @@ function renderHtml(
           '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
         for (const req of incomingList) {
           const u = req.user || {};
+          const uName = String(u.displayName || u.name || 'Peer');
+          const cleanName = uName.replace(/"/g, '&quot;');
           const avatarHtml = u.avatarDataUrl ?
             '<img src="' + u.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" />' :
             (u.avatar || 'P');
@@ -12974,17 +13048,17 @@ function renderHtml(
               '</div>' +
               '<div>' +
                 '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
-                  '<span>' + u.name + '</span>' +
+                  '<span>' + uName + '</span>' +
                   '<span style="color: #38bdf8; font-size: 0.75rem;">✓</span>' +
                   '<span style="font-size: 0.68rem; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 6px; border-radius: 8px;">' + (u.device || 'Mesh') + '</span>' +
                 '</div>' +
-                '<div style="font-size: 0.78rem; color: #94a3b8;">' + u.handle + '</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8;">' + (u.handle || '@peer') + '</div>' +
                 '<div style="font-size: 0.72rem; color: #10b981; margin-top: 2px; font-weight: 600;">⚡ Incoming bilateral friend request on Wi-Fi/P2P</div>' +
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
-              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="acceptFriendRequest(&quot;' + req.id + '&quot;, &quot;' + u.name.replace(/"/g, '&quot;') + '&quot;)">✓ Accept</button>' +
-              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem;" onclick="rejectFriendRequest(&quot;' + req.id + '&quot;, &quot;' + u.name.replace(/"/g, '&quot;') + '&quot;)">✕ Reject</button>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="acceptFriendRequest(&quot;' + req.id + '&quot;, &quot;' + cleanName + '&quot;)">✓ Accept</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem;" onclick="rejectFriendRequest(&quot;' + req.id + '&quot;, &quot;' + cleanName + '&quot;)">✕ Reject</button>' +
             '</div>' +
           '</div>';
         }
@@ -12997,6 +13071,8 @@ function renderHtml(
           '<div class="friends-section-title"><span>✨</span> <span>Discovered Peers on Mesh (' + suggestionsList.length + ')</span></div>' +
           '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
         for (const p of suggestionsList) {
+          const pName = String(p.displayName || p.name || 'Peer');
+          const cleanName = pName.replace(/"/g, '&quot;');
           const avatarHtml = p.avatarDataUrl ?
             '<img src="' + p.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" />' :
             (p.avatar || 'P');
@@ -13007,7 +13083,7 @@ function renderHtml(
           } else if (p.relationshipStatus === 'pending_received') {
             actionBtnHtml = '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 0.85rem;" onclick="setFriendsFilter(&quot;requests&quot;)">Respond 📩</button>';
           } else {
-            actionBtnHtml = '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="sendFriendRequest(&quot;' + p.did + '&quot;, &quot;' + p.name.replace(/"/g, '&quot;') + '&quot;)">+ Add Friend</button>';
+            actionBtnHtml = '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="sendFriendRequest(&quot;' + p.did + '&quot;, &quot;' + cleanName + '&quot;)">+ Add Friend</button>';
           }
 
           html += '<div class="friend-card">' +
@@ -13018,10 +13094,10 @@ function renderHtml(
               '</div>' +
               '<div>' +
                 '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
-                  '<span>' + p.name + '</span>' +
+                  '<span>' + pName + '</span>' +
                   '<span style="font-size: 0.68rem; background: rgba(99,102,241,0.2); color: #a5b4fc; padding: 2px 6px; border-radius: 8px;">' + (p.device || 'Peer') + '</span>' +
                 '</div>' +
-                '<div style="font-size: 0.78rem; color: #94a3b8;">' + p.handle + ' &bull; ' + (p.isOnline ? '<span style="color:#10b981;">Online</span>' : 'Offline') + '</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8;">' + (p.handle || '@peer') + ' &bull; ' + (p.isOnline ? '<span style="color:#10b981;">Online</span>' : 'Offline') + '</div>' +
                 '<div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">⚡ Discovered via Wi-Fi Multicast / GossipSub</div>' +
               '</div>' +
             '</div>' +
@@ -13039,6 +13115,8 @@ function renderHtml(
           '<div class="friends-section-title"><span>🤝</span> <span>My Connected Friends (' + friendsList.length + ')</span></div>' +
           '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
         for (const f of friendsList) {
+          const fName = String(f.displayName || f.name || 'Friend');
+          const cleanName = fName.replace(/"/g, '&quot;');
           const avatarHtml = f.avatarDataUrl ?
             '<img src="' + f.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" />' :
             (f.avatar || 'F');
@@ -13051,17 +13129,17 @@ function renderHtml(
               '</div>' +
               '<div>' +
                 '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
-                  '<span>' + f.name + '</span>' +
+                  '<span>' + fName + '</span>' +
                   '<span style="color: #10b981; font-size: 0.75rem;">❤️</span>' +
                   '<span style="font-size: 0.68rem; background: rgba(16,185,129,0.15); color: #10b981; padding: 2px 6px; border-radius: 8px;">' + (f.device || 'Friend') + '</span>' +
                 '</div>' +
-                '<div style="font-size: 0.78rem; color: #94a3b8;">' + f.handle + ' &bull; ' + (f.isOnline ? '<span style="color:#10b981;">Online on Mesh</span>' : '<span style="color:#64748b;">Offline</span>') + '</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8;">' + (f.handle || '@friend') + ' &bull; ' + (f.isOnline ? '<span style="color:#10b981;">Online on Mesh</span>' : '<span style="color:#64748b;">Offline</span>') + '</div>' +
                 '<div style="font-size: 0.72rem; color: #6ee7b7; margin-top: 2px;">⚡ Verified Mutual Friend on Sovra Mesh</div>' +
               '</div>' +
             '</div>' +
             '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
-              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700; background: #6366f1; color: #fff;" onclick="messageFriend(&quot;' + f.did + '&quot;, &quot;' + f.name.replace(/"/g, '&quot;') + '&quot;)">💬 Message</button>' +
-              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.75rem; color: #f87171; border-color: rgba(239, 68, 68, 0.3);" title="Remove Friend" onclick="unfriendUser(&quot;' + f.did + '&quot;, &quot;' + f.name.replace(/"/g, '&quot;') + '&quot;)">✕</button>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700; background: #6366f1; color: #fff;" onclick="messageFriend(&quot;' + f.did + '&quot;, &quot;' + cleanName + '&quot;)">💬 Message</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.75rem; color: #f87171; border-color: rgba(239, 68, 68, 0.3);" title="Remove Friend" onclick="unfriendUser(&quot;' + f.did + '&quot;, &quot;' + cleanName + '&quot;)">✕</button>' +
             '</div>' +
           '</div>';
         }
@@ -13076,7 +13154,6 @@ function renderHtml(
       }
 
       container.innerHTML = html;
-      renderRightRailSuggestions();
     }
 
     function sendFriendRequest(targetDid, name) {
@@ -13602,7 +13679,8 @@ function renderHtml(
       window.addEventListener('load', function() {
         navigator.serviceWorker.register('/sw.js')
           .then(function(reg) {
-            console.log('[PWA] Service Worker registered successfully! Scope:', reg.scope);
+            reg.update();
+            console.log('[PWA] Service Worker registered & updated! Scope:', reg.scope);
           })
           .catch(function(err) {
             console.warn('[PWA] Service Worker registration failed:', err);
@@ -14040,7 +14118,7 @@ async function startDevServer() {
         }
       });
 
-      const candidatesMap = new Map<string, { did: string; handle: string; displayName: string; avatar: string; avatarDataUrl?: string; avatarBg: string; bio: string; isOnline: boolean }>();
+      const candidatesMap = new Map<string, { did: string; handle: string; displayName: string; name: string; avatar: string; avatarDataUrl?: string; avatarBg: string; bio: string; isOnline: boolean }>();
 
       for (const u of allUsers) {
         if (!excludedDids.has(u.did)) {
@@ -14048,6 +14126,7 @@ async function startDevServer() {
             did: u.did,
             handle: u.handle,
             displayName: u.displayName,
+            name: u.displayName,
             avatar: u.avatar || (u.displayName ? u.displayName.charAt(0).toUpperCase() : 'S'),
             avatarDataUrl: u.avatarDataUrl,
             avatarBg: u.avatarBg || '#6366f1',
@@ -14063,6 +14142,7 @@ async function startDevServer() {
             did: p.did,
             handle: p.handle,
             displayName: p.name,
+            name: p.name,
             avatar: p.avatar || (p.name ? p.name.charAt(0).toUpperCase() : 'P'),
             avatarDataUrl: p.avatarDataUrl,
             avatarBg: p.avatarBg || '#10b981',
@@ -14142,8 +14222,11 @@ async function startDevServer() {
 
     // API: Dynamic Feed List
     if (url.pathname === '/api/feed/list' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, posts: dynamicSocialStore.posts }));
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+      });
+      res.end(JSON.stringify({ ok: true, posts: sovraDb.getAllPosts() }));
       return;
     }
 
@@ -14271,10 +14354,10 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          const post = dynamicSocialStore.posts.find(p => p.id === parsed.postId);
+          const userDid = String(parsed.userDid || 'self');
+          const post = sovraDb.getAllPosts().find(p => p.id === parsed.postId);
           if (post) {
             if (!Array.isArray(post.likedByDids)) post.likedByDids = [];
-            const userDid = String(parsed.userDid || 'self');
             const idx = post.likedByDids.indexOf(userDid);
             let isLiked: boolean;
             if (typeof parsed.isLiked === 'boolean') {
@@ -14296,7 +14379,8 @@ async function startDevServer() {
             }
             post.likesCount = post.likedByDids.length;
             post.isLiked = isLiked;
-            saveDynamicSocialState(dynamicSocialStore);
+            sovraDb.save();
+            dynamicSocialStore.posts = sovraDb.getAllPosts();
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, isLiked: post.isLiked, likesCount: post.likesCount, likedByDids: post.likedByDids }));
           } else {
@@ -14318,7 +14402,7 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          const post = dynamicSocialStore.posts.find(p => p.id === parsed.postId);
+          const post = sovraDb.getAllPosts().find(p => p.id === parsed.postId);
           if (post) {
             const text = String(parsed.text || '').trim();
             if (!text) {
@@ -14336,7 +14420,8 @@ async function startDevServer() {
             };
             if (!Array.isArray(post.comments)) post.comments = [];
             post.comments.push(comment);
-            saveDynamicSocialState(dynamicSocialStore);
+            sovraDb.save();
+            dynamicSocialStore.posts = sovraDb.getAllPosts();
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, comment, commentsCount: post.comments.length }));
           } else {
@@ -14358,11 +14443,10 @@ async function startDevServer() {
       req.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          const idx = dynamicSocialStore.posts.findIndex(p => p.id === parsed.postId);
-          if (idx !== -1) {
-            dynamicSocialStore.posts.splice(idx, 1);
-            saveDynamicSocialState(dynamicSocialStore);
-            try { sovraDb.deletePost(parsed.postId); } catch(e) {}
+          let deleted = false;
+          try { deleted = sovraDb.deletePost(parsed.postId); } catch(e) {}
+          dynamicSocialStore.posts = sovraDb.getAllPosts();
+          if (deleted) {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true }));
           } else {
@@ -15608,7 +15692,9 @@ async function startDevServer() {
       res.writeHead(200, {
         'Content-Type': 'application/javascript; charset=utf-8',
         'Service-Worker-Allowed': '/',
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       });
       res.end(SOVRA_SERVICE_WORKER_SCRIPT);
       return;
@@ -15636,7 +15722,12 @@ async function startDevServer() {
       const allUsers = sovraDb.getAllUsers();
       const allMsgs = sovraDb.getState().chatMessages;
       const threadsCount = new Set(allMsgs.map(m => m.threadId)).size;
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
       res.end(
         renderAdminHtml({
           peerId: binding.peerId,
@@ -15671,7 +15762,12 @@ async function startDevServer() {
 
     // Product A: Sovra Consumer Social App & Creator Studio (Dedicated User Panel)
     if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/app') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
       res.end(renderHtml(binding, masterKey, tcpPort, Date.now() - startTime, storageDaemon, socialGraph, localFeed));
       return;
     }

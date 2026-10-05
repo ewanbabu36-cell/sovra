@@ -24,6 +24,7 @@ export interface UserRecord {
   did: string;
   handle: string; // e.g. '@rahul_phone'
   displayName: string;
+  name?: string; // Interoperability alias for displayName
   avatar: string; // Avatar initial or emoji
   avatarDataUrl?: string; // Real uploaded photo Data URL / base64
   avatarBg: string; // Color swatch (e.g. '#6366f1')
@@ -403,6 +404,7 @@ class SovraDatabaseEngine {
       did: user.did,
       handle: cleanHandle,
       displayName: user.displayName.trim() || 'Sovereign Peer',
+      name: user.displayName.trim() || 'Sovereign Peer',
       avatar: user.avatar || user.displayName.trim().charAt(0).toUpperCase() || 'S',
       avatarDataUrl: user.avatarDataUrl,
       avatarBg: user.avatarBg || '#6366f1',
@@ -447,7 +449,7 @@ class SovraDatabaseEngine {
 
   public getAllUsers(): UserRecord[] {
     this.load();
-    return [...this.db.users];
+    return this.db.users.map(u => ({ ...u, name: u.name || u.displayName }));
   }
 
   public updateUserAvatar(did: string, avatarDataUrl: string): UserRecord | undefined {
