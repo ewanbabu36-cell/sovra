@@ -1627,12 +1627,182 @@ function renderHtml(
       border-color: #38bdf8;
     }
 
-    .nav-tabs {
+    /* ==========================================
+       🏛️ INDUSTRY STANDARD 3-COLUMN APP SHELL
+       ========================================== */
+    .app-layout {
       display: flex;
-      background-color: rgba(0, 0, 0, 0.25);
-      border-radius: 8px;
-      padding: 4px;
-      gap: 4px;
+      justify-content: center;
+      min-height: 100vh;
+      width: 100%;
+      background: var(--bg);
+    }
+
+    /* Column 1: Left Navigation Rail (Desktop) */
+    .app-left-rail {
+      width: 250px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 1.25rem 0.85rem 1.25rem 0.85rem;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(11, 20, 26, 0.98);
+      z-index: 100;
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+    .rail-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.25rem 0.5rem 1.25rem 0.5rem;
+      cursor: pointer;
+    }
+    .rail-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .rail-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.7rem 0.9rem;
+      background: none;
+      border: none;
+      border-radius: 14px;
+      color: #94a3b8;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      text-align: left;
+      width: 100%;
+    }
+    .rail-nav-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      transform: translateX(3px);
+    }
+    .rail-nav-item.active {
+      background: rgba(99, 102, 241, 0.15);
+      color: #38bdf8;
+      box-shadow: inset 3px 0 0 #38bdf8;
+    }
+    .rail-icon {
+      font-size: 1.25rem;
+      width: 24px;
+      text-align: center;
+    }
+    .rail-label {
+      flex: 1;
+    }
+    .rail-badge {
+      background: #ef4444;
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+    .rail-post-btn {
+      margin: 0.85rem 0;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      padding: 0.8rem;
+      font-weight: 800;
+      font-size: 0.92rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+      transition: all 0.2s;
+    }
+    .rail-post-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+    }
+    .rail-user-profile {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.6rem;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .rail-user-profile:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Column 2: Center Stage */
+    .app-center-stage {
+      flex: 1;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      min-height: 100vh;
+    }
+    .app-top-header {
+      position: sticky;
+      top: 0;
+      z-index: 90;
+      background: rgba(11, 20, 26, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .mobile-brand {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .app-center-stage .container {
+      max-width: 100%;
+      margin: 1rem auto 2rem auto;
+      padding: 0 1rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Column 3: Right Discovery Rail */
+    .app-right-rail {
+      width: 320px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 1.25rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+
+    .nav-tabs {
+      display: none;
     }
     .tab-btn {
       padding: 0.5rem 0.85rem;
@@ -1652,11 +1822,11 @@ function renderHtml(
       box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
     }
 
-    /* Top Prominent Search Bar */
+    /* Top Prominent Search Bar (Expansive, Wide & Unsquished) */
     .header-search-wrap {
       flex: 1;
-      min-width: 170px;
-      max-width: 290px;
+      min-width: 220px;
+      max-width: 520px;
       position: relative;
     }
     .header-search-bar {
@@ -1665,8 +1835,8 @@ function renderHtml(
       background: rgba(255, 255, 255, 0.07);
       border: 1px solid rgba(255, 255, 255, 0.16);
       border-radius: 20px;
-      padding: 0.35rem 0.85rem;
-      gap: 0.5rem;
+      padding: 0.45rem 1rem;
+      gap: 0.6rem;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .header-search-bar:focus-within {
@@ -1849,8 +2019,36 @@ function renderHtml(
       .brand-subtitle {
         display: none !important;
       }
+      .app-right-rail {
+        display: none !important;
+      }
     }
     @media (max-width: 860px) {
+      .app-left-rail {
+        display: none !important;
+      }
+      .app-right-rail {
+        display: none !important;
+      }
+      .app-layout {
+        display: block !important;
+      }
+      .app-center-stage {
+        max-width: 100% !important;
+        width: 100% !important;
+        border-right: none !important;
+      }
+      .mobile-brand {
+        display: flex !important;
+      }
+      .app-top-header {
+        padding: 0.45rem 0.85rem !important;
+        height: auto !important;
+      }
+      .app-center-stage .container {
+        margin: 0 auto 5.5rem auto !important;
+        padding: 0 !important;
+      }
       .container {
         margin: 0 auto 5.5rem auto;
         padding: 0;
@@ -4219,7 +4417,8 @@ function renderHtml(
     }
 
     /* 2. Dock-Only Mode (Only bottom dock is visible, top tabs hidden even on desktop) */
-    body.nav-mode-dock .nav-tabs {
+    body.nav-mode-dock .nav-tabs,
+    body.nav-mode-dock .app-left-rail {
       display: none !important;
     }
     body.nav-mode-dock .mobile-bottom-nav {
@@ -4235,7 +4434,8 @@ function renderHtml(
     body.nav-mode-top .mobile-bottom-nav {
       display: none !important;
     }
-    body.nav-mode-top .nav-tabs {
+    body.nav-mode-top .nav-tabs,
+    body.nav-mode-top .app-left-rail {
       display: flex !important;
     }
     .bottom-nav-item {
@@ -4793,46 +4993,92 @@ function renderHtml(
   </style>
 </head>
 <body class="nav-mode-auto">
-  <header>
-    <div class="brand">
-      <div class="brand-logo">S</div>
-      <div>
-        <div class="brand-title">SOVRA</div>
-        <div class="brand-subtitle" style="font-size: 0.75rem; color: var(--text-muted);">Decentralized Social Platform & Operations Console</div>
+  <div class="app-layout">
+    <!-- Column 1: Left Navigation Rail (Desktop) -->
+    <aside class="app-left-rail">
+      <div class="rail-brand" onclick="switchTab('feed')">
+        <div class="brand-logo">S</div>
+        <div>
+          <div class="brand-title">SOVRA</div>
+          <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">Decentralized Mesh</div>
+        </div>
       </div>
-    </div>
 
-    <!-- Prominent Top Friend Search Bar -->
-    <div class="header-search-wrap">
-      <div class="header-search-bar">
-        <span style="font-size: 0.9rem; color: #38bdf8;">🔍</span>
-        <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, @handle, people..." oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
-        <button id="headerSearchClearBtn" onclick="clearHeaderSearch()" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.8rem;">✕</button>
-      </div>
-      <div id="headerSearchDropdown" class="header-search-dropdown" style="display: none;"></div>
-    </div>
+      <nav class="rail-nav">
+        <button class="rail-nav-item active" id="tab-feed" onclick="switchTab('feed')">
+          <span class="rail-icon">📷</span>
+          <span class="rail-label">Feed</span>
+        </button>
+        <button class="rail-nav-item" id="tab-friends" onclick="switchTab('friends')">
+          <span class="rail-icon">👥</span>
+          <span class="rail-label">Friends</span>
+          <span class="rail-badge" id="railFriendsBadge">1</span>
+        </button>
+        <button class="rail-nav-item" id="tab-reels" onclick="switchTab('reels')">
+          <span class="rail-icon">🎬</span>
+          <span class="rail-label">Reels</span>
+        </button>
+        <button class="rail-nav-item" id="tab-youtube" onclick="switchTab('youtube')">
+          <span class="rail-icon">📺</span>
+          <span class="rail-label">Watch</span>
+        </button>
+        <button class="rail-nav-item" id="tab-chat" onclick="switchTab('chat')">
+          <span class="rail-icon">💬</span>
+          <span class="rail-label">Chats</span>
+          <span class="rail-badge" style="background: #3b82f6;">2</span>
+        </button>
+        <button class="rail-nav-item" id="tab-me" onclick="switchTab('me')">
+          <span class="rail-icon">👤</span>
+          <span class="rail-label">Profile</span>
+        </button>
+        <button class="rail-nav-item" id="tab-admin" onclick="switchTab('admin')">
+          <span class="rail-icon">⚙️</span>
+          <span class="rail-label">Ops Console</span>
+        </button>
+      </nav>
 
-    <div class="nav-tabs">
-      <button class="tab-btn active" id="tab-feed" onclick="switchTab('feed')">📷 Feed</button>
-      <button class="tab-btn" id="tab-friends" onclick="switchTab('friends')">👥 Friends</button>
-      <button class="tab-btn" id="tab-reels" onclick="switchTab('reels')">🎬 Reels</button>
-      <button class="tab-btn" id="tab-youtube" onclick="switchTab('youtube')">📺 Watch</button>
-      <button class="tab-btn" id="tab-chat" onclick="switchTab('chat')">💬 Chats</button>
-      <button class="tab-btn" id="tab-me" onclick="switchTab('me')">👤 Me</button>
-      <button class="tab-btn" id="tab-admin" onclick="switchTab('admin')" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15);">⚙️ Ops Console</button>
-    </div>
-
-    <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0;">
-      <button id="navModeToggleBtn" onclick="toggleNavLayoutMode()" class="nav-mode-btn" title="Toggle Navigation Layout (Auto Responsive / Mobile Dock / Desktop Top)">
-        <span id="navModeIcon">⚡</span> <span id="navModeLabel" class="nav-mode-text">Auto</span>
+      <button class="rail-post-btn" onclick="triggerBottomCreateAction()">
+        <span>✍️</span> <span>New Post</span>
       </button>
-      <button onclick="openOmniSearch()" title="Omni-Search (Channels, Pages, People, Media)" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: background 0.15s;">🔍</button>
-      <span class="badge badge-online">● Node Online</span>
-      <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">TCP :${tcpPort}</span>
-    </div>
-  </header>
 
-  <div class="container">
+      <div class="rail-user-profile" onclick="switchTab('me')">
+        <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #ec4899); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; color: #fff;">S</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 700; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">sovra-local</div>
+          <div style="font-size: 0.72rem; color: #34d399;">● Online Node</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Column 2: Center Stage -->
+    <div class="app-center-stage">
+      <!-- Center Sticky Top Header with Expansive Search -->
+      <header class="app-top-header">
+        <div class="mobile-brand" onclick="switchTab('feed')">
+          <div class="brand-logo" style="width: 34px; height: 34px; font-size: 1rem; border-radius: 10px;">S</div>
+        </div>
+
+        <!-- Prominent Wide Friend & Mesh Search Bar -->
+        <div class="header-search-wrap">
+          <div class="header-search-bar">
+            <span style="font-size: 0.95rem; color: #38bdf8;">🔍</span>
+            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, @handle, channels, hashtags..." oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
+            <button id="headerSearchClearBtn" onclick="clearHeaderSearch()" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.8rem;">✕</button>
+          </div>
+          <div id="headerSearchDropdown" class="header-search-dropdown" style="display: none;"></div>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0;">
+          <button id="navModeToggleBtn" onclick="toggleNavLayoutMode()" class="nav-mode-btn" title="Toggle Navigation Layout (Auto Responsive / Mobile Dock / Desktop Top)">
+            <span id="navModeIcon">⚡</span> <span id="navModeLabel" class="nav-mode-text">Auto</span>
+          </button>
+          <button onclick="openOmniSearch()" title="Omni-Search (Channels, Pages, People, Media)" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #fff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.95rem; transition: background 0.15s;">🔍</button>
+          <span class="badge badge-online">● Node Online</span>
+          <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">TCP :${tcpPort}</span>
+        </div>
+      </header>
+
+      <div class="container">
     <!-- Tab 1: Instagram Main Feed (Stories, Photo Stream, Double-Tap Hearts) -->
     <main class="main-content" id="feed-view" style="display: flex;">
       <div class="feed-container">
@@ -6420,6 +6666,63 @@ function renderHtml(
   <footer style="text-align: center; padding: 1.5rem 1.5rem 5rem 1.5rem; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--surface-border);">
     Sovra Protocol & Monorepo Foundation &bull; Production P2P Stack &bull; Localhost Dev Runner
   </footer>
+</div> <!-- Close Column 2: .app-center-stage -->
+
+<!-- Column 3: Right Discovery Rail (Desktop >= 1200px) -->
+<aside class="app-right-rail">
+  <!-- People You May Know / Suggested Connections -->
+  <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+    <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+      <span>👥 Suggested For You</span>
+      <span style="font-size: 0.75rem; color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="switchTab('friends')">See All</span>
+    </div>
+    <div id="rightRailSuggestionsList" style="display: flex; flex-direction: column; gap: 0.85rem;">
+      <!-- Dynamically rendered via renderRightRailSuggestions() -->
+    </div>
+  </div>
+
+  <!-- Trending on Mesh -->
+  <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+    <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+      <span>🔥 Trending on Mesh</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+      <div style="cursor: pointer; padding: 4px 6px; border-radius: 8px; transition: background 0.15s;" onclick="searchHashtag('#SovraLaunch')" onmouseenter="this.style.background='rgba(255,255,255,0.04)'" onmouseleave="this.style.background='transparent'">
+        <div style="font-size: 0.72rem; color: #64748b;">Technology &bull; Trending</div>
+        <div style="font-weight: 700; font-size: 0.88rem; color: #e2e8f0;">#SovraLaunch</div>
+        <div style="font-size: 0.72rem; color: #64748b;">12.4K mesh posts</div>
+      </div>
+      <div style="cursor: pointer; padding: 4px 6px; border-radius: 8px; transition: background 0.15s;" onclick="searchHashtag('#DecentralizedP2P')" onmouseenter="this.style.background='rgba(255,255,255,0.04)'" onmouseleave="this.style.background='transparent'">
+        <div style="font-size: 0.72rem; color: #64748b;">Protocols &bull; Trending</div>
+        <div style="font-weight: 700; font-size: 0.88rem; color: #e2e8f0;">#DecentralizedP2P</div>
+        <div style="font-size: 0.72rem; color: #64748b;">8.1K mesh posts</div>
+      </div>
+      <div style="cursor: pointer; padding: 4px 6px; border-radius: 8px; transition: background 0.15s;" onclick="searchHashtag('#ZeroCloud')" onmouseenter="this.style.background='rgba(255,255,255,0.04)'" onmouseleave="this.style.background='transparent'">
+        <div style="font-size: 0.72rem; color: #64748b;">Privacy &bull; Trending</div>
+        <div style="font-weight: 700; font-size: 0.88rem; color: #e2e8f0;">#ZeroCloud</div>
+        <div style="font-size: 0.72rem; color: #64748b;">5.7K mesh posts</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P2P Node Health Widget -->
+  <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.6); border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem;">
+    <div style="font-weight: 800; color: #94a3b8; margin-bottom: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem;">Node Diagnostics</div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 0.4rem;">
+      <span style="color: #64748b;">Swarm Peers:</span>
+      <span style="color: #34d399; font-weight: 700;" id="railPeerCount">3 Active (TCP)</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 0.4rem;">
+      <span style="color: #64748b;">Merkle DAG:</span>
+      <span style="color: #38bdf8; font-weight: 700;">BitSwap Sync</span>
+    </div>
+    <div style="display: flex; justify-content: space-between;">
+      <span style="color: #64748b;">Noise_XX Latency:</span>
+      <span style="color: #a78bfa; font-weight: 700;">&lt; 12ms (Direct)</span>
+    </div>
+  </div>
+</aside>
+</div> <!-- Close Column 1 & 2 & 3: .app-layout -->
 
   <!-- Fixed Mobile & Desktop Synchronized Glassmorphic Bottom Navigation Bar -->
   <nav class="mobile-bottom-nav">
@@ -7183,6 +7486,7 @@ function renderHtml(
     }
 
     setTimeout(applyNavLayoutMode, 10);
+    setTimeout(renderRightRailSuggestions, 50);
 
     // Tab switching for all modes + admin console + friends discovery
     function switchTab(tab) {
@@ -10441,6 +10745,12 @@ function renderHtml(
         bnavBadge.style.display = totalPending > 0 ? 'flex' : 'none';
       }
 
+      const railBadge = document.getElementById('railFriendsBadge');
+      if (railBadge) {
+        railBadge.innerText = totalPending;
+        railBadge.style.display = totalPending > 0 ? 'inline' : 'none';
+      }
+
       let html = '';
 
       // 1. Pending Requests Section
@@ -10541,6 +10851,7 @@ function renderHtml(
       }
 
       container.innerHTML = html;
+      renderRightRailSuggestions();
     }
 
     function acceptFriendRequest(pubkey, name) {
@@ -10670,6 +10981,42 @@ function renderHtml(
         if (dd) dd.style.display = 'none';
       }
     });
+
+    // Right Discovery Rail & Hashtag Helpers
+    function searchHashtag(tag) {
+      const input = document.getElementById('headerFriendSearchInput');
+      if (input) {
+        input.value = tag;
+        handleHeaderFriendSearch(tag);
+        input.focus();
+      }
+    }
+
+    function renderRightRailSuggestions() {
+      const container = document.getElementById('rightRailSuggestionsList');
+      if (!container || !window.socialOmniCatalog || !window.socialOmniCatalog.people) return;
+      const suggestions = window.socialOmniCatalog.people
+        .filter(function(p) { return !p.isBlocked && !p.isFriend && !p.isPending; })
+        .slice(0, 4);
+
+      if (suggestions.length === 0) {
+        container.innerHTML = '<div style="font-size: 0.78rem; color: #64748b; padding: 0.5rem 0; text-align: center;">All caught up! No new suggestions.</div>';
+        return;
+      }
+
+      container.innerHTML = suggestions.map(function(p) {
+        return '<div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">' +
+          '<div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0;">' +
+            '<div style="width: 38px; height: 38px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; flex-shrink: 0;">' + p.avatar + '</div>' +
+            '<div style="min-width: 0;">' +
+              '<div style="font-weight: 700; color: #fff; font-size: 0.84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + p.name + '</div>' +
+              '<div style="font-size: 0.72rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + p.handle + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<button class="action-pill-btn action-pill-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;" onclick="sendFriendRequest(\'' + p.pubkey + '\', \'' + p.name.replace(/'/g, "\\'") + '\'); renderRightRailSuggestions();">+ Add</button>' +
+        '</div>';
+      }).join('');
+    }
 
     // --- Channel Creation Handlers ---
     function openCreateChannelModal() {
