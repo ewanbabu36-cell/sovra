@@ -1816,9 +1816,7 @@ function renderHtml(
       position: sticky;
       top: 0;
       z-index: 90;
-      background: rgba(11, 20, 26, 0.95);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: #0b141a;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       padding: 0.65rem 1.25rem;
       display: flex;
@@ -5392,7 +5390,7 @@ function renderHtml(
         <div class="header-search-wrap">
           <div class="header-search-bar" onclick="document.getElementById('headerFriendSearchInput').focus()">
             <span style="font-size: 0.95rem; color: #38bdf8;">🔍</span>
-            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, @handle, channels, hashtags... (Ctrl+K)" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
+            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, @handle, channels, tags..." oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
             <kbd class="search-kbd-shortcut" onclick="openOmniSearch(); event.stopPropagation();" title="Omni-Search (Ctrl+K)">Ctrl K</kbd>
             <button id="headerSearchClearBtn" onclick="clearHeaderSearch(); event.stopPropagation();" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.8rem;">✕</button>
           </div>
@@ -5536,9 +5534,13 @@ function renderHtml(
               <!-- Media Box with Double-Tap Heart Physics -->
               ${post.mediaImage ? `
               <div class="insta-media-box" id="media-${post.id}" 
-                   style="position: relative; overflow: hidden; max-height: 520px; background: #000; display: flex; align-items: center; justify-content: center;"
+                   style="position: relative; overflow: hidden; max-height: 520px; background: ${post.mediaGradient || '#0f172a'}; display: flex; align-items: center; justify-content: center;"
                    ondblclick="handleFeedDoubleTap('${post.id}', event)">
-                <img src="${post.mediaImage}" alt="Feed photo" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" />
+                <img src="${post.mediaImage}" alt="Feed photo" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" onerror="this.style.display='none'; var fb=document.getElementById('fallback-media-${post.id}'); if(fb) fb.style.display='flex';" />
+                <div id="fallback-media-${post.id}" style="display: none; width: 100%; min-height: 240px; text-align: center; pointer-events: none; z-index: 2; padding: 2rem; flex-direction: column; align-items: center; justify-content: center;">
+                  <div style="font-size: 3.5rem; margin-bottom: 0.5rem;">${post.mediaEmoji || '🌐'}</div>
+                  <div style="font-size: 1.15rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); line-height: 1.35;">${post.mediaTitle || 'P2P Merkle DAG Synced Post'}</div>
+                </div>
                 <div style="position: absolute; bottom: 8px; left: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(15,23,42,0.85); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">
                   <span>📦 CID:</span> <span>${(post.mediaCid || 'bafybei...').substring(0, 14)}...</span>
                 </div>
@@ -9017,7 +9019,9 @@ function renderHtml(
         })
         .catch(function() {});
     }
-    setInterval(syncFeedPosts, 3500);
+    setInterval(function() {
+      if (!document.hidden) syncFeedPosts();
+    }, 5000);
 
     function renderDynamicPostCard(post, isNew) {
       const container = document.getElementById('feedPostsStream');
@@ -9049,8 +9053,12 @@ function renderHtml(
       }
 
       const mediaBoxHtml = post.mediaImage ?
-        '<div class="insta-media-box" id="media-' + post.id + '" style="position: relative; overflow: hidden; max-height: 520px; background: #000; display: flex; align-items: center; justify-content: center;">' +
-          '<img src="' + post.mediaImage + '" alt="Feed media" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" />' +
+        '<div class="insta-media-box" id="media-' + post.id + '" style="position: relative; overflow: hidden; max-height: 520px; background: ' + (post.mediaGradient || '#0f172a') + '; display: flex; align-items: center; justify-content: center;" ondblclick="handleFeedDoubleTap(\'' + post.id + '\', event)">' +
+          '<img src="' + post.mediaImage + '" alt="Feed media" style="width: 100%; height: auto; max-height: 520px; object-fit: contain; display: block;" onerror="this.style.display=\'none\'; var fb=document.getElementById(\'fallback-media-' + post.id + '\'); if(fb) fb.style.display=\'flex\';" />' +
+          '<div id="fallback-media-' + post.id + '" style="display: none; width: 100%; min-height: 240px; text-align: center; pointer-events: none; z-index: 2; padding: 2rem; flex-direction: column; align-items: center; justify-content: center;">' +
+            '<div style="font-size: 3.5rem; margin-bottom: 0.5rem;">' + (post.mediaEmoji || '🌐') + '</div>' +
+            '<div style="font-size: 1.15rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); line-height: 1.35;">' + (post.mediaTitle || 'P2P Merkle DAG Synced Post') + '</div>' +
+          '</div>' +
           '<div style="position: absolute; bottom: 8px; left: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(15,23,42,0.85); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">' +
             '<span>📦 CID:</span> <span>' + (post.mediaCid ? post.mediaCid.substring(0, 14) + '...' : 'bafybei...') + '</span>' +
           '</div>' +
@@ -10966,21 +10974,27 @@ function renderHtml(
         })
         .catch(function() {});
     }
-    setInterval(syncChatMessages, 1000);
+    setInterval(syncChatMessages, 2000);
 
+    let lastContactsSignature = '';
     function syncPeersAndContacts() {
+      if (document.hidden) return;
       const myDid = myProfile ? myProfile.did : 'self';
       fetch('/api/chat/contacts?userDid=' + encodeURIComponent(myDid))
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data && data.ok && Array.isArray(data.contacts)) {
-            contactsData = data.contacts;
-            renderChatContactsList();
+            const sig = data.contacts.map(c => (c.did || '') + ':' + (c.unreadCount || 0) + ':' + (c.lastMessage || '')).join('|');
+            if (sig !== lastContactsSignature) {
+              lastContactsSignature = sig;
+              contactsData = data.contacts;
+              renderChatContactsList();
+            }
           }
         })
         .catch(function() {});
     }
-    setInterval(syncPeersAndContacts, 1800);
+    setInterval(syncPeersAndContacts, 3500);
 
     // Voice recording handlers
     function toggleVoiceRecord() {
@@ -12514,6 +12528,8 @@ function renderHtml(
         { id: 'aud-3', title: 'Sunset Chill Acoustic', artist: 'Acoustic Peer', count: 430 }
       ]
     };
+    window.socialOmniCatalog = socialOmniCatalog;
+    try { setTimeout(renderRightRailSuggestions, 50); } catch(e) {}
 
     function openOmniSearch() {
       const m = document.getElementById('omniSearchModal');
@@ -12819,14 +12835,18 @@ function renderHtml(
             if (meFriendsCount) meFriendsCount.innerText = totalFriends.toString();
 
             if (document.body.dataset.activeTab === 'friends') {
-              renderFriendsDiscoveryView();
+              const isTyping = document.activeElement && (document.activeElement.id === 'friendsViewSearchInput');
+              if (!isTyping) {
+                renderFriendsDiscoveryView();
+              }
             }
+            try { renderRightRailSuggestions(); } catch(e) {}
             if (callback) callback();
           }
         })
         .catch(function() {});
     }
-    setInterval(syncFriendsRelationships, 2500);
+    setInterval(syncFriendsRelationships, 4000);
 
     function renderFriendsDiscoveryView() {
       const container = document.getElementById('friendsViewContent');
@@ -13218,8 +13238,9 @@ function renderHtml(
 
     function renderRightRailSuggestions() {
       const container = document.getElementById('rightRailSuggestionsList');
-      if (!container || !window.socialOmniCatalog || !window.socialOmniCatalog.people) return;
-      const suggestions = window.socialOmniCatalog.people
+      const catalog = window.socialOmniCatalog || (typeof socialOmniCatalog !== 'undefined' ? socialOmniCatalog : null);
+      if (!container || !catalog || !catalog.people) return;
+      const suggestions = catalog.people
         .filter(function(p) { return !p.isBlocked && !p.isFriend && !p.isPending; })
         .slice(0, 4);
 

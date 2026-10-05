@@ -18,8 +18,8 @@ async function runMilestoneTests() {
   const laptopDid = `did:sovra:laptop_node_${Date.now()}`;
   const laptopHandle = `@laptop_dev_${Math.random().toString(36).substring(2, 6)}`;
   
-  // Sample small 1x1 WebP avatar Data URL
-  const sampleAvatarWebp = 'data:image/webp;base64,UklGRlIAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAwAAAARBxAR/Q9ERP8DAABWUDggGAAAADABAJ0BKgEAAQAAAP4AAA3AAP7mt+AAA==';
+  // Sample valid 1x1 WebP avatar Data URL
+  const sampleAvatarWebp = 'data:image/webp;base64,UklGRhIAAABXRUJQVlA4TBEAAAAvAAAAAAfQ//73v/+BiOh/AAA=';
 
   console.log(`   [1.1] Registering unique Laptop user (${laptopHandle})...`);
   const regLaptopRes = await fetch(`${BASE_URL}/api/user/register`, {
@@ -216,7 +216,7 @@ async function runMilestoneTests() {
 
   // Step 3.1: Simulate compressed post image (WebP payload)
   console.log(`   [3.1] Generating compressed post media (WebP < 50KB)...`);
-  const sampleCompressedPostImage = 'data:image/webp;base64,UklGRmYAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAwAAAARBxAR/Q9ERP8DAABWUDggIAAAADACAJ0BKgIAAgAAAP4AAA3AAP7mt+AAAAAAAAAAAAAAAA==';
+  const sampleCompressedPostImage = 'data:image/webp;base64,UklGRhIAAABXRUJQVlA4TBEAAAAvAAAAAAfQ//73v/+BiOh/AAA=';
 
   // Step 3.2: Laptop creates post
   console.log(`   [3.2] Laptop publishes post to feed with compressed image & caption...`);
