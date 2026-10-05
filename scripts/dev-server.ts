@@ -1,4 +1,5 @@
 import http from 'node:http';
+import fs from 'node:fs';
 import {
   generateEd25519KeyPair,
   bytesToHex,
@@ -497,7 +498,7 @@ interface ChatMessageRecord {
   reactions?: { emoji: string; senderDid: string }[];
 }
 
-const chatMessagesStore: ChatMessageRecord[] = [
+const initialChatMessages: ChatMessageRecord[] = [
   {
     id: 'msg-1',
     senderDid: 'did:sovra:alice_peer',
@@ -568,7 +569,7 @@ export interface FeedPostRecord {
   comments: { author: string; text: string }[];
 }
 
-const feedPostsStore: FeedPostRecord[] = [
+const initialFeedPosts: FeedPostRecord[] = [
   {
     id: 'feed-1',
     authorDid: 'did:sovra:alice_peer',
@@ -656,6 +657,96 @@ const feedPostsStore: FeedPostRecord[] = [
     ],
   },
 ];
+
+export interface ChannelRecord {
+  id: string;
+  handle: string;
+  name: string;
+  category: string;
+  desc: string;
+  count: number;
+  avatar: string;
+  bg: string;
+  isSubbed: boolean;
+  ownerDid?: string;
+  createdAt: number;
+}
+
+export interface PageRecord {
+  id: string;
+  handle: string;
+  name: string;
+  category: string;
+  bio: string;
+  count: number;
+  cta: string;
+  ctaType: string;
+  avatar: string;
+  bg: string;
+  isFollowing: boolean;
+  ownerDid?: string;
+  createdAt: number;
+}
+
+const initialChannels: ChannelRecord[] = [
+  { id: 'ch-alpha', handle: '@sovra_alpha', name: 'Sovra Alpha Radar', category: 'tech', desc: 'Cutting-edge P2P social dispatches', count: 14200, avatar: '📢', bg: '#0284c7', isSubbed: true, createdAt: Date.now() - 10000000 },
+  { id: 'ch-gaming', handle: '@web3_gaming', name: 'Web3 Arcade Live', category: 'gaming', desc: 'Multiplayer P2P tournaments & game clips', count: 8900, avatar: '🎮', bg: '#8b5cf6', isSubbed: false, createdAt: Date.now() - 8000000 },
+  { id: 'ch-news', handle: '@decentral_news', name: 'Global Mesh Dispatches', category: 'news', desc: 'Uncensored citizen dispatches over GossipSub', count: 24500, avatar: '📰', bg: '#10b981', isSubbed: false, createdAt: Date.now() - 6000000 },
+  { id: 'ch-music', handle: '@ambient_radio', name: '24/7 Lo-Fi Mesh Waves', category: 'music', desc: 'Continuous stream seeded across 40 nodes', count: 6200, avatar: '🎵', bg: '#f43f5e', isSubbed: true, createdAt: Date.now() - 4000000 },
+];
+
+const initialPages: PageRecord[] = [
+  { id: 'pg-metropolis', handle: '@metropolis_coffee', name: 'Metropolis Roastery', category: 'business', bio: 'Artisan cold brew with gigabit sovereign Wi-Fi', count: 3400, cta: 'Book Table', ctaType: 'book', avatar: '☕', bg: '#78350f', isFollowing: false, createdAt: Date.now() - 12000000 },
+  { id: 'pg-meshlabs', handle: '@mesh_labs', name: 'Mesh Labs AI', category: 'brand', bio: 'Local edge LLMs and private search models', count: 12400, cta: 'Visit Website', ctaType: 'website', avatar: '⚡', bg: '#4f46e5', isFollowing: true, createdAt: Date.now() - 9000000 },
+  { id: 'pg-bakery', handle: '@artisan_bakery', name: 'Sovereign Sourdough', category: 'business', bio: 'Fresh organic loaves delivered directly via P2P orders', count: 1850, cta: 'Send Message', ctaType: 'message', avatar: '🥖', bg: '#d97706', isFollowing: false, createdAt: Date.now() - 7000000 },
+];
+
+export interface DynamicSocialState {
+  posts: FeedPostRecord[];
+  channels: ChannelRecord[];
+  pages: PageRecord[];
+  chatMessages: ChatMessageRecord[];
+}
+
+const DYNAMIC_STATE_PATH = './.sovra-storage-dev/dynamic-social-state.json';
+
+function loadDynamicSocialState(): DynamicSocialState {
+  try {
+    if (fs.existsSync(DYNAMIC_STATE_PATH)) {
+      const raw = fs.readFileSync(DYNAMIC_STATE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.posts) && Array.isArray(parsed.channels) && Array.isArray(parsed.pages)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('[DynamicStore] Error loading saved dynamic state, initializing defaults:', e);
+  }
+
+  const initial: DynamicSocialState = {
+    posts: initialFeedPosts,
+    channels: initialChannels,
+    pages: initialPages,
+    chatMessages: initialChatMessages,
+  };
+  saveDynamicSocialState(initial);
+  return initial;
+}
+
+function saveDynamicSocialState(state: DynamicSocialState): void {
+  try {
+    if (!fs.existsSync('./.sovra-storage-dev')) {
+      fs.mkdirSync('./.sovra-storage-dev', { recursive: true });
+    }
+    fs.writeFileSync(DYNAMIC_STATE_PATH, JSON.stringify(state, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[DynamicStore] Error saving dynamic state to disk:', e);
+  }
+}
+
+const dynamicSocialStore = loadDynamicSocialState();
+const feedPostsStore = dynamicSocialStore.posts;
+const chatMessagesStore = dynamicSocialStore.chatMessages;
 
 export interface VideoChapter {
   timeSeconds: number;
@@ -4475,6 +4566,35 @@ function renderHtml(
           </div>
         </div>
 
+        <!-- ✍️ DYNAMIC FEED POST COMPOSER (INSTA / TWITTER STYLE) -->
+        <div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.25); background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.95)); box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+          <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+            <div style="width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; color: #fff; flex-shrink: 0; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);">
+              S
+            </div>
+            <div style="flex: 1;">
+              <textarea id="dynamicPostCaption" placeholder="What's happening on the mesh? Share photo, update or thought..." style="width: 100%; min-height: 65px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; color: #fff; padding: 0.65rem 0.85rem; font-size: 0.88rem; resize: vertical; outline: none; font-family: inherit; transition: border-color 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'"></textarea>
+              
+              <!-- Format & Theme Selector -->
+              <div style="display: flex; gap: 0.5rem; margin-top: 0.65rem; flex-wrap: wrap; align-items: center;">
+                <select id="dynamicPostTheme" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; padding: 6px 10px; border-radius: 8px; font-size: 0.78rem; outline: none; cursor: pointer;">
+                  <option value="mesh">🚀 P2P GossipSub Swarm</option>
+                  <option value="dag">📦 Merkle DAG Block</option>
+                  <option value="5g">⚡ 5G CGNAT Traversal</option>
+                  <option value="audio">🎵 Spatial Audio Stem</option>
+                  <option value="creator">💎 95/5 Creator Split</option>
+                </select>
+
+                <input id="dynamicPostTags" type="text" placeholder="#sovra #p2p #mesh" value="#sovra #p2p #decentralized" style="flex: 1; min-width: 140px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; padding: 6px 10px; border-radius: 8px; font-size: 0.78rem; outline: none;">
+                
+                <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; font-weight: 700; font-size: 0.82rem; padding: 6px 18px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4); transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                  <span>🚀 Post to Mesh</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Instagram Feed Cards Stream -->
         <div id="feedPostsStream" style="display: flex; flex-direction: column; gap: 1.5rem;">
           ${feedPostsStore
@@ -6746,6 +6866,13 @@ function renderHtml(
       if (countEl) countEl.innerText = post.likesCount.toLocaleString();
       const btnEl = document.getElementById('btn-like-' + postId);
       if (btnEl) btnEl.innerText = post.isLiked ? '❤️' : '🤍';
+
+      // Persist to backend dynamic store
+      fetch('/api/feed/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: postId, isLiked: post.isLiked })
+      }).catch(function(err) { console.warn('[Feed] Like sync warning:', err); });
     }
 
     function handleFeedDoubleTap(postId, event) {
@@ -6758,6 +6885,13 @@ function renderHtml(
         if (countEl) countEl.innerText = post.likesCount.toLocaleString();
         const btnEl = document.getElementById('btn-like-' + postId);
         if (btnEl) btnEl.innerText = '❤️';
+
+        // Persist to backend dynamic store
+        fetch('/api/feed/like', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId: postId, isLiked: true })
+        }).catch(function(err) { console.warn('[Feed] Like sync warning:', err); });
       }
 
       // Heart dopamine burst
@@ -6798,6 +6932,140 @@ function renderHtml(
         const commentDiv = document.createElement('div');
         commentDiv.innerHTML = '<strong style="color: #38bdf8; font-size: 0.82rem;">You (Me)</strong> <span style="color: #cbd5e1; font-size: 0.82rem;">' + text + '</span>';
         commentsBox.appendChild(commentDiv);
+      }
+
+      // Persist to backend dynamic store
+      fetch('/api/feed/comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: postId, text: text, author: 'You (Me)' })
+      }).catch(function(err) { console.warn('[Feed] Comment sync warning:', err); });
+    }
+
+    function submitDynamicPost() {
+      const captionEl = document.getElementById('dynamicPostCaption');
+      const text = captionEl ? captionEl.value.trim() : '';
+      if (!text) {
+        alert('Please write a caption or message before posting.');
+        return;
+      }
+
+      const theme = document.getElementById('dynamicPostTheme') ? document.getElementById('dynamicPostTheme').value : 'mesh';
+      const tags = document.getElementById('dynamicPostTags') ? document.getElementById('dynamicPostTags').value : '#sovra #p2p';
+      const btn = document.getElementById('dynamicPostPublishBtn');
+      if (btn) btn.innerText = 'Publishing...';
+
+      fetch('/api/feed/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caption: text,
+          tags: tags,
+          theme: theme
+        })
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (btn) btn.innerHTML = '<span>🚀 Post to Mesh</span>';
+        if (data.ok && data.post) {
+          captionEl.value = '';
+          feedPostsData.unshift(data.post);
+          renderDynamicPostCard(data.post, true);
+          updateProfileDynamicStats();
+        } else {
+          alert('Could not publish post: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        if (btn) btn.innerHTML = '<span>🚀 Post to Mesh</span>';
+        alert('Post error: ' + err.message);
+      });
+    }
+
+    function renderDynamicPostCard(post, isNew) {
+      const container = document.getElementById('feedPostsStream');
+      if (!container) return;
+
+      const card = document.createElement('article');
+      card.className = 'insta-post-card';
+      card.id = 'card-' + post.id;
+      if (isNew) {
+        card.style.border = '1px solid #10b981';
+        card.style.boxShadow = '0 0 25px rgba(16, 185, 129, 0.4)';
+        card.style.animation = 'feedCardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
+      }
+
+      var commentsHtml = '';
+      if (post.comments && post.comments.length) {
+        for (var i = 0; i < post.comments.length; i++) {
+          var c = post.comments[i];
+          commentsHtml += '<div><strong style="color: #cbd5e1; font-size: 0.82rem;">' + c.author + '</strong> <span style="color: #94a3b8; font-size: 0.82rem;">' + c.text + '</span></div>';
+        }
+      }
+
+      card.innerHTML = 
+        '<div class="insta-post-header">' +
+          '<div class="insta-author-info" onclick="openCreatorProfile(\'' + post.authorName.split(' ')[0].toLowerCase() + '\')">' +
+            '<div class="insta-author-avatar" style="background: ' + post.authorAvatarBg + ';">' + post.authorAvatar + '</div>' +
+            '<div>' +
+              '<div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 4px;">' +
+                '<span>' + post.authorName + '</span>' +
+                '<span style="color: #38bdf8; font-size: 0.8rem;">✓</span>' +
+              '</div>' +
+              '<div style="font-size: 0.72rem; color: #94a3b8;"><span>' + post.audioTrack + '</span></div>' +
+            '</div>' +
+          '</div>' +
+          '<button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 1rem;" title="Post Options" onclick="openPostOptionsModal(\'' + post.id + '\', \'' + post.authorName + '\', \'' + post.mediaCid + '\')">⋮</button>' +
+        '</div>' +
+
+        '<div class="insta-media-box" id="media-' + post.id + '" style="background: ' + post.mediaGradient + ';" ondblclick="handleFeedDoubleTap(\'' + post.id + '\', event)">' +
+          '<div style="text-align: center; pointer-events: none; z-index: 2; padding: 2rem;">' +
+            '<div style="font-size: 4rem; margin-bottom: 0.75rem;">' + post.mediaEmoji + '</div>' +
+            '<div style="font-size: 1.15rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); line-height: 1.35;">' + post.mediaTitle + '</div>' +
+            '<div style="margin-top: 0.85rem; display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-family: monospace; color: #a5b4fc;">' +
+              '<span>📦 CID:</span> <span>' + (post.mediaCid ? post.mediaCid.substring(0, 16) : 'bafybei...') + '...</span>' +
+            '</div>' +
+          '</div>' +
+          '<div id="heart-pop-' + post.id + '"></div>' +
+        '</div>' +
+
+        '<div class="insta-actions-row">' +
+          '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
+            '<button class="insta-action-btn" id="btn-like-' + post.id + '" onclick="triggerFeedPostLike(\'' + post.id + '\')" title="Like Post">' + (post.isLiked ? '❤️' : '🤍') + '</button>' +
+            '<button class="insta-action-btn" onclick="focusFeedComment(\'' + post.id + '\')" title="Comment">💬</button>' +
+            '<button class="insta-action-btn" onclick="openRepostModal(\'' + post.id + '\')" title="Repost / Quote">🔁</button>' +
+            '<button class="insta-action-btn" onclick="shareFeedPostCid(\'' + post.mediaCid + '\')" title="Share CID to P2P Mesh">🚀</button>' +
+            '<button class="insta-action-btn" onclick="handleFeedDislike(\'' + post.id + '\')" title="Dislike / Show Less">👎</button>' +
+          '</div>' +
+          '<button class="insta-action-btn" id="btn-save-' + post.id + '" onclick="toggleSaveFeedPost(\'' + post.id + '\')" title="Pin to Local Blockstore">' + (post.isSaved ? '🔖' : '🏷️') + '</button>' +
+        '</div>' +
+
+        '<div class="insta-likes-text">' +
+          '<span id="likes-count-' + post.id + '">' + post.likesCount.toLocaleString() + '</span> likes' +
+        '</div>' +
+
+        '<div class="insta-caption">' +
+          '<strong>' + post.authorName.split(' ')[0] + '</strong> <span>' + post.caption + '</span>' +
+          '<div class="insta-tags" style="margin-top: 0.25rem;">' + post.tags + '</div>' +
+        '</div>' +
+
+        '<div class="insta-comments-preview" id="comments-box-' + post.id + '">' +
+          '<div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">View all comments &bull; Verified on DHT</div>' +
+          commentsHtml +
+        '</div>' +
+
+        '<div class="insta-comment-input-row">' +
+          '<input type="text" id="input-comment-' + post.id + '" placeholder="Add a comment to GossipSub swarm..." onkeydown="if(event.key===\'Enter\') submitFeedComment(\'' + post.id + '\')">' +
+          '<button onclick="submitFeedComment(\'' + post.id + '\')">Post</button>' +
+        '</div>';
+
+      container.insertBefore(card, container.firstChild);
+    }
+
+    function updateProfileDynamicStats() {
+      const postsCountEl = document.getElementById('profilePostsCount');
+      if (postsCountEl) {
+        postsCountEl.innerText = feedPostsData.length.toString();
       }
     }
 
@@ -7940,6 +8208,12 @@ function renderHtml(
       chatMessages.push(newMsg);
       input.value = '';
       renderChatBubbles();
+
+      fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMsg)
+      }).catch(function(err) { console.warn('[Chat] Send sync warning:', err); });
 
       // Progression 1: Delivered (Double grey ticks) after 450ms
       setTimeout(function() {
@@ -9675,19 +9949,29 @@ function renderHtml(
     }
 
     function toggleChannelSubscribeDemo(id) {
-      const ch = socialOmniCatalog.channels.find(x => x.id === id);
+      const ch = socialOmniCatalog.channels.find(function(x) { return x.id === id; });
       if (!ch) return;
       ch.isSubbed = !ch.isSubbed;
       ch.count += ch.isSubbed ? 1 : -1;
       filterOmniSearch(document.getElementById('omniSearchInput').value || '');
+      fetch('/api/social/channels/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: id })
+      }).catch(function(err) { console.warn('[Channel] Subscribe sync warning:', err); });
     }
 
     function togglePageFollowDemo(id) {
-      const pg = socialOmniCatalog.pages.find(x => x.id === id);
+      const pg = socialOmniCatalog.pages.find(function(x) { return x.id === id; });
       if (!pg) return;
       pg.isFollowing = !pg.isFollowing;
       pg.count += pg.isFollowing ? 1 : -1;
       filterOmniSearch(document.getElementById('omniSearchInput').value || '');
+      fetch('/api/social/pages/follow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId: id })
+      }).catch(function(err) { console.warn('[Page] Follow sync warning:', err); });
     }
 
     // --- Channel Creation Handlers ---
@@ -9709,22 +9993,32 @@ function renderHtml(
         return;
       }
       if (!handle.startsWith('@')) handle = '@' + handle;
-      const newChan = {
-        id: 'ch-' + Date.now(),
-        handle: handle.toLowerCase(),
-        name,
-        category: cat,
-        desc: desc || 'Sovereign channel',
-        count: 1,
-        avatar: '📢',
-        bg: '#0284c7',
-        isSubbed: true
-      };
-      socialOmniCatalog.channels.unshift(newChan);
-      closeCreateChannelModal();
-      alert('🎉 Sovereign Channel ' + handle + ' successfully published to GossipSub! You are registered as the Owner.');
-      openOmniSearch();
-      switchSearchTab('channels');
+
+      fetch('/api/social/channels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name,
+          handle: handle,
+          category: cat,
+          desc: desc
+        })
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.ok && data.channel) {
+          socialOmniCatalog.channels.unshift(data.channel);
+          closeCreateChannelModal();
+          alert('🎉 Sovereign Channel ' + handle + ' created and saved to dynamic store! You are registered as the Owner.');
+          openOmniSearch();
+          switchSearchTab('channels');
+        } else {
+          alert('Failed to create channel: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        alert('Channel creation error: ' + err.message);
+      });
     }
 
     // --- Page Creation Handlers ---
@@ -9747,30 +10041,38 @@ function renderHtml(
         return;
       }
       if (!handle.startsWith('@')) handle = '@' + handle;
-      const ctaLabels = { message: 'Send Message', website: 'Visit Website', book: 'Book Service', tip: 'Tip Creator' };
-      const newPage = {
-        id: 'pg-' + Date.now(),
-        handle: handle.toLowerCase(),
-        name,
-        category: cat,
-        bio: bio || 'Sovereign page',
-        count: 1,
-        cta: ctaLabels[ctaType] || 'Contact',
-        ctaType,
-        avatar: '🏢',
-        bg: '#9333ea',
-        isFollowing: true
-      };
-      socialOmniCatalog.pages.unshift(newPage);
-      closeCreatePageModal();
-      alert('🎉 Sovereign Page ' + handle + ' created! Customers can now discover your brand in Omni-Search.');
-      openOmniSearch();
-      switchSearchTab('pages');
+
+      fetch('/api/social/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name,
+          handle: handle,
+          category: cat,
+          ctaType: ctaType,
+          bio: bio
+        })
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.ok && data.page) {
+          socialOmniCatalog.pages.unshift(data.page);
+          closeCreatePageModal();
+          alert('🎉 Sovereign Page ' + handle + ' created and saved to dynamic store! CTA: ' + data.page.cta);
+          openOmniSearch();
+          switchSearchTab('pages');
+        } else {
+          alert('Failed to create page: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        alert('Page creation error: ' + err.message);
+      });
     }
 
     // --- Feed Post Options & Actions ---
     function openPostOptionsModal(postId, author, cid) {
-      activeTargetPost = { id: postId, author, cid };
+      activeTargetPost = { id: postId, author: author, cid: cid };
       const m = document.getElementById('postOptionsModal');
       if (m) m.style.display = 'flex';
     }
@@ -9797,6 +10099,24 @@ function renderHtml(
       const card = document.getElementById('card-' + activeTargetPost.id);
       if (card) card.style.display = 'none';
       alert('🚫 Author ' + activeTargetPost.author + ' blocked! Post removed from viewport.');
+    }
+    function triggerDeleteFromModal() {
+      closePostOptionsModal();
+      const card = document.getElementById('card-' + activeTargetPost.id);
+      if (card) {
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.95)';
+        card.style.transition = 'all 0.3s ease';
+        setTimeout(function() { card.remove(); }, 320);
+      }
+      feedPostsData = feedPostsData.filter(function(p) { return p.id !== activeTargetPost.id; });
+      updateProfileDynamicStats();
+      fetch('/api/feed/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: activeTargetPost.id })
+      }).catch(function(err) { console.warn('[Feed] Delete error:', err); });
+      alert('🗑️ Post deleted from local feed and network tombstone published!');
     }
 
     // --- Dislike Handler ---
@@ -10261,6 +10581,311 @@ async function startDevServer() {
       const feedItems = localFeed.getChronologicalFeed(masterKey.did, 50);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, posts: feedItems }));
+      return;
+    }
+
+    // ==========================================
+    // 🌐 100% DYNAMIC DATA-DRIVEN SOCIAL ENGINE
+    // ==========================================
+
+    // API: Dynamic Feed List
+    if (url.pathname === '/api/feed/list' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, posts: dynamicSocialStore.posts }));
+      return;
+    }
+
+    // API: Create Dynamic Post
+    if (url.pathname === '/api/feed/create' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body);
+          const caption = String(parsed.caption || '').trim();
+          if (!caption) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Caption is required' }));
+            return;
+          }
+
+          const themes: Record<string, { emoji: string; title: string; gradient: string }> = {
+            dag: { emoji: '📦', title: 'Merkle DAG Block Verified on Device', gradient: 'radial-gradient(circle at center, #064e3b 0%, #022c22 100%)' },
+            '5g': { emoji: '⚡', title: '5G CGNAT Hole Punch Traversal Benchmark', gradient: 'radial-gradient(circle at center, #78350f 0%, #451a03 100%)' },
+            audio: { emoji: '🎵', title: 'Spatial Audio Stem Mixed Locally', gradient: 'radial-gradient(circle at center, #831843 0%, #4a044e 100%)' },
+            creator: { emoji: '💎', title: 'Dynamic 95/5 Creator Split Settlement', gradient: 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)' },
+            mesh: { emoji: '🚀', title: 'P2P GossipSub Swarm Live Packet Sync', gradient: 'radial-gradient(circle at center, #1e1b4b 0%, #1e40af 100%)' },
+          };
+
+          const selectedTheme = themes[parsed.theme || 'mesh'] || themes.mesh;
+          const newPostId = 'feed-' + Date.now();
+          const mockCid = 'bafybei' + Math.random().toString(36).substring(2, 12) + Math.random().toString(36).substring(2, 12);
+
+          const newPost: FeedPostRecord = {
+            id: newPostId,
+            authorDid: masterKey.did,
+            authorName: 'You (Sovereign Peer)',
+            authorAvatar: 'S',
+            authorAvatarBg: '#6366f1',
+            audioTrack: String(parsed.audioTrack || 'Original Audio • Sovra Mesh'),
+            mediaGradient: selectedTheme.gradient,
+            mediaEmoji: selectedTheme.emoji,
+            mediaTitle: selectedTheme.title,
+            mediaCid: mockCid,
+            likesCount: 0,
+            isLiked: false,
+            isSaved: false,
+            caption,
+            tags: String(parsed.tags || '#sovra #p2p #mesh'),
+            timestamp: Date.now(),
+            comments: [],
+          };
+
+          dynamicSocialStore.posts.unshift(newPost);
+          saveDynamicSocialState(dynamicSocialStore);
+
+          localFeed.appendEvent({
+            id: newPost.id,
+            pubkey: masterKey.did,
+            createdAt: Math.floor(newPost.timestamp / 1000),
+            kind: 1,
+            tags: [['tags', newPost.tags]],
+            content: newPost.caption,
+            sig: 'ed25519_sig_dynamic_' + newPost.id,
+          });
+
+          await node.pubsub.publish('sovra/feed/main', new TextEncoder().encode(JSON.stringify(newPost)));
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, post: newPost }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: String(e) }));
+        }
+      });
+      return;
+    }
+
+    // API: Like / Unlike Feed Post
+    if (url.pathname === '/api/feed/like' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const post = dynamicSocialStore.posts.find(p => p.id === parsed.postId);
+          if (post) {
+            post.isLiked = Boolean(parsed.isLiked);
+            if (post.isLiked) {
+              post.likesCount++;
+            } else {
+              post.likesCount = Math.max(0, post.likesCount - 1);
+            }
+            saveDynamicSocialState(dynamicSocialStore);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, isLiked: post.isLiked, likesCount: post.likesCount }));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Post not found' }));
+          }
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    // API: Add Comment to Post
+    if (url.pathname === '/api/feed/comment' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const post = dynamicSocialStore.posts.find(p => p.id === parsed.postId);
+          if (post) {
+            const comment = {
+              author: String(parsed.author || 'You (Me)'),
+              text: String(parsed.text || ''),
+            };
+            post.comments.push(comment);
+            saveDynamicSocialState(dynamicSocialStore);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, comment }));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Post not found' }));
+          }
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    // API: Delete Post
+    if (url.pathname === '/api/feed/delete' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const idx = dynamicSocialStore.posts.findIndex(p => p.id === parsed.postId);
+          if (idx !== -1) {
+            dynamicSocialStore.posts.splice(idx, 1);
+            saveDynamicSocialState(dynamicSocialStore);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true }));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Post not found' }));
+          }
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    // API: Channels List & Create & Subscribe
+    if (url.pathname === '/api/social/channels' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, channels: dynamicSocialStore.channels }));
+      return;
+    }
+
+    if (url.pathname === '/api/social/channels' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          let handle = String(parsed.handle || '').trim();
+          if (!handle.startsWith('@')) handle = '@' + handle;
+          const newChan: ChannelRecord = {
+            id: 'ch-' + Date.now(),
+            handle: handle.toLowerCase(),
+            name: String(parsed.name || 'Untitled Channel'),
+            category: String(parsed.category || 'tech'),
+            desc: String(parsed.desc || 'Sovereign channel'),
+            count: 1,
+            avatar: '📢',
+            bg: '#0284c7',
+            isSubbed: true,
+            ownerDid: masterKey.did,
+            createdAt: Date.now(),
+          };
+          dynamicSocialStore.channels.unshift(newChan);
+          saveDynamicSocialState(dynamicSocialStore);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, channel: newChan }));
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/social/channels/subscribe' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const ch = dynamicSocialStore.channels.find(c => c.id === parsed.channelId);
+          if (ch) {
+            ch.isSubbed = !ch.isSubbed;
+            ch.count = ch.isSubbed ? ch.count + 1 : Math.max(0, ch.count - 1);
+            saveDynamicSocialState(dynamicSocialStore);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, isSubbed: ch.isSubbed, count: ch.count }));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Channel not found' }));
+          }
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    // API: Pages List & Create & Follow
+    if (url.pathname === '/api/social/pages' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, pages: dynamicSocialStore.pages }));
+      return;
+    }
+
+    if (url.pathname === '/api/social/pages' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          let handle = String(parsed.handle || '').trim();
+          if (!handle.startsWith('@')) handle = '@' + handle;
+          const ctaLabels: Record<string, string> = {
+            message: 'Send Message',
+            website: 'Visit Website',
+            book: 'Book Service',
+            tip: 'Tip Creator',
+          };
+          const ctaType = String(parsed.ctaType || 'message');
+          const newPage: PageRecord = {
+            id: 'pg-' + Date.now(),
+            handle: handle.toLowerCase(),
+            name: String(parsed.name || 'Untitled Page'),
+            category: String(parsed.category || 'business'),
+            bio: String(parsed.bio || 'Sovereign business page'),
+            count: 1,
+            cta: ctaLabels[ctaType] || 'Send Message',
+            ctaType,
+            avatar: '🏢',
+            bg: '#4f46e5',
+            isFollowing: true,
+            ownerDid: masterKey.did,
+            createdAt: Date.now(),
+          };
+          dynamicSocialStore.pages.unshift(newPage);
+          saveDynamicSocialState(dynamicSocialStore);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, page: newPage }));
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/social/pages/follow' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const pg = dynamicSocialStore.pages.find(p => p.id === parsed.pageId);
+          if (pg) {
+            pg.isFollowing = !pg.isFollowing;
+            pg.count = pg.isFollowing ? pg.count + 1 : Math.max(0, pg.count - 1);
+            saveDynamicSocialState(dynamicSocialStore);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, isFollowing: pg.isFollowing, count: pg.count }));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Page not found' }));
+          }
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        }
+      });
       return;
     }
 
