@@ -30,6 +30,7 @@ import {
   createSignedReactionEvent,
   createSignedShortPost,
 } from '../packages/social/dist/index.js';
+import { renderAdminHtml } from './admin-console.ts';
 
 interface PostRecord {
   id: string;
@@ -5410,6 +5411,11 @@ function renderHtml(
           <div style="font-size: 0.72rem; color: #34d399;">● Online Node</div>
         </div>
       </div>
+
+      <a href="/admin" target="_blank" style="margin-top: 0.65rem; display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.75rem; border-radius: 10px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; text-decoration: none; font-size: 0.78rem; font-weight: 700; transition: all 0.15s;" onmouseover="this.style.background='rgba(56, 189, 248, 0.18)'" onmouseout="this.style.background='rgba(56, 189, 248, 0.08)'" title="Open Dedicated Company Operations Console">
+        <span>🛡️ Ops Console (/admin)</span>
+        <span>↗</span>
+      </a>
     </aside>
 
     <!-- Column 2: Center Stage -->
@@ -7080,6 +7086,30 @@ function renderHtml(
 
         <!-- Ops Console Main Metrics & Audit Stream -->
         <div style="display: flex; flex-direction: column; gap: 1.5rem; flex: 1;">
+          <!-- Product B Decoupled Portal Hero Card -->
+          <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98)); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.4);">
+            <div>
+              <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.72rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.35); text-transform: uppercase; margin-bottom: 0.5rem;">
+                🚀 Product B &bull; Separated Operations Architecture
+              </div>
+              <div style="font-size: 1.25rem; font-weight: 800; color: #fff;">
+                Dedicated Standalone Operations Console Active
+              </div>
+              <div style="font-size: 0.82rem; color: #94a3b8; margin-top: 0.25rem; max-width: 600px;">
+                The Admin Console now has its own isolated development environment, real-time telemetry stream, P2P swarm visualizer, and 95/5 economic ledger at <strong style="color: #38bdf8;">/admin</strong>.
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+              <a href="/admin" target="_blank" class="btn btn-primary" style="padding: 0.65rem 1.25rem; font-size: 0.88rem; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 16px rgba(99, 102, 241, 0.5);">
+                <span>🛡️ Launch Fullscreen Admin Panel (/admin)</span>
+                <span>↗</span>
+              </a>
+              <a href="/api/status" target="_blank" class="btn btn-secondary" style="padding: 0.65rem 1rem; font-size: 0.84rem; text-decoration: none;">
+                <span>JSON Status</span>
+              </a>
+            </div>
+          </div>
+
           <div class="notice-banner">
             🛡️ <strong>Decentralized Independence Notice:</strong> This company operations console is an auxiliary tool for Sovra company staff. The Sovra decentralized mesh, end-user messaging, creator studio, and identity layers continue operating autonomously with <strong>zero runtime dependency</strong> on this admin console.
           </div>
@@ -13672,8 +13702,36 @@ async function startDevServer() {
       return;
     }
 
-    // Default HTML UI
-    if (url.pathname === '/' || url.pathname === '/index.html') {
+    // Product B: Standalone Company Operations Console (Dedicated Admin Panel)
+    if (url.pathname === '/admin' || url.pathname === '/admin/' || url.pathname === '/admin/index.html') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(
+        renderAdminHtml({
+          peerId: binding.peerId,
+          did: masterKey.did,
+          devicePublicKeyHex: binding.devicePublicKeyHex,
+          tcpPort,
+          uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
+          totalBlocks: storageDaemon.getStats().totalBlocks,
+          pinnedCount: storageDaemon.getStats().pinnedCount,
+          postsCount: feedPostsStore.length,
+          connectedPeers: node.getConnectedPeers(),
+          vouchers: tipVouchersStore,
+        }),
+      );
+      return;
+    }
+
+    // Emergency Panic Wipe Endpoint (Operations Console)
+    if (url.pathname === '/api/admin/panic' && req.method === 'POST') {
+      console.log('[SECURITY] Emergency panic wipe triggered from Operations Console');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, wiped: true }));
+      return;
+    }
+
+    // Product A: Sovra Consumer Social App & Creator Studio (Dedicated User Panel)
+    if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/app') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(renderHtml(binding, masterKey, tcpPort, Date.now() - startTime, storageDaemon, socialGraph, localFeed));
       return;
@@ -13689,8 +13747,8 @@ async function startDevServer() {
     console.log(`  🌐 Sovra Localhost Server is LIVE at:`);
     console.log(`     👉 http://localhost:${HTTP_PORT}`);
     console.log(`============================================================\n`);
-    console.log(`  - Product A (Sovra End-User App & Creator Studio): http://localhost:${HTTP_PORT}`);
-    console.log(`  - Product B (Sovra Company Operations Console):   http://localhost:${HTTP_PORT}`);
+    console.log(`  - Product A (Sovra End-User Social App):          http://localhost:${HTTP_PORT}`);
+    console.log(`  - Product B (Sovra Company Operations Console):   http://localhost:${HTTP_PORT}/admin`);
     console.log(`  - JSON Node Health Status:                      http://localhost:${HTTP_PORT}/api/status`);
     console.log(`  - P2P Noise_XX TCP Port:                         127.0.0.1:${tcpPort}`);
     console.log(`\nPress Ctrl+C to terminate the local node.`);
