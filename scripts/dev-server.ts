@@ -10425,43 +10425,48 @@ function renderHtml(
     let isSessionLockedState = false;
     let currentProfileWiped = false;
     let myProfile = null;
-    try {
-      const saved = localStorage.getItem('sovra_user_profile');
-      if (saved) {
-        myProfile = JSON.parse(saved);
-        if (myProfile) {
-          myProfile.name = myProfile.displayName || myProfile.name || (isMobileDevice ? 'Mobile Peer' : 'Host Node');
+    const isExplicitlyLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
+    if (!isExplicitlyLoggedOut) {
+      try {
+        const saved = localStorage.getItem('sovra_user_profile');
+        if (saved) {
+          myProfile = JSON.parse(saved);
+          if (myProfile) {
+            myProfile.name = myProfile.displayName || myProfile.name || (isMobileDevice ? 'Mobile Peer' : 'Host Node');
+          }
+        }
+      } catch (e) {}
+
+      // Auto-seed host profile if none exists so UI is 100% dynamic & immediately interactive
+      if (!myProfile) {
+        myProfile = {
+          did: '${masterKey.did}',
+          handle: isMobileDevice ? '@phone_user' : '${hostUser ? hostUser.handle : "@laptop_host"}',
+          displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
+          name: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
+          avatar: isMobileDevice ? '📱' : '💻',
+          avatarBg: '#6366f1',
+          bio: isMobileDevice ? 'Sovereign Phone Peer' : 'Sovereign P2P Node Operator',
+          deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
+          device: isMobileDevice ? 'Mobile' : 'Desktop',
+          isOnline: true,
+          sessionToken: '${hostSessionToken}',
+        };
+        try {
+          localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+          if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
+        } catch(e) {}
+      } else {
+        const activeSavedToken = localStorage.getItem('sovra_session_token');
+        if ((!activeSavedToken || activeSavedToken === 'undefined' || activeSavedToken === 'null') && window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) {
+          try { localStorage.setItem('sovra_session_token', window.SOVRA_HOST_SESSION.token); } catch(e) {}
         }
       }
-    } catch (e) {}
-
-    // Auto-seed host profile if none exists so UI is 100% dynamic & immediately interactive
-    if (!myProfile) {
-      myProfile = {
-        did: '${masterKey.did}',
-        handle: isMobileDevice ? '@phone_user' : '${hostUser ? hostUser.handle : "@laptop_host"}',
-        displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
-        name: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
-        avatar: isMobileDevice ? '📱' : '💻',
-        avatarBg: '#6366f1',
-        bio: isMobileDevice ? 'Sovereign Phone Peer' : 'Sovereign P2P Node Operator',
-        deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
-        device: isMobileDevice ? 'Mobile' : 'Desktop',
-        isOnline: true,
-        sessionToken: '${hostSessionToken}',
-      };
-      try {
-        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-        if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
-      } catch(e) {}
     } else {
-      const activeSavedToken = localStorage.getItem('sovra_session_token');
-      if ((!activeSavedToken || activeSavedToken === 'undefined' || activeSavedToken === 'null') && window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) {
-        try { localStorage.setItem('sovra_session_token', window.SOVRA_HOST_SESSION.token); } catch(e) {}
-      }
+      myProfile = null;
     }
 
-    let currentUserHandle = myProfile ? myProfile.handle : (isMobileDevice ? '@phone_user' : '${hostUser ? hostUser.handle : "@laptop_host"}');
+    let currentUserHandle = myProfile ? myProfile.handle : '@guest';
 
     function compressImage(file, maxDimension, quality, callback) {
       maxDimension = maxDimension || 1200;
@@ -10760,7 +10765,64 @@ function renderHtml(
     }
 
     function updateUserDisplayInUI() {
-      if (!myProfile) return;
+      if (!myProfile) {
+        currentUserHandle = '@guest';
+        const avatarEl = document.getElementById('currentUserAvatar');
+        if (avatarEl) { avatarEl.innerText = '?'; avatarEl.style.background = '#475569'; }
+        const railAvatar = document.getElementById('railUserAvatar');
+        if (railAvatar) { railAvatar.innerText = '?'; railAvatar.style.background = '#475569'; }
+        const railName = document.getElementById('railUserName');
+        if (railName) railName.innerText = 'Guest (Logged Out)';
+        const railHandle = document.getElementById('railUserHandle');
+        if (railHandle) railHandle.innerText = '@guest';
+        const handleEl = document.getElementById('currentUserHandleText');
+        if (handleEl) handleEl.innerText = '@guest';
+        const almHandle = document.getElementById('almProfileHandle');
+        if (almHandle) almHandle.innerText = '@guest';
+        const profileName = document.getElementById('meProfileName') || document.querySelector('.profile-name');
+        if (profileName) profileName.innerText = 'Guest (Logged Out)';
+        const profileAvatarDiv = document.getElementById('meProfileAvatarContainer') || document.querySelector('.profile-avatar-large');
+        const avatarRemoveBadge = document.getElementById('avatarRemoveBadge');
+        if (profileAvatarDiv) {
+          profileAvatarDiv.style.background = '#334155';
+          profileAvatarDiv.innerHTML = '<span id="meProfileAvatarText">?</span>';
+          if (avatarRemoveBadge) avatarRemoveBadge.style.display = 'none';
+        }
+        const profileHandle = document.getElementById('meProfileHandle');
+        if (profileHandle) profileHandle.innerHTML = '@guest &bull; Logged Out';
+        const profileBio = document.getElementById('meProfileBio');
+        if (profileBio) profileBio.innerText = 'You are currently logged out. Create or sign in with your sovereign passkey identity.';
+        const profileDid = document.getElementById('meProfileDid');
+        if (profileDid) {
+          profileDid.innerText = 'did:key:...';
+          profileDid.dataset.fullDid = '';
+        }
+        const roleBadge = document.getElementById('meRoleBadge');
+        if (roleBadge) roleBadge.innerText = 'Unauthenticated Guest';
+        const cardDid = document.getElementById('meCardDid');
+        if (cardDid) { cardDid.innerText = 'Not Signed In'; cardDid.dataset.fullValue = ''; }
+        const cardPeerId = document.getElementById('meCardPeerId');
+        if (cardPeerId) { cardPeerId.innerText = '—'; cardPeerId.dataset.fullValue = ''; }
+        const cardDeviceKey = document.getElementById('meCardDeviceKey');
+        if (cardDeviceKey) { cardDeviceKey.innerText = '—'; cardDeviceKey.dataset.fullValue = ''; }
+        const composerAvatar = document.querySelector('.composer-avatar');
+        if (composerAvatar) { composerAvatar.innerText = '?'; composerAvatar.style.background = '#475569'; }
+        const myStoryAvatar = document.getElementById('myStoryAvatar');
+        if (myStoryAvatar) { myStoryAvatar.innerText = '?'; myStoryAvatar.style.background = '#475569'; }
+        const coverEl = document.getElementById('meProfileCover');
+        const directCoverRemoveBtn = document.getElementById('directCoverRemoveBtn');
+        if (coverEl) {
+          coverEl.style.backgroundImage = 'none';
+          coverEl.style.background = 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)';
+          coverEl.style.backgroundSize = 'cover';
+          if (directCoverRemoveBtn) directCoverRemoveBtn.style.display = 'none';
+        }
+        const websiteRow = document.getElementById('meProfileWebsiteRow');
+        if (websiteRow) websiteRow.style.display = 'none';
+        const badge = document.getElementById('meEd25519Badge');
+        if (badge) badge.innerText = 'Guest';
+        return;
+      }
       myProfile.name = myProfile.displayName || myProfile.name || 'Sovereign Node';
       currentUserHandle = myProfile.handle || '@laptop_host';
 
@@ -10930,6 +10992,7 @@ function renderHtml(
     }
 
     function skipOnboardingAsHost() {
+      localStorage.removeItem('sovra_logged_out');
       closeOnboardingModal();
       if (!myProfile || !myProfile.did) {
         myProfile = {
@@ -10943,8 +11006,12 @@ function renderHtml(
           deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
           device: isMobileDevice ? 'Mobile' : 'Desktop',
           isOnline: true,
+          sessionToken: '${hostSessionToken}',
         };
-        try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
+        try {
+          localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+          if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
+        } catch(e) {}
       }
       currentUserHandle = myProfile.handle;
       updateUserDisplayInUI();
@@ -11150,6 +11217,23 @@ function renderHtml(
 
     // Auto-check onboarding on first visit & restore session from server
     window.addEventListener('DOMContentLoaded', function() {
+      const isExplicitlyLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
+      if (isExplicitlyLoggedOut) {
+        updateUserDisplayInUI();
+        const wom = document.getElementById('welcomeOnboardingModal');
+        if (wom) {
+          wom.style.zIndex = '999998';
+          wom.style.display = 'flex';
+          const s1 = document.getElementById('womStep1');
+          const s2 = document.getElementById('womStep2');
+          const s3 = document.getElementById('womStep3');
+          if (s1) s1.style.display = 'block';
+          if (s2) s2.style.display = 'none';
+          if (s3) s3.style.display = 'none';
+        }
+        return;
+      }
+
       const sessionToken = localStorage.getItem('sovra_session_token');
 
       function showOnboardingModal() {
@@ -11287,8 +11371,10 @@ function renderHtml(
     }
 
     function openLogoutModal() {
+      if (typeof hideProfileOverflowMenu === 'function') hideProfileOverflowMenu();
       const modal = document.getElementById('logoutConfirmModal');
       if (!modal) return;
+      modal.style.zIndex = '999999';
       const handleEl = document.getElementById('logoutModalUserHandle');
       if (handleEl) {
         const handle = (myProfile && myProfile.handle) ? myProfile.handle : '@you';
@@ -11326,19 +11412,36 @@ function renderHtml(
 
       localStorage.removeItem('sovra_session_token');
       sessionStorage.removeItem('sovra_session_token');
+      localStorage.removeItem('sovra_user_profile');
+      sessionStorage.removeItem('sovra_user_profile');
+      sessionStorage.removeItem('sovra_onboarding_dismissed');
+      localStorage.setItem('sovra_logged_out', 'true');
+
+      myProfile = null;
+      currentUserHandle = '@guest';
+
+      updateUserDisplayInUI();
 
       showAccountToast('👋 Logged out successfully. See you soon on the mesh!');
       closeLogoutModal();
 
       setTimeout(function() {
         const wom = document.getElementById('welcomeOnboardingModal');
-        if (wom) wom.style.display = 'flex';
+        if (wom) {
+          wom.style.zIndex = '999998';
+          wom.style.display = 'flex';
+        }
         const s1 = document.getElementById('womStep1');
         const s2 = document.getElementById('womStep2');
         const s3 = document.getElementById('womStep3');
         if (s1) s1.style.display = 'block';
         if (s2) s2.style.display = 'none';
         if (s3) s3.style.display = 'none';
+
+        const handleInput = document.getElementById('womHandleInput');
+        if (handleInput) handleInput.value = '';
+        const nameInput = document.getElementById('womNameInput');
+        if (nameInput) nameInput.value = '';
 
         if (btn) {
           btn.disabled = false;
@@ -11523,6 +11626,7 @@ function renderHtml(
         myProfile = data.user;
         currentUserHandle = myProfile.handle;
 
+        localStorage.removeItem('sovra_logged_out');
         try {
           localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
           if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
@@ -11574,6 +11678,7 @@ function renderHtml(
           })
         }).then(r => r.json()).then(data => {
           if (data.ok && data.user) {
+            localStorage.removeItem('sovra_logged_out');
             myProfile = data.user;
             if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
             localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
@@ -11585,6 +11690,7 @@ function renderHtml(
     }
 
     function closeOnboardingModalAndEnter() {
+      localStorage.removeItem('sovra_logged_out');
       const wom = document.getElementById('welcomeOnboardingModal');
       if (wom) wom.style.display = 'none';
       currentProfileWiped = false;

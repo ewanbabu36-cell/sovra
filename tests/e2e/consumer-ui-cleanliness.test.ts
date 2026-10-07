@@ -60,5 +60,14 @@ describe('Consumer Social UI Cleanliness & Admin Segregation Suite', () => {
     expect(content).toContain('id="confirmLogoutSubmitBtn"');
     expect(content).toContain('executeUserLogout()');
     expect(content).toContain('/api/user/logout');
+
+    // 4. Complete session & profile credential purge
+    expect(content).toContain("localStorage.setItem('sovra_logged_out', 'true')");
+    expect(content).toContain("localStorage.removeItem('sovra_user_profile')");
+    expect(content).toContain("localStorage.removeItem('sovra_session_token')");
+
+    // 5. Explicitly logged out protection against auto-seed trap
+    expect(content).toContain("const isExplicitlyLoggedOut = localStorage.getItem('sovra_logged_out') === 'true'");
+    expect(content).toContain("currentUserHandle = '@guest'");
   });
 });
