@@ -9,4 +9,9 @@ export * from './spectral.js';
 export * from './channel.js';
 export * from './page.js';
 export * from './omni-search.js';
+export * from './portable-graph.js';
+export * from './reputation.js';
+export * from './knowledge-graph.js';
+export * from './governance.js';
+
 

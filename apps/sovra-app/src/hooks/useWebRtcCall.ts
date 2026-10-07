@@ -22,7 +22,7 @@ export interface UseWebRtcCallReturn {
   readonly session: CallSessionSnapshot | null;
   readonly isInCall: boolean;
   readonly isRinging: boolean;
-  readonly metrics: CallQualityMetrics;
+  readonly metrics: CallQualityMetrics | null;
   startCall(peerDid: string, peerName: string, mediaType: CallMediaType): CallSignalingMessage;
   answerCall(): CallSignalingMessage | null;
   rejectCall(): CallSignalingMessage | null;

@@ -1,0 +1,9 @@
+platform :ios, '15.1'
+prepare_react_native_project!
+
+target 'SovraMobile' do
+  use_frameworks! :linkage => :static
+
+  # Core Pods
+  pod 'SovraBleNative', :path => './SovraBleNative.podspec'
+end

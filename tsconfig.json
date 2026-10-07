@@ -2,7 +2,22 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
-    "noEmit": true
+    "noEmit": true,
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": false,
+    "baseUrl": ".",
+    "paths": {
+      "@sovra/crypto": ["packages/crypto/src/index.ts"],
+      "@sovra/identity": ["packages/identity/src/index.ts"],
+      "@sovra/protocol": ["packages/protocol/src/index.ts"],
+      "@sovra/p2p": ["packages/p2p/src/index.ts"],
+      "@sovra/storage": ["packages/storage/src/index.ts"],
+      "@sovra/storage-node": ["nodes/storage-node/src/index.ts"],
+      "@sovra/shared": ["packages/shared/src/index.ts"],
+      "@sovra/social": ["packages/social/src/index.ts"],
+      "@sovra/messaging": ["packages/messaging/src/index.ts"],
+      "@sovra/app": ["apps/sovra-app/src/index.ts"]
+    }
   },
-  "include": ["tests/**/*"]
+  "include": ["tests/**/*", "packages/*/src/**/*", "nodes/*/src/**/*", "apps/sovra-app/src/**/*"]
 }

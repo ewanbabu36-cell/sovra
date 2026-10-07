@@ -6,13 +6,15 @@
  * RSSI distance approximation, duplicate packet suppression, and instant emergency panic wiping.
  */
 
+import { secureRandomBytes, bytesToHex } from '@sovra/crypto';
+
 export interface BitChatPeer {
   readonly did: string;
   readonly displayName: string;
   readonly rssi: number; // Signal strength in dBm (e.g. -45 dBm)
   readonly distanceMeters: number; // Approximated distance from RSSI
   readonly hops: number; // 1 = direct link, >1 = relayed multi-hop
-  readonly relayVia?: string; // DID of the intermediate relay peer
+  readonly relayVia?: string | undefined; // DID of the intermediate relay peer
   readonly isDirect: boolean;
   readonly lastSeen: number;
 }
@@ -22,13 +24,13 @@ export interface BitChatPacket {
   readonly sourceDid: string;
   readonly sourceName: string;
   readonly destDid: string; // Specific recipient DID or '*' for broadcast
-  readonly channel?: string; // Hyperlocal channel (e.g. '#local-mesh', '#emergency-sos')
+  readonly channel?: string | undefined; // Hyperlocal channel (e.g. '#local-mesh', '#emergency-sos')
   readonly payload: string; // Encrypted payload or broadcast message
   readonly hopCount: number; // Current hop count (increments at each relay)
   readonly maxHops: number; // TTL limit to prevent infinite loops (standard = 7)
   readonly route: readonly string[]; // Audit path of node DIDs traversed
   readonly timestamp: number;
-  readonly isEmergency?: boolean;
+  readonly isEmergency?: boolean | undefined;
 }
 
 export interface BitChatChannel {
@@ -100,7 +102,7 @@ export class BitChatMeshRouter {
       isEmergency?: boolean;
     },
   ): BitChatPacket {
-    const packetId = 'pkt_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+    const packetId = `pkt_${bytesToHex(secureRandomBytes(8))}_${Date.now()}`;
     const packet: BitChatPacket = {
       packetId,
       sourceDid: this.localDid,

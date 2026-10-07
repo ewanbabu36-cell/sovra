@@ -5,6 +5,41 @@ const BASE_URL = 'http://localhost:3001';
 async function runTests() {
   console.log('🧪 Starting Phase 5 & Phase 6 Integration Tests...\n');
 
+  async function registerOrLogin(userData) {
+    const regRes = await fetch(`${BASE_URL}/api/user/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData),
+    });
+    if (regRes.status === 200) {
+      const data = await regRes.json();
+      return { user: data.user, sessionToken: data.sessionToken || data.user?.sessionToken };
+    }
+    const loginRes = await fetch(`${BASE_URL}/api/user/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: userData.handle || userData.did }),
+    });
+    const loginData = await loginRes.json();
+    return { user: loginData.user, sessionToken: loginData.sessionToken || loginData.user?.sessionToken };
+  }
+
+  // Register or Login Alice (Creator)
+  const aliceData = await registerOrLogin({
+    did: 'did:sovra:creator_test_alice',
+    handle: '@alice_creator',
+    displayName: 'Alice P2P Architect',
+  });
+  const aliceToken = aliceData.sessionToken;
+
+  // Register or Login Bob (User)
+  const bobData = await registerOrLogin({
+    did: 'did:sovra:tester_bob',
+    handle: '@bob_live',
+    displayName: 'Bob Telecom',
+  });
+  const bobToken = bobData.sessionToken;
+
   // Test 1: GET /api/reels/list
   console.log('1️⃣ Testing GET /api/reels/list...');
   const reelsRes = await fetch(`${BASE_URL}/api/reels/list`);
@@ -22,7 +57,10 @@ async function runTests() {
 
   const createReelRes = await fetch(`${BASE_URL}/api/reels/create`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${aliceToken}`,
+    },
     body: JSON.stringify({
       caption: '🚀 Building decentralized 9:16 vertical reels with BitSwap & libp2p! #sovra #p2p #web3',
       audioTrack: 'Original Sound — @alice_creator',
@@ -68,7 +106,10 @@ async function runTests() {
   console.log('\n4️⃣ Testing POST /api/reels/like (Toggle Like)...');
   const likeRes = await fetch(`${BASE_URL}/api/reels/like`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${bobToken}`,
+    },
     body: JSON.stringify({
       reelId: uploadedReelId,
       userDid: 'did:sovra:tester_bob',
@@ -85,7 +126,10 @@ async function runTests() {
   console.log('\n5️⃣ Testing Reels Comments Persistence...');
   const commentRes = await fetch(`${BASE_URL}/api/reels/comment`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${bobToken}`,
+    },
     body: JSON.stringify({
       reelId: uploadedReelId,
       text: 'Insane 60fps streaming quality directly from local storage!',
@@ -120,7 +164,10 @@ async function runTests() {
   console.log('\n7️⃣ Testing POST /api/youtube/comment (Persistent Comments & Replies)...');
   const postYtCommentRes = await fetch(`${BASE_URL}/api/youtube/comment`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${aliceToken}`,
+    },
     body: JSON.stringify({
       videoId: 'yt-video-1',
       text: 'Super clean zero-RTT Noise_XX handshake presentation!',
@@ -138,7 +185,10 @@ async function runTests() {
   // Nested Reply
   const replyRes = await fetch(`${BASE_URL}/api/youtube/comment`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${bobToken}`,
+    },
     body: JSON.stringify({
       videoId: 'yt-video-1',
       parentCommentId,
@@ -158,7 +208,10 @@ async function runTests() {
   console.log('\n7️⃣b Testing POST /api/youtube/comment/like...');
   const likeCommentRes = await fetch(`${BASE_URL}/api/youtube/comment/like`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${aliceToken}`,
+    },
     body: JSON.stringify({
       videoId: 'yt-video-1',
       commentId: parentCommentId,
@@ -173,7 +226,10 @@ async function runTests() {
   // Like the nested reply
   const likeReplyRes = await fetch(`${BASE_URL}/api/youtube/comment/like`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${bobToken}`,
+    },
     body: JSON.stringify({
       videoId: 'yt-video-1',
       commentId: replyData.reply.id,
@@ -187,27 +243,30 @@ async function runTests() {
 
   // Test 8: POST /api/youtube/tip (Wallet Balance Ledger Deduction & Super Thanks)
   console.log('\n8️⃣ Testing POST /api/youtube/tip (Sovereign Wallet Ledger & Split)...');
-  // First register or get current user balance
-  const userRegRes = await fetch(`${BASE_URL}/api/user/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      did: 'did:sovra:tipper_wallet_alice',
-      handle: '@tipper_alice',
-      name: 'Alice Tipper',
-      avatar: 'A',
-    }),
+  // First register a fresh tipper with 500 SOV initial balance
+  const tipperRunId = Math.random().toString(36).substring(2, 7);
+  const tipperUser = await registerOrLogin({
+    did: `did:sovra:tipper_wallet_${tipperRunId}`,
+    handle: `@tipper_${tipperRunId}`,
+    displayName: 'Alice Tipper',
+    avatar: 'A',
   });
-  const userRegData = await userRegRes.json();
-  assert.strictEqual(userRegData.ok, true);
-  const initialBalance = userRegData.user.balanceSov;
+  const tipperToken = tipperUser.sessionToken;
+  const meRes = await fetch(`${BASE_URL}/api/user/me`, {
+    headers: { 'Authorization': `Bearer ${tipperToken}` },
+  });
+  const meData = await meRes.json();
+  const initialBalance = meData.user.balanceSov;
   console.log(`   Initial balance of tipper: ${initialBalance} SOV`);
 
   const tipRes = await fetch(`${BASE_URL}/api/youtube/tip`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${tipperToken}`,
+    },
     body: JSON.stringify({
-      fromDid: 'did:sovra:tipper_wallet_alice',
+      fromDid: tipperUser.user.did,
       creatorDid: 'did:sovra:creator_studio_broadcast',
       amount: 50,
       videoId: 'yt-video-1',
@@ -228,7 +287,21 @@ async function runTests() {
 
   // Test 9: GET /api/admin/metrics (Live Dynamic Metrics)
   console.log('\n9️⃣ Testing GET /api/admin/metrics (Operations Console Metrics)...');
-  const metricsRes = await fetch(`${BASE_URL}/api/admin/metrics`);
+  const adminLoginRes = await fetch(`${BASE_URL}/api/admin/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      did: 'did:sovra:admin_operator',
+      role: 'SUPER_ADMIN',
+      adminKey: 'sovra-test-admin-secret-key-32-chars-ok!',
+    }),
+  });
+  const adminLoginData = await adminLoginRes.json();
+  const adminToken = adminLoginData.sessionToken;
+
+  const metricsRes = await fetch(`${BASE_URL}/api/admin/metrics`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` },
+  });
   assert.strictEqual(metricsRes.status, 200);
   const metrics = await metricsRes.json();
   assert.strictEqual(metrics.ok, true);

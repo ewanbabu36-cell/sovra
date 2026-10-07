@@ -59,4 +59,5 @@ tmp/
 *.tmp
 .sovra-storage-dev/
 .tmp-*
+.test-drill-*
 

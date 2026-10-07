@@ -8,7 +8,6 @@ import {
   MutePayload,
   ReactionPayload,
   FriendRequestPayload,
-  RestrictPayload,
 } from './types.js';
 
 interface FollowOp {
@@ -564,15 +563,26 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
 
   // --- Extractors ---
   private extractFollowPayload(event: SovraEvent): FollowPayload | null {
+    const pTag = event.tags.find(t => t[0] === 'p');
     if (typeof event.content === 'object' && event.content !== null) {
-      return event.content as unknown as FollowPayload;
+      const obj = event.content as unknown as FollowPayload;
+      if (obj.targetPubkey) return obj;
+      if (pTag && pTag[1]) {
+        return { targetPubkey: pTag[1], isUnfollow: Boolean(obj.isUnfollow) };
+      }
     }
     if (typeof event.content === 'string' && event.content.startsWith('{')) {
       try {
-        return JSON.parse(event.content);
+        const parsed = JSON.parse(event.content);
+        const targetPubkey = parsed.targetPubkey ?? pTag?.[1];
+        if (targetPubkey) {
+          return {
+            targetPubkey,
+            isUnfollow: Boolean(parsed.isUnfollow),
+          };
+        }
       } catch {}
     }
-    const pTag = event.tags.find(t => t[0] === 'p');
     if (pTag && pTag[1]) {
       const actionTag = event.tags.find(t => t[0] === 'action');
       return {
@@ -584,15 +594,27 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
   }
 
   private extractBlockPayload(event: SovraEvent): BlockPayload | null {
+    const pTag = event.tags.find(t => t[0] === 'p');
     if (typeof event.content === 'object' && event.content !== null) {
-      return event.content as unknown as BlockPayload;
+      const obj = event.content as unknown as BlockPayload;
+      if (obj.targetPubkey) return obj;
+      if (pTag && pTag[1]) {
+        return { targetPubkey: pTag[1], isUnblock: Boolean(obj.isUnblock), reason: obj.reason };
+      }
     }
     if (typeof event.content === 'string' && event.content.startsWith('{')) {
       try {
-        return JSON.parse(event.content);
+        const parsed = JSON.parse(event.content);
+        const targetPubkey = parsed.targetPubkey ?? pTag?.[1];
+        if (targetPubkey) {
+          return {
+            targetPubkey,
+            isUnblock: Boolean(parsed.isUnblock),
+            reason: parsed.reason,
+          };
+        }
       } catch {}
     }
-    const pTag = event.tags.find(t => t[0] === 'p');
     if (pTag && pTag[1]) {
       const actionTag = event.tags.find(t => t[0] === 'action');
       return {
@@ -604,15 +626,27 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
   }
 
   private extractMutePayload(event: SovraEvent): MutePayload | null {
+    const pTag = event.tags.find(t => t[0] === 'p');
     if (typeof event.content === 'object' && event.content !== null) {
-      return event.content as unknown as MutePayload;
+      const obj = event.content as unknown as MutePayload;
+      if (obj.targetPubkey) return obj;
+      if (pTag && pTag[1]) {
+        return { targetPubkey: pTag[1], isUnmute: Boolean(obj.isUnmute), durationSeconds: obj.durationSeconds };
+      }
     }
     if (typeof event.content === 'string' && event.content.startsWith('{')) {
       try {
-        return JSON.parse(event.content);
+        const parsed = JSON.parse(event.content);
+        const targetPubkey = parsed.targetPubkey ?? pTag?.[1];
+        if (targetPubkey) {
+          return {
+            targetPubkey,
+            isUnmute: Boolean(parsed.isUnmute),
+            durationSeconds: parsed.durationSeconds,
+          };
+        }
       } catch {}
     }
-    const pTag = event.tags.find(t => t[0] === 'p');
     if (pTag && pTag[1]) {
       const actionTag = event.tags.find(t => t[0] === 'action');
       return {
@@ -646,15 +680,26 @@ export class DefaultSocialGraphEngine implements SocialGraphEngine {
   }
 
   private extractFriendRequestPayload(event: SovraEvent): FriendRequestPayload | null {
+    const pTag = event.tags.find(t => t[0] === 'p');
     if (typeof event.content === 'object' && event.content !== null) {
-      return event.content as unknown as FriendRequestPayload;
+      const obj = event.content as unknown as FriendRequestPayload;
+      if (obj.targetPubkey) return obj;
+      if (pTag && pTag[1]) {
+        return { targetPubkey: pTag[1], action: obj.action ?? 'send' };
+      }
     }
     if (typeof event.content === 'string' && event.content.startsWith('{')) {
       try {
-        return JSON.parse(event.content);
+        const parsed = JSON.parse(event.content);
+        const targetPubkey = parsed.targetPubkey ?? pTag?.[1];
+        if (targetPubkey) {
+          return {
+            targetPubkey,
+            action: parsed.action ?? 'send',
+          };
+        }
       } catch {}
     }
-    const pTag = event.tags.find(t => t[0] === 'p');
     if (pTag && pTag[1]) {
       const actionTag = event.tags.find(t => t[0] === 'action');
       const action = (actionTag?.[1] as any) ?? 'send';

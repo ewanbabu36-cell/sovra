@@ -494,7 +494,7 @@ export function AccountSettingsModal({
             >
               <div style={{ fontSize: 60 }}>🏁</div>
               <div style={{ color: '#000', fontSize: 11, fontWeight: 700, marginTop: 8 }}>
-                {profile.handle} QR KEY
+                {qrPayload?.handle || profile.handle} QR KEY
               </div>
             </div>
 

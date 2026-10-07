@@ -14,7 +14,7 @@ import { type CallSessionSnapshot, type CallQualityMetrics } from '@sovra/messag
 
 export interface CallModalProps {
   readonly session: CallSessionSnapshot;
-  readonly metrics: CallQualityMetrics;
+  readonly metrics: CallQualityMetrics | null;
 }
 
 export function renderCallModalHtml(props: CallModalProps): string {
@@ -34,7 +34,7 @@ export function renderCallModalHtml(props: CallModalProps): string {
       case 'incoming_ringing':
         return 'Incoming Call...';
       case 'connecting':
-        return `Connecting (${metrics.connectionTier})...`;
+        return metrics ? `Connecting (${metrics.connectionTier})...` : 'Connecting...';
       case 'active':
         return formatDuration(session.durationSeconds);
       case 'rejected':
@@ -77,7 +77,7 @@ export function renderCallModalHtml(props: CallModalProps): string {
       <div class="call-header-hud">
         <div class="call-status-pill">${getStatusText()}</div>
         <div class="call-telemetry-badge">
-          ● RTT: ${metrics.roundTripTimeMs}ms &bull; Loss: ${metrics.packetLossPercent}% &bull; ${metrics.connectionTier}
+          ${metrics ? `● RTT: ${metrics.roundTripTimeMs}ms &bull; Loss: ${metrics.packetLossPercent}% &bull; ${metrics.connectionTier}` : `● Connecting...`}
         </div>
       </div>
 

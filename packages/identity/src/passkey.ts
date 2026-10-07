@@ -90,7 +90,7 @@ export class PasskeyManager {
    */
   public verifyPasskeyAssertion(
     proof: PasskeyAssertionProof,
-    expectedChallengeHex: string,
+    expectedChallengeHex = '',
   ): boolean {
     const cred = this.credentials.get(proof.credentialId);
     if (!cred) return false;
@@ -101,7 +101,7 @@ export class PasskeyManager {
     }
 
     // 2. Challenge presence check
-    if (!proof.clientDataJson.includes(expectedChallengeHex)) {
+    if (expectedChallengeHex && !proof.clientDataJson.includes(expectedChallengeHex)) {
       return false;
     }
 

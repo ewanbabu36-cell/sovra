@@ -75,7 +75,7 @@ export function CallScreen({
         </div>
         <div style={{ fontSize: 22, fontWeight: 700 }}>{peerName}</div>
         <div style={{ fontSize: 13, color: '#94a3b8', fontFamily: 'monospace' }}>
-          {formatTimer(duration)} &bull; Tier 1 (IPv6 Direct)
+          {formatTimer(duration)} &bull; Tier 1 (IPv6 Direct) &bull; {peerDid.slice(0, 16)}...
         </div>
       </div>
 

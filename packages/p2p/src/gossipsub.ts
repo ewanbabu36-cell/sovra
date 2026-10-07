@@ -101,6 +101,9 @@ export class GossipSubRouter implements PubSubService {
   public registerKnownPeer(peerId: string): void {
     if (peerId !== this.localPeerId) {
       this.knownPeers.add(peerId);
+      for (const topic of this.subscriptions.keys()) {
+        this.maintainTopicMesh(topic).catch(() => {});
+      }
     }
   }
 
@@ -119,9 +122,11 @@ export class GossipSubRouter implements PubSubService {
     return Array.from(this.topicMesh.get(topic) ?? []);
   }
 
-  public async subscribe(topic: string, handler: TopicMessageHandler): Promise<Result<void>> {
+  public async subscribe(topic: string, handler?: TopicMessageHandler): Promise<Result<void>> {
     const handlers = this.subscriptions.get(topic) ?? new Set();
-    handlers.add(handler);
+    if (handler) {
+      handlers.add(handler);
+    }
     this.subscriptions.set(topic, handlers);
 
     if (!this.topicMesh.has(topic)) {
@@ -383,11 +388,20 @@ export class GossipSubRouter implements PubSubService {
   public async handleInboundMessage(
     topic: string,
     fromPeerId: string,
-    data: Uint8Array,
+    data: Uint8Array | unknown,
   ): Promise<boolean> {
     if (this.scoring.isBlacklisted(fromPeerId)) {
       return false;
     }
+
+    const rawData: Uint8Array =
+      data instanceof Uint8Array
+        ? data
+        : (data as any)?.__u8
+          ? new Uint8Array((data as any).__u8)
+          : data && typeof data === 'object'
+            ? new Uint8Array(Object.values(data) as number[])
+            : new Uint8Array();
 
     // Rate limiting check
     const now = Date.now();
@@ -405,7 +419,7 @@ export class GossipSubRouter implements PubSubService {
     this.peerMessageCounters.set(fromPeerId, rateData);
 
     // Deduplication check
-    const messageId = bytesToHex(sha256(data));
+    const messageId = bytesToHex(sha256(rawData));
     if (this.seenCache.has(messageId)) {
       return false; // Suppress duplicate
     }
@@ -417,7 +431,7 @@ export class GossipSubRouter implements PubSubService {
     this.seenCache.add(messageId);
 
     // 10-Step Message Validation Pipeline
-    const validationResult = EventValidationPipeline.validate(data, {
+    const validationResult = EventValidationPipeline.validate(rawData, {
       topic,
       revocationRegistry: this.revocationRegistry,
       seenEventIds: this.seenCache,
@@ -439,7 +453,7 @@ export class GossipSubRouter implements PubSubService {
     const topicMsg: TopicMessage = {
       topic,
       fromPeerId,
-      data,
+      data: rawData,
       sequenceNumber: ++this.sequenceCounter,
       receivedAt: now,
     };

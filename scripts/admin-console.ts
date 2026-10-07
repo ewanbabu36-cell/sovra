@@ -1355,6 +1355,31 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
   </div>
 
   <script>
+    window.__SOVRA_ADMIN_TOKEN__ = sessionStorage.getItem('sovra_ops_session') || '';
+
+    async function promptAdminLogin() {
+      const secret = prompt('Enter Admin Secret Key:');
+      if (!secret) return;
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminKey: secret })
+        });
+        const data = await res.json();
+        if (data.ok && data.sessionToken) {
+          sessionStorage.setItem('sovra_ops_session', data.sessionToken);
+          window.__SOVRA_ADMIN_TOKEN__ = data.sessionToken;
+          alert('Authenticated successfully');
+          window.location.reload();
+        } else {
+          alert('Authentication failed: ' + (data.error || 'Invalid credential'));
+        }
+      } catch (err) {
+        alert('Authentication error: ' + err);
+      }
+    }
+
     // Tab switching for Admin Sections
     function switchAdminTab(tabId) {
       document.querySelectorAll('.admin-nav-item').forEach(btn => {
@@ -1527,7 +1552,9 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
 
     async function refreshAdminMetrics() {
       try {
-        const res = await fetch('/api/admin/metrics');
+        const token = window.__SOVRA_ADMIN_TOKEN__ || localStorage.getItem('sovra_admin_token') || sessionStorage.getItem('sovra_admin_token');
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        const res = await fetch('/api/admin/metrics', { headers });
         const data = await res.json();
         if (data.ok) {
           updateAdminMetricsInDom(data);

@@ -22,6 +22,8 @@ export interface MobileReelItem {
   bgGradient: string;
   manifestCid: string;
   segment0Cid: string;
+  videoUrl?: string;
+  isLiked?: boolean;
 }
 
 export interface MobileStoryItem {

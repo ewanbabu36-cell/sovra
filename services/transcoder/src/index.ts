@@ -8,6 +8,7 @@ import {
 } from '@sovra/storage';
 
 export type { VideoResolution };
+import { VideoIngestionPipeline } from './pipeline.js';
 export * from './pipeline.js';
 
 export interface TranscodeJob {
@@ -52,20 +53,29 @@ export class TranscoderWorker {
   }
 
   public async transcode(job: TranscodeJob): Promise<Result<TranscodeResult>> {
-    const dummyCids: Record<VideoResolution, string> = {
-      '360p': `bafybei360p_${job.jobId}`,
-      '480p': `bafybei480p_${job.jobId}`,
-      '720p': `bafybei720p_${job.jobId}`,
-      '1080p': `bafybei1080p_${job.jobId}`,
-    };
+    const pipeline = new VideoIngestionPipeline();
+    const pipeRes = await pipeline.processVideo({
+      mediaId: job.jobId,
+      creatorDid: job.sourceCid,
+      title: `Transcoded ${job.jobId}`,
+      durationSeconds: Math.max(job.segmentDurationSeconds * 2, 8),
+      targetResolutions: job.targetResolutions,
+    }, job.segmentDurationSeconds);
 
-    const masterM3u8 = this.generateMasterPlaylist(job.jobId, job.targetResolutions);
+    if (!pipeRes.ok) {
+      return pipeRes;
+    }
+
+    const resolutionCids: Partial<Record<VideoResolution, string>> = {};
+    for (const variant of pipeRes.value.variants) {
+      resolutionCids[variant.resolution] = variant.segments[0]?.cid || variant.playlistUri;
+    }
 
     return ok({
       jobId: job.jobId,
-      masterManifestCid: `bafybeimaster_${job.jobId}`,
-      resolutionCids: dummyCids,
-      masterM3u8,
+      masterManifestCid: pipeRes.value.masterManifestCid,
+      resolutionCids: resolutionCids as Record<VideoResolution, string>,
+      masterM3u8: pipeRes.value.masterM3u8,
     });
   }
 }

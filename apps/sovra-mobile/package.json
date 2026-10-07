@@ -9,7 +9,7 @@
     "ios": "expo run:ios",
     "build:apk": "eas build -p android --profile preview",
     "build:bundle": "eas build -p android --profile production",
-    "test": "vitest run",
+    "test": "vitest run ../../apps/sovra-mobile/test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

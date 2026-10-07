@@ -88,7 +88,7 @@ export interface PeerScoringParameters {
 }
 
 export interface PubSubService {
-  subscribe(topic: string, handler: TopicMessageHandler): Promise<Result<void>>;
+  subscribe(topic: string, handler?: TopicMessageHandler): Promise<Result<void>>;
   unsubscribe(topic: string): Promise<Result<void>>;
   publish(topic: string, data: Uint8Array): Promise<Result<{ messageId: string }>>;
   getSubscribedTopics(): readonly string[];
@@ -171,6 +171,8 @@ export interface RequestResponseProtocol<TReq = Uint8Array, TRes = Uint8Array> {
 
 export interface ResourceLimits {
   readonly maxConnections: number;
+  readonly maxInboundConnections?: number | undefined;
+  readonly maxOutboundConnections?: number | undefined;
   readonly maxStreamsPerConnection: number;
   readonly maxMessageSizeBytes: number;
   readonly maxPendingRequests: number;

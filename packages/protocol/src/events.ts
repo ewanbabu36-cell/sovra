@@ -40,6 +40,23 @@ export enum EventKind {
   ModerationAssertion = 30, // Signed node or moderator quarantine flag
   CreatorSubscription = 40, // Creator tier subscription assertion
   DisputeAssertion = 50, // Mesh dispute or safety violation assertion
+
+  // Knowledge Network Primitives (Phase 1 & 7)
+  Question = 60, // Epistemic question requiring community inquiry
+  Answer = 61, // Proposed solution or answer to a question
+  Claim = 62, // Formal factual or scientific assertion
+  Evidence = 63, // Supporting proof, experiment data, citation, or CID
+  Counterargument = 64, // Rebuttal, falsification, or opposing evidence
+  KnowledgeSynthesis = 65, // Community consensus, synthesis, or living wiki state
+
+  // Advanced Community Governance
+  CommunityGovernance = 70, // Decentralized proposal, vote, or role grant
+
+  // Multidimensional Reputation & Web-of-Trust
+  ReputationAssertion = 80, // Signed trust or domain-specific reputation assertion
+
+  // Personal AI Configuration
+  PersonalAiConfig = 90, // Encrypted personal AI preferences and policy
 }
 
 export interface ContentReference {

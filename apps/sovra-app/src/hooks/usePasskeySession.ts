@@ -42,8 +42,8 @@ export function createPasskeySessionManager(): UsePasskeySessionReturn {
       isUnlocked = true;
       return cred;
     },
-    verifyAssertion(proof: PasskeyAssertionProof) {
-      const verified = manager.verifyPasskeyAssertion(proof);
+    verifyAssertion(proof: PasskeyAssertionProof, expectedChallengeHex?: string) {
+      const verified = manager.verifyPasskeyAssertion(proof, expectedChallengeHex ?? '');
       if (verified) {
         isUnlocked = true;
       }

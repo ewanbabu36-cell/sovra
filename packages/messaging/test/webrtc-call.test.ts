@@ -148,4 +148,39 @@ describe('WebRTC Live Audio/Video Calling Engine Suite (@sovra/messaging)', () =
     expect(hangupMsg?.type).toBe('CALL_HANGUP');
     expect(engine.session?.state).toBe('ended');
   });
+
+  it('derives real call quality telemetry from RTCPeerConnection stats without hardcoded metrics', () => {
+    const engine = new WebRtcCallEngine(
+      aliceIdentity.did,
+      aliceKp.privateKey,
+      aliceKp.publicKey,
+    );
+    engine.createCallOffer(bobIdentity.did, 'Bob', 'video');
+
+    // Telemetry is unavailable before stats report
+    expect(engine.metrics).toBeNull();
+
+    // Ingest genuine WebRTC getStats report
+    const liveMetrics = engine.updateRtcStats({
+      currentRoundTripTime: 0.0385, // 38.5 ms
+      packetsReceived: 990,
+      packetsLost: 10, // 10 / 1000 = 1.0% loss
+      jitter: 0.0028, // 2.8 ms
+      bytesReceived: 380000,
+      durationSeconds: 2,
+      candidatePairType: 'srflx',
+      isIPv6: false,
+    });
+
+    expect(liveMetrics.roundTripTimeMs).toBe(38.5);
+    expect(liveMetrics.packetLossPercent).toBe(1.0);
+    expect(liveMetrics.jitterMs).toBe(2.8);
+    expect(liveMetrics.connectionTier).toBe('UDP_HolePunch');
+    expect(liveMetrics.isLive).toBe(true);
+    expect(engine.metrics).toEqual(liveMetrics);
+
+    // After call ends, telemetry resets
+    engine.endCall('normal');
+    expect(engine.metrics).toBeNull();
+  });
 });

@@ -1,0 +1,70 @@
+# ============================================================
+#   SOVRA PRODUCTION REVERSE PROXY & TLS CONFIGURATION
+#   Caddyfile with unbuffered SSE and Security Headers
+# ============================================================
+
+{
+  admin off
+  auto_https disable_redirects
+}
+
+:80 {
+  # Redirect HTTP to HTTPS in production
+  @insecure {
+    header_regexp Host ^(.*)$
+  }
+  handle @insecure {
+    # If TLS is enabled in prod, redirect to https://{host}{uri}
+    # For localhost testing, proxy directly
+    reverse_proxy sovra-node:3001
+  }
+}
+
+:443 {
+  tls internal
+
+  # Security Headers (OWASP Hardening)
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    X-XSS-Protection "1; mode=block"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  }
+
+  # Compression for static responses
+  encode zstd gzip
+
+  # Realtime Server-Sent Events (SSE) bypass buffering
+  @sse {
+    path /api/realtime/stream* /api/chat/events*
+  }
+  handle @sse {
+    reverse_proxy sovra-node:3001 {
+      flush_interval -1
+      header_up Connection "keep-alive"
+      header_up Cache-Control "no-cache"
+    }
+  }
+
+  # Media streaming byte-range support
+  @media {
+    path /api/feed/video/* /api/feed/image/*
+  }
+  handle @media {
+    reverse_proxy sovra-node:3001 {
+      header_down Accept-Ranges "bytes"
+    }
+  }
+
+  # All general API & UI requests
+  handle {
+    reverse_proxy sovra-node:3001 {
+      header_up Host {host}
+      header_up X-Real-IP {remote_host}
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto {scheme}
+    }
+  }
+}

@@ -11,13 +11,9 @@
  */
 
 import {
-  sha256,
   bytesToHex,
   hexToBytes,
   secureRandomBytes,
-  generateEd25519KeyPair,
-  signEd25519,
-  verifyEd25519,
 } from '@sovra/crypto';
 import { Result, ok, err, ValidationError } from '@sovra/shared';
 import { SovraIdentityKey, SovraDeviceKey } from './keypair.js';

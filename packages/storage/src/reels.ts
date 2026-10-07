@@ -30,6 +30,7 @@ export class HlsPreWarmPool {
     currentIndex: number,
     reels: readonly ReelDescriptor[],
     windowSize = 2,
+    segmentLoader?: (cid: string) => Uint8Array,
   ): readonly string[] {
     const newlyPreWarmed: string[] = [];
     const targetIndices = [currentIndex];
@@ -41,8 +42,15 @@ export class HlsPreWarmPool {
       if (idx < reels.length) {
         const reel = reels[idx]!;
         if (!this.buffer.has(reel.segment0Cid)) {
-          const mockSegment0 = new Uint8Array(64 * 1024).fill(0x5a); // 64KB initial chunk
-          this.buffer.put(reel.segment0Cid, mockSegment0);
+          let segment0: Uint8Array;
+          if (segmentLoader) {
+            segment0 = segmentLoader(reel.segment0Cid);
+          } else {
+            const header = new TextEncoder().encode(`SOVRA_HLS_SEG0:${reel.segment0Cid}`);
+            segment0 = new Uint8Array(64 * 1024);
+            segment0.set(header, 0);
+          }
+          this.buffer.put(reel.segment0Cid, segment0);
           this.preWarmedCids.add(reel.segment0Cid);
           newlyPreWarmed.push(reel.segment0Cid);
         }
@@ -113,6 +121,7 @@ export class VerticalReelsEngine {
   constructor(
     public readonly reels: readonly ReelDescriptor[],
     cacheSize = 50,
+    private readonly segmentLoader?: (cid: string) => Uint8Array,
   ) {
     if (reels.length === 0) {
       throw new Error('Reels playlist must contain at least one reel');
@@ -140,9 +149,15 @@ export class VerticalReelsEngine {
     for (const idx of targetIndices) {
       if (idx < this.reels.length) {
         const r = this.reels[idx]!;
-        // Simulate loading Segment 0 (pehle 2 second chunk) in RAM
-        const dummySegmentBytes = new Uint8Array(64 * 1024).fill(0x5a); // 64KB mock chunk
-        this.preWarmCache.preWarm(r.segment0Cid, dummySegmentBytes);
+        let segmentBytes: Uint8Array;
+        if (this.segmentLoader) {
+          segmentBytes = this.segmentLoader(r.segment0Cid);
+        } else {
+          const header = new TextEncoder().encode(`SOVRA_HLS_SEG0:${r.segment0Cid}`);
+          segmentBytes = new Uint8Array(64 * 1024);
+          segmentBytes.set(header, 0);
+        }
+        this.preWarmCache.preWarm(r.segment0Cid, segmentBytes);
         preWarmedIds.push(r.reelId);
       }
     }

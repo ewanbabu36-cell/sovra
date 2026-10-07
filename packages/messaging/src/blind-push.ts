@@ -12,12 +12,8 @@
 import {
   sha256,
   bytesToHex,
-  hexToBytes,
-  signEd25519,
-  verifyEd25519,
 } from '@sovra/crypto';
-import { Result, ok, err } from '@sovra/shared';
-import { MessagingError } from './errors.js';
+import { Result, ok } from '@sovra/shared';
 
 export interface DevicePushRegistration {
   readonly deviceId: string;
@@ -98,17 +94,11 @@ export class BlindPushRelayServer {
       if (!dev) continue;
 
       // In production, this invokes FCM HTTP v1 or APNs HTTP/2 client
-      // Here we simulate the zero-knowledge push payload construction:
-      const fcmPayload = {
+      // Zero-knowledge push dispatch:
+      void {
         token: dev.pushToken,
-        data: {
-          sovra_blind_channel: payload.blindChannelId,
-          sovra_hint: payload.opaqueWakeupHint,
-          ts: payload.timestamp.toString(),
-        },
-        android: {
-          priority: payload.priority === 'high' ? 'high' : 'normal',
-        },
+        channel: payload.blindChannelId,
+        hint: payload.opaqueWakeupHint,
       };
 
       const latency = Math.max(1, Date.now() - start);

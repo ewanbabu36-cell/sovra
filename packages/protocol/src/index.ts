@@ -4,3 +4,17 @@ export * from './serialization.js';
 export * from './monetization.js';
 export * from './channel-mesh.js';
 export * from './dispute-bond.js';
+export * from './replay.js';
+export * from './operation.js';
+export * from './knowledge.js';
+export * from './protocol-event.js';
+export * from './authorization.js';
+export * from './envelope.js';
+export * from './peer.js';
+export * from './store.js';
+export * from './pipeline.js';
+export * from './transition.js';
+export * from './vector-clock.js';
+export * from './crdt-projection.js';
+export * from './distributed-state.js';
+

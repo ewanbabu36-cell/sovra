@@ -1,0 +1,1148 @@
+[
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/identity/src/admin.ts",
+    "line": 86,
+    "snippet": "if (resolvedKey === 'sovra-operations-master-key' || resolvedKey.length < 32) {"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/identity/src/admin.ts",
+    "line": 93,
+    "snippet": "this.masterAdminKeyHex = resolvedKey || 'sovra-operations-master-key';"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/identity/src/admin.ts",
+    "line": 102,
+    "snippet": "if (!newSecret || newSecret.length < 32 || newSecret === 'sovra-operations-master-key') {"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/identity/test/admin-credentials.test.ts",
+    "line": 22,
+    "snippet": "new AdminSecurityEngine('sovra-operations-master-key', { isProduction: true });"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/messaging/src/bitchat-mesh.ts",
+    "line": 103,
+    "snippet": "const packetId = 'pkt_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/messaging/src/blind-push.ts",
+    "line": 109,
+    "snippet": "messageId: `fcm_msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/messaging/src/chat-engine.ts",
+    "line": 191,
+    "snippet": "id: `msg-${now}-${Math.floor(Math.random() * 10000)}`,"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/messaging/src/chat-engine.ts",
+    "line": 223,
+    "snippet": "id: `audio-${now}-${Math.floor(Math.random() * 10000)}`,"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/messaging/src/chat-engine.ts",
+    "line": 260,
+    "snippet": "id: `inc-${now}-${Math.floor(Math.random() * 10000)}`,"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/messaging/src/webrtc-call.ts",
+    "line": 208,
+    "snippet": "const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "packages/p2p/src/connection.ts",
+    "line": 111,
+    "snippet": "// Subnet diversity check for non-localhost addresses"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/p2p/src/connection.ts",
+    "line": 209,
+    "snippet": "const jitter = Math.random() * 50;"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "packages/p2p/src/dht.ts",
+    "line": 91,
+    "snippet": "if (ip4Match[1] === '127.0.0') return null; // Exclude localhost from quota in local tests"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/p2p/src/gossipsub.ts",
+    "line": 306,
+    "snippet": "const targetPeer = nonMeshPeers[Math.floor(Math.random() * nonMeshPeers.length)];"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/p2p/src/multiplex.ts",
+    "line": 354,
+    "snippet": "public async sendPing(pingId = Math.floor(Math.random() * 0xffffffff)): Promise<number> {"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/p2p/src/nat.ts",
+    "line": 180,
+    "snippet": "const allocationId = `turn_alloc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/p2p/src/nat.ts",
+    "line": 204,
+    "snippet": "receiptId: `rcpt_${timestamp}_${Math.random().toString(36).substring(2, 7)}`,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/src/nat.ts",
+    "line": 276,
+    "snippet": "// Tier 1: Direct IPv6 Bypass (if IPv6 peer is present)"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "packages/p2p/src/node.ts",
+    "line": 490,
+    "snippet": "(ipMatch[1] === '127.0.0.1' || ipMatch[1] === 'localhost')"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/p2p/src/relay-v2.ts",
+    "line": 172,
+    "snippet": "const circuitId = `cir_${now}_${Math.random().toString(36).substring(2, 9)}`;"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 41,
+    "snippet": "const masterKey = SovraIdentityKey.generate();"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 46,
+    "snippet": "masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 52,
+    "snippet": "masterKey,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 57,
+    "snippet": "const binding = createPeerIdentityBinding(deviceKey, masterKey.did, delegation);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 62,
+    "snippet": "expect(binding.masterDid).toBe(masterKey.did);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 69,
+    "snippet": "const masterKey = SovraIdentityKey.generate();"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 74,
+    "snippet": "masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 79,
+    "snippet": "masterKey,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 84,
+    "snippet": "const binding = createPeerIdentityBinding(deviceKey, masterKey.did, delegation);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 95,
+    "snippet": "const masterKey = SovraIdentityKey.generate();"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 101,
+    "snippet": "masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 106,
+    "snippet": "masterKey,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 111,
+    "snippet": "const binding = createPeerIdentityBinding(deviceKey, masterKey.did, delegation);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 119,
+    "snippet": "const masterKey = SovraIdentityKey.generate();"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 124,
+    "snippet": "masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 129,
+    "snippet": "masterKey,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 134,
+    "snippet": "const binding = createPeerIdentityBinding(deviceKey, masterKey.did, delegation);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "packages/p2p/test/identity.test.ts",
+    "line": 141,
+    "snippet": "masterKey,"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "packages/p2p/test/subnet-diversity.test.ts",
+    "line": 10,
+    "snippet": "// Localhost loopback is excluded from quotas"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/protocol/src/dispute-bond.ts",
+    "line": 76,
+    "snippet": "disputeId: `disp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "packages/shared/src/hardening.ts",
+    "line": 63,
+    "snippet": "trustedOrigins: ['http://localhost:3001', 'http://127.0.0.1:3001'],"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "packages/shared/src/hardening.ts",
+    "line": 69,
+    "snippet": "* In development, allows localhost / loopback."
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "packages/shared/test/hardening.test.ts",
+    "line": 25,
+    "snippet": "const devOrigin = resolveAllowedOrigin('http://localhost:3000', {"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "packages/shared/test/hardening.test.ts",
+    "line": 28,
+    "snippet": "trustedOrigins: ['http://localhost:3001'],"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "packages/shared/test/hardening.test.ts",
+    "line": 31,
+    "snippet": "expect(devOrigin).toBe('http://localhost:3000');"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/storage/src/incubator.ts",
+    "line": 63,
+    "snippet": "grantId: `incubator_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "packages/storage/src/reels.ts",
+    "line": 246,
+    "snippet": "storyId: `story_${now}_${Math.random().toString(36).substring(2, 7)}`,"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "apps/sovra-mobile/src/screens/AccountSettingsModal.tsx",
+    "line": 541,
+    "snippet": "placeholder=\"Friend 1 (@handle or did:key)\""
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "apps/sovra-mobile/src/screens/AccountSettingsModal.tsx",
+    "line": 555,
+    "snippet": "placeholder=\"Friend 2 (@handle or did:key)\""
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "apps/sovra-mobile/src/screens/AccountSettingsModal.tsx",
+    "line": 569,
+    "snippet": "placeholder=\"Friend 3 (@handle or did:key)\""
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "apps/sovra-mobile/src/screens/ChatsScreen.tsx",
+    "line": 230,
+    "snippet": "placeholder={isRecordingVoice ? 'Recording voice note... (ChaCha20 audio)' : 'Message'}"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "apps/sovra-mobile/src/screens/OnboardingModal.tsx",
+    "line": 183,
+    "snippet": "placeholder=\"username\""
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "apps/sovra-mobile/src/screens/OnboardingModal.tsx",
+    "line": 207,
+    "snippet": "placeholder=\"e.g. Meraj Sharif\""
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "services/moderation-worker/src/index.ts",
+    "line": 6,
+    "snippet": "* quarantine policy engine, and deterministic evaluation (no static/mock scores)."
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "services/moderation-worker/src/index.ts",
+    "line": 61,
+    "snippet": "SUGGESTIVE_THUMBNAIL: ['fake sensational thumbnail trap'],"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "nodes/full-node/test/index.test.ts",
+    "line": 7,
+    "snippet": "listenAddresses: ['/ip4/0.0.0.0/tcp/4001'],"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "nodes/storage-node/src/verifier.ts",
+    "line": 159,
+    "snippet": "challengeId: `por_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/admin-console.ts",
+    "line": 743,
+    "snippet": "<div class=\"ops-card-sub\">Bound to 0.0.0.0 (Localhost & LAN reachable)</div>"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/admin-console.ts",
+    "line": 935,
+    "snippet": "<input type=\"text\" id=\"customCidPinInput\" placeholder=\"Enter CIDv1 (bafybeig...)\" style=\"background: rgba(0,0,0,0.5); border: 1px solid var(--admin-border); col"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/admin-console.ts",
+    "line": 1101,
+    "snippet": "<span style=\"color:#10b981;\">Localhost</span>"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/admin-console.ts",
+    "line": 1322,
+    "snippet": "<span style=\"font-family: var(--font-mono); font-size: 0.75rem; color: #94a3b8;\">sovra-daemon@localhost:${tcpPort} ~ streaming telemetry</span>"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/admin-console.ts",
+    "line": 1335,
+    "snippet": "<div><span class=\"t-log-info\">[HTTP]</span> REST Gateway and WebSocket server listening at http://localhost:3001</div>"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/admin-console.ts",
+    "line": 1336,
+    "snippet": "<div><span class=\"t-log-info\">[ADMIN]</span> Product B Company Operations Console decoupled at http://localhost:3001/admin</div>"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/admin-console.ts",
+    "line": 1482,
+    "snippet": "const chosen = randomEvents[Math.floor(Math.random() * randomEvents.length)];"
+  },
+  {
+    "pattern": "TODO_FIXME",
+    "file": "scripts/audit-scanner.mjs",
+    "line": 9,
+    "snippet": "{ name: 'TODO_FIXME', regex: /\\b(TODO|FIXME|XXX)\\b/i },"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/audit-scanner.mjs",
+    "line": 10,
+    "snippet": "{ name: 'MOCK_STUB_DUMMY_FAKE', regex: /\\b(mock|mocked|stub|dummy|fake|placeholder)\\b/i },"
+  },
+  {
+    "pattern": "DEV_FALLBACK_TEST_ONLY",
+    "file": "scripts/audit-scanner.mjs",
+    "line": 11,
+    "snippet": "{ name: 'DEV_FALLBACK_TEST_ONLY', regex: /\\b(test-only|dev-only|development fallback|NODE_ENV\\s*!==\\s*['\"]production['\"])\\b/i },"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/audit-scanner.mjs",
+    "line": 12,
+    "snippet": "{ name: 'HARDCODED_DATA_INITIAL', regex: /\\b(INITIAL_|sample\\s+data|demo\\s+data|Math\\.random)\\b/i },"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/audit-scanner.mjs",
+    "line": 13,
+    "snippet": "{ name: 'AUTH_BYPASS_SECRETS', regex: /\\b(master[-_]?key|ADMIN_SECRET|default[-_]?secret|bypass|skipAuth|disableAuth|allowAll)\\b/i },"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/audit-scanner.mjs",
+    "line": 14,
+    "snippet": "{ name: 'WILDCARD_CORS_NETWORK', regex: /(Access-Control-Allow-Origin.*\\*|0\\.0\\.0\\.0|localhost)/i },"
+  },
+  {
+    "pattern": "CLIENT_CONTROLLED_ACTOR",
+    "file": "scripts/audit-scanner.mjs",
+    "line": 15,
+    "snippet": "{ name: 'CLIENT_CONTROLLED_ACTOR', regex: /\\b(req\\.body\\.(authorDid|userDid|fromDid|actorDid|senderDid)|actorCandidate)\\b/i }"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/audit-scanner.mjs",
+    "line": 40,
+    "snippet": "// Skip test files for mock/fixture keywords, but scan them for other patterns"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/bootstrap-node.ts",
+    "line": 7,
+    "snippet": "* 2. Real OS TCP socket listener on 0.0.0.0:4001 with Noise_XX transport."
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/bootstrap-node.ts",
+    "line": 34,
+    "snippet": "const P2P_HOST = process.env.SOVRA_P2P_HOST ?? '0.0.0.0';"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/bootstrap-node.ts",
+    "line": 137,
+    "snippet": "res.setHeader('Access-Control-Allow-Origin', '*');"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/bootstrap-node.ts",
+    "line": 192,
+    "snippet": "httpServer.listen(HTTP_PORT, '0.0.0.0', () => {"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/bootstrap-node.ts",
+    "line": 193,
+    "snippet": "console.log(`[HTTP] Health Status Endpoint: http://0.0.0.0:${HTTP_PORT}/health`);"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/bootstrap-node.ts",
+    "line": 194,
+    "snippet": "console.log(`[HTTP] Prometheus Metrics:     http://0.0.0.0:${HTTP_PORT}/metrics`);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 1061,
+    "snippet": "const masterKey = SovraIdentityKey.generate();"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 1067,
+    "snippet": "'Localhost Workstation Device',"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 1068,
+    "snippet": "masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 1073,
+    "snippet": "const delegation = createDeviceDelegation(masterKey, deviceKey, expiresAt);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 1074,
+    "snippet": "const binding = createPeerIdentityBinding(deviceKey, masterKey.did, delegation);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 1138,
+    "snippet": "masterKey,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 1374,
+    "snippet": "masterKey: SovraIdentityKey,"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 1603,
+    "snippet": ".composer-textarea::placeholder {"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 1960,
+    "snippet": ".header-search-input::placeholder {"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 5404,
+    "snippet": "<input type=\"text\" id=\"headerFriendSearchInput\" class=\"header-search-input\" placeholder=\"Search friends, @handle, channels, tags...\" oninput=\"handleHeaderFriend"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 5467,
+    "snippet": "<textarea id=\"dynamicPostCaption\" class=\"composer-textarea\" placeholder=\"What's happening on the mesh? Share photo, update or thought...\" oninput=\"this.style.he"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 5499,
+    "snippet": "<input id=\"dynamicPostTags\" type=\"text\" placeholder=\"#sovra #p2p\" value=\"#sovra #p2p #mesh\" class=\"composer-tags-input\" />"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 5638,
+    "snippet": "<input type=\"text\" class=\"insta-comment-input\" id=\"input-comment-${post.id}\" placeholder=\"Add a comment on sovereign mesh...\" onkeydown=\"if(event.key==='Enter')"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 5672,
+    "snippet": "<input type=\"text\" id=\"friendsViewSearchInput\" class=\"friends-search-input\" placeholder=\"Search friends by name, @handle, bio or peer DID...\" oninput=\"filterFri"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 5837,
+    "snippet": "<input type=\"text\" id=\"sheetCommentInput\" class=\"chat-text-input\" placeholder=\"Add a public comment...\" onkeydown=\"if(event.key==='Enter') submitReelComment()\">"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 6001,
+    "snippet": "<textarea id=\"reelUploadCaption\" rows=\"2\" class=\"chat-text-input\" style=\"width: 100%; border-radius: 8px; resize: none; font-size: 0.85rem;\" placeholder=\"What's"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 6007,
+    "snippet": "<input type=\"text\" id=\"reelUploadAudio\" class=\"chat-text-input\" style=\"width: 100%; border-radius: 8px; font-size: 0.85rem;\" placeholder=\"Original Audio — You ("
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 6013,
+    "snippet": "<input type=\"text\" id=\"reelUploadTags\" class=\"chat-text-input\" style=\"width: 100%; border-radius: 8px; font-size: 0.85rem;\" placeholder=\"web3, tech, coding, dec"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 6087,
+    "snippet": "<input type=\"text\" class=\"chat-search-input\" id=\"chatSearchInput\" placeholder=\"Search contacts & mesh...\" oninput=\"filterChatContacts(this.value)\">"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 6169,
+    "snippet": "<input type=\"text\" class=\"chat-text-input\" id=\"chatInputText\" placeholder=\"Type an encrypted message...\" onkeydown=\"if(event.key==='Enter') sendChatMessage()\">"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 6605,
+    "snippet": "<textarea id=\"newCommentInput\" placeholder=\"Add a public sovereign comment (Signed with Ed25519)...\" class=\"chat-text-input\" style=\"width: 100%; min-height: 48p"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 6718,
+    "snippet": "Support <b>Sovra Protocol Lab</b> directly. Memberships bypass all app stores and platforms (100% peer funded via state channel vouchers)."
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 6854,
+    "snippet": "<span id=\"meProfileDid\">${masterKey.did}</span>"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 6902,
+    "snippet": "<span class=\"key-data\" style=\"cursor: pointer;\" onclick=\"copyProfileDid()\" title=\"Click to copy\">${masterKey.did}</span>"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 6940,
+    "snippet": "<span class=\"badge\" style=\"background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);\">Active (Localhost)</span>"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7060,
+    "snippet": "<textarea id=\"postContent\" style=\"width: 100%; min-height: 60px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7076,
+    "snippet": "<textarea id=\"mediaPayload\" style=\"width: 100%; min-height: 50px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; colo"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 7123,
+    "snippet": "<span class=\"key-data\" id=\"followingCount\" style=\"color: #60a5fa; font-weight: bold;\">${socialGraph.getFollowing(masterKey.did).length}</span>"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 7127,
+    "snippet": "<span class=\"key-data\" id=\"blockedCount\" style=\"color: #f87171; font-weight: bold;\">${socialGraph.getBlockedUsers(masterKey.did).length}</span>"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 7131,
+    "snippet": "<span class=\"key-data\" id=\"mutedCount\" style=\"color: #fbbf24; font-weight: bold;\">${socialGraph.getMutedUsers(masterKey.did).length}</span>"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 7197,
+    "snippet": "<div>[INFO] Cryptographic identity generated: ${masterKey.did}</div>"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 7209,
+    "snippet": "Sovra Protocol & Monorepo Foundation &bull; Production P2P Stack &bull; Localhost Dev Runner"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7347,
+    "snippet": "<input type=\"text\" id=\"storyReplyInput\" class=\"story-reply-input\" placeholder=\"Send message...\" onkeydown=\"if(event.key==='Enter') sendStoryReply()\">"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7395,
+    "snippet": "<input type=\"text\" id=\"editProfileNameInput\" placeholder=\"e.g. Rahul Sharma\" style=\"width: 100%; padding: 0.75rem 1rem; background: #1e293b; border: 1px solid r"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7400,
+    "snippet": "<input type=\"text\" id=\"editProfileHandleInput\" placeholder=\"e.g. @rahul_phone\" style=\"width: 100%; padding: 0.75rem 1rem; background: #1e293b; border: 1px solid"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7405,
+    "snippet": "<textarea id=\"editProfileBioInput\" placeholder=\"Tell nearby peers about your node...\" rows=\"3\" style=\"width: 100%; padding: 0.75rem 1rem; background: #1e293b; b"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 7451,
+    "snippet": "${masterKey.did}"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7575,
+    "snippet": "<input type=\"text\" id=\"guardianInput1\" placeholder=\"Friend 1 (@alice_creator)\" value=\"@alice_creator\" style=\"padding: 0.65rem 0.8rem; background: #1e293b; borde"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7576,
+    "snippet": "<input type=\"text\" id=\"guardianInput2\" placeholder=\"Friend 2 (@bob_live)\" value=\"@bob_live\" style=\"padding: 0.65rem 0.8rem; background: #1e293b; border: 1px sol"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7577,
+    "snippet": "<input type=\"text\" id=\"guardianInput3\" placeholder=\"Friend 3 (@carol_sounds)\" value=\"@carol_sounds\" style=\"padding: 0.65rem 0.8rem; background: #1e293b; border:"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7626,
+    "snippet": "<input type=\"text\" id=\"womNameInput\" placeholder=\"e.g. Rahul Sharma\" style=\"width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid #334155; bor"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7637,
+    "snippet": "<input type=\"text\" id=\"womHandleInput\" placeholder=\"username\" oninput=\"validateWomHandleLive(this.value)\" style=\"width: 100%; padding: 11px 12px 11px 28px; back"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7722,
+    "snippet": "<input type=\"text\" id=\"omniSearchInput\" oninput=\"filterOmniSearch(this.value)\" placeholder=\"Search people, @channels, @pages, #hashtags, audio...\" style=\"width:"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7765,
+    "snippet": "<input type=\"text\" id=\"chanNameInput\" class=\"social-modal-input\" placeholder=\"e.g. Sovra Alpha Radar\" value=\"Sovra Alpha Radar\">"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7768,
+    "snippet": "<input type=\"text\" id=\"chanHandleInput\" class=\"social-modal-input\" placeholder=\"@channel_name\" value=\"@sovra_alpha\">"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7788,
+    "snippet": "<textarea id=\"chanDescInput\" class=\"social-modal-input\" style=\"min-height: 70px; resize: vertical;\" placeholder=\"Describe what subscribers will receive...\">Dece"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7809,
+    "snippet": "<input type=\"text\" id=\"pageNameInput\" class=\"social-modal-input\" placeholder=\"e.g. Metropolis Coffee\" value=\"Metropolis Coffee\">"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7812,
+    "snippet": "<input type=\"text\" id=\"pageHandleInput\" class=\"social-modal-input\" placeholder=\"@business_page\" value=\"@metropolis_coffee\">"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7831,
+    "snippet": "<textarea id=\"pageBioInput\" class=\"social-modal-input\" style=\"min-height: 70px; resize: vertical;\" placeholder=\"Tell customers about your business...\">Artisan c"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7878,
+    "snippet": "<textarea id=\"repostCommentaryInput\" class=\"social-modal-input\" style=\"min-height: 80px; resize: vertical;\" placeholder=\"Write your commentary or take on this p"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7909,
+    "snippet": "<option value=\"impersonation\">🎭 Fake Identity or Impersonation</option>"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 7915,
+    "snippet": "<textarea id=\"reportDetailsInput\" class=\"social-modal-input\" style=\"min-height: 60px; resize: vertical;\" placeholder=\"Provide context for the Mesh Jurors...\"></"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 7987,
+    "snippet": "did: '${masterKey.did}',"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 8179,
+    "snippet": "did: '${masterKey.did}',"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 8244,
+    "snippet": "did: myProfile ? myProfile.did : ('did:sovra:user_' + Math.random().toString(36).substring(2, 8)),"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 8592,
+    "snippet": "const uniqueDid = 'did:sovra:' + rawHandle + '_' + Math.random().toString(36).substring(2, 7);"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 8838,
+    "snippet": "p.innerText = particleChars[Math.floor(Math.random() * particleChars.length)];"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 8839,
+    "snippet": "const angle = (i / 10) * 2 * Math.PI + (Math.random() * 0.4 - 0.2);"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 8840,
+    "snippet": "const dist = 45 + Math.random() * 55;"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 8843,
+    "snippet": "const rot = (Math.random() - 0.5) * 60;"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 9061,
+    "snippet": "authorDid: myProfile ? myProfile.did : '${masterKey.did}',"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 9230,
+    "snippet": "'<input type=\"text\" id=\"input-comment-' + post.id + '\" placeholder=\"Add a comment to GossipSub swarm...\">' +"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 9261,
+    "snippet": "const myDid = (myProfile && myProfile.did) ? myProfile.did : '${masterKey.did}';"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 9353,
+    "snippet": "const did = '${masterKey.did}';"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 9379,
+    "snippet": "const myDid = (myProfile && myProfile.did) ? myProfile.did : '${masterKey.did}';"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 9673,
+    "snippet": "const preWarmTime = Math.floor(10 + Math.random() * 15);"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 9714,
+    "snippet": "note.innerText = notes[Math.floor(Math.random() * notes.length)];"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 9715,
+    "snippet": "note.style.right = (12 + Math.random() * 22) + 'px';"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 9716,
+    "snippet": "note.style.bottom = (65 + Math.random() * 25) + 'px';"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 11019,
+    "snippet": "id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 7),"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 11029,
+    "snippet": "signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 11074,
+    "snippet": "const myDid = myProfile ? myProfile.did : '${masterKey.did}';"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 11139,
+    "snippet": "const myDid = myProfile ? myProfile.did : '${masterKey.did}';"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 11198,
+    "snippet": "waveform.push(Math.floor(Math.random() * 75) + 25);"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 11204,
+    "snippet": "id: 'audio-' + now + '-' + Math.random().toString(36).substring(2, 6),"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 11215,
+    "snippet": "signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),"
+  },
+  {
+    "pattern": "MOCK_STUB_DUMMY_FAKE",
+    "file": "scripts/dev-server.ts",
+    "line": 12331,
+    "snippet": "'<input type=\"text\" id=\"reply-input-' + c.id + '\" class=\"chat-text-input\" placeholder=\"Add a public reply...\" style=\"flex: 1;\" onkeydown=\"if(event.key===&quot;E"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 12491,
+    "snippet": "p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 12492,
+    "snippet": "p.style.left = (Math.random() * 100) + 'vw';"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 12494,
+    "snippet": "p.style.animationDuration = (1.5 + Math.random() * 2) + 's';"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 12495,
+    "snippet": "p.style.transform = 'scale(' + (0.5 + Math.random() * 0.8) + ')';"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 12979,
+    "snippet": "const myDid = myProfile ? myProfile.did : '${masterKey.did}';"
+  },
+  {
+    "pattern": "HARDCODED_DATA_INITIAL",
+    "file": "scripts/dev-server.ts",
+    "line": 13704,
+    "snippet": "const ticketId = 'SR-' + Math.floor(1000 + Math.random() * 9000);"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 13800,
+    "snippet": "console.log('   SOVRA LOCALHOST DEVELOPMENT & P2P NODE RUNNER');"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 13804,
+    "snippet": "const { masterKey, deviceKey, binding, node, tcpPort, storageDaemon, socialGraph, localFeed, workstationPrivKey } = await bootstrapLocalNode();"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 13807,
+    "snippet": "console.log(`[DID] Identity DID: ${masterKey.did}`);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 13812,
+    "snippet": "did: masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 13828,
+    "snippet": "const adminSecret = process.env.ADMIN_SECRET_KEY || (process.env.NODE_ENV === 'production' ? undefined : 'sovra-operations-master-key');"
+  },
+  {
+    "pattern": "CLIENT_CONTROLLED_ACTOR",
+    "file": "scripts/dev-server.ts",
+    "line": 13915,
+    "snippet": "const actorCandidate = parsedBody?.authorDid || parsedBody?.userDid || parsedBody?.fromDid || parsedBody?.senderDid || parsedBody?.creatorDid || parsedBody?.did"
+  },
+  {
+    "pattern": "CLIENT_CONTROLLED_ACTOR",
+    "file": "scripts/dev-server.ts",
+    "line": 13916,
+    "snippet": "if (actorCandidate && process.env.NODE_ENV !== 'production') {"
+  },
+  {
+    "pattern": "CLIENT_CONTROLLED_ACTOR",
+    "file": "scripts/dev-server.ts",
+    "line": 13917,
+    "snippet": "const user = sovraDb.findUserByDid(String(actorCandidate));"
+  },
+  {
+    "pattern": "CLIENT_CONTROLLED_ACTOR",
+    "file": "scripts/dev-server.ts",
+    "line": 13928,
+    "snippet": "if (!actorCandidate && (parsedBody?.messageIds || parsedBody?.messageId) && process.env.NODE_ENV !== 'production') {"
+  },
+  {
+    "pattern": "CLIENT_CONTROLLED_ACTOR",
+    "file": "scripts/dev-server.ts",
+    "line": 13946,
+    "snippet": "if (!actorCandidate && parsedBody?.postId && process.env.NODE_ENV !== 'production') {"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 14017,
+    "snippet": "did: masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 14302,
+    "snippet": "const feedItems = localFeed.getChronologicalFeed(masterKey.did, 50);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 14523,
+    "snippet": "pubkey: masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 16012,
+    "snippet": "did: masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 16044,
+    "snippet": "did: masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "scripts/dev-server.ts",
+    "line": 16112,
+    "snippet": "res.end(renderHtml(binding, masterKey, tcpPort, Date.now() - startTime, storageDaemon, socialGraph, localFeed));"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 16120,
+    "snippet": "server.listen(HTTP_PORT, '0.0.0.0', () => {"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 16134,
+    "snippet": "console.log(`  🌐 Sovra Mesh Node is LIVE on LAN & Localhost:`);"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 16135,
+    "snippet": "console.log(`     💻 Laptop Browser: 👉 http://localhost:${HTTP_PORT}`);"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 16138,
+    "snippet": "console.log(`  - Product A (Sovra Social & Friends):   http://localhost:${HTTP_PORT}`);"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 16140,
+    "snippet": "console.log(`  - Product B (Sovra Ops Console):        http://localhost:${HTTP_PORT}/admin`);"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/dev-server.ts",
+    "line": 16141,
+    "snippet": "console.log(`  - JSON Node Health Status:              http://localhost:${HTTP_PORT}/api/status`);"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/test-milestones.mjs",
+    "line": 5,
+    "snippet": "const BASE_URL = 'http://localhost:3001';"
+  },
+  {
+    "pattern": "WILDCARD_CORS_NETWORK",
+    "file": "scripts/test-phase5-6.mjs",
+    "line": 3,
+    "snippet": "const BASE_URL = 'http://localhost:3001';"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "tests/integration/multi-node-convergence.test.ts",
+    "line": 42,
+    "snippet": "readonly masterKey: SovraIdentityKey;"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "tests/integration/multi-node-convergence.test.ts",
+    "line": 76,
+    "snippet": "const masterKey = SovraIdentityKey.generate();"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "tests/integration/multi-node-convergence.test.ts",
+    "line": 83,
+    "snippet": "masterKey.did,"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "tests/integration/multi-node-convergence.test.ts",
+    "line": 87,
+    "snippet": "const delegation = createDeviceDelegation(masterKey, deviceKey, validUntil);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "tests/integration/multi-node-convergence.test.ts",
+    "line": 88,
+    "snippet": "const binding = createPeerIdentityBinding(deviceKey, masterKey.did, delegation);"
+  },
+  {
+    "pattern": "AUTH_BYPASS_SECRETS",
+    "file": "tests/integration/multi-node-convergence.test.ts",
+    "line": 103,
+    "snippet": "masterKey,"
+  }
+]

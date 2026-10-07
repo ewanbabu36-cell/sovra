@@ -1,0 +1,65 @@
+# ============================================================
+#   SOVRA PROTOCOL - PRODUCTION NODE DOCKER CONTAINER
+#   Multi-Stage Hardened Alpine Node.js 22 Runtime
+# ============================================================
+
+# STAGE 1: Build & Compilation
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+# Enable pnpm package manager
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy dependency manifests
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json tsconfig.base.json ./
+COPY packages/ ./packages/
+COPY nodes/ ./nodes/
+COPY services/ ./services/
+COPY apps/ ./apps/
+COPY scripts/ ./scripts/
+
+# Install dependencies and build all workspace packages
+RUN pnpm install --frozen-lockfile
+RUN pnpm -r run build
+RUN node scripts/build-client-bundle.ts
+
+# STAGE 2: Hardened Minimal Production Runtime
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+
+# Install curl for reliable health checks
+RUN apk add --no-cache curl
+
+# Enable pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Set production environment variables
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV SOVRA_STORAGE_DIR=/app/.sovra-storage-prod
+ENV SOVRA_P2P_PORT=4001
+ENV SOVRA_HTTP_PORT=3001
+
+# Copy build artifacts and dependencies from builder stage
+COPY --from=builder /app /app
+
+# Create storage directory and ensure non-root ownership
+RUN mkdir -p /app/.sovra-storage-prod && chown -R node:node /app
+
+# Security: Run as non-privileged 'node' user
+USER node
+
+# Expose HTTP REST/SSE port and Noise_XX P2P port
+EXPOSE 3001 4001
+
+# Persistent volume for SQLite WAL database, media, and keys
+VOLUME ["/app/.sovra-storage-prod"]
+
+# Container Healthcheck using native /readyz endpoint
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://127.0.0.1:3001/readyz || exit 1
+
+# Start sovereign dev/prod node
+CMD ["node", "--experimental-strip-types", "scripts/dev-server.ts"]

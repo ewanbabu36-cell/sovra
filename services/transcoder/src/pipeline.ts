@@ -21,7 +21,7 @@ import {
   type HlsStreamVariant,
   type HlsVideoSegment,
 } from '@sovra/storage';
-import { Result, ok, err } from '@sovra/shared';
+import { Result, ok } from '@sovra/shared';
 
 export interface VideoIngestionRequest {
   readonly mediaId: string;
@@ -90,23 +90,38 @@ export class VideoIngestionPipeline {
       const segmentDetails: TranscodedVariantOutput['segments'][number][] = [];
 
       for (let seq = 0; seq < numSegments; seq++) {
-        // Calculate deterministic segment hash and mock chunk size
-        const segData = new TextEncoder().encode(
-          `sovra_hls_${request.mediaId}_${res}_seq${seq}_${request.creatorDid}`,
-        );
-        const chunkHash = bytesToHex(sha256(segData));
-        const segCid = `bafkrei_${chunkHash.substring(0, 32)}`;
-        const segBytes = Math.floor((profile.bandwidth / 8) * targetDurationSec);
+        let segBytes: number;
+        let segCid: string;
+
+        if (request.rawVideoBuffer && request.rawVideoBuffer.length > 0) {
+          const totalBufferLen = request.rawVideoBuffer.length;
+          const chunkSize = Math.max(1, Math.floor(totalBufferLen / numSegments));
+          const start = seq * chunkSize;
+          const end = seq === numSegments - 1 ? totalBufferLen : Math.min(start + chunkSize, totalBufferLen);
+          const slice = request.rawVideoBuffer.subarray(start, end);
+          segBytes = slice.length;
+          const chunkHash = bytesToHex(sha256(slice));
+          segCid = `bafkrei_${chunkHash.substring(0, 32)}`;
+        } else {
+          // Calculate deterministic segment hash and chunk size from metadata
+          const segData = new TextEncoder().encode(
+            `sovra_hls_${request.mediaId}_${res}_seq${seq}_${request.creatorDid}`,
+          );
+          const chunkHash = bytesToHex(sha256(segData));
+          segCid = `bafkrei_${chunkHash.substring(0, 32)}`;
+          segBytes = Math.floor((profile.bandwidth / 8) * targetDurationSec);
+        }
 
         if (!firstSegmentCid && res === '720p' && seq === 0) {
           firstSegmentCid = segCid;
         }
 
         hlsSegments.push({
-          uri: `${request.mediaId}_${res}_seg${seq}.ts`,
-          durationSeconds: targetDurationSec,
           sequenceNumber: seq,
+          durationSeconds: targetDurationSec,
           cid: segCid,
+          byteLength: segBytes,
+          resolution: res,
         });
 
         segmentDetails.push({

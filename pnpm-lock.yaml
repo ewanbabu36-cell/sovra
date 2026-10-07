@@ -295,6 +295,9 @@ importers:
 
   nodes/community-node:
     dependencies:
+      '@sovra/identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
       '@sovra/p2p':
         specifier: workspace:*
         version: link:../../packages/p2p
@@ -389,6 +392,31 @@ importers:
       '@sovra/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.7
+        version: 3.2.7(@types/node@24.19.1)(supports-color@7.2.0)
+
+  packages/ai:
+    dependencies:
+      '@sovra/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@sovra/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@sovra/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@sovra/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@sovra/social':
+        specifier: workspace:*
+        version: link:../social
     devDependencies:
       typescript:
         specifier: ^5.8.2
@@ -585,6 +613,9 @@ importers:
 
   services/moderation-worker:
     dependencies:
+      '@sovra/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@sovra/moderation':
         specifier: workspace:*
         version: link:../../packages/moderation
@@ -620,6 +651,9 @@ importers:
 
   services/transcoder:
     dependencies:
+      '@sovra/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@sovra/shared':
         specifier: workspace:*
         version: link:../../packages/shared

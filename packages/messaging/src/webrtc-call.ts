@@ -13,7 +13,6 @@
 import {
   signEd25519,
   verifyEd25519,
-  sha256,
   bytesToHex,
   hexToBytes,
 } from '@sovra/crypto';
@@ -90,6 +89,21 @@ export interface CallQualityMetrics {
   readonly audioBitrateKbps: number;
   readonly videoBitrateKbps: number;
   readonly connectionTier: 'IPv6_Direct' | 'UDP_HolePunch' | 'P2P_Relay';
+  readonly isLive: boolean;
+  readonly timestamp: number;
+}
+
+export interface RtcStatsReportPayload {
+  readonly currentRoundTripTime?: number | undefined; // in seconds as reported by RTCStats
+  readonly packetsSent?: number | undefined;
+  readonly packetsReceived?: number | undefined;
+  readonly packetsLost?: number | undefined;
+  readonly jitter?: number | undefined; // in seconds as reported by RTCStats
+  readonly bytesSent?: number | undefined;
+  readonly bytesReceived?: number | undefined;
+  readonly durationSeconds?: number | undefined;
+  readonly candidatePairType?: 'host' | 'srflx' | 'prflx' | 'relay' | undefined;
+  readonly isIPv6?: boolean | undefined;
 }
 
 /**
@@ -119,14 +133,7 @@ function canonicalSignalingPayload(msg: Omit<CallSignalingMessage, 'signatureHex
 export class WebRtcCallEngine {
   private currentSession: CallSessionSnapshot | null = null;
   private readonly iceCandidatesQueue: IceCandidatePayload[] = [];
-  private currentMetrics: CallQualityMetrics = {
-    roundTripTimeMs: 24,
-    packetLossPercent: 0.0,
-    jitterMs: 3.2,
-    audioBitrateKbps: 64,
-    videoBitrateKbps: 1850,
-    connectionTier: 'IPv6_Direct',
-  };
+  private currentMetrics: CallQualityMetrics | null = null;
 
   constructor(
     public readonly localDid: string,
@@ -138,7 +145,54 @@ export class WebRtcCallEngine {
     return this.currentSession;
   }
 
-  public get metrics(): CallQualityMetrics {
+  public get metrics(): CallQualityMetrics | null {
+    return this.currentMetrics;
+  }
+
+  /**
+   * Updates real-time telemetry from genuine RTCPeerConnection stats.
+   */
+  public updateRtcStats(report: RtcStatsReportPayload): CallQualityMetrics {
+    const rttMs = report.currentRoundTripTime !== undefined
+      ? Number((report.currentRoundTripTime * 1000).toFixed(1))
+      : 0;
+
+    const totalPackets = (report.packetsReceived ?? 0) + (report.packetsLost ?? 0);
+    const packetLossPercent = totalPackets > 0 && report.packetsLost !== undefined
+      ? Number(((report.packetsLost / totalPackets) * 100).toFixed(2))
+      : 0.0;
+
+    const jitterMs = report.jitter !== undefined
+      ? Number((report.jitter * 1000).toFixed(1))
+      : 0.0;
+
+    let connectionTier: 'IPv6_Direct' | 'UDP_HolePunch' | 'P2P_Relay' = 'UDP_HolePunch';
+    if (report.candidatePairType === 'relay') {
+      connectionTier = 'P2P_Relay';
+    } else if (report.isIPv6) {
+      connectionTier = 'IPv6_Direct';
+    } else {
+      connectionTier = 'UDP_HolePunch';
+    }
+
+    const duration = Math.max(1, report.durationSeconds ?? 1);
+    const totalBitrateKbps = report.bytesReceived !== undefined
+      ? Number(((report.bytesReceived * 8) / (duration * 1000)).toFixed(0))
+      : (report.bytesSent !== undefined ? Number(((report.bytesSent * 8) / (duration * 1000)).toFixed(0)) : 0);
+
+    const audioBitrateKbps = Math.min(totalBitrateKbps, 64);
+    const videoBitrateKbps = Math.max(0, totalBitrateKbps - audioBitrateKbps);
+
+    this.currentMetrics = {
+      roundTripTimeMs: rttMs,
+      packetLossPercent,
+      jitterMs,
+      audioBitrateKbps,
+      videoBitrateKbps,
+      connectionTier,
+      isLive: true,
+      timestamp: Date.now(),
+    };
     return this.currentMetrics;
   }
 
@@ -393,6 +447,7 @@ export class WebRtcCallEngine {
       endReason: reason,
       durationSeconds: duration,
     };
+    this.currentMetrics = null;
 
     return message;
   }

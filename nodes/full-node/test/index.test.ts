@@ -14,5 +14,31 @@ describe('@sovra/full-node', () => {
 
     const startResult = await daemon.start();
     expect(startResult.ok).toBe(true);
+
+    // Verify storage blockstore
+    expect(daemon.getBlockstore()).toBeDefined();
+
+    // Verify pubsub operation handling
+    let receivedOp: any = null;
+    daemon.onOperation((op) => {
+      receivedOp = op;
+    });
+
+    const testOp = {
+      eventId: 'evt_12345',
+      issuerDid: 'did:sovra:test_issuer',
+      deviceId: 'dev_1',
+      operationType: 'FEED_POST_CREATE' as const,
+      payload: { text: 'Test' },
+      nonce: 'n_1',
+      timestamp: Date.now(),
+      signature: 'ed_sig_mock',
+    };
+
+    const pubRes = await daemon.publishOperation(testOp);
+    expect(pubRes.ok).toBe(true);
+
+    await daemon.stop();
+    expect(daemon.isRunning).toBe(false);
   });
 });

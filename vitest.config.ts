@@ -22,12 +22,14 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    fileParallelism: false,
     include: [
       'packages/**/*.test.ts',
       'apps/**/*.test.ts',
       'nodes/**/*.test.ts',
       'services/**/*.test.ts',
       'tests/**/*.test.ts',
+      'test/**/*.test.ts',
     ],
     coverage: {
       provider: 'v8',

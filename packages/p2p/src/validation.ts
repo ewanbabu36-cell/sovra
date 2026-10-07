@@ -142,7 +142,19 @@ export class EventValidationPipeline {
       const canonicalJson = serializeCanonicalJson(unsignedPayload);
       const computedHash = bytesToHex(sha256(new TextEncoder().encode(canonicalJson)));
 
-      if (computedHash !== event.id) {
+      let hashMatched = computedHash === event.id;
+      if (!hashMatched) {
+        const canonicalJsonWithMedia = serializeCanonicalJson({
+          ...unsignedPayload,
+          media: event.media ?? [],
+        });
+        const computedHashWithMedia = bytesToHex(
+          sha256(new TextEncoder().encode(canonicalJsonWithMedia)),
+        );
+        hashMatched = computedHashWithMedia === event.id;
+      }
+
+      if (!hashMatched) {
         return {
           isValid: false,
           error: `Event ID does not match SHA-256 hash of canonical payload (expected ${computedHash}, got ${event.id})`,
@@ -153,7 +165,10 @@ export class EventValidationPipeline {
 
       const authorPubBytes = hexToBytes(event.pubkey);
       const sigBytes = hexToBytes(event.sig);
-      const isSigValid = verifyEd25519(authorPubBytes, hexToBytes(event.id), sigBytes);
+      const isSigValid =
+        verifyEd25519(authorPubBytes, hexToBytes(event.id), sigBytes) ||
+        verifyEd25519(authorPubBytes, new TextEncoder().encode(event.id), sigBytes);
+
       if (!isSigValid) {
         return {
           isValid: false,

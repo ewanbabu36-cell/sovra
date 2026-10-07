@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sovra-system
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sovra-node
+  namespace: sovra-system
+  labels:
+    app.kubernetes.io/name: sovra-node
+    app.kubernetes.io/part-of: sovra-platform
+spec:
+  serviceName: "sovra-node-internal"
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sovra-node
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sovra-node
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: sovra-node
+          image: ghcr.io/sovra/sovra-node:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+            - name: p2p-noise
+              containerPort: 4001
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3001"
+            - name: SOVRA_STORAGE_DIR
+              value: "/app/.sovra-storage-prod"
+            - name: SOVRA_P2P_PORT
+              value: "4001"
+            - name: ADMIN_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sovra-admin-credentials
+                  key: admin-secret-key
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: sovra-storage
+              mountPath: /app/.sovra-storage-prod
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 3001
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+  volumeClaimTemplates:
+    - metadata:
+        name: sovra-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sovra-node-svc
+  namespace: sovra-system
+  labels:
+    app.kubernetes.io/name: sovra-node
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3001
+      targetPort: 3001
+      name: http
+  selector:
+    app.kubernetes.io/name: sovra-node
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sovra-p2p-svc
+  namespace: sovra-system
+  labels:
+    app.kubernetes.io/name: sovra-node
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 4001
+      targetPort: 4001
+      name: p2p-noise
+  selector:
+    app.kubernetes.io/name: sovra-node
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sovra-ingress
+  namespace: sovra-system
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - sovra.network
+      secretName: sovra-tls-cert
+  rules:
+    - host: sovra.network
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sovra-node-svc
+                port:
+                  number: 3001

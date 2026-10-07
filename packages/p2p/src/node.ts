@@ -45,7 +45,20 @@ export interface SovraP2PNodeConfig {
 }
 
 function safeJsonStringify(obj: unknown): string {
-  return JSON.stringify(obj, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
+  return JSON.stringify(obj, (_k, v) => {
+    if (typeof v === 'bigint') return v.toString();
+    if (v instanceof Uint8Array) return { __u8: Array.from(v) };
+    return v;
+  });
+}
+
+function safeJsonParse<T = any>(str: string): T {
+  return JSON.parse(str, (_k, v) => {
+    if (v && typeof v === 'object' && Array.isArray((v as any).__u8)) {
+      return new Uint8Array((v as any).__u8);
+    }
+    return v;
+  });
 }
 
 /**
@@ -366,7 +379,7 @@ export class SovraP2PNode implements P2PNode {
       muxer.registerProtocolHandler('/sovra/gossipsub/1.2.0', stream => {
         stream.onData(async data => {
           try {
-            const packet = JSON.parse(new TextDecoder().decode(data));
+            const packet = safeJsonParse(new TextDecoder().decode(data));
             await this.pubsub.handleInboundPacket(remotePeerId, packet);
           } catch {}
         });
@@ -578,7 +591,7 @@ export class SovraP2PNode implements P2PNode {
         const pubsubStream = await muxer.openStream('/sovra/gossipsub/1.2.0');
         pubsubStream.onData(async data => {
           try {
-            const packet = JSON.parse(new TextDecoder().decode(data));
+            const packet = safeJsonParse(new TextDecoder().decode(data));
             await this.pubsub.handleInboundPacket(peerId, packet);
           } catch {}
         });

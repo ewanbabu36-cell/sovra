@@ -132,7 +132,7 @@ export function OnboardingModal({
                 width: 32,
                 height: 6,
                 borderRadius: 3,
-                backgroundColor: step === s ? '#38bdf8' : step > s ? '#10b981' : '#334155',
+                backgroundColor: step === s ? '#38bdf8' : typeof step === 'number' && step > s ? '#10b981' : '#334155',
                 transition: 'all 0.3s ease',
               }}
             />

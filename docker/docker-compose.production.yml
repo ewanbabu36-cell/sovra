@@ -1,0 +1,72 @@
+version: '3.8'
+
+# ============================================================
+#   SOVRA PRODUCTION MULTI-CONTAINER STACK
+#   Sovra Node + Caddy TLS Reverse Proxy + Health Checks
+# ============================================================
+
+services:
+  sovra-node:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    container_name: sovra-production-node
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - SOVRA_STORAGE_DIR=/app/.sovra-storage-prod
+      - SOVRA_P2P_PORT=4001
+      - SOVRA_HTTP_PORT=3001
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY:-sovra-production-admin-secret-key-32chars!}
+    volumes:
+      - sovra-prod-storage:/app/.sovra-storage-prod
+    ports:
+      - "4001:4001" # P2P Noise_XX TCP Mesh Listen Port
+    networks:
+      - sovra-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3001/readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  caddy-proxy:
+    image: caddy:2-alpine
+    container_name: sovra-caddy-proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      sovra-node:
+        condition: service_healthy
+    networks:
+      - sovra-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+networks:
+  sovra-network:
+    driver: bridge
+
+volumes:
+  sovra-prod-storage:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local

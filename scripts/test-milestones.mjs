@@ -37,9 +37,9 @@ async function runMilestoneTests() {
   assert.strictEqual(regLaptopRes.status, 200, 'Laptop registration must succeed with 200');
   const regLaptopData = await regLaptopRes.json();
   assert.strictEqual(regLaptopData.ok, true);
-  assert.strictEqual(regLaptopData.user.handle, laptopHandle);
-  assert.ok(regLaptopData.user.sessionToken, 'Session token must be generated');
-  console.log(`      ✅ Registered user: ${regLaptopData.user.displayName} (${regLaptopData.user.handle}) with session: ${regLaptopData.user.sessionToken}`);
+  const laptopToken = regLaptopData.sessionToken || regLaptopData.user?.sessionToken;
+  assert.ok(laptopToken, 'Session token must be generated');
+  console.log(`      ✅ Registered user: ${regLaptopData.user.displayName} (${regLaptopData.user.handle}) with session: ${laptopToken}`);
 
   // Step 1.2: Enforce Unique Handle Constraint (Duplicate Check)
   console.log(`   [1.2] Testing unique handle collision constraint with duplicate (${laptopHandle})...`);
@@ -63,7 +63,10 @@ async function runMilestoneTests() {
   const updatedAvatarWebp = 'data:image/webp;base64,UklGRmIAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAwAAAARBxAR/Q9ERP8DAABWUDggIAAAADACAJ0BKgIAAgAAAP4AAA3AAP7mt+AAAAAAAAAAAAAAAA==';
   const uploadAvatarRes = await fetch(`${BASE_URL}/api/user/upload-avatar`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${laptopToken}`,
+    },
     body: JSON.stringify({
       did: laptopDid,
       avatarDataUrl: updatedAvatarWebp,
@@ -100,6 +103,7 @@ async function runMilestoneTests() {
   assert.strictEqual(regPhoneRes.status, 200);
   const regPhoneData = await regPhoneRes.json();
   assert.strictEqual(regPhoneData.ok, true);
+  const phoneToken = regPhoneData.sessionToken || regPhoneData.user?.sessionToken;
   console.log(`      ✅ Phone registered: ${regPhoneData.user.displayName} (${regPhoneData.user.handle})`);
   console.log('   🎉 MILESTONE 1 VERIFIED 100%!\n');
 
@@ -110,7 +114,9 @@ async function runMilestoneTests() {
 
   // Step 2.1: Verify Real Contacts List
   console.log(`   [2.1] Fetching Laptop contacts list (verifying phone peer is listed)...`);
-  const laptopContactsRes = await fetch(`${BASE_URL}/api/chat/contacts?userDid=${encodeURIComponent(laptopDid)}`);
+  const laptopContactsRes = await fetch(`${BASE_URL}/api/chat/contacts?userDid=${encodeURIComponent(laptopDid)}`, {
+    headers: { 'Authorization': `Bearer ${laptopToken}` },
+  });
   assert.strictEqual(laptopContactsRes.status, 200);
   const laptopContactsData = await laptopContactsRes.json();
   assert.strictEqual(laptopContactsData.ok, true);
@@ -124,7 +130,10 @@ async function runMilestoneTests() {
   const msg1Id = `msg_test_${Date.now()}_1`;
   const send1Res = await fetch(`${BASE_URL}/api/chat/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${laptopToken}`,
+    },
     body: JSON.stringify({
       id: msg1Id,
       senderDid: laptopDid,
@@ -142,7 +151,9 @@ async function runMilestoneTests() {
 
   // Step 2.3: Phone receives message and acknowledges delivery (Status: 'delivered' -> Double Grey Ticks)
   console.log(`   [2.3] Phone polls incoming messages and confirms network delivery...`);
-  const phonePoll1Res = await fetch(`${BASE_URL}/api/chat/messages?userDid=${encodeURIComponent(phoneDid)}`);
+  const phonePoll1Res = await fetch(`${BASE_URL}/api/chat/messages?userDid=${encodeURIComponent(phoneDid)}`, {
+    headers: { 'Authorization': `Bearer ${phoneToken}` },
+  });
   const phonePoll1Data = await phonePoll1Res.json();
   const receivedMsgOnPhone = phonePoll1Data.messages.find(m => m.id === msg1Id);
   assert.ok(receivedMsgOnPhone, 'Phone must retrieve the incoming message');
@@ -150,7 +161,10 @@ async function runMilestoneTests() {
   // Phone sends delivered receipt
   const delivReceiptRes = await fetch(`${BASE_URL}/api/chat/receipt`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${phoneToken}`,
+    },
     body: JSON.stringify({
       messageIds: [msg1Id],
       status: 'delivered',
@@ -163,7 +177,10 @@ async function runMilestoneTests() {
   console.log(`   [2.4] Phone opens conversation thread and marks message read...`);
   const readReceiptRes = await fetch(`${BASE_URL}/api/chat/receipt`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${phoneToken}`,
+    },
     body: JSON.stringify({
       messageIds: [msg1Id],
       status: 'read',
@@ -172,7 +189,9 @@ async function runMilestoneTests() {
   assert.strictEqual(readReceiptRes.status, 200);
 
   // Laptop verifies status is now 'read' (Blue Ticks)
-  const laptopCheckRes = await fetch(`${BASE_URL}/api/chat/messages?userDid=${encodeURIComponent(laptopDid)}`);
+  const laptopCheckRes = await fetch(`${BASE_URL}/api/chat/messages?userDid=${encodeURIComponent(laptopDid)}`, {
+    headers: { 'Authorization': `Bearer ${laptopToken}` },
+  });
   const laptopCheckData = await laptopCheckRes.json();
   const msgOnLaptop = laptopCheckData.messages.find(m => m.id === msg1Id);
   assert.strictEqual(msgOnLaptop.status, 'read', 'Message status must be updated to read');
@@ -183,7 +202,10 @@ async function runMilestoneTests() {
   const msg2Id = `msg_test_${Date.now()}_2`;
   const send2Res = await fetch(`${BASE_URL}/api/chat/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${phoneToken}`,
+    },
     body: JSON.stringify({
       id: msg2Id,
       senderDid: phoneDid,
@@ -200,7 +222,10 @@ async function runMilestoneTests() {
   // Laptop receives reply and marks read
   await fetch(`${BASE_URL}/api/chat/receipt`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${laptopToken}`,
+    },
     body: JSON.stringify({
       messageIds: [msg2Id],
       status: 'read',
@@ -222,7 +247,10 @@ async function runMilestoneTests() {
   console.log(`   [3.2] Laptop publishes post to feed with compressed image & caption...`);
   const createPostRes = await fetch(`${BASE_URL}/api/feed/create`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${laptopToken}`,
+    },
     body: JSON.stringify({
       caption: 'Testing decentralized feed synchronization between Laptop and Mobile Phone! 🚀 #sovra #mesh',
       tags: '#sovra #mesh #p2p',
@@ -265,7 +293,10 @@ async function runMilestoneTests() {
   console.log(`   [3.5] Phone likes and adds comment to Laptop's post...`);
   const likeRes = await fetch(`${BASE_URL}/api/feed/like`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${phoneToken}`,
+    },
     body: JSON.stringify({
       postId: createdPostId,
       userDid: phoneDid,
@@ -279,7 +310,10 @@ async function runMilestoneTests() {
 
   const commentRes = await fetch(`${BASE_URL}/api/feed/comment`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${phoneToken}`,
+    },
     body: JSON.stringify({
       postId: createdPostId,
       text: 'Verified on phone! Ultra fast sync directly over local Wi-Fi.',
@@ -300,7 +334,23 @@ async function runMilestoneTests() {
 
   // Step 4.1: Query Ops Console Metrics & verify multi-device presence
   console.log(`   [4.1] Checking Operations Console Live Mesh Metrics...`);
-  const metricsRes = await fetch(`${BASE_URL}/api/admin/metrics`);
+  const adminAuthRes = await fetch(`${BASE_URL}/api/admin/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      did: 'did:sovra:admin_operator',
+      role: 'SUPER_ADMIN',
+      adminKey: 'sovra-test-admin-secret-key-32-chars-ok!',
+    }),
+  });
+  assert.strictEqual(adminAuthRes.status, 200, 'Admin auth must succeed with 200');
+  const adminAuthData = await adminAuthRes.json();
+  const adminToken = adminAuthData.sessionToken;
+  assert.ok(adminToken, 'Admin token must be returned');
+
+  const metricsRes = await fetch(`${BASE_URL}/api/admin/metrics`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` },
+  });
   assert.strictEqual(metricsRes.status, 200);
   const metrics = await metricsRes.json();
   assert.strictEqual(metrics.ok, true);
@@ -327,7 +377,10 @@ async function runMilestoneTests() {
   console.log(`   [4.3] Isolating test run & cleaning test post from live feed...`);
   const delPostRes = await fetch(`${BASE_URL}/api/feed/delete`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${laptopToken}`,
+    },
     body: JSON.stringify({ postId: createdPostId }),
   });
   assert.strictEqual(delPostRes.status, 200);

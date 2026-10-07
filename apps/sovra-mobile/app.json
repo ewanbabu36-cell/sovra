@@ -20,7 +20,13 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Sovra needs camera access to record reels, capture stories, and scan peer QR codes.",
         "NSMicrophoneUsageDescription": "Sovra needs microphone access to record voice notes and audio for reels.",
-        "NSFaceIDUsageDescription": "Sovra uses FaceID to authenticate passkeys and secure local private keys."
+        "NSFaceIDUsageDescription": "Sovra uses FaceID to authenticate passkeys and secure local private keys.",
+        "NSBluetoothAlwaysUsageDescription": "Sovra uses Bluetooth Low Energy for peer-to-peer decentralized offline mesh messaging and content sync.",
+        "NSBluetoothPeripheralUsageDescription": "Sovra advertises as a Bluetooth Low Energy peripheral to discover nearby mesh peers.",
+        "UIBackgroundModes": [
+          "bluetooth-central",
+          "bluetooth-peripheral"
+        ]
       }
     },
     "android": {
@@ -33,6 +39,15 @@
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_ADVERTISE",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.USE_BIOMETRIC",
