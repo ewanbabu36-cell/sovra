@@ -6837,9 +6837,55 @@ function renderHtml(
       text-transform: uppercase;
       letter-spacing: 0.03em;
     }
+
+    /* =========================================================================
+       PUBLIC LANDING GATEWAY & AUTHENTICATED VIEW SEPARATION
+       ========================================================================= */
+    html.sovra-unauthenticated .app-layout,
+    html.sovra-unauthenticated .mobile-bottom-nav,
+    .app-layout.app-hidden,
+    .mobile-bottom-nav.app-hidden {
+      display: none !important;
+    }
+    html.sovra-unauthenticated #welcomeOnboardingModal {
+      display: flex !important;
+    }
+    @media (max-width: 860px) {
+      .sovra-landing-container {
+        flex-direction: column !important;
+        gap: 1.5rem !important;
+        padding: 0.5rem 0 !important;
+      }
+      .sovra-landing-hero {
+        text-align: center !important;
+        max-width: 440px;
+        margin: 0 auto;
+      }
+      .sovra-landing-hero h1 {
+        font-size: 1.8rem !important;
+      }
+      .sovra-landing-hero p {
+        margin: 0 auto 1.25rem auto !important;
+      }
+      .sovra-landing-hero > div:nth-child(4) {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body class="nav-mode-auto">
+  <script>
+    (function() {
+      try {
+        var isLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
+        var token = localStorage.getItem('sovra_session_token');
+        var profile = localStorage.getItem('sovra_user_profile');
+        if (isLoggedOut || !token || !profile) {
+          document.documentElement.classList.add('sovra-unauthenticated');
+        }
+      } catch(e) {}
+    })();
+  </script>
   <div class="app-layout">
     <!-- Column 1: Left Navigation Rail (Desktop) -->
     <aside class="app-left-rail">
@@ -9531,6 +9577,8 @@ function renderHtml(
         <button style="background: none; border: none; font-size: 1.25rem; cursor: pointer;" onclick="sendStoryReaction('🔥')">🔥</button>
         <button style="background: none; border: none; font-size: 1.25rem; cursor: pointer;" onclick="sendStoryReaction('👏')">👏</button>
       </div>
+    </div> <!-- Close .story-card-modal -->
+  </div> <!-- Close .story-modal-overlay -->
 
   <!-- 🔒 1. SCREEN QUICK-LOCK OVERLAY -->
   <div id="screenLockOverlay" style="display: none; position: fixed; inset: 0; background: rgba(5, 8, 16, 0.96); backdrop-filter: blur(24px); z-index: 100000; align-items: center; justify-content: center; flex-direction: column; text-align: center; color: #fff; padding: 2rem;">
@@ -10161,140 +10209,187 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- ⚡ 3. SOVEREIGN AUTH & ONBOARDING LANDING GATE -->
-  <div id="welcomeOnboardingModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(5,8,16,0.96); backdrop-filter: blur(25px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto;">
-    <div style="background: linear-gradient(145deg, #0f172a, #111a33); border: 1px solid rgba(255,255,255,0.14); border-radius: 28px; max-width: 460px; width: 100%; padding: 2rem; box-shadow: 0 25px 60px -12px rgba(0,0,0,0.85); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center; position: relative;">
+  <!-- ⚡ 3. SOVEREIGN AUTH & PUBLIC LANDING GATEWAY -->
+  <div id="welcomeOnboardingModal" role="dialog" aria-modal="true" class="sovra-landing-viewport" style="display: none; position: fixed; inset: 0; background: radial-gradient(circle at 50% 15%, rgba(59, 130, 246, 0.15), rgba(5, 8, 16, 0.98) 75%), #050810; backdrop-filter: blur(25px); z-index: 999998; align-items: center; justify-content: center; padding: 1.5rem 1rem; overflow-y: auto;">
+    <div class="sovra-landing-container" style="max-width: 940px; width: 100%; display: flex; flex-direction: row; gap: 2.5rem; align-items: center; justify-content: center; margin: auto; padding: 1rem 0;">
       
-      <div style="display: flex; justify-content: flex-end; margin-bottom: -0.5rem;">
-        <button type="button" id="womCloseBtn" onclick="closeOnboardingModal()" style="display: none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; align-items: center; justify-content: center;" title="Close modal" aria-label="Close modal">✕</button>
-      </div>
-
-      <!-- STEP 1: Handle input or Passkey auto-find -->
-      <div id="womStep1">
-        <div style="width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, #6366f1, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; margin: 0 auto 0.75rem auto; box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);">
-          S
+      <!-- HERO BRAND & VALUE PROPOSITION (Desktop / Tablet) -->
+      <div class="sovra-landing-hero" style="flex: 1; text-align: left; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 20px; padding: 4px 12px; margin-bottom: 1.25rem;">
+          <span style="font-size: 0.75rem; color: #38bdf8; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">🌐 Decentralized Social Protocol</span>
         </div>
-        <h2 style="font-size: 1.45rem; font-weight: 800; margin: 0 0 0.25rem 0; letter-spacing: -0.02em;">Welcome to Sovra</h2>
-        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0 0 1.25rem 0;">
-          Decentralized Social Network • Zero Passwords • Cryptographic Mesh
+        <h1 style="font-size: 2.4rem; font-weight: 900; line-height: 1.15; margin: 0 0 1rem 0; letter-spacing: -0.03em; background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+          The Sovereign Social Network Owned By You.
+        </h1>
+        <p style="font-size: 0.95rem; color: #94a3b8; line-height: 1.6; margin: 0 0 1.75rem 0; max-width: 440px;">
+          Zero surveillance algorithms. Zero corporate censorship. Connect directly with friends, share reels, and chat over an encrypted P2P cryptographic mesh.
         </p>
 
-        <!-- Segmented Tab Switcher: Create Account vs Sign In -->
-        <div style="display: flex; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 4px; margin-bottom: 1.25rem; gap: 4px;">
-          <button type="button" id="womTabRegisterBtn" onclick="switchWomAuthTab('register')" style="flex: 1; padding: 8px 12px; border: none; border-radius: 9px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: #3b82f6; color: #fff; transition: all 0.2s ease;">
-            ✨ Create Account
-          </button>
-          <button type="button" id="womTabLoginBtn" onclick="switchWomAuthTab('login')" style="flex: 1; padding: 8px 12px; border: none; border-radius: 9px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s ease;">
-            🔑 Sign In
-          </button>
-        </div>
-
-        <!-- TAB A: REGISTER (New Sovereign User) -->
-        <div id="womRegisterForm">
-          <!-- Live Validation Alert -->
-          <div id="womErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
-
-          <!-- Full Name Input -->
-          <div style="margin-bottom: 0.9rem; text-align: left;">
-            <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Your Full Name</label>
-            <input type="text" id="womNameInput" placeholder="e.g. Rahul Sharma" style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
-          </div>
-
-          <!-- Handle Input with Live Duplicate Check -->
-          <div style="margin-bottom: 1rem; text-align: left;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-              <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Choose Sovereign Handle</label>
-              <span id="womHandleFeedback" style="font-size: 0.72rem; color: #94a3b8;">Checked on P2P Mesh</span>
-            </div>
-            <div style="position: relative;">
-              <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-              <input type="text" id="womHandleInput" placeholder="username (e.g. rahul_phone)" oninput="validateWomHandleLive(this.value)" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+        <!-- 3 Core Pillars -->
+        <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">🛡️</div>
+            <div>
+              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">Cryptographic Sovereign Identity</div>
+              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Your Ed25519 DID lives safely in your device hardware, never on corporate servers.</div>
             </div>
           </div>
-
-          <!-- Optional Profile Photo Upload Row -->
-          <div style="display: flex; align-items: center; gap: 0.85rem; padding: 0.65rem 0.85rem; background: #1e293b; border-radius: 12px; border: 1px solid #334155; margin-bottom: 1.25rem; text-align: left;">
-            <div id="womAvatarPreview" style="width: 44px; height: 44px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; overflow: hidden; border: 2px solid #38bdf8; flex-shrink: 0;">
-              <span id="womAvatarLetter">S</span>
-            </div>
-            <div style="flex: 1;">
-              <div style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 2px;">Profile Photo (Optional)</div>
-              <button type="button" onclick="document.getElementById('womPhotoInput').click()" style="padding: 0.3rem 0.65rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; color: #38bdf8; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                <span>📷</span> <span>Choose Photo</span>
-              </button>
-              <input type="file" id="womPhotoInput" accept="image/*" style="display: none;" onchange="handleWomPhotoSelect(event)">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">⚡</div>
+            <div>
+              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">BitSwap Peer-to-Peer Mesh</div>
+              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Feeds and media distribute directly between neighboring peer nodes.</div>
             </div>
           </div>
-
-          <button id="womRegisterSubmitBtn" onclick="triggerBiometricAccountCreation()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); margin-bottom: 0.75rem;">
-            <span>Create Sovereign Identity</span> <span>➔</span>
-          </button>
-
-          <!-- 🔑 Auto-Find with Passkey -->
-          <button onclick="autoFindForgotUserIdDemo()" style="width: 100%; padding: 0.75rem; background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0.5rem;">
-            <span>🔑 Auto-Find Identity with Passkey Enclave</span>
-          </button>
-        </div>
-
-        <!-- TAB B: SIGN IN (Existing User) -->
-        <div id="womLoginForm" style="display: none;">
-          <div id="womLoginErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
-
-          <div style="margin-bottom: 1.25rem; text-align: left;">
-            <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Your Sovereign Handle or DID</label>
-            <div style="position: relative;">
-              <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-              <input type="text" id="womLoginHandleInput" placeholder="username (e.g. laptop_host or rahul_phone)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">🔑</div>
+            <div>
+              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">Zero Passwords &amp; Biometrics</div>
+              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Seamless resident passkeys and biometric sign-in eliminate stolen password risk.</div>
             </div>
-            <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 5px;">Enter your handle or W3C Ed25519 DID to authenticate your session.</div>
           </div>
-
-          <button id="womLoginSubmitBtn" onclick="triggerUserLogin()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4); margin-bottom: 0.75rem;">
-            <span>Sign In to Sovereign Node</span> <span>➔</span>
-          </button>
         </div>
 
-        <!-- Dev Link / Connect as Node Operator -->
-        <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.75rem; margin-top: 0.75rem;">
-          <button type="button" onclick="skipOnboardingAsHost()" style="width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            <span>💻 Connect as Local Node Operator (@laptop_host) ➔</span>
-          </button>
-        </div>
-
-        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.5rem;">
-          Cryptographic DID &amp; hardware session saved permanently on device.
+        <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; color: #10b981; font-weight: 600;">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981;"></span>
+          <span>P2P Relay Active &bull; Zero Server Traces &bull; W3C DID Standard</span>
         </div>
       </div>
 
-      <!-- STEP 2: Biometric Scan Animation -->
-      <div id="womStep2" style="display: none; padding: 1.5rem 0;">
-        <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); border: 2px dashed #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 1.25rem auto;">
-          👆
+      <!-- AUTH GATEWAY CARD -->
+      <div class="sovra-landing-card" style="background: linear-gradient(145deg, #0f172a, #111a33); border: 1px solid rgba(255,255,255,0.14); border-radius: 28px; max-width: 440px; width: 100%; padding: 2rem; box-shadow: 0 25px 60px -12px rgba(0,0,0,0.85); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center; position: relative;">
+        
+        <div style="display: flex; justify-content: flex-end; margin-bottom: -0.5rem;">
+          <button type="button" id="womCloseBtn" onclick="closeOnboardingModal()" style="display: none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; align-items: center; justify-content: center;" title="Close modal" aria-label="Close modal">✕</button>
         </div>
-        <h3 style="font-size: 1.2rem; font-weight: 700; margin: 0 0 0.5rem 0;">Scanning Passkey Credential...</h3>
-        <p style="font-size: 0.8rem; color: #94a3b8; margin: 0;">Resolving resident identity from Hardware Enclave...</p>
-      </div>
 
-      <!-- STEP 3: Account Restored / Ready -->
-      <div id="womStep3" style="display: none; padding: 0.5rem 0;">
-        <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 2px solid #10b981; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 1rem auto;">
-          ✓
-        </div>
-        <h3 style="font-size: 1.25rem; font-weight: 800; margin: 0 0 0.25rem 0;">Identity Ready!</h3>
-        <div style="font-size: 1.05rem; color: #38bdf8; font-weight: 700; margin-bottom: 1.25rem;" id="womRestoredHandleDisplay">@sovereign.mesh</div>
-        <div style="background: #1e293b; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.75rem; text-align: left; color: #94a3b8; margin-bottom: 1.25rem;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-            <span>Discovery Method:</span> <span style="color: #10b981;">Passkey Resident Key ✓</span>
+        <!-- STEP 1: Handle input or Passkey auto-find -->
+        <div id="womStep1">
+          <div style="width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, #6366f1, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; margin: 0 auto 0.75rem auto; box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);">
+            S
           </div>
-          <div style="display: flex; justify-content: space-between;">
-            <span>Hardware Enclave:</span> <span style="color: #fff;">Verified</span>
-          </div>
-        </div>
-        <button onclick="closeOnboardingModalAndEnter()" style="width: 100%; padding: 0.85rem; background: #10b981; color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
-          Enter Sovra Super-App 🚀
-        </button>
-      </div>
+          <h2 style="font-size: 1.45rem; font-weight: 800; margin: 0 0 0.25rem 0; letter-spacing: -0.02em;">Welcome to Sovra</h2>
+          <p style="font-size: 0.82rem; color: #94a3b8; margin: 0 0 1.25rem 0;">
+            Decentralized Social Network • Zero Passwords • Cryptographic Mesh
+          </p>
 
+          <!-- Segmented Tab Switcher: Create Account vs Sign In -->
+          <div style="display: flex; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 4px; margin-bottom: 1.25rem; gap: 4px;">
+            <button type="button" id="womTabRegisterBtn" onclick="switchWomAuthTab('register')" style="flex: 1; padding: 8px 12px; border: none; border-radius: 9px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: #3b82f6; color: #fff; transition: all 0.2s ease;">
+              ✨ Create Account
+            </button>
+            <button type="button" id="womTabLoginBtn" onclick="switchWomAuthTab('login')" style="flex: 1; padding: 8px 12px; border: none; border-radius: 9px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s ease;">
+              🔑 Sign In
+            </button>
+          </div>
+
+          <!-- TAB A: REGISTER (New Sovereign User) -->
+          <div id="womRegisterForm">
+            <!-- Live Validation Alert -->
+            <div id="womErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
+
+            <!-- Full Name Input -->
+            <div style="margin-bottom: 0.9rem; text-align: left;">
+              <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Your Full Name</label>
+              <input type="text" id="womNameInput" placeholder="e.g. Rahul Sharma" style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+            </div>
+
+            <!-- Handle Input with Live Duplicate Check -->
+            <div style="margin-bottom: 1rem; text-align: left;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Choose Sovereign Handle</label>
+                <span id="womHandleFeedback" style="font-size: 0.72rem; color: #94a3b8;">Checked on P2P Mesh</span>
+              </div>
+              <div style="position: relative;">
+                <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
+                <input type="text" id="womHandleInput" placeholder="username (e.g. rahul_phone)" oninput="validateWomHandleLive(this.value)" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+              </div>
+            </div>
+
+            <!-- Optional Profile Photo Upload Row -->
+            <div style="display: flex; align-items: center; gap: 0.85rem; padding: 0.65rem 0.85rem; background: #1e293b; border-radius: 12px; border: 1px solid #334155; margin-bottom: 1.25rem; text-align: left;">
+              <div id="womAvatarPreview" style="width: 44px; height: 44px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; overflow: hidden; border: 2px solid #38bdf8; flex-shrink: 0;">
+                <span id="womAvatarLetter">S</span>
+              </div>
+              <div style="flex: 1;">
+                <div style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 2px;">Profile Photo (Optional)</div>
+                <button type="button" onclick="document.getElementById('womPhotoInput').click()" style="padding: 0.3rem 0.65rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; color: #38bdf8; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                  <span>📷</span> <span>Choose Photo</span>
+                </button>
+                <input type="file" id="womPhotoInput" accept="image/*" style="display: none;" onchange="handleWomPhotoSelect(event)">
+              </div>
+            </div>
+
+            <button id="womRegisterSubmitBtn" onclick="triggerBiometricAccountCreation()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); margin-bottom: 0.75rem;">
+              <span>Create Sovereign Identity</span> <span>➔</span>
+            </button>
+
+            <!-- 🔑 Auto-Find with Passkey -->
+            <button onclick="autoFindForgotUserIdDemo()" style="width: 100%; padding: 0.75rem; background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0.5rem;">
+              <span>🔑 Auto-Find Identity with Passkey Enclave</span>
+            </button>
+          </div>
+
+          <!-- TAB B: SIGN IN (Existing User) -->
+          <div id="womLoginForm" style="display: none;">
+            <div id="womLoginErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
+
+            <div style="margin-bottom: 1.25rem; text-align: left;">
+              <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Your Sovereign Handle or DID</label>
+              <div style="position: relative;">
+                <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
+                <input type="text" id="womLoginHandleInput" placeholder="username (e.g. laptop_host or rahul_phone)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+              </div>
+              <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 5px;">Enter your handle or W3C Ed25519 DID to authenticate your session.</div>
+            </div>
+
+            <button id="womLoginSubmitBtn" onclick="triggerUserLogin()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4); margin-bottom: 0.75rem;">
+              <span>Sign In to Sovereign Node</span> <span>➔</span>
+            </button>
+          </div>
+
+          <!-- Dev Link / Connect as Node Operator -->
+          <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.75rem; margin-top: 0.75rem;">
+            <button type="button" onclick="skipOnboardingAsHost()" style="width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>💻 Connect as Local Node Operator (@laptop_host) ➔</span>
+            </button>
+          </div>
+
+          <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.5rem;">
+            Cryptographic DID &amp; hardware session saved permanently on device.
+          </div>
+        </div>
+
+        <!-- STEP 2: Biometric Scan Animation -->
+        <div id="womStep2" style="display: none; padding: 1.5rem 0;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); border: 2px dashed #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 1.25rem auto;">
+            👆
+          </div>
+          <h3 style="font-size: 1.2rem; font-weight: 700; margin: 0 0 0.5rem 0;">Scanning Passkey Credential...</h3>
+          <p style="font-size: 0.8rem; color: #94a3b8; margin: 0;">Resolving resident identity from Hardware Enclave...</p>
+        </div>
+
+        <!-- STEP 3: Account Restored / Ready -->
+        <div id="womStep3" style="display: none; padding: 0.5rem 0;">
+          <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 2px solid #10b981; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 1rem auto;">
+            ✓
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 800; margin: 0 0 0.25rem 0;">Identity Ready!</h3>
+          <div style="font-size: 1.05rem; color: #38bdf8; font-weight: 700; margin-bottom: 1.25rem;" id="womRestoredHandleDisplay">@sovereign.mesh</div>
+          <div style="background: #1e293b; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.75rem; text-align: left; color: #94a3b8; margin-bottom: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span>Discovery Method:</span> <span style="color: #10b981;">Passkey Resident Key ✓</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Hardware Enclave:</span> <span style="color: #fff;">Verified</span>
+            </div>
+          </div>
+          <button onclick="closeOnboardingModalAndEnter()" style="width: 100%; padding: 0.85rem; background: #10b981; color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
+            Enter Sovra Super-App 🚀
+          </button>
+        </div>
+
+      </div>
     </div>
   </div>
 
@@ -11145,6 +11240,12 @@ function renderHtml(
     }
 
     function showAuthLandingGate() {
+      try { document.documentElement.classList.add('sovra-unauthenticated'); } catch(e) {}
+      const appLayout = document.querySelector('.app-layout');
+      if (appLayout) appLayout.classList.add('app-hidden');
+      const bottomNav = document.querySelector('.mobile-bottom-nav');
+      if (bottomNav) bottomNav.classList.add('app-hidden');
+
       const wom = document.getElementById('welcomeOnboardingModal');
       if (wom) {
         wom.style.zIndex = '999998';
@@ -11161,13 +11262,23 @@ function renderHtml(
       }
     }
 
+    function showAuthenticatedAppView() {
+      try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+      const appLayout = document.querySelector('.app-layout');
+      if (appLayout) appLayout.classList.remove('app-hidden');
+      const bottomNav = document.querySelector('.mobile-bottom-nav');
+      if (bottomNav) bottomNav.classList.remove('app-hidden');
+      const wom = document.getElementById('welcomeOnboardingModal');
+      if (wom) wom.style.display = 'none';
+      updateUserDisplayInUI();
+    }
+
     function closeOnboardingModal() {
       if (!myProfile || !myProfile.sessionToken) {
         showAccountToast('⚠️ Please create an account or sign in to enter Sovra.');
         return;
       }
-      const wom = document.getElementById('welcomeOnboardingModal');
-      if (wom) wom.style.display = 'none';
+      showAuthenticatedAppView();
       try { sessionStorage.setItem('sovra_onboarding_dismissed', 'true'); } catch(e) {}
     }
 
@@ -11252,9 +11363,7 @@ function renderHtml(
           body: JSON.stringify(myProfile)
         }).catch(function() {});
 
-        const wom = document.getElementById('welcomeOnboardingModal');
-        if (wom) wom.style.display = 'none';
-        updateUserDisplayInUI();
+        showAuthenticatedAppView();
         showAccountToast('🎉 Welcome back, ' + (myProfile.name || myProfile.handle) + '!');
       } catch (err) {
         if (errBox) {
@@ -11289,9 +11398,7 @@ function renderHtml(
         if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
       } catch(e) {}
       currentUserHandle = myProfile.handle;
-      const wom = document.getElementById('welcomeOnboardingModal');
-      if (wom) wom.style.display = 'none';
-      updateUserDisplayInUI();
+      showAuthenticatedAppView();
       showAccountToast('💻 Connected as Local Node Operator (' + myProfile.handle + ')');
     }
 
@@ -11841,37 +11948,47 @@ function renderHtml(
       myProfile = null;
       currentUserHandle = '@guest';
 
+      // Reset hash/route so user is never stuck on a private profile/settings URL
+      try {
+        if (window.location.hash) {
+          history.replaceState(null, '', window.location.pathname);
+        }
+      } catch (e) {}
+
+      // Immediately hide authenticated app shell and display Public Landing Gateway
+      showAuthLandingGate();
       updateUserDisplayInUI();
-
       closeLogoutModal();
-      showAccountToast('👋 Logged out successfully. See you soon on the mesh!', 'success');
 
-      setTimeout(function() {
-        const wom = document.getElementById('welcomeOnboardingModal');
-        if (wom) {
-          wom.style.zIndex = '999998';
-          wom.style.display = 'flex';
-        }
-        if (typeof switchWomAuthTab === 'function') {
-          switchWomAuthTab('login');
-        }
-        const s1 = document.getElementById('womStep1');
-        const s2 = document.getElementById('womStep2');
-        const s3 = document.getElementById('womStep3');
-        if (s1) s1.style.display = 'block';
-        if (s2) s2.style.display = 'none';
-        if (s3) s3.style.display = 'none';
+      // Close all open modals/overlays
+      const overlays = document.querySelectorAll('.story-modal-overlay, .reels-sheet-overlay, .modal, [role="dialog"]');
+      overlays.forEach(function(o) {
+        if (o.id !== 'welcomeOnboardingModal') o.style.display = 'none';
+      });
 
-        const handleInput = document.getElementById('womHandleInput');
-        if (handleInput) handleInput.value = '';
-        const nameInput = document.getElementById('womNameInput');
-        if (nameInput) nameInput.value = '';
+      showAccountToast('👋 Logged out successfully. Welcome to Sovra Landing!', 'success');
 
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Log Out</span>';
-        }
-      }, 350);
+      if (typeof switchWomAuthTab === 'function') {
+        switchWomAuthTab('login');
+      }
+      const s1 = document.getElementById('womStep1');
+      const s2 = document.getElementById('womStep2');
+      const s3 = document.getElementById('womStep3');
+      if (s1) s1.style.display = 'block';
+      if (s2) s2.style.display = 'none';
+      if (s3) s3.style.display = 'none';
+
+      const handleInput = document.getElementById('womLoginHandleInput');
+      if (handleInput) handleInput.value = '';
+      const regHandleInput = document.getElementById('womHandleInput');
+      if (regHandleInput) regHandleInput.value = '';
+      const regNameInput = document.getElementById('womNameInput');
+      if (regNameInput) regNameInput.value = '';
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Log Out</span>';
+      }
     }
 
     function quickLockSession(event) {
@@ -12173,10 +12290,8 @@ function renderHtml(
 
     function closeOnboardingModalAndEnter() {
       localStorage.removeItem('sovra_logged_out');
-      const wom = document.getElementById('welcomeOnboardingModal');
-      if (wom) wom.style.display = 'none';
       currentProfileWiped = false;
-      updateUserDisplayInUI();
+      showAuthenticatedAppView();
       switchTab('chat');
       showAccountToast('🎉 Connected to Mesh as ' + (myProfile ? myProfile.name : currentUserHandle) + '!');
     }
@@ -13834,7 +13949,7 @@ function renderHtml(
           }, 2000);
         }
         var preview = did.length > 24 ? (did.slice(0, 16) + '...' + did.slice(-6)) : did;
-        showAccountToast('📋 Copied Sovereign DID: ' + preview, 'success');
+        showAccountToast('Copied to clipboard');
       });
     }
 
@@ -14098,7 +14213,8 @@ function renderHtml(
     }
 
     // --- Sovereign Identity Card & QR Logic ---
-    function openSovereignIdCardModal(event) {
+    function openSovereignIdCardModal() {
+      const event = arguments[0];
       if (event && event.stopPropagation) event.stopPropagation();
       const m = document.getElementById('sovereignIdCardModal');
       if (!m) return;
@@ -19420,7 +19536,7 @@ function renderHtml(
           if (banner) banner.style.display = 'none';
         });
       } else {
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (typeof navigator !== 'undefined' && (navigator as any).standalone);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (typeof navigator !== 'undefined' && Boolean(navigator['standalone']));
         if (isStandalone) {
           showAccountToast('📱 Sovra is already installed and running as a standalone app!', 'success');
           return;
@@ -19436,7 +19552,7 @@ function renderHtml(
       modal.style.display = 'flex';
 
       const modeBadge = document.getElementById('pwaDisplayModeBadge');
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (typeof navigator !== 'undefined' && (navigator as any).standalone);
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (typeof navigator !== 'undefined' && Boolean(navigator['standalone']));
       if (modeBadge) modeBadge.innerText = isStandalone ? 'Standalone App' : 'Web Browser';
 
       const triggerBtn = document.getElementById('pwaDirectTriggerBtn');
