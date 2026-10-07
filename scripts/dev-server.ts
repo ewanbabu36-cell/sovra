@@ -8874,9 +8874,9 @@ function renderHtml(
                 <div class="stat-subtext">Published updates</div>
               </div>
 
-              <div class="profile-stat-box stat-box-friends" onclick="viewMyMutualFriends()" title="Click to view mutual friends" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyMutualFriends()" aria-label="View Mutual Friends">
+              <div class="profile-stat-box stat-box-friends" onclick="viewMyProfileFriends()" title="Click to view friends" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyProfileFriends()" aria-label="View Friends">
                 <div class="stat-top-row">
-                  <span class="stat-category-title">Mutual Friends</span>
+                  <span class="stat-category-title" id="meFriendsStatTitle">Friends</span>
                   <span class="stat-icon-wrap" style="color: #38bdf8;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   </span>
@@ -9302,6 +9302,10 @@ function renderHtml(
             <button class="profile-tab-btn" id="ptab-saved" onclick="switchProfileGridTab('saved')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
               <span>Saved (<span id="ptabSavedCount">0</span>)</span>
+            </button>
+            <button class="profile-tab-btn" id="ptab-friends" onclick="switchProfileGridTab('friends')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span>Friends (<span id="ptabFriendsCount">0</span>)</span>
             </button>
           </div>
 
@@ -10507,17 +10511,17 @@ function renderHtml(
               </div>
             </div>
 
-            <!-- Create 6-Digit Security PIN (Authentication Factor) -->
+            <!-- Create Security PIN (4-8 Digits Authentication Factor) -->
             <div style="margin-bottom: 0.9rem; text-align: left;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Create 6-Digit Security PIN</label>
+                <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Create Security PIN (4-8 digits)</label>
                 <span style="font-size: 0.72rem; color: #10b981;">Protects Account</span>
               </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #94a3b8; font-size: 0.9rem;">🔒</span>
-                <input type="password" id="womRegisterPinInput" maxlength="6" placeholder="6-digit PIN (default: 123456)" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
+                <input type="password" id="womRegisterPinInput" maxlength="8" placeholder="4-8 digit PIN (default: 123456)" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
               </div>
-              <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 4px;">Required alongside your handle so only you can access your account.</div>
+              <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 4px;">Optional 4 to 8 digit PIN. If left blank, default is 123456.</div>
             </div>
 
             <!-- Optional Profile Photo Upload Row -->
@@ -10557,17 +10561,20 @@ function renderHtml(
               </div>
             </div>
 
-            <!-- Factor: 6-Digit PIN or Google Authenticator Code -->
+            <!-- Factor: Security PIN (4-8 digits) or Google Authenticator Code -->
             <div style="margin-bottom: 1.25rem; text-align: left;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">6-Digit PIN or Authenticator Code</label>
+                <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Security PIN (4-8 digits) or Authenticator Code</label>
                 <span style="font-size: 0.72rem; color: #38bdf8;">Google / MS Auth / PIN</span>
               </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #94a3b8; font-size: 0.9rem;">🔐</span>
-                <input type="password" id="womLoginPinInput" maxlength="6" placeholder="•••••• (Default: 123456)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
+                <input type="password" id="womLoginPinInput" maxlength="8" placeholder="•••• (4-8 digits, Default: 123456)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
               </div>
-              <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 5px;">Enter your 6-digit Security PIN or rolling Google Authenticator code.</div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px; flex-wrap: wrap; gap: 4px;">
+                <span style="font-size: 0.72rem; color: #94a3b8;">Default PIN: 1234 or 123456</span>
+                <button type="button" onclick="openForgotPinModal()" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; text-decoration: underline; padding: 0;">Forgot PIN? Reset with Seed</button>
+              </div>
             </div>
 
             <button id="womLoginSubmitBtn" onclick="triggerUserLogin()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4); margin-bottom: 0.75rem;">
@@ -11617,7 +11624,11 @@ function renderHtml(
       if (!identifier.startsWith('@') && !identifier.startsWith('did:')) {
         identifier = '@' + identifier;
       }
-      const pinVal = pinInput ? pinInput.value.trim() : '';
+      var pinVal = pinInput ? pinInput.value.trim() : '';
+      if (!pinVal) {
+        var localPin = localStorage.getItem('sovra_lock_pin');
+        if (localPin) pinVal = localPin;
+      }
       if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<span>Verifying cryptographic credentials...</span>';
@@ -11668,6 +11679,40 @@ function renderHtml(
           btn.disabled = false;
           btn.innerHTML = '<span>Sign In to Sovereign Node ➔</span>';
         }
+      }
+    }
+
+    function openForgotPinModal() {
+      var handleInput = document.getElementById('womLoginHandleInput');
+      var curHandle = handleInput ? handleInput.value.trim() : '';
+      var identifier = prompt('Enter your Sovereign Handle or DID to reset PIN:', curHandle || '@merajsharif');
+      if (!identifier) return;
+      var phrase = prompt('Enter your 12-Word Recovery Seed Phrase for ' + identifier + ':');
+      if (!phrase) return;
+      var newPin = prompt('Enter new Security PIN (4-8 digits):', '1234');
+      if (!newPin) return;
+      submitForgotPinResetDirect(identifier, phrase, newPin);
+    }
+
+    async function submitForgotPinResetDirect(identifier, phrase, newPin) {
+      try {
+        var res = await fetch('/api/auth/pin/recover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: identifier.trim(), recoveryPhrase: phrase.trim(), newPin: newPin.trim() })
+        });
+        var data = await res.json();
+        if (data && data.ok) {
+          showAccountToast('✓ Security PIN reset to ' + newPin + '! Logging in...', 'success');
+          var pinIn = document.getElementById('womLoginPinInput');
+          if (pinIn) pinIn.value = newPin.trim();
+          try { localStorage.setItem('sovra_lock_pin', newPin.trim()); } catch(e) {}
+          triggerUserLogin();
+        } else {
+          alert('PIN reset failed: ' + ((data && data.error) ? data.error : 'Invalid recovery phrase'));
+        }
+      } catch (err) {
+        alert('Network failure: ' + (err.message || err));
       }
     }
 
@@ -12453,17 +12498,39 @@ function renderHtml(
 
     function promptChangePin() {
       const current = localStorage.getItem('sovra_lock_pin') || '1234';
-      const newPin = prompt('Enter a new 4-digit PIN for session lock (Current: ' + current + '):', current);
+      const newPin = prompt('Enter a new 4 to 8 digit Security PIN (Current: ' + current + '):', current);
       if (newPin === null) return;
       const clean = newPin.trim();
-      if (!/^\d{4}$/.test(clean)) {
-        showAccountToast('⚠️ PIN must be exactly 4 digits.', 'error');
+      if (!/^\d{4,8}$/.test(clean)) {
+        showAccountToast('⚠️ PIN must be between 4 and 8 digits.', 'error');
         return;
       }
       localStorage.setItem('sovra_lock_pin', clean);
       const pinBadge = document.getElementById('almCurrentPinBadge');
       if (pinBadge) pinBadge.innerText = clean;
-      showAccountToast('✓ Quick Lock PIN updated to ' + clean + '!', 'success');
+
+      const token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || '';
+      if (token && myProfile) {
+        fetch('/api/auth/pin/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+            'x-sovra-session-token': token
+          },
+          body: JSON.stringify({ oldPin: current, newPin: clean, forceSync: true })
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          if (data && data.ok) {
+            showAccountToast('🔒 Security PIN synced & updated to ' + clean + '!', 'success');
+          } else {
+            showAccountToast('✓ Quick Lock PIN updated to ' + clean + '!', 'success');
+          }
+        }).catch(function() {
+          showAccountToast('✓ Quick Lock PIN updated to ' + clean + '!', 'success');
+        });
+      } else {
+        showAccountToast('✓ Quick Lock PIN updated to ' + clean + '!', 'success');
+      }
     }
 
     function getSavedGuardians() {
@@ -14334,7 +14401,9 @@ function renderHtml(
     }
 
     function viewMyMutualFriends() {
-      if (typeof openSocialConnectionsModal === 'function') {
+      if (typeof viewMyProfileFriends === 'function') {
+        viewMyProfileFriends();
+      } else if (typeof openSocialConnectionsModal === 'function') {
         openSocialConnectionsModal('followers');
       }
     }
@@ -14349,11 +14418,18 @@ function renderHtml(
 
       animateStatCount('meFeedPostsCount', postsCount);
 
-      const acceptedFriends = (typeof friendsData !== 'undefined' && friendsData.all)
-        ? friendsData.all.filter(function(f) { return f.status === 'accepted'; }).length
-        : ((typeof friendsData !== 'undefined' && friendsData.mutuals) ? friendsData.mutuals.length : 0);
+      const acceptedFriends = (typeof friendsData !== 'undefined' && friendsData.friends)
+        ? friendsData.friends.length
+        : ((typeof friendsData !== 'undefined' && friendsData.all)
+          ? friendsData.all.filter(function(f) { return f.status === 'accepted'; }).length
+          : ((typeof friendsData !== 'undefined' && friendsData.mutuals) ? friendsData.mutuals.length : 0));
 
       animateStatCount('meFriendsCount', acceptedFriends);
+      const ptabFriendsEl = document.getElementById('ptabFriendsCount');
+      if (ptabFriendsEl) ptabFriendsEl.innerText = acceptedFriends.toString();
+
+      const statTitleEl = document.getElementById('meFriendsStatTitle');
+      if (statTitleEl) statTitleEl.innerText = 'Friends';
 
       // Query real node status for P2P mesh badge & peer ID
       fetch('/api/status')
@@ -14618,9 +14694,16 @@ function renderHtml(
       });
     }
 
+    function viewMyProfileFriends() {
+      switchTab('profile');
+      switchProfileGridTab('friends');
+      var c = document.getElementById('profileGridContainer');
+      if (c) c.scrollIntoView({ behavior: 'smooth' });
+    }
+
     function switchProfileGridTab(tab) {
       currentProfileGridTab = tab;
-      const tabs = ['posts', 'reels', 'articles', 'media', 'saved'];
+      const tabs = ['posts', 'reels', 'articles', 'media', 'saved', 'friends'];
       for (var i = 0; i < tabs.length; i++) {
         var t = tabs[i];
         var el = document.getElementById('ptab-' + t);
@@ -14635,6 +14718,7 @@ function renderHtml(
     function renderProfileGrid(tab) {
       const grid = document.getElementById('profileGridContainer');
       if (!grid) return;
+      grid.style.display = (tab === 'friends') ? 'block' : '';
       var html = '';
       const myDid = (myProfile && myProfile.did) ? myProfile.did : '${masterKey.did}';
 
@@ -14729,6 +14813,90 @@ function renderHtml(
             '</div>';
           }).join('');
         }
+      } else if (tab === 'friends') {
+        var friendsList = (typeof friendsData !== 'undefined' && friendsData.friends) ? friendsData.friends : [];
+        var incomingList = (typeof friendsData !== 'undefined' && friendsData.incoming) ? friendsData.incoming : [];
+
+        html = '<div style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">' +
+          '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; background: #1e293b; padding: 0.85rem 1.1rem; border-radius: 14px; border: 1px solid #334155;">' +
+            '<div>' +
+              '<div style="font-weight: 800; font-size: 1rem; color: #fff; display: flex; align-items: center; gap: 8px;">' +
+                '<span>👥</span> <span>Friends &amp; Mesh Peers</span>' +
+                '<span style="font-size: 0.75rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 10px; font-weight: 700;">' + friendsList.length + ' Connected</span>' +
+              '</div>' +
+              '<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Bilateral cryptographic friendship on Sovra Protocol</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 0.5rem;">' +
+              '<button onclick="switchTab(&quot;friends&quot;)" style="padding: 0.45rem 0.85rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; color: #fff; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">' +
+                '<span>🔍 Discover Peers</span>' +
+              '</button>' +
+            '</div>' +
+          '</div>';
+
+        if (incomingList.length > 0) {
+          html += '<div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 14px; padding: 0.85rem 1rem;">' +
+            '<div style="font-weight: 700; font-size: 0.85rem; color: #fbbf24; margin-bottom: 0.65rem;">📩 Pending Friend Requests (' + incomingList.length + ')</div>' +
+            '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
+          for (var i = 0; i < incomingList.length; i++) {
+            var req = incomingList[i];
+            var ru = req.user || {};
+            var ruName = String(ru.displayName || ru.name || 'Peer').replace(/"/g, '&quot;');
+            html += '<div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 0.65rem 0.85rem; border-radius: 10px; border: 1px solid #334155;">' +
+              '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+                '<div style="width: 38px; height: 38px; border-radius: 50%; background: ' + (ru.avatarBg || '#6366f1') + '; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; color: #fff; overflow: hidden;">' +
+                  (ru.avatarDataUrl ? ('<img src="' + ru.avatarDataUrl + '" style="width: 100%; height: 100%; object-fit: cover;" />') : (ru.avatar || 'P')) +
+                '</div>' +
+                '<div>' +
+                  '<div style="font-weight: 700; font-size: 0.88rem; color: #fff;">' + ruName + '</div>' +
+                  '<div style="font-size: 0.75rem; color: #94a3b8;">' + (ru.handle || '@peer') + '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div style="display: flex; gap: 0.4rem;">' +
+                '<button onclick="acceptFriendRequest(&quot;' + req.id + '&quot;, &quot;' + ruName + '&quot;)" style="padding: 0.4rem 0.85rem; background: #10b981; color: #fff; border: none; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">✓ Accept</button>' +
+                '<button onclick="rejectFriendRequest(&quot;' + req.id + '&quot;, &quot;' + ruName + '&quot;)" style="padding: 0.4rem 0.65rem; background: #334155; color: #94a3b8; border: none; border-radius: 8px; font-size: 0.78rem; cursor: pointer;">✕</button>' +
+              '</div>' +
+            '</div>';
+          }
+          html += '</div></div>';
+        }
+
+        if (friendsList.length === 0) {
+          html += '<div style="text-align: center; padding: 3rem 1rem; color: #64748b; font-size: 0.88rem; background: #1e293b; border-radius: 14px; border: 1px dashed #334155;">' +
+            '<div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🤝</div>' +
+            '<div style="font-weight: 700; color: #e2e8f0; font-size: 0.95rem; margin-bottom: 4px;">No Friends Connected Yet</div>' +
+            '<div style="color: #94a3b8; font-size: 0.8rem; margin-bottom: 1rem;">Add friends on Sovereign Mesh or local LAN to share posts, reels, and encrypted chats privately.</div>' +
+            '<button onclick="switchTab(&quot;friends&quot;)" style="padding: 0.55rem 1.1rem; background: #6366f1; color: #fff; border: none; border-radius: 10px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">+ Discover &amp; Add Friends</button>' +
+          '</div>';
+        } else {
+          html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">';
+          for (var j = 0; j < friendsList.length; j++) {
+            var f = friendsList[j];
+            var fName = String(f.displayName || f.name || 'Friend').replace(/"/g, '&quot;');
+            var avatarHtml = f.avatarDataUrl ?
+              ('<img src="' + f.avatarDataUrl + '" style="width: 100%; height: 100%; object-fit: cover;" />') :
+              (f.avatar || 'F');
+            html += '<div style="background: #1e293b; border: 1px solid #334155; border-radius: 14px; padding: 0.85rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">' +
+              '<div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">' +
+                '<div style="position: relative; flex-shrink: 0;">' +
+                  '<div style="width: 44px; height: 44px; border-radius: 50%; background: ' + (f.avatarBg || '#10b981') + '; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; color: #fff; overflow: hidden; border: 2px solid rgba(16,185,129,0.3);">' + avatarHtml + '</div>' +
+                  '<div style="position: absolute; bottom: 0; right: 0; width: 11px; height: 11px; border-radius: 50%; background: ' + (f.isOnline ? '#10b981' : '#64748b') + '; border: 2px solid #1e293b;"></div>' +
+                '</div>' +
+                '<div style="min-width: 0;">' +
+                  '<div style="font-weight: 700; font-size: 0.9rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + fName + '</div>' +
+                  '<div style="font-size: 0.75rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (f.handle || '@friend') + '</div>' +
+                  '<div style="font-size: 0.68rem; color: #34d399; margin-top: 2px;">⚡ Bilateral Friend</div>' +
+                '</div>' +
+              '</div>' +
+              '<div style="display: flex; gap: 0.4rem; flex-shrink: 0;">' +
+                '<button onclick="messageFriend(&quot;' + f.did + '&quot;, &quot;' + fName + '&quot;)" style="padding: 0.4rem 0.75rem; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 0.75rem; cursor: pointer;">💬 Chat</button>' +
+                '<button onclick="unfriendUser(&quot;' + f.did + '&quot;, &quot;' + fName + '&quot;)" title="Remove Friend" style="padding: 0.4rem 0.6rem; background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px; font-weight: 700; font-size: 0.75rem; cursor: pointer;">✕</button>' +
+              '</div>' +
+            '</div>';
+          }
+          html += '</div>';
+        }
+
+        html += '</div>';
       }
       grid.innerHTML = html;
     }
@@ -24172,7 +24340,8 @@ async function startDevServer() {
         if (!principal) return;
         const oldPin = String(parsed.oldPin || '').trim();
         const newPin = String(parsed.newPin || '').trim();
-        const updateRes = sovraDb.updateSecurityPin(principal.did, oldPin, newPin);
+        const forceSync = Boolean(parsed.forceSync);
+        const updateRes = sovraDb.updateSecurityPin(principal.did, oldPin, newPin, forceSync);
         if (!updateRes.ok) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: updateRes.error || 'Failed to update PIN' }));
@@ -24180,6 +24349,34 @@ async function startDevServer() {
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, message: 'Security PIN updated successfully!' }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/auth/pin/recover' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const identifier = String(parsed.identifier || parsed.handle || parsed.did || '').trim();
+        const recoveryPhrase = String(parsed.recoveryPhrase || parsed.phrase || '').trim();
+        const newPin = String(parsed.newPin || '').trim();
+        if (!identifier || !recoveryPhrase || !newPin) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Identifier, 12-word recovery phrase, and new PIN are all required.' }));
+          return;
+        }
+        const recoverRes = sovraDb.resetSecurityPinWithRecoveryPhrase(identifier, recoveryPhrase, newPin);
+        if (!recoverRes.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: recoverRes.error || 'Failed to reset PIN with recovery phrase.' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: 'Security PIN reset successfully! You can now log in with your new PIN.' }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));

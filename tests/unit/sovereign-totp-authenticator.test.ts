@@ -80,7 +80,7 @@ describe('Sovereign RFC 6238 TOTP Authenticator & Multi-Factor Security Suite', 
     // 2. Login requires correct PIN when factor is provided
     const wrongPinLogin = sovraDb.loginUser(handle, 'Desktop', { pin: '000000' });
     expect(wrongPinLogin.ok).toBe(false);
-    expect(wrongPinLogin.error).toContain('Incorrect 6-digit Security PIN');
+    expect(wrongPinLogin.error).toContain('Incorrect Security PIN');
 
     const correctPinLogin = sovraDb.loginUser(handle, 'Desktop', { pin: initialPin });
     expect(correctPinLogin.ok).toBe(true);
