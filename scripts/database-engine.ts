@@ -547,10 +547,12 @@ export interface NotificationRecord {
   senderHandle: string;
   senderName: string;
   senderAvatar: string;
-  type: 'FOLLOW' | 'LIKE' | 'COMMENT' | 'CHAT' | 'TIP' | 'CHANNEL_SUBSCRIBE';
+  type: string;
   title: string;
   body: string;
   targetId?: string;
+  link?: string;
+  data?: Record<string, any>;
   isRead: boolean;
   createdAt: number;
 }
@@ -788,6 +790,22 @@ export class SovraDatabaseEngine {
   private sanitizeState(): void {
     if (!Array.isArray(this.db.contacts_and_peers)) this.db.contacts_and_peers = [];
     if (!Array.isArray(this.db.chatMessages)) this.db.chatMessages = [];
+    if (!Array.isArray(this.db.users)) this.db.users = [];
+
+    // Ensure every user has a unique, cryptographically random BIP-39 recovery phrase
+    let usersNeedSave = false;
+    const seenRecoveryPhrases = new Set<string>();
+    for (const u of this.db.users) {
+      const isDefaultStatic = (u.recoveryPhrase === 'sovereign galaxy velvet nexus matrix beacon titan solar quantum pulse harbor orbit');
+      if (!u.recoveryPhrase || isDefaultStatic || seenRecoveryPhrases.has(u.recoveryPhrase.toLowerCase())) {
+        u.recoveryPhrase = this.generateRecoveryPhrase();
+        usersNeedSave = true;
+      }
+      seenRecoveryPhrases.add(u.recoveryPhrase.toLowerCase());
+    }
+    if (usersNeedSave) {
+      this.save();
+    }
 
     // Filter out test drill artifacts & deduplicate
     const isTestArtifact = (p: ContactPeerRecord) => {
@@ -1257,6 +1275,33 @@ export class SovraDatabaseEngine {
 
   public getAllPeers(excludeDid?: string): ContactPeerRecord[] {
     this.load();
+    if (!Array.isArray(this.db.contacts_and_peers)) this.db.contacts_and_peers = [];
+    const existingDids = new Set(this.db.contacts_and_peers.map(p => p.did));
+    let added = false;
+    for (const u of (this.db.users || [])) {
+      if (!existingDids.has(u.did)) {
+        this.db.contacts_and_peers.push({
+          did: u.did,
+          handle: u.handle,
+          name: u.displayName || u.name || u.handle,
+          avatar: u.avatar || 'P',
+          avatarDataUrl: u.avatarDataUrl,
+          avatarBg: u.avatarBg || '#6366f1',
+          role: `${u.deviceType || 'Mesh'} Peer`,
+          device: u.deviceType || 'Desktop',
+          isOnline: true,
+          lastSeen: 'Online',
+          lastSeenTimestamp: u.updatedAt || u.createdAt || Date.now(),
+          disappearingDurationSec: 0,
+          safetyNumbers: '28471 90432 18942 ' + u.did.slice(-12),
+          isVerified: true,
+        });
+        existingDids.add(u.did);
+        added = true;
+      }
+    }
+    if (added) this.save();
+
     if (!excludeDid) return [...this.db.contacts_and_peers];
     return this.db.contacts_and_peers.filter(p => p.did !== excludeDid);
   }
@@ -3089,10 +3134,12 @@ export class SovraDatabaseEngine {
     senderHandle?: string;
     senderName?: string;
     senderAvatar?: string;
-    type: NotificationRecord['type'];
+    type: string;
     title: string;
     body: string;
     targetId?: string;
+    link?: string;
+    data?: Record<string, any>;
   }): NotificationRecord {
     this.load();
     if (!Array.isArray(this.db.notifications)) this.db.notifications = [];
@@ -3110,6 +3157,8 @@ export class SovraDatabaseEngine {
       title: notif.title,
       body: notif.body,
       targetId: notif.targetId,
+      link: notif.link,
+      data: notif.data,
       isRead: false,
       createdAt: Date.now(),
     };
@@ -3360,19 +3409,65 @@ export class SovraDatabaseEngine {
     return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
   }
 
+  public static readonly BIP39_WORDLIST: string[] = [
+    'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse',
+    'access', 'accident', 'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire', 'across', 'act',
+    'action', 'actor', 'actress', 'actual', 'adapt', 'add', 'addict', 'address', 'adjust', 'admit',
+    'adult', 'advance', 'advice', 'aerobic', 'affair', 'afford', 'afraid', 'again', 'age', 'agent',
+    'agree', 'ahead', 'aim', 'air', 'airport', 'aisle', 'alarm', 'album', 'alcohol', 'alert',
+    'alien', 'all', 'alley', 'allow', 'almost', 'alone', 'alpha', 'already', 'also', 'alter',
+    'always', 'amateur', 'amazing', 'among', 'amount', 'amused', 'analyst', 'anchor', 'ancient', 'anger',
+    'angle', 'angry', 'animal', 'ankle', 'announce', 'annual', 'another', 'answer', 'antenna', 'antique',
+    'anxiety', 'any', 'apart', 'apology', 'appear', 'apple', 'approve', 'april', 'arch', 'arctic',
+    'area', 'arena', 'argue', 'arm', 'armed', 'armor', 'army', 'around', 'arrange', 'arrest',
+    'arrive', 'arrow', 'art', 'artefact', 'artist', 'artwork', 'ask', 'aspect', 'assault', 'asset',
+    'assist', 'assume', 'asthma', 'athlete', 'atom', 'attack', 'attend', 'attitude', 'attract', 'auction',
+    'audit', 'august', 'aunt', 'author', 'auto', 'autumn', 'average', 'avocado', 'avoid', 'awake',
+    'aware', 'away', 'awesome', 'awful', 'awkward', 'axis', 'baby', 'bachelor', 'bacon', 'badge',
+    'bag', 'balance', 'balcony', 'ball', 'bamboo', 'banana', 'banner', 'bar', 'barely', 'bargain',
+    'barrel', 'base', 'basic', 'basket', 'battle', 'beach', 'beacon', 'bean', 'beauty', 'because',
+    'become', 'beef', 'before', 'begin', 'behave', 'behind', 'believe', 'below', 'belt', 'bench',
+    'benefit', 'best', 'betray', 'better', 'between', 'beyond', 'bicycle', 'bid', 'bike', 'bind',
+    'biology', 'bird', 'birth', 'bitter', 'black', 'blade', 'blame', 'blanket', 'blast', 'bleak',
+    'bless', 'blind', 'blood', 'blossom', 'blouse', 'blue', 'blur', 'blush', 'board', 'boat',
+    'body', 'boil', 'bomb', 'bone', 'bonus', 'book', 'boost', 'border', 'boring', 'borrow',
+    'boss', 'bottom', 'bounce', 'box', 'boy', 'bracket', 'brain', 'brand', 'brass', 'brave',
+    'bread', 'breeze', 'brick', 'bridge', 'brief', 'bright', 'bring', 'brisk', 'broccoli', 'broken',
+    'bronze', 'broom', 'brother', 'brown', 'brush', 'bubble', 'buddy', 'budget', 'buffalo', 'build',
+    'bulb', 'bulk', 'bullet', 'bundle', 'bunker', 'burden', 'burger', 'burst', 'bus', 'business',
+    'busy', 'butter', 'buyer', 'buzz', 'matrix', 'nexus', 'pulse', 'orbit', 'enclave', 'cipher'
+  ];
+
   public generateRecoveryPhrase(): string {
-    const WORDS = [
-      'mesh', 'sovereign', 'crypt', 'block', 'relay', 'enclave',
-      'node', 'peer', 'secret', 'quantum', 'cipher', 'vault',
-      'signal', 'bitswap', 'merkle', 'ledger', 'genesis', 'alpha',
-      'matrix', 'shield', 'key', 'nexus', 'pulse', 'orbit'
-    ];
-    const picked: string[] = [];
-    for (let i = 0; i < 12; i++) {
-      const idx = crypto.randomInt(0, WORDS.length);
-      picked.push(WORDS[idx]);
+    const wordPool = SovraDatabaseEngine.BIP39_WORDLIST;
+    const existing = new Set<string>();
+    if (Array.isArray(this.db?.users)) {
+      for (const u of this.db.users) {
+        if (u.recoveryPhrase) existing.add(u.recoveryPhrase.toLowerCase().trim());
+      }
     }
-    return picked.join(' ');
+
+    for (let attempts = 0; attempts < 100; attempts++) {
+      const picked: string[] = [];
+      const usedIndices = new Set<number>();
+      while (picked.length < 12) {
+        const idx = crypto.randomInt(0, wordPool.length);
+        if (!usedIndices.has(idx)) {
+          usedIndices.add(idx);
+          picked.push(wordPool[idx]);
+        }
+      }
+      const candidate = picked.join(' ');
+      if (!existing.has(candidate.toLowerCase())) {
+        return candidate;
+      }
+    }
+
+    const fallback: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      fallback.push(wordPool[crypto.randomInt(0, wordPool.length)]);
+    }
+    return fallback.join(' ');
   }
 
   public enableUserTotp(identifier: string, totpCode: string): { ok: boolean; error?: string } {

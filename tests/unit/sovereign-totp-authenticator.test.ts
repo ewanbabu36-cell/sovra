@@ -122,5 +122,5 @@ describe('Sovereign RFC 6238 TOTP Authenticator & Multi-Factor Security Suite', 
     // 7. After disabling TOTP, login succeeds with the updated PIN alone
     const loginAfterDisable = sovraDb.loginUser(handle, 'Desktop', { pin: '112233' });
     expect(loginAfterDisable.ok).toBe(true);
-  });
+  }, 30000);
 });

@@ -7555,7 +7555,7 @@ function renderHtml(
           <!-- Dedicated Friends Search Bar Input -->
           <div class="friends-search-input-box">
             <span style="font-size: 1.1rem; color: #38bdf8;">🔍</span>
-            <input type="text" id="friendsViewSearchInput" class="friends-search-input" placeholder="Search friends by name, @handle, bio or peer DID..." oninput="filterFriendsView(this.value)" />
+            <input type="text" id="friendsViewSearchInput" class="friends-search-input" placeholder="Search friends by name, @handle, or bio..." oninput="filterFriendsView(this.value)" />
             <button id="friendsSearchClearBtn" onclick="clearFriendsViewSearch()" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 2px 6px; font-size: 0.9rem;">✕</button>
           </div>
 
@@ -7970,7 +7970,12 @@ function renderHtml(
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               <span>Chats</span>
             </span>
-            <span style="font-size: 0.72rem; color: #38bdf8; background: rgba(56, 189, 248, 0.15); padding: 2px 8px; border-radius: 10px; font-weight: 600;" id="chatSidebarProtocolBadge">BitChat Mesh Ready</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" onclick="openNewChatPickerModal()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 6px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;" title="Start New Direct Chat">
+                <span>+</span> New Chat
+              </button>
+              <span style="font-size: 0.72rem; color: #38bdf8; background: rgba(56, 189, 248, 0.15); padding: 2px 8px; border-radius: 10px; font-weight: 600;" id="chatSidebarProtocolBadge">BitChat Mesh Ready</span>
+            </div>
           </div>
           <!-- Search box -->
           <div class="chat-search-box">
@@ -9734,7 +9739,7 @@ function renderHtml(
             <span style="font-size: 0.72rem; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 3px 8px; border-radius: 6px; font-weight: 700;">● Active</span>
           </div>
           <div style="font-size: 0.73rem; color: #cbd5e1; font-family: monospace; margin-top: 6px; word-break: break-all;" id="almProfileDid">
-            ${masterKey.did}
+            🔒 Protected Identity &bull; Hidden from public network
           </div>
           <div id="almSecurityTier" style="font-size: 0.72rem; color: #34d399; margin-top: 6px; font-weight: 600;">
             ✓ Ed25519 Hardware-Bound Key • RAM Protected
@@ -10323,8 +10328,8 @@ function renderHtml(
       </div>
 
       <div style="margin-bottom: 1rem;">
-        <label style="display: block; font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Recipient DID or Handle</label>
-        <input type="text" id="sendModalRecipientInput" placeholder="@alice or did:key:z6Mk..." style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.9rem; box-sizing: border-box; outline: none;">
+        <label style="display: block; font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Recipient Handle or Name</label>
+        <input type="text" id="sendModalRecipientInput" placeholder="@handle (e.g. @alice)" style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.9rem; box-sizing: border-box; outline: none;">
       </div>
 
       <div style="margin-bottom: 1rem;">
@@ -12104,26 +12109,95 @@ function renderHtml(
       }
     }
 
+    function generateClientDeterministicPhrase(seedStr) {
+      var wordPool = [
+        'galaxy', 'matrix', 'beacon', 'titan', 'solar', 'quantum', 'pulse', 'harbor', 'orbit', 'zenith',
+        'vector', 'cipher', 'nexus', 'prism', 'cosmos', 'shield', 'echo', 'flux', 'vortex', 'radiant',
+        'anchor', 'crystal', 'vertex', 'aurora', 'signal', 'bastion', 'strata', 'shadow', 'canyon', 'falcon',
+        'alpha', 'bravo', 'cosmic', 'drift', 'ember', 'frost', 'gravity', 'horizon', 'ion', 'jupiter',
+        'kinetic', 'lunar', 'meteor', 'nebula', 'omega', 'plasma', 'quasar', 'stellar', 'transit', 'umbra'
+      ];
+      var seed = String(seedStr || ('sovra_' + Date.now()));
+      var h = 0x811c9dc5;
+      for (var i = 0; i < seed.length; i++) {
+        h ^= seed.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+      }
+      var selected = [];
+      for (var j = 0; j < 12; j++) {
+        var idx = Math.abs((h ^ (j * 0x45d9f3b)) % wordPool.length);
+        selected.push(wordPool[idx]);
+        h = Math.imul(h ^ idx, 0x01000193);
+      }
+      return selected.join(' ');
+    }
+
     function renderMfaRecoveryPhrase() {
       var grid = document.getElementById('mfaRecoveryWordsGrid');
       if (!grid) return;
-      var phrase = (myProfile && myProfile.recoveryPhrase) ? myProfile.recoveryPhrase : '';
-      if (!phrase) {
-        phrase = 'sovereign galaxy velvet nexus matrix beacon titan solar quantum pulse harbor orbit';
+
+      function renderPhrase(phrase) {
+        if (!phrase) return;
+        var words = phrase.trim().split(/\s+/);
+        var html = '';
+        for (var i = 0; i < words.length; i++) {
+          html += '<div style="background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px;">' +
+            '<span style="font-size: 0.7rem; color: #64748b; font-weight: 700; width: 16px;">' + (i + 1) + '.</span>' +
+            '<span style="font-size: 0.82rem; font-family: monospace; color: #38bdf8; font-weight: 600;">' + words[i] + '</span>' +
+            '</div>';
+        }
+        grid.innerHTML = html;
       }
-      var words = phrase.split(' ');
-      var html = '';
-      for (var i = 0; i < words.length; i++) {
-        html += '<div style="background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px;">' +
-          '<span style="font-size: 0.7rem; color: #64748b; font-weight: 700; width: 16px;">' + (i + 1) + '.</span>' +
-          '<span style="font-size: 0.82rem; font-family: monospace; color: #38bdf8; font-weight: 600;">' + words[i] + '</span>' +
-          '</div>';
+
+      if (myProfile && myProfile.recoveryPhrase && myProfile.recoveryPhrase.trim()) {
+        renderPhrase(myProfile.recoveryPhrase);
+        return;
       }
-      grid.innerHTML = html;
+
+      // Fetch uniquely generated seed phrase from backend for this authenticated account
+      var token = (myProfile && myProfile.sessionToken) || localStorage.getItem('sovra_session_token') || '';
+      var url = '/api/user/recovery-phrase' + (token ? ('?sessionToken=' + encodeURIComponent(token)) : '');
+      var headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+      fetch(url, { headers: headers })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok && data.recoveryPhrase) {
+            if (myProfile) {
+              myProfile.recoveryPhrase = data.recoveryPhrase;
+              try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
+            }
+            renderPhrase(data.recoveryPhrase);
+          } else {
+            var fallback = generateClientDeterministicPhrase(myProfile ? (myProfile.did || myProfile.handle) : '');
+            if (myProfile) myProfile.recoveryPhrase = fallback;
+            renderPhrase(fallback);
+          }
+        })
+        .catch(function() {
+          var fallback = generateClientDeterministicPhrase(myProfile ? (myProfile.did || myProfile.handle) : '');
+          if (myProfile) myProfile.recoveryPhrase = fallback;
+          renderPhrase(fallback);
+        });
     }
 
     function copyRecoveryPhrase() {
-      var phrase = (myProfile && myProfile.recoveryPhrase) ? myProfile.recoveryPhrase : 'sovereign galaxy velvet nexus matrix beacon titan solar quantum pulse harbor orbit';
+      var phrase = (myProfile && myProfile.recoveryPhrase) ? myProfile.recoveryPhrase : '';
+      if (!phrase) {
+        var grid = document.getElementById('mfaRecoveryWordsGrid');
+        if (grid) {
+          var wordSpans = grid.querySelectorAll('span:nth-child(2)');
+          if (wordSpans && wordSpans.length >= 12) {
+            var extracted = [];
+            for (var i = 0; i < wordSpans.length; i++) extracted.push(wordSpans[i].textContent.trim());
+            phrase = extracted.join(' ');
+          }
+        }
+      }
+      if (!phrase) {
+        phrase = generateClientDeterministicPhrase(myProfile ? (myProfile.did || myProfile.handle) : '');
+        if (myProfile) myProfile.recoveryPhrase = phrase;
+      }
       copyToClipboard(phrase, function(success) {
         if (success) {
           showMfaNotice('📋 12-Word Recovery Phrase copied to clipboard!', true);
@@ -12159,7 +12233,10 @@ function renderHtml(
       const handleEl = document.getElementById('almProfileHandle');
       if (handleEl) handleEl.innerText = handle;
       const didEl = document.getElementById('almProfileDid');
-      if (didEl) didEl.innerText = did;
+      if (didEl) {
+        var maskedDid = did ? (did.length > 18 ? (did.substring(0, 10) + '••••••••' + did.substring(did.length - 4)) : did) : 'did:sovra:protected';
+        didEl.innerText = '🔒 ' + maskedDid + ' (ID Protected)';
+      }
       const nameEl = document.getElementById('almProfileName');
       if (nameEl) nameEl.innerText = name;
 
@@ -16391,135 +16468,135 @@ function renderHtml(
       if (!container) return;
 
       const q = (document.getElementById('chatSearchInput')?.value || '').toLowerCase().trim();
+      const myDid = myProfile ? myProfile.did : 'self';
 
-      if (bitchatModeActive) {
-        const filteredPeers = bitchatPeersData.filter(function(p) {
-          if (!q) return true;
-          return p.name.toLowerCase().includes(q) || p.role.toLowerCase().includes(q);
-        });
+      // 1. Mesh Channels
+      const channels = bitchatPeersData.filter(function(p) {
+        if (!p.isChannel) return false;
+        if (!q) return true;
+        return p.name.toLowerCase().includes(q) || (p.role && p.role.toLowerCase().includes(q));
+      });
 
-        const channels = filteredPeers.filter(p => p.isChannel);
-        const directPeers = filteredPeers.filter(p => !p.isChannel);
+      // 2. Direct Contacts (Real registered users + direct peers)
+      const directContactsMap = new Map();
 
-        let html = '';
-
-        if (channels.length > 0) {
-          html += '<div class="bitchat-section-title">✨ Hyperlocal Mesh Channels</div>';
-          for (const c of channels) {
-            const isActive = c.did === activeContactDid;
-            html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + c.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
-              '<div class="contact-avatar" style="background: ' + c.avatarBg + ';">' +
-                c.avatar +
-                '<div class="online-dot" style="background: #38bdf8;"></div>' +
-              '</div>' +
-              '<div class="contact-info">' +
-                '<div class="contact-top-row">' +
-                  '<span class="contact-name" style="color: #38bdf8; font-weight: 800;">' + c.name + '</span>' +
-                  '<span class="bitchat-hop-badge">50m Beacon</span>' +
-                '</div>' +
-                '<div class="contact-preview-row">' +
-                  '<span style="color: #94a3b8; font-size: 0.75rem;">' + c.role + '</span>' +
-                '</div>' +
-              '</div>' +
-            '</div>';
-          }
+      // Add real users from contactsData
+      (contactsData || []).forEach(function(c) {
+        if (!c || !c.did || c.did === myDid) return;
+        const isFixture = (!c.lastMessage && !c.unreadCount && c.did !== activeContactDid && /@(?:attacker|victim|drill_|probe_|snoop_)/.test((c.handle || '').toLowerCase()));
+        if (!isFixture) {
+          directContactsMap.set(c.did, {
+            did: c.did,
+            name: c.displayName || c.name || c.handle || 'Peer',
+            handle: c.handle || '',
+            avatar: c.avatar || 'P',
+            avatarDataUrl: c.avatarDataUrl,
+            avatarBg: c.avatarBg || '#6366f1',
+            role: c.role || 'Direct Contact',
+            isOnline: c.isOnline !== false,
+            lastSeen: c.lastSeen || 'Online',
+            lastMessage: c.lastMessage || '',
+            lastMessageTimestamp: c.lastMessageTimestamp || 0,
+            lastMessageStatus: c.lastMessageStatus || null,
+            lastMessageIsOutgoing: Boolean(c.lastMessageIsOutgoing),
+            unreadCount: Number(c.unreadCount || 0),
+            disappearingDurationSec: Number(c.disappearingDurationSec || 0),
+            isVerified: Boolean(c.isVerified),
+          });
         }
+      });
 
-        // Include real registered peers into direct mesh list, filtering out test artifacts
-        const allDirectPeers = [...directPeers];
-        const myDid = myProfile ? myProfile.did : 'self';
-        const isTestPeer = function(p) {
-          const s = ((p.handle || '') + ' ' + (p.name || '') + ' ' + (p.did || '')).toLowerCase();
-          return /(_[a-z0-9]{4,}|bb_|mu_|\d{4,}|attacker|victim|gate_|drill|test|dev_|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_mu|_e2e)/i.test(s);
-        };
-        const seenDids = new Set(allDirectPeers.map(function(p) { return p.did; }));
-        const seenNames = new Set(allDirectPeers.map(function(p) { return (p.name || '').toLowerCase(); }));
-
-        contactsData.forEach(function(c) {
-          if (c.did !== myDid && !seenDids.has(c.did) && !seenNames.has((c.name || '').toLowerCase()) && !isTestPeer(c)) {
-            seenDids.add(c.did);
-            seenNames.add((c.name || '').toLowerCase());
-            allDirectPeers.push({
-              did: c.did,
-              name: c.name,
-              avatar: c.avatar,
-              avatarDataUrl: c.avatarDataUrl,
-              avatarBg: c.avatarBg || '#6366f1',
-              role: c.role || 'Direct BLE',
-              rssi: -45,
-              distanceMeters: 2.1,
-              hops: 1,
-              isDirect: true,
-              isOnline: c.isOnline !== false,
-              lastMessage: c.lastMessage,
-              lastMessageStatus: c.lastMessageStatus,
-              lastMessageIsOutgoing: c.lastMessageIsOutgoing,
-              unreadCount: c.unreadCount,
-            });
-          }
-        });
-
-        if (allDirectPeers.length > 0) {
-          html += '<div class="bitchat-section-title">📡 Nearby Discovered Peers (' + allDirectPeers.length + ')</div>';
-          for (const p of allDirectPeers) {
-            const isActive = p.did === activeContactDid;
-            const hopLabel = p.hops === 1 ? '1 Hop Direct' : p.hops + ' Hops Relay';
-
-            let pTick = '';
-            if (p.lastMessageIsOutgoing) {
-              if (p.lastMessageStatus === 'read') {
-                pTick = '<span style="color: #53bdeb; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
-              } else if (p.lastMessageStatus === 'delivered') {
-                pTick = '<span style="color: #94a3b8; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
-              } else {
-                pTick = '<span style="color: #94a3b8; margin-right: 4px; font-size: 0.78rem;">✓</span>';
-              }
-            }
-            const pUnread = (p.unreadCount && p.unreadCount > 0)
-              ? '<span class="contact-unread-badge" style="background: #22c55e; color: #0b141a; font-size: 0.7rem; font-weight: 800; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; margin-left: auto;">' + p.unreadCount + '</span>'
-              : '';
-
-            html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + p.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + p.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
-              '<div class="contact-avatar" style="background: ' + p.avatarBg + '; overflow: hidden;">' +
-                (p.avatarDataUrl ? '<img src="' + p.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : p.avatar) +
-                '<div class="online-dot" style="background: ' + (p.isOnline !== false ? '#10b981' : '#64748b') + ';"></div>' +
-              '</div>' +
-              '<div class="contact-info">' +
-                '<div class="contact-top-row">' +
-                  '<span class="contact-name">' + p.name + '</span>' +
-                  '<span class="bitchat-hop-badge">' + hopLabel + '</span>' +
-                '</div>' +
-                '<div class="contact-preview-row" style="display: flex; align-items: center;">' +
-                  (p.lastMessage ? (pTick + '<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; ' + (p.unreadCount > 0 ? 'color: #f1f5f9; font-weight: 600;' : '') + '">' + p.lastMessage + '</span>' + pUnread) :
-                   ('<span style="color: #38bdf8; font-weight: 700; font-size: 0.72rem;">' + p.rssi + ' dBm</span>' +
-                    '<span style="color: #94a3b8; font-size: 0.72rem;">&bull; ~' + p.distanceMeters + 'm &bull; ' + p.role + '</span>')) +
-                '</div>' +
-              '</div>' +
-            '</div>';
-          }
+      // Add canonical bitchat direct peers (like Alice, Bob) if not present
+      (bitchatPeersData || []).forEach(function(p) {
+        if (!p || p.isChannel || p.did === myDid) return;
+        if (!directContactsMap.has(p.did)) {
+          directContactsMap.set(p.did, {
+            did: p.did,
+            name: p.name,
+            handle: p.handle || ('@' + p.name.toLowerCase().replace(/\s+/g, '_')),
+            avatar: p.avatar,
+            avatarDataUrl: p.avatarDataUrl,
+            avatarBg: p.avatarBg || '#ec4899',
+            role: p.role || 'Nearby BLE Swarm',
+            isOnline: true,
+            lastSeen: 'Online',
+            lastMessage: p.lastMessage || '',
+            lastMessageTimestamp: p.lastMessageTimestamp || 0,
+            lastMessageStatus: p.lastMessageStatus || null,
+            lastMessageIsOutgoing: Boolean(p.lastMessageIsOutgoing),
+            unreadCount: Number(p.unreadCount || 0),
+            disappearingDurationSec: 0,
+            isVerified: true,
+            isBlePeer: true,
+            rssi: p.rssi,
+            distanceMeters: p.distanceMeters,
+            hops: p.hops || 1,
+          });
         }
+      });
 
-        if (allDirectPeers.length === 0 && channels.length === 0) {
-          html = '<div style="text-align: center; padding: 2rem 1rem; color: #64748b; font-size: 0.82rem;">No BitChat peers found in range.</div>';
+      const allDirectList = Array.from(directContactsMap.values());
+      const filteredDirectList = allDirectList.filter(function(c) {
+        if (!q) return true;
+        return (c.name || '').toLowerCase().includes(q) ||
+               (c.handle || '').toLowerCase().includes(q) ||
+               (c.lastMessage || '').toLowerCase().includes(q) ||
+               (c.role || '').toLowerCase().includes(q);
+      });
+
+      // Sort: Active conversations by lastMessageTimestamp DESC, others alphabetically
+      filteredDirectList.sort(function(a, b) {
+        const aHasMsg = Boolean(a.lastMessage || a.unreadCount > 0);
+        const bHasMsg = Boolean(b.lastMessage || b.unreadCount > 0);
+        if (aHasMsg && bHasMsg) {
+          return (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0);
         }
+        if (aHasMsg && !bHasMsg) return -1;
+        if (!aHasMsg && bHasMsg) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
 
-        container.innerHTML = html;
-      } else {
-        const myDid = myProfile ? myProfile.did : 'self';
-        const filteredContacts = contactsData.filter(function(c) {
-          if (c.did === myDid) return false;
-          if (!q) return true;
-          return (c.name || '').toLowerCase().includes(q) || (c.handle || '').toLowerCase().includes(q) || (c.role || '').toLowerCase().includes(q);
-        });
+      let html = '';
 
-        let html = '';
-        for (const c of filteredContacts) {
+      // Section 1: Mesh Channels
+      if (channels.length > 0) {
+        html += '<div class="bitchat-section-title" style="display:flex; justify-content:space-between; align-items:center;">' +
+          '<span>✨ Hyperlocal Mesh Channels</span>' +
+          '<span style="font-size:0.65rem; color:#38bdf8; text-transform:none; font-weight:600;">Zero-Internet Swarm</span>' +
+        '</div>';
+        for (const c of channels) {
           const isActive = c.did === activeContactDid;
+          html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + c.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
+            '<div class="contact-avatar" style="background: ' + c.avatarBg + ';">' +
+              c.avatar +
+              '<div class="online-dot" style="background: #38bdf8;"></div>' +
+            '</div>' +
+            '<div class="contact-info">' +
+              '<div class="contact-top-row">' +
+                '<span class="contact-name" style="color: #38bdf8; font-weight: 800;">' + c.name + '</span>' +
+                '<span class="bitchat-hop-badge">50m Beacon</span>' +
+              '</div>' +
+              '<div class="contact-preview-row">' +
+                '<span style="color: #94a3b8; font-size: 0.75rem;">' + c.role + '</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+        }
+      }
 
-          // Time formatting
-          let timeDisplay = c.isOnline ? 'Online' : (c.lastSeen || 'Offline');
-          if (c.lastMessageTimestamp && c.lastMessageTimestamp > 0) {
-            const msgDate = new Date(c.lastMessageTimestamp);
+      // Section 2: Direct Messages & Contacts
+      if (filteredDirectList.length > 0) {
+        html += '<div class="bitchat-section-title" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">' +
+          '<span>💬 Direct Messages (' + filteredDirectList.length + ')</span>' +
+          '<span style="font-size:0.65rem; color:#10b981; text-transform:none; font-weight:600;">End-to-End Encrypted</span>' +
+        '</div>';
+
+        for (const p of filteredDirectList) {
+          const isActive = p.did === activeContactDid;
+
+          let timeDisplay = p.isOnline ? 'Online' : (p.lastSeen || 'Offline');
+          if (p.lastMessageTimestamp && p.lastMessageTimestamp > 0) {
+            const msgDate = new Date(p.lastMessageTimestamp);
             const now = new Date();
             if (msgDate.toDateString() === now.toDateString()) {
               timeDisplay = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -16528,54 +16605,141 @@ function renderHtml(
             }
           }
 
-          // Tick icon for preview
-          let previewTick = '';
-          if (c.lastMessageIsOutgoing) {
-            if (c.lastMessageStatus === 'read') {
-              previewTick = '<span style="color: #53bdeb; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
-            } else if (c.lastMessageStatus === 'delivered') {
-              previewTick = '<span style="color: #94a3b8; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
+          let pTick = '';
+          if (p.lastMessageIsOutgoing) {
+            if (p.lastMessageStatus === 'read') {
+              pTick = '<span style="color: #53bdeb; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
+            } else if (p.lastMessageStatus === 'delivered') {
+              pTick = '<span style="color: #94a3b8; font-weight: bold; margin-right: 4px; font-size: 0.78rem;">✓✓</span>';
             } else {
-              previewTick = '<span style="color: #94a3b8; margin-right: 4px; font-size: 0.78rem;">✓</span>';
+              pTick = '<span style="color: #94a3b8; margin-right: 4px; font-size: 0.78rem;">✓</span>';
             }
           }
 
-          const unreadBadgeHtml = (c.unreadCount && c.unreadCount > 0)
-            ? '<span class="contact-unread-badge" style="background: #22c55e; color: #0b141a; font-size: 0.7rem; font-weight: 800; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; margin-left: auto;">' + c.unreadCount + '</span>'
+          const unreadBadge = (p.unreadCount && p.unreadCount > 0)
+            ? '<span class="contact-unread-badge" style="background: #22c55e; color: #0b141a; font-size: 0.7rem; font-weight: 800; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; margin-left: auto;">' + p.unreadCount + '</span>'
             : '';
 
-          html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + c.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
-            '<div class="contact-avatar" style="background: ' + (c.avatarBg || '#6366f1') + '; overflow: hidden;">' +
-              (c.avatarDataUrl ? '<img src="' + c.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : (c.avatar || 'P')) +
-              (c.isOnline ? '<div class="online-dot"></div>' : '') +
-              (c.disappearingDurationSec > 0 ? '<div class="contact-clock-badge" title="Disappearing Messages Active">⏱️</div>' : '') +
+          const previewText = p.lastMessage
+            ? (pTick + '<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; ' + (p.unreadCount > 0 ? 'color: #f1f5f9; font-weight: 600;' : '') + '">' + p.lastMessage + '</span>')
+            : ('<span style="color: #94a3b8; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + (p.role || 'Ready to chat') + '</span>');
+
+          html += '<div class="contact-item ' + (isActive ? 'active' : '') + '" data-did="' + p.did + '" onclick="selectContact(this.dataset.did)" id="contact-' + p.did.replace(/[^a-zA-Z0-9]/g, '_') + '">' +
+            '<div class="contact-avatar" style="background: ' + p.avatarBg + '; overflow: hidden;">' +
+              (p.avatarDataUrl ? '<img src="' + p.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : p.avatar) +
+              '<div class="online-dot" style="background: ' + (p.isOnline ? '#10b981' : '#64748b') + ';"></div>' +
+              (p.disappearingDurationSec > 0 ? '<div class="contact-clock-badge" title="Disappearing Messages Active">⏱️</div>' : '') +
             '</div>' +
             '<div class="contact-info">' +
               '<div class="contact-top-row">' +
                 '<span class="contact-name">' +
-                  c.name +
-                  (c.isVerified ? '<span class="verified-shield-icon" title="Safety Numbers Verified">🛡️</span>' : '') +
+                  p.name +
+                  (p.isVerified ? '<span class="verified-shield-icon" title="Safety Numbers Verified" style="margin-left: 4px;">🛡️</span>' : '') +
                 '</span>' +
-                '<span class="contact-time" style="' + (c.unreadCount > 0 ? 'color: #22c55e; font-weight: 700;' : '') + '">' + timeDisplay + '</span>' +
+                '<span class="contact-time" style="' + (p.unreadCount > 0 ? 'color: #22c55e; font-weight: 700;' : '') + '">' + timeDisplay + '</span>' +
               '</div>' +
-              '<div class="contact-preview-row" style="display: flex; align-items: center;">' +
-                previewTick +
-                '<span id="preview-' + c.did.replace(/[^a-zA-Z0-9]/g, '_') + '" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; ' + (c.unreadCount > 0 ? 'color: #f1f5f9; font-weight: 600;' : '') + '">' + (c.lastMessage || c.role || 'Ready to chat') + '</span>' +
-                unreadBadgeHtml +
+              '<div class="contact-preview-row" style="display: flex; align-items: center; width: 100%;">' +
+                previewText +
+                unreadBadge +
               '</div>' +
             '</div>' +
           '</div>';
         }
+      }
 
-        if (filteredContacts.length === 0) {
+      // Section 3: If searching and network matches exist
+      if (q) {
+        const renderedDids = new Set(filteredDirectList.map(p => p.did));
+        let networkMatches = [];
+        if (typeof dynamicCatalogPeople !== 'undefined' && Array.isArray(dynamicCatalogPeople)) {
+          networkMatches = dynamicCatalogPeople.filter(function(p) {
+            if (!p || !p.pubkey || renderedDids.has(p.pubkey) || p.pubkey === myDid) return false;
+            return (p.name || '').toLowerCase().includes(q) || (p.handle || '').toLowerCase().includes(q);
+          });
+        }
+
+        if (networkMatches.length > 0) {
+          html += '<div class="bitchat-section-title" style="margin-top: 10px;">👥 Friends & Network Users (' + networkMatches.length + ')</div>';
+          for (const u of networkMatches) {
+            html += '<div class="contact-item" style="cursor: default;">' +
+              '<div class="contact-avatar" style="background: ' + (u.avatarBg || '#6366f1') + ';">' + (u.avatar || u.name.charAt(0)) + '</div>' +
+              '<div class="contact-info" style="flex: 1;">' +
+                '<div class="contact-top-row">' +
+                  '<span class="contact-name">' + u.name + '</span>' +
+                  '<span style="font-size: 0.7rem; color: #94a3b8;">' + (u.handle || '') + '</span>' +
+                '</div>' +
+                '<div style="font-size: 0.72rem; color: #64748b;">Not yet in active chats</div>' +
+              '</div>' +
+              '<button type="button" class="action-pill-btn" data-action="open-chat-user" data-target-did="' + u.pubkey + '" data-target-name="' + (u.name || '').replace(/"/g, '&quot;') + '" data-target-handle="' + (u.handle || '').replace(/"/g, '&quot;') + '" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 6px; padding: 4px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">Chat ➔</button>' +
+            '</div>';
+          }
+        }
+
+        if (filteredDirectList.length === 0 && channels.length === 0 && networkMatches.length === 0) {
           html = '<div style="text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">' +
-            '<div style="font-size: 2rem; margin-bottom: 0.5rem;">👥</div>' +
-            '<div style="font-weight: 600; color: #cbd5e1; margin-bottom: 0.25rem;">No Other Registered Peers Yet</div>' +
-            '<div>Connect other devices (mobile or laptop) on the network to begin messaging!</div>' +
+            '<div style="font-size: 1.8rem; margin-bottom: 0.5rem;">🔍</div>' +
+            '<div style="font-weight: 600; color: #cbd5e1; margin-bottom: 0.25rem;">No contacts found for "' + q + '"</div>' +
+            '<div style="margin-bottom: 1rem; font-size: 0.78rem;">Search for registered friends or start a new direct conversation.</div>' +
+            '<button type="button" class="action-pill-btn" data-action="goto-friends-hub" data-query="' + q.replace(/"/g, '&quot;') + '" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; border-radius: 6px; padding: 6px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">Search Friends Hub ➔</button>' +
           '</div>';
         }
-        container.innerHTML = html;
       }
+
+      if (!q && filteredDirectList.length === 0 && channels.length === 0) {
+        html = '<div style="text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">' +
+          '<div style="font-size: 2rem; margin-bottom: 0.5rem;">👥</div>' +
+          '<div style="font-weight: 600; color: #cbd5e1; margin-bottom: 0.25rem;">No Active Conversations</div>' +
+          '<div>Connect other devices or invite peers to start encrypted messaging!</div>' +
+        '</div>';
+      }
+
+      container.innerHTML = html;
+    }
+
+    function openDirectChatWithUser(targetDid, targetName, targetHandle) {
+      if (!targetDid) return;
+      switchTab('chat');
+
+      let contact = contactsData.find(function(c) { return c.did === targetDid; });
+      if (!contact) {
+        contact = bitchatPeersData.find(function(p) { return p.did === targetDid; });
+      }
+
+      if (!contact) {
+        let matchedPerson = null;
+        if (typeof dynamicCatalogPeople !== 'undefined' && Array.isArray(dynamicCatalogPeople)) {
+          matchedPerson = dynamicCatalogPeople.find(function(p) { return p.pubkey === targetDid || p.did === targetDid; });
+        }
+        const displayName = targetName || (matchedPerson ? matchedPerson.name : '') || (targetHandle ? targetHandle.replace(/^@/, '') : 'User');
+        const handle = targetHandle || (matchedPerson ? matchedPerson.handle : '') || ('@' + displayName.toLowerCase().replace(/\s+/g, '_'));
+
+        contact = {
+          did: targetDid,
+          name: displayName,
+          handle: handle,
+          avatar: displayName.charAt(0).toUpperCase() || 'P',
+          avatarBg: '#6366f1',
+          role: 'Direct Contact',
+          isOnline: true,
+          lastSeen: 'Online',
+          disappearingDurationSec: 0,
+          safetyNumbers: '28471 90432 18942 ' + targetDid.slice(-12),
+          isVerified: true,
+          unreadCount: 0,
+        };
+        contactsData.unshift(contact);
+      }
+
+      selectContact(targetDid);
+      renderChatContactsList();
+      renderChatBubbles();
+
+      setTimeout(function() {
+        const input = document.getElementById('chatInputText');
+        if (input) input.focus();
+        const scrollArea = document.getElementById('chatMessagesScroll');
+        if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
+      }, 80);
     }
 
     function selectContact(did) {
@@ -16938,6 +17102,39 @@ function renderHtml(
                 chatMessages[existingIdx].status = msg.status;
                 hasNew = true;
               }
+
+              // Update or register contact in contactsData
+              if (msg.senderDid && !msg.senderDid.startsWith('channel:')) {
+                const partnerDid = (msg.senderDid === myDid || msg.senderDid === 'self') ? msg.recipientDid : msg.senderDid;
+                let c = contactsData.find(function(x) { return x.did === partnerDid; });
+                if (!c) {
+                  c = {
+                    did: partnerDid,
+                    name: msg.senderName || 'Peer',
+                    handle: msg.senderHandle || '@peer',
+                    avatar: (msg.senderName || 'P').charAt(0).toUpperCase(),
+                    avatarBg: '#6366f1',
+                    role: 'Direct Contact',
+                    isOnline: true,
+                    lastSeen: 'Online',
+                    lastMessage: msg.text || (msg.isAudio ? '🎙️ Voice note' : 'Attachment'),
+                    lastMessageTimestamp: msg.timestamp,
+                    unreadCount: (activeContactDid === partnerDid) ? 0 : 1,
+                    isVerified: true,
+                  };
+                  contactsData.unshift(c);
+                } else {
+                  c.lastMessage = msg.text || (msg.isAudio ? '🎙️ Voice note' : 'Attachment');
+                  c.lastMessageTimestamp = msg.timestamp;
+                  c.lastMessageStatus = msg.status;
+                  c.lastMessageIsOutgoing = (msg.senderDid === myDid || msg.senderDid === 'self');
+                  if (activeContactDid !== partnerDid && msg.senderDid !== myDid && msg.senderDid !== 'self' && msg.status !== 'read') {
+                    if (existingIdx === -1) {
+                      c.unreadCount = (c.unreadCount || 0) + 1;
+                    }
+                  }
+                }
+              }
             });
 
             // Send delivered acknowledgments to server so sender gets grey double tick (✓✓)
@@ -16961,6 +17158,7 @@ function renderHtml(
             if (hasNew) {
               renderChatBubbles();
               renderChatContactsList();
+              if (typeof fetchNotifications === 'function') fetchNotifications();
             }
           }
         })
@@ -17448,12 +17646,78 @@ function renderHtml(
     }
 
     function filterChatContacts(query) {
-      const q = (query || '').toLowerCase().trim();
-      const items = document.querySelectorAll('.contact-item');
-      items.forEach(function(item) {
-        const text = item.innerText.toLowerCase();
-        item.style.display = text.includes(q) ? 'flex' : 'none';
+      renderChatContactsList();
+    }
+
+    function openNewChatPickerModal() {
+      const modal = document.getElementById('newChatPickerModal');
+      const input = document.getElementById('newChatSearchInput');
+      if (modal) modal.style.display = 'flex';
+      if (input) {
+        input.value = '';
+        setTimeout(function() { input.focus(); }, 60);
+      }
+      renderNewChatPickerList('');
+    }
+
+    function filterNewChatPicker(q) {
+      renderNewChatPickerList(q);
+    }
+
+    function renderNewChatPickerList(q) {
+      const listEl = document.getElementById('newChatPickerList');
+      if (!listEl) return;
+      const query = (q || '').toLowerCase().trim();
+      const myDid = myProfile ? myProfile.did : 'self';
+
+      const candidatesMap = new Map();
+      (contactsData || []).forEach(function(c) {
+        if (c.did !== myDid && !/@(?:attacker|victim|drill_|probe_|snoop_)/.test(c.handle || '')) {
+          candidatesMap.set(c.did, {
+            did: c.did,
+            name: c.name || c.displayName || c.handle || 'User',
+            handle: c.handle || '',
+            avatar: c.avatar || (c.name ? c.name.charAt(0).toUpperCase() : 'P'),
+            avatarBg: c.avatarBg || '#6366f1',
+          });
+        }
       });
+      if (typeof dynamicCatalogPeople !== 'undefined' && Array.isArray(dynamicCatalogPeople)) {
+        dynamicCatalogPeople.forEach(function(p) {
+          if (p.pubkey !== myDid && !candidatesMap.has(p.pubkey)) {
+            candidatesMap.set(p.pubkey, {
+              did: p.pubkey,
+              name: p.name,
+              handle: p.handle,
+              avatar: p.avatar || (p.name ? p.name.charAt(0).toUpperCase() : 'P'),
+              avatarBg: p.avatarBg || '#6366f1',
+            });
+          }
+        });
+      }
+
+      const list = Array.from(candidatesMap.values()).filter(function(u) {
+        if (!query) return true;
+        return (u.name || '').toLowerCase().includes(query) || (u.handle || '').toLowerCase().includes(query);
+      });
+
+      if (list.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.82rem; padding: 2rem 0;">No matching friends found.<br/><button type="button" class="action-pill-btn" data-action="goto-friends-hub" data-query="" style="margin-top: 10px; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; border-radius: 6px; padding: 5px 10px; font-size: 0.75rem; cursor: pointer;">Discover Friends Hub ➔</button></div>';
+        return;
+      }
+
+      listEl.innerHTML = list.map(function(u) {
+        return '<div class="new-chat-picker-item" data-action="open-chat-user" data-target-did="' + u.did + '" data-target-name="' + (u.name || '').replace(/"/g, '&quot;') + '" data-target-handle="' + (u.handle || '').replace(/"/g, '&quot;') + '" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; background: rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s ease;">' +
+          '<div style="display: flex; align-items: center; gap: 10px;">' +
+            '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + u.avatarBg + '; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">' + u.avatar + '</div>' +
+            '<div>' +
+              '<div style="font-weight: 700; color: #fff; font-size: 0.85rem;">' + u.name + '</div>' +
+              '<div style="font-size: 0.72rem; color: #94a3b8;">' + (u.handle || '') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<button type="button" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); color: #22c55e; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; pointer-events: none;">Chat ➔</button>' +
+        '</div>';
+      }).join('');
     }
 
     // Start ticker
@@ -19300,28 +19564,7 @@ function renderHtml(
     }
 
     function messageFriend(didOrPubkey, name) {
-      switchTab('chat');
-      let contact = contactsData.find(c => c.did === didOrPubkey || c.name.toLowerCase().includes(name.toLowerCase()));
-      if (contact) {
-        selectContact(contact.did);
-      } else {
-        const targetDid = didOrPubkey || ('did:sovra:' + name.toLowerCase().replace(/[^a-z0-9]/g, '_'));
-        const newContact = {
-          did: targetDid,
-          name: name,
-          avatar: name ? name.charAt(0).toUpperCase() : 'P',
-          avatarBg: '#6366f1',
-          role: 'P2P Sovereign Peer',
-          isOnline: true,
-          lastSeen: 'Online',
-          disappearingDurationSec: 0,
-          safetyNumbers: '28471 90432 18942 09182 39182 48192 19283 48192 48192 01928 38192 49182',
-          isVerified: true
-        };
-        contactsData.unshift(newContact);
-        renderChatContactsList();
-        selectContact(newContact.did);
-      }
+      openDirectChatWithUser(didOrPubkey, name, '');
     }
 
     function triggerBottomCreateAction() {
@@ -19555,8 +19798,8 @@ function renderHtml(
 
     function fetchNotifications() {
       fetch('/api/notifications')
-        .then(r => r.json())
-        .then(data => {
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
           if (data.ok && Array.isArray(data.notifications)) {
             const badge = document.getElementById('headerNotificationBadge');
             if (badge) {
@@ -19573,16 +19816,102 @@ function renderHtml(
               listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 20px;">No notifications yet</div>';
               return;
             }
-            listEl.innerHTML = data.notifications.map(n => {
-              const bg = n.read ? 'transparent' : 'rgba(99, 102, 241, 0.1)';
-              return '<div class="notification-card" data-action="mark-notification-read" data-id="' + n.id + '" style="background: ' + bg + '; padding: 8px; border-radius: 8px; margin-bottom: 6px; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);">' +
-                '<div style="font-size: 0.82rem; font-weight: 700; color: #fff;">' + n.title + '</div>' +
-                '<div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 2px;">' + n.body + '</div>' +
-                '<div style="font-size: 0.65rem; color: #64748b; margin-top: 4px;">' + new Date(n.createdAt).toLocaleTimeString() + '</div>' +
+            listEl.innerHTML = data.notifications.map(function(n) {
+              const isUnread = (!n.isRead && !n.read);
+              const bg = isUnread ? 'rgba(99, 102, 241, 0.16)' : 'rgba(255, 255, 255, 0.03)';
+              const border = isUnread ? 'rgba(99, 102, 241, 0.35)' : 'rgba(255, 255, 255, 0.05)';
+              const typeIcon = (n.type === 'message' || n.type === 'chat') ? '💬' :
+                               (n.type === 'friend_request') ? '👥' :
+                               (n.type === 'friend_accept') ? '🤝' :
+                               (n.type === 'tip') ? '⚡' :
+                               (n.type === 'like') ? '❤️' :
+                               (n.type === 'comment') ? '🗨️' : '🔔';
+
+              const senderDid = n.senderDid || (n.data && n.data.senderDid) || (n.data && n.data.fromDid) || '';
+              const relId = (n.data && n.data.relId) || '';
+
+              let actionButtonsHtml = '';
+              if (n.type === 'friend_request') {
+                actionButtonsHtml = '<div style="display: flex; gap: 8px; margin-top: 8px;">' +
+                  '<button type="button" class="notif-action-btn notif-accept-btn" data-action="accept-freq-notif" data-id="' + n.id + '" data-rel-id="' + relId + '" data-sender-did="' + senderDid + '" style="background: #22c55e; color: #0b141a; font-weight: 700; border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">✓ Accept</button>' +
+                  '<button type="button" class="notif-action-btn notif-reject-btn" data-action="reject-freq-notif" data-id="' + n.id + '" data-rel-id="' + relId + '" data-sender-did="' + senderDid + '" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; cursor: pointer;">Ignore</button>' +
+                '</div>';
+              } else if (n.type === 'message' || n.type === 'chat') {
+                actionButtonsHtml = '<div style="display: flex; gap: 8px; margin-top: 6px;">' +
+                  '<button type="button" class="notif-action-btn" data-action="open-chat-notif" data-id="' + n.id + '" data-type="' + (n.type || 'message') + '" data-sender-did="' + senderDid + '" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 3px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">💬 Open Chat ➔</button>' +
+                '</div>';
+              }
+
+              return '<div class="notification-card" data-action="click-notification" data-id="' + n.id + '" data-type="' + (n.type || '') + '" data-sender-did="' + senderDid + '" style="background: ' + bg + '; padding: 10px; border-radius: 8px; margin-bottom: 6px; cursor: pointer; border: 1px solid ' + border + '; transition: background 0.15s ease;">' +
+                '<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 6px;">' +
+                  '<div style="display: flex; align-items: center; gap: 6px;">' +
+                    '<span style="font-size: 0.9rem;">' + typeIcon + '</span>' +
+                    '<span style="font-size: 0.82rem; font-weight: 700; color: #fff;">' + n.title + '</span>' +
+                  '</div>' +
+                  (isUnread ? '<span style="width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; flex-shrink: 0; margin-top: 4px;"></span>' : '') +
+                '</div>' +
+                '<div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 4px; word-break: break-word;">' + n.body + '</div>' +
+                actionButtonsHtml +
+                '<div style="font-size: 0.65rem; color: #64748b; margin-top: 5px;">' + new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div>' +
               '</div>';
             }).join('');
           }
-        }).catch(err => console.warn('[Notifications] Error:', err));
+        }).catch(function(err) { console.warn('[Notifications] Error:', err); });
+    }
+
+    function handleNotificationClick(id, type, senderDid, event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      if (id) markNotificationAsRead(id);
+
+      const dd = document.getElementById('notificationDropdown');
+      if (dd) dd.style.display = 'none';
+
+      const notifType = (type || '').toLowerCase();
+      if (notifType === 'message' || notifType === 'chat') {
+        if (senderDid) {
+          openDirectChatWithUser(senderDid);
+        } else {
+          switchTab('chat');
+        }
+      } else if (notifType === 'friend_request') {
+        switchTab('friends');
+      } else if (notifType === 'friend_accept') {
+        if (senderDid) {
+          openDirectChatWithUser(senderDid);
+        } else {
+          switchTab('friends');
+        }
+      } else if (notifType === 'tip') {
+        switchTab('me');
+      } else if (notifType === 'like' || notifType === 'comment' || notifType === 'post') {
+        switchTab('feed');
+      } else {
+        switchTab('chat');
+      }
+    }
+
+    function respondFriendRequestFromNotif(notifId, relId, senderDid, status, event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      fetch('/api/friends/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: relId || undefined,
+          fromDid: senderDid || undefined,
+          status: status,
+        }),
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (notifId) markNotificationAsRead(notifId);
+        showAccountToast(status === 'accept' ? '✓ Friend request accepted!' : 'Friend request ignored.');
+        fetchNotifications();
+        if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
+        if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
+      })
+      .catch(function(err) {
+        console.warn('[Notification] Friend response error:', err);
+      });
     }
 
     function markNotificationAsRead(id) {
@@ -19642,6 +19971,55 @@ function renderHtml(
     }
 
     document.addEventListener('click', function(e) {
+      const chatBtn = e.target && e.target.closest ? e.target.closest('[data-action="open-chat-user"]') : null;
+      if (chatBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const tDid = chatBtn.getAttribute('data-target-did') || chatBtn.dataset.targetDid;
+        const tName = chatBtn.getAttribute('data-target-name') || chatBtn.dataset.targetName || 'Peer';
+        const tHandle = chatBtn.getAttribute('data-target-handle') || chatBtn.dataset.targetHandle || '';
+        closeWaModal('newChatPickerModal');
+        openDirectChatWithUser(tDid, tName, tHandle);
+        return;
+      }
+      const friendsHubBtn = e.target && e.target.closest ? e.target.closest('[data-action="goto-friends-hub"]') : null;
+      if (friendsHubBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeWaModal('newChatPickerModal');
+        const q = friendsHubBtn.getAttribute('data-query') || '';
+        switchTab('friends');
+        if (typeof filterFriendsView === 'function') filterFriendsView(q);
+        return;
+      }
+      const notifAccept = e.target && e.target.closest ? e.target.closest('[data-action="accept-freq-notif"]') : null;
+      if (notifAccept) {
+        e.preventDefault();
+        e.stopPropagation();
+        respondFriendRequestFromNotif(notifAccept.dataset.id, notifAccept.dataset.relId, notifAccept.dataset.senderDid, 'accept', e);
+        return;
+      }
+      const notifReject = e.target && e.target.closest ? e.target.closest('[data-action="reject-freq-notif"]') : null;
+      if (notifReject) {
+        e.preventDefault();
+        e.stopPropagation();
+        respondFriendRequestFromNotif(notifReject.dataset.id, notifReject.dataset.relId, notifReject.dataset.senderDid, 'reject', e);
+        return;
+      }
+      const notifChat = e.target && e.target.closest ? e.target.closest('[data-action="open-chat-notif"]') : null;
+      if (notifChat) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleNotificationClick(notifChat.dataset.id, notifChat.dataset.type, notifChat.dataset.senderDid, e);
+        return;
+      }
+      const notifCard = e.target && e.target.closest ? e.target.closest('[data-action="click-notification"]') : null;
+      if (notifCard) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleNotificationClick(notifCard.dataset.id, notifCard.dataset.type, notifCard.dataset.senderDid, e);
+        return;
+      }
       const bell = document.getElementById('headerNotificationBell');
       const dd = document.getElementById('notificationDropdown');
       if (bell && dd && !bell.contains(e.target) && !dd.contains(e.target)) {
@@ -20101,9 +20479,16 @@ function renderHtml(
           triggerBottomCreateAction();
           break;
         }
+        case 'click-notification':
         case 'mark-notification-read': {
           const id = actionEl.dataset.id;
-          if (id) markNotificationAsRead(id);
+          const type = actionEl.dataset.type || '';
+          const senderDid = actionEl.dataset.senderDid || actionEl.dataset.did || '';
+          if (typeof handleNotificationClick === 'function') {
+            handleNotificationClick(id, type, senderDid, e);
+          } else if (id) {
+            markNotificationAsRead(id);
+          }
           break;
         }
         case 'send-friend-request': {
@@ -23233,7 +23618,12 @@ async function startDevServer() {
           return;
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, user: toPublicUserDTO(loginRes.user), sessionToken: loginRes.sessionToken }));
+        res.end(JSON.stringify({
+          ok: true,
+          user: toPublicUserDTO(loginRes.user),
+          sessionToken: loginRes.sessionToken,
+          recoveryPhrase: loginRes.user.recoveryPhrase,
+        }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
@@ -23641,21 +24031,52 @@ async function startDevServer() {
       const principal = resolvePrincipal(req);
       const did = url.searchParams.get('did') || '';
       const handle = url.searchParams.get('handle') || '';
+      const sessionTokenQuery = url.searchParams.get('sessionToken') || '';
       let user: any = null;
-      if (did) {
+      if (sessionTokenQuery) {
+        user = sovraDb.findUserBySessionToken(sessionTokenQuery);
+      }
+      if (!user && did) {
         user = sovraDb.findUserByDid(did);
-      } else if (handle) {
+      } else if (!user && handle) {
         user = sovraDb.findUserByHandle(handle);
-      } else if (principal) {
+      } else if (!user && principal) {
         user = sovraDb.findUserByDid(principal.did);
       }
-      if (!user && !did && !handle) {
+      if (!user && !did && !handle && !sessionTokenQuery) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: No active session' }));
+        return;
+      }
+      const isSelf = !!(
+        (principal && user && (principal.did === user.did)) ||
+        (sessionTokenQuery && user && user.sessionToken === sessionTokenQuery)
+      );
+      const userDTO: any = toPublicUserDTO(user);
+      if (isSelf && user?.recoveryPhrase) {
+        userDTO.recoveryPhrase = user.recoveryPhrase;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, user: userDTO }));
+      return;
+    }
+
+    if (url.pathname === '/api/user/recovery-phrase' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      const sessionTokenQuery = url.searchParams.get('sessionToken') || '';
+      let user: any = null;
+      if (principal) {
+        user = sovraDb.findUserByDid(principal.did);
+      } else if (sessionTokenQuery) {
+        user = sovraDb.findUserBySessionToken(sessionTokenQuery);
+      }
+      if (!user) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Unauthorized: No active session' }));
         return;
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, user: toPublicUserDTO(user) }));
+      res.end(JSON.stringify({ ok: true, recoveryPhrase: user.recoveryPhrase || '' }));
       return;
     }
 
@@ -24105,14 +24526,25 @@ async function startDevServer() {
         });
 
         if (record && record.recipientDid && !record.recipientDid.startsWith('channel:')) {
+          const senderUser = sovraDb.findUserByDid(principal.did);
+          const sName = record.senderName || senderUser?.displayName || senderUser?.handle || 'Peer';
+          const sHandle = record.senderHandle || senderUser?.handle || '@peer';
           sovraDb.addNotification({
             recipientDid: record.recipientDid,
             senderDid: principal.did,
+            senderHandle: sHandle,
+            senderName: sName,
             type: 'message',
-            title: `Message from ${record.senderName || 'Peer'}`,
+            title: `Message from ${sName}`,
             body: record.isAudio ? '🎤 Voice note' : (record.text.slice(0, 50) || 'Attachment'),
             link: '/app',
-            data: { messageId: record.id, threadId: record.threadId },
+            data: {
+              messageId: record.id,
+              threadId: record.threadId,
+              senderDid: principal.did,
+              senderName: sName,
+              senderHandle: sHandle,
+            },
           });
 
           // Deliver message instantly to active realtime SSE subscriber
