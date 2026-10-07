@@ -7108,19 +7108,19 @@ function renderHtml(
                   <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 600;">Publishing as:</span>
                   <select id="composerAuthorSelect" onchange="handleComposerAuthorChange(this.value)" class="composer-author-dropdown">
                     <optgroup label="👤 Personal Account">
-                      <option value="personal:self" selected>👤 ${hostUser ? escapeHtml(hostUser.displayName) : 'Personal Profile'} (${hostUser ? hostUser.handle : '@you'})</option>
+                      <option value="personal:self" selected>👤 ${hostUser ? escapeHtml(hostUser.displayName) : 'Personal Profile'}</option>
                     </optgroup>
                     <optgroup label="📄 Sovereign Pages">
-                      ${sovraDb.getAllPages().map(pg => `<option value="page:${pg.id}">📄 ${escapeHtml(pg.name)} (${pg.handle})</option>`).join('')}
+                      ${sovraDb.getAllPages().map(pg => `<option value="page:${pg.id}">📄 ${escapeHtml(pg.name)}</option>`).join('')}
                     </optgroup>
                     <optgroup label="📢 Broadcast Channels">
-                      ${sovraDb.getAllChannels().map(ch => `<option value="channel:${ch.id}">📢 ${escapeHtml(ch.name)} (${ch.handle})</option>`).join('')}
+                      ${sovraDb.getAllChannels().map(ch => `<option value="channel:${ch.id}">📢 ${escapeHtml(ch.name)}</option>`).join('')}
                     </optgroup>
                   </select>
                 </div>
                 <div style="display: flex; align-items: center; gap: 5px; margin-top: 2px;">
-                  <span id="composerEntityBadge" class="badge badge-personal">👤 Personal</span>
-                  <span id="composerEntityHandle" style="font-size: 0.72rem; color: #64748b;">${hostUser ? hostUser.handle : '@you'}</span>
+                  <span id="composerEntityBadge" class="badge badge-personal" style="display: none;">👤 Personal</span>
+                  <span id="composerEntityHandle" style="display: none !important;">${hostUser ? hostUser.handle : '@you'}</span>
                 </div>
               </div>
             </div>
@@ -11451,16 +11451,17 @@ function renderHtml(
         const composerAuthorSelect = document.getElementById('composerAuthorSelect');
         if (composerAuthorSelect) {
           const selfOpt = composerAuthorSelect.querySelector('option[value="personal:self"]');
-          if (selfOpt) selfOpt.textContent = '👤 Guest Profile (@guest)';
+          if (selfOpt) selfOpt.textContent = '👤 Guest Profile';
         }
         const composerAuthorAvatar = document.getElementById('composerAuthorAvatar');
         if (composerAuthorAvatar) { composerAuthorAvatar.innerText = '?'; composerAuthorAvatar.style.background = '#475569'; }
         const composerEntityHandle = document.getElementById('composerEntityHandle');
-        if (composerEntityHandle) composerEntityHandle.innerText = '@guest';
+        if (composerEntityHandle) composerEntityHandle.innerText = '';
         const composerEntityBadge = document.getElementById('composerEntityBadge');
         if (composerEntityBadge) {
           composerEntityBadge.className = 'badge badge-personal';
           composerEntityBadge.innerText = '👤 Guest';
+          composerEntityBadge.style.display = 'none';
         }
         const myStoryAvatar = document.getElementById('myStoryAvatar');
         if (myStoryAvatar) { myStoryAvatar.innerText = '?'; myStoryAvatar.style.background = '#475569'; }
@@ -11613,7 +11614,7 @@ function renderHtml(
       if (composerAuthorSelect) {
         const selfOpt = composerAuthorSelect.querySelector('option[value="personal:self"]');
         if (selfOpt) {
-          selfOpt.textContent = '👤 ' + (myProfile.displayName || myProfile.name || 'Personal Profile') + ' (' + (myProfile.handle || '@you') + ')';
+          selfOpt.textContent = '👤 ' + (myProfile.displayName || myProfile.name || 'Personal Profile');
         }
       }
       handleComposerAuthorChange(composerAuthorSelect ? composerAuthorSelect.value : 'personal:self');
@@ -13697,8 +13698,9 @@ function renderHtml(
         if (badgeEl) {
           badgeEl.className = 'badge badge-personal';
           badgeEl.innerText = '👤 Personal';
+          badgeEl.style.display = 'none';
         }
-        if (handleEl) handleEl.innerText = pHandle;
+        if (handleEl) handleEl.innerText = '';
         if (captionEl && currentPostFormat === 'text') {
           captionEl.placeholder = "What's happening on the mesh? Share a thought, update, question...";
         }
@@ -13719,8 +13721,9 @@ function renderHtml(
           if (badgeEl) {
             badgeEl.className = 'badge badge-page';
             badgeEl.innerText = '📄 Page';
+            badgeEl.style.display = 'inline-block';
           }
-          if (handleEl) handleEl.innerText = page.handle;
+          if (handleEl) handleEl.innerText = '';
           if (captionEl && currentPostFormat === 'text') {
             captionEl.placeholder = "Publish an announcement or update from " + page.name + "...";
           }
@@ -13735,8 +13738,9 @@ function renderHtml(
           if (badgeEl) {
             badgeEl.className = 'badge badge-channel';
             badgeEl.innerText = '📢 Channel';
+            badgeEl.style.display = 'inline-block';
           }
-          if (handleEl) handleEl.innerText = channel.handle;
+          if (handleEl) handleEl.innerText = '';
           if (captionEl && currentPostFormat === 'text') {
             captionEl.placeholder = "Broadcast a channel update to subscribers of " + channel.name + "...";
           }
@@ -17140,7 +17144,7 @@ function renderHtml(
               ? '<img src="' + of.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />'
               : (of.avatar || 'F');
             const firstName = (of.name || of.handle || 'Friend').split(' ')[0];
-            railHtml += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; flex-shrink: 0; min-width: 52px;" onclick="openDirectChatWithUser(\'' + of.did + '\', \'' + (of.name || '').replace(/'/g, "\\'") + '\', \'' + (of.handle || '').replace(/'/g, "\\'") + '\')" title="Chat with ' + (of.name || 'Friend') + ' (Online)">' +
+            railHtml += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; flex-shrink: 0; min-width: 52px;" data-did="' + of.did + '" data-name="' + (of.name || 'Friend').replace(/"/g, '&quot;') + '" data-handle="' + (of.handle || '').replace(/"/g, '&quot;') + '" onclick="openDirectChatWithUser(this.dataset.did, this.dataset.name, this.dataset.handle)" title="Chat with ' + (of.name || 'Friend') + ' (Online)">' +
               '<div style="position: relative; width: 44px; height: 44px; border-radius: 50%; background: ' + (of.avatarBg || '#10b981') + '; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 0.95rem; border: 2px solid rgba(16, 185, 129, 0.5);">' +
                 avatarContent +
                 '<div class="online-dot" style="background: #10b981; box-shadow: 0 0 6px #10b981; width: 12px; height: 12px; border: 2px solid #0f172a; position: absolute; bottom: 0; right: 0; border-radius: 50%;"></div>' +
@@ -21207,7 +21211,7 @@ function renderHtml(
             }
             const opt = document.createElement('option');
             opt.value = 'channel:' + data.channel.id;
-            opt.textContent = '📢 ' + data.channel.name + ' (' + data.channel.handle + ')';
+            opt.textContent = '📢 ' + data.channel.name;
             optGroup.appendChild(opt);
           }
           if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
@@ -21269,7 +21273,7 @@ function renderHtml(
             }
             const opt = document.createElement('option');
             opt.value = 'page:' + data.page.id;
-            opt.textContent = '🏢 ' + data.page.name + ' (' + data.page.handle + ')';
+            opt.textContent = '🏢 ' + data.page.name;
             optGroup.appendChild(opt);
           }
           if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
