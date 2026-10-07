@@ -2022,6 +2022,7 @@ function renderHtml(
     .ops-console-rail-link,
     #tab-admin,
     #bnav-admin,
+    #bnav-friends,
     .tcp-port-badge {
       display: none !important;
     }
@@ -9577,17 +9578,12 @@ function renderHtml(
       <span class="bnav-icon">📷</span>
       <span class="bnav-label">Feed</span>
     </button>
-    <button class="bottom-nav-item" id="bnav-friends" data-action="switch-tab" data-tab="friends" onclick="switchTab('friends')" title="Friends & Search" aria-label="Friends and Search">
-      <span class="bnav-icon">👥</span>
-      <span class="bnav-label">Friends</span>
-      <span class="bnav-badge" id="bnavFriendsBadge">1</span>
-    </button>
-    <button class="bottom-nav-create" data-action="create-post" onclick="triggerBottomCreateAction()" title="Create Post or Story" aria-label="Create Post or Story">
-      <span>+</span>
-    </button>
     <button class="bottom-nav-item" id="bnav-reels" data-action="switch-tab" data-tab="reels" onclick="switchTab('reels')" title="Reels" aria-label="Reels Video Feed">
       <span class="bnav-icon">🎬</span>
       <span class="bnav-label">Reels</span>
+    </button>
+    <button class="bottom-nav-create" data-action="create-post" onclick="triggerBottomCreateAction()" title="Create Post or Story" aria-label="Create Post or Story">
+      <span>+</span>
     </button>
     <button class="bottom-nav-item" id="bnav-youtube" data-action="switch-tab" data-tab="youtube" onclick="switchTab('youtube')" title="Watch" aria-label="Watch Videos">
       <span class="bnav-icon">📺</span>
@@ -9601,6 +9597,11 @@ function renderHtml(
     <button class="bottom-nav-item" id="bnav-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" title="Profile" aria-label="Sovereign Profile and Wallet">
       <span class="bnav-icon">👤</span>
       <span class="bnav-label">Me</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-friends" style="display: none !important;" data-action="switch-tab" data-tab="friends" onclick="switchTab('friends')" title="Friends & Search" aria-label="Friends and Search">
+      <span class="bnav-icon">👥</span>
+      <span class="bnav-label">Friends</span>
+      <span class="bnav-badge" id="bnavFriendsBadge">1</span>
     </button>
     <button class="bottom-nav-item" id="bnav-admin" data-action="switch-tab" data-tab="admin" onclick="switchTab('admin')" title="Ops Console" aria-label="Node Operations Console">
       <span class="bnav-icon">⚙️</span>
