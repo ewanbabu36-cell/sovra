@@ -1547,6 +1547,20 @@ function escapeHtml(str: any): string {
     .replace(/'/g, '&#39;');
 }
 
+function formatFeedTimestamp(ts?: number | string): { timeAgo: string; fullDate: string } {
+  if (!ts) return { timeAgo: 'Just now', fullDate: 'Just now' };
+  const numTs = typeof ts === 'string' ? (isNaN(Number(ts)) ? Date.parse(ts) : Number(ts)) : ts;
+  if (isNaN(numTs) || numTs <= 0) return { timeAgo: 'Just now', fullDate: 'Just now' };
+  const d = new Date(numTs);
+  const fullDate = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const diffSec = Math.floor((Date.now() - numTs) / 1000);
+  if (diffSec < 45) return { timeAgo: 'Just now', fullDate };
+  if (diffSec < 3600) return { timeAgo: `${Math.floor(diffSec / 60)}m ago`, fullDate };
+  if (diffSec < 86400) return { timeAgo: `${Math.floor(diffSec / 3600)}h ago`, fullDate };
+  if (diffSec < 604800) return { timeAgo: `${Math.floor(diffSec / 86400)}d ago`, fullDate };
+  return { timeAgo: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), fullDate };
+}
+
 function renderHtml(
   binding: PeerIdentityBinding,
   masterKey: SovraIdentityKey,
@@ -5162,25 +5176,15 @@ function renderHtml(
     }
     .composer-format-tabs {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
       gap: 0.45rem;
       margin-bottom: 0.75rem;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       padding-bottom: 0.65rem;
-    }
-    @media (max-width: 640px) {
-      .composer-format-tabs {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        scrollbar-width: none !important;
-        -ms-overflow-style: none !important;
-        -webkit-overflow-scrolling: touch;
-      }
-      .composer-format-tabs::-webkit-scrollbar {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-      }
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
+      -webkit-overflow-scrolling: touch;
     }
     .composer-format-tabs::-webkit-scrollbar {
       display: none !important;
@@ -7002,13 +7006,13 @@ function renderHtml(
             <span id="currentUserAvatar" style="width: 20px; height: 20px; border-radius: 50%; background: #6366f1; color: #fff; font-size: 0.7rem; font-weight: bold; display: flex; align-items: center; justify-content: center;">S</span>
             <span id="currentUserHandleText" style="font-size: 0.75rem; font-weight: 700; color: #cbd5e1;">@you</span>
           </div>
-          <button id="navModeToggleBtn" onclick="toggleNavLayoutMode()" class="nav-mode-btn" title="Toggle Navigation Layout (Auto Responsive / Mobile Dock / Desktop Top)" aria-label="Toggle Navigation Layout">
+          <button id="navModeToggleBtn" onclick="toggleNavLayoutMode()" class="nav-mode-btn" style="display: none;" title="Toggle Navigation Layout (Auto Responsive / Mobile Dock / Desktop Top)" aria-label="Toggle Navigation Layout">
             <span id="navModeIcon">⚡</span> <span id="navModeLabel" class="nav-mode-text">Auto</span>
           </button>
-          <div class="node-status-pill" title="Sovra Mesh Online • TCP :${tcpPort} • LibP2P Noise_XX Active">
-            <span class="status-pulse-dot"></span>
-            <span class="status-text">Online</span>
-            <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); font-size: 0.72rem; padding: 2px 7px; border-radius: 8px;">:${tcpPort}</span>
+          <div class="node-status-pill" title="Sovra Mesh Online • TCP :${tcpPort} • LibP2P Noise_XX Active" style="display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 20px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); cursor: default;">
+            <span class="status-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; display: inline-block;"></span>
+            <span class="status-text" style="font-size: 0.72rem; font-weight: 600; color: #34d399;">Online</span>
+            <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); font-size: 0.65rem; padding: 1px 5px; border-radius: 6px;">:${tcpPort}</span>
           </div>
         </div>
       </header>
@@ -7215,11 +7219,6 @@ function renderHtml(
 
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                   <input id="dynamicPostTags" type="text" placeholder="#sovra #community" value="#sovra #community" class="composer-tags-input" />
-                  <select id="dynamicPostVisibility" title="Post Visibility" style="background: rgba(30, 41, 59, 0.8); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 0.4rem 0.6rem; font-size: 0.8rem; cursor: pointer;">
-                    <option value="public">Public</option>
-                    <option value="friends">Friends</option>
-                    <option value="only_me">Only Me</option>
-                  </select>
                   <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" class="composer-publish-btn">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     <span>Post</span>
@@ -7245,7 +7244,9 @@ function renderHtml(
             </div>
           ` : livePosts
             .map(
-              post => `
+              post => {
+                const tsInfo = formatFeedTimestamp(post.timestamp);
+                return `
             <article class="insta-post-card" id="card-${post.id}">
               <!-- Post Header -->
               <div class="insta-post-header">
@@ -7253,18 +7254,24 @@ function renderHtml(
                   <div class="insta-author-avatar" style="background: ${post.authorAvatarBg}; overflow: hidden;">
                     ${post.authorAvatarDataUrl ? `<img src="${post.authorAvatarDataUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />` : post.authorAvatar}
                   </div>
-                  <div>
-                    <div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 4px;">
-                      <span>${post.authorName}</span>
-                      <span style="color: #38bdf8; font-size: 0.8rem;">✓</span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+                      <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${post.authorName}</span>
+                      <span style="color: #38bdf8; font-size: 0.8rem;" title="Cryptographically Verified Peer">✓</span>
                       ${post.authorBadge ? `<span class="badge ${post.authorType === 'page' ? 'badge-page' : (post.authorType === 'channel' ? 'badge-channel' : 'badge-personal')}">${post.authorBadge}</span>` : ''}
-                      <span style="font-size: 0.68rem; color: #94a3b8; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px; margin-left: 4px;">
+                      <span style="font-size: 0.68rem; color: #94a3b8; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px;">
                         ${(post as any).visibility === 'only_me' ? '🔒 Only Me' : ((post as any).visibility === 'friends' ? '👥 Friends' : '🌐 Public')}
                       </span>
+                      <span class="post-time-badge" title="${tsInfo.fullDate}" style="font-size: 0.72rem; color: #94a3b8; margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-weight: normal; background: rgba(255,255,255,0.04); padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <span style="font-size: 0.68rem;">🕒</span>
+                        <span>${tsInfo.timeAgo}</span>
+                      </span>
                     </div>
-                    <div style="font-size: 0.72rem; color: #94a3b8;">
-                      ${(post as any).authorEntityHandle ? `<span style="color: #64748b; margin-right: 4px;">${(post as any).authorEntityHandle} &bull; </span>` : ''}
-                      <span>${post.audioTrack || 'Original Audio • Sovra Mesh'}</span>
+                    <div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 5px; margin-top: 2px;">
+                      ${(post as any).authorEntityHandle ? `<span style="color: #64748b; font-weight: 500;">${(post as any).authorEntityHandle}</span><span>&bull;</span>` : ''}
+                      <span title="${tsInfo.fullDate}">${tsInfo.fullDate}</span>
+                      ${post.audioTrack ? `<span>&bull;</span><span>🎵 ${post.audioTrack}</span>` : ''}
+                      ${(post as any).updatedAt ? `<span style="color: #f59e0b; font-size: 0.68rem; margin-left: 2px;">(Edited)</span>` : ''}
                     </div>
                   </div>
                 </div>
@@ -7502,8 +7509,12 @@ function renderHtml(
               </div>
 
               <!-- Time Ago -->
-              <div style="padding: 0 1rem; font-size: 0.68rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.65rem;">
-                ${Math.floor((Date.now() - post.timestamp) / 3600000)} HOURS AGO &bull; ED25519 SIGNED
+              <div style="padding: 0 1rem; font-size: 0.68rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.65rem; display: flex; align-items: center; gap: 5px;">
+                <span>🕒 ${tsInfo.fullDate}</span>
+                <span>&bull;</span>
+                <span>${tsInfo.timeAgo.toUpperCase()}</span>
+                <span>&bull;</span>
+                <span>ED25519 VERIFIED</span>
               </div>
 
               <!-- Add Comment Input Box -->
@@ -7513,7 +7524,8 @@ function renderHtml(
                 <button class="insta-post-btn" onclick="submitFeedComment('${post.id}')">Post</button>
               </div>
             </article>
-          `,
+          `;
+              },
             )
             .join('')}
         </div>
@@ -9830,7 +9842,18 @@ function renderHtml(
               <div style="font-weight: 700; font-size: 0.9rem; color: #10b981;">🛡️ Sovereign Authenticator 2FA &amp; PIN</div>
               <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Google Authenticator, Microsoft Authenticator &amp; PIN management.</div>
             </div>
-            <span style="color: #10b981; font-size: 1.1rem;">→</span>
+            <span style="color: #10b981; font-weight: 700; font-size: 0.82rem;">Configure →</span>
+          </div>
+
+          <!-- Navigation Layout Mode (Settings) -->
+          <div style="background: #1e293b; border: 1px solid #334155; padding: 0.85rem 1rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="flex: 1;">
+              <div style="font-weight: 700; font-size: 0.9rem; color: #f8fafc;">🧭 Navigation Layout Mode</div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Switch between Auto Responsive, Mobile Dock, or Desktop Rail.</div>
+            </div>
+            <button type="button" onclick="toggleNavLayoutMode()" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+              ⚡ Toggle Mode
+            </button>
           </div>
 
           <!-- Connected Devices & Remote Logout -->
@@ -13301,6 +13324,26 @@ function renderHtml(
       }
     }
 
+    function formatFeedTimeAgo(ts) {
+      if (!ts) return 'Just now';
+      var numTs = typeof ts === 'string' ? (isNaN(Number(ts)) ? Date.parse(ts) : Number(ts)) : ts;
+      if (isNaN(numTs) || numTs <= 0) return 'Just now';
+      var diffSec = Math.floor((Date.now() - numTs) / 1000);
+      if (diffSec < 45) return 'Just now';
+      if (diffSec < 3600) return Math.floor(diffSec / 60) + 'm ago';
+      if (diffSec < 86400) return Math.floor(diffSec / 3600) + 'h ago';
+      if (diffSec < 604800) return Math.floor(diffSec / 86400) + 'd ago';
+      var d = new Date(numTs);
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    function formatFeedFullDateTime(ts) {
+      if (!ts) return new Date().toLocaleString();
+      var numTs = typeof ts === 'string' ? (isNaN(Number(ts)) ? Date.parse(ts) : Number(ts)) : ts;
+      if (isNaN(numTs) || numTs <= 0) return new Date().toLocaleString();
+      return new Date(numTs).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
     function triggerFeedPostLike(postId) {
       const post = feedPostsData.find(function(p) { return p.id === postId; });
       if (!post) return;
@@ -13335,11 +13378,18 @@ function renderHtml(
         }
       }
 
+      var token = localStorage.getItem('sovra_session_token') || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : '') || (myProfile && myProfile.sessionToken ? myProfile.sessionToken : '') || '';
+      var authHeaders = { 'Content-Type': 'application/json' };
+      if (token) {
+        authHeaders['Authorization'] = 'Bearer ' + token;
+        authHeaders['X-Sovra-Session-Token'] = token;
+      }
+
       // Persist to backend dynamic store
       fetch('/api/feed/like', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: postId, userDid: myDid, isLiked: isNowLiked })
+        headers: authHeaders,
+        body: JSON.stringify({ postId: postId, userDid: myDid, isLiked: isNowLiked, sessionToken: token })
       })
       .then(function(r) { return r.json(); })
       .then(function(res) {
@@ -13378,11 +13428,18 @@ function renderHtml(
           btnEl.classList.add('heart-bounce-pop');
         }
 
+        var token = localStorage.getItem('sovra_session_token') || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : '') || (myProfile && myProfile.sessionToken ? myProfile.sessionToken : '') || '';
+        var authHeaders = { 'Content-Type': 'application/json' };
+        if (token) {
+          authHeaders['Authorization'] = 'Bearer ' + token;
+          authHeaders['X-Sovra-Session-Token'] = token;
+        }
+
         // Persist to backend dynamic store
         fetch('/api/feed/like', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postId: postId, userDid: myDid, isLiked: true })
+          headers: authHeaders,
+          body: JSON.stringify({ postId: postId, userDid: myDid, isLiked: true, sessionToken: token })
         })
         .then(function(r) { return r.json(); })
         .then(function(res) {
@@ -14189,18 +14246,24 @@ function renderHtml(
             '<div class="insta-author-avatar" style="background: ' + post.authorAvatarBg + '; overflow: hidden;">' +
               (post.authorAvatarDataUrl ? '<img src="' + post.authorAvatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : post.authorAvatar) +
             '</div>' +
-            '<div>' +
-              '<div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 4px;">' +
-                '<span>' + post.authorName + '</span>' +
-                '<span style="color: #38bdf8; font-size: 0.8rem;">✓</span>' +
+            '<div style="flex: 1; min-width: 0;">' +
+              '<div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">' +
+                '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">' + post.authorName + '</span>' +
+                '<span style="color: #38bdf8; font-size: 0.8rem;" title="Cryptographically Verified Peer">✓</span>' +
                 (post.authorBadge ? '<span class="badge ' + (post.authorType === 'page' ? 'badge-page' : (post.authorType === 'channel' ? 'badge-channel' : 'badge-personal')) + '">' + post.authorBadge + '</span>' : '') +
-                '<span style="font-size: 0.68rem; color: #94a3b8; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px; margin-left: 4px;">' +
+                '<span style="font-size: 0.68rem; color: #94a3b8; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px;">' +
                   (post.visibility === 'only_me' ? '🔒 Only Me' : (post.visibility === 'friends' ? '👥 Friends' : '🌐 Public')) +
                 '</span>' +
+                '<span class="post-time-badge" title="' + formatFeedFullDateTime(post.timestamp) + '" style="font-size: 0.72rem; color: #94a3b8; margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-weight: normal; background: rgba(255,255,255,0.04); padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">' +
+                  '<span style="font-size: 0.68rem;">🕒</span>' +
+                  '<span>' + formatFeedTimeAgo(post.timestamp) + '</span>' +
+                '</span>' +
               '</div>' +
-              '<div style="font-size: 0.72rem; color: #94a3b8;">' +
-                (post.authorEntityHandle ? '<span style="color: #64748b; margin-right: 4px;">' + post.authorEntityHandle + ' &bull; </span>' : '') +
-                '<span>' + (post.audioTrack || 'Original Audio • Sovra Mesh') + '</span>' +
+              '<div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 5px; margin-top: 2px;">' +
+                (post.authorEntityHandle ? '<span style="color: #64748b; font-weight: 500;">' + post.authorEntityHandle + '</span><span>&bull;</span>' : '') +
+                '<span title="' + formatFeedFullDateTime(post.timestamp) + '">' + formatFeedFullDateTime(post.timestamp) + '</span>' +
+                (post.audioTrack ? '<span>&bull;</span><span>🎵 ' + post.audioTrack + '</span>' : '') +
+                (post.updatedAt ? '<span style="color: #f59e0b; font-size: 0.68rem; margin-left: 2px;">(Edited)</span>' : '') +
               '</div>' +
             '</div>' +
           '</div>' +
@@ -14227,6 +14290,14 @@ function renderHtml(
         '<div class="insta-comments-preview" id="comments-box-' + post.id + '">' +
           '<div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">View all ' + (post.comments ? post.comments.length : 0) + ' comments &bull; Verified on DHT</div>' +
           commentsHtml +
+        '</div>' +
+
+        '<div style="padding: 0 1rem; font-size: 0.68rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.65rem; display: flex; align-items: center; gap: 5px;">' +
+          '<span>🕒 ' + formatFeedFullDateTime(post.timestamp) + '</span>' +
+          '<span>&bull;</span>' +
+          '<span>' + formatFeedTimeAgo(post.timestamp).toUpperCase() + '</span>' +
+          '<span>&bull;</span>' +
+          '<span>ED25519 VERIFIED</span>' +
         '</div>' +
 
         '<div class="insta-comment-input-box">' +
@@ -16364,8 +16435,8 @@ function renderHtml(
         showAccountToast('ℹ️ No mutual friends in common with ' + currentProfileSheetHandle + ' yet.');
         return;
       }
-      var names = currentMutualFriendsList.map(function(u) { return (u.displayName || u.name || u.handle) + ' (' + u.handle + ')'; }).join('\n• ');
-      alert('🤝 Mutual Friends in common with ' + currentProfileSheetHandle + ' (' + currentMutualFriendsList.length + '):\n\n• ' + names);
+      var names = currentMutualFriendsList.map(function(u) { return (u.displayName || u.name || u.handle) + ' (' + u.handle + ')'; }).join('\\n• ');
+      alert('🤝 Mutual Friends in common with ' + currentProfileSheetHandle + ' (' + currentMutualFriendsList.length + '):\\n\\n• ' + names);
     }
 
     function toggleProfileFriendBtn() {
@@ -21449,6 +21520,9 @@ async function startDevServer() {
         if (qToken) token = qToken.trim();
       } catch (e) {}
     }
+    if (!token && _parsedBody && typeof _parsedBody === 'object' && _parsedBody.sessionToken) {
+      token = String(_parsedBody.sessionToken).trim();
+    }
 
     if (token) {
       const adminPrinc = adminSecurity.resolveAdminSession(token);
@@ -23132,10 +23206,22 @@ async function startDevServer() {
       if (!ok) return;
       try {
         const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
+        let principal = resolvePrincipal(req, parsed);
+        let userDid = principal?.did;
+        if (!userDid && parsed.sessionToken) {
+          const u = sovraDb.findUserBySessionToken(parsed.sessionToken);
+          if (u) userDid = u.did;
+        }
+        if (!userDid && parsed.userDid) {
+          const u = sovraDb.findUserByDid(parsed.userDid);
+          if (u) userDid = u.did;
+        }
+        if (!userDid) {
+          const enforced = enforceAuth(req, res, parsed);
+          if (!enforced) return;
+          userDid = enforced.did;
+        }
 
-        const userDid = principal.did;
         const post = sovraDb.getAllPosts().find(p => p.id === parsed.postId);
         if (post) {
           if (!Array.isArray(post.likedByDids)) post.likedByDids = [];

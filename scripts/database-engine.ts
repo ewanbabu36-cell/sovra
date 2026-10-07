@@ -373,6 +373,7 @@ export interface FeedPostRecord {
   surveyData?: SurveyData;
   moodData?: MoodData;
   ratingData?: RatingData;
+  updatedAt?: number;
   linkData?: LinkData;
   articleData?: ArticleData;
   discussionData?: DiscussionData;
@@ -3250,6 +3251,7 @@ export class SovraDatabaseEngine {
     if (post.authorDid !== authorDid) return { ok: false, error: 'Unauthorized: Only author can edit post' };
     if (typeof updates.caption === 'string') post.caption = updates.caption;
     if (typeof updates.tags === 'string') post.tags = updates.tags;
+    post.updatedAt = Date.now();
     this.save();
     return { ok: true, post };
   }
