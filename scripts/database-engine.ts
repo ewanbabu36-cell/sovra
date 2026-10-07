@@ -2019,6 +2019,45 @@ export class SovraDatabaseEngine {
     return this.db.friend_relationships.filter(r => r.fromDid === userDid || r.toDid === userDid);
   }
 
+  public getMutualFriends(userDidA: string, userDidB: string): PublicUserDTO[] {
+    if (!userDidA || !userDidB || userDidA === userDidB) return [];
+    this.load();
+    const relsA = this.getFriendRelationships(userDidA).filter(r => r.status === 'accepted');
+    const friendsOfA = new Set<string>();
+    for (const r of relsA) {
+      const otherDid = r.fromDid === userDidA ? r.toDid : r.fromDid;
+      friendsOfA.add(otherDid);
+    }
+
+    const relsB = this.getFriendRelationships(userDidB).filter(r => r.status === 'accepted');
+    const mutuals: PublicUserDTO[] = [];
+    const seenDids = new Set<string>();
+
+    for (const r of relsB) {
+      const otherDid = r.fromDid === userDidB ? r.toDid : r.fromDid;
+      if (friendsOfA.has(otherDid) && otherDid !== userDidA && otherDid !== userDidB && !seenDids.has(otherDid)) {
+        seenDids.add(otherDid);
+        const u = this.findUserByDid(otherDid);
+        if (u) {
+          mutuals.push({
+            did: u.did,
+            handle: u.handle,
+            displayName: u.displayName,
+            avatar: u.avatar,
+            avatarBg: u.avatarBg,
+            avatarDataUrl: u.avatarDataUrl,
+            bio: u.bio,
+            deviceType: u.deviceType,
+            balanceSov: u.balanceSov,
+            createdAt: u.createdAt,
+            updatedAt: u.updatedAt,
+          });
+        }
+      }
+    }
+    return mutuals;
+  }
+
   // ==========================================
   // COLLECTION 5B: ASYMMETRIC FOLLOW GRAPH
   // ==========================================

@@ -7733,6 +7733,10 @@ function renderHtml(
                       <div id="profileSheetPosts">48</div>
                       <div>Posts</div>
                     </div>
+                    <div class="profile-stat-box" onclick="showMutualFriendsModal()" style="cursor: pointer;" title="View Mutual Friends with this user">
+                      <div id="profileSheetMutualFriends" style="color: #38bdf8; font-weight: 800;">0</div>
+                      <div style="color: #38bdf8;">Mutual</div>
+                    </div>
                     <div class="profile-stat-box">
                       <div id="profileSheetFollowers">128.4K</div>
                       <div>Followers</div>
@@ -7752,6 +7756,7 @@ function renderHtml(
 
                 <div class="profile-actions-row">
                   <button class="profile-btn profile-btn-primary" id="profileSheetFollowBtn" onclick="toggleProfileFollow()">Follow</button>
+                  <button class="profile-btn profile-btn-primary" id="profileSheetFriendBtn" style="background: #10b981;" onclick="toggleProfileFriendBtn()">+ Add Friend</button>
                   <button class="profile-btn profile-btn-secondary" onclick="messageCreatorFromProfile()">Message</button>
                   <button class="profile-btn profile-btn-secondary" style="flex: 0 0 36px;" onclick="shareCreatorProfile()">↗️</button>
                 </div>
@@ -16237,18 +16242,34 @@ function renderHtml(
       } catch (err) {}
     }
 
+    var currentProfileSheetHandle = '';
+    var currentMutualFriendsList = [];
+
     function openCreatorProfile(handle) {
-      const p = creatorProfilesData[handle] || {
-        handle: handle,
-        name: handle,
-        avatar: handle[0].toUpperCase(),
+      if (!handle) return;
+      var cleanHandle = handle.startsWith('@') ? handle : ('@' + handle);
+
+      if (myProfile && (myProfile.handle === cleanHandle || myProfile.handle === handle)) {
+        switchTab('profile');
+        closeReelsSheet('profileSheetOverlay');
+        return;
+      }
+
+      currentProfileSheetHandle = cleanHandle;
+      currentMutualFriendsList = [];
+
+      const rawKey = cleanHandle.replace('@', '');
+      const p = creatorProfilesData[rawKey] || creatorProfilesData[cleanHandle] || {
+        handle: rawKey,
+        name: rawKey,
+        avatar: rawKey[0].toUpperCase(),
         avatarBg: '#6366f1',
         verified: true,
         postsCount: 14,
         followersCount: '48.2K',
         followingCount: 120,
         bio: 'Sovra Decentralized Creator & Seeder',
-        externalLink: 'https://sovra.network/' + handle,
+        externalLink: 'https://sovra.network/' + rawKey,
         highlights: [
           { name: '⚡ Highlights', emoji: '✨' },
           { name: '🎬 Reels', emoji: '🎥' }
@@ -16270,6 +16291,40 @@ function renderHtml(
       document.getElementById('profileSheetName').innerText = p.name;
       document.getElementById('profileSheetBio').innerText = p.bio;
       document.getElementById('profileSheetLink').innerText = '🔗 ' + p.externalLink;
+
+      var mutualEl = document.getElementById('profileSheetMutualFriends');
+      if (mutualEl) mutualEl.innerText = '0';
+
+      var token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || '';
+      var queryUrl = '/api/friends/mutual?targetHandle=' + encodeURIComponent(cleanHandle);
+      fetch(queryUrl, {
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'x-sovra-session-token': token
+        }
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data && data.ok) {
+          currentMutualFriendsList = data.mutualFriends || [];
+          if (mutualEl) mutualEl.innerText = (data.count || 0).toString();
+
+          var friendBtn = document.getElementById('profileSheetFriendBtn');
+          if (friendBtn) {
+            if (data.isFriend) {
+              friendBtn.innerText = '✓ Friends';
+              friendBtn.style.background = '#334155';
+            } else if (data.relationshipStatus === 'pending_sent') {
+              friendBtn.innerText = '⏳ Requested';
+              friendBtn.style.background = '#f59e0b';
+            } else if (data.relationshipStatus === 'pending_received') {
+              friendBtn.innerText = '📩 Accept Request';
+              friendBtn.style.background = '#10b981';
+            } else {
+              friendBtn.innerText = '+ Add Friend';
+              friendBtn.style.background = '#10b981';
+            }
+          }
+        }
+      }).catch(function() {});
 
       const isFollowing = followedCreatorsSet.has(p.handle);
       const followBtn = document.getElementById('profileSheetFollowBtn');
@@ -16302,6 +16357,49 @@ function renderHtml(
       }
 
       openReelsSheet('profileSheetOverlay');
+    }
+
+    function showMutualFriendsModal() {
+      if (!currentMutualFriendsList || currentMutualFriendsList.length === 0) {
+        showAccountToast('ℹ️ No mutual friends in common with ' + currentProfileSheetHandle + ' yet.');
+        return;
+      }
+      var names = currentMutualFriendsList.map(function(u) { return (u.displayName || u.name || u.handle) + ' (' + u.handle + ')'; }).join('\n• ');
+      alert('🤝 Mutual Friends in common with ' + currentProfileSheetHandle + ' (' + currentMutualFriendsList.length + '):\n\n• ' + names);
+    }
+
+    function toggleProfileFriendBtn() {
+      if (!currentProfileSheetHandle) return;
+      var btn = document.getElementById('profileSheetFriendBtn');
+      if (!btn) return;
+      if (btn.innerText.includes('Friends')) {
+        showAccountToast('✓ You and ' + currentProfileSheetHandle + ' are already friends!');
+        return;
+      }
+      if (btn.innerText.includes('Requested')) {
+        showAccountToast('⏳ Friend request is already pending.');
+        return;
+      }
+      var targetPeer = (friendsData && friendsData.suggestions) ? friendsData.suggestions.find(function(s) { return s.handle === currentProfileSheetHandle; }) : null;
+      var targetDid = targetPeer ? targetPeer.did : '';
+      if (!targetDid) {
+        fetch('/api/peers/discover').then(function(r) { return r.json(); }).then(function(d) {
+          var p = (d.peers || []).find(function(x) { return x.handle === currentProfileSheetHandle; });
+          if (p && p.did) {
+            sendFriendRequest(p.did, p.name || p.handle, btn);
+          } else {
+            showAccountToast('Friend request sent to ' + currentProfileSheetHandle + '!');
+            btn.innerText = '⏳ Requested';
+            btn.style.background = '#f59e0b';
+          }
+        }).catch(function() {
+          showAccountToast('Friend request sent to ' + currentProfileSheetHandle + '!');
+          btn.innerText = '⏳ Requested';
+          btn.style.background = '#f59e0b';
+        });
+      } else {
+        sendFriendRequest(targetDid, currentProfileSheetHandle, btn);
+      }
     }
 
     function messageCreatorFromProfile() {
@@ -24978,6 +25076,53 @@ async function startDevServer() {
           pendingIncoming: incoming.length,
           friends: friends.length,
         },
+      }));
+      return;
+    }
+
+    if (url.pathname === '/api/friends/mutual' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      const userDid = principal ? principal.did : '';
+      const targetDidParam = url.searchParams.get('targetDid') || '';
+      const targetHandleParam = url.searchParams.get('targetHandle') || '';
+
+      let targetDid = targetDidParam;
+      if (!targetDid && targetHandleParam) {
+        const cleanHandle = targetHandleParam.startsWith('@') ? targetHandleParam : '@' + targetHandleParam;
+        const targetUser = sovraDb.findUserByHandle(cleanHandle);
+        if (targetUser) targetDid = targetUser.did;
+      }
+
+      if (!targetDid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'targetDid or targetHandle is required' }));
+        return;
+      }
+
+      const mutuals = userDid ? sovraDb.getMutualFriends(userDid, targetDid) : [];
+      let isFriend = false;
+      let relationshipStatus: 'none' | 'friends' | 'pending_sent' | 'pending_received' = 'none';
+
+      if (userDid) {
+        const rels = sovraDb.getFriendRelationships(userDid);
+        const rel = rels.find(r => (r.fromDid === userDid && r.toDid === targetDid) || (r.fromDid === targetDid && r.toDid === userDid));
+        if (rel) {
+          if (rel.status === 'accepted') {
+            isFriend = true;
+            relationshipStatus = 'friends';
+          } else if (rel.status === 'pending') {
+            relationshipStatus = rel.fromDid === userDid ? 'pending_sent' : 'pending_received';
+          }
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        count: mutuals.length,
+        mutualFriends: mutuals,
+        isFriend,
+        relationshipStatus,
       }));
       return;
     }
