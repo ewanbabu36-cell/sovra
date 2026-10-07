@@ -2197,7 +2197,7 @@ function renderHtml(
     /* Top Prominent Search Bar (Expansive, Wide & Unsquished) */
     .header-search-wrap {
       flex: 1;
-      min-width: 220px;
+      min-width: 140px;
       max-width: 520px;
       position: relative;
     }
@@ -2207,9 +2207,10 @@ function renderHtml(
       background: rgba(255, 255, 255, 0.07);
       border: 1px solid rgba(255, 255, 255, 0.16);
       border-radius: 20px;
-      padding: 0.45rem 1rem;
-      gap: 0.6rem;
+      padding: 0.45rem 0.85rem;
+      gap: 0.5rem;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      min-width: 0;
     }
     .header-search-bar:focus-within {
       background: rgba(17, 24, 39, 0.95);
@@ -2223,9 +2224,16 @@ function renderHtml(
       font-size: 0.84rem;
       outline: none;
       width: 100%;
+      min-width: 0;
+      text-overflow: ellipsis;
     }
     .header-search-input::placeholder {
       color: #94a3b8;
+    }
+    @media (max-width: 1024px) {
+      .search-kbd-shortcut {
+        display: none !important;
+      }
     }
     .header-search-dropdown {
       position: absolute;
@@ -6963,7 +6971,7 @@ function renderHtml(
         <div class="header-search-wrap">
           <div class="header-search-bar" onclick="document.getElementById('headerFriendSearchInput').focus()">
             <span style="font-size: 0.95rem; color: #38bdf8;">🔍</span>
-            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, @handle, channels, tags..." aria-label="Search friends, channels, and tags" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
+            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, mesh, tags..." aria-label="Search friends, channels, and tags" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
             <kbd class="search-kbd-shortcut" onclick="openOmniSearch(); event.stopPropagation();" title="Omni-Search (Ctrl+K)" aria-label="Open Omni-Search shortcut">Ctrl K</kbd>
             <button id="headerSearchClearBtn" onclick="clearHeaderSearch(); event.stopPropagation();" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.8rem;" aria-label="Clear search input">✕</button>
           </div>
@@ -11229,6 +11237,20 @@ function renderHtml(
         if (cardDeviceKey) { cardDeviceKey.innerText = '—'; cardDeviceKey.dataset.fullValue = ''; }
         const composerAvatar = document.querySelector('.composer-avatar');
         if (composerAvatar) { composerAvatar.innerText = '?'; composerAvatar.style.background = '#475569'; }
+        const composerAuthorSelect = document.getElementById('composerAuthorSelect');
+        if (composerAuthorSelect) {
+          const selfOpt = composerAuthorSelect.querySelector('option[value="personal:self"]');
+          if (selfOpt) selfOpt.textContent = '👤 Guest Profile (@guest)';
+        }
+        const composerAuthorAvatar = document.getElementById('composerAuthorAvatar');
+        if (composerAuthorAvatar) { composerAuthorAvatar.innerText = '?'; composerAuthorAvatar.style.background = '#475569'; }
+        const composerEntityHandle = document.getElementById('composerEntityHandle');
+        if (composerEntityHandle) composerEntityHandle.innerText = '@guest';
+        const composerEntityBadge = document.getElementById('composerEntityBadge');
+        if (composerEntityBadge) {
+          composerEntityBadge.className = 'badge badge-personal';
+          composerEntityBadge.innerText = '👤 Guest';
+        }
         const myStoryAvatar = document.getElementById('myStoryAvatar');
         if (myStoryAvatar) { myStoryAvatar.innerText = '?'; myStoryAvatar.style.background = '#475569'; }
         const coverEl = document.getElementById('meProfileCover');
@@ -11376,22 +11398,21 @@ function renderHtml(
         cardDeviceKey.dataset.fullValue = dKey;
       }
 
-      const composerAvatar = document.querySelector('.composer-avatar');
-      if (composerAvatar) {
-        if (myProfile.avatarDataUrl) {
-          composerAvatar.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
-        } else {
-          composerAvatar.innerText = myProfile.avatar || 'S';
-          if (myProfile.avatarBg) composerAvatar.style.background = myProfile.avatarBg;
+      const composerAuthorSelect = document.getElementById('composerAuthorSelect');
+      if (composerAuthorSelect) {
+        const selfOpt = composerAuthorSelect.querySelector('option[value="personal:self"]');
+        if (selfOpt) {
+          selfOpt.textContent = '👤 ' + (myProfile.displayName || myProfile.name || 'Personal Profile') + ' (' + (myProfile.handle || '@you') + ')';
         }
       }
+      handleComposerAuthorChange(composerAuthorSelect ? composerAuthorSelect.value : 'personal:self');
 
       const myStoryAvatar = document.getElementById('myStoryAvatar');
       if (myStoryAvatar) {
         if (myProfile.avatarDataUrl) {
           myStoryAvatar.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
         } else {
-          myStoryAvatar.innerText = myProfile.avatar || 'S';
+          myStoryAvatar.innerText = (myProfile.displayName || myProfile.name) ? (myProfile.displayName || myProfile.name).charAt(0).toUpperCase() : (myProfile.avatar || 'S');
           if (myProfile.avatarBg) myStoryAvatar.style.background = myProfile.avatarBg;
         }
       }
@@ -12139,12 +12160,12 @@ function renderHtml(
 
       function renderPhrase(phrase) {
         if (!phrase) return;
-        var words = phrase.trim().split(/\s+/);
+        var words = phrase.trim().split(/[ \t\r\n]+/).filter(Boolean);
         var html = '';
         for (var i = 0; i < words.length; i++) {
-          html += '<div style="background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px;">' +
-            '<span style="font-size: 0.7rem; color: #64748b; font-weight: 700; width: 16px;">' + (i + 1) + '.</span>' +
-            '<span style="font-size: 0.82rem; font-family: monospace; color: #38bdf8; font-weight: 600;">' + words[i] + '</span>' +
+          html += '<div style="background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden;">' +
+            '<span style="font-size: 0.7rem; color: #64748b; font-weight: 700; width: 18px; flex-shrink: 0;">' + (i + 1) + '.</span>' +
+            '<span style="font-size: 0.82rem; font-family: monospace; color: #38bdf8; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + words[i] + '</span>' +
             '</div>';
         }
         grid.innerHTML = html;
@@ -13353,9 +13374,9 @@ function renderHtml(
       const captionEl = document.getElementById('dynamicPostCaption');
 
       if (!val || val === 'personal:self') {
-        const pAvatar = (typeof myProfile !== 'undefined' && myProfile) ? (myProfile.avatar || 'S') : 'S';
+        const pAvatar = (typeof myProfile !== 'undefined' && myProfile) ? ((myProfile.displayName || myProfile.name) ? (myProfile.displayName || myProfile.name).charAt(0).toUpperCase() : (myProfile.avatar || 'S')) : 'S';
         const pBg = (typeof myProfile !== 'undefined' && myProfile) ? (myProfile.avatarBg || '#6366f1') : '#6366f1';
-        const pHandle = (typeof myProfile !== 'undefined' && myProfile) ? myProfile.handle : '@you';
+        const pHandle = (typeof myProfile !== 'undefined' && myProfile) ? (myProfile.handle || '@you') : '@you';
         if (avatarEl) {
           avatarEl.style.background = pBg;
           avatarEl.innerHTML = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) ? '<img src="' + myProfile.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />' : pAvatar;
@@ -16518,7 +16539,7 @@ function renderHtml(
           directContactsMap.set(p.did, {
             did: p.did,
             name: p.name,
-            handle: p.handle || ('@' + p.name.toLowerCase().replace(/\s+/g, '_')),
+            handle: p.handle || ('@' + p.name.toLowerCase().replace(/[ \t\r\n]+/g, '_')),
             avatar: p.avatar,
             avatarDataUrl: p.avatarDataUrl,
             avatarBg: p.avatarBg || '#ec4899',
@@ -16834,7 +16855,7 @@ function renderHtml(
           matchedPerson = dynamicCatalogPeople.find(function(p) { return p.pubkey === targetDid || p.did === targetDid; });
         }
         const displayName = targetName || (matchedPerson ? matchedPerson.name : '') || (targetHandle ? targetHandle.replace(/^@/, '') : 'Peer');
-        const handle = targetHandle || (matchedPerson ? matchedPerson.handle : '') || ('@' + displayName.toLowerCase().replace(/\s+/g, '_'));
+        const handle = targetHandle || (matchedPerson ? matchedPerson.handle : '') || ('@' + displayName.toLowerCase().replace(/[ \t\r\n]+/g, '_'));
 
         contact = {
           did: targetDid,
@@ -19091,7 +19112,7 @@ function renderHtml(
       ? contactsData.map(function(c) {
           return {
             pubkey: c.did,
-            handle: c.handle || ('@' + (c.name || 'peer').toLowerCase().replace(/\s+/g, '_')),
+            handle: c.handle || ('@' + (c.name || 'peer').toLowerCase().replace(/[ \t\r\n]+/g, '_')),
             name: c.name || 'Sovereign Peer',
             bio: c.role || 'Decentralized P2P Peer',
             avatar: c.avatar || ((c.name && c.name[0]) ? c.name[0].toUpperCase() : 'P'),
