@@ -8774,6 +8774,10 @@ function renderHtml(
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #94a3b8;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
                     <span>Account &amp; Security Settings</span>
                   </div>
+                  <div class="overflow-menu-item" id="profileMfaBtn" role="menuitem" tabindex="0" onclick="openSovereignMfaModal(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="11" r="3"/><path d="M12 14v2"/></svg>
+                    <span>🛡️ Authenticator 2FA &amp; PIN</span>
+                  </div>
                   <div class="overflow-menu-item" role="menuitem" tabindex="0" onclick="openConnectedDevicesView(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a78bfa;"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
                     <span>Connected Devices &amp; Sessions</span>
@@ -9750,6 +9754,15 @@ function renderHtml(
             </div>
           </div>
 
+          <!-- Sovereign Authenticator (TOTP) & 2FA -->
+          <div onclick="closeAccountLifecycleModal(); openSovereignMfaModal();" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 0.85rem 1rem; border-radius: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+            <div style="flex: 1;">
+              <div style="font-weight: 700; font-size: 0.9rem; color: #10b981;">🛡️ Sovereign Authenticator 2FA &amp; PIN</div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Google Authenticator, Microsoft Authenticator &amp; PIN management.</div>
+            </div>
+            <span style="color: #10b981; font-size: 1.1rem;">→</span>
+          </div>
+
           <!-- Connected Devices & Remote Logout -->
           <div onclick="switchAlmView('devices')" style="background: #1e293b; border: 1px solid #334155; padding: 0.85rem 1rem; border-radius: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
             <div>
@@ -9875,6 +9888,133 @@ function renderHtml(
             Yes, Wipe Device
           </button>
         </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 🛡️ SOVEREIGN MFA / TOTP & SECURITY PIN MODAL -->
+  <div id="sovereignMfaModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(14px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; max-width: 480px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; max-height: 90vh; overflow-y: auto;">
+      
+      <!-- Modal Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div style="font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+          <span style="color: #10b981;">🛡️</span> <span>Sovereign 2FA &amp; Security PIN</span>
+        </div>
+        <button onclick="closeSovereignMfaModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; padding: 4px;" aria-label="Close modal">✕</button>
+      </div>
+
+      <!-- Live Notice Toast inside Modal -->
+      <div id="mfaModalNotice" style="display: none; padding: 0.65rem 1rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: center;"></div>
+
+      <!-- Tab Switcher -->
+      <div style="display: flex; gap: 0.4rem; margin-bottom: 1.25rem; background: #1e293b; padding: 4px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+        <button id="mfaTabTotpBtn" onclick="switchMfaTab('totp')" style="flex: 1; padding: 0.5rem 0.6rem; background: #3b82f6; color: #fff; border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
+          Authenticator
+        </button>
+        <button id="mfaTabPinBtn" onclick="switchMfaTab('pin')" style="flex: 1; padding: 0.5rem 0.6rem; background: transparent; color: #94a3b8; border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
+          Security PIN
+        </button>
+        <button id="mfaTabRecoveryBtn" onclick="switchMfaTab('recovery')" style="flex: 1; padding: 0.5rem 0.6rem; background: transparent; color: #94a3b8; border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
+          Recovery Seed
+        </button>
+      </div>
+
+      <!-- SECTION 1: TOTP AUTHENTICATOR -->
+      <div id="mfaSectionTotp">
+        <!-- Status indicator badge -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 0.75rem 1rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.06);">
+          <div>
+            <div style="font-weight: 700; font-size: 0.88rem;">2-Factor Authentication (TOTP)</div>
+            <div style="font-size: 0.75rem; color: #94a3b8;">Google / Microsoft / Apple Authenticator</div>
+          </div>
+          <span id="mfaTotpBadge" style="font-size: 0.72rem; padding: 4px 10px; border-radius: 6px; font-weight: 700; background: rgba(239, 68, 68, 0.2); color: #f87171;">Disabled</span>
+        </div>
+
+        <!-- Setup View (When Disabled) -->
+        <div id="mfaTotpSetupView">
+          <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 1rem 0;">
+            Scan this QR code with <b>Google Authenticator</b>, <b>Microsoft Authenticator</b>, or <b>Apple Passwords</b>, then enter the 6-digit rolling code to activate.
+          </p>
+          
+          <div style="display: flex; flex-direction: column; align-items: center; background: #ffffff; padding: 1rem; border-radius: 16px; margin-bottom: 1rem; width: fit-content; margin-left: auto; margin-right: auto;">
+            <div id="mfaTotpQrContainer" style="width: 147px; height: 147px; display: flex; align-items: center; justify-content: center;">
+              <span style="color: #64748b; font-size: 0.8rem;">Generating QR...</span>
+            </div>
+          </div>
+
+          <div style="background: #1e293b; border: 1px solid #334155; padding: 0.75rem 1rem; border-radius: 12px; margin-bottom: 1rem;">
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px; font-weight: 600;">CANNOT SCAN? ENTER KEY MANUALLY:</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <code id="mfaTotpSecretKey" style="font-family: monospace; font-size: 0.88rem; color: #38bdf8; word-break: break-all; letter-spacing: 0.05rem;">----------------</code>
+              <button onclick="copyTotpSecretKey()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 4px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">📋 Copy</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Enter 6-Digit Authenticator Code to Confirm:</label>
+            <input type="text" id="mfaTotpVerifyInput" maxlength="6" placeholder="000000" style="width: 100%; padding: 10px 12px; background: #1e293b; border: 1px solid #334155; border-radius: 10px; color: #fff; font-size: 1.1rem; text-align: center; letter-spacing: 0.25rem; box-sizing: border-box; outline: none;">
+          </div>
+
+          <button id="mfaTotpVerifyBtn" onclick="submitVerifyTotpSetup()" style="width: 100%; padding: 0.8rem; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>Verify &amp; Activate 2FA</span> <span>✓</span>
+          </button>
+        </div>
+
+        <!-- Active View (When Enabled) -->
+        <div id="mfaTotpActiveView" style="display: none;">
+          <div style="text-align: center; padding: 1.25rem 0; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 14px; margin-bottom: 1rem;">
+            <div style="font-size: 2rem; margin-bottom: 0.4rem;">🔒</div>
+            <div style="font-weight: 800; color: #34d399; font-size: 1rem;">2FA Protection is Active</div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px; padding: 0 1rem;">Every sign-in to this identity requires your 6-digit rolling Authenticator code.</div>
+          </div>
+
+          <div style="background: #1e293b; border: 1px solid #334155; padding: 1rem; border-radius: 14px;">
+            <div style="font-weight: 700; font-size: 0.85rem; color: #ef4444; margin-bottom: 6px;">Disable 2FA Protection</div>
+            <p style="font-size: 0.75rem; color: #94a3b8; margin: 0 0 0.75rem 0;">To disable 2FA, enter your 6-digit Security PIN.</p>
+            <input type="password" id="mfaDisablePinInput" maxlength="8" placeholder="Enter Security PIN" style="width: 100%; padding: 9px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.9rem; margin-bottom: 0.75rem; box-sizing: border-box; outline: none;">
+            <button id="mfaDisableTotpBtn" onclick="submitDisableTotp()" style="width: 100%; padding: 0.7rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">
+              Disable Authenticator 2FA
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: SECURITY PIN -->
+      <div id="mfaSectionPin" style="display: none;">
+        <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 1rem 0;">
+          Your 6-digit Sovereign Security PIN safeguards sensitive operations and acts as the primary login factor when 2FA is off.
+        </p>
+
+        <div style="margin-bottom: 0.9rem;">
+          <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Current Security PIN:</label>
+          <input type="password" id="mfaOldPinInput" maxlength="8" placeholder="Current PIN (Default: 123456)" style="width: 100%; padding: 10px 12px; background: #1e293b; border: 1px solid #334155; border-radius: 10px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+        </div>
+
+        <div style="margin-bottom: 1.25rem;">
+          <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">New Security PIN (4 to 8 digits):</label>
+          <input type="password" id="mfaNewPinInput" maxlength="8" placeholder="Enter new PIN" style="width: 100%; padding: 10px 12px; background: #1e293b; border: 1px solid #334155; border-radius: 10px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+        </div>
+
+        <button id="mfaUpdatePinBtn" onclick="submitUpdatePin()" style="width: 100%; padding: 0.8rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>Update Security PIN</span> <span>✓</span>
+        </button>
+      </div>
+
+      <!-- SECTION 3: RECOVERY SEED -->
+      <div id="mfaSectionRecovery" style="display: none;">
+        <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 1rem 0;">
+          Write down these <b>12 cryptographic recovery words</b> and store them safely offline. If you lose access to your Authenticator app or device, these words can restore your identity.
+        </p>
+
+        <div id="mfaRecoveryWordsGrid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem; background: #1e293b; padding: 1rem; border-radius: 14px; border: 1px solid #334155;">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <button onclick="copyRecoveryPhrase()" style="width: 100%; padding: 0.75rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>📋 Copy 12-Word Recovery Phrase</span>
+        </button>
       </div>
 
     </div>
@@ -10295,7 +10435,7 @@ function renderHtml(
             </div>
 
             <!-- Handle Input with Live Duplicate Check -->
-            <div style="margin-bottom: 1rem; text-align: left;">
+            <div style="margin-bottom: 0.9rem; text-align: left;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                 <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Choose Sovereign Handle</label>
                 <span id="womHandleFeedback" style="font-size: 0.72rem; color: #94a3b8;">Checked on P2P Mesh</span>
@@ -10304,6 +10444,19 @@ function renderHtml(
                 <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
                 <input type="text" id="womHandleInput" placeholder="username (e.g. rahul_phone)" oninput="validateWomHandleLive(this.value)" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
               </div>
+            </div>
+
+            <!-- Create 6-Digit Security PIN (Authentication Factor) -->
+            <div style="margin-bottom: 0.9rem; text-align: left;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Create 6-Digit Security PIN</label>
+                <span style="font-size: 0.72rem; color: #10b981;">Protects Account</span>
+              </div>
+              <div style="position: relative;">
+                <span style="position: absolute; left: 12px; top: 11px; color: #94a3b8; font-size: 0.9rem;">🔒</span>
+                <input type="password" id="womRegisterPinInput" maxlength="6" placeholder="6-digit PIN (default: 123456)" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
+              </div>
+              <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 4px;">Required alongside your handle so only you can access your account.</div>
             </div>
 
             <!-- Optional Profile Photo Upload Row -->
@@ -10334,13 +10487,26 @@ function renderHtml(
           <div id="womLoginForm" style="display: none;">
             <div id="womLoginErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
 
-            <div style="margin-bottom: 1.25rem; text-align: left;">
+            <!-- Identifier: Handle or DID -->
+            <div style="margin-bottom: 0.9rem; text-align: left;">
               <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Your Sovereign Handle or DID</label>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-                <input type="text" id="womLoginHandleInput" placeholder="username (e.g. laptop_host or rahul_phone)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+                <input type="text" id="womLoginHandleInput" placeholder="username (e.g. laptop_host or rahul_phone)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
               </div>
-              <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 5px;">Enter your handle or W3C Ed25519 DID to authenticate your session.</div>
+            </div>
+
+            <!-- Factor: 6-Digit PIN or Google Authenticator Code -->
+            <div style="margin-bottom: 1.25rem; text-align: left;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">6-Digit PIN or Authenticator Code</label>
+                <span style="font-size: 0.72rem; color: #38bdf8;">Google / MS Auth / PIN</span>
+              </div>
+              <div style="position: relative;">
+                <span style="position: absolute; left: 12px; top: 11px; color: #94a3b8; font-size: 0.9rem;">🔐</span>
+                <input type="password" id="womLoginPinInput" maxlength="6" placeholder="•••••• (Default: 123456)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
+              </div>
+              <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 5px;">Enter your 6-digit Security PIN or rolling Google Authenticator code.</div>
             </div>
 
             <button id="womLoginSubmitBtn" onclick="triggerUserLogin()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4); margin-bottom: 0.75rem;">
@@ -11316,6 +11482,7 @@ function renderHtml(
 
     async function triggerUserLogin() {
       const input = document.getElementById('womLoginHandleInput');
+      const pinInput = document.getElementById('womLoginPinInput');
       const errBox = document.getElementById('womLoginErrorMsg');
       const btn = document.getElementById('womLoginSubmitBtn');
       if (!input) return;
@@ -11330,6 +11497,7 @@ function renderHtml(
       if (!identifier.startsWith('@') && !identifier.startsWith('did:')) {
         identifier = '@' + identifier;
       }
+      const pinVal = pinInput ? pinInput.value.trim() : '';
       if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<span>Verifying cryptographic credentials...</span>';
@@ -11338,12 +11506,17 @@ function renderHtml(
         const res = await fetch('/api/user/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: identifier, device: isMobileDevice ? 'Mobile' : 'Desktop' })
+          body: JSON.stringify({
+            identifier: identifier,
+            pin: pinVal,
+            totpCode: pinVal,
+            device: isMobileDevice ? 'Mobile' : 'Desktop'
+          })
         });
         const data = await res.json();
         if (!res.ok || !data.ok || !data.user) {
           if (errBox) {
-            errBox.innerText = data.error || 'User not found. Please check your handle or create an account.';
+            errBox.innerText = data.error || 'Authentication failed. Please check your credentials.';
             errBox.style.display = 'block';
           }
           return;
@@ -11668,6 +11841,298 @@ function renderHtml(
         if (typeof renderTrendingHashtags === 'function') renderTrendingHashtags();
       }, 30000);
     });
+
+    // ==========================================
+    // 🛡️ SOVEREIGN 2FA / TOTP & SECURITY PIN LOGIC
+    // ==========================================
+    var currentTotpSecret = '';
+
+    function openSovereignMfaModal(event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      var m = document.getElementById('sovereignMfaModal');
+      if (m) {
+        m.style.zIndex = '100000';
+        m.style.display = 'flex';
+      }
+      switchMfaTab('totp');
+      clearMfaNotice();
+      loadTotpSetupData();
+      renderMfaRecoveryPhrase();
+    }
+
+    function closeSovereignMfaModal() {
+      var m = document.getElementById('sovereignMfaModal');
+      if (m) m.style.display = 'none';
+      clearMfaNotice();
+    }
+
+    function showMfaNotice(msg, isSuccess) {
+      var box = document.getElementById('mfaModalNotice');
+      if (!box) return;
+      box.innerText = msg;
+      box.style.display = 'block';
+      if (isSuccess) {
+        box.style.background = 'rgba(16, 185, 129, 0.15)';
+        box.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+        box.style.color = '#34d399';
+      } else {
+        box.style.background = 'rgba(239, 68, 68, 0.15)';
+        box.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+        box.style.color = '#f87171';
+      }
+    }
+
+    function clearMfaNotice() {
+      var box = document.getElementById('mfaModalNotice');
+      if (box) {
+        box.style.display = 'none';
+        box.innerText = '';
+      }
+    }
+
+    function switchMfaTab(tab) {
+      var tabs = ['totp', 'pin', 'recovery'];
+      tabs.forEach(function(t) {
+        var btn = document.getElementById('mfaTab' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
+        var section = document.getElementById('mfaSection' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (btn) {
+          if (t === tab) {
+            btn.style.background = '#3b82f6';
+            btn.style.color = '#fff';
+          } else {
+            btn.style.background = 'transparent';
+            btn.style.color = '#94a3b8';
+          }
+        }
+        if (section) {
+          section.style.display = (t === tab) ? 'block' : 'none';
+        }
+      });
+      clearMfaNotice();
+    }
+
+    function updateMfaStatusView(isEnabled) {
+      var badge = document.getElementById('mfaTotpBadge');
+      var setupView = document.getElementById('mfaTotpSetupView');
+      var activeView = document.getElementById('mfaTotpActiveView');
+      if (badge) {
+        if (isEnabled) {
+          badge.innerText = '● Active';
+          badge.style.background = 'rgba(16, 185, 129, 0.2)';
+          badge.style.color = '#10b981';
+        } else {
+          badge.innerText = 'Disabled';
+          badge.style.background = 'rgba(239, 68, 68, 0.2)';
+          badge.style.color = '#f87171';
+        }
+      }
+      if (setupView) setupView.style.display = isEnabled ? 'none' : 'block';
+      if (activeView) activeView.style.display = isEnabled ? 'block' : 'none';
+
+      if (myProfile) myProfile.totpEnabled = isEnabled;
+    }
+
+    async function loadTotpSetupData() {
+      var token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : '') || '';
+      try {
+        var res = await fetch('/api/auth/totp/setup', {
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'x-sovra-session-token': token
+          }
+        });
+        var data = await res.json();
+        if (data && data.ok) {
+          currentTotpSecret = data.secret || '';
+          var secretEl = document.getElementById('mfaTotpSecretKey');
+          if (secretEl) secretEl.innerText = data.secret;
+          var qrContainer = document.getElementById('mfaTotpQrContainer');
+          if (qrContainer && data.otpauthUri) {
+            qrContainer.innerHTML = generateSvgQrCode(data.otpauthUri);
+          }
+          updateMfaStatusView(Boolean(data.totpEnabled));
+        }
+      } catch (e) {
+        console.warn('Failed to fetch TOTP setup:', e);
+      }
+    }
+
+    function copyTotpSecretKey() {
+      if (!currentTotpSecret) return;
+      copyToClipboard(currentTotpSecret, function(success) {
+        if (success) {
+          showMfaNotice('📋 Authenticator Secret Key copied to clipboard!', true);
+          showAccountToast('📋 Secret key copied for Google Authenticator');
+        } else {
+          prompt('Copy Authenticator Secret Key:', currentTotpSecret);
+        }
+      });
+    }
+
+    async function submitVerifyTotpSetup() {
+      var input = document.getElementById('mfaTotpVerifyInput');
+      var code = input ? input.value.trim() : '';
+      if (!code || code.length !== 6) {
+        showMfaNotice('Please enter a valid 6-digit code from your authenticator app.', false);
+        return;
+      }
+      var btn = document.getElementById('mfaTotpVerifyBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Verifying Authenticator Code...';
+      }
+      var token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : '') || '';
+      try {
+        var res = await fetch('/api/auth/totp/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+            'x-sovra-session-token': token
+          },
+          body: JSON.stringify({ code: code })
+        });
+        var data = await res.json();
+        if (!res.ok || !data.ok) {
+          showMfaNotice(data.error || 'Invalid 6-digit code. Please check your authenticator clock and retry.', false);
+          return;
+        }
+        if (input) input.value = '';
+        showMfaNotice('✅ Google Authenticator 2FA activated successfully!', true);
+        showAccountToast('🛡️ 2FA Activated! Account is now protected by Authenticator.');
+        updateMfaStatusView(true);
+      } catch (err) {
+        showMfaNotice('Network failure: ' + (err.message || err), false);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Verify &amp; Activate 2FA</span> <span>✓</span>';
+        }
+      }
+    }
+
+    async function submitDisableTotp() {
+      var pinInput = document.getElementById('mfaDisablePinInput');
+      var pin = pinInput ? pinInput.value.trim() : '';
+      if (!pin) {
+        showMfaNotice('Please enter your 6-digit Security PIN to disable 2FA.', false);
+        return;
+      }
+      var btn = document.getElementById('mfaDisableTotpBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Disabling...';
+      }
+      var token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : '') || '';
+      try {
+        var res = await fetch('/api/auth/totp/disable', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+            'x-sovra-session-token': token
+          },
+          body: JSON.stringify({ pin: pin })
+        });
+        var data = await res.json();
+        if (!res.ok || !data.ok) {
+          showMfaNotice(data.error || 'Failed to disable 2FA. Incorrect PIN.', false);
+          return;
+        }
+        if (pinInput) pinInput.value = '';
+        showMfaNotice('2FA has been disabled. You can re-enable anytime.', true);
+        showAccountToast('⚠️ 2FA Disabled.');
+        updateMfaStatusView(false);
+      } catch (err) {
+        showMfaNotice('Network failure: ' + (err.message || err), false);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Disable Authenticator 2FA';
+        }
+      }
+    }
+
+    async function submitUpdatePin() {
+      var oldPinInput = document.getElementById('mfaOldPinInput');
+      var newPinInput = document.getElementById('mfaNewPinInput');
+      var oldPin = oldPinInput ? oldPinInput.value.trim() : '';
+      var newPin = newPinInput ? newPinInput.value.trim() : '';
+      if (!oldPin) {
+        showMfaNotice('Please enter your current Security PIN (default: 123456).', false);
+        return;
+      }
+      if (!newPin || newPin.length < 4 || newPin.length > 8) {
+        showMfaNotice('New PIN must be between 4 and 8 digits.', false);
+        return;
+      }
+      var btn = document.getElementById('mfaUpdatePinBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Updating PIN...';
+      }
+      var token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : '') || '';
+      try {
+        var res = await fetch('/api/auth/pin/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+            'x-sovra-session-token': token
+          },
+          body: JSON.stringify({ oldPin: oldPin, newPin: newPin })
+        });
+        var data = await res.json();
+        if (!res.ok || !data.ok) {
+          showMfaNotice(data.error || 'Failed to update PIN. Incorrect current PIN.', false);
+          return;
+        }
+        if (oldPinInput) oldPinInput.value = '';
+        if (newPinInput) newPinInput.value = '';
+        try { localStorage.setItem('sovra_lock_pin', newPin); } catch(e) {}
+        var pinBadge = document.getElementById('almCurrentPinBadge');
+        if (pinBadge) pinBadge.innerText = newPin;
+        showMfaNotice('✅ Security PIN updated successfully!', true);
+        showAccountToast('🔒 Security PIN updated successfully!');
+      } catch (err) {
+        showMfaNotice('Network failure: ' + (err.message || err), false);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Update Security PIN</span> <span>✓</span>';
+        }
+      }
+    }
+
+    function renderMfaRecoveryPhrase() {
+      var grid = document.getElementById('mfaRecoveryWordsGrid');
+      if (!grid) return;
+      var phrase = (myProfile && myProfile.recoveryPhrase) ? myProfile.recoveryPhrase : '';
+      if (!phrase) {
+        phrase = 'sovereign galaxy velvet nexus matrix beacon titan solar quantum pulse harbor orbit';
+      }
+      var words = phrase.split(' ');
+      var html = '';
+      for (var i = 0; i < words.length; i++) {
+        html += '<div style="background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px;">' +
+          '<span style="font-size: 0.7rem; color: #64748b; font-weight: 700; width: 16px;">' + (i + 1) + '.</span>' +
+          '<span style="font-size: 0.82rem; font-family: monospace; color: #38bdf8; font-weight: 600;">' + words[i] + '</span>' +
+          '</div>';
+      }
+      grid.innerHTML = html;
+    }
+
+    function copyRecoveryPhrase() {
+      var phrase = (myProfile && myProfile.recoveryPhrase) ? myProfile.recoveryPhrase : 'sovereign galaxy velvet nexus matrix beacon titan solar quantum pulse harbor orbit';
+      copyToClipboard(phrase, function(success) {
+        if (success) {
+          showMfaNotice('📋 12-Word Recovery Phrase copied to clipboard!', true);
+          showAccountToast('📋 12-Word Recovery Phrase copied!');
+        } else {
+          prompt('Copy Recovery Phrase:', phrase);
+        }
+      });
+    }
 
     function openAccountLifecycleModal(event) {
       if (event && event.stopPropagation) event.stopPropagation();
@@ -12184,10 +12649,12 @@ function renderHtml(
     async function triggerBiometricAccountCreation() {
       const nameInput = document.getElementById('womNameInput');
       const handleInput = document.getElementById('womHandleInput');
+      const pinInput = document.getElementById('womRegisterPinInput');
       const errorBox = document.getElementById('womErrorMsg');
 
       const nameVal = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : '';
       const handleVal = (handleInput && handleInput.value.trim()) ? handleInput.value.trim().replace(/^@/, '') : '';
+      const pinVal = (pinInput && pinInput.value.trim()) ? pinInput.value.trim() : '123456';
 
       if (!handleVal) {
         if (errorBox) {
@@ -12210,6 +12677,7 @@ function renderHtml(
             device: isMobileDevice ? 'Mobile' : 'Desktop',
             avatar: fullName.charAt(0).toUpperCase(),
             avatarDataUrl: womSelectedAvatarDataUrl || undefined,
+            securityPin: pinVal,
           })
         });
         const data = await res.json();
@@ -19023,6 +19491,7 @@ function renderHtml(
       if (typeof closeSovereignIdCardModal === 'function') closeSovereignIdCardModal();
       if (typeof closeEditProfileModal === 'function') closeEditProfileModal();
       if (typeof closeAccountLifecycleModal === 'function') closeAccountLifecycleModal();
+      if (typeof closeSovereignMfaModal === 'function') closeSovereignMfaModal();
       if (typeof closeSocialConnectionsModal === 'function') closeSocialConnectionsModal();
       if (typeof closeOnboardingModal === 'function') closeOnboardingModal();
       if (typeof closeOmniSearch === 'function') closeOmniSearch();
@@ -22698,6 +23167,7 @@ async function startDevServer() {
         }
         const sessionToken = parsed.sessionToken ? String(parsed.sessionToken) : ('stk_' + crypto.randomBytes(16).toString('hex'));
         const displayName = String(parsed.name || parsed.displayName || handle.replace('@', '')).trim();
+        const securityPin = parsed.securityPin ? String(parsed.securityPin).trim() : (parsed.pin ? String(parsed.pin).trim() : '123456');
 
         const regResult = sovraDb.registerUser({
           did,
@@ -22710,6 +23180,7 @@ async function startDevServer() {
           deviceType: parsed.device === 'Mobile' || parsed.deviceType === 'Mobile' ? 'Mobile' : 'Desktop',
           publicKey: userPubKeyHex,
           sessionToken,
+          securityPin,
         });
 
         if (!regResult.ok) {
@@ -22720,7 +23191,12 @@ async function startDevServer() {
 
         const user = regResult.user;
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, user: toPublicUserDTO(user), sessionToken: user.sessionToken }));
+        res.end(JSON.stringify({
+          ok: true,
+          user: toPublicUserDTO(user),
+          sessionToken: user.sessionToken,
+          recoveryPhrase: user.recoveryPhrase,
+        }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
@@ -22743,14 +23219,124 @@ async function startDevServer() {
           identifier = '@' + identifier;
         }
         const deviceName = String(parsed.device || parsed.deviceName || (req.headers['user-agent']?.includes('Mobile') ? 'Mobile Node' : 'Web Session'));
-        const loginRes = sovraDb.loginUser(identifier, deviceName, clientIp, req.headers['user-agent'] as string);
+        const hasFactorInput = parsed.pin !== undefined || parsed.securityPin !== undefined || parsed.totpCode !== undefined || parsed.code !== undefined || parsed.enclaveBypass !== undefined || parsed.isEnclaveBypass !== undefined;
+        const factor = hasFactorInput ? {
+          pin: parsed.pin ? String(parsed.pin).trim() : (parsed.securityPin ? String(parsed.securityPin).trim() : undefined),
+          totpCode: parsed.totpCode ? String(parsed.totpCode).trim() : (parsed.code ? String(parsed.code).trim() : undefined),
+          isEnclaveBypass: Boolean(parsed.enclaveBypass || parsed.isEnclaveBypass),
+        } : undefined;
+        const loginRes = sovraDb.loginUser(identifier, deviceName, clientIp, req.headers['user-agent'] as string, factor);
         if (!loginRes.ok || !loginRes.user) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: loginRes.error || 'User not found' }));
+          const status = loginRes.error?.includes('not found') ? 404 : 401;
+          res.writeHead(status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: loginRes.error || 'Authentication failed' }));
           return;
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, user: toPublicUserDTO(loginRes.user), sessionToken: loginRes.sessionToken }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // SOVEREIGN 2FA / TOTP & SECURITY PIN ROUTES
+    // ==========================================
+
+    if (url.pathname === '/api/auth/totp/setup' && req.method === 'GET') {
+      const principal = enforceAuth(req, res);
+      if (!principal) return;
+      const user = sovraDb.findUserByDid(principal.did);
+      if (!user) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'User not found' }));
+        return;
+      }
+      if (!user.totpSecret) {
+        user.totpSecret = sovraDb.generateTotpSecret();
+        sovraDb.save();
+      }
+      const otpauthUri = sovraDb.getTotpUri(user.handle, user.totpSecret);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        secret: user.totpSecret,
+        otpauthUri,
+        totpEnabled: Boolean(user.totpEnabled),
+      }));
+      return;
+    }
+
+    if (url.pathname === '/api/auth/totp/verify' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const totpCode = String(parsed.totpCode || parsed.code || '').trim();
+        if (!totpCode) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: '6-digit Authenticator code is required' }));
+          return;
+        }
+        const verifyRes = sovraDb.enableUserTotp(principal.did, totpCode);
+        if (!verifyRes.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: verifyRes.error || 'Invalid 6-digit Authenticator code' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: 'Google Authenticator 2FA enabled successfully!' }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/auth/totp/disable' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const pin = String(parsed.pin || '').trim();
+        const disableRes = sovraDb.disableUserTotp(principal.did, pin);
+        if (!disableRes.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: disableRes.error || 'Failed to disable 2FA' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: '2FA disabled successfully' }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/auth/pin/update' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const oldPin = String(parsed.oldPin || '').trim();
+        const newPin = String(parsed.newPin || '').trim();
+        const updateRes = sovraDb.updateSecurityPin(principal.did, oldPin, newPin);
+        if (!updateRes.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: updateRes.error || 'Failed to update PIN' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: 'Security PIN updated successfully!' }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));

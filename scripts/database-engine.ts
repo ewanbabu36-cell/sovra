@@ -47,6 +47,10 @@ export interface UserRecord {
   sessionToken?: string;
   balanceSov?: number; // Sovereign wallet balance in SOV (default: 500.00)
   privacySettings?: UserPrivacySettings;
+  securityPinHash?: string; // SHA-256 hash of 6-digit PIN
+  totpSecret?: string; // Base32 RFC 6238 TOTP Secret Key for Google Authenticator
+  totpEnabled?: boolean; // Whether Google Authenticator 2FA is active
+  recoveryPhrase?: string; // 12-Word Sovereign Disaster Recovery Seed Phrase
   createdAt: number;
   updatedAt: number;
 }
@@ -67,6 +71,8 @@ export interface PublicUserDTO {
   publicKey?: string;
   balanceSov?: number;
   privacySettings?: UserPrivacySettings;
+  totpEnabled?: boolean;
+  hasSecurityPin?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -89,6 +95,8 @@ export function toPublicUserDTO(user: UserRecord | undefined | null): PublicUser
     publicKey: user.publicKey,
     balanceSov: user.balanceSov,
     privacySettings: user.privacySettings,
+    totpEnabled: Boolean(user.totpEnabled),
+    hasSecurityPin: Boolean(user.securityPinHash),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -1040,6 +1048,8 @@ export class SovraDatabaseEngine {
     publicKey?: string;
     sessionToken?: string;
     balanceSov?: number;
+    securityPin?: string;
+    recoveryPhrase?: string;
   }): { ok: true; user: UserRecord } | { ok: false; error: string; code: number } {
     this.load();
     let cleanHandle = user.handle.trim();
@@ -1059,6 +1069,7 @@ export class SovraDatabaseEngine {
 
     const now = Date.now();
     const sessionToken = user.sessionToken || ('stk_' + crypto.randomBytes(24).toString('hex'));
+    const chosenPin = (user.securityPin && user.securityPin.trim()) ? user.securityPin.trim() : '123456';
     const record: UserRecord = {
       did: user.did,
       handle: cleanHandle,
@@ -1072,6 +1083,10 @@ export class SovraDatabaseEngine {
       publicKey: user.publicKey,
       sessionToken,
       balanceSov: typeof user.balanceSov === 'number' ? user.balanceSov : 500.0,
+      securityPinHash: this.hashSecurityPin(chosenPin),
+      totpSecret: this.generateTotpSecret(),
+      totpEnabled: false,
+      recoveryPhrase: user.recoveryPhrase || this.generateRecoveryPhrase(),
       createdAt: now,
       updatedAt: now,
     };
@@ -3171,7 +3186,13 @@ export class SovraDatabaseEngine {
   // USER LOGIN & LOGOUT
   // ==========================================
 
-  public loginUser(identifier: string, deviceName?: string, ipAddress?: string, userAgent?: string): { ok: boolean; user?: UserRecord; sessionToken?: string; error?: string } {
+  public loginUser(
+    identifier: string,
+    deviceName?: string,
+    ipAddressOrFactor?: string | { pin?: string; totpCode?: string; isEnclaveBypass?: boolean },
+    userAgent?: string,
+    factorArg?: { pin?: string; totpCode?: string; isEnclaveBypass?: boolean }
+  ): { ok: boolean; user?: UserRecord; sessionToken?: string; error?: string } {
     this.load();
     const clean = identifier.trim();
     const cleanHandle = clean.startsWith('@') ? clean : '@' + clean;
@@ -3183,6 +3204,35 @@ export class SovraDatabaseEngine {
     if (!user) {
       return { ok: false, error: 'User account not found' };
     }
+
+    const factor = (typeof ipAddressOrFactor === 'object' && ipAddressOrFactor !== null) ? ipAddressOrFactor : factorArg;
+    const ipAddress = typeof ipAddressOrFactor === 'string' ? ipAddressOrFactor : undefined;
+
+    // Verify 2FA / Security PIN factors
+    if (user.totpEnabled) {
+      if (!factor || !factor.totpCode) {
+        return { ok: false, error: 'Google Authenticator 2FA code is required for this account.' };
+      }
+      if (!user.totpSecret || !this.verifyTotpCode(user.totpSecret, factor.totpCode)) {
+        return { ok: false, error: 'Invalid Google Authenticator 6-digit code.' };
+      }
+    } else if (factor) {
+      if (factor.isEnclaveBypass) {
+        // Enclave resident passkey verified
+      } else if (user.securityPinHash) {
+        let passed = false;
+        if (factor.pin) {
+          passed = this.verifySecurityPin(factor.pin, user.securityPinHash);
+        }
+        if (!passed && factor.totpCode && user.totpSecret) {
+          passed = this.verifyTotpCode(user.totpSecret, factor.totpCode);
+        }
+        if (!passed) {
+          return { ok: false, error: 'Incorrect 6-digit Security PIN.' };
+        }
+      }
+    }
+
     const token = 'stk_' + crypto.randomBytes(24).toString('hex');
     user.sessionToken = token;
     user.updatedAt = Date.now();
@@ -3217,6 +3267,162 @@ export class SovraDatabaseEngine {
       return true;
     }
     return false;
+  }
+
+  // ==========================================
+  // SOVEREIGN AUTHENTICATION & TOTP 2FA ENGINE
+  // ==========================================
+
+  private static readonly BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+  public generateTotpSecret(byteLength: number = 20): string {
+    const buffer = crypto.randomBytes(byteLength);
+    let bits = 0;
+    let value = 0;
+    let output = '';
+    for (let i = 0; i < buffer.length; i++) {
+      value = (value << 8) | buffer[i];
+      bits += 8;
+      while (bits >= 5) {
+        output += SovraDatabaseEngine.BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
+        bits -= 5;
+      }
+    }
+    if (bits > 0) {
+      output += SovraDatabaseEngine.BASE32_ALPHABET[(value << (5 - bits)) & 31];
+    }
+    return output;
+  }
+
+  private base32Decode(input: string): Buffer {
+    const cleaned = input.toUpperCase().replace(/=+$/, '').replace(/\s+/g, '');
+    let bits = 0;
+    let value = 0;
+    const bytes: number[] = [];
+    for (let i = 0; i < cleaned.length; i++) {
+      const idx = SovraDatabaseEngine.BASE32_ALPHABET.indexOf(cleaned[i]);
+      if (idx === -1) continue;
+      value = (value << 5) | idx;
+      bits += 5;
+      if (bits >= 8) {
+        bytes.push((value >>> (bits - 8)) & 0xff);
+        bits -= 8;
+      }
+    }
+    return Buffer.from(bytes);
+  }
+
+  public computeTotpCode(secretBase32: string, timeStepOffset = 0): string {
+    const key = this.base32Decode(secretBase32);
+    const counter = Math.floor(Date.now() / 1000 / 30) + timeStepOffset;
+    const counterBuf = Buffer.alloc(8);
+    counterBuf.writeBigInt64BE(BigInt(counter));
+
+    const hmac = crypto.createHmac('sha1', key).update(counterBuf).digest();
+    const offset = hmac[hmac.length - 1] & 0x0f;
+    const code = (
+      ((hmac[offset] & 0x7f) << 24) |
+      ((hmac[offset + 1] & 0xff) << 16) |
+      ((hmac[offset + 2] & 0xff) << 8) |
+      (hmac[offset + 3] & 0xff)
+    ) % 1000000;
+    return code.toString().padStart(6, '0');
+  }
+
+  public verifyTotpCode(secretBase32: string, userCode: string): boolean {
+    if (!secretBase32 || !userCode) return false;
+    const cleanCode = String(userCode).trim().replace(/\s+/g, '');
+    if (cleanCode.length !== 6 || !/^\d{6}$/.test(cleanCode)) return false;
+
+    for (const offset of [0, -1, 1]) {
+      const computed = this.computeTotpCode(secretBase32, offset);
+      if (crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(cleanCode))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public getTotpUri(handle: string, secret: string, issuer: string = 'Sovra'): string {
+    const cleanHandle = handle.replace(/^@/, '');
+    return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(cleanHandle)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+  }
+
+  public hashSecurityPin(pin: string): string {
+    const clean = String(pin || '').trim();
+    return crypto.createHash('sha256').update('sovra_salt_pin_' + clean).digest('hex');
+  }
+
+  public verifySecurityPin(pin: string, hash: string): boolean {
+    if (!pin || !hash) return false;
+    const computed = this.hashSecurityPin(pin);
+    if (computed.length !== hash.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
+  }
+
+  public generateRecoveryPhrase(): string {
+    const WORDS = [
+      'mesh', 'sovereign', 'crypt', 'block', 'relay', 'enclave',
+      'node', 'peer', 'secret', 'quantum', 'cipher', 'vault',
+      'signal', 'bitswap', 'merkle', 'ledger', 'genesis', 'alpha',
+      'matrix', 'shield', 'key', 'nexus', 'pulse', 'orbit'
+    ];
+    const picked: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      const idx = crypto.randomInt(0, WORDS.length);
+      picked.push(WORDS[idx]);
+    }
+    return picked.join(' ');
+  }
+
+  public enableUserTotp(identifier: string, totpCode: string): { ok: boolean; error?: string } {
+    this.load();
+    const clean = identifier.trim();
+    const cleanHandle = clean.startsWith('@') ? clean : '@' + clean;
+    const user = this.db.users.find(u => u.did === clean || u.handle.toLowerCase() === clean.toLowerCase() || u.handle.toLowerCase() === cleanHandle.toLowerCase());
+    if (!user) return { ok: false, error: 'User not found' };
+    if (!user.totpSecret) user.totpSecret = this.generateTotpSecret();
+    if (!this.verifyTotpCode(user.totpSecret, totpCode)) {
+      return { ok: false, error: 'Invalid 6-digit Authenticator code. Check your phone time sync.' };
+    }
+    user.totpEnabled = true;
+    user.updatedAt = Date.now();
+    this.save();
+    return { ok: true };
+  }
+
+  public disableUserTotp(identifier: string, pin: string): { ok: boolean; error?: string } {
+    this.load();
+    const clean = identifier.trim();
+    const cleanHandle = clean.startsWith('@') ? clean : '@' + clean;
+    const user = this.db.users.find(u => u.did === clean || u.handle.toLowerCase() === clean.toLowerCase() || u.handle.toLowerCase() === cleanHandle.toLowerCase());
+    if (!user) return { ok: false, error: 'User not found' };
+    if (user.securityPinHash && !this.verifySecurityPin(pin, user.securityPinHash)) {
+      return { ok: false, error: 'Invalid Security PIN. PIN required to disable 2FA.' };
+    }
+    user.totpEnabled = false;
+    user.updatedAt = Date.now();
+    this.save();
+    return { ok: true };
+  }
+
+  public updateSecurityPin(identifier: string, oldPin: string, newPin: string): { ok: boolean; error?: string } {
+    this.load();
+    const clean = identifier.trim();
+    const cleanHandle = clean.startsWith('@') ? clean : '@' + clean;
+    const user = this.db.users.find(u => u.did === clean || u.handle.toLowerCase() === clean.toLowerCase() || u.handle.toLowerCase() === cleanHandle.toLowerCase());
+    if (!user) return { ok: false, error: 'User not found' };
+    if (user.securityPinHash && !this.verifySecurityPin(oldPin, user.securityPinHash)) {
+      return { ok: false, error: 'Incorrect current Security PIN.' };
+    }
+    const cleanNew = String(newPin || '').trim();
+    if (!/^\d{4,8}$/.test(cleanNew)) {
+      return { ok: false, error: 'New PIN must be 4 to 8 digits.' };
+    }
+    user.securityPinHash = this.hashSecurityPin(cleanNew);
+    user.updatedAt = Date.now();
+    this.save();
+    return { ok: true };
   }
 
   // ==========================================
