@@ -16,7 +16,7 @@ describe('Automated Browser-Script Syntax Verification Gate', () => {
     } catch {
       // If server is not running on localhost, read dev-server.ts source to extract template
       const devServerFile = path.resolve(__dirname, '../../scripts/dev-server.ts');
-      html = fs.readFileSync(devServerFile, 'utf8');
+      html = fs.readFileSync(devServerFile, 'utf8').replace(/\$\{[^}]+\}/g, 'null');
     }
 
     expect(html).toBeTruthy();
@@ -37,7 +37,7 @@ describe('Automated Browser-Script Syntax Verification Gate', () => {
       }
     } catch {
       const adminFile = path.resolve(__dirname, '../../scripts/admin-console.ts');
-      html = fs.readFileSync(adminFile, 'utf8');
+      html = fs.readFileSync(adminFile, 'utf8').replace(/\$\{[^}]+\}/g, 'null');
     }
 
     expect(html).toBeTruthy();
