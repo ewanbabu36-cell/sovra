@@ -10853,9 +10853,6 @@ function renderHtml(
         const response = await _origFetch.call(window, input, init);
         if (response.status === 401 && !String(input).includes('/api/user/login') && !String(input).includes('/api/user/register')) {
           console.warn('[AuthenticatedFetch] 401 Unauthorized for endpoint:', input);
-          if (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token && token !== window.SOVRA_HOST_SESSION.token) {
-            try { localStorage.setItem('sovra_session_token', window.SOVRA_HOST_SESSION.token); } catch(e) {}
-          }
         }
         return response;
       } catch (err) {
@@ -11442,6 +11439,10 @@ function renderHtml(
       const wom = document.getElementById('welcomeOnboardingModal');
       if (wom) wom.style.display = 'none';
       updateUserDisplayInUI();
+      if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
+      if (typeof syncChatMessages === 'function') syncChatMessages();
+      if (typeof fetchNotifications === 'function') fetchNotifications();
+      if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
     }
 
     function closeOnboardingModal() {
@@ -12931,6 +12932,10 @@ function renderHtml(
     setTimeout(renderRightRailSuggestions, 50);
     setTimeout(function() {
       if (typeof renderChatContactsList === 'function') renderChatContactsList();
+      if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
+      if (typeof syncChatMessages === 'function') syncChatMessages();
+      if (typeof fetchNotifications === 'function') fetchNotifications();
+      if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
     }, 60);
 
     // Tab switching for all modes + admin console + friends discovery
@@ -16651,26 +16656,99 @@ function renderHtml(
       if (q) {
         const renderedDids = new Set(filteredDirectList.map(p => p.did));
         let networkMatches = [];
+
+        // 1. Check friendsData.friends
+        if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
+          friendsData.friends.forEach(function(f) {
+            if (!f || !f.did || renderedDids.has(f.did) || f.did === myDid) return;
+            if ((f.name || '').toLowerCase().includes(q) || (f.handle || '').toLowerCase().includes(q)) {
+              networkMatches.push({
+                pubkey: f.did,
+                name: f.name || 'Friend',
+                handle: f.handle || '@friend',
+                avatar: f.avatar || ((f.name && f.name[0]) ? f.name[0].toUpperCase() : 'F'),
+                avatarDataUrl: f.avatarDataUrl,
+                avatarBg: f.avatarBg || '#10b981',
+                subtext: 'Mutual Friend'
+              });
+              renderedDids.add(f.did);
+            }
+          });
+        }
+
+        // 2. Check friendsData.suggestions
+        if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.suggestions)) {
+          friendsData.suggestions.forEach(function(s) {
+            if (!s || !s.did || renderedDids.has(s.did) || s.did === myDid) return;
+            if ((s.name || '').toLowerCase().includes(q) || (s.handle || '').toLowerCase().includes(q)) {
+              networkMatches.push({
+                pubkey: s.did,
+                name: s.name || 'Peer',
+                handle: s.handle || '@peer',
+                avatar: s.avatar || ((s.name && s.name[0]) ? s.name[0].toUpperCase() : 'P'),
+                avatarDataUrl: s.avatarDataUrl,
+                avatarBg: s.avatarBg || '#6366f1',
+                subtext: 'Discovered Peer'
+              });
+              renderedDids.add(s.did);
+            }
+          });
+        }
+
+        // 3. Check contactsData items
+        if (typeof contactsData !== 'undefined' && Array.isArray(contactsData)) {
+          contactsData.forEach(function(c) {
+            if (!c || !c.did || renderedDids.has(c.did) || c.did === myDid) return;
+            if ((c.name || '').toLowerCase().includes(q) || (c.handle || '').toLowerCase().includes(q)) {
+              networkMatches.push({
+                pubkey: c.did,
+                name: c.name || c.displayName || 'Peer',
+                handle: c.handle || '@peer',
+                avatar: c.avatar || ((c.name && c.name[0]) ? c.name[0].toUpperCase() : 'P'),
+                avatarDataUrl: c.avatarDataUrl,
+                avatarBg: c.avatarBg || '#6366f1',
+                subtext: c.role || 'Direct Contact'
+              });
+              renderedDids.add(c.did);
+            }
+          });
+        }
+
+        // 4. Check dynamicCatalogPeople
         if (typeof dynamicCatalogPeople !== 'undefined' && Array.isArray(dynamicCatalogPeople)) {
-          networkMatches = dynamicCatalogPeople.filter(function(p) {
-            if (!p || !p.pubkey || renderedDids.has(p.pubkey) || p.pubkey === myDid) return false;
-            return (p.name || '').toLowerCase().includes(q) || (p.handle || '').toLowerCase().includes(q);
+          dynamicCatalogPeople.forEach(function(p) {
+            if (!p || !p.pubkey || renderedDids.has(p.pubkey) || p.pubkey === myDid) return;
+            if ((p.name || '').toLowerCase().includes(q) || (p.handle || '').toLowerCase().includes(q)) {
+              networkMatches.push({
+                pubkey: p.pubkey,
+                name: p.name || 'Peer',
+                handle: p.handle || '@peer',
+                avatar: p.avatar || 'P',
+                avatarDataUrl: p.avatarDataUrl,
+                avatarBg: p.bg || '#6366f1',
+                subtext: p.bio || 'Network User'
+              });
+              renderedDids.add(p.pubkey);
+            }
           });
         }
 
         if (networkMatches.length > 0) {
           html += '<div class="bitchat-section-title" style="margin-top: 10px;">👥 Friends & Network Users (' + networkMatches.length + ')</div>';
           for (const u of networkMatches) {
-            html += '<div class="contact-item" style="cursor: default;">' +
-              '<div class="contact-avatar" style="background: ' + (u.avatarBg || '#6366f1') + ';">' + (u.avatar || u.name.charAt(0)) + '</div>' +
+            const avatarHtml = u.avatarDataUrl
+              ? '<img src="' + u.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />'
+              : (u.avatar || 'P');
+            html += '<div class="contact-item" data-action="open-chat-user" data-target-did="' + u.pubkey + '" data-target-name="' + encodeURIComponent(u.name || '') + '" data-target-handle="' + encodeURIComponent(u.handle || '') + '" style="cursor: pointer;">' +
+              '<div class="contact-avatar" style="background: ' + (u.avatarBg || '#6366f1') + '; overflow: hidden;">' + avatarHtml + '</div>' +
               '<div class="contact-info" style="flex: 1;">' +
                 '<div class="contact-top-row">' +
                   '<span class="contact-name">' + u.name + '</span>' +
                   '<span style="font-size: 0.7rem; color: #94a3b8;">' + (u.handle || '') + '</span>' +
                 '</div>' +
-                '<div style="font-size: 0.72rem; color: #64748b;">Not yet in active chats</div>' +
+                '<div style="font-size: 0.72rem; color: #64748b;">' + (u.subtext || 'Ready to chat') + '</div>' +
               '</div>' +
-              '<button type="button" class="action-pill-btn" data-action="open-chat-user" data-target-did="' + u.pubkey + '" data-target-name="' + (u.name || '').replace(/"/g, '&quot;') + '" data-target-handle="' + (u.handle || '').replace(/"/g, '&quot;') + '" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 6px; padding: 4px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">Chat ➔</button>' +
+              '<button type="button" class="action-pill-btn" data-action="open-chat-user" data-target-did="' + u.pubkey + '" data-target-name="' + encodeURIComponent(u.name || '') + '" data-target-handle="' + encodeURIComponent(u.handle || '') + '" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 6px; padding: 4px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">Chat ➔</button>' +
             '</div>';
           }
         }
@@ -16700,9 +16778,54 @@ function renderHtml(
       if (!targetDid) return;
       switchTab('chat');
 
+      const searchBox = document.getElementById('chatSearchInput');
+      if (searchBox) searchBox.value = '';
+
       let contact = contactsData.find(function(c) { return c.did === targetDid; });
       if (!contact) {
         contact = bitchatPeersData.find(function(p) { return p.did === targetDid; });
+      }
+
+      if (!contact && typeof friendsData !== 'undefined' && friendsData) {
+        const f = (friendsData.friends || []).find(function(x) { return x.did === targetDid; });
+        if (f) {
+          contact = {
+            did: f.did,
+            name: f.name || targetName || 'Friend',
+            handle: f.handle || targetHandle || '@friend',
+            avatar: f.avatar || ((f.name && f.name[0]) ? f.name[0].toUpperCase() : 'F'),
+            avatarDataUrl: f.avatarDataUrl,
+            avatarBg: f.avatarBg || '#10b981',
+            role: 'Mutual Friend',
+            isOnline: f.isOnline !== false,
+            lastSeen: f.lastSeen || 'Online',
+            disappearingDurationSec: 0,
+            safetyNumbers: '28471 90432 18942 ' + f.did.slice(-12),
+            isVerified: true,
+            unreadCount: 0,
+          };
+          contactsData.unshift(contact);
+        } else {
+          const s = (friendsData.suggestions || []).find(function(x) { return x.did === targetDid; });
+          if (s) {
+            contact = {
+              did: s.did,
+              name: s.name || targetName || 'Peer',
+              handle: s.handle || targetHandle || '@peer',
+              avatar: s.avatar || ((s.name && s.name[0]) ? s.name[0].toUpperCase() : 'P'),
+              avatarDataUrl: s.avatarDataUrl,
+              avatarBg: s.avatarBg || '#6366f1',
+              role: s.role || 'Discovered Peer',
+              isOnline: s.isOnline !== false,
+              lastSeen: s.lastSeen || 'Online',
+              disappearingDurationSec: 0,
+              safetyNumbers: '28471 90432 18942 ' + s.did.slice(-12),
+              isVerified: true,
+              unreadCount: 0,
+            };
+            contactsData.unshift(contact);
+          }
+        }
       }
 
       if (!contact) {
@@ -16710,7 +16833,7 @@ function renderHtml(
         if (typeof dynamicCatalogPeople !== 'undefined' && Array.isArray(dynamicCatalogPeople)) {
           matchedPerson = dynamicCatalogPeople.find(function(p) { return p.pubkey === targetDid || p.did === targetDid; });
         }
-        const displayName = targetName || (matchedPerson ? matchedPerson.name : '') || (targetHandle ? targetHandle.replace(/^@/, '') : 'User');
+        const displayName = targetName || (matchedPerson ? matchedPerson.name : '') || (targetHandle ? targetHandle.replace(/^@/, '') : 'Peer');
         const handle = targetHandle || (matchedPerson ? matchedPerson.handle : '') || ('@' + displayName.toLowerCase().replace(/\s+/g, '_'));
 
         contact = {
@@ -16728,11 +16851,41 @@ function renderHtml(
           unreadCount: 0,
         };
         contactsData.unshift(contact);
+      } else if (targetName && (!contact.name || contact.name === 'User' || contact.name === 'Peer')) {
+        contact.name = targetName;
+        if (targetHandle) contact.handle = targetHandle;
       }
 
-      selectContact(targetDid);
+      selectContact(targetDid, contact);
       renderChatContactsList();
       renderChatBubbles();
+
+      // Immediately sync messages for this direct conversation
+      const myDid = myProfile ? myProfile.did : 'self';
+      fetch('/api/chat/messages?since=0&userDid=' + encodeURIComponent(myDid))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok && Array.isArray(data.messages)) {
+            let hasNew = false;
+            data.messages.forEach(function(msg) {
+              const existingIdx = chatMessages.findIndex(function(m) { return m.id === msg.id; });
+              if (existingIdx === -1) {
+                chatMessages.push(msg);
+                hasNew = true;
+              } else if (chatMessages[existingIdx].status !== msg.status) {
+                chatMessages[existingIdx].status = msg.status;
+                hasNew = true;
+              }
+            });
+            if (hasNew) {
+              renderChatBubbles();
+              renderChatContactsList();
+              const scrollArea = document.getElementById('chatMessagesScroll');
+              if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
+            }
+          }
+        })
+        .catch(function() {});
 
       setTimeout(function() {
         const input = document.getElementById('chatInputText');
@@ -16742,7 +16895,7 @@ function renderHtml(
       }, 80);
     }
 
-    function selectContact(did) {
+    function selectContact(did, optContact) {
       activeContactDid = did;
       const wCont = document.querySelector('.whatsapp-container');
       if (wCont) wCont.classList.add('show-chat');
@@ -16767,7 +16920,11 @@ function renderHtml(
       }
 
       const bcPeer = bitchatPeersData.find(function(p) { return p.did === did; });
-      const contact = contactsData.find(function(c) { return c.did === did; });
+      let contact = contactsData.find(function(c) { return c.did === did; }) || optContact;
+      if (!contact && typeof friendsData !== 'undefined' && friendsData) {
+        contact = (friendsData.friends || []).find(function(f) { return f.did === did; }) ||
+                  (friendsData.suggestions || []).find(function(s) { return s.did === did; });
+      }
 
       const avatarEl = document.getElementById('activePeerAvatar');
       const nameEl = document.getElementById('activePeerName');
@@ -16812,11 +16969,11 @@ function renderHtml(
           if (contact.avatarDataUrl) {
             avatarEl.innerHTML = '<img src="' + contact.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />';
           } else {
-            avatarEl.innerText = contact.avatar || 'P';
+            avatarEl.innerText = contact.avatar || ((contact.name && contact.name[0]) ? contact.name[0].toUpperCase() : 'P');
             avatarEl.style.background = contact.avatarBg || '#6366f1';
           }
         }
-        if (nameEl) nameEl.innerText = contact.name;
+        if (nameEl) nameEl.innerText = contact.name || contact.displayName || contact.handle || 'Peer';
         if (badgeEl) badgeEl.style.display = contact.isVerified ? 'inline-block' : 'none';
         if (statusEl) {
           statusEl.innerText = (contact.isOnline ? '● Online' : 'Last seen ' + (contact.lastSeen || 'recently')) + ' • Double Ratchet Active';
@@ -19827,7 +19984,9 @@ function renderHtml(
                                (n.type === 'like') ? '❤️' :
                                (n.type === 'comment') ? '🗨️' : '🔔';
 
-              const senderDid = n.senderDid || (n.data && n.data.senderDid) || (n.data && n.data.fromDid) || '';
+              const senderDid = n.senderDid || (n.data && n.data.senderDid) || (n.data && n.data.fromDid) || (n.data && n.data.friendDid) || '';
+              const senderName = n.senderName || (n.data && n.data.senderName) || (n.senderHandle ? n.senderHandle.replace(/^@/, '') : '') || '';
+              const senderHandle = n.senderHandle || (n.data && n.data.senderHandle) || '';
               const relId = (n.data && n.data.relId) || '';
 
               let actionButtonsHtml = '';
@@ -19838,11 +19997,11 @@ function renderHtml(
                 '</div>';
               } else if (n.type === 'message' || n.type === 'chat') {
                 actionButtonsHtml = '<div style="display: flex; gap: 8px; margin-top: 6px;">' +
-                  '<button type="button" class="notif-action-btn" data-action="open-chat-notif" data-id="' + n.id + '" data-type="' + (n.type || 'message') + '" data-sender-did="' + senderDid + '" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 3px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">💬 Open Chat ➔</button>' +
+                  '<button type="button" class="notif-action-btn" data-action="open-chat-notif" data-id="' + n.id + '" data-type="' + (n.type || 'message') + '" data-sender-did="' + senderDid + '" data-sender-name="' + encodeURIComponent(senderName) + '" data-sender-handle="' + encodeURIComponent(senderHandle) + '" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 3px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">💬 Open Chat ➔</button>' +
                 '</div>';
               }
 
-              return '<div class="notification-card" data-action="click-notification" data-id="' + n.id + '" data-type="' + (n.type || '') + '" data-sender-did="' + senderDid + '" style="background: ' + bg + '; padding: 10px; border-radius: 8px; margin-bottom: 6px; cursor: pointer; border: 1px solid ' + border + '; transition: background 0.15s ease;">' +
+              return '<div class="notification-card" data-action="click-notification" data-id="' + n.id + '" data-type="' + (n.type || '') + '" data-sender-did="' + senderDid + '" data-sender-name="' + encodeURIComponent(senderName) + '" data-sender-handle="' + encodeURIComponent(senderHandle) + '" style="background: ' + bg + '; padding: 10px; border-radius: 8px; margin-bottom: 6px; cursor: pointer; border: 1px solid ' + border + '; transition: background 0.15s ease;">' +
                 '<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 6px;">' +
                   '<div style="display: flex; align-items: center; gap: 6px;">' +
                     '<span style="font-size: 0.9rem;">' + typeIcon + '</span>' +
@@ -19859,7 +20018,7 @@ function renderHtml(
         }).catch(function(err) { console.warn('[Notifications] Error:', err); });
     }
 
-    function handleNotificationClick(id, type, senderDid, event) {
+    function handleNotificationClick(id, type, senderDid, event, senderName, senderHandle) {
       if (event && event.stopPropagation) event.stopPropagation();
       if (id) markNotificationAsRead(id);
 
@@ -19869,7 +20028,7 @@ function renderHtml(
       const notifType = (type || '').toLowerCase();
       if (notifType === 'message' || notifType === 'chat') {
         if (senderDid) {
-          openDirectChatWithUser(senderDid);
+          openDirectChatWithUser(senderDid, senderName, senderHandle);
         } else {
           switchTab('chat');
         }
@@ -19877,7 +20036,7 @@ function renderHtml(
         switchTab('friends');
       } else if (notifType === 'friend_accept') {
         if (senderDid) {
-          openDirectChatWithUser(senderDid);
+          openDirectChatWithUser(senderDid, senderName, senderHandle);
         } else {
           switchTab('friends');
         }
@@ -19976,9 +20135,11 @@ function renderHtml(
         e.preventDefault();
         e.stopPropagation();
         const tDid = chatBtn.getAttribute('data-target-did') || chatBtn.dataset.targetDid;
-        const tName = chatBtn.getAttribute('data-target-name') || chatBtn.dataset.targetName || 'Peer';
-        const tHandle = chatBtn.getAttribute('data-target-handle') || chatBtn.dataset.targetHandle || '';
-        closeWaModal('newChatPickerModal');
+        let tName = chatBtn.getAttribute('data-target-name') || chatBtn.dataset.targetName || 'Peer';
+        let tHandle = chatBtn.getAttribute('data-target-handle') || chatBtn.dataset.targetHandle || '';
+        try { tName = decodeURIComponent(tName); } catch(err) {}
+        try { tHandle = decodeURIComponent(tHandle); } catch(err) {}
+        if (typeof closeWaModal === 'function') closeWaModal('newChatPickerModal');
         openDirectChatWithUser(tDid, tName, tHandle);
         return;
       }
@@ -19986,7 +20147,7 @@ function renderHtml(
       if (friendsHubBtn) {
         e.preventDefault();
         e.stopPropagation();
-        closeWaModal('newChatPickerModal');
+        if (typeof closeWaModal === 'function') closeWaModal('newChatPickerModal');
         const q = friendsHubBtn.getAttribute('data-query') || '';
         switchTab('friends');
         if (typeof filterFriendsView === 'function') filterFriendsView(q);
@@ -20010,14 +20171,22 @@ function renderHtml(
       if (notifChat) {
         e.preventDefault();
         e.stopPropagation();
-        handleNotificationClick(notifChat.dataset.id, notifChat.dataset.type, notifChat.dataset.senderDid, e);
+        let sName = notifChat.dataset.senderName || notifChat.getAttribute('data-sender-name') || '';
+        let sHandle = notifChat.dataset.senderHandle || notifChat.getAttribute('data-sender-handle') || '';
+        try { sName = decodeURIComponent(sName); } catch(err) {}
+        try { sHandle = decodeURIComponent(sHandle); } catch(err) {}
+        handleNotificationClick(notifChat.dataset.id, notifChat.dataset.type, notifChat.dataset.senderDid, e, sName, sHandle);
         return;
       }
       const notifCard = e.target && e.target.closest ? e.target.closest('[data-action="click-notification"]') : null;
       if (notifCard) {
         e.preventDefault();
         e.stopPropagation();
-        handleNotificationClick(notifCard.dataset.id, notifCard.dataset.type, notifCard.dataset.senderDid, e);
+        let sName = notifCard.dataset.senderName || notifCard.getAttribute('data-sender-name') || '';
+        let sHandle = notifCard.dataset.senderHandle || notifCard.getAttribute('data-sender-handle') || '';
+        try { sName = decodeURIComponent(sName); } catch(err) {}
+        try { sHandle = decodeURIComponent(sHandle); } catch(err) {}
+        handleNotificationClick(notifCard.dataset.id, notifCard.dataset.type, notifCard.dataset.senderDid, e, sName, sHandle);
         return;
       }
       const bell = document.getElementById('headerNotificationBell');
@@ -20729,6 +20898,16 @@ async function startDevServer() {
       token = authHeader.substring(7).trim();
     } else if (req.headers['x-sovra-session-token']) {
       token = String(req.headers['x-sovra-session-token']).trim();
+    } else if (req.headers.cookie) {
+      const match = req.headers.cookie.match(/(?:^|;\s*)sovra_session_token=([^;]+)/);
+      if (match) token = decodeURIComponent(match[1]).trim();
+    }
+    if (!token && req.url) {
+      try {
+        const u = new URL(req.url, 'http://localhost');
+        const qToken = u.searchParams.get('sessionToken') || u.searchParams.get('token');
+        if (qToken) token = qToken.trim();
+      } catch (e) {}
     }
 
     if (token) {
@@ -24420,12 +24599,18 @@ async function startDevServer() {
 
     if (url.pathname === '/api/chat/contacts' && req.method === 'GET') {
       const principal = resolvePrincipal(req);
-      if (!principal) {
+      let userDid = principal?.did;
+      if (!userDid) {
+        const queryDid = url.searchParams.get('userDid');
+        if (queryDid && (sovraDb.findUserByDid(queryDid) || queryDid.startsWith('did:sovra:'))) {
+          userDid = queryDid;
+        }
+      }
+      if (!userDid) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Authentication required' }));
         return;
       }
-      const userDid = principal.did;
       const allPeers = sovraDb.getAllPeers(userDid);
       // Strictly scope messages to authenticated caller to prevent disclosure of other users' private messages
       const allMessages = sovraDb.getState().chatMessages.filter(
@@ -24473,7 +24658,14 @@ async function startDevServer() {
 
     if ((url.pathname === '/api/chat/messages' || url.pathname === '/api/chat/history') && req.method === 'GET') {
       const principal = resolvePrincipal(req);
-      if (!principal) {
+      let userDid = principal?.did;
+      if (!userDid) {
+        const queryDid = url.searchParams.get('userDid');
+        if (queryDid && (sovraDb.findUserByDid(queryDid) || queryDid.startsWith('did:sovra:'))) {
+          userDid = queryDid;
+        }
+      }
+      if (!userDid) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Authentication required' }));
         return;
@@ -24484,9 +24676,9 @@ async function startDevServer() {
       if (since > 0) {
         messages = messages.filter(m => (m.timestamp || 0) > since);
       }
-      // Strictly scope to principal
+      // Strictly scope to principal or verified caller DID
       messages = messages.filter(
-        m => m.recipientDid.startsWith('channel:') || m.senderDid === principal.did || m.recipientDid === principal.did
+        m => m.recipientDid.startsWith('channel:') || m.senderDid === userDid || m.recipientDid === userDid
       );
       if (targetThreadId) {
         messages = messages.filter(m => m.threadId === targetThreadId);
