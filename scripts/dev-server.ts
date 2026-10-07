@@ -2023,6 +2023,7 @@ function renderHtml(
     #tab-admin,
     #bnav-admin,
     #bnav-friends,
+    .node-status-pill,
     .tcp-port-badge {
       display: none !important;
     }
@@ -7010,7 +7011,7 @@ function renderHtml(
           <button id="navModeToggleBtn" onclick="toggleNavLayoutMode()" class="nav-mode-btn" style="display: none;" title="Toggle Navigation Layout (Auto Responsive / Mobile Dock / Desktop Top)" aria-label="Toggle Navigation Layout">
             <span id="navModeIcon">⚡</span> <span id="navModeLabel" class="nav-mode-text">Auto</span>
           </button>
-          <div class="node-status-pill" title="Sovra Mesh Online • TCP :${tcpPort} • LibP2P Noise_XX Active" style="display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 20px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); cursor: default;">
+          <div class="node-status-pill" title="Sovra Mesh Online • TCP :${tcpPort} • LibP2P Noise_XX Active" style="display: none !important; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 20px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); cursor: default;">
             <span class="status-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; display: inline-block;"></span>
             <span class="status-text" style="font-size: 0.72rem; font-weight: 600; color: #34d399;">Online</span>
             <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); font-size: 0.65rem; padding: 1px 5px; border-radius: 6px;">:${tcpPort}</span>
@@ -7986,6 +7987,17 @@ function renderHtml(
           <!-- Search box -->
           <div class="chat-search-box">
             <input type="text" class="chat-search-input" id="chatSearchInput" placeholder="Search contacts & mesh..." oninput="filterChatContacts(this.value)">
+          </div>
+          <!-- Online Friends Active Rail (Shows online friends in chat) -->
+          <div id="chatOnlineFriendsRail" style="display: none; padding: 0.6rem 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(15, 23, 42, 0.5);">
+            <div style="font-size: 0.72rem; font-weight: 700; color: #10b981; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem;">
+              <span style="display: flex; align-items: center; gap: 5px;">
+                <span class="status-pulse-dot" style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
+                <span>Online Friends</span>
+              </span>
+              <span id="chatOnlineFriendsCountBadge" style="font-size: 0.68rem; background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 1px 6px; border-radius: 8px;">0 active</span>
+            </div>
+            <div id="chatOnlineFriendsItems" style="display: flex; gap: 0.65rem; overflow-x: auto; padding-bottom: 3px; scrollbar-width: none;"></div>
           </div>
           <div class="chat-contacts-list" id="contactsList">
             ${contactsStore
@@ -10999,6 +11011,40 @@ function renderHtml(
     window.fetch = window.authenticatedFetch;
 
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+    function isSovraAppInstalled() {
+      try {
+        if (localStorage.getItem('sovra_pwa_installed') === 'true' || localStorage.getItem('pwa_installed') === 'true') {
+          return true;
+        }
+        if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+          localStorage.setItem('sovra_pwa_installed', 'true');
+          return true;
+        }
+        if (window.navigator && Boolean(window.navigator['standalone'])) {
+          localStorage.setItem('sovra_pwa_installed', 'true');
+          return true;
+        }
+        if (document.referrer && (document.referrer.startsWith('android-app://') || document.referrer.includes('sovra'))) {
+          localStorage.setItem('sovra_pwa_installed', 'true');
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+    if (typeof navigator !== 'undefined' && 'getInstalledRelatedApps' in navigator) {
+      navigator.getInstalledRelatedApps().then(function(apps) {
+        if (apps && apps.length > 0) {
+          try {
+            localStorage.setItem('sovra_pwa_installed', 'true');
+            localStorage.setItem('pwa_installed', 'true');
+          } catch (e) {}
+          const topBtn = document.getElementById('pwaInstallBtn');
+          if (topBtn) topBtn.style.display = 'none';
+          const banner = document.getElementById('pwaInstallBanner');
+          if (banner) banner.style.display = 'none';
+        }
+      }).catch(function() {});
+    }
     let isSessionLockedState = false;
     let currentProfileWiped = false;
     let myProfile = null;
@@ -12012,8 +12058,9 @@ function renderHtml(
         showAuthLandingGate();
       }
 
-      if (isMobileDevice) {
+      if (isMobileDevice && !isSovraAppInstalled()) {
         setTimeout(function() {
+          if (isSovraAppInstalled()) return;
           const topBtn = document.getElementById('pwaInstallBtn');
           if (topBtn) topBtn.style.display = 'inline-flex';
           const banner = document.getElementById('pwaInstallBanner');
@@ -12021,6 +12068,11 @@ function renderHtml(
             banner.style.display = 'flex';
           }
         }, 1200);
+      } else {
+        const topBtn = document.getElementById('pwaInstallBtn');
+        if (topBtn) topBtn.style.display = 'none';
+        const banner = document.getElementById('pwaInstallBanner');
+        if (banner) banner.style.display = 'none';
       }
       setTimeout(function() {
         if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
@@ -16951,6 +17003,7 @@ function renderHtml(
             avatarDataUrl: c.avatarDataUrl,
             avatarBg: c.avatarBg || '#6366f1',
             role: c.role || 'Direct Contact',
+            isFriend: Boolean(c.isFriend),
             isOnline: c.isOnline !== false,
             lastSeen: c.lastSeen || 'Online',
             lastMessage: c.lastMessage || '',
@@ -16964,6 +17017,39 @@ function renderHtml(
         }
       });
 
+      // Also merge accepted friends into direct contacts map
+      if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
+        friendsData.friends.forEach(function(f) {
+          if (!f || !f.did || f.did === myDid) return;
+          const existing = directContactsMap.get(f.did);
+          if (existing) {
+            existing.isFriend = true;
+            if (typeof f.isOnline === 'boolean') existing.isOnline = f.isOnline;
+            if (f.lastSeen) existing.lastSeen = f.lastSeen;
+          } else {
+            directContactsMap.set(f.did, {
+              did: f.did,
+              name: f.displayName || f.name || f.handle || 'Friend',
+              handle: f.handle || '',
+              avatar: f.avatar || 'F',
+              avatarDataUrl: f.avatarDataUrl,
+              avatarBg: f.avatarBg || '#10b981',
+              role: 'Mutual Friend',
+              isFriend: true,
+              isOnline: f.isOnline !== false,
+              lastSeen: f.lastSeen || 'Online',
+              lastMessage: '',
+              lastMessageTimestamp: 0,
+              lastMessageStatus: null,
+              lastMessageIsOutgoing: false,
+              unreadCount: 0,
+              disappearingDurationSec: 0,
+              isVerified: true,
+            });
+          }
+        });
+      }
+
       // Add canonical bitchat direct peers (like Alice, Bob) if not present
       (bitchatPeersData || []).forEach(function(p) {
         if (!p || p.isChannel || p.did === myDid) return;
@@ -16976,6 +17062,7 @@ function renderHtml(
             avatarDataUrl: p.avatarDataUrl,
             avatarBg: p.avatarBg || '#ec4899',
             role: p.role || 'Nearby BLE Swarm',
+            isFriend: false,
             isOnline: true,
             lastSeen: 'Online',
             lastMessage: p.lastMessage || '',
@@ -16994,6 +17081,41 @@ function renderHtml(
       });
 
       const allDirectList = Array.from(directContactsMap.values());
+
+      // Render Online Friends Active Rail in chat sidebar
+      const onlineFriendsRail = document.getElementById('chatOnlineFriendsRail');
+      const onlineFriendsItems = document.getElementById('chatOnlineFriendsItems');
+      const onlineFriendsCountBadge = document.getElementById('chatOnlineFriendsCountBadge');
+
+      const onlineFriends = allDirectList.filter(function(c) {
+        return (c.isFriend || c.role === 'Mutual Friend') && c.isOnline;
+      });
+
+      if (onlineFriendsRail && onlineFriendsItems) {
+        if (onlineFriends.length > 0) {
+          onlineFriendsRail.style.display = 'block';
+          if (onlineFriendsCountBadge) {
+            onlineFriendsCountBadge.innerText = onlineFriends.length + ' active';
+          }
+          let railHtml = '';
+          for (const of of onlineFriends) {
+            const avatarContent = of.avatarDataUrl
+              ? '<img src="' + of.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />'
+              : (of.avatar || 'F');
+            const firstName = (of.name || of.handle || 'Friend').split(' ')[0];
+            railHtml += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; flex-shrink: 0; min-width: 52px;" onclick="openDirectChatWithUser(\'' + of.did + '\', \'' + (of.name || '').replace(/'/g, "\\'") + '\', \'' + (of.handle || '').replace(/'/g, "\\'") + '\')" title="Chat with ' + (of.name || 'Friend') + ' (Online)">' +
+              '<div style="position: relative; width: 44px; height: 44px; border-radius: 50%; background: ' + (of.avatarBg || '#10b981') + '; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 0.95rem; border: 2px solid rgba(16, 185, 129, 0.5);">' +
+                avatarContent +
+                '<div class="online-dot" style="background: #10b981; box-shadow: 0 0 6px #10b981; width: 12px; height: 12px; border: 2px solid #0f172a; position: absolute; bottom: 0; right: 0; border-radius: 50%;"></div>' +
+              '</div>' +
+              '<span style="font-size: 0.68rem; color: #e2e8f0; font-weight: 600; max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;">' + firstName + '</span>' +
+            '</div>';
+          }
+          onlineFriendsItems.innerHTML = railHtml;
+        } else {
+          onlineFriendsRail.style.display = 'none';
+        }
+      }
       const filteredDirectList = allDirectList.filter(function(c) {
         if (!q) return true;
         return (c.name || '').toLowerCase().includes(q) ||
@@ -17092,9 +17214,12 @@ function renderHtml(
               '<div class="contact-top-row">' +
                 '<span class="contact-name">' +
                   p.name +
+                  ((p.isFriend || p.role === 'Mutual Friend') ? '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.65rem; padding: 1px 5px; border-radius: 6px; margin-left: 5px; font-weight: 600;">Friend</span>' : '') +
                   (p.isVerified ? '<span class="verified-shield-icon" title="Safety Numbers Verified" style="margin-left: 4px;">🛡️</span>' : '') +
                 '</span>' +
-                '<span class="contact-time" style="' + (p.unreadCount > 0 ? 'color: #22c55e; font-weight: 700;' : '') + '">' + timeDisplay + '</span>' +
+                '<span class="contact-time" style="' + (p.unreadCount > 0 ? 'color: #22c55e; font-weight: 700;' : (p.isOnline ? 'color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;' : '')) + '">' +
+                  (p.isOnline ? '<span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span> Online' : timeDisplay) +
+                '</span>' +
               '</div>' +
               '<div class="contact-preview-row" style="display: flex; align-items: center; width: 100%;">' +
                 previewText +
@@ -17429,7 +17554,16 @@ function renderHtml(
         if (nameEl) nameEl.innerText = contact.name || contact.displayName || contact.handle || 'Peer';
         if (badgeEl) badgeEl.style.display = contact.isVerified ? 'inline-block' : 'none';
         if (statusEl) {
-          statusEl.innerText = (contact.isOnline ? '● Online' : 'Last seen ' + (contact.lastSeen || 'recently')) + ' • Double Ratchet Active';
+          const isF = Boolean(contact.isFriend || contact.role === 'Mutual Friend');
+          if (isF) {
+            if (contact.isOnline) {
+              statusEl.innerHTML = '<span style="color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><span class="status-pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span> Online</span> &bull; <span style="color: #34d399; font-size: 0.72rem; padding: 1px 6px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px;">Friend</span> &bull; Double Ratchet Active';
+            } else {
+              statusEl.innerHTML = '<span style="color: #94a3b8;">Last seen ' + (contact.lastSeen || 'recently') + '</span> &bull; <span style="color: #34d399; font-size: 0.72rem; padding: 1px 6px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px;">Friend</span> &bull; Double Ratchet Active';
+            }
+          } else {
+            statusEl.innerHTML = (contact.isOnline ? '<span style="color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><span class="status-pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span> Online</span>' : '<span style="color: #94a3b8;">Last seen ' + (contact.lastSeen || 'recently') + '</span>') + ' &bull; Double Ratchet Active';
+          }
         }
         if (routeEl) routeEl.style.display = 'none';
         updateHeaderTimerDisplay(contact.disappearingDurationSec || 0);
@@ -21127,6 +21261,13 @@ function renderHtml(
     }
 
     window.addEventListener('beforeinstallprompt', function(e) {
+      if (isSovraAppInstalled()) {
+        const topBtn = document.getElementById('pwaInstallBtn');
+        if (topBtn) topBtn.style.display = 'none';
+        const banner = document.getElementById('pwaInstallBanner');
+        if (banner) banner.style.display = 'none';
+        return;
+      }
       e.preventDefault();
       deferredInstallPrompt = e;
       const banner = document.getElementById('pwaInstallBanner');
@@ -21139,6 +21280,12 @@ function renderHtml(
 
     window.addEventListener('appinstalled', function() {
       deferredInstallPrompt = null;
+      try {
+        localStorage.setItem('sovra_pwa_installed', 'true');
+        localStorage.setItem('pwa_installed', 'true');
+      } catch (e) {}
+      const topBtn = document.getElementById('pwaInstallBtn');
+      if (topBtn) topBtn.style.display = 'none';
       const banner = document.getElementById('pwaInstallBanner');
       if (banner) banner.style.display = 'none';
       const pwaMeBtn = document.getElementById('pwaMeInstallBtn');
@@ -21153,10 +21300,26 @@ function renderHtml(
 
     function triggerPwaInstall(event) {
       if (event && event.stopPropagation) event.stopPropagation();
+      if (isSovraAppInstalled()) {
+        const topBtn = document.getElementById('pwaInstallBtn');
+        if (topBtn) topBtn.style.display = 'none';
+        const banner = document.getElementById('pwaInstallBanner');
+        if (banner) banner.style.display = 'none';
+        showAccountToast('📱 Sovra is already installed on this device!', 'success');
+        return;
+      }
       if (deferredInstallPrompt) {
         deferredInstallPrompt.prompt();
         deferredInstallPrompt.userChoice.then(function(choiceResult) {
           if (choiceResult.outcome === 'accepted') {
+            try {
+              localStorage.setItem('sovra_pwa_installed', 'true');
+              localStorage.setItem('pwa_installed', 'true');
+            } catch (e) {}
+            const topBtn = document.getElementById('pwaInstallBtn');
+            if (topBtn) topBtn.style.display = 'none';
+            const banner = document.getElementById('pwaInstallBanner');
+            if (banner) banner.style.display = 'none';
             showAccountToast('✓ Sovra PWA installation accepted!', 'success');
           }
           deferredInstallPrompt = null;
@@ -21166,6 +21329,12 @@ function renderHtml(
       } else {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (typeof navigator !== 'undefined' && Boolean(navigator['standalone']));
         if (isStandalone) {
+          try {
+            localStorage.setItem('sovra_pwa_installed', 'true');
+            localStorage.setItem('pwa_installed', 'true');
+          } catch (e) {}
+          const topBtn = document.getElementById('pwaInstallBtn');
+          if (topBtn) topBtn.style.display = 'none';
           showAccountToast('📱 Sovra is already installed and running as a standalone app!', 'success');
           return;
         }
@@ -21204,6 +21373,14 @@ function renderHtml(
         deferredInstallPrompt.prompt();
         deferredInstallPrompt.userChoice.then(function(choiceResult) {
           if (choiceResult.outcome === 'accepted') {
+            try {
+              localStorage.setItem('sovra_pwa_installed', 'true');
+              localStorage.setItem('pwa_installed', 'true');
+            } catch (e) {}
+            const topBtn = document.getElementById('pwaInstallBtn');
+            if (topBtn) topBtn.style.display = 'none';
+            const banner = document.getElementById('pwaInstallBanner');
+            if (banner) banner.style.display = 'none';
             showAccountToast('🎉 Thank you for installing Sovra!', 'success');
             closePwaGuideModal();
           }
@@ -25315,12 +25492,17 @@ async function startDevServer() {
         return;
       }
       const allPeers = sovraDb.getAllPeers(userDid);
+      const allRels = sovraDb.getFriendRelationships(userDid);
+      const friendDids = new Set(
+        allRels.filter(r => r.status === 'accepted').map(r => r.fromDid === userDid ? r.toDid : r.fromDid)
+      );
       // Strictly scope messages to authenticated caller to prevent disclosure of other users' private messages
       const allMessages = sovraDb.getState().chatMessages.filter(
         m => m.senderDid === userDid || m.recipientDid === userDid || m.recipientDid.startsWith('channel:')
       );
 
       const contactsWithThreads = allPeers.map(peer => {
+        const isFriend = friendDids.has(peer.did);
         const threadId = sovraDb.getThreadId(userDid, peer.did);
         const threadMessages = allMessages.filter(
           m => m.threadId === threadId || (m.senderDid === peer.did && m.recipientDid === userDid) || (m.senderDid === userDid && m.recipientDid === peer.did)
@@ -25331,7 +25513,7 @@ async function startDevServer() {
           m => m.senderDid === peer.did && (m.recipientDid === userDid || m.recipientDid === 'self') && m.status !== 'read'
         ).length;
 
-        let lastMessageText = peer.role || 'Ready to chat';
+        let lastMessageText = peer.role || (isFriend ? 'Friend on Mesh' : 'Ready to chat');
         if (lastMsg) {
           if (lastMsg.isDisappeared) {
             lastMessageText = '💨 Message disappeared';
@@ -25344,6 +25526,9 @@ async function startDevServer() {
 
         return {
           ...peer,
+          isFriend,
+          isOnline: peer.isOnline !== false,
+          role: isFriend ? (peer.role || 'Friend on Mesh') : peer.role,
           lastMessage: lastMessageText,
           lastMessageTimestamp: lastMsg ? lastMsg.timestamp : (peer.lastSeenTimestamp || 0),
           lastMessageStatus: lastMsg ? lastMsg.status : null,
