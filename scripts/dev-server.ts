@@ -6979,27 +6979,7 @@ function renderHtml(
         </div>
 
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; position: relative;">
-          <!-- Universal + Create Contextual Dropdown -->
-          <div class="header-create-wrap">
-            <button id="headerCreateBtn" onclick="toggleHeaderCreateMenu(event)" class="btn btn-primary" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; font-weight: 700; font-size: 0.8rem; padding: 5px 11px; border-radius: 12px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;" title="Create Channel, Page, or Feed Post" aria-label="Create Channel, Page, or Feed Post" aria-haspopup="menu" aria-expanded="false">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-              <span>Create</span> <span style="font-size: 0.68rem; opacity: 0.7;">▾</span>
-            </button>
-            <div id="headerCreateDropdown" class="header-create-dropdown" role="menu" style="display: none;">
-              <div class="header-create-item" role="menuitem" tabindex="0" onclick="openCreateChannelModal(); hideHeaderCreateMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="m3 11 18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
-                <span>Create Channel</span>
-              </div>
-              <div class="header-create-item" role="menuitem" tabindex="0" onclick="openCreatePageModal(); hideHeaderCreateMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #c084fc;"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>
-                <span>Create Page</span>
-              </div>
-              <div class="header-create-item" role="menuitem" tabindex="0" onclick="triggerBottomCreateAction(); hideHeaderCreateMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #34d399;"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                <span>New Feed Post</span>
-              </div>
-            </div>
-          </div>
+
 
           <div id="headerNotificationBell" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" style="position: relative; cursor: pointer; padding: 4px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center;" title="Real-Time Notifications" aria-label="Notifications">
             <span style="font-size: 0.95rem;">🔔</span>
@@ -8282,10 +8262,13 @@ function renderHtml(
                   </span>
                 </div>
                 
-                <div style="position: absolute; top: 16px; right: 16px; z-index: 10; display: flex; gap: 0.5rem;">
+                <div style="position: absolute; top: 16px; right: 16px; z-index: 10; display: flex; gap: 0.5rem; align-items: center;">
                   <span class="badge" id="videoQualityBadge" style="background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.45);">
                     4K UHD 60FPS
                   </span>
+                  <button class="btn btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.3rem; background: #e11d48; border-color: #f43f5e;" onclick="event.stopPropagation(); openVideoUploadModal()">
+                    <span>🎥</span> Upload Video
+                  </button>
                 </div>
 
                 <!-- Video Canvas Visual Overlay -->
@@ -8409,6 +8392,11 @@ function renderHtml(
                 <!-- Download P2P Blockstore Button -->
                 <button class="yt-pill-btn" style="background: rgba(255,255,255,0.08); border-radius: 20px; border: 1px solid rgba(255,255,255,0.15);" onclick="pinVideoToLocalBlockstore()" id="btnDownloadYt">
                   <span>⬇️</span> <span>Download to P2P</span>
+                </button>
+
+                <!-- Upload Long Video Button -->
+                <button class="yt-pill-btn" style="background: rgba(225, 29, 72, 0.18); border-radius: 20px; border: 1px solid rgba(244, 63, 94, 0.4); color: #f43f5e; font-weight: 700;" onclick="openVideoUploadModal()">
+                  <span>🎥</span> <span>Upload Video</span>
                 </button>
 
                 <!-- Super Thanks Button -->
@@ -9229,6 +9217,66 @@ function renderHtml(
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Creator Hub & Sovereign Entities (Broadcast Channels & Sovereign Pages) -->
+        <div class="card" id="profileCreatorHubCard" style="padding: 1.25rem; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.35); background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <span style="font-size: 1.3rem;">✨</span>
+              <div>
+                <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Creator Hub &amp; Sovereign Entities</div>
+                <div style="font-size: 0.76rem; color: #94a3b8;">Create and manage decentralized broadcast channels and public pages.</div>
+              </div>
+            </div>
+            <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.4); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
+              Sovereign Assets
+            </span>
+          </div>
+
+          <!-- 2-Column Action Cards for Channel & Page Creation -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 0.75rem;">
+            <!-- Broadcast Channels Action Card -->
+            <div style="background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 14px; padding: 1.1rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.85rem;">
+              <div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                  <span style="font-size: 1.35rem;">📢</span>
+                  <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.68rem; font-weight: 700;">BROADCAST</span>
+                </div>
+                <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">Broadcast Channels</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin-top: 0.25rem;">
+                  One-to-many decentralized feeds for subscribers, crypto updates, and announcements.
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Create Channel</span>
+              </button>
+            </div>
+
+            <!-- Sovereign Pages Action Card -->
+            <div style="background: rgba(192, 132, 252, 0.06); border: 1px solid rgba(192, 132, 252, 0.22); border-radius: 14px; padding: 1.1rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.85rem;">
+              <div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                  <span style="font-size: 1.35rem;">🏢</span>
+                  <span class="badge" style="background: rgba(192, 132, 252, 0.15); color: #c084fc; font-size: 0.68rem; font-weight: 700;">PAGE</span>
+                </div>
+                <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">Sovereign Pages</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin-top: 0.25rem;">
+                  Public verified profiles for organizations, projects, developer tools, and communities.
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" onclick="openCreatePageModal()" style="background: rgba(192, 132, 252, 0.2); border: 1px solid rgba(192, 132, 252, 0.45); color: #c084fc; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Create Page</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Managed Entities Live Preview List -->
+          <div id="creatorHubEntitiesContainer" style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid rgba(255,255,255,0.08);">
+            <!-- Rendered dynamically via renderCreatorHubEntities() -->
           </div>
         </div>
 
@@ -10707,6 +10755,50 @@ function renderHtml(
     </div>
   </div>
 
+  <!-- 🎥 6B. UPLOAD LONG VIDEO MODAL (Watch Platform) -->
+  <div id="videoUploadModal" class="omni-modal-overlay" style="display: none;">
+    <div class="omni-modal-card" style="max-width: 500px;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+          <span>🎥</span> <span>Upload Video to Sovereign Watch</span>
+        </div>
+        <button onclick="closeVideoUploadModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.25rem;">
+        <label class="social-modal-label">Video Title</label>
+        <input type="text" id="videoUploadTitleInput" class="social-modal-input" placeholder="e.g. Decentralized Media &amp; P2P BitSwap Deep Dive" value="Decentralized Media &amp; P2P BitSwap Deep Dive">
+
+        <label class="social-modal-label">Channel Author</label>
+        <select id="videoUploadChannelSelect" class="social-modal-input">
+          <option value="personal">👤 Personal Profile</option>
+        </select>
+
+        <label class="social-modal-label">Tags (comma separated)</label>
+        <input type="text" id="videoUploadTagsInput" class="social-modal-input" placeholder="e.g. #P2P, #BitSwap, #Decentralized" value="#P2P, #BitSwap, #Decentralized">
+
+        <label class="social-modal-label">Resolution / Bitrate</label>
+        <select id="videoUploadQualitySelect" class="social-modal-input">
+          <option value="1080p60">1080p 60FPS (High-Bitrate HLS)</option>
+          <option value="4k">4K UHD (Master Profile)</option>
+          <option value="720p">720p (Bandwidth Efficient)</option>
+        </select>
+
+        <label class="social-modal-label">Video File / P2P CID</label>
+        <div style="border: 2px dashed rgba(255,255,255,0.15); border-radius: 12px; padding: 1.25rem; text-align: center; cursor: pointer; background: rgba(0,0,0,0.25);" onclick="document.getElementById('videoUploadFileInput').click()">
+          <input type="file" id="videoUploadFileInput" accept="video/*" style="display: none;" onchange="handleVideoFileSelected(event)" />
+          <div style="font-size: 1.8rem; margin-bottom: 0.25rem;">🎬</div>
+          <div style="font-size: 0.84rem; color: #f8fafc; font-weight: 600;" id="videoUploadFilePrompt">Choose video file (MP4, MKV, WebM)</div>
+          <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Automatic RFC 8216 HLS chunking &amp; BitSwap P2P seed announce</div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+          <button onclick="closeVideoUploadModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
+          <button onclick="submitVideoUpload()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem; background: #e11d48; border-color: #f43f5e;">Publish Video 🚀</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ⚙️ 7. POST OPTIONS MODAL -->
   <div id="postOptionsModal" class="omni-modal-overlay" style="display: none;">
     <div class="omni-modal-card" style="max-width: 380px;">
@@ -11426,6 +11518,7 @@ function renderHtml(
 
       verifyCurrentIdentityCrypto(myProfile);
       updateProfileDynamicStats();
+      if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
     }
 
     function showAuthLandingGate() {
@@ -12160,7 +12253,7 @@ function renderHtml(
 
       function renderPhrase(phrase) {
         if (!phrase) return;
-        var words = phrase.trim().split(/[ \t\r\n]+/).filter(Boolean);
+        var words = phrase.trim().split(' ').map(function(w) { return w.trim(); }).filter(Boolean);
         var html = '';
         for (var i = 0; i < words.length; i++) {
           html += '<div style="background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden;">' +
@@ -13059,6 +13152,7 @@ function renderHtml(
       } else if (tab === 'me') {
         renderProfileGrid(currentProfileGridTab || 'posts');
         if (typeof updateProfileDynamicStats === 'function') updateProfileDynamicStats();
+        if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
       } else if (tab === 'friends') {
         if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
         renderFriendsDiscoveryView();
@@ -16539,7 +16633,7 @@ function renderHtml(
           directContactsMap.set(p.did, {
             did: p.did,
             name: p.name,
-            handle: p.handle || ('@' + p.name.toLowerCase().replace(/[ \t\r\n]+/g, '_')),
+            handle: p.handle || ('@' + p.name.toLowerCase().split(' ').filter(Boolean).join('_')),
             avatar: p.avatar,
             avatarDataUrl: p.avatarDataUrl,
             avatarBg: p.avatarBg || '#ec4899',
@@ -16855,7 +16949,7 @@ function renderHtml(
           matchedPerson = dynamicCatalogPeople.find(function(p) { return p.pubkey === targetDid || p.did === targetDid; });
         }
         const displayName = targetName || (matchedPerson ? matchedPerson.name : '') || (targetHandle ? targetHandle.replace(/^@/, '') : 'Peer');
-        const handle = targetHandle || (matchedPerson ? matchedPerson.handle : '') || ('@' + displayName.toLowerCase().replace(/[ \t\r\n]+/g, '_'));
+        const handle = targetHandle || (matchedPerson ? matchedPerson.handle : '') || ('@' + displayName.toLowerCase().split(' ').filter(Boolean).join('_'));
 
         contact = {
           did: targetDid,
@@ -19112,7 +19206,7 @@ function renderHtml(
       ? contactsData.map(function(c) {
           return {
             pubkey: c.did,
-            handle: c.handle || ('@' + (c.name || 'peer').toLowerCase().replace(/[ \t\r\n]+/g, '_')),
+            handle: c.handle || ('@' + (c.name || 'peer').toLowerCase().split(' ').filter(Boolean).join('_')),
             name: c.name || 'Sovereign Peer',
             bio: c.role || 'Decentralized P2P Peer',
             avatar: c.avatar || ((c.name && c.name[0]) ? c.name[0].toUpperCase() : 'P'),
@@ -20355,10 +20449,23 @@ function renderHtml(
       .then(function(data) {
         if (data.ok && data.channel) {
           socialOmniCatalog.channels.unshift(data.channel);
+          if (typeof allChannelsData !== 'undefined') allChannelsData.unshift(data.channel);
           closeCreateChannelModal();
-          alert('🎉 Sovereign Channel ' + handle + ' created and saved to dynamic store! You are registered as the Owner.');
-          openOmniSearch();
-          switchSearchTab('channels');
+          const authorSelect = document.getElementById('composerAuthorSelect');
+          if (authorSelect) {
+            let optGroup = authorSelect.querySelector('optgroup[label*="Broadcast Channels"]');
+            if (!optGroup) {
+              optGroup = document.createElement('optgroup');
+              optGroup.label = '📢 Broadcast Channels';
+              authorSelect.appendChild(optGroup);
+            }
+            const opt = document.createElement('option');
+            opt.value = 'channel:' + data.channel.id;
+            opt.textContent = '📢 ' + data.channel.name + ' (' + data.channel.handle + ')';
+            optGroup.appendChild(opt);
+          }
+          if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
+          showAccountToast('🎉 Sovereign Channel ' + handle + ' created in Creator Hub!');
         } else {
           alert('Failed to create channel: ' + (data.error || 'Unknown error'));
         }
@@ -20404,10 +20511,23 @@ function renderHtml(
       .then(function(data) {
         if (data.ok && data.page) {
           socialOmniCatalog.pages.unshift(data.page);
+          if (typeof allPagesData !== 'undefined') allPagesData.unshift(data.page);
           closeCreatePageModal();
-          alert('🎉 Sovereign Page ' + handle + ' created and saved to dynamic store! CTA: ' + data.page.cta);
-          openOmniSearch();
-          switchSearchTab('pages');
+          const authorSelect = document.getElementById('composerAuthorSelect');
+          if (authorSelect) {
+            let optGroup = authorSelect.querySelector('optgroup[label*="Sovereign Pages"]');
+            if (!optGroup) {
+              optGroup = document.createElement('optgroup');
+              optGroup.label = '🏢 Sovereign Pages';
+              authorSelect.appendChild(optGroup);
+            }
+            const opt = document.createElement('option');
+            opt.value = 'page:' + data.page.id;
+            opt.textContent = '🏢 ' + data.page.name + ' (' + data.page.handle + ')';
+            optGroup.appendChild(opt);
+          }
+          if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
+          showAccountToast('🎉 Sovereign Page ' + handle + ' created in Creator Hub!');
         } else {
           alert('Failed to create page: ' + (data.error || 'Unknown error'));
         }
@@ -20415,6 +20535,139 @@ function renderHtml(
       .catch(function(err) {
         alert('Page creation error: ' + err.message);
       });
+    }
+
+    // --- Long-Form Video Upload Handlers (YouTube / Watch Platform) ---
+    function openVideoUploadModal() {
+      const m = document.getElementById('videoUploadModal');
+      if (m) {
+        m.style.display = 'flex';
+        const sel = document.getElementById('videoUploadChannelSelect');
+        if (sel) {
+          const myName = (myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Profile';
+          let opts = '<option value="personal">👤 ' + myName + '</option>';
+          const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+          for (let i = 0; i < channels.length; i++) {
+            opts += '<option value="' + channels[i].id + '">📢 ' + channels[i].name + ' (' + channels[i].handle + ')</option>';
+          }
+          sel.innerHTML = opts;
+        }
+      }
+    }
+    function closeVideoUploadModal() {
+      const m = document.getElementById('videoUploadModal');
+      if (m) m.style.display = 'none';
+    }
+    let selectedVideoUploadFile = null;
+    function handleVideoFileSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      selectedVideoUploadFile = file;
+      const prompt = document.getElementById('videoUploadFilePrompt');
+      if (prompt) prompt.innerText = '✓ Selected: ' + file.name + ' (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB)';
+    }
+    function submitVideoUpload() {
+      const title = document.getElementById('videoUploadTitleInput').value.trim();
+      const tagsStr = document.getElementById('videoUploadTagsInput').value.trim();
+      if (!title) {
+        alert('Please enter a video title.');
+        return;
+      }
+      const tags = tagsStr.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+      const newVideo = {
+        id: 'yt-vid-' + Date.now(),
+        title: title,
+        channelName: (myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Sovereign Creator',
+        channelHandle: (myProfile && myProfile.handle) ? myProfile.handle : '@creator',
+        channelAvatar: (myProfile && myProfile.avatar) ? myProfile.avatar : '🎬',
+        channelAvatarBg: (myProfile && myProfile.avatarBg) ? myProfile.avatarBg : '#e11d48',
+        channelSubscribersText: '1.2K subscribers',
+        views: 1,
+        likes: 0,
+        cid: 'bafybeig' + Math.random().toString(36).substring(2, 10),
+        tags: tags.length ? tags : ['#Sovereign', '#P2P']
+      };
+      if (typeof longFormVideosCatalog !== 'undefined') {
+        longFormVideosCatalog.unshift(newVideo);
+        const titleEl = document.getElementById('ytVideoTitle');
+        if (titleEl) titleEl.innerText = newVideo.title;
+        const cidEl = document.getElementById('ytCidDisplay');
+        if (cidEl) cidEl.innerText = 'CID: ' + newVideo.cid;
+        const chanEl = document.getElementById('ytChannelName');
+        if (chanEl) chanEl.innerText = newVideo.channelName;
+      }
+      closeVideoUploadModal();
+      showAccountToast('🎉 Video "' + title + '" published to Sovereign Watch over P2P!');
+    }
+
+    // --- Profile Creator Hub Dynamic Entities Renderer ---
+    function renderCreatorHubEntities() {
+      const container = document.getElementById('creatorHubEntitiesContainer');
+      if (!container) return;
+      const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const pages = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+
+      let html = '<div style="font-size: 0.82rem; font-weight: 700; color: #cbd5e1; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">' +
+        '<span>📋 Your Active Entities (' + (channels.length + pages.length) + ')</span>' +
+        '<span style="font-size: 0.72rem; color: #94a3b8;">Sovereign Network Registry</span>' +
+        '</div>';
+
+      if (channels.length === 0 && pages.length === 0) {
+        html += '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 12px;">No channels or pages created yet. Use the buttons above to create your first decentralized channel or page!</div>';
+        container.innerHTML = html;
+        return;
+      }
+
+      html += '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
+      for (let i = 0; i < channels.length; i++) {
+        const c = channels[i];
+        html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">' +
+          '<div style="display: flex; align-items: center; gap: 8px;">' +
+            '<div style="width: 32px; height: 32px; border-radius: 8px; background: ' + (c.bg || '#38bdf8') + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #fff;">' + (c.avatar || '📢') + '</div>' +
+            '<div>' +
+              '<div style="font-weight: 700; color: #f8fafc; font-size: 0.85rem;">' + c.name + ' <span style="font-size: 0.68rem; color: #38bdf8; font-weight: 600;">' + c.handle + '</span></div>' +
+              '<div style="font-size: 0.72rem; color: #94a3b8;">📢 Broadcast Channel &bull; ' + (c.count ? c.count.toLocaleString() : '0') + ' subscribers</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display: flex; gap: 6px;">' +
+            '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">Broadcast As</button>' +
+          '</div>' +
+        '</div>';
+      }
+
+      for (let j = 0; j < pages.length; j++) {
+        const p = pages[j];
+        html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">' +
+          '<div style="display: flex; align-items: center; gap: 8px;">' +
+            '<div style="width: 32px; height: 32px; border-radius: 8px; background: ' + (p.bg || '#c084fc') + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #fff;">' + (p.avatar || '🏢') + '</div>' +
+            '<div>' +
+              '<div style="font-weight: 700; color: #f8fafc; font-size: 0.85rem;">' + p.name + ' <span style="font-size: 0.68rem; color: #c084fc; font-weight: 600;">' + p.handle + '</span></div>' +
+              '<div style="font-size: 0.72rem; color: #94a3b8;">🏢 Sovereign Page &bull; ' + (p.category || 'Entity') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display: flex; gap: 6px;">' +
+            '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px;" data-entity="page:' + p.id + '" onclick="publishAsEntity(this.dataset.entity)">Post As</button>' +
+          '</div>' +
+        '</div>';
+      }
+      html += '</div>';
+
+      container.innerHTML = html;
+    }
+
+    function publishAsEntity(val) {
+      const select = document.getElementById('composerAuthorSelect');
+      if (select) {
+        select.value = val;
+        handleComposerAuthorChange(val);
+      }
+      switchTab('feed');
+      const composer = document.querySelector('.feed-container .card');
+      if (composer) {
+        composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input = composer.querySelector('textarea') || composer.querySelector('input');
+        if (input) setTimeout(function() { input.focus(); }, 300);
+      }
     }
 
     // --- Feed Post Options & Actions ---
