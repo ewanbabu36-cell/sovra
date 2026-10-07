@@ -3184,9 +3184,7 @@ export class SovraDatabaseEngine {
       return { ok: false, error: 'User account not found' };
     }
     const token = 'stk_' + crypto.randomBytes(24).toString('hex');
-    if (!user.sessionToken) {
-      user.sessionToken = token;
-    }
+    user.sessionToken = token;
     user.updatedAt = Date.now();
     this.createSession({
       userDid: user.did,
@@ -3202,11 +3200,19 @@ export class SovraDatabaseEngine {
   public logoutUser(token: string): boolean {
     this.load();
     if (!token) return false;
-    this.revokeSession(token);
-    const user = this.db.users.find(u => u.sessionToken === token);
-    if (user) {
+    let modified = false;
+    const session = (this.db.user_sessions || []).find(s => s.token === token || s.sessionId === token);
+    if (session) {
+      session.isRevoked = true;
+      modified = true;
+    }
+    const user = this.db.users.find(u => u.sessionToken === token || (session && u.did === session.userDid));
+    if (user && user.sessionToken === token) {
       user.sessionToken = undefined;
       user.updatedAt = Date.now();
+      modified = true;
+    }
+    if (modified) {
       this.save();
       return true;
     }

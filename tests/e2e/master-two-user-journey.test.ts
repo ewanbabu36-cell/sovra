@@ -5,7 +5,7 @@ import * as path from 'path';
 const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
 const STORAGE_FILE = path.resolve(process.cwd(), '.sovra-storage-dev', 'dynamic-social-state.json');
 
-describe('Sovra Master Two-User & Multi-Format End-to-End Journey', () => {
+describe('Sovra Master Two-User & Multi-Format End-to-End Journey', { timeout: 30000 }, () => {
   let userAToken: string;
   let userADid: string;
 

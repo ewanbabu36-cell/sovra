@@ -10018,70 +10018,105 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- ⚡ 3. WELCOME & FORGOT USER ID ONBOARDING MODAL -->
-  <div id="welcomeOnboardingModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(5,8,16,0.96); backdrop-filter: blur(25px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
-    <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; max-width: 440px; width: 100%; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center; position: relative;">
+  <!-- ⚡ 3. SOVEREIGN AUTH & ONBOARDING LANDING GATE -->
+  <div id="welcomeOnboardingModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(5,8,16,0.96); backdrop-filter: blur(25px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto;">
+    <div style="background: linear-gradient(145deg, #0f172a, #111a33); border: 1px solid rgba(255,255,255,0.14); border-radius: 28px; max-width: 460px; width: 100%; padding: 2rem; box-shadow: 0 25px 60px -12px rgba(0,0,0,0.85); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center; position: relative;">
       
       <div style="display: flex; justify-content: flex-end; margin-bottom: -0.5rem;">
-        <button type="button" onclick="closeOnboardingModal()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;" title="Close modal" aria-label="Close modal">✕</button>
+        <button type="button" id="womCloseBtn" onclick="closeOnboardingModal()" style="display: none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; align-items: center; justify-content: center;" title="Close modal" aria-label="Close modal">✕</button>
       </div>
 
       <!-- STEP 1: Handle input or Passkey auto-find -->
       <div id="womStep1">
-        <div style="font-size: 40px; margin-bottom: 0.5rem;">⚡</div>
-        <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0 0 0.35rem 0;">Welcome to Sovra</h2>
-        <p style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 1.5rem 0;">
-          Zero passwords. Pure biometric hardware ownership.
+        <div style="width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, #6366f1, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; margin: 0 auto 0.75rem auto; box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);">
+          S
+        </div>
+        <h2 style="font-size: 1.45rem; font-weight: 800; margin: 0 0 0.25rem 0; letter-spacing: -0.02em;">Welcome to Sovra</h2>
+        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0 0 1.25rem 0;">
+          Decentralized Social Network • Zero Passwords • Cryptographic Mesh
         </p>
 
-        <!-- Live Validation Alert -->
-        <div id="womErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
-
-        <!-- Full Name Input -->
-        <div style="margin-bottom: 1rem; text-align: left;">
-          <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">Your Full Name</label>
-          <input type="text" id="womNameInput" placeholder="e.g. Rahul Sharma" style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+        <!-- Segmented Tab Switcher: Create Account vs Sign In -->
+        <div style="display: flex; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 4px; margin-bottom: 1.25rem; gap: 4px;">
+          <button type="button" id="womTabRegisterBtn" onclick="switchWomAuthTab('register')" style="flex: 1; padding: 8px 12px; border: none; border-radius: 9px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: #3b82f6; color: #fff; transition: all 0.2s ease;">
+            ✨ Create Account
+          </button>
+          <button type="button" id="womTabLoginBtn" onclick="switchWomAuthTab('login')" style="flex: 1; padding: 8px 12px; border: none; border-radius: 9px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s ease;">
+            🔑 Sign In
+          </button>
         </div>
 
-        <!-- Handle Input with Live Duplicate Check -->
-        <div style="margin-bottom: 1.25rem; text-align: left;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Choose Sovereign Handle</label>
-            <span id="womHandleFeedback" style="font-size: 0.72rem; color: #94a3b8;">Checked on P2P Mesh</span>
+        <!-- TAB A: REGISTER (New Sovereign User) -->
+        <div id="womRegisterForm">
+          <!-- Live Validation Alert -->
+          <div id="womErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
+
+          <!-- Full Name Input -->
+          <div style="margin-bottom: 0.9rem; text-align: left;">
+            <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Your Full Name</label>
+            <input type="text" id="womNameInput" placeholder="e.g. Rahul Sharma" style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
           </div>
-          <div style="position: relative;">
-            <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-            <input type="text" id="womHandleInput" placeholder="username" oninput="validateWomHandleLive(this.value)" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+
+          <!-- Handle Input with Live Duplicate Check -->
+          <div style="margin-bottom: 1rem; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Choose Sovereign Handle</label>
+              <span id="womHandleFeedback" style="font-size: 0.72rem; color: #94a3b8;">Checked on P2P Mesh</span>
+            </div>
+            <div style="position: relative;">
+              <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
+              <input type="text" id="womHandleInput" placeholder="username (e.g. rahul_phone)" oninput="validateWomHandleLive(this.value)" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+            </div>
           </div>
+
+          <!-- Optional Profile Photo Upload Row -->
+          <div style="display: flex; align-items: center; gap: 0.85rem; padding: 0.65rem 0.85rem; background: #1e293b; border-radius: 12px; border: 1px solid #334155; margin-bottom: 1.25rem; text-align: left;">
+            <div id="womAvatarPreview" style="width: 44px; height: 44px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; overflow: hidden; border: 2px solid #38bdf8; flex-shrink: 0;">
+              <span id="womAvatarLetter">S</span>
+            </div>
+            <div style="flex: 1;">
+              <div style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 2px;">Profile Photo (Optional)</div>
+              <button type="button" onclick="document.getElementById('womPhotoInput').click()" style="padding: 0.3rem 0.65rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; color: #38bdf8; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                <span>📷</span> <span>Choose Photo</span>
+              </button>
+              <input type="file" id="womPhotoInput" accept="image/*" style="display: none;" onchange="handleWomPhotoSelect(event)">
+            </div>
+          </div>
+
+          <button id="womRegisterSubmitBtn" onclick="triggerBiometricAccountCreation()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); margin-bottom: 0.75rem;">
+            <span>Create Sovereign Identity</span> <span>➔</span>
+          </button>
+
+          <!-- 🔑 Auto-Find with Passkey -->
+          <button onclick="autoFindForgotUserIdDemo()" style="width: 100%; padding: 0.75rem; background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0.5rem;">
+            <span>🔑 Auto-Find Identity with Passkey Enclave</span>
+          </button>
         </div>
 
-        <!-- Optional Profile Photo Upload Row -->
-        <div style="display: flex; align-items: center; gap: 0.85rem; padding: 0.65rem 0.85rem; background: #1e293b; border-radius: 12px; border: 1px solid #334155; margin-bottom: 1.25rem; text-align: left;">
-          <div id="womAvatarPreview" style="width: 46px; height: 46px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; overflow: hidden; border: 2px solid #38bdf8; flex-shrink: 0;">
-            <span id="womAvatarLetter">S</span>
+        <!-- TAB B: SIGN IN (Existing User) -->
+        <div id="womLoginForm" style="display: none;">
+          <div id="womLoginErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
+
+          <div style="margin-bottom: 1.25rem; text-align: left;">
+            <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Your Sovereign Handle or DID</label>
+            <div style="position: relative;">
+              <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
+              <input type="text" id="womLoginHandleInput" placeholder="username (e.g. laptop_host or rahul_phone)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+            </div>
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 5px;">Enter your handle or W3C Ed25519 DID to authenticate your session.</div>
           </div>
-          <div style="flex: 1;">
-            <div style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 2px;">Profile Photo (Optional)</div>
-            <button type="button" onclick="document.getElementById('womPhotoInput').click()" style="padding: 0.3rem 0.65rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; color: #38bdf8; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-              <span>📷</span> <span>Choose Photo</span>
-            </button>
-            <input type="file" id="womPhotoInput" accept="image/*" style="display: none;" onchange="handleWomPhotoSelect(event)">
-          </div>
+
+          <button id="womLoginSubmitBtn" onclick="triggerUserLogin()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4); margin-bottom: 0.75rem;">
+            <span>Sign In to Sovereign Node</span> <span>➔</span>
+          </button>
         </div>
 
-        <button onclick="triggerBiometricAccountCreation()" style="width: 100%; padding: 0.85rem; background: #3b82f6; color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); margin-bottom: 0.75rem;">
-          <span>Continue with Biometrics</span> <span>→</span>
-        </button>
-
-        <!-- 🔑 THE FORGOT USER ID BUTTON -->
-        <button onclick="autoFindForgotUserIdDemo()" style="width: 100%; padding: 0.8rem; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0.5rem;">
-          <span>🔑 Forgot User ID? Auto-Find with Passkey</span>
-        </button>
-
-        <!-- Skip / Continue as Node Operator -->
-        <button type="button" onclick="skipOnboardingAsHost()" style="width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 0.5rem;">
-          <span>Skip &amp; Continue as Local Host Node ➔</span>
-        </button>
+        <!-- Dev Link / Connect as Node Operator -->
+        <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.75rem; margin-top: 0.75rem;">
+          <button type="button" onclick="skipOnboardingAsHost()" style="width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>💻 Connect as Local Node Operator (@laptop_host) ➔</span>
+          </button>
+        </div>
 
         <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.5rem;">
           Cryptographic DID &amp; hardware session saved permanently on device.
@@ -10102,7 +10137,7 @@ function renderHtml(
         <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 2px solid #10b981; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 1rem auto;">
           ✓
         </div>
-        <h3 style="font-size: 1.25rem; font-weight: 800; margin: 0 0 0.25rem 0;">Identity Restored!</h3>
+        <h3 style="font-size: 1.25rem; font-weight: 800; margin: 0 0 0.25rem 0;">Identity Ready!</h3>
         <div style="font-size: 1.05rem; color: #38bdf8; font-weight: 700; margin-bottom: 1.25rem;" id="womRestoredHandleDisplay">@sovereign.mesh</div>
         <div style="background: #1e293b; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.75rem; text-align: left; color: #94a3b8; margin-bottom: 1.25rem;">
           <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
@@ -10437,29 +10472,10 @@ function renderHtml(
         }
       } catch (e) {}
 
-      // Auto-seed host profile if none exists so UI is 100% dynamic & immediately interactive
-      if (!myProfile) {
-        myProfile = {
-          did: '${masterKey.did}',
-          handle: isMobileDevice ? '@phone_user' : '${hostUser ? hostUser.handle : "@laptop_host"}',
-          displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
-          name: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
-          avatar: isMobileDevice ? '📱' : '💻',
-          avatarBg: '#6366f1',
-          bio: isMobileDevice ? 'Sovereign Phone Peer' : 'Sovereign P2P Node Operator',
-          deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
-          device: isMobileDevice ? 'Mobile' : 'Desktop',
-          isOnline: true,
-          sessionToken: '${hostSessionToken}',
-        };
-        try {
-          localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-          if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
-        } catch(e) {}
-      } else {
+      if (myProfile) {
         const activeSavedToken = localStorage.getItem('sovra_session_token');
-        if ((!activeSavedToken || activeSavedToken === 'undefined' || activeSavedToken === 'null') && window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) {
-          try { localStorage.setItem('sovra_session_token', window.SOVRA_HOST_SESSION.token); } catch(e) {}
+        if ((!activeSavedToken || activeSavedToken === 'undefined' || activeSavedToken === 'null') && myProfile.sessionToken) {
+          try { localStorage.setItem('sovra_session_token', myProfile.sessionToken); } catch(e) {}
         }
       }
     } else {
@@ -10985,36 +11001,155 @@ function renderHtml(
       updateProfileDynamicStats();
     }
 
+    function showAuthLandingGate() {
+      const wom = document.getElementById('welcomeOnboardingModal');
+      if (wom) {
+        wom.style.zIndex = '999998';
+        wom.style.display = 'flex';
+        const s1 = document.getElementById('womStep1');
+        const s2 = document.getElementById('womStep2');
+        const s3 = document.getElementById('womStep3');
+        if (s1) s1.style.display = 'block';
+        if (s2) s2.style.display = 'none';
+        if (s3) s3.style.display = 'none';
+
+        const closeBtn = document.getElementById('womCloseBtn');
+        if (closeBtn) closeBtn.style.display = (myProfile && myProfile.sessionToken) ? 'flex' : 'none';
+      }
+    }
+
     function closeOnboardingModal() {
+      if (!myProfile || !myProfile.sessionToken) {
+        showAccountToast('⚠️ Please create an account or sign in to enter Sovra.');
+        return;
+      }
       const wom = document.getElementById('welcomeOnboardingModal');
       if (wom) wom.style.display = 'none';
       try { sessionStorage.setItem('sovra_onboarding_dismissed', 'true'); } catch(e) {}
     }
 
+    function switchWomAuthTab(tab) {
+      const regTab = document.getElementById('womTabRegisterBtn');
+      const loginTab = document.getElementById('womTabLoginBtn');
+      const regForm = document.getElementById('womRegisterForm');
+      const loginForm = document.getElementById('womLoginForm');
+      if (tab === 'register') {
+        if (regTab) {
+          regTab.style.background = '#3b82f6';
+          regTab.style.color = '#fff';
+        }
+        if (loginTab) {
+          loginTab.style.background = 'transparent';
+          loginTab.style.color = '#94a3b8';
+        }
+        if (regForm) regForm.style.display = 'block';
+        if (loginForm) loginForm.style.display = 'none';
+      } else {
+        if (regTab) {
+          regTab.style.background = 'transparent';
+          regTab.style.color = '#94a3b8';
+        }
+        if (loginTab) {
+          loginTab.style.background = '#10b981';
+          loginTab.style.color = '#fff';
+        }
+        if (regForm) regForm.style.display = 'none';
+        if (loginForm) loginForm.style.display = 'block';
+        const loginInput = document.getElementById('womLoginHandleInput');
+        if (loginInput) setTimeout(() => loginInput.focus(), 100);
+      }
+    }
+
+    async function triggerUserLogin() {
+      const input = document.getElementById('womLoginHandleInput');
+      const errBox = document.getElementById('womLoginErrorMsg');
+      const btn = document.getElementById('womLoginSubmitBtn');
+      if (!input) return;
+      let identifier = input.value.trim();
+      if (!identifier) {
+        if (errBox) {
+          errBox.innerText = 'Please enter your sovereign handle or DID.';
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+      if (!identifier.startsWith('@') && !identifier.startsWith('did:')) {
+        identifier = '@' + identifier;
+      }
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Verifying cryptographic credentials...</span>';
+      }
+      try {
+        const res = await fetch('/api/user/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: identifier, device: isMobileDevice ? 'Mobile' : 'Desktop' })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok || !data.user) {
+          if (errBox) {
+            errBox.innerText = data.error || 'User not found. Please check your handle or create an account.';
+            errBox.style.display = 'block';
+          }
+          return;
+        }
+
+        if (errBox) errBox.style.display = 'none';
+        myProfile = data.user;
+        currentUserHandle = myProfile.handle;
+
+        localStorage.removeItem('sovra_logged_out');
+        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+        if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
+
+        fetch('/api/peers/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(myProfile)
+        }).catch(function() {});
+
+        const wom = document.getElementById('welcomeOnboardingModal');
+        if (wom) wom.style.display = 'none';
+        updateUserDisplayInUI();
+        showAccountToast('🎉 Welcome back, ' + (myProfile.name || myProfile.handle) + '!');
+      } catch (err) {
+        if (errBox) {
+          errBox.innerText = 'Network error: ' + (err?.message || err);
+          errBox.style.display = 'block';
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Sign In to Sovereign Node ➔</span>';
+        }
+      }
+    }
+
     function skipOnboardingAsHost() {
       localStorage.removeItem('sovra_logged_out');
-      closeOnboardingModal();
-      if (!myProfile || !myProfile.did) {
-        myProfile = {
-          did: '${masterKey.did}',
-          handle: isMobileDevice ? '@phone_user' : '@laptop_host',
-          displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
-          name: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
-          avatar: isMobileDevice ? '📱' : '💻',
-          avatarBg: '#6366f1',
-          bio: 'Sovereign P2P Node Operator',
-          deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
-          device: isMobileDevice ? 'Mobile' : 'Desktop',
-          isOnline: true,
-          sessionToken: '${hostSessionToken}',
-        };
-        try {
-          localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-          if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
-        } catch(e) {}
-      }
+      myProfile = {
+        did: '${masterKey.did}',
+        handle: isMobileDevice ? '@phone_user' : '@laptop_host',
+        displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
+        name: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
+        avatar: isMobileDevice ? '📱' : '💻',
+        avatarBg: '#6366f1',
+        bio: 'Sovereign P2P Node Operator',
+        deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
+        device: isMobileDevice ? 'Mobile' : 'Desktop',
+        isOnline: true,
+        sessionToken: '${hostSessionToken}',
+      };
+      try {
+        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+        if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
+      } catch(e) {}
       currentUserHandle = myProfile.handle;
+      const wom = document.getElementById('welcomeOnboardingModal');
+      if (wom) wom.style.display = 'none';
       updateUserDisplayInUI();
+      showAccountToast('💻 Connected as Local Node Operator (' + myProfile.handle + ')');
     }
 
     let selectedEditAvatarBg = '#6366f1';
@@ -11218,42 +11353,13 @@ function renderHtml(
     // Auto-check onboarding on first visit & restore session from server
     window.addEventListener('DOMContentLoaded', function() {
       const isExplicitlyLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
-      if (isExplicitlyLoggedOut) {
-        updateUserDisplayInUI();
-        const wom = document.getElementById('welcomeOnboardingModal');
-        if (wom) {
-          wom.style.zIndex = '999998';
-          wom.style.display = 'flex';
-          const s1 = document.getElementById('womStep1');
-          const s2 = document.getElementById('womStep2');
-          const s3 = document.getElementById('womStep3');
-          if (s1) s1.style.display = 'block';
-          if (s2) s2.style.display = 'none';
-          if (s3) s3.style.display = 'none';
-        }
-        return;
-      }
-
       const sessionToken = localStorage.getItem('sovra_session_token');
+      const savedProfile = localStorage.getItem('sovra_user_profile');
 
-      function showOnboardingModal() {
-        const dismissed = sessionStorage.getItem('sovra_onboarding_dismissed');
-        if (dismissed) return;
-        setTimeout(function() {
-          const wom = document.getElementById('welcomeOnboardingModal');
-          if (wom) {
-            wom.style.display = 'flex';
-            const handleInput = document.getElementById('womHandleInput');
-            if (handleInput && !handleInput.value) {
-              handleInput.value = isMobileDevice ? 'rahul_phone' : 'host_laptop';
-              validateWomHandleLive(handleInput.value);
-            }
-            const nameInput = document.getElementById('womNameInput');
-            if (nameInput && !nameInput.value) {
-              nameInput.value = isMobileDevice ? 'Rahul Sharma' : 'Host Node';
-            }
-          }
-        }, 120);
+      if (isExplicitlyLoggedOut || !sessionToken || !savedProfile) {
+        updateUserDisplayInUI();
+        showAuthLandingGate();
+        return;
       }
 
       if (sessionToken) {
@@ -11271,45 +11377,22 @@ function renderHtml(
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(myProfile)
               }).catch(function() {});
-            } else if (!myProfile) {
-              updateUserDisplayInUI();
             } else {
+              myProfile = null;
+              currentUserHandle = '@guest';
+              localStorage.removeItem('sovra_user_profile');
+              localStorage.removeItem('sovra_session_token');
               updateUserDisplayInUI();
+              showAuthLandingGate();
             }
           })
           .catch(() => {
             if (myProfile) updateUserDisplayInUI();
+            else showAuthLandingGate();
           });
-      } else if (myProfile && myProfile.did) {
-        // Sync with server by DID
-        fetch('/api/user/me?did=' + encodeURIComponent(myProfile.did))
-          .then(r => r.json())
-          .then(data => {
-            if (data.ok && data.user) {
-              myProfile = data.user;
-              currentUserHandle = myProfile.handle;
-              if (data.user.sessionToken) localStorage.setItem('sovra_session_token', data.user.sessionToken);
-              localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-              updateUserDisplayInUI();
-            } else {
-              // Register current profile with server
-              fetch('/api/user/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(myProfile)
-              }).then(r => r.json()).then(regData => {
-                if (regData.ok && regData.sessionToken) {
-                  localStorage.setItem('sovra_session_token', regData.sessionToken);
-                  myProfile = regData.user;
-                  localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-                }
-                updateUserDisplayInUI();
-              }).catch(() => updateUserDisplayInUI());
-            }
-          })
-          .catch(() => updateUserDisplayInUI());
       } else {
         updateUserDisplayInUI();
+        showAuthLandingGate();
       }
 
       if (isMobileDevice) {
