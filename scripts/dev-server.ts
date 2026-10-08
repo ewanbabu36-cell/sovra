@@ -1869,11 +1869,86 @@ function renderHtml(
       cursor: pointer;
       transition: all 0.15s ease;
     }
-    .composer-media-btn:hover {
+    .composer-media-btn:hover, .composer-media-btn.active {
       background: rgba(99, 102, 241, 0.15);
       color: #c7d2fe;
       border-color: rgba(99, 102, 241, 0.3);
       transform: translateY(-1px);
+    }
+    .composer-more-menu-container {
+      position: relative;
+      display: inline-block;
+    }
+    .composer-more-dropdown {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      background: rgba(15, 23, 42, 0.96);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(99, 102, 241, 0.2);
+      padding: 6px;
+      z-index: 1000;
+      min-width: 175px;
+    }
+    .composer-more-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 7px 10px;
+      border: none;
+      background: transparent;
+      color: #cbd5e1;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+      box-sizing: border-box;
+    }
+    .composer-more-item:hover {
+      background: rgba(99, 102, 241, 0.2);
+      color: #fff;
+      transform: translateX(2px);
+    }
+    .composer-active-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(99, 102, 241, 0.18);
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      color: #c7d2fe;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-top: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+    .composer-active-pill-remove {
+      background: rgba(255, 255, 255, 0.15);
+      border: none;
+      color: #cbd5e1;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      transition: all 0.15s ease;
+    }
+    .composer-active-pill-remove:hover {
+      background: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
     }
     .composer-theme-select {
       background: rgba(255, 255, 255, 0.06);
@@ -7218,21 +7293,56 @@ function renderHtml(
                 <button type="button" onclick="clearFeedSelectedVideo()" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold;">✕</button>
               </div>
 
+              <!-- Active Smart Attachment Pill -->
+              <div id="composerActiveAttachmentPill" class="composer-active-pill" style="display: none;">
+                <span id="composerActiveAttachmentLabel">📊 Poll Attached</span>
+                <button type="button" class="composer-active-pill-remove" onclick="cancelComposerAttachment()" title="Remove attachment">✕</button>
+              </div>
+
               <!-- Bottom Attachment Bar & Actions -->
               <div class="composer-actions-bar">
                 <div class="composer-media-tray">
-                  <button type="button" class="composer-media-btn" title="Add Photo" onclick="setPostFormat('photo'); document.getElementById('realFeedFileInput').click();">
+                  <button type="button" class="composer-media-btn" id="composerAddPhotoBtn" title="Add Photo" onclick="document.getElementById('realFeedFileInput').click();">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                     <span class="media-btn-label">Photo</span>
                   </button>
-                  <button type="button" class="composer-media-btn" title="Add Video Reel" onclick="setPostFormat('video'); document.getElementById('realFeedVideoInput').click();">
+                  <button type="button" class="composer-media-btn" id="composerAddVideoBtn" title="Add Video Reel" onclick="document.getElementById('realFeedVideoInput').click();">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
                     <span class="media-btn-label">Reel</span>
                   </button>
-                  <button type="button" class="composer-media-btn" title="Create Poll" onclick="setPostFormat(currentPostFormat === 'poll' ? 'text' : 'poll');">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                    <span class="media-btn-label">Poll</span>
-                  </button>
+                  <div class="composer-more-menu-container">
+                    <button type="button" class="composer-media-btn" id="composerMoreMenuBtn" title="More attachments (Poll, Survey, Q&A, Article, Mood, Card)" onclick="toggleComposerMoreMenu(event)">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      <span class="media-btn-label">More</span>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 1px;"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div id="composerMoreMenuDropdown" class="composer-more-dropdown" onclick="event.stopPropagation()">
+                      <button type="button" class="composer-more-item" onclick="selectSmartAttachment('poll')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        <span>Poll</span>
+                      </button>
+                      <button type="button" class="composer-more-item" onclick="selectSmartAttachment('survey')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        <span>Survey</span>
+                      </button>
+                      <button type="button" class="composer-more-item" onclick="selectSmartAttachment('qa')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #34d399;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                        <span>Q&amp;A</span>
+                      </button>
+                      <button type="button" class="composer-more-item" onclick="selectSmartAttachment('article')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f59e0b;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                        <span>Article</span>
+                      </button>
+                      <button type="button" class="composer-more-item" onclick="selectSmartAttachment('mood')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ec4899;"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+                        <span>Mood</span>
+                      </button>
+                      <button type="button" class="composer-more-item" onclick="selectSmartAttachment('canvas')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #6366f1;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.4-.4-.8-.4-1.3 0-.9.7-1.6 1.6-1.6h1.9c3.8 0 6.9-3.1 6.9-6.9 0-5.2-4.1-9.5-9.2-9.5z"/></svg>
+                        <span>Card</span>
+                      </button>
+                    </div>
+                  </div>
                   <select id="dynamicPostTheme" class="composer-theme-select" title="Target Audience">
                     <option value="mesh">Public Feed</option>
                     <option value="dag">Friends Circle</option>
@@ -13796,6 +13906,71 @@ function renderHtml(
       } else if (format === 'canvas') {
         if (captionEl) captionEl.placeholder = "Write your status to display on this card...";
       }
+
+      updateComposerAttachmentPill(format);
+    }
+
+    function updateComposerAttachmentPill(format) {
+      const pill = document.getElementById('composerActiveAttachmentPill');
+      const label = document.getElementById('composerActiveAttachmentLabel');
+      if (!pill || !label) return;
+
+      const formatLabels = {
+        poll: '📊 Poll Attached',
+        survey: '📋 Survey Attached',
+        qa: '❓ Q&A Attached',
+        article: '📝 Article Format',
+        mood: '😊 Mood Status',
+        canvas: '🎨 Styled Card'
+      };
+
+      if (formatLabels[format]) {
+        label.innerText = formatLabels[format];
+        pill.style.display = 'inline-flex';
+      } else {
+        pill.style.display = 'none';
+      }
+    }
+
+    function toggleComposerMoreMenu(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('composerMoreMenuDropdown');
+      if (menu) {
+        menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+      }
+    }
+
+    function closeComposerMoreMenu() {
+      const menu = document.getElementById('composerMoreMenuDropdown');
+      if (menu) menu.style.display = 'none';
+    }
+
+    function selectSmartAttachment(format) {
+      closeComposerMoreMenu();
+      if (currentPostFormat === format) {
+        cancelComposerAttachment();
+        return;
+      }
+      if (selectedFeedPhotoDataUrl) clearFeedSelectedPhoto();
+      if (selectedFeedVideoDataUrl) clearFeedSelectedVideo();
+      setPostFormat(format);
+      if (format === 'survey') {
+        const inp = document.getElementById('feedSurveyTitle');
+        if (inp) inp.focus();
+      } else if (format === 'poll') {
+        const inp = document.getElementById('feedPollOpt1');
+        if (inp) inp.focus();
+      } else if (format === 'article') {
+        const inp = document.getElementById('feedArticleTitle');
+        if (inp) inp.focus();
+      }
+    }
+
+    function cancelComposerAttachment() {
+      closeComposerMoreMenu();
+      clearFeedSelectedPhoto();
+      clearFeedSelectedVideo();
+      setPostFormat('text');
     }
 
     function handleComposerAuthorChange(val) {
@@ -13900,6 +14075,7 @@ function renderHtml(
     function handleFeedPhotoSelected(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
+      if (selectedFeedVideoDataUrl) clearFeedSelectedVideo();
       const origBytes = file.size;
       compressImage(file, 1200, 0.82, function(compressedUrl) {
         selectedFeedPhotoDataUrl = compressedUrl;
@@ -13931,11 +14107,15 @@ function renderHtml(
       if (fileInput) fileInput.value = '';
       const badgeEl = document.getElementById('feedPhotoCompressBadge');
       if (badgeEl) badgeEl.innerText = '';
+      if (currentPostFormat === 'photo') {
+        setPostFormat('text');
+      }
     }
 
     function handleFeedVideoSelected(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
+      if (selectedFeedPhotoDataUrl) clearFeedSelectedPhoto();
       if (file.size > 25 * 1024 * 1024) {
         showAccountToast('⚠️ Video exceeds 25MB limit. Please choose a shorter clip.');
         return;
@@ -13970,6 +14150,65 @@ function renderHtml(
         previewEl.src = '';
       }
       if (fileInput) fileInput.value = '';
+      if (currentPostFormat === 'video') {
+        setPostFormat('text');
+      }
+    }
+
+    document.addEventListener('click', function(e) {
+      const menu = document.getElementById('composerMoreMenuDropdown');
+      const btn = document.getElementById('composerMoreMenuBtn');
+      if (menu && menu.style.display === 'block') {
+        if (btn && !btn.contains(e.target) && !menu.contains(e.target)) {
+          menu.style.display = 'none';
+        }
+      }
+    });
+
+    function initComposerSmartAttachments() {
+      const composerTextarea = document.getElementById('dynamicPostCaption');
+      if (composerTextarea && !composerTextarea.__smartAttached) {
+        composerTextarea.__smartAttached = true;
+        composerTextarea.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          composerTextarea.style.borderColor = '#6366f1';
+        });
+        composerTextarea.addEventListener('dragleave', function(e) {
+          composerTextarea.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+        });
+        composerTextarea.addEventListener('drop', function(e) {
+          e.preventDefault();
+          composerTextarea.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          const files = e.dataTransfer && e.dataTransfer.files;
+          if (files && files.length > 0) {
+            const file = files[0];
+            if (file.type && file.type.startsWith('image/')) {
+              handleFeedPhotoSelected({ target: { files: [file] } });
+            } else if (file.type && file.type.startsWith('video/')) {
+              handleFeedVideoSelected({ target: { files: [file] } });
+            }
+          }
+        });
+        composerTextarea.addEventListener('paste', function(e) {
+          const items = e.clipboardData && e.clipboardData.items;
+          if (!items) return;
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type && items[i].type.indexOf('image') !== -1) {
+              const file = items[i].getAsFile();
+              if (file) {
+                handleFeedPhotoSelected({ target: { files: [file] } });
+                break;
+              }
+            }
+          }
+        });
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initComposerSmartAttachments);
+    } else {
+      initComposerSmartAttachments();
     }
 
     function submitDynamicPost() {
