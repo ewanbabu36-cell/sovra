@@ -7142,6 +7142,17 @@ function renderHtml(
             </div>
 
             <div style="flex: 1; min-width: 0;">
+              <!-- Active Page Persona Indicator (Only visible when acting as Page) -->
+              <div id="composerActivePersonaBar" style="display: none; align-items: center; justify-content: space-between; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.3); border-radius: 8px; padding: 6px 12px; margin-bottom: 0.65rem; font-size: 0.78rem;">
+                <div style="display: flex; align-items: center; gap: 6px; color: #f1f5f9;">
+                  <span>🏢 Posting as <strong id="composerActivePersonaName">Page Name</strong></span>
+                  <span id="composerActivePersonaHandle" style="color: #c084fc; font-weight: 600;">@page</span>
+                </div>
+                <button type="button" onclick="switchToPersona('personal')" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-decoration: underline; padding: 2px;">
+                  Switch to Personal ↩
+                </button>
+              </div>
+
               <!-- Long-form Article Inputs -->
               <div id="feedArticleInputsContainer" style="display: none; flex-direction: column; gap: 0.5rem; margin-bottom: 0.65rem;">
                 <input type="text" id="feedArticleTitle" placeholder="Article Title (e.g. Sovereign Mesh Architecture)" style="background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 0.5rem 0.75rem; color: #fff; font-weight: 600; font-size: 0.95rem; width: 100%; box-sizing: border-box;" />
@@ -8833,11 +8844,19 @@ function renderHtml(
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                 <span>Edit Profile</span>
               </button>
+              <button class="profile-btn profile-btn-secondary" onclick="openSwitchPersonaModal(event)" aria-label="Switch Profile or Page" title="Switch Profile or Page">
+                <span style="font-size: 0.95rem;">🔄</span>
+                <span>Switch Page</span>
+              </button>
               <div class="profile-overflow-wrap">
                 <button class="profile-btn profile-btn-secondary" id="profileOverflowMenuBtn" onclick="toggleProfileOverflowMenu(event)" aria-label="More account and sovereign options" aria-haspopup="menu" aria-expanded="false" title="More Account &amp; Sovereign Options">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                 </button>
                 <div id="profileOverflowDropdown" class="profile-overflow-dropdown" role="menu" style="display: none;">
+                  <div class="overflow-menu-item" id="profileSwitchPersonaBtn" role="menuitem" tabindex="0" onclick="openSwitchPersonaModal(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #c084fc;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>🔄 Switch Profile / Page</span>
+                  </div>
                   <div class="overflow-menu-item" role="menuitem" tabindex="0" onclick="openSovereignIdCardModal(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 10h4"/><path d="M14 14h4"/></svg>
                     <span>Sovereign Identity Details</span>
@@ -10839,6 +10858,97 @@ function renderHtml(
         <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
           <button onclick="closeCreatePageModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
           <button onclick="submitCreatePage()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem; background: #9333ea;">Create Page 🏢</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔄 6C. SWITCH PROFILE / PAGE MODAL (Instagram / Facebook Persona Switcher) -->
+  <div id="switchPersonaModal" class="omni-modal-overlay" style="display: none; z-index: 10050;">
+    <div class="omni-modal-card" style="max-width: 480px; border-radius: 20px; overflow: hidden; background: #0b1120; border: 1px solid rgba(255,255,255,0.12);">
+      <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; background: rgba(15,23,42,0.85);">
+        <div>
+          <div style="font-weight: 800; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.25rem;">🔄</span> <span>Switch Profile / Page</span>
+          </div>
+          <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 2px;">Select the identity you want to browse and publish as</div>
+        </div>
+        <button onclick="closeSwitchPersonaModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; padding: 4px;">✕</button>
+      </div>
+      <div style="padding: 1.25rem 1.5rem; max-height: 60vh; overflow-y: auto;" id="switchPersonaListContainer">
+        <!-- Rendered dynamically by renderSwitchPersonaList() -->
+      </div>
+      <div style="padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(15,23,42,0.5); display: flex; justify-content: space-between; align-items: center;">
+        <button onclick="closeSwitchPersonaModal(); openCreatePageModal();" style="background: rgba(192,132,252,0.15); border: 1px solid rgba(192,132,252,0.3); color: #c084fc; border-radius: 10px; font-weight: 700; font-size: 0.8rem; padding: 6px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <span>+ Create New Page</span>
+        </button>
+        <button onclick="closeSwitchPersonaModal()" class="action-pill-btn action-pill-secondary" style="padding: 6px 16px; font-size: 0.82rem;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📢 6D. TELEGRAM / WHATSAPP BROADCAST CHANNEL ROOM -->
+  <div id="channelRoomModal" class="omni-modal-overlay" style="display: none; z-index: 10050;">
+    <div class="omni-modal-card" style="max-width: 640px; width: 95%; height: 86vh; max-height: 850px; display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: #0b1120; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
+      <!-- Room Header (Telegram/WhatsApp Header) -->
+      <div style="padding: 0.85rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; background: rgba(15,23,42,0.95); backdrop-filter: blur(12px);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button onclick="closeChannelRoom()" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #cbd5e1; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;" title="Back" aria-label="Back">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div id="channelRoomAvatar" style="width: 40px; height: 40px; border-radius: 12px; background: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: #fff; font-weight: 700; flex-shrink: 0;">📢</div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span id="channelRoomName" style="font-weight: 800; font-size: 1rem; color: #fff;">Channel Name</span>
+              <span style="color: #38bdf8; font-size: 0.8rem;" title="Verified Channel">✓</span>
+            </div>
+            <div id="channelRoomSubtext" style="font-size: 0.72rem; color: #94a3b8;">
+              <span id="channelRoomHandle">@channel</span> &bull; <span id="channelRoomSubs">0 subscribers</span> &bull; 📢 Broadcast Channel
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="channelRoomSubBtn" onclick="toggleChannelRoomSubscribe()" class="action-pill-btn action-pill-primary" style="padding: 5px 12px; font-size: 0.76rem; border-radius: 20px;">
+            Subscribe
+          </button>
+        </div>
+      </div>
+
+      <!-- Channel Description / Banner -->
+      <div id="channelRoomBioBanner" style="padding: 0.6rem 1.25rem; background: rgba(56, 189, 248, 0.05); border-bottom: 1px solid rgba(56, 189, 248, 0.12); font-size: 0.78rem; color: #cbd5e1; line-height: 1.4;">
+        Channel bio goes here.
+      </div>
+
+      <!-- Broadcast Stream Messages Container -->
+      <div id="channelRoomStream" style="flex: 1; overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; background: radial-gradient(circle at 50% 10%, rgba(30, 41, 59, 0.4), #0b1120 70%);">
+        <!-- Rendered broadcast cards -->
+      </div>
+
+      <!-- Channel Dedicated Broadcast Composer (WhatsApp/Telegram Channel Bottom Bar) -->
+      <div id="channelRoomComposerWrap" style="padding: 0.85rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(15,23,42,0.95); backdrop-filter: blur(12px);">
+        <!-- Active Admin Broadcast Bar -->
+        <div id="channelAdminComposer" style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.74rem; color: #94a3b8;">
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <span>📢 Broadcast Announcement</span>
+              <span style="color: #38bdf8; font-weight: 700;">(Posts directly to Channel feed)</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.6rem; align-items: flex-end;">
+            <textarea id="channelBroadcastInput" placeholder="Broadcast an announcement or link to channel subscribers..." rows="2" style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px 12px; color: #fff; font-size: 0.88rem; outline: none; resize: none; font-family: inherit; line-height: 1.4;"></textarea>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <button type="button" onclick="triggerChannelPhotoUpload()" class="btn btn-secondary" style="padding: 7px 10px; border-radius: 10px; font-size: 0.85rem;" title="Attach Photo">📷</button>
+              <button type="button" onclick="submitChannelBroadcast()" class="btn btn-primary" style="padding: 7px 14px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; gap: 4px;">
+                <span>🚀</span> <span>Broadcast</span>
+              </button>
+            </div>
+          </div>
+          <div id="channelPhotoPreviewWrap" style="display: none; align-items: center; gap: 8px; margin-top: 2px;">
+            <img id="channelPhotoPreviewImg" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
+            <span style="font-size: 0.74rem; color: #94a3b8;">Photo attached</span>
+            <button type="button" onclick="clearChannelPhotoUpload()" style="background: none; border: none; color: #ef4444; font-size: 0.74rem; cursor: pointer; text-decoration: underline;">Remove</button>
+          </div>
+          <input type="file" id="channelPhotoFileInput" accept="image/*" style="display: none;" onchange="handleChannelPhotoFile(event)">
         </div>
       </div>
     </div>
@@ -13709,6 +13819,8 @@ function renderHtml(
           badgeEl.style.display = 'none';
         }
         if (handleEl) handleEl.innerText = '';
+        const personaBar = document.getElementById('composerActivePersonaBar');
+        if (personaBar) personaBar.style.display = 'none';
         if (captionEl && currentPostFormat === 'text') {
           captionEl.placeholder = "What's on your mind?";
         }
@@ -13725,6 +13837,19 @@ function renderHtml(
           if (avatarEl) {
             avatarEl.style.background = page.bg || '#10b981';
             avatarEl.innerHTML = page.avatar || '📄';
+          }
+          const mainAvatar = document.getElementById('mainComposerUserAvatar');
+          if (mainAvatar) {
+            mainAvatar.style.background = page.bg || '#c084fc';
+            mainAvatar.innerHTML = page.avatar || '🏢';
+          }
+          const personaBar = document.getElementById('composerActivePersonaBar');
+          const personaName = document.getElementById('composerActivePersonaName');
+          const personaHandle = document.getElementById('composerActivePersonaHandle');
+          if (personaBar) {
+            personaBar.style.display = 'flex';
+            if (personaName) personaName.innerText = page.name;
+            if (personaHandle) personaHandle.innerText = page.handle;
           }
           if (badgeEl) {
             badgeEl.className = 'badge badge-page';
@@ -20100,7 +20225,7 @@ function renderHtml(
         for (const ch of matched) {
           const subText = ch.isSubbed ? 'Subscribed ✓' : 'Subscribe';
           const subClass = ch.isSubbed ? 'action-pill-secondary' : 'action-pill-primary';
-          html += '<div class="omni-result-item">' +
+          html += '<div class="omni-result-item" style="cursor: pointer;" data-channel-id="' + ch.id + '" onclick="closeOmniSearch(); openChannelRoom(this.dataset.channelId)">' +
             '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
               '<div style="width: 40px; height: 40px; border-radius: 12px; background: ' + ch.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">' + ch.avatar + '</div>' +
               '<div>' +
@@ -20108,10 +20233,10 @@ function renderHtml(
                   '<span>' + ch.name + '</span>' +
                   '<span style="font-size: 0.65rem; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 1px 6px; border-radius: 8px;">' + ch.category.toUpperCase() + '</span>' +
                 '</div>' +
-                '<div style="font-size: 0.75rem; color: #94a3b8;">' + ch.handle + ' &bull; ' + ch.count.toLocaleString() + ' subscribers</div>' +
+                '<div style="font-size: 0.75rem; color: #94a3b8;">' + ch.handle + ' &bull; ' + ch.count.toLocaleString() + ' subscribers &bull; 📢 Tap to open room</div>' +
               '</div>' +
             '</div>' +
-            '<button class="action-pill-btn ' + subClass + '" data-channel-id="' + ch.id + '" onclick="toggleChannelSubscribeDemo(this.dataset.channelId)">' + subText + '</button>' +
+            '<button class="action-pill-btn ' + subClass + '" data-channel-id="' + ch.id + '" onclick="event.stopPropagation(); toggleChannelSubscribeDemo(this.dataset.channelId)">' + subText + '</button>' +
           '</div>';
         }
       }
@@ -20122,7 +20247,7 @@ function renderHtml(
         for (const pg of matched) {
           const folText = pg.isFollowing ? 'Following ✓' : 'Follow';
           const folClass = pg.isFollowing ? 'action-pill-secondary' : 'action-pill-primary';
-          html += '<div class="omni-result-item">' +
+          html += '<div class="omni-result-item" style="cursor: pointer;" data-persona="page:' + pg.id + '" data-tab="feed" onclick="closeOmniSearch(); switchToPersona(this.dataset.persona); switchTab(this.dataset.tab);">' +
             '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
               '<div style="width: 40px; height: 40px; border-radius: 12px; background: ' + pg.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">' + pg.avatar + '</div>' +
               '<div>' +
@@ -20132,10 +20257,9 @@ function renderHtml(
                 '</div>' +
                 '<div style="font-size: 0.75rem; color: #94a3b8;">' + pg.handle + ' &bull; ' + pg.bio + '</div>' +
               '</div>' +
-            '</div>' +
             '<div style="display: flex; gap: 0.4rem;">' +
-              '<button class="action-pill-btn action-pill-secondary" style="border-color: #38bdf8; color: #38bdf8;" data-cta="' + pg.cta.replace(/"/g, '&quot;') + '" onclick="alert(&quot;CTA Action: Redirecting to &quot; + this.dataset.cta)">' + pg.cta + '</button>' +
-              '<button class="action-pill-btn ' + folClass + '" data-page-id="' + pg.id + '" onclick="togglePageFollowDemo(this.dataset.pageId)">' + folText + '</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="border-color: #38bdf8; color: #38bdf8;" data-cta="' + (pg.cta ? pg.cta.replace(/"/g, '&quot;') : 'Visit') + '" onclick="event.stopPropagation(); alert(&quot;CTA Action: Redirecting to &quot; + this.dataset.cta)">' + (pg.cta || 'Visit') + '</button>' +
+              '<button class="action-pill-btn ' + folClass + '" data-page-id="' + pg.id + '" onclick="event.stopPropagation(); togglePageFollowDemo(this.dataset.pageId)">' + folText + '</button>' +
             '</div>' +
           '</div>';
         }
@@ -20770,6 +20894,8 @@ function renderHtml(
       if (typeof closeOmniSearch === 'function') closeOmniSearch();
       if (typeof closeCreateChannelModal === 'function') closeCreateChannelModal();
       if (typeof closeCreatePageModal === 'function') closeCreatePageModal();
+      if (typeof closeSwitchPersonaModal === 'function') closeSwitchPersonaModal();
+      if (typeof closeChannelRoom === 'function') closeChannelRoom();
       if (typeof closePostOptionsModal === 'function') closePostOptionsModal();
       if (typeof closeRepostModal === 'function') closeRepostModal();
       if (typeof closeSafetyReportModal === 'function') closeSafetyReportModal();
@@ -21379,32 +21505,38 @@ function renderHtml(
       html += '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
       for (let i = 0; i < channels.length; i++) {
         const c = channels[i];
-        html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">' +
-          '<div style="display: flex; align-items: center; gap: 8px;">' +
-            '<div style="width: 32px; height: 32px; border-radius: 8px; background: ' + (c.bg || '#38bdf8') + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #fff;">' + (c.avatar || '📢') + '</div>' +
+        html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">' +
+          '<div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">' +
+            '<div style="width: 36px; height: 36px; border-radius: 10px; background: ' + (c.bg || '#38bdf8') + '; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #fff;">' + (c.avatar || '📢') + '</div>' +
             '<div>' +
-              '<div style="font-weight: 700; color: #f8fafc; font-size: 0.85rem;">' + c.name + ' <span style="font-size: 0.68rem; color: #38bdf8; font-weight: 600;">' + c.handle + '</span></div>' +
+              '<div style="font-weight: 700; color: #f8fafc; font-size: 0.88rem;">' + c.name + ' <span style="font-size: 0.7rem; color: #38bdf8; font-weight: 600;">' + c.handle + '</span></div>' +
               '<div style="font-size: 0.72rem; color: #94a3b8;">📢 Broadcast Channel &bull; ' + (c.count ? c.count.toLocaleString() : '0') + ' subscribers</div>' +
             '</div>' +
           '</div>' +
           '<div style="display: flex; gap: 6px;">' +
-            '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">Broadcast As</button>' +
+            '<button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.76rem; border-radius: 8px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; display: inline-flex; align-items: center; gap: 5px;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">' +
+              '<span>📢</span> <span>Open Channel Room</span>' +
+            '</button>' +
           '</div>' +
         '</div>';
       }
 
       for (let j = 0; j < pages.length; j++) {
         const p = pages[j];
-        html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">' +
-          '<div style="display: flex; align-items: center; gap: 8px;">' +
-            '<div style="width: 32px; height: 32px; border-radius: 8px; background: ' + (p.bg || '#c084fc') + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #fff;">' + (p.avatar || '🏢') + '</div>' +
+        const isCurrentActive = (typeof currentActivePersona !== 'undefined' && currentActivePersona.type === 'page' && currentActivePersona.id === p.id);
+        html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">' +
+          '<div style="display: flex; align-items: center; gap: 10px;">' +
+            '<div style="width: 36px; height: 36px; border-radius: 10px; background: ' + (p.bg || '#c084fc') + '; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #fff;">' + (p.avatar || '🏢') + '</div>' +
             '<div>' +
-              '<div style="font-weight: 700; color: #f8fafc; font-size: 0.85rem;">' + p.name + ' <span style="font-size: 0.68rem; color: #c084fc; font-weight: 600;">' + p.handle + '</span></div>' +
+              '<div style="font-weight: 700; color: #f8fafc; font-size: 0.88rem;">' + p.name + ' <span style="font-size: 0.7rem; color: #c084fc; font-weight: 600;">' + p.handle + '</span></div>' +
               '<div style="font-size: 0.72rem; color: #94a3b8;">🏢 Sovereign Page &bull; ' + (p.category || 'Entity') + '</div>' +
             '</div>' +
           '</div>' +
           '<div style="display: flex; gap: 6px;">' +
-            '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px;" data-entity="page:' + p.id + '" onclick="publishAsEntity(this.dataset.entity)">Post As</button>' +
+            (isCurrentActive
+              ? '<button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.76rem; border-radius: 8px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">✓ Active (Switch to Personal)</button>'
+              : '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.76rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12);" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">🔄 Switch to Page</button>'
+            ) +
           '</div>' +
         '</div>';
       }
@@ -21413,18 +21545,371 @@ function renderHtml(
       container.innerHTML = html;
     }
 
-    function publishAsEntity(val) {
-      const select = document.getElementById('composerAuthorSelect');
-      if (select) {
-        select.value = val;
-        handleComposerAuthorChange(val);
+    // --- Instagram / Facebook Page Persona Switcher ---
+    let currentActivePersona = {
+      type: 'personal',
+      id: 'personal',
+      name: (typeof myProfile !== 'undefined' && myProfile ? (myProfile.displayName || myProfile.name || 'Personal Profile') : 'Personal Profile'),
+      handle: (typeof myProfile !== 'undefined' && myProfile ? (myProfile.handle || '@you') : '@you'),
+      avatar: (typeof myProfile !== 'undefined' && myProfile ? (myProfile.avatar || 'S') : 'S'),
+      bg: '#6366f1'
+    };
+
+    function openSwitchPersonaModal(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      const m = document.getElementById('switchPersonaModal');
+      if (m) {
+        renderSwitchPersonaList();
+        m.style.display = 'flex';
       }
-      switchTab('feed');
-      const composer = document.querySelector('.feed-container .card');
-      if (composer) {
-        composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const input = composer.querySelector('textarea') || composer.querySelector('input');
-        if (input) setTimeout(function() { input.focus(); }, 300);
+    }
+
+    function closeSwitchPersonaModal() {
+      const m = document.getElementById('switchPersonaModal');
+      if (m) m.style.display = 'none';
+    }
+
+    function renderSwitchPersonaList() {
+      const container = document.getElementById('switchPersonaListContainer');
+      if (!container) return;
+      const myName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Profile';
+      const myHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : currentUserHandle;
+      const myAvatar = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : 'S';
+      const myAvatarDataUrl = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) ? myProfile.avatarDataUrl : null;
+      const isPersonalActive = (!currentActivePersona || currentActivePersona.type === 'personal');
+      const pages = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+
+      let html = '<div style="margin-bottom: 1rem;">' +
+        '<div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Personal Identity</div>' +
+        '<div style="background: rgba(255,255,255,0.04); border: 1px solid ' + (isPersonalActive ? 'rgba(99, 102, 241, 0.6)' : 'rgba(255,255,255,0.08)') + '; border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">' +
+          '<div style="display: flex; align-items: center; gap: 10px;">' +
+            '<div style="width: 36px; height: 36px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; color: #fff; overflow: hidden;">' +
+              (myAvatarDataUrl ? '<img src="' + myAvatarDataUrl + '" style="width:100%;height:100%;object-fit:cover;" />' : myAvatar) +
+            '</div>' +
+            '<div>' +
+              '<div style="font-weight: 700; font-size: 0.9rem; color: #f8fafc;">' + myName + '</div>' +
+              '<div style="font-size: 0.74rem; color: #94a3b8;">' + myHandle + ' &bull; Personal Account</div>' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            (isPersonalActive 
+              ? '<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); padding: 4px 10px; border-radius: 20px; font-size: 0.74rem;">✓ Active</span>'
+              : '<button type="button" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.76rem; border-radius: 8px;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">Switch</button>') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+      html += '<div>' +
+        '<div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Sovereign Pages You Manage (' + pages.length + ')</div>';
+
+      if (pages.length === 0) {
+        html += '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 14px; background: rgba(255,255,255,0.02); border-radius: 10px;">No Sovereign Pages created yet. You can create a Page for your organization or project!</div>';
+      } else {
+        html += '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
+        for (let j = 0; j < pages.length; j++) {
+          const p = pages[j];
+          const isPageActive = (currentActivePersona && currentActivePersona.type === 'page' && currentActivePersona.id === p.id);
+          html += '<div style="background: rgba(255,255,255,0.04); border: 1px solid ' + (isPageActive ? 'rgba(192, 132, 252, 0.6)' : 'rgba(255,255,255,0.08)') + '; border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">' +
+            '<div style="display: flex; align-items: center; gap: 10px;">' +
+              '<div style="width: 36px; height: 36px; border-radius: 10px; background: ' + (p.bg || '#c084fc') + '; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #fff;">' +
+                (p.avatar || '🏢') +
+              '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; font-size: 0.9rem; color: #f8fafc;">' + p.name + '</div>' +
+                '<div style="font-size: 0.74rem; color: #c084fc;">' + p.handle + ' &bull; ' + (p.category || 'Page') + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div>' +
+              (isPageActive 
+                ? '<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); padding: 4px 10px; border-radius: 20px; font-size: 0.74rem;">✓ Active</span>'
+                : '<button type="button" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.76rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12);" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">Switch to Page</button>') +
+            '</div>' +
+          '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+
+      container.innerHTML = html;
+    }
+
+    function switchToPersona(val) {
+      const authorSelect = document.getElementById('composerAuthorSelect');
+      const personaBar = document.getElementById('composerActivePersonaBar');
+      const personaName = document.getElementById('composerActivePersonaName');
+      const personaHandle = document.getElementById('composerActivePersonaHandle');
+      const mainAvatar = document.getElementById('mainComposerUserAvatar');
+      const composerInput = document.getElementById('dynamicPostCaption');
+
+      if (!val || val === 'personal' || val === 'personal:self') {
+        const myName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Profile';
+        const myHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : currentUserHandle;
+        const myAvatar = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : 'S';
+        const myAvatarDataUrl = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) ? myProfile.avatarDataUrl : null;
+        currentActivePersona = {
+          type: 'personal',
+          id: 'personal',
+          name: myName,
+          handle: myHandle,
+          avatar: myAvatar,
+          bg: '#6366f1'
+        };
+
+        if (authorSelect) {
+          authorSelect.value = 'personal:self';
+          handleComposerAuthorChange('personal:self');
+        }
+        if (personaBar) personaBar.style.display = 'none';
+        if (mainAvatar) {
+          mainAvatar.style.background = '#6366f1';
+          mainAvatar.innerHTML = myAvatarDataUrl ? '<img src="' + myAvatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : myAvatar;
+        }
+        if (composerInput) {
+          composerInput.placeholder = "What's on your mind?";
+        }
+        showAccountToast('👤 Switched to Personal Profile (' + myHandle + ')');
+      } else if (val.startsWith('page:')) {
+        const pageId = val.replace('page:', '');
+        const pages = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+        const page = pages.find(function(p) { return p.id === pageId; });
+        if (page) {
+          currentActivePersona = {
+            type: 'page',
+            id: page.id,
+            name: page.name,
+            handle: page.handle,
+            avatar: page.avatar || '🏢',
+            bg: page.bg || '#c084fc'
+          };
+
+          if (authorSelect) {
+            authorSelect.value = val;
+            handleComposerAuthorChange(val);
+          }
+          if (personaBar) {
+            personaBar.style.display = 'flex';
+            if (personaName) personaName.innerText = page.name;
+            if (personaHandle) personaHandle.innerText = page.handle;
+          }
+          if (mainAvatar) {
+            mainAvatar.style.background = page.bg || '#c084fc';
+            mainAvatar.innerHTML = page.avatar || '🏢';
+          }
+          if (composerInput) {
+            composerInput.placeholder = 'Post an update as ' + page.name + '...';
+          }
+          showAccountToast('🏢 Switched to Page: ' + page.name + ' (' + page.handle + ')');
+        }
+      }
+
+      closeSwitchPersonaModal();
+      if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
+    }
+
+    // --- Telegram / WhatsApp Broadcast Channel Room ---
+    let activeChannelRoomId = null;
+
+    function openChannelRoom(channelId) {
+      const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const ch = channels.find(function(c) { return c.id === channelId || c.handle === channelId; });
+      if (!ch) {
+        showAccountToast('Channel not found');
+        return;
+      }
+      activeChannelRoomId = ch.id;
+
+      const avatarEl = document.getElementById('channelRoomAvatar');
+      if (avatarEl) {
+        avatarEl.innerText = ch.avatar || '📢';
+        avatarEl.style.background = ch.bg || '#0284c7';
+      }
+      const nameEl = document.getElementById('channelRoomName');
+      if (nameEl) nameEl.innerText = ch.name;
+      const handleEl = document.getElementById('channelRoomHandle');
+      if (handleEl) handleEl.innerText = ch.handle;
+      const subsEl = document.getElementById('channelRoomSubs');
+      if (subsEl) subsEl.innerText = (ch.count ? ch.count.toLocaleString() : '1') + ' subscribers';
+      const bioEl = document.getElementById('channelRoomBioBanner');
+      if (bioEl) bioEl.innerText = ch.desc || 'Decentralized broadcast channel for P2P updates.';
+
+      const subBtn = document.getElementById('channelRoomSubBtn');
+      if (subBtn) {
+        subBtn.innerText = ch.isSubbed ? 'Subscribed ✓' : 'Subscribe';
+        subBtn.className = ch.isSubbed ? 'action-pill-btn action-pill-secondary' : 'action-pill-btn action-pill-primary';
+      }
+
+      renderChannelRoomStream(ch);
+
+      const modal = document.getElementById('channelRoomModal');
+      if (modal) modal.style.display = 'flex';
+
+      const input = document.getElementById('channelBroadcastInput');
+      if (input) {
+        input.value = '';
+        setTimeout(function() { input.focus(); }, 200);
+      }
+    }
+
+    function closeChannelRoom() {
+      const modal = document.getElementById('channelRoomModal');
+      if (modal) modal.style.display = 'none';
+      activeChannelRoomId = null;
+    }
+
+    function toggleChannelRoomSubscribe() {
+      if (!activeChannelRoomId) return;
+      const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const ch = channels.find(function(c) { return c.id === activeChannelRoomId; });
+      if (!ch) return;
+      ch.isSubbed = !ch.isSubbed;
+      ch.count += ch.isSubbed ? 1 : -1;
+      const subBtn = document.getElementById('channelRoomSubBtn');
+      if (subBtn) {
+        subBtn.innerText = ch.isSubbed ? 'Subscribed ✓' : 'Subscribe';
+        subBtn.className = ch.isSubbed ? 'action-pill-btn action-pill-secondary' : 'action-pill-btn action-pill-primary';
+      }
+      const subsEl = document.getElementById('channelRoomSubs');
+      if (subsEl) subsEl.innerText = (ch.count ? ch.count.toLocaleString() : '1') + ' subscribers';
+      fetch('/api/social/channels/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: ch.id })
+      }).catch(function(err) { console.warn('[Channel] Subscribe error:', err); });
+      showAccountToast(ch.isSubbed ? '🔔 Subscribed to ' + ch.name : '🔕 Unsubscribed from ' + ch.name);
+    }
+
+    function renderChannelRoomStream(ch) {
+      const container = document.getElementById('channelRoomStream');
+      if (!container) return;
+      const posts = (typeof feedPostsData !== 'undefined' ? feedPostsData : []).filter(function(p) {
+        return (p.authorType === 'channel' && (p.authorEntityId === ch.id || p.authorEntityHandle === ch.handle));
+      });
+
+      if (posts.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">' +
+          '<div style="width: 52px; height: 52px; border-radius: 16px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; display: align-items: center; justify-content: center; font-size: 1.6rem; display: flex;">📢</div>' +
+          '<div style="font-weight: 700; color: #f8fafc; font-size: 1.05rem;">' + ch.name + ' Broadcast Feed</div>' +
+          '<div style="font-size: 0.82rem; max-width: 360px; line-height: 1.4;">This is a decentralized Telegram-style broadcast channel. Subscribers receive real-time updates directly over the peer-to-peer mesh.</div>' +
+          '<div style="font-size: 0.76rem; color: #38bdf8; font-weight: 600; margin-top: 0.25rem;">Broadcast an announcement below to get started!</div>' +
+        '</div>';
+        return;
+      }
+
+      let html = '';
+      for (let i = posts.length - 1; i >= 0; i--) {
+        const p = posts[i];
+        const timeStr = new Date(p.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        html += '<div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.3);">' +
+          '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+            '<div style="display: flex; align-items: center; gap: 6px;">' +
+              '<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.68rem; font-weight: 700;">📢 BROADCAST</span>' +
+              '<span style="font-size: 0.74rem; color: #94a3b8; font-family: monospace;">' + (p.mediaCid ? p.mediaCid.slice(0, 12) + '...' : 'Ed25519 Signed') + '</span>' +
+            '</div>' +
+            '<span style="font-size: 0.72rem; color: #64748b;">' + timeStr + '</span>' +
+          '</div>' +
+          (p.mediaImage ? '<div style="border-radius: 10px; overflow: hidden; max-height: 280px; background: #000;"><img src="' + p.mediaImage + '" style="width: 100%; max-height: 280px; object-fit: contain; display: block;" /></div>' : '') +
+          '<div style="color: #f8fafc; font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;">' + (p.caption || '') + '</div>' +
+          '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; margin-top: 2px;">' +
+            '<div style="display: flex; gap: 6px;">' +
+              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 12px;" data-msg="❤️ Liked broadcast!" onclick="showAccountToast(this.dataset.msg)">❤️ ' + (p.likesCount || 0) + '</button>' +
+              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 12px;" data-msg="🚀 Boosted to local peers!" onclick="showAccountToast(this.dataset.msg)">🚀 Boost</button>' +
+            '</div>' +
+            '<span style="font-size: 0.7rem; color: #38bdf8;">✓ P2P Relayed</span>' +
+          '</div>' +
+        '</div>';
+      }
+      container.innerHTML = html;
+      container.scrollTop = container.scrollHeight;
+    }
+
+    let channelPhotoDataUrl = null;
+    function triggerChannelPhotoUpload() {
+      const fileInput = document.getElementById('channelPhotoFileInput');
+      if (fileInput) fileInput.click();
+    }
+    function handleChannelPhotoFile(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        channelPhotoDataUrl = evt.target.result;
+        const previewWrap = document.getElementById('channelPhotoPreviewWrap');
+        const previewImg = document.getElementById('channelPhotoPreviewImg');
+        if (previewWrap && previewImg) {
+          previewImg.src = channelPhotoDataUrl;
+          previewWrap.style.display = 'flex';
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+    function clearChannelPhotoUpload() {
+      channelPhotoDataUrl = null;
+      const previewWrap = document.getElementById('channelPhotoPreviewWrap');
+      if (previewWrap) previewWrap.style.display = 'none';
+      const fileInput = document.getElementById('channelPhotoFileInput');
+      if (fileInput) fileInput.value = '';
+    }
+
+    function submitChannelBroadcast() {
+      if (!activeChannelRoomId) return;
+      const input = document.getElementById('channelBroadcastInput');
+      const text = input ? input.value.trim() : '';
+      if (!text && !channelPhotoDataUrl) {
+        alert('Please enter a message or attach a photo to broadcast.');
+        return;
+      }
+      const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const ch = channels.find(function(c) { return c.id === activeChannelRoomId; });
+      if (!ch) return;
+
+      const payload = {
+        caption: text,
+        postType: 'text',
+        authorType: 'channel',
+        authorEntityId: ch.id,
+        authorBadge: '📢 Channel',
+        authorEntityHandle: ch.handle,
+        mediaImage: channelPhotoDataUrl || undefined,
+      };
+
+      fetch('/api/feed/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + (localStorage.getItem('sovra_session_token') || '')
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.ok && data.post) {
+          if (typeof feedPostsData !== 'undefined') {
+            feedPostsData.unshift(data.post);
+          }
+          if (input) input.value = '';
+          clearChannelPhotoUpload();
+          renderChannelRoomStream(ch);
+          if (typeof renderFeedPosts === 'function') renderFeedPosts();
+          showAccountToast('📢 Broadcast dispatched to ' + ch.name + ' subscribers!');
+        } else {
+          alert('Broadcast failed: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        console.error('[Channel] Broadcast error:', err);
+        alert('Broadcast failed: ' + err.message);
+      });
+    }
+
+    function publishAsEntity(val) {
+      if (val && val.startsWith('channel:')) {
+        openChannelRoom(val.replace('channel:', ''));
+      } else if (val && val.startsWith('page:')) {
+        switchToPersona(val);
+        switchTab('feed');
+      } else {
+        switchToPersona('personal');
+        switchTab('feed');
       }
     }
 
@@ -24410,10 +24895,23 @@ async function startDevServer() {
         if (!principal) return;
         let handle = String(parsed.handle || '').trim();
         if (!handle.startsWith('@')) handle = '@' + handle;
+        const reqName = String(parsed.name || 'Untitled Channel').trim();
+        const existing = dynamicSocialStore.channels.find(c => 
+          (c.handle && c.handle.toLowerCase() === handle.toLowerCase()) || 
+          (c.name && c.name.toLowerCase() === reqName.toLowerCase())
+        );
+        if (existing) {
+          existing.name = reqName;
+          existing.desc = String(parsed.desc || existing.desc);
+          saveDynamicSocialState(dynamicSocialStore);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, channel: existing }));
+          return;
+        }
         const newChan: ChannelRecord = {
           id: 'ch-' + Date.now(),
           handle: handle.toLowerCase(),
-          name: String(parsed.name || 'Untitled Channel'),
+          name: reqName,
           category: String(parsed.category || 'tech'),
           desc: String(parsed.desc || 'Sovereign channel'),
           count: 1,

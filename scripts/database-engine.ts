@@ -760,8 +760,32 @@ export class SovraDatabaseEngine {
           contacts_and_peers: Array.isArray(parsed.contacts_and_peers) ? parsed.contacts_and_peers : [],
           chatMessages: Array.isArray(parsed.chatMessages) ? parsed.chatMessages : [],
           posts: Array.isArray(parsed.posts) ? parsed.posts : [],
-          channels: Array.isArray(parsed.channels) ? parsed.channels : this.db.channels,
-          pages: Array.isArray(parsed.pages) ? parsed.pages : this.db.pages,
+          channels: (() => {
+            const list = Array.isArray(parsed.channels) ? parsed.channels : this.db.channels;
+            const seen = new Set<string>();
+            const deduped: ChannelRecord[] = [];
+            for (const ch of list) {
+              const key = (ch.name || ch.handle || ch.id || '').trim().toLowerCase();
+              if (key && !seen.has(key)) {
+                seen.add(key);
+                deduped.push(ch);
+              }
+            }
+            return deduped.length > 0 ? deduped : this.db.channels;
+          })(),
+          pages: (() => {
+            const list = Array.isArray(parsed.pages) ? parsed.pages : this.db.pages;
+            const seen = new Set<string>();
+            const deduped: PageRecord[] = [];
+            for (const pg of list) {
+              const key = (pg.name || pg.handle || pg.id || '').trim().toLowerCase();
+              if (key && !seen.has(key)) {
+                seen.add(key);
+                deduped.push(pg);
+              }
+            }
+            return deduped.length > 0 ? deduped : this.db.pages;
+          })(),
           friend_relationships: Array.isArray(parsed.friend_relationships) ? parsed.friend_relationships : [],
           follows: Array.isArray(parsed.follows) ? parsed.follows : [],
           user_sessions: Array.isArray(parsed.user_sessions) ? parsed.user_sessions : [],
@@ -1812,7 +1836,16 @@ export class SovraDatabaseEngine {
 
   public getAllChannels(): ChannelRecord[] {
     this.load();
-    return [...this.db.channels];
+    const seen = new Set<string>();
+    const result: ChannelRecord[] = [];
+    for (const c of this.db.channels) {
+      const key = (c.name || c.handle || c.id || '').trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        result.push(c);
+      }
+    }
+    return result;
   }
 
   public getChannelById(id: string): ChannelRecord | undefined {
@@ -1822,7 +1855,16 @@ export class SovraDatabaseEngine {
 
   public getAllPages(): PageRecord[] {
     this.load();
-    return [...this.db.pages];
+    const seen = new Set<string>();
+    const result: PageRecord[] = [];
+    for (const p of this.db.pages) {
+      const key = (p.name || p.handle || p.id || '').trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        result.push(p);
+      }
+    }
+    return result;
   }
 
   public getPageById(id: string): PageRecord | undefined {
