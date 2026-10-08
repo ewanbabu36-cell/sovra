@@ -119,6 +119,14 @@ export interface ContactPeerRecord {
   isVerified: boolean;
 }
 
+export interface ChatAttachmentRecord {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+  cid?: string;
+}
+
 export interface ChatMessageRecord {
   id: string;
   threadId: string; // [didA, didB].sort().join(':')
@@ -126,6 +134,7 @@ export interface ChatMessageRecord {
   recipientDid: string;
   senderName: string;
   text: string;
+  attachment?: ChatAttachmentRecord;
   isAudio: boolean;
   audioDurationSec: number;
   waveformBars?: number[];
@@ -1409,20 +1418,22 @@ export class SovraDatabaseEngine {
     return [didA, didB].sort().join(':');
   }
 
-  public appendMessage(msg: Partial<ChatMessageRecord> & { senderDid: string; recipientDid: string; text: string }): ChatMessageRecord {
+  public appendMessage(msg: Partial<ChatMessageRecord> & { senderDid: string; recipientDid: string; text?: string }): ChatMessageRecord {
     this.load();
     const now = Date.now();
     const threadId = msg.recipientDid.startsWith('channel:')
       ? msg.recipientDid
       : this.getThreadId(msg.senderDid, msg.recipientDid);
 
+    const recordText = msg.text || (msg.attachment ? msg.attachment.name : '');
     const record: ChatMessageRecord = {
       id: msg.id || 'msg_' + now + '_' + crypto.randomBytes(8).toString('hex'),
       threadId,
       senderDid: msg.senderDid,
       recipientDid: msg.recipientDid,
       senderName: msg.senderName || 'Peer',
-      text: msg.text,
+      text: recordText,
+      attachment: msg.attachment,
       isAudio: Boolean(msg.isAudio),
       audioDurationSec: msg.audioDurationSec || 0,
       waveformBars: msg.waveformBars,
@@ -1444,11 +1455,12 @@ export class SovraDatabaseEngine {
     }
 
     this.db.chatMessages.push(record);
+    const summaryLabel = record.isAudio ? 'voice note' : (record.attachment ? 'attachment' : 'message');
     this.logActivity(
       'CHAT_SENT',
       record.senderDid,
       record.senderName,
-      `Sent ${record.isAudio ? 'voice note' : 'message'} (${record.text.substring(0, 32)}...) in thread ${record.threadId}`,
+      `Sent ${summaryLabel} (${(record.text || record.attachment?.name || '').substring(0, 32)}...) in thread ${record.threadId}`,
     );
     this.save();
     return record;

@@ -4818,6 +4818,100 @@ function renderHtml(
       z-index: 5;
     }
 
+    /* Chat File & Media Attachment Styles */
+    .chat-attachment-img {
+      max-width: 100%;
+      max-height: 280px;
+      border-radius: 8px;
+      object-fit: cover;
+      display: block;
+      margin-bottom: 0.35rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .chat-attachment-img:hover {
+      opacity: 0.92;
+    }
+    .chat-attachment-video {
+      max-width: 100%;
+      max-height: 260px;
+      border-radius: 8px;
+      display: block;
+      margin-bottom: 0.35rem;
+      background: #000;
+    }
+    .chat-attachment-audio {
+      width: 100%;
+      min-width: 220px;
+      margin-bottom: 0.35rem;
+    }
+    .chat-attachment-filecard {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 0.5rem 0.65rem;
+      margin-bottom: 0.35rem;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .chat-attachment-filecard:hover {
+      background: rgba(0, 0, 0, 0.35);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+    .chat-file-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    .chat-file-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .chat-file-name {
+      font-weight: 600;
+      font-size: 0.82rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #f1f5f9;
+    }
+    .chat-file-meta {
+      font-size: 0.68rem;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .chat-file-download-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .chat-file-download-btn:hover {
+      background: #38bdf8;
+      color: #0f172a;
+    }
+
     /* Voice Note Player Styles */
     .voice-note-card {
       display: flex;
@@ -7941,6 +8035,11 @@ function renderHtml(
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             <span>Install</span>
           </button>
+          <div class="node-status-pill" title="Sovra Mesh Online • TCP :${tcpPort} • LibP2P Noise_XX Active" style="display: none !important; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 20px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); cursor: default;">
+            <span class="status-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; display: inline-block;"></span>
+            <span class="status-text" style="color: #10b981; font-weight: 700; font-size: 0.75rem;">Online</span>
+            <span class="badge tcp-port-badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.7rem; font-family: monospace; padding: 1px 5px; border-radius: 6px;">:${tcpPort}</span>
+          </div>
           <div id="currentUserPill" role="button" tabindex="0" onclick="toggleHolographicNav()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleHolographicNav()" style="display: flex; align-items: center; background: none; border: none; padding: 0; cursor: pointer;" title="Your Sovereign Profile (Tap for Holographic Core)" aria-label="Your Sovereign Profile">
             <span id="currentUserAvatar" class="header-avatar-circle">S</span>
           </div>
@@ -9065,12 +9164,23 @@ function renderHtml(
 
           <!-- Bottom Input Bar -->
           <div class="chat-input-bar">
+            <!-- Pending Attachment Preview Tray -->
+            <div id="chatAttachmentPreviewTray" style="display: none; width: 100%; margin-bottom: 0.5rem; padding: 0.45rem 0.65rem; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; backdrop-filter: blur(8px); align-items: center; justify-content: space-between; gap: 0.5rem;">
+              <div id="chatAttachmentPreviewContent" style="display: flex; align-items: center; gap: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+                <!-- Thumbnail or file icon + name + size -->
+              </div>
+              <button class="chat-btn-round" style="width: 26px; height: 26px; min-width: 26px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-size: 0.75rem; cursor: pointer;" onclick="clearPendingChatAttachment()" title="Remove file">✕</button>
+            </div>
+
+            <!-- Hidden File Input -->
+            <input type="file" id="chatFileInput" style="display: none;" onchange="handleChatFileSelected(this.files)" accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.json,.csv,.tar,.gz" />
+
             <!-- Standard view -->
             <div id="standardInputRow" style="display: flex; align-items: center; gap: 0.65rem; width: 100%;">
               <button class="chat-btn-round" title="Send Reaction" onclick="insertEmojiToInput('👍')" aria-label="Reaction">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
               </button>
-              <button class="chat-btn-round" title="Send P2P Merkle DAG UnixFS Attachment" onclick="alert('P2P UnixFS File Attachment: File encrypted with ChaCha20-Poly1305 and pinned to local blockstore.')" aria-label="Attach File">
+              <button class="chat-btn-round" id="chatAttachBtn" title="Send File or Image Attachment" onclick="triggerChatFileSelect()" aria-label="Attach File">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               </button>
               <input type="text" class="chat-text-input" id="chatInputText" placeholder="Type an encrypted message..." onkeydown="if(event.key==='Enter') sendChatMessage()">
@@ -10989,7 +11099,7 @@ function renderHtml(
               <div style="font-weight: 700; font-size: 0.9rem; color: #f8fafc;">🧭 Navigation Layout Mode</div>
               <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Switch between Auto Responsive, Mobile Dock, or Desktop Rail.</div>
             </div>
-            <button type="button" onclick="toggleNavLayoutMode()" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+            <button type="button" id="navModeToggleBtn" onclick="toggleNavLayoutMode()" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
               ⚡ Toggle Mode
             </button>
           </div>
@@ -19637,7 +19747,29 @@ function renderHtml(
             '<span style="font-size: 0.72rem; color: #cbd5e1; font-family: monospace;" id="time-' + m.id + '">' + m.audioDurationSec.toFixed(1) + 's</span>' +
             '</div>';
         } else {
-          bodyHtml = '<div style="word-break: break-word;">' + m.text + '</div>';
+          let attachmentHtml = '';
+          if (m.attachment && m.attachment.dataUrl) {
+            const att = m.attachment;
+            if (att.type && att.type.startsWith('image/')) {
+              attachmentHtml = '<img src="' + att.dataUrl + '" class="chat-attachment-img" alt="' + (att.name || 'Image') + '" onclick="event.stopPropagation(); window.open(&quot;' + att.dataUrl + '&quot;, &quot;_blank&quot;)" title="Click to view full size" />';
+            } else if (att.type && att.type.startsWith('video/')) {
+              attachmentHtml = '<video src="' + att.dataUrl + '" class="chat-attachment-video" controls playsinline onclick="event.stopPropagation()"></video>';
+            } else if (att.type && att.type.startsWith('audio/')) {
+              attachmentHtml = '<audio src="' + att.dataUrl + '" class="chat-attachment-audio" controls onclick="event.stopPropagation()"></audio>';
+            } else {
+              const fileExt = (att.name || '').split('.').pop().toUpperCase();
+              attachmentHtml = '<a href="' + att.dataUrl + '" download="' + (att.name || 'download') + '" class="chat-attachment-filecard" onclick="event.stopPropagation()">' +
+                '<div class="chat-file-icon">📄</div>' +
+                '<div class="chat-file-info">' +
+                  '<div class="chat-file-name">' + (att.name || 'File') + '</div>' +
+                  '<div class="chat-file-meta"><span>' + (formatBytes(att.size) || '') + '</span>' + (fileExt ? '<span>• ' + fileExt + '</span>' : '') + '</div>' +
+                '</div>' +
+                '<div class="chat-file-download-btn" title="Download">⬇</div>' +
+              '</a>';
+            }
+          }
+          const textHtml = m.text ? ('<div style="word-break: break-word;">' + m.text + '</div>') : '';
+          bodyHtml = attachmentHtml + textHtml;
         }
 
         // BitChat Multi-Hop Routing Box
@@ -19699,10 +19831,96 @@ function renderHtml(
       container.scrollTop = container.scrollHeight;
     }
 
+    let _pendingChatAttachment = null;
+
+    function formatBytes(bytes) {
+      if (!bytes || isNaN(bytes)) return '0 B';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function triggerChatFileSelect() {
+      const fileInput = document.getElementById('chatFileInput');
+      if (fileInput) {
+        fileInput.value = '';
+        fileInput.click();
+      }
+    }
+
+    function handleChatFileSelected(files) {
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      if (file.size > 8 * 1024 * 1024) {
+        showAccountToast('File size exceeds 8MB limit for P2P transport', 'warning');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const dataUrl = e.target.result;
+        _pendingChatAttachment = {
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          dataUrl: dataUrl,
+          cid: 'bafy' + Math.random().toString(36).substring(2, 12)
+        };
+        renderPendingChatAttachmentPreview();
+      };
+      reader.onerror = function() {
+        showAccountToast('Failed to read file', 'error');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearPendingChatAttachment() {
+      _pendingChatAttachment = null;
+      const tray = document.getElementById('chatAttachmentPreviewTray');
+      if (tray) tray.style.display = 'none';
+      const fileInput = document.getElementById('chatFileInput');
+      if (fileInput) fileInput.value = '';
+    }
+
+    function renderPendingChatAttachmentPreview() {
+      const tray = document.getElementById('chatAttachmentPreviewTray');
+      const content = document.getElementById('chatAttachmentPreviewContent');
+      if (!tray || !content || !_pendingChatAttachment) return;
+
+      const att = _pendingChatAttachment;
+      let iconOrThumb = '';
+      if (att.type.startsWith('image/')) {
+        iconOrThumb = '<img src="' + att.dataUrl + '" style="width: 32px; height: 32px; border-radius: 6px; object-fit: cover;" />';
+      } else if (att.type.startsWith('video/')) {
+        iconOrThumb = '<div style="font-size: 1.2rem;">🎬</div>';
+      } else if (att.type.startsWith('audio/')) {
+        iconOrThumb = '<div style="font-size: 1.2rem;">🎵</div>';
+      } else if (att.type.includes('pdf')) {
+        iconOrThumb = '<div style="font-size: 1.2rem;">📕</div>';
+      } else {
+        iconOrThumb = '<div style="font-size: 1.2rem;">📄</div>';
+      }
+
+      content.innerHTML = iconOrThumb +
+        '<div style="flex: 1; min-width: 0;">' +
+          '<div style="font-size: 0.78rem; font-weight: 600; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + att.name + '</div>' +
+          '<div style="font-size: 0.68rem; color: #38bdf8;">' + formatBytes(att.size) + ' • Ready to send</div>' +
+        '</div>';
+
+      tray.style.display = 'flex';
+    }
+
+    window.triggerChatFileSelect = triggerChatFileSelect;
+    window.handleChatFileSelected = handleChatFileSelected;
+    window.clearPendingChatAttachment = clearPendingChatAttachment;
+
     async function sendChatMessage() {
       const input = document.getElementById('chatInputText');
-      const text = input.value.trim();
-      if (!text) return;
+      const text = input ? input.value.trim() : '';
+      if (!text && !_pendingChatAttachment) return;
+
+      const attToSend = _pendingChatAttachment ? Object.assign({}, _pendingChatAttachment) : undefined;
+      clearPendingChatAttachment();
 
       const bcPeer = bitchatPeersData.find(function(p) { return p.did === activeContactDid; });
       const contact = contactsData.find(function(c) { return c.did === activeContactDid; });
@@ -19718,6 +19936,7 @@ function renderHtml(
         recipientDid: activeContactDid,
         senderName: myName,
         text: text,
+        attachment: attToSend,
         isAudio: false,
         audioDurationSec: 0,
         timestamp: now,
@@ -19734,10 +19953,10 @@ function renderHtml(
       };
 
       chatMessages.push(newMsg);
-      input.value = '';
+      if (input) input.value = '';
 
       if (contact) {
-        contact.lastMessage = text;
+        contact.lastMessage = text || (attToSend ? ('📎 ' + attToSend.name) : '');
         contact.lastMessageTimestamp = now;
         contact.lastMessageStatus = 'sent';
         contact.lastMessageIsOutgoing = true;
@@ -20353,18 +20572,45 @@ function renderHtml(
           _activeCallPollBusy = false;
           if (data && data.ok && data.session) {
             const st = data.session.status;
-            if (st === 'answered' && !_isCallAnswered) {
-              _isCallAnswered = true;
-              _callConnectedSeconds = 0;
-              stopCallAudioRinging();
-              const wave = document.getElementById('callWaveformContainer');
-              if (wave) wave.style.display = 'flex';
-              const directBtnWrap = document.getElementById('callDirectConnectWrap');
-              if (directBtnWrap) directBtnWrap.style.display = 'none';
-              const statusEl = document.getElementById('callStatusText');
-              if (statusEl) {
-                statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
-                statusEl.style.color = '#38bdf8';
+            if (st === 'answered') {
+              if (!_isCallAnswered) {
+                _isCallAnswered = true;
+                _callConnectedSeconds = 0;
+                stopCallAudioRinging();
+                const wave = document.getElementById('callWaveformContainer');
+                if (wave) wave.style.display = 'flex';
+                const directBtnWrap = document.getElementById('callDirectConnectWrap');
+                if (directBtnWrap) directBtnWrap.style.display = 'none';
+                const statusEl = document.getElementById('callStatusText');
+                if (statusEl) {
+                  statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
+                  statusEl.style.color = '#38bdf8';
+                }
+              }
+
+              // Apply remote SDP answer to RTCPeerConnection if available and in have-local-offer state
+              if (_peerConnection && data.session.sdpAnswer && _peerConnection.signalingState === 'have-local-offer') {
+                try {
+                  _peerConnection.setRemoteDescription(new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: data.session.sdpAnswer
+                  })).catch(function(e) { console.warn('[WebRTC] setRemoteDescription warning:', e); });
+                } catch (e) {
+                  console.warn('[WebRTC] Remote answer parse warning:', e);
+                }
+              }
+
+              // Apply remote ICE candidates
+              if (_peerConnection && Array.isArray(data.session.iceCandidates)) {
+                const myDid = myProfile ? myProfile.did : '';
+                data.session.iceCandidates.forEach(function(item) {
+                  if (item.senderDid !== myDid && item.candidate) {
+                    try {
+                      const candObj = typeof item.candidate === 'string' ? JSON.parse(item.candidate) : item.candidate;
+                      _peerConnection.addIceCandidate(new RTCIceCandidate(candObj)).catch(function() {});
+                    } catch (_) {}
+                  }
+                });
               }
             } else if (st === 'ended' || st === 'rejected' || st === 'declined') {
               handleRemoteCallEnded(data.session.reason || 'peer_hung_up');
@@ -20407,6 +20653,168 @@ function renderHtml(
       } else {
         if (document.exitFullscreen) document.exitFullscreen();
       }
+    }
+
+    let _peerConnection = null;
+
+    async function initCallLocalMediaStream(type) {
+      if (window._localMediaStream) {
+        try {
+          window._localMediaStream.getTracks().forEach(function(t) { t.stop(); });
+        } catch (_) {}
+        window._localMediaStream = null;
+      }
+
+      const needVideo = (type === 'video');
+      let realStream = null;
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          realStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            video: needVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false
+          });
+        } catch (err) {
+          console.warn('[Call] Real media stream unavailable, attempting fallback tracks:', err.message);
+          if (needVideo) {
+            try {
+              realStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            } catch (_) {}
+          }
+        }
+      }
+
+      const tracks = [];
+      if (realStream) {
+        realStream.getTracks().forEach(function(t) { tracks.push(t); });
+      }
+
+      // Audio track fallback: minimal Web Audio oscillator carrier so RTCPeerConnection audio track always exists
+      const hasAudio = tracks.some(function(t) { return t.kind === 'audio'; });
+      if (!hasAudio) {
+        try {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) {
+            const actx = new AC();
+            const osc = actx.createOscillator();
+            const dst = actx.createMediaStreamDestination();
+            const gain = actx.createGain();
+            gain.gain.value = 0.001;
+            osc.connect(gain);
+            gain.connect(dst);
+            osc.start();
+            dst.stream.getAudioTracks().forEach(function(t) { tracks.push(t); });
+          }
+        } catch (e) {
+          console.warn('[Call] Audio fallback error:', e);
+        }
+      }
+
+      // Video track fallback for video calls: virtual canvas capture
+      const hasVideo = tracks.some(function(t) { return t.kind === 'video'; });
+      if (needVideo && !hasVideo) {
+        try {
+          const cvs = document.createElement('canvas');
+          cvs.width = 640;
+          cvs.height = 360;
+          const ctx = cvs.getContext('2d');
+          if (ctx && cvs.captureStream) {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, 640, 360);
+            const vStream = cvs.captureStream(30);
+            vStream.getVideoTracks().forEach(function(t) { tracks.push(t); });
+          }
+        } catch (e) {
+          console.warn('[Call] Video fallback error:', e);
+        }
+      }
+
+      const finalStream = new MediaStream(tracks);
+      window._localMediaStream = finalStream;
+
+      const localVideo = document.getElementById('localVideoFeed');
+      if (localVideo) {
+        localVideo.srcObject = finalStream;
+        localVideo.play().catch(function() {});
+      }
+
+      return finalStream;
+    }
+
+    function createRTCPeerConnectionInstance() {
+      if (_peerConnection) {
+        try {
+          _peerConnection.ontrack = null;
+          _peerConnection.onicecandidate = null;
+          _peerConnection.close();
+        } catch (_) {}
+        _peerConnection = null;
+      }
+
+      let pc = null;
+      try {
+        pc = new RTCPeerConnection({
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' }
+          ]
+        });
+      } catch (err) {
+        console.warn('[WebRTC] RTCPeerConnection instantiation warning:', err);
+        return null;
+      }
+
+      _peerConnection = pc;
+
+      pc.ontrack = function(event) {
+        console.log('[WebRTC] Remote track received:', event.track.kind);
+        const remoteStream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+        window._remoteMediaStream = remoteStream;
+
+        const remoteVideo = document.getElementById('remoteVideoFeed');
+        if (remoteVideo) {
+          remoteVideo.srcObject = remoteStream;
+          remoteVideo.play().catch(function(e) { console.warn('Remote video play warning:', e); });
+        }
+
+        let remoteAudio = document.getElementById('remoteAudioPlayer');
+        if (!remoteAudio) {
+          remoteAudio = document.createElement('audio');
+          remoteAudio.id = 'remoteAudioPlayer';
+          remoteAudio.autoplay = true;
+          document.body.appendChild(remoteAudio);
+        }
+        remoteAudio.srcObject = remoteStream;
+        remoteAudio.play().catch(function(e) { console.warn('Remote audio play warning:', e); });
+
+        const fallback = document.getElementById('remoteVideoFallback');
+        if (fallback && _currentCallType === 'video') fallback.style.display = 'none';
+      };
+
+      pc.onicecandidate = function(event) {
+        if (event.candidate && window._activeCallId) {
+          fetch('/api/call/candidate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              callId: window._activeCallId,
+              candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate
+            })
+          }).catch(function() {});
+        }
+      };
+
+      if (window._localMediaStream) {
+        window._localMediaStream.getTracks().forEach(function(track) {
+          try {
+            pc.addTrack(track, window._localMediaStream);
+          } catch (e) {
+            console.warn('[WebRTC] addTrack warning:', e);
+          }
+        });
+      }
+
+      return pc;
     }
 
     async function setupLocalCameraStream() {
@@ -20704,6 +21112,15 @@ function renderHtml(
     }
 
     function cleanupActiveCallSession() {
+      if (_peerConnection) {
+        try {
+          _peerConnection.ontrack = null;
+          _peerConnection.onicecandidate = null;
+          _peerConnection.close();
+        } catch (_) {}
+        _peerConnection = null;
+      }
+      _iceCandidateQueue = [];
       if (_callPeerCanvasAnimId) {
         cancelAnimationFrame(_callPeerCanvasAnimId);
         _callPeerCanvasAnimId = null;
@@ -20718,6 +21135,14 @@ function renderHtml(
         } catch (_) {}
         window._localMediaStream = null;
       }
+      if (window._remoteMediaStream) {
+        try {
+          window._remoteMediaStream.getTracks().forEach(function(t) { t.stop(); });
+        } catch (_) {}
+        window._remoteMediaStream = null;
+      }
+      const remoteAudio = document.getElementById('remoteAudioPlayer');
+      if (remoteAudio) remoteAudio.srcObject = null;
       const remoteVideo = document.getElementById('remoteVideoFeed');
       if (remoteVideo) remoteVideo.srcObject = null;
       const localVideo = document.getElementById('localVideoFeed');
@@ -20759,7 +21184,7 @@ function renderHtml(
       showAccountToast('✓ Sovra Direct E2EE Call Connected!', 'success');
     }
 
-    function startE2eeCall(type) {
+    async function startE2eeCall(type) {
       const contact = contactsData.find(function(c) { return c.did === activeContactDid; }) ||
         (typeof friendsData !== 'undefined' && friendsData ? (friendsData.friends || []).find(function(f) { return f.did === activeContactDid; }) : null);
       if (!contact) return;
@@ -20799,29 +21224,37 @@ function renderHtml(
       // Play outgoing ring sound
       playCallAudioRinging('outgoing');
 
-      // Acquire user media stream if browser supports it
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' })
-          .then(function(stream) {
-            window._localMediaStream = stream;
-            const localVideo = document.getElementById('localVideoFeed');
-            if (localVideo && type === 'video') {
-              localVideo.srcObject = stream;
-              localVideo.play().catch(function() {});
-            }
-          })
-          .catch(function(e) {
-            console.warn('[Call] Media stream info:', e.message);
+      // 1. Acquire local media stream (microphone & optional camera)
+      await initCallLocalMediaStream(_currentCallType);
+
+      // 2. Setup RTCPeerConnection and attach tracks
+      const pc = createRTCPeerConnectionInstance();
+
+      // 3. Generate real WebRTC Offer SDP
+      let offerSdp = '';
+      if (pc) {
+        try {
+          const offer = await pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: (_currentCallType === 'video')
           });
+          await pc.setLocalDescription(offer);
+          offerSdp = offer.sdp || (pc.localDescription && pc.localDescription.sdp);
+        } catch (err) {
+          console.warn('[Call] WebRTC createOffer warning:', err);
+        }
+      }
+      if (!offerSdp) {
+        offerSdp = 'v=0\\r\\no=- 461173 2 IN IP4 127.0.0.1\\r\\ns=-\\r\\nt=0 0\\r\\na=sendrecv\\r\\nm=' + (type || 'audio') + ' 9 UDP/TLS/RTP/SAVPF 111';
       }
 
-      // Send real WebRTC signaling offer to backend
+      // 4. Send WebRTC signaling offer to backend
       fetch('/api/call/offer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipientDid: contact.did,
-          offerSdp: 'v=0\\r\\no=- 461173 2 IN IP4 127.0.0.1\\r\\ns=-\\r\\nt=0 0\\r\\na=sendrecv\\r\\nm=' + (type || 'audio') + ' 9 UDP/TLS/RTP/SAVPF 111',
+          offerSdp: offerSdp,
           callType: type || 'audio',
         }),
       }).then(r => r.json()).then(data => {
@@ -20945,7 +21378,7 @@ function renderHtml(
         .catch(function() {});
     }
 
-    function acceptIncomingCall() {
+    async function acceptIncomingCall() {
       stopCallAudioRinging();
       const incModal = document.getElementById('incomingCallModal');
       if (incModal) incModal.style.display = 'none';
@@ -20953,16 +21386,6 @@ function renderHtml(
       if (!_currentIncomingCall) return;
       const inc = _currentIncomingCall;
       window._activeCallId = inc.callId;
-
-      // Answer call on backend
-      fetch('/api/call/answer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callId: inc.callId,
-          answerSdp: 'v=0\\r\\no=- 461173 3 IN IP4 127.0.0.1\\r\\ns=-\\r\\nt=0 0\\r\\na=sendrecv\\r\\nm=' + (inc.callType || 'audio') + ' 9 UDP/TLS/RTP/SAVPF 111',
-        }),
-      }).catch(function(e) { console.warn('[Call] Answer error:', e); });
 
       // Open active call modal
       const avatarEl = document.getElementById('callAvatarIcon');
@@ -20995,6 +21418,40 @@ function renderHtml(
       _currentCallType = (inc.callType === 'video') ? 'video' : 'audio';
       _callVideoEnabled = (_currentCallType === 'video');
       applyCallLayoutMode();
+
+      // 1. Acquire local media stream (microphone & optional camera)
+      await initCallLocalMediaStream(_currentCallType);
+
+      // 2. Setup RTCPeerConnection and attach tracks
+      const pc = createRTCPeerConnectionInstance();
+
+      // 3. Set remote offer & generate answer
+      let answerSdp = '';
+      if (pc) {
+        try {
+          if (inc.sdpOffer) {
+            await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: inc.sdpOffer }));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            answerSdp = answer.sdp || (pc.localDescription && pc.localDescription.sdp);
+          }
+        } catch (err) {
+          console.warn('[Call] WebRTC answer error:', err);
+        }
+      }
+      if (!answerSdp) {
+        answerSdp = 'v=0\\r\\no=- 461173 3 IN IP4 127.0.0.1\\r\\ns=-\\r\\nt=0 0\\r\\na=sendrecv\\r\\nm=' + (inc.callType || 'audio') + ' 9 UDP/TLS/RTP/SAVPF 111';
+      }
+
+      // 4. Send WebRTC answer to backend
+      fetch('/api/call/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callId: inc.callId,
+          answerSdp: answerSdp,
+        }),
+      }).catch(function(e) { console.warn('[Call] Answer error:', e); });
 
       if (callTimerInterval) clearInterval(callTimerInterval);
       callTimerInterval = setInterval(function() {
@@ -28843,24 +29300,34 @@ async function startDevServer() {
     }
 
     if (url.pathname === '/api/chat/send' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 1024 * 1024);
+      const { body, ok } = await readBoundedBody(req, res, 10 * 1024 * 1024);
       if (!ok) return;
       try {
         const parsed = JSON.parse(body);
         const principal = enforceAuth(req, res, parsed);
         if (!principal) return;
 
-        if (!parsed.text && !parsed.isAudio) {
+        if (!parsed.text && !parsed.isAudio && !parsed.attachment) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Message text or audio required' }));
+          res.end(JSON.stringify({ ok: false, error: 'Message text, audio or attachment required' }));
           return;
         }
+
+        const validAttachment = parsed.attachment && typeof parsed.attachment === 'object' && parsed.attachment.dataUrl ? {
+          name: String(parsed.attachment.name || 'file'),
+          type: String(parsed.attachment.type || 'application/octet-stream'),
+          size: Number(parsed.attachment.size || 0),
+          dataUrl: String(parsed.attachment.dataUrl || ''),
+          cid: parsed.attachment.cid ? String(parsed.attachment.cid) : undefined,
+        } : undefined;
+
         const record = sovraDb.appendMessage({
           id: parsed.id,
           senderDid: principal.did,
           recipientDid: String(parsed.recipientDid || 'channel:local_mesh'),
           senderName: String(parsed.senderName || 'Peer'),
           text: String(parsed.text || ''),
+          attachment: validAttachment,
           isAudio: Boolean(parsed.isAudio),
           audioDurationSec: Number(parsed.audioDurationSec || 0),
           waveformBars: Array.isArray(parsed.waveformBars) ? parsed.waveformBars : undefined,
@@ -28875,6 +29342,10 @@ async function startDevServer() {
           const senderUser = sovraDb.findUserByDid(principal.did);
           const sName = record.senderName || senderUser?.displayName || senderUser?.handle || 'Peer';
           const sHandle = record.senderHandle || senderUser?.handle || '@peer';
+          const notifBody = record.isAudio
+            ? '🎤 Voice note'
+            : (record.attachment ? `📎 ${record.attachment.name}` : (record.text.slice(0, 50) || 'Message'));
+
           sovraDb.addNotification({
             recipientDid: record.recipientDid,
             senderDid: principal.did,
@@ -28882,7 +29353,7 @@ async function startDevServer() {
             senderName: sName,
             type: 'message',
             title: `Message from ${sName}`,
-            body: record.isAudio ? '🎤 Voice note' : (record.text.slice(0, 50) || 'Attachment'),
+            body: notifBody,
             link: '/app',
             data: {
               messageId: record.id,
@@ -28901,11 +29372,17 @@ async function startDevServer() {
             const peerName = record.recipientDid === 'did:sovra:alice_ble' ? 'Alice Sovereign' : 'Bob Mesh Node';
             setTimeout(() => {
               try {
-                const directReplies = [
-                  'Got your message over direct BLE! Signal is strong. ⚡',
-                  'Ratchet session verified and synchronized. How is your node running? 🚀',
-                  'Decentralized packet acknowledged. E2EE keys matched! 🔒',
-                ];
+                const directReplies = record.attachment
+                  ? [
+                      `Received attachment "${record.attachment.name}"! Decrypted and verified block integrity. 📎⚡`,
+                      `File "${record.attachment.name}" pinned to local IPFS blockstore. Looks great! 📦🔒`,
+                      `Got the file! SHA-256 fingerprint verified over direct BLE. ⚡`,
+                    ]
+                  : [
+                      'Got your message over direct BLE! Signal is strong. ⚡',
+                      'Ratchet session verified and synchronized. How is your node running? 🚀',
+                      'Decentralized packet acknowledged. E2EE keys matched! 🔒',
+                    ];
                 const replyText = directReplies[Math.floor(Math.random() * directReplies.length)];
                 const peerReply = sovraDb.appendMessage({
                   id: 'msg_direct_reply_' + Date.now(),
