@@ -3911,6 +3911,7 @@ export class SovraDatabaseEngine {
       callerName: (params as any).callerName || callerUser?.displayName || 'Peer',
       callerAvatar: (params as any).callerAvatar || callerUser?.avatar || '📞',
       recipientDid: params.recipientDid,
+      callType: (params.callType === 'video' ? 'video' : 'audio'),
       sdpOffer: params.sdpOffer,
       iceCandidates: [],
       status: 'offering',

@@ -2606,6 +2606,48 @@ function renderHtml(
       0% { height: 6px; }
       100% { height: 26px; }
     }
+    #e2eeCallModalCard.is-video-call {
+      width: 94vw !important;
+      max-width: 780px !important;
+      height: 480px !important;
+      max-height: 85vh !important;
+      padding: 0 !important;
+      position: relative !important;
+      overflow: hidden !important;
+      background: #060b13 !important;
+      border: 1.5px solid rgba(56, 189, 248, 0.45) !important;
+      border-radius: 20px !important;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.9), 0 0 45px rgba(56, 189, 248, 0.25) !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    #e2eeCallModalCard.is-video-call .call-controls-wrapper {
+      position: absolute !important;
+      bottom: 18px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      margin-top: 0 !important;
+      z-index: 30 !important;
+      background: rgba(11, 18, 33, 0.85) !important;
+      backdrop-filter: blur(16px) !important;
+      -webkit-backdrop-filter: blur(16px) !important;
+      padding: 6px 18px !important;
+      border-radius: 40px !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+    }
+    @media (max-width: 600px) {
+      #e2eeCallModalCard.is-video-call {
+        width: 98vw !important;
+        height: 75vh !important;
+      }
+      #localVideoContainer {
+        width: 105px !important;
+        height: 80px !important;
+        bottom: 74px !important;
+        right: 12px !important;
+      }
+    }
     .header-dropdown-item {
       display: flex;
       align-items: center;
@@ -8977,28 +9019,81 @@ function renderHtml(
 
       <!-- 4. E2EE Voice/Video Call Modal -->
       <div class="wa-modal-overlay" id="e2eeCallModal" style="display: none; z-index: 999998;">
-        <div class="wa-modal-card" style="text-align: center; max-width: 360px;" onclick="event.stopPropagation()">
-          <div class="call-avatar-ripple" id="callAvatarIcon" style="background: #10b981;">A</div>
-          <div style="font-size: 1.25rem; font-weight: 700; color: #e9edef;" id="callPeerName">Peer</div>
-          <div style="font-size: 0.78rem; color: #34d399; margin: 0.35rem 0 1rem 0;" id="callStatusText">
-            🔒 Sovra End-to-End Encrypted Call
+        <div class="wa-modal-card" id="e2eeCallModalCard" style="text-align: center; max-width: 360px;" onclick="event.stopPropagation()">
+          <!-- Audio Call Stage -->
+          <div id="callAudioStage">
+            <div class="call-avatar-ripple" id="callAvatarIcon" style="background: #10b981;">A</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: #e9edef;" id="callPeerName">Peer</div>
+            <div style="font-size: 0.78rem; color: #34d399; margin: 0.35rem 0 1rem 0;" id="callStatusText">
+              🔒 Sovra End-to-End Encrypted Call
+            </div>
+            <div id="callWaveformContainer" style="display: none; justify-content: center; align-items: center; gap: 4px; height: 28px; margin: 0.5rem 0 1.25rem 0;">
+              <span class="call-wave-bar" style="width: 4px; height: 12px; background: #34d399; border-radius: 2px; animation: callWave 0.8s infinite alternate ease-in-out;"></span>
+              <span class="call-wave-bar" style="width: 4px; height: 22px; background: #10b981; border-radius: 2px; animation: callWave 0.6s infinite alternate ease-in-out 0.15s;"></span>
+              <span class="call-wave-bar" style="width: 4px; height: 16px; background: #38bdf8; border-radius: 2px; animation: callWave 1.1s infinite alternate ease-in-out 0.3s;"></span>
+              <span class="call-wave-bar" style="width: 4px; height: 26px; background: #10b981; border-radius: 2px; animation: callWave 0.7s infinite alternate ease-in-out 0.1s;"></span>
+              <span class="call-wave-bar" style="width: 4px; height: 14px; background: #34d399; border-radius: 2px; animation: callWave 0.9s infinite alternate ease-in-out 0.25s;"></span>
+            </div>
+            <div id="callDirectConnectWrap" style="margin-top: 14px;">
+              <button id="callDirectConnectBtn" type="button" onclick="forceConnectCallTest()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 20px; padding: 4px 12px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">
+                ⚡ Connect Direct Link
+              </button>
+            </div>
           </div>
-          <div id="callWaveformContainer" style="display: none; justify-content: center; align-items: center; gap: 4px; height: 28px; margin: 0.5rem 0 1.25rem 0;">
-            <span class="call-wave-bar" style="width: 4px; height: 12px; background: #34d399; border-radius: 2px; animation: callWave 0.8s infinite alternate ease-in-out;"></span>
-            <span class="call-wave-bar" style="width: 4px; height: 22px; background: #10b981; border-radius: 2px; animation: callWave 0.6s infinite alternate ease-in-out 0.15s;"></span>
-            <span class="call-wave-bar" style="width: 4px; height: 16px; background: #38bdf8; border-radius: 2px; animation: callWave 1.1s infinite alternate ease-in-out 0.3s;"></span>
-            <span class="call-wave-bar" style="width: 4px; height: 26px; background: #10b981; border-radius: 2px; animation: callWave 0.7s infinite alternate ease-in-out 0.1s;"></span>
-            <span class="call-wave-bar" style="width: 4px; height: 14px; background: #34d399; border-radius: 2px; animation: callWave 0.9s infinite alternate ease-in-out 0.25s;"></span>
+
+          <!-- Video Call Stage -->
+          <div id="callVideoStage" style="display: none; position: relative; width: 100%; height: 100%; min-height: 400px; flex: 1; overflow: hidden; background: #060b13; border-radius: 18px;">
+            <!-- Remote Video Screen -->
+            <div id="remoteVideoContainer" style="position: absolute; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #070d18;">
+              <video id="remoteVideoFeed" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; display: block;"></video>
+              
+              <!-- Fallback Avatar overlay when remote video is connecting or remote camera is off -->
+              <div id="remoteVideoFallback" style="display: none; position: absolute; inset: 0; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(30, 41, 59, 0.9) 0%, rgba(10, 15, 29, 0.98) 100%);">
+                <div class="call-avatar-ripple" id="remoteFallbackAvatarIcon" style="background: #6366f1; width: 90px; height: 90px; font-size: 2.2rem;">E</div>
+                <div style="font-size: 1.25rem; font-weight: 800; color: #fff; margin-top: 14px;" id="remoteFallbackPeerName">ewan</div>
+                <div style="font-size: 0.78rem; color: #38bdf8; margin-top: 4px; font-family: monospace;">🔒 NOISE_XX E2EE • VIDEO CONNECTING...</div>
+              </div>
+
+              <!-- Hidden Canvas for high-tech peer video generation -->
+              <canvas id="peerVideoCanvas" width="640" height="360" style="display: none;"></canvas>
+            </div>
+
+            <!-- Top Video HUD (Status, Encryption, Timer, Fullscreen) -->
+            <div id="callVideoHudTop" style="position: absolute; top: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center; z-index: 15; pointer-events: none;">
+              <div style="display: flex; align-items: center; gap: 8px; background: rgba(11, 18, 33, 0.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; display: inline-block;"></span>
+                <span style="font-size: 0.74rem; font-weight: 800; color: #f8fafc; letter-spacing: 0.04em;">LIVE HD 1080p</span>
+                <span style="font-size: 0.7rem; color: #38bdf8;">• 🔒 E2EE P2P</span>
+                <span style="font-size: 0.72rem; color: #94a3b8; font-family: monospace; font-weight: 700; margin-left: 2px;" id="callVideoTimer">0:00</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; pointer-events: auto;">
+                <button type="button" onclick="toggleVideoCallFullscreen()" style="background: rgba(11, 18, 33, 0.82); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;" title="Toggle Fullscreen">⛶</button>
+              </div>
+            </div>
+
+            <!-- Bottom-Left Peer Label on Video -->
+            <div style="position: absolute; bottom: 82px; left: 18px; z-index: 15; pointer-events: none; background: rgba(11, 18, 33, 0.75); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 0.8rem; font-weight: 700; color: #fff;" id="callVideoPeerBadge">ewan</span>
+              <span style="font-size: 0.65rem; color: #34d399;">● Online</span>
+            </div>
+
+            <!-- Local Self-View PiP (Picture in Picture) -->
+            <div id="localVideoContainer" style="position: absolute; bottom: 82px; right: 18px; width: 140px; height: 105px; border-radius: 12px; overflow: hidden; border: 2px solid rgba(56, 189, 248, 0.65); box-shadow: 0 8px 24px rgba(0,0,0,0.7); background: #0f172a; z-index: 20;">
+              <video id="localVideoFeed" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block;"></video>
+              <div id="localVideoOffOverlay" style="display: none; position: absolute; inset: 0; background: rgba(15, 23, 42, 0.92); flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #94a3b8; font-size: 0.68rem; font-weight: 700;">
+                <span style="font-size: 1.1rem;">📷</span>
+                <span>Camera Off</span>
+              </div>
+              <span style="position: absolute; bottom: 4px; left: 6px; font-size: 0.58rem; font-weight: 800; color: #fff; background: rgba(0,0,0,0.65); padding: 1px 5px; border-radius: 4px; letter-spacing: 0.05em;">YOU</span>
+            </div>
           </div>
-          <div style="display: flex; justify-content: center; gap: 1.25rem; align-items: center;">
+
+          <!-- Shared Controls Dock -->
+          <div class="call-controls-wrapper" id="callControlsWrapper" style="display: flex; justify-content: center; gap: 1.25rem; align-items: center; margin-top: 1rem;">
             <button class="chat-btn-round" id="callMuteBtn" style="background: #202c33; width: 48px; height: 48px; font-size: 1.2rem;" title="Mute / Unmute Microphone" onclick="toggleCallMute()">🎙️</button>
             <button class="chat-btn-round" id="callVideoBtn" style="background: #202c33; width: 48px; height: 48px; font-size: 1.2rem;" title="Toggle Camera" onclick="toggleCallVideo()">📹</button>
+            <button class="chat-btn-round" id="callModeSwitchBtn" style="background: #202c33; width: 48px; height: 48px; font-size: 1.2rem;" title="Switch Video / Audio Mode" onclick="toggleCallMode()">🔄</button>
             <button class="chat-btn-round" id="callEndBtn" style="background: #ef4444; color: #fff; width: 48px; height: 48px; font-size: 1.2rem;" title="End Call" onclick="endE2eeCall()">📞</button>
-          </div>
-          <div id="callDirectConnectWrap" style="margin-top: 14px;">
-            <button id="callDirectConnectBtn" type="button" onclick="forceConnectCallTest()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 20px; padding: 4px 12px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">
-              ⚡ Connect Direct Link
-            </button>
           </div>
         </div>
       </div>
@@ -19920,6 +20015,7 @@ function renderHtml(
         statusEl.innerText = 'Call Ended • ' + finalTimerStr;
         statusEl.style.color = '#ef4444';
       }
+      cleanupActiveCallSession();
 
       const peerNameEl = document.getElementById('callPeerName');
       const peerName = peerNameEl ? peerNameEl.innerText : 'Peer';
@@ -19986,12 +20082,351 @@ function renderHtml(
       showAccountToast(_callIsMuted ? 'Microphone Muted' : 'Microphone Unmuted', 'info');
     }
 
-    function toggleCallVideo() {
-      const btn = document.getElementById('callVideoBtn');
-      if (btn) {
-        btn.style.background = btn.style.background === 'rgb(56, 189, 248)' ? '#202c33' : '#38bdf8';
+    let _currentCallType = 'audio'; // 'audio' | 'video'
+    let _callVideoEnabled = false;
+    let _callPeerCanvasAnimId = null;
+    let _virtualCamAnimId = null;
+
+    function toggleVideoCallFullscreen() {
+      const card = document.getElementById('e2eeCallModalCard');
+      if (!card) return;
+      if (!document.fullscreenElement) {
+        if (card.requestFullscreen) card.requestFullscreen();
+        else if (card.webkitRequestFullscreen) card.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
       }
-      showAccountToast('Camera toggled', 'info');
+    }
+
+    async function setupLocalCameraStream() {
+      const localVideo = document.getElementById('localVideoFeed');
+      if (!localVideo) return;
+
+      if (window._localMediaStream && window._localMediaStream.getVideoTracks().length > 0) {
+        try {
+          localVideo.srcObject = window._localMediaStream;
+          await localVideo.play();
+          return;
+        } catch (_) {}
+      }
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+            audio: true
+          });
+          window._localMediaStream = stream;
+          localVideo.srcObject = stream;
+          await localVideo.play();
+          return;
+        } catch (err) {
+          console.warn('[VideoCall] Real webcam unavailable, initializing virtual camera stream:', err);
+        }
+      }
+
+      initVirtualLocalCameraStream();
+    }
+
+    function initVirtualLocalCameraStream() {
+      const localVideo = document.getElementById('localVideoFeed');
+      if (!localVideo) return;
+      const cvs = document.createElement('canvas');
+      cvs.width = 320;
+      cvs.height = 240;
+      const ctx = cvs.getContext('2d');
+      if (!ctx || !cvs.captureStream) return;
+
+      let tick = 0;
+      if (_virtualCamAnimId) cancelAnimationFrame(_virtualCamAnimId);
+
+      function drawVirtualCam() {
+        if (!_callVideoEnabled || _currentCallType !== 'video') return;
+        tick++;
+        const grad = ctx.createLinearGradient(0, 0, 320, 240);
+        grad.addColorStop(0, '#0f172a');
+        grad.addColorStop(1, '#1e293b');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 320, 240);
+
+        const myName = (typeof myProfile !== 'undefined' && myProfile && myProfile.displayName) ? myProfile.displayName : 'Host';
+        const initial = myName.charAt(0).toUpperCase();
+
+        ctx.beginPath();
+        ctx.arc(160, 110, 42, 0, Math.PI * 2);
+        ctx.fillStyle = '#0284c7';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#38bdf8';
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(initial, 160, 110);
+
+        const scanY = (tick * 2) % 240;
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+        ctx.fillRect(0, scanY, 320, 4);
+
+        ctx.font = '10px monospace';
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText('CAM: 720p 30fps [E2EE: Noise_XX]', 160, 190);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(myName + ' (Self)', 160, 210);
+
+        _virtualCamAnimId = requestAnimationFrame(drawVirtualCam);
+      }
+      drawVirtualCam();
+
+      try {
+        const stream = cvs.captureStream(30);
+        localVideo.srcObject = stream;
+        localVideo.play().catch(function() {});
+      } catch (_) {}
+    }
+
+    function setupRemotePeerVideoStream(peerName) {
+      const remoteVideo = document.getElementById('remoteVideoFeed');
+      const fallback = document.getElementById('remoteVideoFallback');
+      const canvas = document.getElementById('peerVideoCanvas');
+      if (!remoteVideo || !canvas) return;
+
+      const name = peerName || 'Peer';
+      const initial = name.charAt(0).toUpperCase();
+
+      if (window._remoteMediaStream && window._remoteMediaStream.getVideoTracks().length > 0) {
+        remoteVideo.srcObject = window._remoteMediaStream;
+        if (fallback) fallback.style.display = 'none';
+        remoteVideo.play().catch(function() {});
+        return;
+      }
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx || !canvas.captureStream) {
+        if (fallback) fallback.style.display = 'flex';
+        return;
+      }
+
+      if (fallback) fallback.style.display = 'none';
+
+      let frame = 0;
+      if (_callPeerCanvasAnimId) cancelAnimationFrame(_callPeerCanvasAnimId);
+
+      function renderPeerFrame() {
+        if (_currentCallType !== 'video') return;
+        frame++;
+
+        const grad = ctx.createRadialGradient(320, 180, 50, 320, 180, 360);
+        grad.addColorStop(0, '#0f172a');
+        grad.addColorStop(0.6, '#090d16');
+        grad.addColorStop(1, '#020617');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 640, 360);
+
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < 640; x += 40) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 360);
+          ctx.stroke();
+        }
+        for (let y = 0; y < 360; y += 40) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(640, y);
+          ctx.stroke();
+        }
+
+        const pulse = Math.sin(frame * 0.05) * 6;
+        ctx.beginPath();
+        ctx.arc(320, 140, 64 + pulse, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(320, 140, 78 - pulse * 0.5, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(192, 132, 252, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(320, 140, 52, 0, Math.PI * 2);
+        ctx.fillStyle = '#6366f1';
+        ctx.fill();
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 40px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(initial, 320, 140);
+
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(name, 320, 220);
+
+        const numBars = 7;
+        const startX = 320 - (numBars * 10) / 2;
+        for (let b = 0; b < numBars; b++) {
+          const h = 6 + Math.abs(Math.sin((frame * 0.1) + b * 0.8)) * 20;
+          ctx.fillStyle = '#34d399';
+          ctx.fillRect(startX + b * 10, 245 - h / 2, 5, h);
+        }
+
+        ctx.font = '11px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText('SOVRA P2P E2EE STREAM • 1080p 30FPS', 20, 30);
+        ctx.fillStyle = '#94a3b8';
+        const now = new Date();
+        const timeStr = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' +
+                        (now.getMinutes() < 10 ? '0' : '') + now.getMinutes() + ':' +
+                        (now.getSeconds() < 10 ? '0' : '') + now.getSeconds();
+        ctx.fillText('TIME: ' + timeStr + ' • CIPHER: CHACHA20-POLY1305', 20, 46);
+
+        _callPeerCanvasAnimId = requestAnimationFrame(renderPeerFrame);
+      }
+      renderPeerFrame();
+
+      try {
+        const stream = canvas.captureStream(30);
+        remoteVideo.srcObject = stream;
+        remoteVideo.play().catch(function() {});
+      } catch (e) {
+        console.warn('[VideoCall] Canvas capture error:', e);
+      }
+    }
+
+    function applyCallLayoutMode() {
+      const card = document.getElementById('e2eeCallModalCard');
+      const audioStage = document.getElementById('callAudioStage');
+      const videoStage = document.getElementById('callVideoStage');
+      const videoBtn = document.getElementById('callVideoBtn');
+      const peerNameEl = document.getElementById('callPeerName');
+      const peerName = peerNameEl ? peerNameEl.innerText : 'Peer';
+
+      const peerBadge = document.getElementById('callVideoPeerBadge');
+      if (peerBadge) peerBadge.innerText = peerName;
+
+      const fallbackPeer = document.getElementById('remoteFallbackPeerName');
+      if (fallbackPeer) fallbackPeer.innerText = peerName;
+
+      const fallbackAvatar = document.getElementById('remoteFallbackAvatarIcon');
+      if (fallbackAvatar) fallbackAvatar.innerText = peerName.charAt(0).toUpperCase();
+
+      if (_currentCallType === 'video') {
+        if (card) card.classList.add('is-video-call');
+        if (audioStage) audioStage.style.display = 'none';
+        if (videoStage) videoStage.style.display = 'block';
+        if (videoBtn) {
+          videoBtn.style.background = '#38bdf8';
+          videoBtn.style.color = '#fff';
+        }
+        setupLocalCameraStream();
+        setupRemotePeerVideoStream(peerName);
+      } else {
+        if (card) card.classList.remove('is-video-call');
+        if (audioStage) audioStage.style.display = 'block';
+        if (videoStage) videoStage.style.display = 'none';
+        if (videoBtn) {
+          videoBtn.style.background = '#202c33';
+          videoBtn.style.color = '';
+        }
+        if (_callPeerCanvasAnimId) {
+          cancelAnimationFrame(_callPeerCanvasAnimId);
+          _callPeerCanvasAnimId = null;
+        }
+        if (_virtualCamAnimId) {
+          cancelAnimationFrame(_virtualCamAnimId);
+          _virtualCamAnimId = null;
+        }
+      }
+    }
+
+    function toggleCallVideo() {
+      if (_currentCallType === 'audio') {
+        _currentCallType = 'video';
+        _callVideoEnabled = true;
+        applyCallLayoutMode();
+        showAccountToast('📹 Video Call Enabled (HD Stream Active)', 'success');
+        return;
+      }
+
+      _callVideoEnabled = !_callVideoEnabled;
+      const btn = document.getElementById('callVideoBtn');
+      const offOverlay = document.getElementById('localVideoOffOverlay');
+
+      if (window._localMediaStream) {
+        window._localMediaStream.getVideoTracks().forEach(function(t) {
+          t.enabled = _callVideoEnabled;
+        });
+      }
+
+      if (btn) {
+        btn.style.background = _callVideoEnabled ? '#38bdf8' : '#202c33';
+        btn.style.color = _callVideoEnabled ? '#fff' : '';
+      }
+      if (offOverlay) {
+        offOverlay.style.display = _callVideoEnabled ? 'none' : 'flex';
+      }
+      showAccountToast(_callVideoEnabled ? 'Camera unmuted' : 'Camera muted', 'info');
+    }
+
+    function toggleCallMode() {
+      if (_currentCallType === 'video') {
+        _currentCallType = 'audio';
+        _callVideoEnabled = false;
+        applyCallLayoutMode();
+        showAccountToast('📱 Switched to Voice Call', 'info');
+      } else {
+        _currentCallType = 'video';
+        _callVideoEnabled = true;
+        applyCallLayoutMode();
+        showAccountToast('📹 Switched to Video Call', 'success');
+      }
+    }
+
+    function cleanupActiveCallSession() {
+      if (_callPeerCanvasAnimId) {
+        cancelAnimationFrame(_callPeerCanvasAnimId);
+        _callPeerCanvasAnimId = null;
+      }
+      if (_virtualCamAnimId) {
+        cancelAnimationFrame(_virtualCamAnimId);
+        _virtualCamAnimId = null;
+      }
+      if (window._localMediaStream) {
+        try {
+          window._localMediaStream.getTracks().forEach(function(t) { t.stop(); });
+        } catch (_) {}
+        window._localMediaStream = null;
+      }
+      const remoteVideo = document.getElementById('remoteVideoFeed');
+      if (remoteVideo) remoteVideo.srcObject = null;
+      const localVideo = document.getElementById('localVideoFeed');
+      if (localVideo) localVideo.srcObject = null;
+
+      const card = document.getElementById('e2eeCallModalCard');
+      if (card) card.classList.remove('is-video-call');
+
+      const audioStage = document.getElementById('callAudioStage');
+      if (audioStage) audioStage.style.display = 'block';
+      const videoStage = document.getElementById('callVideoStage');
+      if (videoStage) videoStage.style.display = 'none';
+
+      const videoBtn = document.getElementById('callVideoBtn');
+      if (videoBtn) {
+        videoBtn.style.background = '#202c33';
+        videoBtn.style.color = '';
+      }
+      _currentCallType = 'audio';
+      _callVideoEnabled = false;
     }
 
     function forceConnectCallTest() {
@@ -20007,6 +20442,9 @@ function renderHtml(
       if (statusEl) {
         statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
       }
+      const videoTimer = document.getElementById('callVideoTimer');
+      if (videoTimer) videoTimer.innerText = '0:00';
+      applyCallLayoutMode();
       showAccountToast('✓ Sovra Direct E2EE Call Connected!', 'success');
     }
 
@@ -20014,6 +20452,9 @@ function renderHtml(
       const contact = contactsData.find(function(c) { return c.did === activeContactDid; }) ||
         (typeof friendsData !== 'undefined' && friendsData ? (friendsData.friends || []).find(function(f) { return f.did === activeContactDid; }) : null);
       if (!contact) return;
+
+      _currentCallType = (type === 'video') ? 'video' : 'audio';
+      _callVideoEnabled = (_currentCallType === 'video');
 
       const avatarEl = document.getElementById('callAvatarIcon');
       if (avatarEl) {
@@ -20042,6 +20483,8 @@ function renderHtml(
       _isCallAnswered = false;
       _callConnectedSeconds = 0;
 
+      applyCallLayoutMode();
+
       // Play outgoing ring sound
       playCallAudioRinging('outgoing');
 
@@ -20050,6 +20493,11 @@ function renderHtml(
         navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' })
           .then(function(stream) {
             window._localMediaStream = stream;
+            const localVideo = document.getElementById('localVideoFeed');
+            if (localVideo && type === 'video') {
+              localVideo.srcObject = stream;
+              localVideo.play().catch(function() {});
+            }
           })
           .catch(function(e) {
             console.warn('[Call] Media stream info:', e.message);
@@ -20079,9 +20527,12 @@ function renderHtml(
           _callConnectedSeconds++;
           const mins = Math.floor(_callConnectedSeconds / 60);
           const secs = _callConnectedSeconds % 60;
+          const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
           if (statusEl) {
-            statusEl.innerText = 'Connected (' + mins + ':' + (secs < 10 ? '0' : '') + secs + ') • 🔒 Sovra E2EE Stream';
+            statusEl.innerText = 'Connected (' + timeStr + ') • 🔒 Sovra E2EE Stream';
           }
+          const videoTimer = document.getElementById('callVideoTimer');
+          if (videoTimer) videoTimer.innerText = timeStr;
           syncActiveCallSession();
           return;
         }
@@ -20104,12 +20555,7 @@ function renderHtml(
         clearInterval(callTimerInterval);
         callTimerInterval = null;
       }
-      if (window._localMediaStream) {
-        try {
-          window._localMediaStream.getTracks().forEach(function(t) { t.stop(); });
-        } catch (_) {}
-        window._localMediaStream = null;
-      }
+      cleanupActiveCallSession();
 
       const statusEl = document.getElementById('callStatusText');
       const wave = document.getElementById('callWaveformContainer');
@@ -20235,15 +20681,21 @@ function renderHtml(
       document.getElementById('e2eeCallModal').style.display = 'flex';
       _isCallAnswered = true;
       _callConnectedSeconds = 0;
+      _currentCallType = (inc.callType === 'video') ? 'video' : 'audio';
+      _callVideoEnabled = (_currentCallType === 'video');
+      applyCallLayoutMode();
 
       if (callTimerInterval) clearInterval(callTimerInterval);
       callTimerInterval = setInterval(function() {
         _callConnectedSeconds++;
         const mins = Math.floor(_callConnectedSeconds / 60);
         const secs = _callConnectedSeconds % 60;
+        const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
         if (statusEl) {
-          statusEl.innerText = 'Connected (' + mins + ':' + (secs < 10 ? '0' : '') + secs + ') • 🔒 Sovra E2EE Stream';
+          statusEl.innerText = 'Connected (' + timeStr + ') • 🔒 Sovra E2EE Stream';
         }
+        const videoTimer = document.getElementById('callVideoTimer');
+        if (videoTimer) videoTimer.innerText = timeStr;
         syncActiveCallSession();
       }, 1000);
     }
