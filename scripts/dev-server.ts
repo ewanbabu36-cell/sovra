@@ -1,8 +1,10 @@
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import { ensureDevTlsCertificates } from './tls-helper.ts';
 import {
   generateEd25519KeyPair,
   bytesToHex,
@@ -7918,6 +7920,17 @@ function renderHtml(
       } catch(e) {}
     })();
   </script>
+  <!-- Top Notice Banner for Insecure LAN Contexts (WebRTC Camera/Mic) -->
+  <div id="insecureContextNotice" style="display: none; background: linear-gradient(90deg, #1e1b4b, #312e81); color: #e0e7ff; padding: 10px 16px; font-size: 0.8rem; border-bottom: 1px solid #4f46e5; align-items: center; justify-content: space-between; z-index: 999999; position: sticky; top: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <span style="font-size: 1rem;">🔒</span>
+      <span><strong>Mobile WebRTC Notice:</strong> Camera & Microphone calling requires HTTPS on LAN.</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-top: 4px;">
+      <a id="insecureContextNoticeLink" href="#" style="background: #38bdf8; color: #020617; font-weight: 700; padding: 5px 12px; border-radius: 6px; text-decoration: none; font-size: 0.74rem;">Switch to HTTPS (Port 3443)</a>
+      <button type="button" onclick="document.getElementById('insecureContextNotice').style.display='none'" style="background: none; border: none; color: #a5b4fc; cursor: pointer; font-size: 1rem; padding: 0 4px;" aria-label="Dismiss">✕</button>
+    </div>
+  </div>
   <div class="app-layout">
     <!-- Column 1: Left Navigation Rail (Desktop) -->
     <aside class="app-left-rail">
@@ -9347,6 +9360,18 @@ function renderHtml(
             <div style="font-size: 1.25rem; font-weight: 700; color: #e9edef;" id="callPeerName">Peer</div>
             <div style="font-size: 0.78rem; color: #34d399; margin: 0.35rem 0 1rem 0;" id="callStatusText">
               🔒 Sovra End-to-End Encrypted Call
+            </div>
+            <!-- Insecure Context / HTTPS Helper for Mobile WebRTC Calling -->
+            <div id="callHttpsSwitchWrap" style="display: none; margin: 12px 0; padding: 12px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; text-align: center;">
+              <div style="font-size: 0.76rem; color: #fca5a5; margin-bottom: 8px; line-height: 1.4;">
+                ⚠️ Mobile browsers block Camera &amp; Mic on insecure HTTP LAN. Switch to HTTPS to enable WebRTC calling:
+              </div>
+              <a id="callHttpsSwitchBtn" href="#" style="display: inline-block; background: #38bdf8; color: #030712; font-weight: 700; font-size: 0.78rem; padding: 6px 14px; border-radius: 8px; text-decoration: none; margin-bottom: 6px;">
+                🚀 Switch to HTTPS (Port 3443)
+              </a>
+              <div style="font-size: 0.68rem; color: #94a3b8;">
+                (Tap 'Advanced' &rarr; 'Proceed' when browser asks)
+              </div>
             </div>
             <div id="callWaveformContainer" style="display: none; justify-content: center; align-items: center; gap: 4px; height: 28px; margin: 0.5rem 0 1.25rem 0;">
               <span class="call-wave-bar" style="width: 4px; height: 12px; background: #34d399; border-radius: 2px; animation: callWave 0.8s infinite alternate ease-in-out;"></span>
@@ -13528,6 +13553,17 @@ function renderHtml(
 
     // Auto-check onboarding on first visit & restore session from server
     window.addEventListener('DOMContentLoaded', function() {
+      if (!window.isSecureContext && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        var notice = document.getElementById('insecureContextNotice');
+        if (notice) {
+          notice.style.display = 'flex';
+          var noticeLink = document.getElementById('insecureContextNoticeLink');
+          if (noticeLink) {
+            noticeLink.href = 'https://' + window.location.hostname + ':3443' + window.location.pathname;
+          }
+        }
+      }
+
       const isExplicitlyLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
       const sessionToken = localStorage.getItem('sovra_session_token');
       const savedProfile = localStorage.getItem('sovra_user_profile');
@@ -20860,6 +20896,11 @@ function renderHtml(
       let stream = null;
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        var isSecure = Boolean(window.isSecureContext);
+        var isHttps = (window.location.protocol === 'https:');
+        if (!isSecure && !isHttps) {
+          throw new Error('WebRTC requires HTTPS on mobile devices. Switch to https://' + window.location.hostname + ':3443');
+        }
         throw new Error('WebRTC mediaDevices is not supported in this environment');
       }
 
@@ -21484,6 +21525,9 @@ function renderHtml(
       const directBtnWrap = document.getElementById('callDirectConnectWrap');
       if (directBtnWrap) directBtnWrap.style.display = 'none';
 
+      const switchWrapInit = document.getElementById('callHttpsSwitchWrap');
+      if (switchWrapInit) switchWrapInit.style.display = 'none';
+
       document.getElementById('e2eeCallModal').style.display = 'flex';
       _isCallAnswered = false;
       _callConnectedSeconds = 0;
@@ -21502,10 +21546,19 @@ function renderHtml(
         }
         showAccountToast('⚠️ ' + permErr.message, 'error');
         setCallState(CallState.FAILED);
-        setTimeout(function() {
-          document.getElementById('e2eeCallModal').style.display = 'none';
-          cleanupActiveCallSession();
-        }, 3000);
+        var switchWrap = document.getElementById('callHttpsSwitchWrap');
+        if (switchWrap && (!window.isSecureContext && window.location.protocol !== 'https:')) {
+          switchWrap.style.display = 'block';
+          var switchBtn = document.getElementById('callHttpsSwitchBtn');
+          if (switchBtn) {
+            switchBtn.href = 'https://' + window.location.hostname + ':3443' + window.location.pathname;
+          }
+        } else {
+          setTimeout(function() {
+            document.getElementById('e2eeCallModal').style.display = 'none';
+            cleanupActiveCallSession();
+          }, 3000);
+        }
         return;
       }
 
@@ -21723,6 +21776,9 @@ function renderHtml(
       const directBtnWrap = document.getElementById('callDirectConnectWrap');
       if (directBtnWrap) directBtnWrap.style.display = 'none';
 
+      const switchWrapInit = document.getElementById('callHttpsSwitchWrap');
+      if (switchWrapInit) switchWrapInit.style.display = 'none';
+
       document.getElementById('e2eeCallModal').style.display = 'flex';
       _isCallAnswered = false;
       _callConnectedSeconds = 0;
@@ -21742,10 +21798,19 @@ function renderHtml(
         }
         showAccountToast('⚠️ ' + permErr.message, 'error');
         setCallState(CallState.FAILED);
-        setTimeout(function() {
-          document.getElementById('e2eeCallModal').style.display = 'none';
-          cleanupActiveCallSession();
-        }, 3000);
+        var switchWrap = document.getElementById('callHttpsSwitchWrap');
+        if (switchWrap && (!window.isSecureContext && window.location.protocol !== 'https:')) {
+          switchWrap.style.display = 'block';
+          var switchBtn = document.getElementById('callHttpsSwitchBtn');
+          if (switchBtn) {
+            switchBtn.href = 'https://' + window.location.hostname + ':3443' + window.location.pathname;
+          }
+        } else {
+          setTimeout(function() {
+            document.getElementById('e2eeCallModal').style.display = 'none';
+            cleanupActiveCallSession();
+          }, 3000);
+        }
         return;
       }
 
@@ -25524,6 +25589,7 @@ async function startDevServer() {
   });
 
   const HTTP_PORT = parseInt(process.env.PORT ?? '3001', 10);
+  const HTTPS_PORT = parseInt(process.env.HTTPS_PORT ?? '3443', 10);
   const startTime = Date.now();
 
   const replayStore = new DurableReplayStore({
@@ -25706,8 +25772,10 @@ async function startDevServer() {
     return principal;
   }
 
-  const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+  const requestHandler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
+    const isEncrypted = Boolean((req.socket as any).encrypted);
+    const hostHeader = req.headers.host || (isEncrypted ? `localhost:${HTTPS_PORT}` : `localhost:${HTTP_PORT}`);
+    const url = new URL(req.url ?? '/', `${isEncrypted ? 'https' : 'http'}://${hostHeader}`);
 
     // Security & Origin policy
     const clientIp = req.socket.remoteAddress || '127.0.0.1';
@@ -31043,7 +31111,22 @@ async function startDevServer() {
 
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
-  });
+  };
+
+  const server = http.createServer(requestHandler);
+
+  const tlsCreds = ensureDevTlsCertificates();
+  let httpsServer: https.Server | null = null;
+  if (tlsCreds) {
+    try {
+      httpsServer = https.createServer({
+        key: tlsCreds.key,
+        cert: tlsCreds.cert
+      }, requestHandler);
+    } catch (tlsErr) {
+      console.warn('[HTTPS] Could not initialize HTTPS server:', tlsErr);
+    }
+  }
 
   server.listen(HTTP_PORT, '0.0.0.0', () => {
     console.log('[2/2] HTTP Server Bound!');
@@ -31058,16 +31141,34 @@ async function startDevServer() {
       }
     }
 
+    if (httpsServer) {
+      httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
+        console.log(`[HTTPS] Secure Dev Server Bound on https://0.0.0.0:${HTTPS_PORT}`);
+      });
+    }
+
     console.log(`\n============================================================`);
     console.log(`  🌐 Sovra Mesh Node is LIVE on LAN & Localhost:`);
-    console.log(`     💻 Laptop Browser: 👉 http://localhost:${HTTP_PORT}`);
-    console.log(`     📱 Phone (Wi-Fi LAN): 👉 http://${lanIp}:${HTTP_PORT}`);
+    console.log(`     💻 Laptop Browser (HTTP):  👉 http://localhost:${HTTP_PORT}`);
+    if (httpsServer) {
+      console.log(`     📱 Phone Calling (HTTPS):  👉 https://${lanIp}:${HTTPS_PORT}`);
+    }
+    console.log(`     📱 Phone Access (HTTP):    👉 http://${lanIp}:${HTTP_PORT}`);
     console.log(`============================================================\n`);
     console.log(`  - Product A (Sovra Social & Friends):   http://localhost:${HTTP_PORT}`);
-    console.log(`  - Phone Access (Same Wi-Fi Network):    http://${lanIp}:${HTTP_PORT}`);
+    if (httpsServer) {
+      console.log(`  - Phone Calling Access (Secure HTTPS):  https://${lanIp}:${HTTPS_PORT}`);
+    }
+    console.log(`  - Phone Access (Standard HTTP):         http://${lanIp}:${HTTP_PORT}`);
     console.log(`  - Product B (Sovra Ops Console):        http://localhost:${HTTP_PORT}/admin`);
     console.log(`  - JSON Node Health Status:              http://localhost:${HTTP_PORT}/api/status`);
     console.log(`  - P2P Noise_XX TCP Port:                127.0.0.1:${tcpPort}`);
+    if (httpsServer) {
+      console.log(`\n  💡 WebRTC Camera & Mic Calling on Mobile Devices:`);
+      console.log(`     Mobile browsers require a Secure Context (HTTPS) for mediaDevices.getUserMedia.`);
+      console.log(`     Open https://${lanIp}:${HTTPS_PORT} on your phone and tap 'Advanced' -> 'Proceed'.`);
+      console.log(`     Alternatively in Chrome: chrome://flags/#unsafely-treat-insecure-origin-as-secure`);
+    }
     console.log(`\nPress Ctrl+C to terminate the local node.`);
   });
 }
