@@ -7057,8 +7057,8 @@ function renderHtml(
 
         <!-- ✍️ DYNAMIC FEED POST COMPOSER (MULTI-FORMAT: TWEET / REDDIT / PHOTO / VIDEO / POLL / SURVEY / QA) -->
         <div class="card feed-composer-card">
-          <!-- Format Selector Pills -->
-          <div class="composer-format-tabs">
+          <!-- Format Selector Pills (Hidden from consumer view) -->
+          <div class="composer-format-tabs" style="display: none !important;">
             <button type="button" class="composer-tab-btn active" id="tabBtnText" onclick="setPostFormat('text')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               <span>Post</span>
@@ -7097,8 +7097,8 @@ function renderHtml(
             </button>
           </div>
 
-          <!-- Author Persona Switcher (Personal Account vs. Page vs. Channel) -->
-          <div class="composer-author-switch-bar">
+          <!-- Author Persona Switcher (Hidden from consumer view) -->
+          <div class="composer-author-switch-bar" style="display: none !important;">
             <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0;">
               <div class="composer-avatar" id="composerAuthorAvatar" style="background: #6366f1;">
                 ${hostUser ? hostUser.avatar || 'S' : 'S'}
@@ -7134,7 +7134,13 @@ function renderHtml(
             </div>
           </div>
 
+          <!-- Clean Consumer Post Composer (Twitter / Threads Style) -->
           <div style="display: flex; gap: 0.85rem; align-items: flex-start;">
+            <!-- Left: User Avatar -->
+            <div class="composer-avatar" id="mainComposerUserAvatar" style="background: #6366f1;">
+              ${hostUser ? (hostUser.avatarDataUrl ? `<img src="${hostUser.avatarDataUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />` : (hostUser.avatar || 'S')) : 'S'}
+            </div>
+
             <div style="flex: 1; min-width: 0;">
               <!-- Long-form Article Inputs -->
               <div id="feedArticleInputsContainer" style="display: none; flex-direction: column; gap: 0.5rem; margin-bottom: 0.65rem;">
@@ -7170,7 +7176,7 @@ function renderHtml(
                 </select>
               </div>
 
-              <textarea id="dynamicPostCaption" class="composer-textarea" placeholder="What's happening on the mesh? Share a thought, update, question..." oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';"></textarea>
+              <textarea id="dynamicPostCaption" class="composer-textarea" placeholder="What's on your mind?" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';"></textarea>
               
               <!-- Color Palette Picker (Active in Canvas mode) -->
               <div id="feedCanvasPaletteContainer" style="display: none; margin-top: 0.5rem; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
@@ -7205,28 +7211,26 @@ function renderHtml(
               <div class="composer-actions-bar">
                 <div class="composer-media-tray">
                   <button type="button" class="composer-media-btn" title="Add Photo" onclick="setPostFormat('photo'); document.getElementById('realFeedFileInput').click();">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                     <span class="media-btn-label">Photo</span>
                   </button>
                   <button type="button" class="composer-media-btn" title="Add Video Reel" onclick="setPostFormat('video'); document.getElementById('realFeedVideoInput').click();">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
                     <span class="media-btn-label">Reel</span>
                   </button>
-                  <button type="button" class="composer-media-btn" title="Color Card" onclick="setPostFormat('canvas');">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.4-.4-.8-.4-1.3 0-.9.7-1.6 1.6-1.6h1.9c3.8 0 6.9-3.1 6.9-6.9 0-5.2-4.1-9.5-9.2-9.5z"/></svg>
-                    <span class="media-btn-label">Card</span>
+                  <button type="button" class="composer-media-btn" title="Create Poll" onclick="setPostFormat(currentPostFormat === 'poll' ? 'text' : 'poll');">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <span class="media-btn-label">Poll</span>
                   </button>
-                  <select id="dynamicPostTheme" class="composer-theme-select" title="Broadcast Channel / Topic">
+                  <select id="dynamicPostTheme" class="composer-theme-select" title="Target Audience">
                     <option value="mesh">Public Feed</option>
                     <option value="dag">Friends Circle</option>
-                    <option value="5g">Tech &amp; Code</option>
-                    <option value="audio">Music &amp; Audio</option>
                     <option value="creator">Creator Exclusive</option>
                   </select>
                 </div>
 
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                  <input id="dynamicPostTags" type="text" placeholder="#sovra #community" value="#sovra #community" class="composer-tags-input" />
+                  <input id="dynamicPostTags" type="hidden" value="#sovra #community" />
                   <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" class="composer-publish-btn">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     <span>Post</span>
@@ -11446,8 +11450,7 @@ function renderHtml(
         if (cardPeerId) { cardPeerId.innerText = '—'; cardPeerId.dataset.fullValue = ''; }
         const cardDeviceKey = document.getElementById('meCardDeviceKey');
         if (cardDeviceKey) { cardDeviceKey.innerText = '—'; cardDeviceKey.dataset.fullValue = ''; }
-        const composerAvatar = document.querySelector('.composer-avatar');
-        if (composerAvatar) { composerAvatar.innerText = '?'; composerAvatar.style.background = '#475569'; }
+        document.querySelectorAll('.composer-avatar').forEach(function(el) { el.innerText = '?'; el.style.background = '#475569'; });
         const composerAuthorSelect = document.getElementById('composerAuthorSelect');
         if (composerAuthorSelect) {
           const selfOpt = composerAuthorSelect.querySelector('option[value="personal:self"]');
@@ -13661,7 +13664,7 @@ function renderHtml(
       if (moodContainer) moodContainer.style.display = (format === 'mood') ? 'flex' : 'none';
 
       if (format === 'text') {
-        if (captionEl) captionEl.placeholder = "What's happening on the mesh? Share a thought, update, question...";
+        if (captionEl) captionEl.placeholder = "What's on your mind?";
       } else if (format === 'photo') {
         if (captionEl) captionEl.placeholder = "Write a caption for your photo...";
       } else if (format === 'video') {
@@ -13695,6 +13698,11 @@ function renderHtml(
           avatarEl.style.background = pBg;
           avatarEl.innerHTML = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) ? '<img src="' + myProfile.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />' : pAvatar;
         }
+        const mainAvatar = document.getElementById('mainComposerUserAvatar');
+        if (mainAvatar) {
+          mainAvatar.style.background = pBg;
+          mainAvatar.innerHTML = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) ? '<img src="' + myProfile.avatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : pAvatar;
+        }
         if (badgeEl) {
           badgeEl.className = 'badge badge-personal';
           badgeEl.innerText = '👤 Personal';
@@ -13702,7 +13710,7 @@ function renderHtml(
         }
         if (handleEl) handleEl.innerText = '';
         if (captionEl && currentPostFormat === 'text') {
-          captionEl.placeholder = "What's happening on the mesh? Share a thought, update, question...";
+          captionEl.placeholder = "What's on your mind?";
         }
         return;
       }
