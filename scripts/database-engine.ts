@@ -900,8 +900,8 @@ export class SovraDatabaseEngine {
     }
     this.db.users = uniqueUsers;
 
-    // Filter contacts & peers: remove test artifacts and legacy mock placeholders (did:key:peer, @alice_sovereign, @bob_mesh, @carol_sounds)
-    const legacyMockDids = new Set(['did:key:peer', 'did:sovra:alice_ble', 'did:sovra:bob_ble', 'did:sovra:carol_sounds']);
+    // Filter contacts & peers: remove test artifacts and legacy mock placeholders (did:key:peer, @alice_sovereign, @bob_mesh, @carol_sounds, @rahul_sharma)
+    const legacyMockDids = new Set(['did:key:peer', 'did:sovra:alice_ble', 'did:sovra:bob_ble', 'did:sovra:carol_sounds', 'did:sovra:rahul_sharma']);
     const uniquePeers: ContactPeerRecord[] = [];
     const seenPeerHandles = new Set<string>();
     const seenPeerDids = new Set<string>();
@@ -920,23 +920,34 @@ export class SovraDatabaseEngine {
     this.db.contacts_and_peers = uniquePeers;
 
     // Clean friend relationships referencing non-existent or deleted test users
+    const validUserDids = new Set(this.db.users.map(u => u.did));
     if (Array.isArray(this.db.friend_relationships)) {
       this.db.friend_relationships = this.db.friend_relationships.filter(r => {
         if (legacyMockDids.has(r.fromDid) || legacyMockDids.has(r.toDid)) return false;
         if (isTestArtifact(undefined, undefined, r.fromDid) || isTestArtifact(undefined, undefined, r.toDid)) return false;
+        const isRecent = Boolean(r.createdAt && (Date.now() - r.createdAt < 60000));
+        if (!isRecent && (!validUserDids.has(r.fromDid) || !validUserDids.has(r.toDid))) return false;
         return true;
       });
     }
 
-    this.save();
-
-    // Filter repetitive test messages
+    // Filter repetitive test messages & orphaned test chat messages
+    const now = Date.now();
     this.db.chatMessages = this.db.chatMessages.filter(m => {
+      if (m.recipientDid.startsWith('channel:') || m.threadId?.startsWith('channel:')) return true;
       if (m.text === 'Dynamic P2P ratchet test message' || m.text.includes('ratchet test message')) {
         return false;
       }
+      const isStale = (now - (m.timestamp || 0)) > 60000;
+      if (isStale) {
+        if (!validUserDids.has(m.senderDid) && !validUserDids.has(m.recipientDid)) {
+          return false;
+        }
+      }
       return true;
     });
+
+    this.save();
 
     // Ensure authentic seed messages for channels if empty
     const localMeshCount = this.db.chatMessages.filter(m => m.threadId === 'channel:local_mesh' || m.recipientDid === 'channel:local_mesh').length;
@@ -1439,6 +1450,119 @@ export class SovraDatabaseEngine {
       }
       return true;
     });
+  }
+
+  public getChatConversations(userDid: string): Array<{
+    did: string;
+    name: string;
+    handle: string;
+    avatar: string;
+    avatarDataUrl?: string;
+    avatarBg: string;
+    role: string;
+    device?: string;
+    isFriend: boolean;
+    isOnline: boolean;
+    lastSeen: string;
+    lastSeenTimestamp: number;
+    disappearingDurationSec: number;
+    safetyNumbers: string;
+    isVerified: boolean;
+    lastMessage: string;
+    lastMessageTimestamp: number;
+    lastMessageStatus: 'sent' | 'delivered' | 'read' | null;
+    lastMessageIsOutgoing: boolean;
+    unreadCount: number;
+    hasThread: boolean;
+  }> {
+    this.load();
+    if (!userDid) return [];
+    const now = Date.now();
+
+    const userMap = new Map<string, UserRecord>();
+    for (const u of (this.db.users || [])) {
+      userMap.set(u.did, u);
+    }
+    const peerMap = new Map<string, ContactPeerRecord>();
+    for (const p of (this.db.contacts_and_peers || [])) {
+      peerMap.set(p.did, p);
+    }
+
+    // Direct messages involving userDid (excluding broadcast channels)
+    const directMessages = (this.db.chatMessages || []).filter(m => {
+      if (m.recipientDid.startsWith('channel:') || m.threadId?.startsWith('channel:')) return false;
+      return m.senderDid === userDid || m.recipientDid === userDid;
+    });
+
+    const threadMap = new Map<string, ChatMessageRecord[]>();
+    for (const msg of directMessages) {
+      const partnerDid = msg.senderDid === userDid ? msg.recipientDid : msg.senderDid;
+      if (!partnerDid || partnerDid === userDid || partnerDid === 'self') continue;
+      const list = threadMap.get(partnerDid) || [];
+      list.push(msg);
+      threadMap.set(partnerDid, list);
+    }
+
+    const conversations: any[] = [];
+    const isTestArtifact = (handle?: string, name?: string, did?: string, createdAt?: number) => {
+      if (createdAt && (Date.now() - createdAt < 60000)) return false;
+      const h = (handle || '').toLowerCase().trim();
+      const n = (name || '').toLowerCase().trim();
+      const d = (did || '').toLowerCase().trim();
+      if (h === '@laptop_host' || h === '@merajsharif' || h === '@ewan' || h === '@farhat' || h === '@meraj' || h === '@rahul_phone') return false;
+      return /(alice|bob|charlie|bb_|muw|_mu|\d{6,}|attacker|victim|gate_|drill|dev_\w{3,}|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_e2e|persona_author|test)/i.test(h + ' ' + n + ' ' + d);
+    };
+
+    for (const [partnerDid, msgs] of threadMap.entries()) {
+      msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      const lastMsg = msgs[msgs.length - 1];
+      if (!lastMsg) continue;
+
+      const u = userMap.get(partnerDid);
+      const p = peerMap.get(partnerDid);
+
+      const handle = u?.handle || p?.handle || '';
+      const name = u?.displayName || u?.name || p?.name || lastMsg.senderName || 'Peer';
+
+      if (isTestArtifact(handle, name, partnerDid, lastMsg.timestamp)) continue;
+
+      const isFriend = this.areFriends(userDid, partnerDid);
+      const unreadCount = msgs.filter(m => m.senderDid === partnerDid && (m.recipientDid === userDid || m.recipientDid === 'self') && m.status !== 'read').length;
+
+      let lastMessageText = lastMsg.text;
+      if (lastMsg.isDisappeared || (lastMsg.expiresAt && lastMsg.expiresAt < now)) {
+        lastMessageText = '💨 Message disappeared';
+      } else if (lastMsg.isAudio) {
+        lastMessageText = '🎙️ Voice note (' + (lastMsg.audioDurationSec || 0).toFixed(1) + 's)';
+      }
+
+      conversations.push({
+        did: partnerDid,
+        name: name,
+        handle: handle,
+        avatar: u?.avatar || p?.avatar || (name ? name[0].toUpperCase() : 'P'),
+        avatarDataUrl: u?.avatarDataUrl || p?.avatarDataUrl,
+        avatarBg: u?.avatarBg || p?.avatarBg || (isFriend ? '#10b981' : '#6366f1'),
+        role: isFriend ? 'Mutual Friend' : (p?.role || `${u?.deviceType || 'Mesh'} Peer`),
+        device: u?.deviceType || p?.device || 'Desktop',
+        isFriend,
+        isOnline: p?.isOnline !== false,
+        lastSeen: p?.lastSeen || 'Online',
+        lastSeenTimestamp: p?.lastSeenTimestamp || u?.updatedAt || lastMsg.timestamp,
+        disappearingDurationSec: lastMsg.disappearingDurationSec || 0,
+        safetyNumbers: '28471 90432 18942 ' + partnerDid.slice(-12),
+        isVerified: true,
+        lastMessage: lastMessageText,
+        lastMessageTimestamp: lastMsg.timestamp,
+        lastMessageStatus: lastMsg.status,
+        lastMessageIsOutgoing: (lastMsg.senderDid === userDid || lastMsg.senderDid === 'self'),
+        unreadCount,
+        hasThread: true,
+      });
+    }
+
+    conversations.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
+    return conversations;
   }
 
   public updateMessagesReceipt(messageIds: string[], status: 'delivered' | 'read', timestamp = Date.now()): number {

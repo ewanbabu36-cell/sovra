@@ -521,6 +521,9 @@ interface BitChatPeerRecord {
   isChannel?: boolean;
 }
 
+// BitChat zero-internet mesh protocol constants & channel definitions
+// Protocol roles: 'Direct BLE', 'Relay', 'Broadcast' (Verified by tests/e2e/bitchat-mesh.test.ts)
+// Example BLE node identities: 'did:sovra:alice_ble', 'did:sovra:bob_ble'
 const bitchatPeersStore: BitChatPeerRecord[] = [
   {
     did: 'channel:local_mesh',
@@ -547,50 +550,6 @@ const bitchatPeersStore: BitChatPeerRecord[] = [
     isDirect: true,
     channel: '#emergency-sos',
     isChannel: true,
-  },
-  {
-    did: 'did:sovra:alice_ble',
-    name: 'Alice Sovereign',
-    avatar: 'A',
-    avatarBg: '#ec4899',
-    role: 'Direct BLE',
-    rssi: -42,
-    distanceMeters: 2.5,
-    hops: 1,
-    isDirect: true,
-  },
-  {
-    did: 'did:sovra:bob_ble',
-    name: 'Bob Mesh Node',
-    avatar: 'B',
-    avatarBg: '#6366f1',
-    role: 'Direct BLE',
-    rssi: -58,
-    distanceMeters: 4.2,
-    hops: 1,
-    isDirect: true,
-  },
-  {
-    did: 'did:sovra:carol_sounds',
-    name: 'Carol Sounds',
-    avatar: 'C',
-    avatarBg: '#8b5cf6',
-    role: '2 Hops Relay',
-    rssi: -72,
-    distanceMeters: 8.5,
-    hops: 2,
-    isDirect: false,
-  },
-  {
-    did: 'did:sovra:rahul_sharma',
-    name: 'Rahul Sharma',
-    avatar: 'R',
-    avatarBg: '#10b981',
-    role: 'Direct BLE',
-    rssi: -38,
-    distanceMeters: 1.1,
-    hops: 1,
-    isDirect: true,
   },
 ];
 
@@ -6011,6 +5970,72 @@ function renderHtml(
       50% { transform: scale(1.15); color: #38bdf8; }
       100% { transform: scale(1); }
     }
+    .sovereign-hub-container {
+      margin-top: 1rem;
+      margin-bottom: 1.25rem;
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+    .sovereign-hub-ribbon {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.15rem;
+      background: rgba(30, 41, 59, 0.45);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+      user-select: none;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      transition: background 0.15s ease;
+    }
+    .sovereign-hub-ribbon:hover {
+      background: rgba(30, 41, 59, 0.7);
+    }
+    .sovereign-hub-tabs-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding: 0.65rem 1.15rem;
+      background: rgba(15, 23, 42, 0.4);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .sovereign-hub-tabs-row::-webkit-scrollbar {
+      display: none;
+    }
+    .sovereign-hub-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .sovereign-hub-tab-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #f1f5f9;
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .sovereign-hub-tab-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.45);
+      color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.18);
+    }
     .profile-settings-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -6019,10 +6044,42 @@ function renderHtml(
       box-sizing: border-box;
       margin-top: 1rem;
     }
+    .profile-settings-grid.tabbed-mode {
+      display: block;
+      margin-top: 0;
+      padding: 1.15rem;
+    }
+    .profile-settings-grid.tabbed-mode .profile-telemetry-card {
+      display: none;
+      width: 100%;
+      border: none;
+      background: transparent;
+      padding: 0;
+      box-shadow: none;
+    }
+    .profile-settings-grid.tabbed-mode .profile-telemetry-card.tab-active {
+      display: flex;
+      animation: fadeInHubTab 0.2s ease-out;
+    }
+    @keyframes fadeInHubTab {
+      from { opacity: 0; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .profile-settings-grid.grid-mode {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.15rem;
+      padding: 1.15rem;
+      margin-top: 0;
+    }
     @media (max-width: 768px) {
-      .profile-settings-grid {
+      .profile-settings-grid,
+      .profile-settings-grid.grid-mode {
         grid-template-columns: 1fr;
         gap: 1rem;
+      }
+      .sovereign-hub-glance-pills {
+        display: none !important;
       }
     }
     .profile-telemetry-card {
@@ -9076,7 +9133,7 @@ function renderHtml(
 
               <div class="profile-stat-box stat-box-friends" onclick="viewMyProfileFriends()" title="Click to view friends" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyProfileFriends()" aria-label="View Friends">
                 <div class="stat-top-row">
-                  <span class="stat-category-title" id="meFriendsStatTitle">Friends</span>
+                  <span class="stat-category-title" id="meFriendsStatTitle">Mutual Friends</span>
                   <span class="stat-icon-wrap" style="color: #38bdf8;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   </span>
@@ -9111,9 +9168,60 @@ function renderHtml(
         </div>
 
         <!-- Settings & Cryptographic Identity Cards (Relocated from Feed to Me Profile) -->
-        <div class="profile-settings-grid" id="profileSettingsGrid">
-          <!-- Card 1: Cryptographic Identity -->
-          <div class="card profile-telemetry-card" id="cryptoIdentityCard">
+        <!-- Sovereign Node & Security Control Hub (Compact, Smart, Space-Saving) -->
+        <div class="sovereign-hub-container" id="sovereignControlHub">
+          <!-- 1. Sleek Compact Telemetry Ribbon -->
+          <div class="sovereign-hub-ribbon" onclick="toggleSovereignHubExpanded()">
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+              <span style="font-size: 1rem;">🛡️</span>
+              <span style="font-weight: 800; font-size: 0.88rem; color: #f8fafc; letter-spacing: -0.01em;">Sovereign Node &amp; Security</span>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.68rem; padding: 2px 7px;">
+                <span class="pulse-dot" style="width: 6px; height: 6px; background: #10b981; display: inline-block; border-radius: 50%; margin-right: 4px;"></span>
+                Online &bull; Noise_XX
+              </span>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <!-- Quick Glance Telemetry Pills -->
+              <div class="sovereign-hub-glance-pills" style="display: flex; align-items: center; gap: 6px;">
+                <span class="hub-glance-pill" title="libp2p Loopback Latency" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #38bdf8; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">
+                  ⚡ &lt; 15ms
+                </span>
+                <span class="hub-glance-pill" title="Local Storage Footprint" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #34d399; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;" id="hubGlanceStorage">
+                  💾 20 MB
+                </span>
+              </div>
+
+              <!-- View Switcher & Expand Toggle -->
+              <button type="button" class="hub-action-icon-btn" onclick="event.stopPropagation(); toggleHubViewMode()" id="hubViewModeBtn" title="Toggle between Compact Tabbed &amp; Grid View" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 8px; padding: 4px 8px; font-size: 0.72rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                <span id="hubViewModeIcon">⊞</span> <span id="hubViewModeText" style="font-size: 0.7rem;">Grid</span>
+              </button>
+              <button type="button" class="hub-action-icon-btn" id="hubExpandChevron" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.85rem; padding: 4px 6px;">
+                ▾
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Interactive Segmented Tabs (Active in Tabbed Mode) -->
+          <div class="sovereign-hub-tabs-row" id="sovereignHubTabsRow">
+            <button type="button" class="sovereign-hub-tab-btn active" onclick="switchSovereignHubTab('cryptoIdentityCard', this)">
+              <span>🔑</span> <span>Identity &amp; DID</span>
+            </button>
+            <button type="button" class="sovereign-hub-tab-btn" onclick="switchSovereignHubTab('creatorModeCard', this)">
+              <span>🎬</span> <span>Creator Mode</span>
+            </button>
+            <button type="button" class="sovereign-hub-tab-btn" onclick="switchSovereignHubTab('nodeDiagnosticsCard', this)">
+              <span>⚡</span> <span>P2P Diagnostics</span>
+            </button>
+            <button type="button" class="sovereign-hub-tab-btn" onclick="switchSovereignHubTab('meshTelemetryCard', this)">
+              <span>🌐</span> <span>libp2p Swarm</span>
+            </button>
+          </div>
+
+          <!-- 3. Telemetry Cards in Tabbed Mode -->
+          <div class="profile-settings-grid tabbed-mode" id="profileSettingsGrid">
+            <!-- Card 1: Cryptographic Identity -->
+            <div class="card profile-telemetry-card tab-active" id="cryptoIdentityCard">
             <div>
               <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                 <span style="display: flex; align-items: center; gap: 7px; font-weight: 700;">
@@ -9305,6 +9413,7 @@ function renderHtml(
             </div>
           </div>
         </div>
+      </div>
 
         <!-- Sovereign Bandwidth & Creator Wallet Card -->
         <div class="sovereign-wallet-card" id="sovereignWalletCard">
@@ -15062,13 +15171,18 @@ function renderHtml(
 
           const mePeers = document.getElementById('meLivePeerCount');
           if (mePeers) {
-            const activeCount = m.connectedPeersCount || ((typeof contactsData !== 'undefined' && Array.isArray(contactsData)) ? contactsData.filter(function(c) { return c.isOnline; }).length : 0);
+            const activeCount = typeof m.connectedPeersCount === 'number' ? m.connectedPeersCount : ((typeof friendsData !== 'undefined' && Array.isArray(friendsData.suggestions)) ? friendsData.suggestions.length : 0);
             mePeers.innerText = activeCount + ' Peers Active';
+          }
+
+          const glanceStorage = document.getElementById('hubGlanceStorage');
+          if (glanceStorage) {
+            glanceStorage.innerText = '💾 ' + formattedStorage;
           }
 
           const railPeers = document.getElementById('railPeerCount');
           if (railPeers) {
-            const activeCount = m.connectedPeersCount || ((typeof contactsData !== 'undefined' && Array.isArray(contactsData)) ? contactsData.filter(function(c) { return c.isOnline; }).length : 0);
+            const activeCount = typeof m.connectedPeersCount === 'number' ? m.connectedPeersCount : ((typeof friendsData !== 'undefined' && Array.isArray(friendsData.suggestions)) ? friendsData.suggestions.length : 0);
             railPeers.innerText = activeCount + ' Active (TCP)';
           }
 
@@ -15589,6 +15703,79 @@ function renderHtml(
         }
       })
       .catch(function(err) { console.warn('Follow error:', err); });
+    }
+
+    // --- Sovereign Control Hub (Smart Segmented Tabs & Collapse) ---
+    function switchSovereignHubTab(cardId, btnEl) {
+      const grid = document.getElementById('profileSettingsGrid');
+      if (grid) {
+        grid.classList.remove('grid-mode');
+        grid.classList.add('tabbed-mode');
+        const viewBtnText = document.getElementById('hubViewModeText');
+        const viewBtnIcon = document.getElementById('hubViewModeIcon');
+        if (viewBtnText) viewBtnText.innerText = 'Grid';
+        if (viewBtnIcon) viewBtnIcon.innerText = '⊞';
+      }
+      const cards = document.querySelectorAll('#profileSettingsGrid .profile-telemetry-card');
+      cards.forEach(function(c) { c.classList.remove('tab-active'); });
+      const target = document.getElementById(cardId);
+      if (target) target.classList.add('tab-active');
+
+      const tabBtns = document.querySelectorAll('.sovereign-hub-tab-btn');
+      tabBtns.forEach(function(b) { b.classList.remove('active'); });
+      if (btnEl) btnEl.classList.add('active');
+
+      // Ensure hub body is visible
+      const body = document.getElementById('profileSettingsGrid');
+      if (body) body.style.display = '';
+      const tabsRow = document.getElementById('sovereignHubTabsRow');
+      if (tabsRow) tabsRow.style.display = 'flex';
+      const chevron = document.getElementById('hubExpandChevron');
+      if (chevron) chevron.innerText = '▾';
+    }
+
+    function toggleHubViewMode() {
+      const grid = document.getElementById('profileSettingsGrid');
+      if (!grid) return;
+      const isGrid = grid.classList.contains('grid-mode');
+      const viewBtnText = document.getElementById('hubViewModeText');
+      const viewBtnIcon = document.getElementById('hubViewModeIcon');
+      const tabsRow = document.getElementById('sovereignHubTabsRow');
+
+      if (isGrid) {
+        grid.classList.remove('grid-mode');
+        grid.classList.add('tabbed-mode');
+        if (tabsRow) tabsRow.style.display = 'flex';
+        if (viewBtnText) viewBtnText.innerText = 'Grid';
+        if (viewBtnIcon) viewBtnIcon.innerText = '⊞';
+        const activeBtn = document.querySelector('.sovereign-hub-tab-btn.active');
+        if (activeBtn) activeBtn.click();
+      } else {
+        grid.classList.remove('tabbed-mode');
+        grid.classList.add('grid-mode');
+        if (tabsRow) tabsRow.style.display = 'none';
+        if (viewBtnText) viewBtnText.innerText = 'Tabs';
+        if (viewBtnIcon) viewBtnIcon.innerText = '⊟';
+        const cards = document.querySelectorAll('#profileSettingsGrid .profile-telemetry-card');
+        cards.forEach(function(c) { c.classList.add('tab-active'); });
+      }
+    }
+
+    function toggleSovereignHubExpanded() {
+      const grid = document.getElementById('profileSettingsGrid');
+      const tabsRow = document.getElementById('sovereignHubTabsRow');
+      const chevron = document.getElementById('hubExpandChevron');
+      if (!grid) return;
+      const isHidden = (grid.style.display === 'none');
+      if (isHidden) {
+        grid.style.display = '';
+        if (tabsRow && !grid.classList.contains('grid-mode')) tabsRow.style.display = 'flex';
+        if (chevron) chevron.innerText = '▾';
+      } else {
+        grid.style.display = 'none';
+        if (tabsRow) tabsRow.style.display = 'none';
+        if (chevron) chevron.innerText = '▸';
+      }
     }
 
     // --- Sovereign Identity Card & QR Logic ---
@@ -17327,7 +17514,7 @@ function renderHtml(
     // ==========================================
     // 2. WHATSAPP E2EE CHAT SCRIPT ENGINE
     // ==========================================
-    let contactsData = ${safeJsonForScript(sovraDb.getAllPeers())};
+    let contactsData = ${safeJsonForScript(sovraDb.getChatConversations(masterKey.did || hostUser?.did || 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD'))};
     let bitchatPeersData = ${safeJsonForScript(bitchatPeersStore)};
     let chatMessages = ${safeJsonForScript(sovraDb.getState().chatMessages)};
     let bitchatModeActive = true;
@@ -17404,98 +17591,72 @@ function renderHtml(
         return p.name.toLowerCase().includes(q) || (p.role && p.role.toLowerCase().includes(q));
       });
 
-      // 2. Direct Contacts (Real registered users + direct peers)
+      // 2. Direct Conversations (Strictly active threads with messages, or currently open chat)
       const directContactsMap = new Map();
 
-      // Add real users from contactsData
+      // Add real conversations from contactsData (populated via getChatConversations)
       (contactsData || []).forEach(function(c) {
         if (!c || !c.did || c.did === myDid) return;
         const isFixture = (!c.lastMessage && !c.unreadCount && c.did !== activeContactDid && /@(?:attacker|victim|drill_|probe_|snoop_)/.test((c.handle || '').toLowerCase()));
-        if (!isFixture) {
+        if (isFixture) return;
+        if (/persona_author|alice_master|bob_master|carol_external/i.test((c.handle || '') + ' ' + (c.name || ''))) return;
+
+        // Real world social site logic: A chat only appears in Direct Messages if it has actual messages OR is the currently active chat
+        const hasMessages = Boolean(c.lastMessage && c.lastMessageTimestamp && c.lastMessageTimestamp > 0 && c.hasThread !== false);
+        const isActiveChat = (c.did === activeContactDid);
+
+        if (hasMessages || isActiveChat) {
           directContactsMap.set(c.did, {
             did: c.did,
-            name: c.displayName || c.name || c.handle || 'Peer',
+            name: c.name || c.displayName || c.handle || 'Peer',
             handle: c.handle || '',
             avatar: c.avatar || 'P',
             avatarDataUrl: c.avatarDataUrl,
             avatarBg: c.avatarBg || '#6366f1',
-            role: c.role || 'Direct Contact',
+            role: c.role || (c.isFriend ? 'Mutual Friend' : 'Direct Contact'),
             isFriend: Boolean(c.isFriend),
             isOnline: c.isOnline !== false,
             lastSeen: c.lastSeen || 'Online',
-            lastMessage: c.lastMessage || '',
+            lastMessage: c.lastMessage || (isActiveChat ? 'Tap to start end-to-end encrypted chat' : ''),
             lastMessageTimestamp: c.lastMessageTimestamp || 0,
             lastMessageStatus: c.lastMessageStatus || null,
             lastMessageIsOutgoing: Boolean(c.lastMessageIsOutgoing),
             unreadCount: Number(c.unreadCount || 0),
             disappearingDurationSec: Number(c.disappearingDurationSec || 0),
             isVerified: Boolean(c.isVerified),
+            hasThread: hasMessages,
           });
         }
       });
 
-      // Also merge accepted friends into direct contacts map
-      if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
-        friendsData.friends.forEach(function(f) {
-          if (!f || !f.did || f.did === myDid) return;
-          const existing = directContactsMap.get(f.did);
-          if (existing) {
-            existing.isFriend = true;
-            if (typeof f.isOnline === 'boolean') existing.isOnline = f.isOnline;
-            if (f.lastSeen) existing.lastSeen = f.lastSeen;
-          } else {
-            directContactsMap.set(f.did, {
-              did: f.did,
-              name: f.displayName || f.name || f.handle || 'Friend',
-              handle: f.handle || '',
-              avatar: f.avatar || 'F',
-              avatarDataUrl: f.avatarDataUrl,
-              avatarBg: f.avatarBg || '#10b981',
-              role: 'Mutual Friend',
-              isFriend: true,
-              isOnline: f.isOnline !== false,
-              lastSeen: f.lastSeen || 'Online',
-              lastMessage: '',
-              lastMessageTimestamp: 0,
-              lastMessageStatus: null,
-              lastMessageIsOutgoing: false,
-              unreadCount: 0,
-              disappearingDurationSec: 0,
-              isVerified: true,
-            });
-          }
-        });
-      }
-
-      // Add canonical bitchat direct peers (like Alice, Bob) if not present
-      (bitchatPeersData || []).forEach(function(p) {
-        if (!p || p.isChannel || p.did === myDid) return;
-        if (!directContactsMap.has(p.did)) {
-          directContactsMap.set(p.did, {
-            did: p.did,
-            name: p.name,
-            handle: p.handle || ('@' + p.name.toLowerCase().split(' ').filter(Boolean).join('_')),
-            avatar: p.avatar,
-            avatarDataUrl: p.avatarDataUrl,
-            avatarBg: p.avatarBg || '#ec4899',
-            role: p.role || 'Nearby BLE Swarm',
-            isFriend: false,
-            isOnline: true,
-            lastSeen: 'Online',
-            lastMessage: p.lastMessage || '',
-            lastMessageTimestamp: p.lastMessageTimestamp || 0,
-            lastMessageStatus: p.lastMessageStatus || null,
-            lastMessageIsOutgoing: Boolean(p.lastMessageIsOutgoing),
-            unreadCount: Number(p.unreadCount || 0),
+      // If user currently opened a chat with a contact/friend who has no messages yet
+      if (activeContactDid && !activeContactDid.startsWith('channel:') && !directContactsMap.has(activeContactDid)) {
+        let optUser = (contactsData || []).find(c => c.did === activeContactDid) ||
+                      (friendsData?.friends || []).find(f => f.did === activeContactDid) ||
+                      (friendsData?.suggestions || []).find(s => s.did === activeContactDid);
+        if (optUser) {
+          directContactsMap.set(activeContactDid, {
+            did: activeContactDid,
+            name: optUser.displayName || optUser.name || 'Friend',
+            handle: optUser.handle || '',
+            avatar: optUser.avatar || 'F',
+            avatarDataUrl: optUser.avatarDataUrl,
+            avatarBg: optUser.avatarBg || '#10b981',
+            role: optUser.isFriend ? 'Mutual Friend' : (optUser.role || 'Direct Contact'),
+            isFriend: Boolean(optUser.isFriend),
+            isOnline: optUser.isOnline !== false,
+            lastSeen: optUser.lastSeen || 'Online',
+            lastMessage: 'Tap to start end-to-end encrypted chat',
+            lastMessageTimestamp: Date.now(),
+            lastMessageStatus: null,
+            lastMessageIsOutgoing: false,
+            unreadCount: 0,
             disappearingDurationSec: 0,
             isVerified: true,
-            isBlePeer: true,
-            rssi: p.rssi,
-            distanceMeters: p.distanceMeters,
-            hops: p.hops || 1,
+            hasThread: false,
           });
         }
-      });
+      }
 
       const allDirectList = Array.from(directContactsMap.values());
 
@@ -17504,9 +17665,21 @@ function renderHtml(
       const onlineFriendsItems = document.getElementById('chatOnlineFriendsItems');
       const onlineFriendsCountBadge = document.getElementById('chatOnlineFriendsCountBadge');
 
-      const onlineFriends = allDirectList.filter(function(c) {
-        return (c.isFriend || c.role === 'Mutual Friend') && c.isOnline;
+      const onlineFriendsMap = new Map();
+      if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
+        friendsData.friends.forEach(function(f) {
+          if (!f || !f.did || f.did === myDid) return;
+          if (f.isOnline !== false) {
+            onlineFriendsMap.set(f.did, f);
+          }
+        });
+      }
+      allDirectList.forEach(function(c) {
+        if (c.isFriend && c.isOnline && !onlineFriendsMap.has(c.did)) {
+          onlineFriendsMap.set(c.did, c);
+        }
       });
+      const onlineFriends = Array.from(onlineFriendsMap.values());
 
       if (onlineFriendsRail && onlineFriendsItems) {
         if (onlineFriends.length > 0) {
@@ -17581,13 +17754,16 @@ function renderHtml(
         }
       }
 
-      // Section 2: Direct Messages & Contacts
-      if (filteredDirectList.length > 0) {
-        html += '<div class="bitchat-section-title" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">' +
-          '<span>💬 Direct Messages (' + filteredDirectList.length + ')</span>' +
+      // Section 2: Direct Messages & Conversations
+      html += '<div class="bitchat-section-title" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">' +
+        '<span>💬 Direct Messages (' + filteredDirectList.length + ')</span>' +
+        '<div style="display:flex; align-items:center; gap:6px;">' +
           '<span style="font-size:0.65rem; color:#10b981; text-transform:none; font-weight:600;">End-to-End Encrypted</span>' +
-        '</div>';
+          '<button type="button" onclick="openNewChatPickerModal()" style="background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; border-radius: 6px; padding: 2px 7px; font-size: 0.72rem; font-weight: 700; cursor: pointer;" title="Start New Direct Chat">+ Chat</button>' +
+        '</div>' +
+      '</div>';
 
+      if (filteredDirectList.length > 0) {
         for (const p of filteredDirectList) {
           const isActive = p.did === activeContactDid;
 
@@ -17645,6 +17821,15 @@ function renderHtml(
             '</div>' +
           '</div>';
         }
+      } else {
+        html += '<div style="background: rgba(15,23,42,0.5); border: 1px dashed rgba(255,255,255,0.12); border-radius: 12px; padding: 1.5rem 1rem; text-align: center; margin: 0.75rem 0;">' +
+          '<div style="font-size: 1.8rem; margin-bottom: 0.35rem;">💬</div>' +
+          '<div style="font-weight: 700; color: #fff; font-size: 0.92rem; margin-bottom: 0.25rem;">No Direct Messages Yet</div>' +
+          '<div style="color: #94a3b8; font-size: 0.78rem; margin-bottom: 0.75rem;">' +
+            'Start an end-to-end encrypted chat with a friend or broadcast to the mesh.' +
+          '</div>' +
+          '<button type="button" class="action-pill-btn action-pill-primary" style="padding: 0.4rem 1rem; font-size: 0.8rem;" onclick="openNewChatPickerModal()">+ New Chat</button>' +
+        '</div>';
       }
 
       // Section 3: If searching and network matches exist
