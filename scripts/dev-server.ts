@@ -21930,7 +21930,7 @@ function renderHtml(
       const allCh = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
       const allPg = (typeof allPagesData !== 'undefined' ? allPagesData : []);
 
-      // Filter strictly to entities created by active user
+      // Filter strictly to entities created/owned by the active logged-in user
       const channels = allCh.filter(function(c) {
         return currentDid && c.ownerDid && c.ownerDid === currentDid;
       });
@@ -21939,12 +21939,24 @@ function renderHtml(
       });
 
       let html = '<div style="font-size: 0.82rem; font-weight: 700; color: #cbd5e1; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">' +
-        '<span>📋 Your Active Entities (' + (channels.length + pages.length) + ')</span>' +
-        '<span style="font-size: 0.72rem; color: #94a3b8;">Sovereign Network Registry</span>' +
+        '<span>📋 Your Managed Entities (' + (channels.length + pages.length) + ')</span>' +
+        '<span style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Personal Sovereign Scope</span>' +
         '</div>';
 
       if (channels.length === 0 && pages.length === 0) {
-        html += '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 14px; background: rgba(255,255,255,0.02); border-radius: 10px;">You have not created any Sovereign Channels or Pages yet. Use the buttons above to build your sovereign decentralized presence!</div>';
+        const userHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : '@creator';
+        html += '<div style="background: rgba(15, 23, 42, 0.55); border: 1px dashed rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 1.5rem 1rem; text-align: center; margin-top: 0.4rem;">' +
+          '<div style="font-size: 1.8rem; margin-bottom: 0.4rem;">✨</div>' +
+          '<div style="font-weight: 700; color: #f8fafc; font-size: 0.92rem; margin-bottom: 0.25rem;">No Personal Entities Created Yet</div>' +
+          '<div style="color: #94a3b8; font-size: 0.78rem; line-height: 1.45; max-width: 440px; margin: 0 auto 1rem;">' +
+            'You are operating under your personal cryptographic identity (' + userHandle + '). Network channels and test feeds are isolated in the Admin Ops Console.' +
+          '</div>' +
+          '<div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">' +
+            '<button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 600; cursor: pointer;">+ Create Channel</button>' +
+            '<button type="button" class="btn btn-secondary" onclick="openCreatePageModal()" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(192, 132, 252, 0.15); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; font-weight: 600; cursor: pointer;">+ Create Page</button>' +
+            '<button type="button" class="btn btn-secondary" onclick="openOmniSearch(); switchSearchTab(\'channels\');" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #cbd5e1; font-weight: 600; cursor: pointer;">🌐 Explore Public Channels (' + allCh.length + ')</button>' +
+          '</div>' +
+        '</div>';
         container.innerHTML = html;
         if (typeof refreshComposerAuthorSelect === 'function') refreshComposerAuthorSelect();
         return;
@@ -21961,10 +21973,10 @@ function renderHtml(
               '<div style="font-size: 0.72rem; color: #94a3b8;">📢 Broadcast Channel &bull; ' + (c.count ? c.count.toLocaleString() : '0') + ' subscribers</div>' +
             '</div>' +
           '</div>' +
-          '<div style="display: flex; gap: 6px;">' +
-            '<button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.76rem; border-radius: 8px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; display: inline-flex; align-items: center; gap: 5px;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">' +
-              '<span>📢</span> <span>Open Channel Room</span>' +
-            '</button>' +
+          '<div style="display: flex; gap: 6px; align-items: center;">' +
+            '<button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">📢 Post As</button>' +
+            '<button type="button" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #f1f5f9;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">Room</button>' +
+            '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this channel" onclick="deleteEntityPrompt(\'channel\', \'' + c.id + '\', \'' + (c.name.replace(/'/g, "\\'")) + '\')">🗑️</button>' +
           '</div>' +
         '</div>';
       }
@@ -21980,11 +21992,12 @@ function renderHtml(
               '<div style="font-size: 0.72rem; color: #94a3b8;">🏢 Sovereign Page &bull; ' + (p.category || 'Entity') + '</div>' +
             '</div>' +
           '</div>' +
-          '<div style="display: flex; gap: 6px;">' +
+          '<div style="display: flex; gap: 6px; align-items: center;">' +
             (isCurrentActive
-              ? '<button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.76rem; border-radius: 8px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">✓ Active (Switch to Personal)</button>'
-              : '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.76rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12);" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">🔄 Switch to Page</button>'
+              ? '<button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">✓ Active</button>'
+              : '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12);" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">🔄 Switch</button>'
             ) +
+            '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this page" onclick="deleteEntityPrompt(\'page\', \'' + p.id + '\', \'' + (p.name.replace(/'/g, "\\'")) + '\')">🗑️</button>' +
           '</div>' +
         '</div>';
       }
@@ -21992,6 +22005,37 @@ function renderHtml(
 
       container.innerHTML = html;
       if (typeof refreshComposerAuthorSelect === 'function') refreshComposerAuthorSelect();
+    }
+
+    function deleteEntityPrompt(type, id, name) {
+      const typeLabel = type === 'channel' ? 'Broadcast Channel' : 'Sovereign Page';
+      if (!confirm('Are you sure you want to delete ' + typeLabel + ' "' + name + '"? This will remove it from the sovereign network.')) return;
+      const endpoint = type === 'channel' ? '/api/social/channels/delete' : '/api/social/pages/delete';
+      const payload = type === 'channel' ? { channelId: id } : { pageId: id };
+
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          if (type === 'channel' && typeof allChannelsData !== 'undefined') {
+            allChannelsData = allChannelsData.filter(function(c) { return c.id !== id; });
+          } else if (type === 'page' && typeof allPagesData !== 'undefined') {
+            allPagesData = allPagesData.filter(function(p) { return p.id !== id; });
+          }
+          if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
+          if (typeof refreshComposerAuthorSelect === 'function') refreshComposerAuthorSelect();
+          showAccountToast('✓ ' + typeLabel + ' deleted.');
+        } else {
+          alert('Failed to delete entity: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        alert('Delete error: ' + err.message);
+      });
     }
 
     // --- Instagram / Facebook Page Persona Switcher ---
@@ -25606,6 +25650,64 @@ async function startDevServer() {
       return;
     }
 
+    if (url.pathname === '/api/social/channels/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const channelId = String(parsed.channelId || parsed.id || '');
+        if (!channelId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Channel ID required' }));
+          return;
+        }
+        const delRes = sovraDb.deleteChannel(channelId, principal.did);
+        if (!delRes.ok) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: delRes.error || 'Failed to delete channel' }));
+          return;
+        }
+        dynamicSocialStore.channels = sovraDb.getAllChannels();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, channelId }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/social/pages/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const pageId = String(parsed.pageId || parsed.id || '');
+        if (!pageId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Page ID required' }));
+          return;
+        }
+        const delRes = sovraDb.deletePage(pageId, principal.did);
+        if (!delRes.ok) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: delRes.error || 'Failed to delete page' }));
+          return;
+        }
+        dynamicSocialStore.pages = sovraDb.getAllPages();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, pageId }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
     // ==========================================
     // API: INSTAGRAM REELS
     // ==========================================
@@ -27964,8 +28066,66 @@ async function startDevServer() {
           diskStorageBytes: diskBytes,
           diskStorageMb: String(diskMb),
           auditLogs: sovraDb.getAuditLogs(50),
+          channels: sovraDb.getAllChannels(),
+          pages: sovraDb.getAllPages(),
         }),
       );
+      return;
+    }
+
+    // Admin: Delete Channel
+    if (url.pathname === '/api/admin/channels/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const channelId = String(parsed.channelId || parsed.id || '');
+        if (!channelId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Channel ID required' }));
+          return;
+        }
+        const delRes = sovraDb.deleteChannel(channelId, 'did:sovra:system');
+        dynamicSocialStore.channels = sovraDb.getAllChannels();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: delRes.ok, channelId }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // Admin: Delete Page
+    if (url.pathname === '/api/admin/pages/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const pageId = String(parsed.pageId || parsed.id || '');
+        if (!pageId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Page ID required' }));
+          return;
+        }
+        const delRes = sovraDb.deletePage(pageId, 'did:sovra:system');
+        dynamicSocialStore.pages = sovraDb.getAllPages();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: delRes.ok, pageId }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // Admin: Purge Stale Test Entities
+    if (url.pathname === '/api/admin/entities/purge-test' && req.method === 'POST') {
+      const resPurge = sovraDb.purgeTestEntities();
+      dynamicSocialStore.channels = sovraDb.getAllChannels();
+      dynamicSocialStore.pages = sovraDb.getAllPages();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, ...resPurge }));
       return;
     }
 

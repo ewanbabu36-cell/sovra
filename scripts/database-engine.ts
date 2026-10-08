@@ -880,7 +880,7 @@ export class SovraDatabaseEngine {
       const d = (did || '').toLowerCase().trim();
       if (h === '@laptop_host') return false;
       if (h === '@merajsharif' || h === '@ewan' || h === '@farhat' || h === '@meraj' || h === '@rahul_phone') return false;
-      return /(alice|bob|charlie|bb_|muw|_mu|\d{6,}|attacker|victim|gate_|drill|dev_\w{3,}|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_e2e|persona_author|test)/i.test(h + ' ' + n + ' ' + d);
+      return /(alice|bob|charlie|bb_|muw|_mu|\d{6,}|attacker|victim|gate_|drill|dev_\w{3,}|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_e2e|persona_author|test|meshcore|aimesh|mut_ch|guild_|alice_tech)/i.test(h + ' ' + n + ' ' + d);
     };
 
     // Filter out test drill artifacts & deduplicate users
@@ -946,6 +946,33 @@ export class SovraDatabaseEngine {
       }
       return true;
     });
+
+    // Clean orphaned test channels & test pages
+    const seedChannelIds = new Set(['ch-alpha', 'ch-gaming', 'ch-news', 'ch-music']);
+    if (Array.isArray(this.db.channels)) {
+      this.db.channels = this.db.channels.filter(c => {
+        if (!c || !c.id) return false;
+        if (seedChannelIds.has(c.id)) return true;
+        // If created in the last 60 seconds, keep it (active in-progress automated test)
+        if (c.createdAt && (now - c.createdAt < 60000)) return true;
+        if (isTestArtifact(c.handle, c.name, c.ownerDid, c.createdAt)) return false;
+        if (c.ownerDid && !validUserDids.has(c.ownerDid) && c.ownerDid !== 'did:sovra:system') return false;
+        return true;
+      });
+    }
+
+    const seedPageIds = new Set(['pg-metropolis', 'pg-meshlabs', 'pg-bakery']);
+    if (Array.isArray(this.db.pages)) {
+      this.db.pages = this.db.pages.filter(p => {
+        if (!p || !p.id) return false;
+        if (seedPageIds.has(p.id)) return true;
+        // If created in the last 60 seconds, keep it (active in-progress automated test)
+        if (p.createdAt && (now - p.createdAt < 60000)) return true;
+        if (isTestArtifact(p.handle, p.name, p.ownerDid, p.createdAt)) return false;
+        if (p.ownerDid && !validUserDids.has(p.ownerDid) && p.ownerDid !== 'did:sovra:system') return false;
+        return true;
+      });
+    }
 
     this.save();
 
@@ -2019,6 +2046,65 @@ export class SovraDatabaseEngine {
     this.load();
     return this.getAllPages().find(p => p.id === id || p.handle.toLowerCase() === id.toLowerCase());
   }
+
+  public deleteChannel(channelId: string, requesterDid?: string): { ok: boolean; error?: string } {
+    this.load();
+    const chIdx = this.db.channels.findIndex(c => c.id === channelId || c.handle === channelId);
+    if (chIdx === -1) return { ok: false, error: 'Channel not found' };
+    const ch = this.db.channels[chIdx];
+    if (requesterDid && ch.ownerDid && ch.ownerDid !== requesterDid && requesterDid !== 'did:sovra:system') {
+      return { ok: false, error: 'Unauthorized to delete this channel' };
+    }
+    this.db.channels.splice(chIdx, 1);
+    this.logActivity('CHANNEL_DELETED' as any, requesterDid || 'did:sovra:admin', ch.handle, `Deleted channel ${ch.name} (${ch.handle})`);
+    this.save();
+    return { ok: true };
+  }
+
+  public deletePage(pageId: string, requesterDid?: string): { ok: boolean; error?: string } {
+    this.load();
+    const pgIdx = this.db.pages.findIndex(p => p.id === pageId || p.handle === pageId);
+    if (pgIdx === -1) return { ok: false, error: 'Page not found' };
+    const pg = this.db.pages[pgIdx];
+    if (requesterDid && pg.ownerDid && pg.ownerDid !== requesterDid && requesterDid !== 'did:sovra:system') {
+      return { ok: false, error: 'Unauthorized to delete this page' };
+    }
+    this.db.pages.splice(pgIdx, 1);
+    this.logActivity('PAGE_DELETED' as any, requesterDid || 'did:sovra:admin', pg.handle, `Deleted page ${pg.name} (${pg.handle})`);
+    this.save();
+    return { ok: true };
+  }
+
+  public purgeTestEntities(): { ok: boolean; purgedChannels: number; purgedPages: number } {
+    this.load();
+    const beforeCh = this.db.channels.length;
+    const beforePg = this.db.pages.length;
+    const seedChannelIds = new Set(['ch-alpha', 'ch-gaming', 'ch-news', 'ch-music']);
+    const seedPageIds = new Set(['pg-metropolis', 'pg-meshlabs', 'pg-bakery']);
+    const validUserDids = new Set(this.db.users.map(u => u.did));
+
+    this.db.channels = this.db.channels.filter(c => {
+      if (!c || !c.id) return false;
+      if (seedChannelIds.has(c.id)) return true;
+      if (/(meshcore|aimesh|mut_ch|guild_|alice_tech)/i.test((c.handle || '') + ' ' + (c.name || ''))) return false;
+      if (c.ownerDid && !validUserDids.has(c.ownerDid) && c.ownerDid !== 'did:sovra:system') return false;
+      return true;
+    });
+
+    this.db.pages = this.db.pages.filter(p => {
+      if (!p || !p.id) return false;
+      if (seedPageIds.has(p.id)) return true;
+      if (/(meshcore|aimesh|mut_ch|guild_|alice_tech)/i.test((p.handle || '') + ' ' + (p.name || ''))) return false;
+      if (p.ownerDid && !validUserDids.has(p.ownerDid) && p.ownerDid !== 'did:sovra:system') return false;
+      return true;
+    });
+
+    const purgedCh = beforeCh - this.db.channels.length;
+    const purgedPg = beforePg - this.db.pages.length;
+    this.save();
+    return { ok: true, purgedChannels: purgedCh, purgedPages: purgedPg };
+  }
+
 
   public reportPost(postId: string, reporterDid: string, reason: string): { ok: boolean; reportsCount: number } {
     this.load();

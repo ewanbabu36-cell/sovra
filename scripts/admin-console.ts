@@ -47,6 +47,30 @@ export interface AdminConsoleOptions {
     details: string;
     timestamp: number;
   }>;
+  channels?: Array<{
+    id: string;
+    handle: string;
+    name: string;
+    category: string;
+    desc?: string;
+    count: number;
+    avatar?: string;
+    bg?: string;
+    ownerDid?: string;
+    createdAt?: number;
+  }>;
+  pages?: Array<{
+    id: string;
+    handle: string;
+    name: string;
+    category: string;
+    bio?: string;
+    count: number;
+    avatar?: string;
+    bg?: string;
+    ownerDid?: string;
+    createdAt?: number;
+  }>;
 }
 
 export function renderAdminHtml(opts: AdminConsoleOptions): string {
@@ -68,6 +92,8 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     diskStorageBytes = 0,
     diskStorageMb = '0.00 MB',
     auditLogs = [],
+    channels = [],
+    pages = [],
   } = opts;
 
   return `<!DOCTYPE html>
@@ -690,6 +716,12 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <span class="admin-nav-icon">👥</span>
         <span>Users &amp; Chat Mesh</span>
         <span class="admin-nav-badge" id="sidebarUsersBadge">${registeredUsersCount}</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('entities')">
+        <span class="admin-nav-icon">📢</span>
+        <span>Sovereign Registry</span>
+        <span class="admin-nav-badge" id="sidebarEntitiesBadge" style="background:#f59e0b; color:#000;">${channels.length + pages.length}</span>
       </button>
 
       <button class="admin-nav-item" onclick="switchAdminTab('audit')">
@@ -1339,6 +1371,131 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         </div>
       </section>
 
+      <!-- Section: Sovereign Broadcast Channels & Public Pages Registry -->
+      <section class="ops-section" id="view-entities">
+        <div class="ops-header-card">
+          <div>
+            <div class="ops-header-title">📢 Sovereign Channels &amp; Public Pages Registry</div>
+            <div class="ops-header-desc">Decentralized network registry of broadcast channels, verified organization pages, and author personas. Isolated from consumer profiles.</div>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn-ops" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171;" onclick="purgeTestArtifactsAdmin()">🧹 Purge Stale Test Artifacts</button>
+            <button class="btn-ops btn-ops-user-app" onclick="location.reload()">Sync Registry</button>
+          </div>
+        </div>
+
+        <div class="ops-grid">
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Broadcast Channels</span>
+              <span style="color:#38bdf8;">One-to-Many</span>
+            </div>
+            <div class="ops-card-val">${channels.length}</div>
+            <div class="ops-card-sub">Global GossipSub pubsub topics</div>
+          </div>
+
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Sovereign Pages</span>
+              <span style="color:#c084fc;">Brands &amp; Orgs</span>
+            </div>
+            <div class="ops-card-val">${pages.length}</div>
+            <div class="ops-card-sub">Decentralized verified profiles</div>
+          </div>
+
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Curated Channels</span>
+              <span style="color:#10b981;">Canonical</span>
+            </div>
+            <div class="ops-card-val">4</div>
+            <div class="ops-card-sub">@sovra_alpha, @web3_gaming, @decentral_news, @ambient_radio</div>
+          </div>
+
+          <div class="ops-card">
+            <div class="ops-card-label">
+              <span>Total Network Entities</span>
+              <span style="color:#f59e0b;">Registry</span>
+            </div>
+            <div class="ops-card-val">${channels.length + pages.length}</div>
+            <div class="ops-card-sub">Persisted in dynamic-social-state.json</div>
+          </div>
+        </div>
+
+        <!-- Channels & Pages Table -->
+        <div class="ops-table-card">
+          <div class="ops-table-header">
+            <span class="ops-table-title">📡 Network Entities Directory</span>
+            <span style="font-size:0.75rem; color:#94a3b8;">Centralized Admin Audit (Isolated from Consumer User Profiles)</span>
+          </div>
+          <table class="ops-table">
+            <thead>
+              <tr>
+                <th>Entity</th>
+                <th>Handle</th>
+                <th>Type</th>
+                <th>Category</th>
+                <th>Subscribers / Reach</th>
+                <th>Owner Identity</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                channels.length === 0 && pages.length === 0
+                  ? '<tr><td colspan="7" style="text-align: center; color: #64748b; padding: 2rem;">No network entities found. Database is pristine clean!</td></tr>'
+                  : [
+                      ...channels.map(c => `
+                        <tr>
+                          <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                              <div style="width:28px; height:28px; border-radius:8px; background:${c.bg || '#38bdf8'}; display:flex; align-items:center; justify-content:center; font-size:0.9rem;">${c.avatar || '📢'}</div>
+                              <span style="font-weight:600; color:#f8fafc;">${c.name}</span>
+                            </div>
+                          </td>
+                          <td style="color:#38bdf8; font-weight:600;">${c.handle}</td>
+                          <td><span class="badge" style="background:rgba(56,189,248,0.15); color:#38bdf8; font-size:0.7rem;">📢 Channel</span></td>
+                          <td><span style="color:#94a3b8; font-size:0.8rem;">${c.category || 'tech'}</span></td>
+                          <td><span style="font-weight:600; color:#f8fafc;">${(c.count || 0).toLocaleString()}</span></td>
+                          <td><code style="font-size:0.75rem; color:#94a3b8;" title="${c.ownerDid || 'System'}">${(c.ownerDid || 'did:sovra:system').slice(0, 18)}...</code></td>
+                          <td>
+                            ${
+                              c.ownerDid === 'did:sovra:system' || ['ch-alpha', 'ch-gaming', 'ch-news', 'ch-music'].includes(c.id)
+                                ? '<span style="font-size:0.72rem; color:#64748b;">Protected Seed</span>'
+                                : `<button class="btn-ops" style="padding:3px 8px; font-size:0.72rem; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;" onclick="deleteAdminChannel('${c.id}', '${c.name}')">Delete</button>`
+                            }
+                          </td>
+                        </tr>
+                      `),
+                      ...pages.map(p => `
+                        <tr>
+                          <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                              <div style="width:28px; height:28px; border-radius:8px; background:${p.bg || '#c084fc'}; display:flex; align-items:center; justify-content:center; font-size:0.9rem;">${p.avatar || '🏢'}</div>
+                              <span style="font-weight:600; color:#f8fafc;">${p.name}</span>
+                            </div>
+                          </td>
+                          <td style="color:#c084fc; font-weight:600;">${p.handle}</td>
+                          <td><span class="badge" style="background:rgba(192,132,252,0.15); color:#c084fc; font-size:0.7rem;">🏢 Page</span></td>
+                          <td><span style="color:#94a3b8; font-size:0.8rem;">${p.category || 'brand'}</span></td>
+                          <td><span style="font-weight:600; color:#f8fafc;">${(p.count || 0).toLocaleString()}</span></td>
+                          <td><code style="font-size:0.75rem; color:#94a3b8;" title="${p.ownerDid || 'System'}">${(p.ownerDid || 'did:sovra:system').slice(0, 18)}...</code></td>
+                          <td>
+                            ${
+                              p.ownerDid === 'did:sovra:system' || ['pg-metropolis', 'pg-meshlabs', 'pg-bakery'].includes(p.id)
+                                ? '<span style="font-size:0.72rem; color:#64748b;">Protected Seed</span>'
+                                : `<button class="btn-ops" style="padding:3px 8px; font-size:0.72rem; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;" onclick="deleteAdminPage('${p.id}', '${p.name}')">Delete</button>`
+                            }
+                          </td>
+                        </tr>
+                      `)
+                    ].join('')
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -1638,6 +1795,62 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           ).join('');
         }
       }
+    function deleteAdminChannel(channelId, name) {
+      if (!confirm('Are you sure you want to delete broadcast channel "' + name + '"?')) return;
+      fetch('/api/admin/channels/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: channelId })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.ok) {
+          alert('Channel deleted successfully.');
+          location.reload();
+        } else {
+          alert('Failed to delete channel: ' + (d.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        alert('Delete error: ' + err.message);
+      });
+    }
+
+    function deleteAdminPage(pageId, name) {
+      if (!confirm('Are you sure you want to delete sovereign page "' + name + '"?')) return;
+      fetch('/api/admin/pages/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId: pageId })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.ok) {
+          alert('Page deleted successfully.');
+          location.reload();
+        } else {
+          alert('Failed to delete page: ' + (d.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        alert('Delete error: ' + err.message);
+      });
+    }
+
+    function purgeTestArtifactsAdmin() {
+      if (!confirm('Purge all test channels, test pages, and stale automated artifacts? Protected seed entities will be preserved.')) return;
+      fetch('/api/admin/entities/purge-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        alert('Purged ' + (d.purgedChannels || 0) + ' test channels and ' + (d.purgedPages || 0) + ' test pages.');
+        location.reload();
+      })
+      .catch(function(err) {
+        alert('Purge error: ' + err.message);
+      });
     }
 
     // Auto-poll admin metrics every 3 seconds for live real-time sync
