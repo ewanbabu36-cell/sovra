@@ -2060,8 +2060,407 @@ function renderHtml(
     .node-status-pill,
     #bitchatModeBar,
     #bitchatRadarContainer,
-    .tcp-port-badge {
+    .tcp-port-badge,
+    .app-left-rail,
+    .mobile-bottom-nav,
+    #currentUserHandleText {
       display: none !important;
+    }
+
+    /* =======================================================
+       🛸 ALIEN HOLOGRAPHIC CENTRAL COMMAND CORE & GATEWAY STYLES
+       ======================================================= */
+    .sovra-core-gateway-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.38);
+      border-radius: 14px;
+      padding: 5px 12px 5px 6px;
+      color: #fff;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.14);
+      outline: none;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .sovra-core-gateway-btn:hover {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: rgba(56, 189, 248, 0.75);
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.38);
+      transform: translateY(-1px);
+    }
+    .sovra-core-gateway-btn:focus-visible {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.45);
+    }
+    .sovra-core-gateway-btn:active {
+      transform: scale(0.96);
+    }
+    .sovra-core-icon-ring {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0284c7, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+    }
+    .sovra-core-symbol {
+      font-weight: 900;
+      font-size: 1.05rem;
+      color: #fff;
+      letter-spacing: -0.5px;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.85);
+    }
+    .sovra-core-pulse-halo {
+      position: absolute;
+      inset: -3px;
+      border-radius: 12px;
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      animation: sovraCoreAuraPulse 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes sovraCoreAuraPulse {
+      0%, 100% { transform: scale(1); opacity: 0.35; }
+      50% { transform: scale(1.18); opacity: 0.95; box-shadow: 0 0 16px rgba(56, 189, 248, 0.65); }
+    }
+    .sovra-core-brand-text {
+      font-weight: 800;
+      font-size: 0.95rem;
+      letter-spacing: 0.12em;
+      background: linear-gradient(135deg, #f8fafc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+    }
+
+    /* Minimal circular header avatar */
+    .header-avatar-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #6366f1;
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.35);
+      cursor: pointer;
+      transition: transform 0.18s, border-color 0.18s;
+    }
+    .header-avatar-circle:hover {
+      transform: scale(1.08);
+      border-color: #38bdf8;
+    }
+
+    /* Compact Live indicator dot */
+    .header-live-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      cursor: default;
+    }
+    .live-dot-pulse {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+      transition: background-color 0.3s, box-shadow 0.3s;
+    }
+    .live-dot-pulse.live-connected {
+      background: #10b981;
+      box-shadow: 0 0 10px #10b981, 0 0 20px rgba(16, 185, 129, 0.45);
+      animation: liveDotHeartbeat 2.4s ease-in-out infinite;
+    }
+    .live-dot-pulse.live-connecting {
+      background: #f59e0b;
+      box-shadow: 0 0 8px #f59e0b;
+      animation: liveDotHeartbeat 1.2s ease-in-out infinite;
+    }
+    .live-dot-pulse.live-offline {
+      background: #64748b;
+      box-shadow: none;
+    }
+    @keyframes liveDotHeartbeat {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.28); opacity: 1; }
+    }
+
+    /* =======================================================
+       🛸 HOLOGRAPHIC CENTRAL OVERLAY & POLAR RADIAL SYSTEM
+       ======================================================= */
+    .holo-nav-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .holo-nav-overlay.is-active {
+      display: flex;
+    }
+    .holo-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.78);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      opacity: 0;
+      transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .holo-nav-overlay.is-open .holo-backdrop {
+      opacity: 1;
+    }
+    .holo-stage {
+      position: relative;
+      width: 440px;
+      height: 440px;
+      max-width: 96vw;
+      max-height: 96vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .holo-ambient-rings {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .holo-orbit-ring {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .holo-orbit-ring.ring-outer {
+      width: 380px;
+      height: 380px;
+      max-width: 88vw;
+      max-height: 88vw;
+      border: 1px dashed rgba(56, 189, 248, 0.25);
+      animation: holoOrbitOuter 36s linear infinite;
+    }
+    .holo-orbit-ring.ring-inner {
+      width: 250px;
+      height: 250px;
+      max-width: 62vw;
+      max-height: 62vw;
+      border: 1px solid rgba(192, 132, 252, 0.18);
+      animation: holoOrbitInner 24s linear infinite reverse;
+    }
+    @keyframes holoOrbitOuter {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes holoOrbitInner {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(-360deg); }
+    }
+
+    /* Central Command Core Reactor */
+    .holo-center-core {
+      position: absolute;
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, rgba(15, 23, 42, 0.95) 75%);
+      border: 2px solid rgba(56, 189, 248, 0.7);
+      box-shadow: 0 0 35px rgba(56, 189, 248, 0.45), inset 0 0 18px rgba(56, 189, 248, 0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      z-index: 10;
+      transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s;
+      outline: none;
+    }
+    .holo-center-core:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 50px rgba(56, 189, 248, 0.65), inset 0 0 25px rgba(56, 189, 248, 0.45);
+      border-color: #38bdf8;
+    }
+    .holo-center-core:active {
+      transform: scale(0.94);
+    }
+    .holo-center-core-symbol {
+      font-size: 1.5rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, #ffffff, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.85);
+    }
+    .holo-center-core-sub {
+      font-size: 0.58rem;
+      letter-spacing: 0.15em;
+      color: #94a3b8;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    /* Polar Control Nodes */
+    .holo-nodes-layer {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .holo-node-item {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      pointer-events: auto;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      outline: none;
+      text-decoration: none;
+      user-select: none;
+      transform: translate(0, 0) scale(0.4);
+      opacity: 0;
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s;
+    }
+    .holo-nav-overlay.is-open .holo-node-item {
+      transform: translate(var(--node-x, 0px), var(--node-y, 0px)) scale(1);
+      opacity: 1;
+    }
+    .holo-node-disc {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1.5px solid var(--node-accent, #38bdf8);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.2), inset 0 0 12px rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, background-color 0.2s;
+    }
+    .holo-node-item:hover .holo-node-disc {
+      transform: scale(1.14);
+      box-shadow: 0 0 30px var(--node-accent, #38bdf8);
+      background: rgba(30, 41, 59, 0.95);
+    }
+    .holo-node-item:focus-visible .holo-node-disc {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+    .holo-node-item:active .holo-node-disc {
+      transform: scale(0.92);
+    }
+    .holo-node-item.is-current .holo-node-disc {
+      border-width: 2.5px;
+      box-shadow: 0 0 25px var(--node-accent, #38bdf8), inset 0 0 10px var(--node-accent, #38bdf8);
+    }
+    .holo-node-icon {
+      font-size: 1.3rem;
+      line-height: 1;
+      display: inline-block;
+    }
+    .holo-node-label {
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(6px);
+      white-space: nowrap;
+      transition: color 0.18s, border-color 0.18s;
+    }
+    .holo-node-item:hover .holo-node-label {
+      color: #fff;
+      border-color: var(--node-accent, #38bdf8);
+    }
+    .holo-node-badge {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 0.62rem;
+      font-weight: 900;
+      border-radius: 10px;
+      min-width: 17px;
+      height: 17px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      border: 1.5px solid #0f172a;
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+    }
+
+    /* Mobile Responsive Adaptation */
+    @media (max-width: 480px) {
+      .holo-stage {
+        width: 330px;
+        height: 330px;
+      }
+      .holo-center-core {
+        width: 72px;
+        height: 72px;
+      }
+      .holo-node-disc {
+        width: 46px;
+        height: 46px;
+      }
+      .holo-node-icon {
+        font-size: 1.15rem;
+      }
+      .holo-node-label {
+        font-size: 0.62rem;
+      }
+      .sovra-core-brand-text {
+        display: none;
+      }
+    }
+
+    /* Accessibility: Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+      .holo-orbit-ring.ring-outer,
+      .holo-orbit-ring.ring-inner,
+      .sovra-core-pulse-halo,
+      .live-dot-pulse.live-connected {
+        animation: none !important;
+      }
+      .holo-node-item {
+        transition: opacity 0.12s ease !important;
+      }
     }
     @keyframes callWave {
       0% { height: 6px; }
@@ -2136,7 +2535,7 @@ function renderHtml(
     /* Column 2: Center Stage */
     .app-center-stage {
       flex: 1;
-      max-width: 720px;
+      max-width: 820px;
       display: flex;
       flex-direction: column;
       min-width: 0;
@@ -7107,9 +7506,14 @@ function renderHtml(
     <div class="app-center-stage">
       <!-- Center Sticky Top Header with Expansive Search -->
       <header class="app-top-header">
-        <div class="mobile-brand" onclick="switchTab('feed')">
-          <div class="brand-logo" style="width: 34px; height: 34px; font-size: 1rem; border-radius: 10px;">S</div>
-        </div>
+        <!-- SOVRA Central Command Core Gateway -->
+        <button type="button" id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="toggleHolographicNav()" aria-label="Open SOVRA holographic command center" aria-haspopup="dialog" aria-expanded="false" title="SOVRA Central Command Core (Tap to Activate Holographic Navigation)">
+          <div class="sovra-core-icon-ring">
+            <span class="sovra-core-symbol">S</span>
+            <span class="sovra-core-pulse-halo"></span>
+          </div>
+          <span class="sovra-core-brand-text">SOVRA</span>
+        </button>
 
         <!-- Prominent Wide Friend & Mesh Search Bar -->
         <div class="header-search-wrap">
@@ -7123,8 +7527,6 @@ function renderHtml(
         </div>
 
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; position: relative;">
-
-
           <div id="headerNotificationBell" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" style="position: relative; cursor: pointer; padding: 4px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center;" title="Real-Time Notifications" aria-label="Notifications">
             <span style="font-size: 0.95rem;">🔔</span>
             <span id="headerNotificationBadge" style="display: none; position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: bold; border-radius: 50%; min-width: 16px; height: 16px; align-items: center; justify-content: center; padding: 0 3px;">0</span>
@@ -7142,17 +7544,11 @@ function renderHtml(
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             <span>Install</span>
           </button>
-          <div id="currentUserPill" role="button" tabindex="0" onclick="switchTab('me')" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" style="display: flex; align-items: center; gap: 0.35rem; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 3px 8px; cursor: pointer;" title="Your Sovereign Profile" aria-label="Your Sovereign Profile">
-            <span id="currentUserAvatar" style="width: 20px; height: 20px; border-radius: 50%; background: #6366f1; color: #fff; font-size: 0.7rem; font-weight: bold; display: flex; align-items: center; justify-content: center;">S</span>
-            <span id="currentUserHandleText" style="font-size: 0.75rem; font-weight: 700; color: #cbd5e1;">@you</span>
+          <div id="currentUserPill" role="button" tabindex="0" onclick="toggleHolographicNav()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleHolographicNav()" style="display: flex; align-items: center; background: none; border: none; padding: 0; cursor: pointer;" title="Your Sovereign Profile (Tap for Holographic Core)" aria-label="Your Sovereign Profile">
+            <span id="currentUserAvatar" class="header-avatar-circle">S</span>
           </div>
-          <button id="navModeToggleBtn" onclick="toggleNavLayoutMode()" class="nav-mode-btn" style="display: none;" title="Toggle Navigation Layout (Auto Responsive / Mobile Dock / Desktop Top)" aria-label="Toggle Navigation Layout">
-            <span id="navModeIcon">⚡</span> <span id="navModeLabel" class="nav-mode-text">Auto</span>
-          </button>
-          <div class="node-status-pill" title="Sovra Mesh Online • TCP :${tcpPort} • LibP2P Noise_XX Active" style="display: none !important; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 20px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); cursor: default;">
-            <span class="status-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; display: inline-block;"></span>
-            <span class="status-text" style="font-size: 0.72rem; font-weight: 600; color: #34d399;">Online</span>
-            <span class="badge tcp-port-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); font-size: 0.65rem; padding: 1px 5px; border-radius: 6px;">:${tcpPort}</span>
+          <div class="header-live-indicator" id="headerLiveIndicator" title="SOVRA Mesh Transport: Connected" aria-label="Realtime connection: Live">
+            <span class="live-dot-pulse live-connected" id="liveDotPulse"></span>
           </div>
         </div>
       </header>
@@ -11321,6 +11717,93 @@ function renderHtml(
     </div>
   </div>
 
+  <!-- 🛸 ALIEN HOLOGRAPHIC CENTRAL COMMAND CORE OVERLAY -->
+  <div id="holographicNavOverlay" class="holo-nav-overlay" role="dialog" aria-modal="true" aria-label="SOVRA Holographic Central Navigation">
+    <div class="holo-backdrop" onclick="closeHolographicNav()"></div>
+    <div class="holo-stage" id="holoStage">
+      <!-- Ambient Orbit Rings -->
+      <div class="holo-ambient-rings" aria-hidden="true">
+        <div class="holo-orbit-ring ring-outer"></div>
+        <div class="holo-orbit-ring ring-inner"></div>
+      </div>
+
+      <!-- Central Command Core Reactor -->
+      <button type="button" class="holo-center-core" id="holoCenterCoreBtn" onclick="toggleHolographicNav()" aria-label="Close SOVRA holographic command center" title="SOVRA Command Core (Tap to Close)">
+        <span class="holo-center-core-symbol">S</span>
+        <span class="holo-center-core-sub">SOVRA OS</span>
+      </button>
+
+      <!-- Polar Radial Command Nodes (8 Primary Actions) -->
+      <div class="holo-nodes-layer" id="holoNodesLayer">
+        <!-- 01: NOTIFICATIONS (Top) -->
+        <button type="button" class="holo-node-item" id="holo-node-notif" onclick="executeHoloAction('notifications')" aria-label="Notifications" title="Notifications">
+          <div class="holo-node-disc">
+            <span class="holo-node-icon">🔔</span>
+            <span class="holo-node-badge" id="holoBadgeNotif" style="display: none;">0</span>
+          </div>
+          <span class="holo-node-label">NOTIFICATIONS</span>
+        </button>
+
+        <!-- 02: WATCH (Top-Right) -->
+        <button type="button" class="holo-node-item" id="holo-node-watch" onclick="executeHoloAction('watch')" aria-label="Watch Videos" title="Watch Videos">
+          <div class="holo-node-disc">
+            <span class="holo-node-icon">📺</span>
+          </div>
+          <span class="holo-node-label">WATCH</span>
+        </button>
+
+        <!-- 03: CHAT (Right) -->
+        <button type="button" class="holo-node-item" id="holo-node-chat" onclick="executeHoloAction('chat')" aria-label="Encrypted Chats" title="Encrypted Chats">
+          <div class="holo-node-disc">
+            <span class="holo-node-icon">💬</span>
+            <span class="holo-node-badge" id="holoBadgeChat" style="display: none;">0</span>
+          </div>
+          <span class="holo-node-label">CHAT</span>
+        </button>
+
+        <!-- 04: CREATE POST (Bottom-Right) -->
+        <button type="button" class="holo-node-item" id="holo-node-create" onclick="executeHoloAction('create')" aria-label="Create Post or Story" title="Create Post or Story">
+          <div class="holo-node-disc">
+            <span class="holo-node-icon">✍️</span>
+          </div>
+          <span class="holo-node-label">CREATE POST</span>
+        </button>
+
+        <!-- 05: LOGOUT (Bottom) -->
+        <button type="button" class="holo-node-item" id="holo-node-logout" onclick="executeHoloAction('logout')" aria-label="Logout Sovereign Session" title="Logout Sovereign Session">
+          <div class="holo-node-disc">
+            <span class="holo-node-icon">⏻</span>
+          </div>
+          <span class="holo-node-label">LOGOUT</span>
+        </button>
+
+        <!-- 06: FEED (Bottom-Left) -->
+        <button type="button" class="holo-node-item" id="holo-node-feed" onclick="executeHoloAction('feed')" aria-label="Decentralized Feed" title="Decentralized Feed">
+          <div class="holo-node-disc">
+            <span class="holo-node-icon">📷</span>
+          </div>
+          <span class="holo-node-label">FEED</span>
+        </button>
+
+        <!-- 07: PROFILE (Left) -->
+        <button type="button" class="holo-node-item" id="holo-node-profile" onclick="executeHoloAction('profile')" aria-label="Sovereign Profile" title="Sovereign Profile">
+          <div class="holo-node-disc">
+            <span class="holo-node-icon">👤</span>
+          </div>
+          <span class="holo-node-label">PROFILE</span>
+        </button>
+
+        <!-- 08: REELS (Top-Left) -->
+        <button type="button" class="holo-node-item" id="holo-node-reels" onclick="executeHoloAction('reels')" aria-label="Reels Video Feed" title="Reels Video Feed">
+          <div class="holo-node-disc">
+            <span class="holo-node-icon">🎬</span>
+          </div>
+          <span class="holo-node-label">REELS</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     window.SOVRA_HOST_SESSION = {
       did: '${masterKey.did}',
@@ -13562,11 +14045,282 @@ function renderHtml(
       applyNavLayoutMode();
     }
 
+    /* =======================================================
+       🛸 SOVRA ALIEN HOLOGRAPHIC CENTRAL COMMAND CORE SYSTEM
+       ======================================================= */
+    let _holoNavState = 'CLOSED'; // 'CLOSED' | 'OPENING' | 'OPEN' | 'CLOSING'
+
+    function playHolographicPulseSound() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(540, ctx.currentTime);
+        osc1.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(270, ctx.currentTime);
+        osc2.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.12);
+
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start();
+        osc2.start();
+        osc1.stop(ctx.currentTime + 0.18);
+        osc2.stop(ctx.currentTime + 0.18);
+      } catch (_) {}
+    }
+
+    function playHolographicCollapseSound() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(720, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(360, ctx.currentTime + 0.1);
+
+        gain.gain.setValueAtTime(0.06, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.13);
+      } catch (_) {}
+    }
+
+    const HOLOGRAPHIC_CONFIG = [
+      { id: 'holo-node-notif',  action: 'notifications', angle: 0,   accent: '#38bdf8' },
+      { id: 'holo-node-watch',  action: 'watch',         angle: 45,  accent: '#f43f5e' },
+      { id: 'holo-node-chat',   action: 'chat',          angle: 90,  accent: '#38bdf8' },
+      { id: 'holo-node-create', action: 'create',        angle: 135, accent: '#a855f7' },
+      { id: 'holo-node-logout', action: 'logout',        angle: 180, accent: '#ef4444' },
+      { id: 'holo-node-feed',   action: 'feed',          angle: 225, accent: '#38bdf8' },
+      { id: 'holo-node-profile',action: 'profile',       angle: 270, accent: '#6366f1' },
+      { id: 'holo-node-reels',  action: 'reels',         angle: 315, accent: '#c084fc' },
+    ];
+
+    function calculateHolographicPositions() {
+      const isMobile = window.innerWidth <= 480;
+      const isTablet = window.innerWidth <= 1024 && window.innerWidth > 480;
+      const radius = isMobile ? 116 : (isTablet ? 150 : 180);
+
+      for (let i = 0; i < HOLOGRAPHIC_CONFIG.length; i++) {
+        const item = HOLOGRAPHIC_CONFIG[i];
+        const rad = (item.angle * Math.PI) / 180;
+        const x = Math.round(radius * Math.sin(rad));
+        const y = Math.round(-radius * Math.cos(rad));
+        const el = document.getElementById(item.id);
+        if (el) {
+          el.style.setProperty('--node-x', x + 'px');
+          el.style.setProperty('--node-y', y + 'px');
+          el.style.setProperty('--node-accent', item.accent);
+        }
+      }
+    }
+
+    function refreshHolographicBadges() {
+      const headerNotifBadge = document.getElementById('headerNotificationBadge');
+      const holoNotifBadge = document.getElementById('holoBadgeNotif');
+      if (holoNotifBadge) {
+        if (headerNotifBadge && headerNotifBadge.style.display !== 'none' && headerNotifBadge.innerText !== '0') {
+          holoNotifBadge.innerText = headerNotifBadge.innerText;
+          holoNotifBadge.style.display = 'flex';
+        } else {
+          holoNotifBadge.style.display = 'none';
+        }
+      }
+
+      const holoChatBadge = document.getElementById('holoBadgeChat');
+      if (holoChatBadge) {
+        let unreadChat = 0;
+        if (typeof unreadMessagesCount !== 'undefined') unreadChat = unreadMessagesCount;
+        if (unreadChat > 0) {
+          holoChatBadge.innerText = String(unreadChat);
+          holoChatBadge.style.display = 'flex';
+        } else {
+          holoChatBadge.style.display = 'none';
+        }
+      }
+    }
+
+    function toggleHolographicNav() {
+      if (_holoNavState === 'OPEN' || _holoNavState === 'OPENING') {
+        closeHolographicNav();
+      } else {
+        openHolographicNav();
+      }
+    }
+
+    function openHolographicNav() {
+      if (_holoNavState === 'OPEN' || _holoNavState === 'OPENING') return;
+      _holoNavState = 'OPENING';
+      playHolographicPulseSound();
+
+      calculateHolographicPositions();
+      refreshHolographicBadges();
+
+      const overlay = document.getElementById('holographicNavOverlay');
+      const triggerBtn = document.getElementById('sovraCoreBtn');
+      if (triggerBtn) {
+        triggerBtn.setAttribute('aria-expanded', 'true');
+        triggerBtn.setAttribute('aria-label', 'Close SOVRA holographic command center');
+      }
+
+      if (overlay) {
+        overlay.classList.add('is-active');
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            overlay.classList.add('is-open');
+            _holoNavState = 'OPEN';
+          });
+        });
+      }
+    }
+
+    function closeHolographicNav() {
+      if (_holoNavState === 'CLOSED' || _holoNavState === 'CLOSING') return;
+      _holoNavState = 'CLOSING';
+      playHolographicCollapseSound();
+
+      const overlay = document.getElementById('holographicNavOverlay');
+      const triggerBtn = document.getElementById('sovraCoreBtn');
+      if (triggerBtn) {
+        triggerBtn.setAttribute('aria-expanded', 'false');
+        triggerBtn.setAttribute('aria-label', 'Open SOVRA holographic command center');
+      }
+
+      if (overlay) {
+        overlay.classList.remove('is-open');
+        setTimeout(function() {
+          overlay.classList.remove('is-active');
+          _holoNavState = 'CLOSED';
+        }, 220);
+      }
+    }
+
+    function executeHoloAction(actionKey) {
+      closeHolographicNav();
+      setTimeout(function() {
+        switch (actionKey) {
+          case 'feed':
+            switchTab('feed');
+            break;
+          case 'reels':
+            switchTab('reels');
+            break;
+          case 'watch':
+            switchTab('youtube');
+            break;
+          case 'profile':
+            switchTab('me');
+            break;
+          case 'chat':
+            switchTab('chat');
+            break;
+          case 'notifications':
+            toggleNotificationCenter();
+            break;
+          case 'create':
+            triggerBottomCreateAction();
+            break;
+          case 'logout':
+            openLogoutModal();
+            break;
+        }
+      }, 140);
+    }
+
+    // Keyboard and resize listeners for holographic navigation
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && (_holoNavState === 'OPEN' || _holoNavState === 'OPENING')) {
+        closeHolographicNav();
+      }
+    });
+
+    window.addEventListener('resize', function() {
+      if (_holoNavState === 'OPEN') {
+        calculateHolographicPositions();
+      }
+    });
+
+    // Realtime connection status engine for Header Live Dot
+    let _realtimeEventSource = null;
+    function initRealtimeLiveConnection() {
+      const dot = document.getElementById('liveDotPulse');
+      const indicator = document.getElementById('headerLiveIndicator');
+      if (!dot) return;
+
+      function updateLiveStatus(status) {
+        dot.className = 'live-dot-pulse live-' + status;
+        if (indicator) {
+          indicator.title = 'SOVRA Mesh Transport: ' + (status === 'connected' ? 'Connected (Live)' : (status === 'connecting' ? 'Reconnecting' : 'Offline'));
+          indicator.setAttribute('aria-label', 'Realtime connection: ' + status);
+        }
+      }
+
+      const token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || '';
+      if (!token || !window.EventSource) {
+        updateLiveStatus(navigator.onLine ? 'connected' : 'offline');
+        return;
+      }
+
+      try {
+        if (_realtimeEventSource) {
+          _realtimeEventSource.close();
+        }
+        _realtimeEventSource = new EventSource('/api/realtime/stream?token=' + encodeURIComponent(token));
+        updateLiveStatus('connecting');
+
+        _realtimeEventSource.onopen = function() {
+          updateLiveStatus('connected');
+        };
+
+        _realtimeEventSource.onerror = function() {
+          if (!navigator.onLine) {
+            updateLiveStatus('offline');
+          } else {
+            updateLiveStatus('connecting');
+          }
+        };
+
+        _realtimeEventSource.addEventListener('notification', function() {
+          if (typeof fetchNotifications === 'function') fetchNotifications();
+        });
+
+        _realtimeEventSource.addEventListener('message', function() {
+          if (typeof syncChatMessages === 'function') syncChatMessages();
+        });
+      } catch (_) {
+        updateLiveStatus(navigator.onLine ? 'connected' : 'offline');
+      }
+
+      window.addEventListener('online', function() { updateLiveStatus('connected'); });
+      window.addEventListener('offline', function() { updateLiveStatus('offline'); });
+    }
+
     document.body.classList.add('tab-active-feed');
     document.body.dataset.activeTab = 'feed';
     setTimeout(applyNavLayoutMode, 10);
     setTimeout(renderRightRailSuggestions, 50);
     setTimeout(function() {
+      calculateHolographicPositions();
+      initRealtimeLiveConnection();
       if (typeof renderChatContactsList === 'function') renderChatContactsList();
       if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
       if (typeof syncChatMessages === 'function') syncChatMessages();
@@ -13620,6 +14374,14 @@ function renderHtml(
         }
       }
 
+      // Highlight active node in holographic central navigation
+      const nodeKeys = { feed: 'holo-node-feed', reels: 'holo-node-reels', youtube: 'holo-node-watch', chat: 'holo-node-chat', me: 'holo-node-profile' };
+      document.querySelectorAll('.holo-node-item').forEach(function(n) { n.classList.remove('is-current'); });
+      if (nodeKeys[tab]) {
+        const cur = document.getElementById(nodeKeys[tab]);
+        if (cur) cur.classList.add('is-current');
+      }
+
       // Update body active tab classes
       const allTabNames = ['feed', 'friends', 'reels', 'youtube', 'chat', 'me', 'admin'];
       allTabNames.forEach(t => document.body.classList.remove('tab-active-' + t));
@@ -13640,7 +14402,7 @@ function renderHtml(
           rightRail.style.display = window.innerWidth > 1250 ? 'flex' : 'none';
         }
         if (centerStage) {
-          centerStage.style.maxWidth = tab === 'me' ? '920px' : '720px';
+          centerStage.style.maxWidth = tab === 'me' ? '920px' : '820px';
           centerStage.style.width = '';
         }
       }
