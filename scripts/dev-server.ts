@@ -2073,26 +2073,23 @@ function renderHtml(
     .sovra-core-gateway-btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.75rem;
-      background: rgba(7, 13, 29, 0.92);
-      border: 1.5px solid rgba(56, 189, 248, 0.45);
+      gap: 0.85rem;
+      background: #060b17;
+      border: 1.8px solid #00b4d8;
       border-radius: 9999px;
-      padding: 4px 14px 4px 6px;
+      padding: 5px 18px 5px 6px;
       color: #fff;
       cursor: pointer;
       position: relative;
       transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.18), inset 0 0 8px rgba(56, 189, 248, 0.08);
+      box-shadow: 0 0 16px rgba(0, 180, 216, 0.28), inset 0 0 8px rgba(0, 180, 216, 0.08);
       outline: none;
       user-select: none;
       flex-shrink: 0;
     }
     .sovra-core-gateway-btn:hover {
-      background: rgba(15, 23, 42, 0.96);
       border-color: #38bdf8;
-      box-shadow: 0 0 25px rgba(56, 189, 248, 0.45);
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.5), inset 0 0 10px rgba(56, 189, 248, 0.15);
       transform: translateY(-1px);
     }
     .sovra-core-gateway-btn:focus-visible {
@@ -2100,47 +2097,61 @@ function renderHtml(
       box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.45);
     }
     .sovra-core-gateway-btn:active {
-      transform: scale(0.96);
+      transform: scale(0.97);
     }
     .sovra-core-icon-ring {
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       border-radius: 12px;
-      background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 50%, #8b5cf6 100%);
+      background: linear-gradient(135deg, #0284c7 0%, #3b82f6 45%, #8b5cf6 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.55), inset 0 1px 2px rgba(255, 255, 255, 0.35);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 18px rgba(14, 165, 233, 0.65), 0 0 32px rgba(139, 92, 246, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      flex-shrink: 0;
     }
     .sovra-core-symbol {
       font-weight: 900;
-      font-size: 1.25rem;
-      color: #fff;
+      font-size: 1.35rem;
+      color: #ffffff;
       letter-spacing: -0.5px;
       text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
       line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
     }
     .sovra-core-pulse-halo {
       position: absolute;
-      inset: -3px;
-      border-radius: 14px;
-      border: 1px solid rgba(56, 189, 248, 0.45);
+      inset: -4px;
+      border-radius: 15px;
+      border: 1.4px solid rgba(0, 180, 216, 0.6);
+      box-shadow: 0 0 10px rgba(0, 180, 216, 0.45);
       animation: sovraCoreAuraPulse 3s ease-in-out infinite;
       pointer-events: none;
     }
     @keyframes sovraCoreAuraPulse {
-      0%, 100% { transform: scale(1); opacity: 0.35; }
-      50% { transform: scale(1.18); opacity: 0.95; box-shadow: 0 0 16px rgba(56, 189, 248, 0.65); }
+      0%, 100% {
+        opacity: 0.7;
+        box-shadow: 0 0 8px rgba(0, 180, 216, 0.35);
+      }
+      50% {
+        opacity: 1;
+        box-shadow: 0 0 16px rgba(0, 180, 216, 0.65);
+      }
     }
     .sovra-core-brand-text {
       font-weight: 900;
-      font-size: 1.05rem;
-      letter-spacing: 0.14em;
+      font-size: 1.2rem;
+      letter-spacing: 0.18em;
       color: #7dd3fc;
-      text-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+      text-shadow: 0 0 14px rgba(56, 189, 248, 0.55), 0 0 2px rgba(255, 255, 255, 0.6);
       display: inline-block;
+      line-height: 1;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     }
 
     /* Minimal circular header avatar */
