@@ -57,7 +57,7 @@ describe('Sovra Holographic Central Navigation & Clean Production UI Gate', () =
     expect(html).toContain('display: none !important;');
   });
 
-  it('mounts the Central Holographic Command Core overlay with all 8 primary action nodes', async () => {
+  it('mounts the Central Holographic Command Core overlay with all 9 radial action nodes including Home', async () => {
     const res = await fetch(`${BASE_URL}/`);
     const html = await res.text();
 
@@ -67,9 +67,12 @@ describe('Sovra Holographic Central Navigation & Clean Production UI Gate', () =
 
     // 2. Central Command Reactor Core
     expect(html).toContain('id="holoCenterCoreBtn"');
-    expect(html).toContain('SOVRA OS');
+    expect(html).toContain('SOVRA');
 
-    // 3. All 8 primary action nodes
+    // 3. All 9 primary action nodes (3D glass spheres)
+    expect(html).toContain('id="holo-node-home"');
+    expect(html).toContain('HOME');
+
     expect(html).toContain('id="holo-node-feed"');
     expect(html).toContain('FEED');
 
@@ -93,6 +96,10 @@ describe('Sovra Holographic Central Navigation & Clean Production UI Gate', () =
 
     expect(html).toContain('id="holo-node-logout"');
     expect(html).toContain('LOGOUT');
+
+    // 4. 3D Glass Sphere Node Orb Architecture
+    expect(html).toContain('class="holo-node-orb"');
+    expect(html).toContain('class="holo-floor-pedestal"');
   });
 
   it('contains client-side state machine, polar coordinate engine, and audio synthesizers', async () => {
@@ -122,9 +129,10 @@ describe('Sovra Holographic Central Navigation & Clean Production UI Gate', () =
     const res = await fetch(`${BASE_URL}/`);
     const html = await res.text();
 
-    // 1. Connection lines SVG and 8 pathways from core
+    // 1. Connection lines SVG and 9 pathways from core
     expect(html).toContain('id="holoEnergySvg"');
     expect(html).toContain('class="holo-energy-pathways"');
+    expect(html).toContain('id="holo-path-home"');
     expect(html).toContain('id="holo-path-notif"');
     expect(html).toContain('id="holo-path-watch"');
     expect(html).toContain('id="holo-path-chat"');
@@ -140,7 +148,7 @@ describe('Sovra Holographic Central Navigation & Clean Production UI Gate', () =
     expect(html).toContain('class="holo-core-glow-ring"');
     expect(html).toContain('CORE ACTIVE');
 
-    // 3. Subtle non-opaque backdrop with light blur
-    expect(html).toContain('backdrop-filter: blur(5px);');
+    // 3. Subtle non-opaque backdrop with blur
+    expect(html).toContain('backdrop-filter: blur(8px);');
   });
 });

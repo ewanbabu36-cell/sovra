@@ -2073,26 +2073,26 @@ function renderHtml(
     .sovra-core-gateway-btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.65rem;
-      background: rgba(15, 23, 42, 0.7);
-      border: 1px solid rgba(56, 189, 248, 0.38);
-      border-radius: 14px;
-      padding: 5px 12px 5px 6px;
+      gap: 0.75rem;
+      background: rgba(7, 13, 29, 0.92);
+      border: 1.5px solid rgba(56, 189, 248, 0.45);
+      border-radius: 9999px;
+      padding: 4px 14px 4px 6px;
       color: #fff;
       cursor: pointer;
       position: relative;
       transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.14);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.18), inset 0 0 8px rgba(56, 189, 248, 0.08);
       outline: none;
       user-select: none;
       flex-shrink: 0;
     }
     .sovra-core-gateway-btn:hover {
-      background: rgba(30, 41, 59, 0.9);
-      border-color: rgba(56, 189, 248, 0.75);
-      box-shadow: 0 0 25px rgba(56, 189, 248, 0.38);
+      background: rgba(15, 23, 42, 0.96);
+      border-color: #38bdf8;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.45);
       transform: translateY(-1px);
     }
     .sovra-core-gateway-btn:focus-visible {
@@ -2103,27 +2103,29 @@ function renderHtml(
       transform: scale(0.96);
     }
     .sovra-core-icon-ring {
-      width: 34px;
-      height: 34px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #0284c7, #8b5cf6);
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 50%, #8b5cf6 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
-      box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.55), inset 0 1px 2px rgba(255, 255, 255, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
     .sovra-core-symbol {
       font-weight: 900;
-      font-size: 1.05rem;
+      font-size: 1.25rem;
       color: #fff;
       letter-spacing: -0.5px;
-      text-shadow: 0 0 8px rgba(255, 255, 255, 0.85);
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      line-height: 1;
     }
     .sovra-core-pulse-halo {
       position: absolute;
       inset: -3px;
-      border-radius: 12px;
+      border-radius: 14px;
       border: 1px solid rgba(56, 189, 248, 0.45);
       animation: sovraCoreAuraPulse 3s ease-in-out infinite;
       pointer-events: none;
@@ -2133,12 +2135,11 @@ function renderHtml(
       50% { transform: scale(1.18); opacity: 0.95; box-shadow: 0 0 16px rgba(56, 189, 248, 0.65); }
     }
     .sovra-core-brand-text {
-      font-weight: 800;
-      font-size: 0.95rem;
-      letter-spacing: 0.12em;
-      background: linear-gradient(135deg, #f8fafc, #38bdf8);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      font-weight: 900;
+      font-size: 1.05rem;
+      letter-spacing: 0.14em;
+      color: #7dd3fc;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
       display: inline-block;
     }
 
@@ -2217,9 +2218,9 @@ function renderHtml(
     .holo-backdrop {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.48) 0%, rgba(3, 7, 18, 0.65) 100%);
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.55) 0%, rgba(3, 7, 18, 0.88) 100%);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       opacity: 0;
       transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }
@@ -2228,16 +2229,58 @@ function renderHtml(
     }
     .holo-stage {
       position: relative;
-      width: 480px;
-      height: 480px;
-      max-width: 96vw;
-      max-height: 96vh;
+      width: 580px;
+      height: 580px;
+      max-width: 98vw;
+      max-height: 98vh;
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 2;
       pointer-events: none;
     }
+
+    /* 3D Floor Perspective Pedestal & Light Rings */
+    .holo-floor-pedestal {
+      position: absolute;
+      bottom: 2%;
+      left: 50%;
+      transform: translateX(-50%) rotateX(72deg);
+      width: 560px;
+      height: 260px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .holo-floor-spot {
+      position: absolute;
+      inset: 16%;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(56, 189, 248, 0.65) 0%, rgba(14, 165, 233, 0.25) 35%, transparent 70%);
+      filter: blur(10px);
+      animation: floorSpotPulse 4s ease-in-out infinite;
+    }
+    .holo-floor-ring {
+      position: absolute;
+      border-radius: 50%;
+      inset: 0;
+      border: 1.5px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+    }
+    .holo-floor-ring.f-mid {
+      inset: 14%;
+      border: 1px dashed rgba(56, 189, 248, 0.45);
+    }
+    .holo-floor-ring.f-inner {
+      inset: 28%;
+      border: 1px solid rgba(139, 92, 246, 0.4);
+    }
+    @keyframes floorSpotPulse {
+      0%, 100% { opacity: 0.7; transform: scale(0.98); }
+      50% { opacity: 1; transform: scale(1.04); }
+    }
+
+    /* Ambient Orbit Rings & Shockwave */
     .holo-ambient-rings {
       position: absolute;
       inset: 0;
@@ -2273,34 +2316,49 @@ function renderHtml(
         transform: scale(3.2);
       }
     }
+    .holo-orbital-halo-ring {
+      position: absolute;
+      width: 424px;
+      height: 424px;
+      border-radius: 50%;
+      border: 1px solid rgba(56, 189, 248, 0.16);
+      box-shadow: 0 0 24px rgba(56, 189, 248, 0.08);
+      pointer-events: none;
+      z-index: 1;
+      animation: holoHaloRotate 90s linear infinite;
+    }
+    @keyframes holoHaloRotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
     .holo-orbit-ring {
       position: absolute;
       border-radius: 50%;
       pointer-events: none;
     }
     .holo-orbit-ring.ring-outer {
-      width: 420px;
-      height: 420px;
-      max-width: 90vw;
-      max-height: 90vw;
-      border: 1px dashed rgba(56, 189, 248, 0.22);
-      animation: holoOrbitOuter 42s linear infinite;
+      width: 510px;
+      height: 510px;
+      max-width: 94vw;
+      max-height: 94vw;
+      border: 1px dashed rgba(56, 189, 248, 0.2);
+      animation: holoOrbitOuter 48s linear infinite;
     }
     .holo-orbit-ring.ring-mid {
-      width: 300px;
-      height: 300px;
-      max-width: 72vw;
-      max-height: 72vw;
+      width: 320px;
+      height: 320px;
+      max-width: 76vw;
+      max-height: 76vw;
       border: 1px solid rgba(168, 85, 247, 0.16);
-      animation: holoOrbitInner 28s linear infinite reverse;
+      animation: holoOrbitInner 32s linear infinite reverse;
     }
     .holo-orbit-ring.ring-inner {
-      width: 200px;
-      height: 200px;
-      max-width: 50vw;
-      max-height: 50vw;
+      width: 220px;
+      height: 220px;
+      max-width: 54vw;
+      max-height: 54vw;
       border: 1px dashed rgba(56, 189, 248, 0.18);
-      animation: holoOrbitOuter 20s linear infinite;
+      animation: holoOrbitOuter 22s linear infinite;
     }
     @keyframes holoOrbitOuter {
       from { transform: rotate(0deg); }
@@ -2311,38 +2369,46 @@ function renderHtml(
       to { transform: rotate(-360deg); }
     }
 
-    /* Holographic Energy Pathways (Subtle Connection Lines from Core to Nodes) */
+    /* Holographic Energy Pathways (Fluid Connection Lines from Core to Nodes) */
     .holo-energy-pathways {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       pointer-events: none;
-      z-index: 1;
+      z-index: 2;
       overflow: visible;
     }
     .holo-path-line {
-      stroke: rgba(56, 189, 248, 0.22);
-      stroke-width: 1.2;
-      stroke-dasharray: 4 4;
+      stroke-width: 3;
+      stroke-linecap: round;
       animation: holoEnergyStream 2.5s linear infinite;
-      transition: stroke 0.2s, stroke-width 0.2s, filter 0.2s;
+      transition: stroke-width 0.2s, filter 0.2s;
+      opacity: 0.85;
     }
     .holo-path-line.is-highlighted {
-      stroke: #38bdf8;
-      stroke-width: 2;
-      filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.85));
+      stroke-width: 4.5;
+      filter: drop-shadow(0 0 10px #38bdf8);
+      opacity: 1;
+    }
+    .holo-junction-bead {
+      pointer-events: none;
+      animation: holoBeadPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes holoBeadPulse {
+      0%, 100% { transform: scale(1); opacity: 0.75; }
+      50% { transform: scale(1.3); opacity: 1; }
     }
     @keyframes holoEnergyStream {
-      from { stroke-dashoffset: 16; }
+      from { stroke-dashoffset: 24; }
       to { stroke-dashoffset: 0; }
     }
 
     /* Central Command Core Reactor & Concentric Energy Rings */
     .holo-core-wrap {
       position: absolute;
-      width: 106px;
-      height: 106px;
+      width: 136px;
+      height: 136px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -2351,19 +2417,20 @@ function renderHtml(
     }
     .holo-core-spin-ring {
       position: absolute;
-      width: 126px;
-      height: 126px;
+      width: 168px;
+      height: 168px;
       border-radius: 50%;
-      border: 1px dashed rgba(56, 189, 248, 0.38);
+      border: 1px dashed rgba(56, 189, 248, 0.42);
       animation: holoCoreSpin 22s linear infinite;
       pointer-events: none;
     }
     .holo-core-glow-ring {
       position: absolute;
-      width: 144px;
-      height: 144px;
+      width: 194px;
+      height: 194px;
       border-radius: 50%;
-      border: 1px solid rgba(168, 85, 247, 0.22);
+      border: 1px solid rgba(168, 85, 247, 0.28);
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);
       pointer-events: none;
     }
     @keyframes holoCoreSpin {
@@ -2372,20 +2439,20 @@ function renderHtml(
     }
     @keyframes holoCorePulse {
       0%, 100% {
-        box-shadow: 0 0 35px rgba(56, 189, 248, 0.4), 0 0 75px rgba(139, 92, 246, 0.2), inset 0 0 20px rgba(56, 189, 248, 0.3);
+        box-shadow: 0 0 35px rgba(56, 189, 248, 0.65), 0 0 85px rgba(139, 92, 246, 0.45), inset 0 0 25px rgba(56, 189, 248, 0.5), inset 0 -8px 20px rgba(139, 92, 246, 0.6);
       }
       50% {
-        box-shadow: 0 0 52px rgba(56, 189, 248, 0.62), 0 0 95px rgba(139, 92, 246, 0.32), inset 0 0 28px rgba(56, 189, 248, 0.45);
+        box-shadow: 0 0 55px rgba(56, 189, 248, 0.85), 0 0 110px rgba(139, 92, 246, 0.58), inset 0 0 32px rgba(56, 189, 248, 0.65), inset 0 -10px 24px rgba(139, 92, 246, 0.75);
       }
     }
     .holo-center-core {
       position: absolute;
-      width: 106px;
-      height: 106px;
+      width: 136px;
+      height: 136px;
       border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, rgba(56, 189, 248, 0.25) 0%, rgba(139, 92, 246, 0.18) 45%, rgba(10, 16, 32, 0.94) 85%);
-      border: 2px solid rgba(56, 189, 248, 0.75);
-      box-shadow: 0 0 35px rgba(56, 189, 248, 0.4), 0 0 75px rgba(139, 92, 246, 0.2), inset 0 0 20px rgba(56, 189, 248, 0.3);
+      background: radial-gradient(circle at 40% 35%, rgba(255, 255, 255, 0.18) 0%, rgba(56, 189, 248, 0.28) 25%, rgba(99, 102, 241, 0.45) 55%, rgba(15, 23, 42, 0.96) 90%);
+      border: 2px solid rgba(56, 189, 248, 0.85);
+      box-shadow: 0 0 35px rgba(56, 189, 248, 0.65), 0 0 85px rgba(139, 92, 246, 0.45), inset 0 0 25px rgba(56, 189, 248, 0.5), inset 0 -8px 20px rgba(139, 92, 246, 0.6);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -2396,44 +2463,58 @@ function renderHtml(
       transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s, border-color 0.24s;
       outline: none;
       animation: holoCorePulse 3.6s ease-in-out infinite;
+      position: relative;
+      overflow: hidden;
+    }
+    /* 3D Specular highlight crescent on center core */
+    .holo-center-core::before {
+      content: '';
+      position: absolute;
+      top: 8%;
+      left: 20%;
+      width: 52%;
+      height: 30%;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 70%);
+      transform: rotate(-25deg);
+      pointer-events: none;
+      z-index: 3;
     }
     .holo-center-core:hover {
       transform: scale(1.08);
-      box-shadow: 0 0 55px rgba(56, 189, 248, 0.65), 0 0 100px rgba(139, 92, 246, 0.35), inset 0 0 26px rgba(56, 189, 248, 0.5);
+      box-shadow: 0 0 55px rgba(56, 189, 248, 0.85), 0 0 110px rgba(139, 92, 246, 0.55), inset 0 0 32px rgba(56, 189, 248, 0.65);
       border-color: #38bdf8;
     }
     .holo-center-core:active {
-      transform: scale(0.94);
+      transform: scale(0.95);
     }
     .holo-center-core-symbol {
-      font-size: 1.85rem;
+      font-size: 2.85rem;
       font-weight: 900;
-      background: linear-gradient(135deg, #ffffff 10%, #38bdf8 60%, #c084fc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      line-height: 1;
-      filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.85));
+      line-height: 0.95;
+      color: #ffffff;
+      text-shadow: 0 0 16px rgba(255, 255, 255, 0.9), 0 0 32px rgba(168, 85, 247, 0.7);
       letter-spacing: -0.02em;
+      z-index: 2;
     }
     .holo-center-core-sub {
-      font-size: 0.62rem;
-      letter-spacing: 0.16em;
-      color: #94a3b8;
-      font-weight: 800;
-      margin-top: 3px;
-      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 0.92rem;
+      letter-spacing: 0.22em;
+      color: #ffffff;
+      font-weight: 900;
+      margin-top: 2px;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+      z-index: 2;
     }
     .holo-core-status-pulse {
-      font-size: 0.48rem;
-      letter-spacing: 0.18em;
-      color: #38bdf8;
-      font-weight: 800;
-      margin-top: 1px;
-      opacity: 0.85;
-      font-family: ui-monospace, SFMono-Regular, monospace;
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      width: 1px;
+      height: 1px;
     }
 
-    /* Polar Control Nodes */
+    /* Polar Control Nodes Layer */
     .holo-nodes-layer {
       position: absolute;
       inset: 0;
@@ -2441,6 +2522,7 @@ function renderHtml(
       align-items: center;
       justify-content: center;
       pointer-events: none;
+      z-index: 4;
     }
     .holo-node-item {
       position: absolute;
@@ -2448,7 +2530,6 @@ function renderHtml(
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 4px;
       pointer-events: auto;
       cursor: pointer;
       background: none;
@@ -2457,75 +2538,106 @@ function renderHtml(
       outline: none;
       text-decoration: none;
       user-select: none;
-      transform: translate(0, 0) scale(0.4);
+      transform: translate(0, 0) scale(0.3);
       opacity: 0;
-      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s;
     }
     .holo-nav-overlay.is-open .holo-node-item {
       transform: translate(var(--node-x, 0px), var(--node-y, 0px)) scale(1);
       opacity: 1;
     }
-    .holo-node-disc {
-      width: 60px;
-      height: 60px;
+
+    /* 3D Glass Sphere Node Orb */
+    .holo-node-orb {
+      width: 84px;
+      height: 84px;
       border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.94) 100%);
-      border: 1.5px solid var(--node-accent, #38bdf8);
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.22), inset 0 0 12px rgba(255, 255, 255, 0.06);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.16) 0%, rgba(30, 41, 59, 0.7) 45%, rgba(10, 16, 32, 0.95) 90%);
+      border: 2px solid var(--node-accent, #38bdf8);
+      box-shadow: 0 0 24px var(--node-accent-glow, rgba(56, 189, 248, 0.45)), inset 0 0 16px var(--node-accent-glow, rgba(56, 189, 248, 0.35));
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s, border-color 0.24s;
+    }
+    /* Specular highlight crescent reflection */
+    .holo-node-orb::before {
+      content: '';
+      position: absolute;
+      top: 8%;
+      left: 20%;
+      width: 48%;
+      height: 28%;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 70%);
+      transform: rotate(-28deg);
+      pointer-events: none;
+      z-index: 3;
+    }
+    /* Bottom refraction color sheen */
+    .holo-node-orb::after {
+      content: '';
+      position: absolute;
+      bottom: 4%;
+      left: 20%;
+      width: 60%;
+      height: 26%;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, var(--node-accent, #38bdf8) 0%, transparent 75%);
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .holo-node-item:hover .holo-node-orb {
+      transform: scale(1.15);
+      box-shadow: 0 0 40px var(--node-accent, #38bdf8), inset 0 0 22px var(--node-accent, #38bdf8);
+      border-color: #ffffff;
+    }
+    .holo-node-item:focus-visible .holo-node-orb {
+      outline: 2px solid #fff;
+      outline-offset: 3px;
+    }
+    .holo-node-item:active .holo-node-orb {
+      transform: scale(0.92);
+    }
+    .holo-node-disc {
+      display: contents;
+    }
+    .holo-node-icon {
+      display: contents;
+    }
+    .holo-node-label {
+      display: contents;
+    }
+    .holo-orb-icon {
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, background-color 0.2s;
-    }
-    .holo-node-item:hover .holo-node-disc {
-      transform: scale(1.15);
-      box-shadow: 0 0 32px var(--node-accent, #38bdf8), inset 0 0 14px var(--node-accent, #38bdf8);
-      background: radial-gradient(circle at 35% 35%, rgba(51, 65, 85, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
-    }
-    .holo-node-item:focus-visible .holo-node-disc {
-      outline: 2px solid #fff;
-      outline-offset: 2px;
-    }
-    .holo-node-item:active .holo-node-disc {
-      transform: scale(0.92);
-    }
-    .holo-node-item.is-current .holo-node-disc {
-      border-width: 2.5px;
-      box-shadow: 0 0 28px var(--node-accent, #38bdf8), inset 0 0 12px var(--node-accent, #38bdf8);
-    }
-    .holo-node-icon {
-      font-size: 1.45rem;
+      color: #ffffff;
       line-height: 1;
-      display: inline-block;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+      z-index: 2;
+      filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.6));
     }
-    .holo-node-label {
+    .holo-orb-label {
       font-size: 0.64rem;
       font-weight: 700;
-      letter-spacing: 0.12em;
-      color: #94a3b8;
-      text-transform: uppercase;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      backdrop-filter: blur(6px);
+      color: #ffffff;
+      letter-spacing: 0.04em;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+      z-index: 2;
+      text-align: center;
       white-space: nowrap;
-      transition: color 0.18s, border-color 0.18s, text-shadow 0.18s;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
-    .holo-node-item:hover .holo-node-label {
-      color: #fff;
-      border-color: var(--node-accent, #38bdf8);
-      text-shadow: 0 0 8px var(--node-accent, #38bdf8);
     }
     .holo-node-badge {
       position: absolute;
-      top: -3px;
-      right: -3px;
+      top: 6px;
+      right: 6px;
       background: #ef4444;
       color: #fff;
       font-size: 0.62rem;
@@ -2539,51 +2651,56 @@ function renderHtml(
       padding: 0 4px;
       border: 1.5px solid #0f172a;
       box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+      z-index: 4;
     }
 
     /* Mobile Responsive Adaptation */
     @media (max-width: 480px) {
       .holo-stage {
-        width: 340px;
-        height: 340px;
+        width: 360px;
+        height: 360px;
       }
       .holo-center-core {
-        width: 78px;
-        height: 78px;
-      }
-      .holo-core-wrap {
-        width: 78px;
-        height: 78px;
-      }
-      .holo-core-spin-ring {
         width: 96px;
         height: 96px;
       }
-      .holo-core-glow-ring {
-        width: 110px;
-        height: 110px;
-      }
       .holo-center-core-symbol {
-        font-size: 1.35rem;
+        font-size: 2rem;
       }
       .holo-center-core-sub {
-        font-size: 0.54rem;
-        letter-spacing: 0.12em;
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
       }
-      .holo-core-status-pulse {
-        display: none;
+      .holo-core-wrap {
+        width: 96px;
+        height: 96px;
       }
-      .holo-node-disc {
-        width: 46px;
-        height: 46px;
+      .holo-core-spin-ring {
+        width: 120px;
+        height: 120px;
       }
-      .holo-node-icon {
-        font-size: 1.18rem;
+      .holo-core-glow-ring {
+        width: 138px;
+        height: 138px;
       }
-      .holo-node-label {
-        font-size: 0.56rem;
-        letter-spacing: 0.08em;
-        padding: 1px 4px;
+      .holo-node-orb {
+        width: 58px;
+        height: 58px;
+      }
+      .holo-orb-icon svg {
+        width: 18px;
+        height: 18px;
+      }
+      .holo-orb-label {
+        font-size: 0.52rem;
+      }
+      .holo-floor-pedestal {
+        width: 340px;
+        height: 170px;
+      }
+      .holo-orbital-halo-ring {
+        width: 260px;
+        height: 260px;
       }
       .sovra-core-brand-text {
         display: none;
@@ -2841,18 +2958,26 @@ function renderHtml(
     .header-search-bar {
       display: flex;
       align-items: center;
-      background: rgba(255, 255, 255, 0.07);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      border-radius: 20px;
-      padding: 0.45rem 0.85rem;
-      gap: 0.5rem;
+      background: rgba(8, 14, 28, 0.92);
+      border: 1.5px solid #00c8ff;
+      border-radius: 9999px;
+      padding: 0.42rem 1.05rem;
+      gap: 0.65rem;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       min-width: 0;
+      box-shadow: 0 0 14px rgba(0, 200, 255, 0.25), inset 0 0 6px rgba(0, 200, 255, 0.08);
     }
     .header-search-bar:focus-within {
-      background: rgba(17, 24, 39, 0.95);
+      background: rgba(10, 18, 38, 0.98);
       border-color: #38bdf8;
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.5), inset 0 0 8px rgba(56, 189, 248, 0.15);
+    }
+    .header-search-icon-lens {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.6));
     }
     .header-search-input {
       background: none;
@@ -7700,7 +7825,12 @@ function renderHtml(
         <!-- Prominent Wide Friend & Mesh Search Bar -->
         <div class="header-search-wrap">
           <div class="header-search-bar" onclick="document.getElementById('headerFriendSearchInput').focus()">
-            <span style="font-size: 0.95rem; color: #38bdf8;">🔍</span>
+            <span class="header-search-icon-lens" aria-hidden="true">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                <circle cx="10" cy="10" r="6.5" stroke="#38bdf8" stroke-width="2.5" fill="rgba(56, 189, 248, 0.25)"/>
+                <line x1="15" y1="15" x2="21" y2="21" stroke="#c084fc" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </span>
             <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, mesh, tags..." aria-label="Search friends, channels, and tags" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
             <kbd class="search-kbd-shortcut" onclick="openOmniSearch(); event.stopPropagation();" title="Omni-Search (Ctrl+K)" aria-label="Open Omni-Search shortcut">Ctrl K</kbd>
             <button id="headerSearchClearBtn" onclick="clearHeaderSearch(); event.stopPropagation();" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.8rem;" aria-label="Clear search input">✕</button>
@@ -11953,27 +12083,53 @@ function renderHtml(
   </div>
 
   <!-- 🛸 ALIEN HOLOGRAPHIC CENTRAL COMMAND CORE OVERLAY -->
+  <!-- 🛸 ALIEN HOLOGRAPHIC CENTRAL COMMAND CORE OVERLAY -->
   <div id="holographicNavOverlay" class="holo-nav-overlay" role="dialog" aria-modal="true" aria-label="SOVRA Holographic Central Navigation">
     <div class="holo-backdrop" onclick="closeHolographicNav()"></div>
     <div class="holo-stage" id="holoStage">
+      <!-- 3D Perspective Floor Pedestal & Concentric Rings -->
+      <div class="holo-floor-pedestal" aria-hidden="true">
+        <div class="holo-floor-spot"></div>
+        <div class="holo-floor-ring f-outer"></div>
+        <div class="holo-floor-ring f-mid"></div>
+        <div class="holo-floor-ring f-inner"></div>
+      </div>
+
       <!-- Ambient Orbit Rings & Shockwave -->
       <div class="holo-ambient-rings" aria-hidden="true">
         <div class="holo-shockwave"></div>
+        <div class="holo-orbital-halo-ring"></div>
         <div class="holo-orbit-ring ring-outer"></div>
         <div class="holo-orbit-ring ring-mid"></div>
         <div class="holo-orbit-ring ring-inner"></div>
       </div>
 
-      <!-- Holographic Energy Pathways (Subtle Connection Lines from Core to Nodes) -->
-      <svg class="holo-energy-pathways" id="holoEnergySvg" viewBox="-240 -240 480 480" aria-hidden="true">
-        <line id="holo-path-notif" class="holo-path-line" x1="0" y1="0" x2="0" y2="-184" />
-        <line id="holo-path-watch" class="holo-path-line" x1="0" y1="0" x2="130" y2="-130" />
-        <line id="holo-path-chat" class="holo-path-line" x1="0" y1="0" x2="184" y2="0" />
-        <line id="holo-path-create" class="holo-path-line" x1="0" y1="0" x2="130" y2="130" />
-        <line id="holo-path-logout" class="holo-path-line" x1="0" y1="0" x2="0" y2="184" />
-        <line id="holo-path-feed" class="holo-path-line" x1="0" y1="0" x2="-130" y2="130" />
-        <line id="holo-path-profile" class="holo-path-line" x1="0" y1="0" x2="-184" y2="0" />
-        <line id="holo-path-reels" class="holo-path-line" x1="0" y1="0" x2="-130" y2="-130" />
+      <!-- Holographic Energy Pathways (Fluid Connection Lines from Core to Nodes) -->
+      <svg class="holo-energy-pathways" id="holoEnergySvg" viewBox="-280 -280 560 560" aria-hidden="true">
+        <defs>
+          <linearGradient id="grad-holo-home" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0.95"/></linearGradient>
+          <linearGradient id="grad-holo-feed" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/><stop offset="100%" stop-color="#06b6d4" stop-opacity="0.95"/></linearGradient>
+          <linearGradient id="grad-holo-chat" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/><stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.95"/></linearGradient>
+          <linearGradient id="grad-holo-logout" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.85"/><stop offset="100%" stop-color="#f43f5e" stop-opacity="0.95"/></linearGradient>
+          <linearGradient id="grad-holo-notif" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.85"/><stop offset="100%" stop-color="#d946ef" stop-opacity="0.95"/></linearGradient>
+          <linearGradient id="grad-holo-create" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/><stop offset="100%" stop-color="#10b981" stop-opacity="0.95"/></linearGradient>
+          <linearGradient id="grad-holo-profile" x1="0%" y1="0%" x2="-100%" y2="100%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/><stop offset="100%" stop-color="#2563eb" stop-opacity="0.95"/></linearGradient>
+          <linearGradient id="grad-holo-watch" x1="0%" y1="0%" x2="-100%" y2="0%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/><stop offset="100%" stop-color="#f97316" stop-opacity="0.95"/></linearGradient>
+          <linearGradient id="grad-holo-reels" x1="0%" y1="0%" x2="-100%" y2="-100%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/><stop offset="100%" stop-color="#c084fc" stop-opacity="0.95"/></linearGradient>
+        </defs>
+
+        <line id="holo-path-home" class="holo-path-line" stroke="url(#grad-holo-home)" x1="0" y1="0" x2="0" y2="-212" />
+        <line id="holo-path-feed" class="holo-path-line" stroke="url(#grad-holo-feed)" x1="0" y1="0" x2="136" y2="-162" />
+        <line id="holo-path-chat" class="holo-path-line" stroke="url(#grad-holo-chat)" x1="0" y1="0" x2="209" y2="-37" />
+        <line id="holo-path-logout" class="holo-path-line" stroke="url(#grad-holo-logout)" x1="0" y1="0" x2="184" y2="106" />
+        <line id="holo-path-notif" class="holo-path-line" stroke="url(#grad-holo-notif)" x1="0" y1="0" x2="73" y2="199" />
+        <line id="holo-path-create" class="holo-path-line" stroke="url(#grad-holo-create)" x1="0" y1="0" x2="-73" y2="199" />
+        <line id="holo-path-profile" class="holo-path-line" stroke="url(#grad-holo-profile)" x1="0" y1="0" x2="-184" y2="106" />
+        <line id="holo-path-watch" class="holo-path-line" stroke="url(#grad-holo-watch)" x1="0" y1="0" x2="-209" y2="-37" />
+        <line id="holo-path-reels" class="holo-path-line" stroke="url(#grad-holo-reels)" x1="0" y1="0" x2="-136" y2="-162" />
+
+        <!-- Glowing junction bead on Notifications pathway -->
+        <circle id="holo-bead-notif" class="holo-junction-bead" cx="40" cy="110" r="4.5" fill="#ffffff" filter="drop-shadow(0 0 6px #d946ef)" />
       </svg>
 
       <!-- Central Command Core Reactor with Concentric Rings -->
@@ -11984,76 +12140,129 @@ function renderHtml(
 
       <button type="button" class="holo-center-core" id="holoCenterCoreBtn" onclick="toggleHolographicNav()" aria-label="Close SOVRA holographic command center" title="SOVRA Command Core (Tap to Close)">
         <span class="holo-center-core-symbol">S</span>
-        <span class="holo-center-core-sub">SOVRA OS</span>
-        <span class="holo-core-status-pulse">CORE ACTIVE</span>
+        <span class="holo-center-core-sub">SOVRA</span>
+        <span class="holo-core-status-pulse">SOVRA OS CORE ACTIVE</span>
       </button>
 
-      <!-- Polar Radial Command Nodes (8 Primary Actions) -->
+      <!-- Polar Radial Command Nodes (9 3D Glass Orbs) -->
       <div class="holo-nodes-layer" id="holoNodesLayer">
-        <!-- 01: NOTIFICATIONS (Top) -->
-        <button type="button" class="holo-node-item" id="holo-node-notif" onclick="executeHoloAction('notifications')" aria-label="Notifications" title="Notifications">
-          <div class="holo-node-disc">
-            <span class="holo-node-icon">🔔</span>
-            <span class="holo-node-badge" id="holoBadgeNotif" style="display: none;">0</span>
+        <!-- 01: HOME (Top, 0°) -->
+        <button type="button" class="holo-node-item" id="holo-node-home" onclick="executeHoloAction('home')" aria-label="Home (HOME)" title="Home">
+          <div class="holo-node-orb">
+            <span class="holo-node-disc">
+              <span class="holo-orb-icon">
+                <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              </span>
+              <span class="holo-orb-label">Home</span>
+              <span class="holo-node-label" style="display:none;">HOME</span>
+            </span>
           </div>
-          <span class="holo-node-label">NOTIFICATIONS</span>
         </button>
 
-        <!-- 02: WATCH (Top-Right) -->
-        <button type="button" class="holo-node-item" id="holo-node-watch" onclick="executeHoloAction('watch')" aria-label="Watch Videos" title="Watch Videos">
-          <div class="holo-node-disc">
-            <span class="holo-node-icon">📺</span>
+        <!-- 02: FEED (Top-Right, 40°) -->
+        <button type="button" class="holo-node-item" id="holo-node-feed" onclick="executeHoloAction('feed')" aria-label="Feed (FEED)" title="Feed">
+          <div class="holo-node-orb">
+            <span class="holo-node-disc">
+              <span class="holo-orb-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg>
+              </span>
+              <span class="holo-orb-label">Feed</span>
+              <span class="holo-node-label" style="display:none;">FEED</span>
+            </span>
           </div>
-          <span class="holo-node-label">WATCH</span>
         </button>
 
-        <!-- 03: CHAT (Right) -->
-        <button type="button" class="holo-node-item" id="holo-node-chat" onclick="executeHoloAction('chat')" aria-label="Encrypted Chats" title="Encrypted Chats">
-          <div class="holo-node-disc">
-            <span class="holo-node-icon">💬</span>
-            <span class="holo-node-badge" id="holoBadgeChat" style="display: none;">0</span>
+        <!-- 03: CHAT (Right, 80°) -->
+        <button type="button" class="holo-node-item" id="holo-node-chat" onclick="executeHoloAction('chat')" aria-label="Chat (CHAT)" title="Encrypted Chats">
+          <div class="holo-node-orb">
+            <span class="holo-node-disc">
+              <span class="holo-orb-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.48 3 2 6.94 2 11.8c0 2.76 1.45 5.23 3.73 6.83-.16.9-.58 2.3-1.63 3.37 0 0 2.2-.23 4.14-1.57.57.12 1.16.17 1.76.17 5.52 0 10-3.94 10-8.8S17.52 3 12 3zm-4 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm4 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm4 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
+              </span>
+              <span class="holo-orb-label">Chat</span>
+              <span class="holo-node-badge" id="holoBadgeChat" style="display: none;">0</span>
+              <span class="holo-node-label" style="display:none;">CHAT</span>
+            </span>
           </div>
-          <span class="holo-node-label">CHAT</span>
         </button>
 
-        <!-- 04: CREATE POST (Bottom-Right) -->
-        <button type="button" class="holo-node-item" id="holo-node-create" onclick="executeHoloAction('create')" aria-label="Create Post or Story" title="Create Post or Story">
-          <div class="holo-node-disc">
-            <span class="holo-node-icon">✍️</span>
+        <!-- 04: LOGOUT (Bottom-Right, 120°) -->
+        <button type="button" class="holo-node-item" id="holo-node-logout" onclick="executeHoloAction('logout')" aria-label="Logout (LOGOUT)" title="Logout Sovereign Session">
+          <div class="holo-node-orb">
+            <span class="holo-node-disc">
+              <span class="holo-orb-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              </span>
+              <span class="holo-orb-label">Logout</span>
+              <span class="holo-node-label" style="display:none;">LOGOUT</span>
+            </span>
           </div>
-          <span class="holo-node-label">CREATE POST</span>
         </button>
 
-        <!-- 05: LOGOUT (Bottom) -->
-        <button type="button" class="holo-node-item" id="holo-node-logout" onclick="executeHoloAction('logout')" aria-label="Logout Sovereign Session" title="Logout Sovereign Session">
-          <div class="holo-node-disc">
-            <span class="holo-node-icon">⏻</span>
+        <!-- 05: NOTIFICATIONS (Bottom-Center-Right, 160°) -->
+        <button type="button" class="holo-node-item" id="holo-node-notif" onclick="executeHoloAction('notifications')" aria-label="Notifications (NOTIFICATIONS)" title="Notifications">
+          <div class="holo-node-orb">
+            <span class="holo-node-disc">
+              <span class="holo-orb-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+              </span>
+              <span class="holo-orb-label">Notifications</span>
+              <span class="holo-node-badge" id="holoBadgeNotif" style="display: none;">0</span>
+              <span class="holo-node-label" style="display:none;">NOTIFICATIONS</span>
+            </span>
           </div>
-          <span class="holo-node-label">LOGOUT</span>
         </button>
 
-        <!-- 06: FEED (Bottom-Left) -->
-        <button type="button" class="holo-node-item" id="holo-node-feed" onclick="executeHoloAction('feed')" aria-label="Decentralized Feed" title="Decentralized Feed">
-          <div class="holo-node-disc">
-            <span class="holo-node-icon">📷</span>
+        <!-- 06: POST / CREATE POST (Bottom-Center-Left, 200°) -->
+        <button type="button" class="holo-node-item" id="holo-node-create" onclick="executeHoloAction('create')" aria-label="Post (CREATE POST)" title="Create Post or Story">
+          <div class="holo-node-orb">
+            <span class="holo-node-disc">
+              <span class="holo-orb-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              </span>
+              <span class="holo-orb-label">Post</span>
+              <span class="holo-node-label" style="display:none;">CREATE POST</span>
+            </span>
           </div>
-          <span class="holo-node-label">FEED</span>
         </button>
 
-        <!-- 07: PROFILE (Left) -->
-        <button type="button" class="holo-node-item" id="holo-node-profile" onclick="executeHoloAction('profile')" aria-label="Sovereign Profile" title="Sovereign Profile">
-          <div class="holo-node-disc">
-            <span class="holo-node-icon">👤</span>
+        <!-- 07: PROFILE (Bottom-Left, 240°) -->
+        <button type="button" class="holo-node-item" id="holo-node-profile" onclick="executeHoloAction('profile')" aria-label="Profile (PROFILE)" title="Sovereign Profile">
+          <div class="holo-node-orb">
+            <span class="holo-node-disc">
+              <span class="holo-orb-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+              </span>
+              <span class="holo-orb-label">Profile</span>
+              <span class="holo-node-label" style="display:none;">PROFILE</span>
+            </span>
           </div>
-          <span class="holo-node-label">PROFILE</span>
         </button>
 
-        <!-- 08: REELS (Top-Left) -->
-        <button type="button" class="holo-node-item" id="holo-node-reels" onclick="executeHoloAction('reels')" aria-label="Reels Video Feed" title="Reels Video Feed">
-          <div class="holo-node-disc">
-            <span class="holo-node-icon">🎬</span>
+        <!-- 08: WATCH (Left, 280°) -->
+        <button type="button" class="holo-node-item" id="holo-node-watch" onclick="executeHoloAction('watch')" aria-label="Watch (WATCH)" title="Watch Videos">
+          <div class="holo-node-orb">
+            <span class="holo-node-disc">
+              <span class="holo-orb-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg>
+              </span>
+              <span class="holo-orb-label">Watch</span>
+              <span class="holo-node-label" style="display:none;">WATCH</span>
+            </span>
           </div>
-          <span class="holo-node-label">REELS</span>
+        </button>
+
+        <!-- 09: REELS (Top-Left, 320°) -->
+        <button type="button" class="holo-node-item" id="holo-node-reels" onclick="executeHoloAction('reels')" aria-label="Reels (REELS)" title="Reels Video Feed">
+          <div class="holo-node-orb">
+            <span class="holo-node-disc">
+              <span class="holo-orb-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              </span>
+              <span class="holo-orb-label">Reels</span>
+              <span class="holo-node-label" style="display:none;">REELS</span>
+            </span>
+          </div>
         </button>
       </div>
     </div>
@@ -14360,24 +14569,25 @@ function renderHtml(
     }
 
     const HOLOGRAPHIC_CONFIG = [
-      { id: 'holo-node-notif',  pathId: 'holo-path-notif',  action: 'notifications', angle: 0,   accent: '#38bdf8' },
-      { id: 'holo-node-watch',  pathId: 'holo-path-watch',  action: 'watch',         angle: 45,  accent: '#f43f5e' },
-      { id: 'holo-node-chat',   pathId: 'holo-path-chat',   action: 'chat',          angle: 90,  accent: '#38bdf8' },
-      { id: 'holo-node-create', pathId: 'holo-path-create', action: 'create',        angle: 135, accent: '#a855f7' },
-      { id: 'holo-node-logout', pathId: 'holo-path-logout', action: 'logout',        angle: 180, accent: '#ef4444' },
-      { id: 'holo-node-feed',   pathId: 'holo-path-feed',   action: 'feed',          angle: 225, accent: '#38bdf8' },
-      { id: 'holo-node-profile',pathId: 'holo-path-profile',action: 'profile',       angle: 270, accent: '#6366f1' },
-      { id: 'holo-node-reels',  pathId: 'holo-path-reels',  action: 'reels',         angle: 315, accent: '#c084fc' },
+      { id: 'holo-node-home',   pathId: 'holo-path-home',   action: 'home',          angle: 0,   accent: '#3b82f6', glow: 'rgba(59, 130, 246, 0.5)' },
+      { id: 'holo-node-feed',   pathId: 'holo-path-feed',   action: 'feed',          angle: 40,  accent: '#06b6d4', glow: 'rgba(6, 182, 212, 0.5)' },
+      { id: 'holo-node-chat',   pathId: 'holo-path-chat',   action: 'chat',          angle: 80,  accent: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.5)' },
+      { id: 'holo-node-logout', pathId: 'holo-path-logout', action: 'logout',        angle: 120, accent: '#f43f5e', glow: 'rgba(244, 63, 94, 0.5)' },
+      { id: 'holo-node-notif',  pathId: 'holo-path-notif',  action: 'notifications', angle: 160, accent: '#d946ef', glow: 'rgba(217, 70, 239, 0.5)' },
+      { id: 'holo-node-create', pathId: 'holo-path-create', action: 'create',        angle: 200, accent: '#10b981', glow: 'rgba(16, 185, 129, 0.5)' },
+      { id: 'holo-node-profile',pathId: 'holo-path-profile',action: 'profile',       angle: 240, accent: '#2563eb', glow: 'rgba(37, 99, 235, 0.5)' },
+      { id: 'holo-node-watch',  pathId: 'holo-path-watch',  action: 'watch',         angle: 280, accent: '#f97316', glow: 'rgba(249, 115, 22, 0.5)' },
+      { id: 'holo-node-reels',  pathId: 'holo-path-reels',  action: 'reels',         angle: 320, accent: '#c084fc', glow: 'rgba(192, 132, 252, 0.5)' },
     ];
 
     function calculateHolographicPositions() {
       const isMobile = window.innerWidth <= 480;
       const isTablet = window.innerWidth <= 1024 && window.innerWidth > 480;
-      const radius = isMobile ? 120 : (isTablet ? 154 : 184);
+      const radius = isMobile ? 130 : (isTablet ? 172 : 212);
 
       const svg = document.getElementById('holoEnergySvg');
       if (svg) {
-        const halfSpan = isMobile ? 170 : 240;
+        const halfSpan = isMobile ? 190 : 280;
         svg.setAttribute('viewBox', '-' + halfSpan + ' -' + halfSpan + ' ' + (halfSpan * 2) + ' ' + (halfSpan * 2));
       }
 
@@ -14391,6 +14601,7 @@ function renderHtml(
           el.style.setProperty('--node-x', x + 'px');
           el.style.setProperty('--node-y', y + 'px');
           el.style.setProperty('--node-accent', item.accent);
+          el.style.setProperty('--node-accent-glow', item.glow);
 
           if (!el.dataset.pathBound) {
             el.dataset.pathBound = 'true';
@@ -14409,6 +14620,17 @@ function renderHtml(
         if (pathEl) {
           pathEl.setAttribute('x2', x);
           pathEl.setAttribute('y2', y);
+        }
+      }
+
+      const bead = document.getElementById('holoBeadNotif');
+      if (bead) {
+        const notifItem = HOLOGRAPHIC_CONFIG.find(function(c) { return c.action === 'notifications'; });
+        if (notifItem) {
+          const nRad = (notifItem.angle * Math.PI) / 180;
+          const beadDist = radius * 0.55;
+          bead.setAttribute('cx', Math.round(beadDist * Math.sin(nRad)));
+          bead.setAttribute('cy', Math.round(-beadDist * Math.cos(nRad)));
         }
       }
     }
@@ -14497,6 +14719,10 @@ function renderHtml(
       closeHolographicNav();
       setTimeout(function() {
         switch (actionKey) {
+          case 'home':
+            switchTab('feed');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            break;
           case 'feed':
             switchTab('feed');
             break;
