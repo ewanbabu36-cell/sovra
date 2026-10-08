@@ -3329,6 +3329,36 @@ function renderHtml(
       .e2ee-shield-badge {
         display: none !important;
       }
+      .chat-header-actions {
+        gap: 0.25rem !important;
+        flex-shrink: 0 !important;
+      }
+      .chat-action-btn {
+        width: 34px !important;
+        height: 34px !important;
+        flex-shrink: 0 !important;
+      }
+      .disappearing-timer-pill span#headerTimerText {
+        display: none !important;
+      }
+      .disappearing-timer-pill {
+        padding: 0.25rem 0.4rem !important;
+      }
+      #headerVideoCallBtn, #headerAudioCallBtn {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        flex-shrink: 0 !important;
+      }
+      .chat-input-bar {
+        padding: 0.45rem 0.55rem !important;
+        gap: 0.35rem !important;
+      }
+      .whatsapp-container.show-chat ~ footer,
+      .app-center-stage:has(.whatsapp-container.show-chat) > footer,
+      .app-center-stage:has(#chat-view:not([style*="display: none"])) > footer {
+        display: none !important;
+      }
       .reels-stage {
         gap: 0;
         width: 100%;
@@ -4534,24 +4564,37 @@ function renderHtml(
       min-width: 0;
     }
     .chat-header {
-      padding: 0.65rem 1rem;
+      padding: 0.6rem 0.85rem;
       background: #202c33;
       border-bottom: 1px solid #2a3942;
       display: flex;
       justify-content: space-between;
       align-items: center;
       z-index: 10;
+      gap: 0.5rem;
+      min-width: 0;
     }
     .chat-header-user {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.65rem;
       cursor: pointer;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .chat-header-user-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+      flex: 1;
     }
     .chat-header-actions {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.35rem;
+      flex-shrink: 0;
     }
     .chat-action-btn {
       background: transparent;
@@ -4565,6 +4608,7 @@ function renderHtml(
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
       transition: background 0.15s, color 0.15s;
     }
     .chat-action-btn:hover {
@@ -4941,12 +4985,17 @@ function renderHtml(
 
     /* Bottom Chat Input Bar & Recording Overlay */
     .chat-input-bar {
-      padding: 0.65rem 1rem;
+      padding: 0.55rem 0.85rem;
       background: #202c33;
       display: flex;
-      align-items: center;
-      gap: 0.65rem;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 0.45rem;
       position: relative;
+      flex-shrink: 0;
+      width: 100%;
+      box-sizing: border-box;
+      z-index: 10;
     }
     .chat-text-input {
       flex: 1;
@@ -9055,17 +9104,17 @@ function renderHtml(
           <div class="chat-header">
             <button class="mobile-chat-back-btn" onclick="closeMobileChat()" title="Back to chats list">←</button>
             <div class="chat-header-user" onclick="openSafetyNumbersModal()" title="View Safety Numbers & Encryption Details">
-              <div class="contact-avatar" style="background: #0284c7; display: flex; align-items: center; justify-content: center;" id="activePeerAvatar">
+              <div class="contact-avatar" style="background: #0284c7; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" id="activePeerAvatar">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 20V4"/></svg>
               </div>
-              <div>
-                <div style="font-weight: 600; color: #e9edef; display: flex; align-items: center; gap: 4px;">
-                  <span id="activePeerName">#local-mesh</span>
-                  <span id="activePeerVerifiedBadge" style="display: none; color: #22c55e; font-size: 0.85rem;" title="Safety Numbers Verified">
+              <div class="chat-header-user-info">
+                <div style="font-weight: 600; color: #e9edef; display: flex; align-items: center; gap: 4px; min-width: 0;">
+                  <span id="activePeerName" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">#local-mesh</span>
+                  <span id="activePeerVerifiedBadge" style="display: none; color: #22c55e; font-size: 0.85rem; flex-shrink: 0;" title="Safety Numbers Verified">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                   </span>
                 </div>
-                <div style="font-size: 0.72rem; color: #8696a0;" id="activePeerStatus">● Zero-Internet Local Mesh Swarm &bull; 50m Radius Broadcast</div>
+                <div style="font-size: 0.72rem; color: #8696a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="activePeerStatus">● Zero-Internet Local Mesh Swarm &bull; 50m Radius Broadcast</div>
               </div>
             </div>
             
@@ -9073,18 +9122,20 @@ function renderHtml(
               <!-- BitChat Multi-Hop Routing Indicator -->
               <span id="bitchatHeaderRoute" class="bitchat-hop-badge" style="display: none;">Direct BLE Link (1 Hop)</span>
 
+              <!-- Video Call (Priority 1) -->
+              <button class="chat-action-btn" id="headerVideoCallBtn" onclick="startE2eeCall('video')" title="Encrypted Video Call (Noise_XX QUIC)" aria-label="Video Call">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="12" x="2" y="6" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
+              </button>
+
+              <!-- Audio Call (Priority 2) -->
+              <button class="chat-action-btn" id="headerAudioCallBtn" onclick="startE2eeCall('audio')" title="Encrypted Voice Call (Noise_XX QUIC)" aria-label="Audio Call">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </button>
+
               <!-- Disappearing messages timer toggle -->
               <button class="disappearing-timer-pill" id="headerDisappearingBtn" onclick="openDisappearingModal()" title="Configure Disappearing Messages Timer" style="display: inline-flex; align-items: center; gap: 4px;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span id="headerTimerText">Off</span>
-              </button>
-              
-              <!-- E2EE Audio / Video Call -->
-              <button class="chat-action-btn" onclick="startE2eeCall('audio')" title="Encrypted Voice Call (Noise_XX QUIC)" aria-label="Audio Call">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-              </button>
-              <button class="chat-action-btn" onclick="startE2eeCall('video')" title="Encrypted Video Call (Noise_XX QUIC)" aria-label="Video Call">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="12" x="2" y="6" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
               </button>
               
               <!-- E2EE Shield badge -->
@@ -9105,29 +9156,34 @@ function renderHtml(
           <!-- Bottom Input Bar -->
           <div class="chat-input-bar">
             <!-- Pending Attachment Preview Tray -->
-            <div id="chatAttachmentPreviewTray" style="display: none; width: 100%; margin-bottom: 0.5rem; padding: 0.45rem 0.65rem; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; backdrop-filter: blur(8px); align-items: center; justify-content: space-between; gap: 0.5rem;">
-              <div id="chatAttachmentPreviewContent" style="display: flex; align-items: center; gap: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+            <div id="chatAttachmentPreviewTray" style="display: none; width: 100%; box-sizing: border-box; margin-bottom: 0.35rem; padding: 0.45rem 0.65rem; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; backdrop-filter: blur(8px); align-items: center; justify-content: space-between; gap: 0.5rem;">
+              <div id="chatAttachmentPreviewContent" style="display: flex; align-items: center; gap: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">
                 <!-- Thumbnail or file icon + name + size -->
               </div>
-              <button class="chat-btn-round" style="width: 26px; height: 26px; min-width: 26px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-size: 0.75rem; cursor: pointer;" onclick="clearPendingChatAttachment()" title="Remove file">✕</button>
+              <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                <button class="chat-btn-round" id="chatAttachmentSendBtn" style="width: 34px; height: 34px; min-width: 34px; background: #00a884; color: #fff; border-radius: 50%; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; border: none; box-shadow: 0 2px 8px rgba(0, 168, 132, 0.4);" onclick="sendChatMessage()" title="Send Attachment Now" aria-label="Send File">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                </button>
+                <button class="chat-btn-round" style="width: 28px; height: 28px; min-width: 28px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; border-radius: 50%; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" onclick="clearPendingChatAttachment()" title="Remove file">✕</button>
+              </div>
             </div>
 
             <!-- Hidden File Input -->
             <input type="file" id="chatFileInput" style="display: none;" onchange="handleChatFileSelected(this.files)" accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.json,.csv,.tar,.gz" />
 
             <!-- Standard view -->
-            <div id="standardInputRow" style="display: flex; align-items: center; gap: 0.65rem; width: 100%;">
+            <div id="standardInputRow" style="display: flex; align-items: center; gap: 0.5rem; width: 100%; box-sizing: border-box;">
               <button class="chat-btn-round" title="Send Reaction" onclick="insertEmojiToInput('👍')" aria-label="Reaction">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
               </button>
               <button class="chat-btn-round" id="chatAttachBtn" title="Send File or Image Attachment" onclick="triggerChatFileSelect()" aria-label="Attach File">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               </button>
-              <input type="text" class="chat-text-input" id="chatInputText" placeholder="Type an encrypted message..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+              <input type="text" class="chat-text-input" id="chatInputText" placeholder="Type an encrypted message..." onkeydown="if(event.key==='Enter') sendChatMessage()" style="flex: 1; min-width: 0;">
               <button class="chat-btn-round" id="micBtn" title="Hold/Click to Record Voice Note" onclick="toggleVoiceRecord()" aria-label="Record Voice">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
               </button>
-              <button class="chat-btn-round chat-btn-send" title="Send Message" onclick="sendChatMessage()" aria-label="Send">
+              <button class="chat-btn-round chat-btn-send" id="chatMainSendBtn" title="Send Message" onclick="sendChatMessage()" aria-label="Send">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
             </div>
@@ -10690,7 +10746,7 @@ function renderHtml(
     </main>
   </div>
 
-  <footer style="text-align: center; padding: 1.5rem 1.5rem 5rem 1.5rem; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--surface-border);">
+  <footer id="appStageFooter" style="text-align: center; padding: 1.5rem 1.5rem 5rem 1.5rem; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--surface-border);">
     Sovra Protocol & Monorepo Foundation &bull; Production P2P Stack &bull; Localhost Dev Runner
   </footer>
 </div> <!-- Close Column 2: .app-center-stage -->
@@ -15046,6 +15102,11 @@ function renderHtml(
           centerStage.style.maxWidth = tab === 'me' ? '920px' : '820px';
           centerStage.style.width = '';
         }
+      }
+
+      const stageFooter = document.getElementById('appStageFooter');
+      if (stageFooter) {
+        stageFooter.style.display = (tab === 'chat' || tab === 'reels') ? 'none' : 'block';
       }
 
       if (tab === 'chat') {
@@ -19821,6 +19882,10 @@ function renderHtml(
       if (tray) tray.style.display = 'none';
       const fileInput = document.getElementById('chatFileInput');
       if (fileInput) fileInput.value = '';
+      const input = document.getElementById('chatInputText');
+      if (input && input.placeholder.includes('caption')) {
+        input.placeholder = 'Type an encrypted message...';
+      }
     }
 
     function renderPendingChatAttachmentPreview() {
@@ -19831,22 +19896,25 @@ function renderHtml(
       const att = _pendingChatAttachment;
       let iconOrThumb = '';
       if (att.type.startsWith('image/')) {
-        iconOrThumb = '<img src="' + att.dataUrl + '" style="width: 32px; height: 32px; border-radius: 6px; object-fit: cover;" />';
+        iconOrThumb = '<img src="' + att.dataUrl + '" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" />';
       } else if (att.type.startsWith('video/')) {
-        iconOrThumb = '<div style="font-size: 1.2rem;">🎬</div>';
+        iconOrThumb = '<div style="font-size: 1.3rem; flex-shrink: 0;">🎬</div>';
       } else if (att.type.startsWith('audio/')) {
-        iconOrThumb = '<div style="font-size: 1.2rem;">🎵</div>';
+        iconOrThumb = '<div style="font-size: 1.3rem; flex-shrink: 0;">🎵</div>';
       } else if (att.type.includes('pdf')) {
-        iconOrThumb = '<div style="font-size: 1.2rem;">📕</div>';
+        iconOrThumb = '<div style="font-size: 1.3rem; flex-shrink: 0;">📕</div>';
       } else {
-        iconOrThumb = '<div style="font-size: 1.2rem;">📄</div>';
+        iconOrThumb = '<div style="font-size: 1.3rem; flex-shrink: 0;">📄</div>';
       }
 
       content.innerHTML = iconOrThumb +
-        '<div style="flex: 1; min-width: 0;">' +
-          '<div style="font-size: 0.78rem; font-weight: 600; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + att.name + '</div>' +
+        '<div style="flex: 1; min-width: 0; overflow: hidden;">' +
+          '<div style="font-size: 0.8rem; font-weight: 600; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + att.name + '</div>' +
           '<div style="font-size: 0.68rem; color: #38bdf8;">' + formatBytes(att.size) + ' • Ready to send</div>' +
         '</div>';
+
+      const input = document.getElementById('chatInputText');
+      if (input) input.placeholder = 'Add a caption... (optional)';
 
       tray.style.display = 'flex';
     }
