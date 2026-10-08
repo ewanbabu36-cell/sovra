@@ -117,4 +117,30 @@ describe('Sovra Holographic Central Navigation & Clean Production UI Gate', () =
     expect(html).toContain('function initRealtimeLiveConnection()');
     expect(html).toContain('/api/realtime/stream');
   });
+
+  it('renders holographic energy pathways, expanding shockwave, concentric rings, and refined backdrop', async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const html = await res.text();
+
+    // 1. Connection lines SVG and 8 pathways from core
+    expect(html).toContain('id="holoEnergySvg"');
+    expect(html).toContain('class="holo-energy-pathways"');
+    expect(html).toContain('id="holo-path-notif"');
+    expect(html).toContain('id="holo-path-watch"');
+    expect(html).toContain('id="holo-path-chat"');
+    expect(html).toContain('id="holo-path-create"');
+    expect(html).toContain('id="holo-path-logout"');
+    expect(html).toContain('id="holo-path-feed"');
+    expect(html).toContain('id="holo-path-profile"');
+    expect(html).toContain('id="holo-path-reels"');
+
+    // 2. Concentric energy rings and expanding shockwave
+    expect(html).toContain('class="holo-shockwave"');
+    expect(html).toContain('class="holo-core-spin-ring"');
+    expect(html).toContain('class="holo-core-glow-ring"');
+    expect(html).toContain('CORE ACTIVE');
+
+    // 3. Subtle non-opaque backdrop with light blur
+    expect(html).toContain('backdrop-filter: blur(5px);');
+  });
 });

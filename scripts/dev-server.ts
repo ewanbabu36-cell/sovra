@@ -2217,19 +2217,19 @@ function renderHtml(
     .holo-backdrop {
       position: absolute;
       inset: 0;
-      background: rgba(3, 7, 18, 0.78);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.48) 0%, rgba(3, 7, 18, 0.65) 100%);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
       opacity: 0;
-      transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .holo-nav-overlay.is-open .holo-backdrop {
       opacity: 1;
     }
     .holo-stage {
       position: relative;
-      width: 440px;
-      height: 440px;
+      width: 480px;
+      height: 480px;
       max-width: 96vw;
       max-height: 96vh;
       display: flex;
@@ -2246,26 +2246,61 @@ function renderHtml(
       justify-content: center;
       pointer-events: none;
     }
+    .holo-shockwave {
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(56, 189, 248, 0.7);
+      box-shadow: 0 0 35px rgba(56, 189, 248, 0.5), inset 0 0 20px rgba(168, 85, 247, 0.3);
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    .holo-nav-overlay.is-open .holo-shockwave {
+      animation: holoShockwave 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes holoShockwave {
+      0% {
+        opacity: 0.85;
+        transform: scale(0.4);
+      }
+      50% {
+        opacity: 0.5;
+      }
+      100% {
+        opacity: 0;
+        transform: scale(3.2);
+      }
+    }
     .holo-orbit-ring {
       position: absolute;
       border-radius: 50%;
       pointer-events: none;
     }
     .holo-orbit-ring.ring-outer {
-      width: 380px;
-      height: 380px;
-      max-width: 88vw;
-      max-height: 88vw;
-      border: 1px dashed rgba(56, 189, 248, 0.25);
-      animation: holoOrbitOuter 36s linear infinite;
+      width: 420px;
+      height: 420px;
+      max-width: 90vw;
+      max-height: 90vw;
+      border: 1px dashed rgba(56, 189, 248, 0.22);
+      animation: holoOrbitOuter 42s linear infinite;
+    }
+    .holo-orbit-ring.ring-mid {
+      width: 300px;
+      height: 300px;
+      max-width: 72vw;
+      max-height: 72vw;
+      border: 1px solid rgba(168, 85, 247, 0.16);
+      animation: holoOrbitInner 28s linear infinite reverse;
     }
     .holo-orbit-ring.ring-inner {
-      width: 250px;
-      height: 250px;
-      max-width: 62vw;
-      max-height: 62vw;
-      border: 1px solid rgba(192, 132, 252, 0.18);
-      animation: holoOrbitInner 24s linear infinite reverse;
+      width: 200px;
+      height: 200px;
+      max-width: 50vw;
+      max-height: 50vw;
+      border: 1px dashed rgba(56, 189, 248, 0.18);
+      animation: holoOrbitOuter 20s linear infinite;
     }
     @keyframes holoOrbitOuter {
       from { transform: rotate(0deg); }
@@ -2276,15 +2311,81 @@ function renderHtml(
       to { transform: rotate(-360deg); }
     }
 
-    /* Central Command Core Reactor */
+    /* Holographic Energy Pathways (Subtle Connection Lines from Core to Nodes) */
+    .holo-energy-pathways {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+      overflow: visible;
+    }
+    .holo-path-line {
+      stroke: rgba(56, 189, 248, 0.22);
+      stroke-width: 1.2;
+      stroke-dasharray: 4 4;
+      animation: holoEnergyStream 2.5s linear infinite;
+      transition: stroke 0.2s, stroke-width 0.2s, filter 0.2s;
+    }
+    .holo-path-line.is-highlighted {
+      stroke: #38bdf8;
+      stroke-width: 2;
+      filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.85));
+    }
+    @keyframes holoEnergyStream {
+      from { stroke-dashoffset: 16; }
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* Central Command Core Reactor & Concentric Energy Rings */
+    .holo-core-wrap {
+      position: absolute;
+      width: 106px;
+      height: 106px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .holo-core-spin-ring {
+      position: absolute;
+      width: 126px;
+      height: 126px;
+      border-radius: 50%;
+      border: 1px dashed rgba(56, 189, 248, 0.38);
+      animation: holoCoreSpin 22s linear infinite;
+      pointer-events: none;
+    }
+    .holo-core-glow-ring {
+      position: absolute;
+      width: 144px;
+      height: 144px;
+      border-radius: 50%;
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      pointer-events: none;
+    }
+    @keyframes holoCoreSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes holoCorePulse {
+      0%, 100% {
+        box-shadow: 0 0 35px rgba(56, 189, 248, 0.4), 0 0 75px rgba(139, 92, 246, 0.2), inset 0 0 20px rgba(56, 189, 248, 0.3);
+      }
+      50% {
+        box-shadow: 0 0 52px rgba(56, 189, 248, 0.62), 0 0 95px rgba(139, 92, 246, 0.32), inset 0 0 28px rgba(56, 189, 248, 0.45);
+      }
+    }
     .holo-center-core {
       position: absolute;
-      width: 84px;
-      height: 84px;
+      width: 106px;
+      height: 106px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, rgba(15, 23, 42, 0.95) 75%);
-      border: 2px solid rgba(56, 189, 248, 0.7);
-      box-shadow: 0 0 35px rgba(56, 189, 248, 0.45), inset 0 0 18px rgba(56, 189, 248, 0.3);
+      background: radial-gradient(circle at 35% 35%, rgba(56, 189, 248, 0.25) 0%, rgba(139, 92, 246, 0.18) 45%, rgba(10, 16, 32, 0.94) 85%);
+      border: 2px solid rgba(56, 189, 248, 0.75);
+      box-shadow: 0 0 35px rgba(56, 189, 248, 0.4), 0 0 75px rgba(139, 92, 246, 0.2), inset 0 0 20px rgba(56, 189, 248, 0.3);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -2292,32 +2393,44 @@ function renderHtml(
       cursor: pointer;
       pointer-events: auto;
       z-index: 10;
-      transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s;
+      transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s, border-color 0.24s;
       outline: none;
+      animation: holoCorePulse 3.6s ease-in-out infinite;
     }
     .holo-center-core:hover {
       transform: scale(1.08);
-      box-shadow: 0 0 50px rgba(56, 189, 248, 0.65), inset 0 0 25px rgba(56, 189, 248, 0.45);
+      box-shadow: 0 0 55px rgba(56, 189, 248, 0.65), 0 0 100px rgba(139, 92, 246, 0.35), inset 0 0 26px rgba(56, 189, 248, 0.5);
       border-color: #38bdf8;
     }
     .holo-center-core:active {
       transform: scale(0.94);
     }
     .holo-center-core-symbol {
-      font-size: 1.5rem;
+      font-size: 1.85rem;
       font-weight: 900;
-      background: linear-gradient(135deg, #ffffff, #38bdf8);
+      background: linear-gradient(135deg, #ffffff 10%, #38bdf8 60%, #c084fc 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       line-height: 1;
-      text-shadow: 0 0 12px rgba(56, 189, 248, 0.85);
+      filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.85));
+      letter-spacing: -0.02em;
     }
     .holo-center-core-sub {
-      font-size: 0.58rem;
-      letter-spacing: 0.15em;
+      font-size: 0.62rem;
+      letter-spacing: 0.16em;
       color: #94a3b8;
-      font-weight: 700;
-      margin-top: 2px;
+      font-weight: 800;
+      margin-top: 3px;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+    .holo-core-status-pulse {
+      font-size: 0.48rem;
+      letter-spacing: 0.18em;
+      color: #38bdf8;
+      font-weight: 800;
+      margin-top: 1px;
+      opacity: 0.85;
+      font-family: ui-monospace, SFMono-Regular, monospace;
     }
 
     /* Polar Control Nodes */
@@ -2353,12 +2466,12 @@ function renderHtml(
       opacity: 1;
     }
     .holo-node-disc {
-      width: 54px;
-      height: 54px;
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
-      background: rgba(15, 23, 42, 0.88);
+      background: radial-gradient(circle at 35% 35%, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.94) 100%);
       border: 1.5px solid var(--node-accent, #38bdf8);
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.2), inset 0 0 12px rgba(255, 255, 255, 0.05);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.22), inset 0 0 12px rgba(255, 255, 255, 0.06);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       display: flex;
@@ -2368,9 +2481,9 @@ function renderHtml(
       transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, background-color 0.2s;
     }
     .holo-node-item:hover .holo-node-disc {
-      transform: scale(1.14);
-      box-shadow: 0 0 30px var(--node-accent, #38bdf8);
-      background: rgba(30, 41, 59, 0.95);
+      transform: scale(1.15);
+      box-shadow: 0 0 32px var(--node-accent, #38bdf8), inset 0 0 14px var(--node-accent, #38bdf8);
+      background: radial-gradient(circle at 35% 35%, rgba(51, 65, 85, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
     }
     .holo-node-item:focus-visible .holo-node-disc {
       outline: 2px solid #fff;
@@ -2381,30 +2494,33 @@ function renderHtml(
     }
     .holo-node-item.is-current .holo-node-disc {
       border-width: 2.5px;
-      box-shadow: 0 0 25px var(--node-accent, #38bdf8), inset 0 0 10px var(--node-accent, #38bdf8);
+      box-shadow: 0 0 28px var(--node-accent, #38bdf8), inset 0 0 12px var(--node-accent, #38bdf8);
     }
     .holo-node-icon {
-      font-size: 1.3rem;
+      font-size: 1.45rem;
       line-height: 1;
       display: inline-block;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
     }
     .holo-node-label {
-      font-size: 0.68rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      color: #cbd5e1;
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: #94a3b8;
       text-transform: uppercase;
-      padding: 2px 7px;
-      border-radius: 8px;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.07);
       backdrop-filter: blur(6px);
       white-space: nowrap;
-      transition: color 0.18s, border-color 0.18s;
+      transition: color 0.18s, border-color 0.18s, text-shadow 0.18s;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
     .holo-node-item:hover .holo-node-label {
       color: #fff;
       border-color: var(--node-accent, #38bdf8);
+      text-shadow: 0 0 8px var(--node-accent, #38bdf8);
     }
     .holo-node-badge {
       position: absolute;
@@ -2428,22 +2544,46 @@ function renderHtml(
     /* Mobile Responsive Adaptation */
     @media (max-width: 480px) {
       .holo-stage {
-        width: 330px;
-        height: 330px;
+        width: 340px;
+        height: 340px;
       }
       .holo-center-core {
-        width: 72px;
-        height: 72px;
+        width: 78px;
+        height: 78px;
+      }
+      .holo-core-wrap {
+        width: 78px;
+        height: 78px;
+      }
+      .holo-core-spin-ring {
+        width: 96px;
+        height: 96px;
+      }
+      .holo-core-glow-ring {
+        width: 110px;
+        height: 110px;
+      }
+      .holo-center-core-symbol {
+        font-size: 1.35rem;
+      }
+      .holo-center-core-sub {
+        font-size: 0.54rem;
+        letter-spacing: 0.12em;
+      }
+      .holo-core-status-pulse {
+        display: none;
       }
       .holo-node-disc {
         width: 46px;
         height: 46px;
       }
       .holo-node-icon {
-        font-size: 1.15rem;
+        font-size: 1.18rem;
       }
       .holo-node-label {
-        font-size: 0.62rem;
+        font-size: 0.56rem;
+        letter-spacing: 0.08em;
+        padding: 1px 4px;
       }
       .sovra-core-brand-text {
         display: none;
@@ -11721,16 +11861,36 @@ function renderHtml(
   <div id="holographicNavOverlay" class="holo-nav-overlay" role="dialog" aria-modal="true" aria-label="SOVRA Holographic Central Navigation">
     <div class="holo-backdrop" onclick="closeHolographicNav()"></div>
     <div class="holo-stage" id="holoStage">
-      <!-- Ambient Orbit Rings -->
+      <!-- Ambient Orbit Rings & Shockwave -->
       <div class="holo-ambient-rings" aria-hidden="true">
+        <div class="holo-shockwave"></div>
         <div class="holo-orbit-ring ring-outer"></div>
+        <div class="holo-orbit-ring ring-mid"></div>
         <div class="holo-orbit-ring ring-inner"></div>
       </div>
 
-      <!-- Central Command Core Reactor -->
+      <!-- Holographic Energy Pathways (Subtle Connection Lines from Core to Nodes) -->
+      <svg class="holo-energy-pathways" id="holoEnergySvg" viewBox="-240 -240 480 480" aria-hidden="true">
+        <line id="holo-path-notif" class="holo-path-line" x1="0" y1="0" x2="0" y2="-184" />
+        <line id="holo-path-watch" class="holo-path-line" x1="0" y1="0" x2="130" y2="-130" />
+        <line id="holo-path-chat" class="holo-path-line" x1="0" y1="0" x2="184" y2="0" />
+        <line id="holo-path-create" class="holo-path-line" x1="0" y1="0" x2="130" y2="130" />
+        <line id="holo-path-logout" class="holo-path-line" x1="0" y1="0" x2="0" y2="184" />
+        <line id="holo-path-feed" class="holo-path-line" x1="0" y1="0" x2="-130" y2="130" />
+        <line id="holo-path-profile" class="holo-path-line" x1="0" y1="0" x2="-184" y2="0" />
+        <line id="holo-path-reels" class="holo-path-line" x1="0" y1="0" x2="-130" y2="-130" />
+      </svg>
+
+      <!-- Central Command Core Reactor with Concentric Rings -->
+      <div class="holo-core-wrap" aria-hidden="true">
+        <div class="holo-core-spin-ring"></div>
+        <div class="holo-core-glow-ring"></div>
+      </div>
+
       <button type="button" class="holo-center-core" id="holoCenterCoreBtn" onclick="toggleHolographicNav()" aria-label="Close SOVRA holographic command center" title="SOVRA Command Core (Tap to Close)">
         <span class="holo-center-core-symbol">S</span>
         <span class="holo-center-core-sub">SOVRA OS</span>
+        <span class="holo-core-status-pulse">CORE ACTIVE</span>
       </button>
 
       <!-- Polar Radial Command Nodes (8 Primary Actions) -->
@@ -14105,20 +14265,26 @@ function renderHtml(
     }
 
     const HOLOGRAPHIC_CONFIG = [
-      { id: 'holo-node-notif',  action: 'notifications', angle: 0,   accent: '#38bdf8' },
-      { id: 'holo-node-watch',  action: 'watch',         angle: 45,  accent: '#f43f5e' },
-      { id: 'holo-node-chat',   action: 'chat',          angle: 90,  accent: '#38bdf8' },
-      { id: 'holo-node-create', action: 'create',        angle: 135, accent: '#a855f7' },
-      { id: 'holo-node-logout', action: 'logout',        angle: 180, accent: '#ef4444' },
-      { id: 'holo-node-feed',   action: 'feed',          angle: 225, accent: '#38bdf8' },
-      { id: 'holo-node-profile',action: 'profile',       angle: 270, accent: '#6366f1' },
-      { id: 'holo-node-reels',  action: 'reels',         angle: 315, accent: '#c084fc' },
+      { id: 'holo-node-notif',  pathId: 'holo-path-notif',  action: 'notifications', angle: 0,   accent: '#38bdf8' },
+      { id: 'holo-node-watch',  pathId: 'holo-path-watch',  action: 'watch',         angle: 45,  accent: '#f43f5e' },
+      { id: 'holo-node-chat',   pathId: 'holo-path-chat',   action: 'chat',          angle: 90,  accent: '#38bdf8' },
+      { id: 'holo-node-create', pathId: 'holo-path-create', action: 'create',        angle: 135, accent: '#a855f7' },
+      { id: 'holo-node-logout', pathId: 'holo-path-logout', action: 'logout',        angle: 180, accent: '#ef4444' },
+      { id: 'holo-node-feed',   pathId: 'holo-path-feed',   action: 'feed',          angle: 225, accent: '#38bdf8' },
+      { id: 'holo-node-profile',pathId: 'holo-path-profile',action: 'profile',       angle: 270, accent: '#6366f1' },
+      { id: 'holo-node-reels',  pathId: 'holo-path-reels',  action: 'reels',         angle: 315, accent: '#c084fc' },
     ];
 
     function calculateHolographicPositions() {
       const isMobile = window.innerWidth <= 480;
       const isTablet = window.innerWidth <= 1024 && window.innerWidth > 480;
-      const radius = isMobile ? 116 : (isTablet ? 150 : 180);
+      const radius = isMobile ? 120 : (isTablet ? 154 : 184);
+
+      const svg = document.getElementById('holoEnergySvg');
+      if (svg) {
+        const halfSpan = isMobile ? 170 : 240;
+        svg.setAttribute('viewBox', '-' + halfSpan + ' -' + halfSpan + ' ' + (halfSpan * 2) + ' ' + (halfSpan * 2));
+      }
 
       for (let i = 0; i < HOLOGRAPHIC_CONFIG.length; i++) {
         const item = HOLOGRAPHIC_CONFIG[i];
@@ -14130,6 +14296,24 @@ function renderHtml(
           el.style.setProperty('--node-x', x + 'px');
           el.style.setProperty('--node-y', y + 'px');
           el.style.setProperty('--node-accent', item.accent);
+
+          if (!el.dataset.pathBound) {
+            el.dataset.pathBound = 'true';
+            el.addEventListener('mouseenter', function() {
+              const p = document.getElementById(item.pathId);
+              if (p) p.classList.add('is-highlighted');
+            });
+            el.addEventListener('mouseleave', function() {
+              const p = document.getElementById(item.pathId);
+              if (p) p.classList.remove('is-highlighted');
+            });
+          }
+        }
+
+        const pathEl = document.getElementById(item.pathId);
+        if (pathEl) {
+          pathEl.setAttribute('x2', x);
+          pathEl.setAttribute('y2', y);
         }
       }
     }
