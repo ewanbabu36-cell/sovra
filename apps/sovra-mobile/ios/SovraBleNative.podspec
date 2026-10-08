@@ -9,5 +9,6 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/sovra/sovra.git", :tag => "#{s.version}" }
   s.source_files = "SovraMobile/**/*.{h,m,mm,swift}"
   s.frameworks   = "CoreBluetooth", "Foundation"
+  s.dependency   "React-Core"
   s.requires_arc = true
 end

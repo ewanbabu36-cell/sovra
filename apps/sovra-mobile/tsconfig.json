@@ -5,7 +5,12 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "outDir": "./dist",
-    "rootDir": "."
+    "rootDir": ".",
+    "paths": {
+      "@sovra/p2p": ["../../packages/p2p/dist/index.d.ts", "../../packages/p2p/src/index.ts"],
+      "@sovra/crypto": ["../../packages/crypto/dist/index.d.ts", "../../packages/crypto/src/index.ts"],
+      "@sovra/identity": ["../../packages/identity/dist/index.d.ts", "../../packages/identity/src/index.ts"]
+    }
   },
   "include": ["src/**/*", "App.tsx"]
 }

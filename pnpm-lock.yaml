@@ -273,6 +273,9 @@ importers:
       '@sovra/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      '@sovra/p2p':
+        specifier: workspace:*
+        version: link:../../packages/p2p
       '@sovra/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

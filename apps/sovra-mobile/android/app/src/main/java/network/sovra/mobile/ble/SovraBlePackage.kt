@@ -1,13 +1,20 @@
 package network.sovra.mobile.ble
 
-import android.content.Context
+import com.facebook.react.ReactPackage
+import com.facebook.react.bridge.NativeModule
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.uimanager.ViewManager
 import java.util.Collections
 
 /**
- * SovraBlePackage registers the Sovra BLE Native Module with the Android runtime.
+ * SovraBlePackage registers the Sovra BLE Native Module with the React Native Android runtime.
  */
-class SovraBlePackage {
-    fun createNativeModule(context: Context): SovraBleModule {
-        return SovraBleModule(context)
+class SovraBlePackage : ReactPackage {
+    override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
+        return listOf(SovraBleReactModule(reactContext))
+    }
+
+    override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {
+        return emptyList()
     }
 }

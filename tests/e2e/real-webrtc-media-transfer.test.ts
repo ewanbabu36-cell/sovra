@@ -48,6 +48,14 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
     });
   }
 
+  function sendCdp(method: string, params: any = {}): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const id = ++cdpId;
+      pending.set(id, { resolve, reject });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+  }
+
   beforeAll(async () => {
     userDataDir = path.join(os.tmpdir(), 'edge-webrtc-vitest-' + Date.now());
     fs.mkdirSync(userDataDir, { recursive: true });
@@ -83,7 +91,10 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
     };
 
     await new Promise(r => ws.onopen = r);
-  }, 20000);
+    await sendCdp('Page.enable', {});
+    await sendCdp('Page.navigate', { url: BASE_URL });
+    await new Promise(r => setTimeout(r, 1500));
+  }, 25000);
 
   afterAll(async () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -99,15 +110,18 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
       (async () => {
         const results = {};
         const ts = Date.now();
+        const baseUrl = (typeof window !== 'undefined' && window.location.origin && window.location.origin.startsWith('http'))
+          ? window.location.origin
+          : 'http://localhost:3001';
 
         // 1. Register Caller & Receiver
-        const resA = await fetch('/api/user/register', {
+        const resA = await fetch(baseUrl + '/api/user/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ handle: '@caller_e2e_' + ts, name: 'Alice E2E' })
         }).then(r => r.json());
 
-        const resB = await fetch('/api/user/register', {
+        const resB = await fetch(baseUrl + '/api/user/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ handle: '@callee_e2e_' + ts, name: 'Bob E2E' })
@@ -142,7 +156,7 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
         pcA.onicecandidate = (e) => {
           if (e.candidate && callId) {
             candidatePostPromises.push(
-              fetch('/api/call/candidate', {
+              fetch(baseUrl + '/api/call/candidate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + userA.token },
                 body: JSON.stringify({ callId, candidate: e.candidate.toJSON() })
@@ -154,7 +168,7 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
         pcB.onicecandidate = (e) => {
           if (e.candidate && callId) {
             candidatePostPromises.push(
-              fetch('/api/call/candidate', {
+              fetch(baseUrl + '/api/call/candidate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + userB.token },
                 body: JSON.stringify({ callId, candidate: e.candidate.toJSON() })
@@ -181,7 +195,7 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
 
         // 5. Offer/Answer signaling
         const offer = await pcA.createOffer();
-        const offerRes = await fetch('/api/call/offer', {
+        const offerRes = await fetch(baseUrl + '/api/call/offer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + userA.token },
           body: JSON.stringify({ recipientDid: userB.did, callType: 'video', offerSdp: offer.sdp })
@@ -190,7 +204,7 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
         callId = offerRes.session.callId;
         await pcA.setLocalDescription(offer);
 
-        const incRes = await fetch('/api/call/incoming', {
+        const incRes = await fetch(baseUrl + '/api/call/incoming', {
           headers: { 'Authorization': 'Bearer ' + userB.token }
         }).then(r => r.json());
 
@@ -198,13 +212,13 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
         const answer = await pcB.createAnswer();
         await pcB.setLocalDescription(answer);
 
-        await fetch('/api/call/answer', {
+        await fetch(baseUrl + '/api/call/answer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + userB.token },
           body: JSON.stringify({ callId, answerSdp: answer.sdp })
         });
 
-        const pollRes = await fetch('/api/call/poll?callId=' + encodeURIComponent(callId), {
+        const pollRes = await fetch(baseUrl + '/api/call/poll?callId=' + encodeURIComponent(callId), {
           headers: { 'Authorization': 'Bearer ' + userA.token }
         }).then(r => r.json());
 
@@ -214,7 +228,7 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
         await new Promise(r => setTimeout(r, 1500));
         await Promise.all(candidatePostPromises);
 
-        const pollCandidates = await fetch('/api/call/poll?callId=' + encodeURIComponent(callId), {
+        const pollCandidates = await fetch(baseUrl + '/api/call/poll?callId=' + encodeURIComponent(callId), {
           headers: { 'Authorization': 'Bearer ' + userA.token }
         }).then(r => r.json());
 
@@ -267,7 +281,7 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
         pcA.close();
         pcB.close();
 
-        const endRes = await fetch('/api/call/end', {
+        const endRes = await fetch(baseUrl + '/api/call/end', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + userA.token },
           body: JSON.stringify({ callId, reason: 'user_hung_up' })
@@ -297,9 +311,9 @@ describe('Sovra Real WebRTC Media Transfer Verification Suite', () => {
     `;
 
     const evalResult = await evaluate(testScript, true);
-    expect(evalResult).toBeDefined();
-    const data = evalResult.result ? evalResult.result.value : evalResult;
-    expect(data.ok).toBe(true);
+    if (evalResult?.exceptionDetails) console.error('CDP ERROR:', JSON.stringify(evalResult.exceptionDetails));
+    const data = evalResult?.result ? evalResult.result.value : evalResult;
+    expect(data?.ok).toBe(true);
 
     // TEST 1: Caller -> Receiver audio
     expect(data.aAudioSent).toBeGreaterThan(0);

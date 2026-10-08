@@ -21,6 +21,9 @@ import {
   markChatReceipt,
   getActiveUserDid,
 } from '../services/api.js';
+import { localDb } from '../services/local-database.js';
+import { syncEngine } from '../services/sync-engine.js';
+import { mobileMesh } from '../services/mobile-mesh-coordinator.js';
 
 export const INITIAL_MESSAGES: MobileChatMessage[] = [
   {
@@ -79,9 +82,42 @@ export function ChatsScreen(): React.JSX.Element {
 
   const loadMessages = useCallback(async () => {
     try {
+      // 1. Immediately display persisted local database messages
+      const localCached = localDb.getThreadMessages(recipientDid);
+      if (localCached.length > 0) {
+        setMessages(
+          localCached.map(cm => ({
+            id: cm.id,
+            senderDid: cm.senderDid,
+            senderName: cm.senderName,
+            text: cm.text,
+            timestamp: cm.timestamp,
+            isOutgoing: cm.senderDid === getActiveUserDid(),
+            tickState: (cm.status as any) || 'delivered',
+            ...(cm.isBitChat !== undefined ? { isBitChat: cm.isBitChat } : {}),
+          })),
+        );
+      }
+
+      // 2. Fetch server updates
       const liveMessages = await fetchChatMessages(recipientDid);
       if (liveMessages && liveMessages.length > 0) {
         setMessages(liveMessages);
+        // Cache to local database
+        for (const lm of liveMessages) {
+          localDb.saveMessage({
+            id: lm.id,
+            threadId: recipientDid,
+            senderDid: lm.senderDid,
+            recipientDid,
+            senderName: lm.senderName,
+            text: lm.text,
+            timestamp: lm.timestamp,
+            status: (lm.tickState as any) || 'delivered',
+            ...(lm.isBitChat !== undefined ? { isBitChat: lm.isBitChat } : {}),
+            syncStatus: 'SYNCED',
+          });
+        }
 
         // Acknowledge read receipts for incoming messages
         const unreadIncoming = liveMessages
@@ -94,8 +130,8 @@ export function ChatsScreen(): React.JSX.Element {
       setError(null);
     } catch (err: any) {
       console.warn('[ChatsScreen] Fetch messages warning:', err);
-      // Keep cached / initial messages on network disruption
-      setError('Live sync paused. Displaying local Double Ratchet cache.');
+      // Keep cached local database messages on network disruption
+      setError('Live sync paused. Operating in durable offline mode.');
     } finally {
       setIsLoading(false);
     }
@@ -150,6 +186,19 @@ export function ChatsScreen(): React.JSX.Element {
     setInputText('');
     setIsSending(true);
 
+    // Save to durable local database immediately
+    await localDb.saveMessage({
+      id: tempId,
+      threadId: recipientDid,
+      senderDid: myDid,
+      recipientDid,
+      senderName: 'You',
+      text,
+      timestamp: Date.now(),
+      status: 'pending',
+      syncStatus: 'LOCAL',
+    });
+
     try {
       const res = await sendChatMessage({
         recipientDid,
@@ -158,6 +207,7 @@ export function ChatsScreen(): React.JSX.Element {
       });
 
       if (res.ok && res.message) {
+        await localDb.updateMessageStatus(tempId, 'delivered', 'SYNCED');
         setMessages(prev =>
           prev.map(m =>
             m.id === tempId
@@ -170,11 +220,22 @@ export function ChatsScreen(): React.JSX.Element {
           ),
         );
       } else {
-        throw new Error(res.error || 'Mesh transmission failed');
+        throw new Error(res.error || 'Server unreachable');
       }
     } catch (err) {
-      console.error('[ChatsScreen] Send failed:', err);
-      // Mark as failed instead of fake success
+      console.warn('[ChatsScreen] Offline fallback: enqueuing message to durable outbox');
+      // Enqueue to crash-safe outbox
+      await localDb.enqueueOperation('SEND_CHAT', myDid, {
+        recipientDid,
+        text,
+        senderName: 'You',
+      });
+
+      // Try routing over BLE mesh if nearby peers are discovered
+      mobileMesh.sendChatMessage(recipientDid, text, 'You').catch(() => {});
+      syncEngine.triggerSync().catch(() => {});
+
+      // Keep message visible in UI with 'sent' (pending outbox) tick
       setMessages(prev =>
         prev.map(m => (m.id === tempId ? { ...m, tickState: 'sent' } : m)),
       );

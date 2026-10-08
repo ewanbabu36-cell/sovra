@@ -29639,7 +29639,7 @@ async function startDevServer() {
       return;
     }
 
-    if (url.pathname === '/api/chat/send' && req.method === 'POST') {
+    if ((url.pathname === '/api/chat/send' || url.pathname === '/api/chat/messages') && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 10 * 1024 * 1024);
       if (!ok) return;
       try {
@@ -29802,6 +29802,266 @@ async function startDevServer() {
         const updatedCount = sovraDb.updateMessagesReceipt(messageIds, status);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, updatedCount, status, messageIds }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // API: OFFLINE CRDT DELTA RECONCILIATION
+    // ==========================================
+    if (url.pathname === '/api/sync/reconcile' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 25 * 1024 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const operations: any[] = Array.isArray(parsed.operations) ? parsed.operations : [];
+        const lastServerTimestamp = Number(parsed.lastServerTimestamp || 0);
+
+        const results: Array<{
+          operationId: string;
+          status: 'APPLIED' | 'DUPLICATE' | 'FAILED';
+          type: string;
+          error?: string;
+          data?: any;
+        }> = [];
+
+        for (const op of operations) {
+          if (!op || !op.operationId || !op.type) {
+            results.push({
+              operationId: op?.operationId || 'unknown',
+              status: 'FAILED',
+              type: op?.type || 'UNKNOWN',
+              error: 'Missing required operation metadata',
+            });
+            continue;
+          }
+
+          try {
+            switch (op.type) {
+              case 'CREATE_POST': {
+                const payload = op.payload || {};
+                const caption = String(payload.caption || '').trim();
+                const existingPost = payload.id ? sovraDb.getPostById(payload.id) : null;
+                if (existingPost) {
+                  results.push({
+                    operationId: op.operationId,
+                    status: 'DUPLICATE',
+                    type: op.type,
+                    data: existingPost,
+                  });
+                  break;
+                }
+
+                const postType: PostType = (payload.postType as PostType) || 'text';
+                const postId = payload.id || ('feed-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7));
+                const authorUser = sovraDb.findUserByDid(principal.did);
+
+                const newPost = sovraDb.createPost({
+                  id: postId,
+                  authorDid: principal.did,
+                  authorName: authorUser?.displayName || payload.authorName || 'Sovereign Peer',
+                  authorAvatar: authorUser?.avatar || payload.authorAvatar || 'S',
+                  authorAvatarBg: authorUser?.avatarBg || payload.authorAvatarBg || '#6366f1',
+                  authorAvatarDataUrl: authorUser?.avatarDataUrl || payload.authorAvatarDataUrl,
+                  authorType: payload.authorType || 'personal',
+                  authorBadge: payload.authorBadge || '👤 Personal',
+                  audioTrack: String(payload.audioTrack || 'Original Audio • Sovra Mesh'),
+                  mediaCid: payload.mediaCid || '',
+                  caption: caption || 'Status update from offline queue',
+                  tags: String(payload.tags || '#sovra #p2p #offline'),
+                  mediaImage: payload.mediaImage ? String(payload.mediaImage) : undefined,
+                  mediaVideo: payload.mediaVideo ? String(payload.mediaVideo) : undefined,
+                  postType,
+                  visibility: payload.visibility || 'public',
+                });
+
+                indexPostInSearch(newPost);
+                dynamicSocialStore.posts = sovraDb.getAllPosts();
+
+                try {
+                  const gossipEvent = {
+                    ...newPost,
+                    mediaImage: newPost.mediaImage ? (newPost.mediaImage.length > 512 ? '[embedded-image]' : newPost.mediaImage) : undefined,
+                    mediaVideo: newPost.mediaVideo ? '[embedded-video]' : undefined,
+                  };
+                  storageDaemon?.node?.services?.pubsub?.publish(
+                    'sovra:feed:global',
+                    Buffer.from(JSON.stringify({ type: 'NEW_POST', post: gossipEvent })),
+                  );
+                } catch {}
+
+                results.push({
+                  operationId: op.operationId,
+                  status: 'APPLIED',
+                  type: op.type,
+                  data: newPost,
+                });
+                break;
+              }
+
+              case 'SEND_CHAT': {
+                const payload = op.payload || {};
+                const recipientDid = String(payload.recipientDid || '');
+                const text = String(payload.text || '');
+
+                if (!recipientDid && !payload.isAudio && !payload.attachment) {
+                  results.push({
+                    operationId: op.operationId,
+                    status: 'FAILED',
+                    type: op.type,
+                    error: 'Invalid chat message payload',
+                  });
+                  break;
+                }
+
+                const existingMsg = payload.id
+                  ? sovraDb.getState().chatMessages.find(m => m.id === payload.id)
+                  : null;
+
+                if (existingMsg) {
+                  results.push({
+                    operationId: op.operationId,
+                    status: 'DUPLICATE',
+                    type: op.type,
+                    data: existingMsg,
+                  });
+                  break;
+                }
+
+                const msgRecord = sovraDb.appendMessage({
+                  id: payload.id,
+                  threadId: payload.threadId,
+                  recipientDid,
+                  text,
+                  isAudio: !!payload.isAudio,
+                  audioDuration: payload.audioDuration ? Number(payload.audioDuration) : undefined,
+                  attachment: payload.attachment,
+                  senderDid: principal.did,
+                });
+
+                broadcastChatEvent(recipientDid, msgRecord);
+
+                results.push({
+                  operationId: op.operationId,
+                  status: 'APPLIED',
+                  type: op.type,
+                  data: msgRecord,
+                });
+                break;
+              }
+
+              case 'LIKE_POST': {
+                const postId = String(op.payload?.postId || '');
+                if (postId) {
+                  sovraDb.toggleLike(postId, principal.did);
+                  results.push({
+                    operationId: op.operationId,
+                    status: 'APPLIED',
+                    type: op.type,
+                  });
+                } else {
+                  results.push({
+                    operationId: op.operationId,
+                    status: 'FAILED',
+                    type: op.type,
+                    error: 'Missing postId',
+                  });
+                }
+                break;
+              }
+
+              case 'ADD_COMMENT': {
+                const postId = String(op.payload?.postId || '');
+                const commentText = String(op.payload?.text || '');
+                if (postId && commentText) {
+                  const authorUser = sovraDb.findUserByDid(principal.did);
+                  sovraDb.addPostComment(postId, {
+                    authorDid: principal.did,
+                    authorName: authorUser?.displayName || op.payload?.authorName || 'Peer',
+                    authorAvatar: authorUser?.avatar || '👤',
+                    text: commentText,
+                  });
+                  results.push({
+                    operationId: op.operationId,
+                    status: 'APPLIED',
+                    type: op.type,
+                  });
+                } else {
+                  results.push({
+                    operationId: op.operationId,
+                    status: 'FAILED',
+                    type: op.type,
+                    error: 'Missing postId or comment text',
+                  });
+                }
+                break;
+              }
+
+              case 'UPDATE_PROFILE': {
+                const payload = op.payload || {};
+                sovraDb.updateUser(principal.did, {
+                  displayName: payload.displayName,
+                  bio: payload.bio,
+                  avatar: payload.avatar,
+                  avatarBg: payload.avatarBg,
+                });
+                results.push({
+                  operationId: op.operationId,
+                  status: 'APPLIED',
+                  type: op.type,
+                });
+                break;
+              }
+
+              default: {
+                results.push({
+                  operationId: op.operationId,
+                  status: 'FAILED',
+                  type: op.type,
+                  error: `Unsupported operation type: ${op.type}`,
+                });
+              }
+            }
+          } catch (itemErr: any) {
+            results.push({
+              operationId: op.operationId,
+              status: 'FAILED',
+              type: op.type,
+              error: itemErr?.message || 'Processing error',
+            });
+          }
+        }
+
+        const allPosts = sovraDb.getAllPosts();
+        const deltaPosts = lastServerTimestamp > 0
+          ? allPosts.filter(p => (p.timestamp || 0) > lastServerTimestamp)
+          : allPosts.slice(-20);
+
+        let deltaMessages = sovraDb.getState().chatMessages.filter(
+          m => m.recipientDid.startsWith('channel:') || m.senderDid === principal.did || m.recipientDid === principal.did
+        );
+        if (lastServerTimestamp > 0) {
+          deltaMessages = deltaMessages.filter(m => (m.timestamp || 0) > lastServerTimestamp);
+        } else {
+          deltaMessages = deltaMessages.slice(-50);
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          serverTimestamp: Date.now(),
+          results,
+          deltas: {
+            posts: deltaPosts,
+            messages: deltaMessages,
+          },
+        }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));

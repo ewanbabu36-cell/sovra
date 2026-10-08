@@ -18,6 +18,8 @@ import {
   fetchStories,
   markStorySeen,
 } from '../services/api.js';
+import { localDb } from '../services/local-database.js';
+import { syncEngine } from '../services/sync-engine.js';
 
 export const INITIAL_STORIES: MobileStoryItem[] = [
   {
@@ -121,8 +123,44 @@ export function FeedScreen(): React.JSX.Element {
       }
       if (postsData.status === 'fulfilled') {
         setPosts(postsData.value);
+        // Cache posts to durable local database
+        for (const p of postsData.value) {
+          localDb.savePost({
+            id: p.id,
+            authorDid: p.creatorHandle,
+            authorName: p.creatorName,
+            authorHandle: p.creatorHandle,
+            authorAvatar: p.avatarEmoji,
+            caption: p.caption,
+            timestamp: Date.now(),
+            likesCount: p.likes,
+            likedByDids: [],
+            isLiked: !!p.isLiked,
+            commentsCount: 0,
+            syncStatus: 'SYNCED',
+          });
+        }
       } else if (postsData.status === 'rejected') {
-        throw postsData.reason;
+        // Fallback to durable local database
+        const cached = localDb.getPosts();
+        if (cached.length > 0) {
+          setPosts(
+            cached.map(cp => ({
+              id: cp.id,
+              creatorHandle: cp.authorHandle,
+              creatorName: cp.authorName,
+              avatarEmoji: cp.authorAvatar || '⚡',
+              imageEmoji: '🌌',
+              caption: cp.caption,
+              likes: cp.likesCount,
+              timeAgo: 'Cached',
+              isLiked: !!cp.isLiked,
+              ...(cp.mediaDataUrl ? { mediaImage: cp.mediaDataUrl } : {}),
+            })),
+          );
+        } else {
+          throw postsData.reason;
+        }
       }
     } catch (err: any) {
       console.warn('[FeedScreen] Load error:', err);
@@ -229,7 +267,40 @@ export function FeedScreen(): React.JSX.Element {
         throw new Error(res.error || 'Failed to publish post');
       }
     } catch (err: any) {
-      setCreateError(err.message || 'Could not publish post to network');
+      // Offline fallback: persist locally and enqueue in durable outbox
+      const localId = `post_offline_${Date.now()}`;
+      await localDb.savePost({
+        id: localId,
+        authorDid: 'you',
+        authorName: 'You',
+        authorHandle: '@you',
+        authorAvatar: '⚡',
+        caption,
+        timestamp: Date.now(),
+        likesCount: 0,
+        likedByDids: [],
+        isLiked: false,
+        commentsCount: 0,
+        syncStatus: 'LOCAL',
+      });
+      await localDb.enqueueOperation('CREATE_POST', 'you', { caption });
+      syncEngine.triggerSync().catch(() => {});
+
+      const newPost: FeedPost = {
+        id: localId,
+        creatorHandle: 'you',
+        creatorName: 'You (Offline)',
+        avatarEmoji: '⚡',
+        imageEmoji: '📦',
+        caption: `${caption} [Offline Outbox • Sync Pending]`,
+        likes: 0,
+        timeAgo: 'Just now',
+        isLiked: false,
+      };
+      setPosts(prev => [newPost, ...prev]);
+      setNewCaption('');
+      setIsCreateOpen(false);
+      showToast('✓ Post saved offline. Queued for auto-sync!');
     } finally {
       setIsSubmitting(false);
     }

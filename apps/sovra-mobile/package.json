@@ -17,6 +17,7 @@
     "@sovra/crypto": "workspace:*",
     "@sovra/identity": "workspace:*",
     "@sovra/messaging": "workspace:*",
+    "@sovra/p2p": "workspace:*",
     "@sovra/protocol": "workspace:*",
     "@sovra/social": "workspace:*",
     "@sovra/storage": "workspace:*"

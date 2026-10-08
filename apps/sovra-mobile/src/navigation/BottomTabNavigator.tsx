@@ -62,7 +62,7 @@ export function BottomTabNavigator(): React.JSX.Element {
         prev
           ? {
               ...prev,
-              status: (res.status as any) || (nextVal ? 'BLUETOOTH_MESH' : 'OFFLINE'),
+              status: (res.status as any) || (nextVal ? 'NO_PEERS' : 'OFFLINE'),
               controls: { ...prev.controls, bluetoothMeshEnabled: nextVal },
             }
           : null,
@@ -122,8 +122,11 @@ export function BottomTabNavigator(): React.JSX.Element {
   const getStatusBadge = () => {
     if (!meshStatus) return { text: 'P2P MESH', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
     switch (meshStatus.status) {
+      case 'ONLINE_IP_MESH':
       case 'ONLINE':
-        return { text: '🟢 ONLINE (HYBRID)', color: '#4ade80', bg: 'rgba(34, 197, 94, 0.15)' };
+        return { text: '🟢 ONLINE (IP MESH)', color: '#4ade80', bg: 'rgba(34, 197, 94, 0.15)' };
+      case 'ONLINE_IP':
+        return { text: '🟢 ONLINE (IP)', color: '#4ade80', bg: 'rgba(34, 197, 94, 0.15)' };
       case 'BLUETOOTH_MESH':
         return {
           text: `🔵 BLE MESH (${meshStatus.diagnostics.authenticatedPeersCount} PEERS)`,
@@ -136,7 +139,7 @@ export function BottomTabNavigator(): React.JSX.Element {
         return { text: '🟡 OFFLINE (SCANNING)', color: '#facc15', bg: 'rgba(250, 204, 21, 0.15)' };
       case 'OFFLINE':
       default:
-        return { text: '🔴 BLE DISABLED', color: '#f87171', bg: 'rgba(239, 68, 68, 0.15)' };
+        return { text: '🔴 OFFLINE / DISCONNECTED', color: '#f87171', bg: 'rgba(239, 68, 68, 0.15)' };
     }
   };
 

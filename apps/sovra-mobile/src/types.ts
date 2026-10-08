@@ -45,4 +45,5 @@ export interface MobileChatMessage {
   isOutgoing: boolean;
   tickState: 'sending' | 'sent' | 'delivered' | 'read';
   isAudioNote?: boolean;
+  isBitChat?: boolean;
 }

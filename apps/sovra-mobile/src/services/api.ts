@@ -451,7 +451,7 @@ export async function checkHandleAvailability(handle: string): Promise<boolean> 
 // ==========================================
 
 export interface MobileMeshStatus {
-  status: 'ONLINE' | 'OFFLINE' | 'BLUETOOTH_MESH' | 'CONNECTING' | 'SYNCING' | 'PARTIALLY_CONNECTED' | 'NO_PEERS';
+  status: 'ONLINE' | 'ONLINE_IP' | 'ONLINE_IP_MESH' | 'OFFLINE' | 'BLUETOOTH_MESH' | 'CONNECTING' | 'SYNCING' | 'PARTIALLY_CONNECTED' | 'NO_PEERS';
   diagnostics: {
     nearbyPeersCount: number;
     authenticatedPeersCount: number;
