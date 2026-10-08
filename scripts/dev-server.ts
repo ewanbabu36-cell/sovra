@@ -2959,116 +2959,74 @@ function renderHtml(
       box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
     }
 
-    /* Top Prominent Search Bar (Capsule Pill matching reference image) */
+    /* Top Clean & Neat Search Bar (Streamlined Fresh Capsule) */
     .header-search-wrap {
       flex: 1;
       min-width: 140px;
-      max-width: 560px;
+      max-width: 540px;
       position: relative;
     }
     .header-search-bar {
       display: flex;
       align-items: center;
-      background: #060b17;
-      border: 2px solid #00b4d8;
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 9999px;
-      padding: 0.35rem 0.65rem 0.35rem 0.95rem;
-      gap: 0.75rem;
+      padding: 0.44rem 1.15rem;
+      gap: 0.5rem;
       transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
       min-width: 0;
-      box-shadow: 0 0 14px rgba(0, 180, 216, 0.28), inset 0 0 8px rgba(0, 180, 216, 0.08);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05);
       position: relative;
     }
     .header-search-bar:hover {
-      border-color: #38bdf8;
-      box-shadow: 0 0 18px rgba(56, 189, 248, 0.4), inset 0 0 10px rgba(56, 189, 248, 0.12);
+      background: rgba(30, 41, 59, 0.65);
+      border-color: rgba(56, 189, 248, 0.4);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), 0 0 12px rgba(56, 189, 248, 0.14);
     }
     .header-search-bar:focus-within {
-      background: #081022;
+      background: rgba(15, 23, 42, 0.95);
       border-color: #38bdf8;
-      box-shadow: 0 0 24px rgba(56, 189, 248, 0.55), inset 0 0 10px rgba(56, 189, 248, 0.15);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), 0 4px 16px rgba(0, 0, 0, 0.4);
     }
     .header-search-icon-lens {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      filter: drop-shadow(0 0 6px rgba(0, 200, 255, 0.7));
+      display: none !important;
     }
-
-    /* Inner Cyan Rectangular Box framing the Input */
     .header-search-inner-box {
       flex: 1;
       display: flex;
       align-items: center;
-      background: rgba(11, 19, 38, 0.6);
-      border: 1.8px solid #00b4d8;
-      border-radius: 3px;
-      box-shadow: 0 0 8px rgba(0, 180, 216, 0.35), inset 0 0 4px rgba(0, 180, 216, 0.12);
-      padding: 0.22rem 0.65rem;
+      background: transparent !important;
+      border: none !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      padding: 0 !important;
       min-width: 0;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .header-search-bar:focus-within .header-search-inner-box {
-      border-color: #38bdf8;
-      box-shadow: 0 0 12px rgba(56, 189, 248, 0.55), inset 0 0 6px rgba(56, 189, 248, 0.2);
     }
     .header-search-input {
-      background: none;
+      flex: 1;
+      background: transparent;
       border: none;
       color: #f1f5f9;
-      font-size: 0.92rem;
+      font-size: 0.9rem;
+      font-weight: 450;
       outline: none;
       width: 100%;
       min-width: 0;
       text-overflow: ellipsis;
       font-family: inherit;
       letter-spacing: -0.01em;
+      padding: 0;
     }
     .header-search-input::placeholder {
       color: #94a3b8;
-      opacity: 0.92;
+      opacity: 0.85;
+      font-weight: 400;
     }
-
-    /* Stacked Dark Badge on the right (Ctrl / K) */
     .search-kbd-shortcut {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: #1b2333;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 8px;
-      padding: 3px 8px;
-      min-width: 34px;
-      cursor: pointer;
-      flex-shrink: 0;
-      user-select: none;
-      transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
-    }
-    .search-kbd-shortcut:hover {
-      background: #242f45;
-      border-color: rgba(56, 189, 248, 0.45);
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
-    }
-    .search-kbd-ctrl {
-      font-size: 0.64rem;
-      font-weight: 700;
-      color: #cbd5e1;
-      line-height: 1.1;
-      letter-spacing: 0.02em;
-    }
-    .search-kbd-k {
-      font-size: 0.68rem;
-      font-weight: 800;
-      color: #e2e8f0;
-      line-height: 1.1;
-    }
-    @media (max-width: 1024px) {
-      .search-kbd-shortcut {
-        display: none !important;
-      }
+      display: none !important;
     }
     .header-search-dropdown {
       position: absolute;
@@ -7989,30 +7947,12 @@ function renderHtml(
           <span class="sovra-core-brand-text">SOVRA</span>
         </button>
 
-        <!-- Prominent Wide Friend & Mesh Search Bar -->
+        <!-- Fresh, Neat & Streamlined Search Bar -->
         <div class="header-search-wrap">
           <div class="header-search-bar" onclick="document.getElementById('headerFriendSearchInput').focus()">
-            <!-- Lens Icon with specular shine and purple handle -->
-            <span class="header-search-icon-lens" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <circle cx="10" cy="10" r="6.5" stroke="#00c8ff" stroke-width="2.2" fill="rgba(0, 200, 255, 0.28)"/>
-                <path d="M7.5 7.5a3.8 3.8 0 0 1 5 0" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/>
-                <line x1="15" y1="15" x2="21" y2="21" stroke="#a855f7" stroke-width="3.5" stroke-linecap="round"/>
-              </svg>
-            </span>
-
-            <!-- Inner Glowing Cyan Rectangular Box framing the input -->
-            <div class="header-search-inner-box">
-              <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, mesh, tags..." aria-label="Search friends, channels, and tags" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
-              <button id="headerSearchClearBtn" onclick="clearHeaderSearch(); event.stopPropagation();" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.8rem;" aria-label="Clear search input">✕</button>
-            </div>
-
-            <!-- Vertically Stacked Ctrl / K Badge -->
-            <kbd class="search-kbd-shortcut" onclick="openOmniSearch(); event.stopPropagation();" title="Omni-Search (Ctrl+K)" aria-label="Open Omni-Search shortcut (Ctrl K)">
-              <span class="search-kbd-ctrl">Ctrl</span>
-              <span class="search-kbd-k">K</span>
-              <span style="display:none;">Ctrl K</span>
-            </kbd>
+            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, mesh, tags..." aria-label="Search friends, channels, and tags" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
+            <button id="headerSearchClearBtn" onclick="clearHeaderSearch(); event.stopPropagation();" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.85rem;" aria-label="Clear search input">✕</button>
+            <kbd class="search-kbd-shortcut" style="display: none !important;" aria-hidden="true">Ctrl K</kbd>
           </div>
           <div id="headerSearchDropdown" class="header-search-dropdown" style="display: none;"></div>
         </div>
