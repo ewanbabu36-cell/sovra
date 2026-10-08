@@ -18919,6 +18919,112 @@ function renderHtml(
       }
     }
 
+    function playCallDisconnectTone() {
+      try {
+        if (!_callAudioCtx) _callAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (_callAudioCtx.state === 'suspended') _callAudioCtx.resume();
+        const osc = _callAudioCtx.createOscillator();
+        const gain = _callAudioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(480, _callAudioCtx.currentTime);
+        osc.frequency.setValueAtTime(400, _callAudioCtx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.12, _callAudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, _callAudioCtx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(_callAudioCtx.destination);
+        osc.start();
+        osc.stop(_callAudioCtx.currentTime + 0.36);
+      } catch (_) {}
+    }
+
+    function handleRemoteCallEnded(reason) {
+      const modal = document.getElementById('e2eeCallModal');
+      if (!modal || modal.style.display === 'none') {
+        window._activeCallId = null;
+        _isCallAnswered = false;
+        _callConnectedSeconds = 0;
+        return;
+      }
+
+      stopCallAudioRinging();
+      playCallDisconnectTone();
+
+      if (callTimerInterval) {
+        clearInterval(callTimerInterval);
+        callTimerInterval = null;
+      }
+
+      if (window._localMediaStream) {
+        try {
+          window._localMediaStream.getTracks().forEach(function(t) { t.stop(); });
+        } catch (_) {}
+        window._localMediaStream = null;
+      }
+
+      const statusEl = document.getElementById('callStatusText');
+      const wave = document.getElementById('callWaveformContainer');
+      if (wave) wave.style.display = 'none';
+
+      const mins = Math.floor(_callConnectedSeconds / 60);
+      const secs = _callConnectedSeconds % 60;
+      const durationFormatted = mins > 0 ? (mins + 'm ' + (secs < 10 ? '0' : '') + secs + 's') : (secs + 's');
+      const finalTimerStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+      if (statusEl) {
+        statusEl.innerText = 'Call Ended • ' + finalTimerStr;
+        statusEl.style.color = '#ef4444';
+      }
+
+      const peerNameEl = document.getElementById('callPeerName');
+      const peerName = peerNameEl ? peerNameEl.innerText : 'Peer';
+
+      setTimeout(function() {
+        if (modal) modal.style.display = 'none';
+        window._activeCallId = null;
+        _isCallAnswered = false;
+        _callConnectedSeconds = 0;
+        if (statusEl) {
+          statusEl.style.color = '';
+        }
+        showAccountToast('📞 Call ended with ' + peerName + ' (' + durationFormatted + ')');
+      }, 1200);
+    }
+
+    let _activeCallPollBusy = false;
+    function syncActiveCallSession() {
+      if (!window._activeCallId || _activeCallPollBusy) return;
+      _activeCallPollBusy = true;
+      fetch('/api/call/poll?callId=' + encodeURIComponent(window._activeCallId))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          _activeCallPollBusy = false;
+          if (data && data.ok && data.session) {
+            const st = data.session.status;
+            if (st === 'answered' && !_isCallAnswered) {
+              _isCallAnswered = true;
+              _callConnectedSeconds = 0;
+              stopCallAudioRinging();
+              const wave = document.getElementById('callWaveformContainer');
+              if (wave) wave.style.display = 'flex';
+              const directBtnWrap = document.getElementById('callDirectConnectWrap');
+              if (directBtnWrap) directBtnWrap.style.display = 'none';
+              const statusEl = document.getElementById('callStatusText');
+              if (statusEl) {
+                statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
+                statusEl.style.color = '#38bdf8';
+              }
+            } else if (st === 'ended' || st === 'rejected' || st === 'declined') {
+              handleRemoteCallEnded(data.session.reason || 'peer_hung_up');
+            }
+          } else if (data && !data.ok) {
+            handleRemoteCallEnded('session_ended');
+          }
+        })
+        .catch(function() {
+          _activeCallPollBusy = false;
+        });
+    }
+
     function toggleCallMute() {
       _callIsMuted = !_callIsMuted;
       const btn = document.getElementById('callMuteBtn');
@@ -18978,6 +19084,7 @@ function renderHtml(
       const statusEl = document.getElementById('callStatusText');
       if (statusEl) {
         statusEl.innerText = 'Calling ' + (contact.name || 'peer').split(' ')[0] + '... Sovra Encrypted Call';
+        statusEl.style.color = '';
       }
       const wave = document.getElementById('callWaveformContainer');
       if (wave) wave.style.display = 'none';
@@ -19029,6 +19136,7 @@ function renderHtml(
           if (statusEl) {
             statusEl.innerText = 'Connected (' + mins + ':' + (secs < 10 ? '0' : '') + secs + ') • 🔒 Sovra E2EE Stream';
           }
+          syncActiveCallSession();
           return;
         }
 
@@ -19039,40 +19147,13 @@ function renderHtml(
           return;
         }
 
-        if (!window._activeCallId) return;
-
-        // Signaling poll: check if remote peer accepted the call
-        fetch('/api/call/poll?callId=' + encodeURIComponent(window._activeCallId))
-          .then(r => r.json())
-          .then(data => {
-            if (data.ok && data.session) {
-              if (data.session.status === 'answered') {
-                _isCallAnswered = true;
-                _callConnectedSeconds = 0;
-                stopCallAudioRinging();
-                if (wave) wave.style.display = 'flex';
-                if (directBtnWrap) directBtnWrap.style.display = 'none';
-                if (statusEl) {
-                  statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
-                }
-              } else if (data.session.status === 'ended' || data.session.status === 'rejected') {
-                if (statusEl) statusEl.innerText = 'Call Ended';
-                stopCallAudioRinging();
-                clearInterval(callTimerInterval);
-                setTimeout(function() {
-                  endE2eeCall();
-                }, 1200);
-              }
-            }
-          })
-          .catch(function(err) {
-            console.warn('[Call] Signaling poll warning:', err);
-          });
+        syncActiveCallSession();
       }, 1000);
     }
 
     function endE2eeCall() {
       stopCallAudioRinging();
+      playCallDisconnectTone();
       if (callTimerInterval) {
         clearInterval(callTimerInterval);
         callTimerInterval = null;
@@ -19083,9 +19164,18 @@ function renderHtml(
         } catch (_) {}
         window._localMediaStream = null;
       }
-      document.getElementById('e2eeCallModal').style.display = 'none';
+
+      const statusEl = document.getElementById('callStatusText');
       const wave = document.getElementById('callWaveformContainer');
       if (wave) wave.style.display = 'none';
+
+      const mins = Math.floor(_callConnectedSeconds / 60);
+      const secs = _callConnectedSeconds % 60;
+      const durationFormatted = mins > 0 ? (mins + 'm ' + (secs < 10 ? '0' : '') + secs + 's') : (secs + 's');
+      if (statusEl) {
+        statusEl.innerText = 'Call Ended • ' + mins + ':' + (secs < 10 ? '0' : '') + secs;
+        statusEl.style.color = '#ef4444';
+      }
 
       if (window._activeCallId) {
         const terminatingCallId = window._activeCallId;
@@ -19096,13 +19186,23 @@ function renderHtml(
           body: JSON.stringify({ callId: terminatingCallId, reason: 'user_hung_up' }),
         }).catch(err => console.warn('[Call] End error:', err));
       }
+
       _isCallAnswered = false;
       _callConnectedSeconds = 0;
+
+      setTimeout(function() {
+        document.getElementById('e2eeCallModal').style.display = 'none';
+        if (statusEl) statusEl.style.color = '';
+        showAccountToast('📞 Call ended (' + durationFormatted + ')');
+      }, 400);
     }
 
     // Recipient Incoming Call Handling
     function pollIncomingCalls() {
       if (document.hidden || !myProfile) return;
+      if (window._activeCallId && document.getElementById('e2eeCallModal').style.display === 'flex') {
+        syncActiveCallSession();
+      }
       fetch('/api/call/incoming')
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -19175,7 +19275,10 @@ function renderHtml(
       if (nameEl) nameEl.innerText = inc.callerName || 'Peer';
 
       const statusEl = document.getElementById('callStatusText');
-      if (statusEl) statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
+      if (statusEl) {
+        statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
+        statusEl.style.color = '#38bdf8';
+      }
 
       const wave = document.getElementById('callWaveformContainer');
       if (wave) wave.style.display = 'flex';
@@ -19195,6 +19298,7 @@ function renderHtml(
         if (statusEl) {
           statusEl.innerText = 'Connected (' + mins + ':' + (secs < 10 ? '0' : '') + secs + ') • 🔒 Sovra E2EE Stream';
         }
+        syncActiveCallSession();
       }, 1000);
     }
 
@@ -21954,7 +22058,7 @@ function renderHtml(
           '<div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">' +
             '<button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 600; cursor: pointer;">+ Create Channel</button>' +
             '<button type="button" class="btn btn-secondary" onclick="openCreatePageModal()" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(192, 132, 252, 0.15); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; font-weight: 600; cursor: pointer;">+ Create Page</button>' +
-            '<button type="button" class="btn btn-secondary" onclick="openOmniSearch(); switchSearchTab(\'channels\');" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #cbd5e1; font-weight: 600; cursor: pointer;">🌐 Explore Public Channels (' + allCh.length + ')</button>' +
+            '<button type="button" class="btn btn-secondary" onclick="openOmniSearch(); switchSearchTab(&apos;channels&apos;);" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #cbd5e1; font-weight: 600; cursor: pointer;">🌐 Explore Public Channels (' + allCh.length + ')</button>' +
           '</div>' +
         '</div>';
         container.innerHTML = html;
@@ -21976,7 +22080,7 @@ function renderHtml(
           '<div style="display: flex; gap: 6px; align-items: center;">' +
             '<button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">📢 Post As</button>' +
             '<button type="button" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #f1f5f9;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">Room</button>' +
-            '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this channel" onclick="deleteEntityPrompt(\'channel\', \'' + c.id + '\', \'' + (c.name.replace(/'/g, "\\'")) + '\')">🗑️</button>' +
+            '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this channel" data-type="channel" data-id="' + c.id + '" data-name="' + (c.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
           '</div>' +
         '</div>';
       }
@@ -21997,7 +22101,7 @@ function renderHtml(
               ? '<button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">✓ Active</button>'
               : '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12);" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">🔄 Switch</button>'
             ) +
-            '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this page" onclick="deleteEntityPrompt(\'page\', \'' + p.id + '\', \'' + (p.name.replace(/'/g, "\\'")) + '\')">🗑️</button>' +
+            '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this page" data-type="page" data-id="' + p.id + '" data-name="' + (p.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
           '</div>' +
         '</div>';
       }

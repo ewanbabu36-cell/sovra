@@ -564,10 +564,13 @@ export interface CallSessionRecord {
   callerName: string;
   callerAvatar?: string;
   recipientDid: string;
+  callType?: 'audio' | 'video';
   sdpOffer?: string;
   sdpAnswer?: string;
   iceCandidates: { candidate: string; senderDid: string }[];
   status: 'offering' | 'answered' | 'connected' | 'ended' | 'rejected';
+  durationSec?: number;
+  reason?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -3953,14 +3956,39 @@ export class SovraDatabaseEngine {
     return call;
   }
 
-  public endCall(callId: string, requesterDid: string, _reason?: string): CallSessionRecord | null {
+  public endCall(callId: string, requesterDid: string, reason?: string): CallSessionRecord | null {
     this.load();
     if (!Array.isArray(this.db.call_sessions)) return null;
     const call = this.db.call_sessions.find(c => c.callId === callId);
     if (!call) return null;
     if (call.callerDid !== requesterDid && call.recipientDid !== requesterDid) return null;
     call.status = 'ended';
+    call.reason = reason || 'user_hung_up';
+    const durationSec = Math.max(0, Math.floor((Date.now() - (call.updatedAt || call.createdAt)) / 1000));
+    call.durationSec = durationSec;
     call.updatedAt = Date.now();
+
+    // Log call event to direct messages thread
+    if (!Array.isArray(this.db.chatMessages)) this.db.chatMessages = [];
+    const otherDid = requesterDid === call.callerDid ? call.recipientDid : call.callerDid;
+    const mins = Math.floor(durationSec / 60);
+    const secs = durationSec % 60;
+    const durStr = mins > 0 ? `${mins}:${secs < 10 ? '0' : ''}${secs}` : `0:${secs < 10 ? '0' : ''}${secs}`;
+    const callerUser = this.findUserByDid(requesterDid);
+    this.db.chatMessages.push({
+      id: 'call_log_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex'),
+      senderDid: requesterDid,
+      recipientDid: otherDid,
+      threadId: this.getThreadId(requesterDid, otherDid),
+      senderName: callerUser?.displayName || callerUser?.name || 'Call',
+      text: `📞 ${call.callType === 'video' ? 'Video' : 'Voice'} call ended (${durStr})`,
+      timestamp: Date.now(),
+      sentAt: Date.now(),
+      deliveredAt: Date.now(),
+      status: 'read',
+      isBitChat: false,
+    });
+
     this.save();
     return call;
   }

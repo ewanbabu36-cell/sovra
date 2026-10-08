@@ -1795,6 +1795,8 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           ).join('');
         }
       }
+    }
+
     function deleteAdminChannel(channelId, name) {
       if (!confirm('Are you sure you want to delete broadcast channel "' + name + '"?')) return;
       fetch('/api/admin/channels/delete', {
