@@ -20429,6 +20429,13 @@ function renderHtml(
         clearInterval(_callRingInterval);
         _callRingInterval = null;
       }
+      if (_callAudioCtx) {
+        try {
+          if (_callAudioCtx.state === 'running') {
+            _callAudioCtx.suspend();
+          }
+        } catch (_) {}
+      }
     }
 
     function playCallDisconnectTone() {
@@ -20712,22 +20719,14 @@ function renderHtml(
         realStream.getTracks().forEach(function(t) { tracks.push(t); });
       }
 
-      // Audio track fallback: active Web Audio carrier
+      // Audio track fallback: silent audio destination track (no synthetic oscillator or continuous beep noise)
       const hasAudio = tracks.some(function(t) { return t.kind === 'audio'; });
       if (!hasAudio) {
         try {
           const AC = window.AudioContext || window.webkitAudioContext;
           if (AC) {
             const actx = new AC();
-            if (actx.state === 'suspended') actx.resume();
-            const osc = actx.createOscillator();
             const dst = actx.createMediaStreamDestination();
-            const gain = actx.createGain();
-            gain.gain.value = 0.05;
-            osc.frequency.value = 440;
-            osc.connect(gain);
-            gain.connect(dst);
-            osc.start();
             dst.stream.getAudioTracks().forEach(function(t) { tracks.push(t); });
           }
         } catch (e) {
@@ -20918,48 +20917,31 @@ function renderHtml(
       try {
         await botPc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offerSdp }));
 
-        // 1. Audio responder track: Web Audio active harmonic chime + caller loopback
+        // 1. Audio responder track: clean silent stream with quick 0.12s connect cue (no continuous oscillator beep or mic feedback loop)
         const AC = window.AudioContext || window.webkitAudioContext;
         if (AC) {
           const actx = new AC();
           if (actx.state === 'suspended') actx.resume();
           const dst = actx.createMediaStreamDestination();
 
-          const osc = actx.createOscillator();
-          const gain = actx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(440, actx.currentTime);
-          gain.gain.setValueAtTime(0.04, actx.currentTime);
-          osc.connect(gain);
-          gain.connect(dst);
-          osc.start();
-
-          // Loop back caller microphone with soft echo
-          if (window._localMediaStream && window._localMediaStream.getAudioTracks().length > 0) {
-            try {
-              const micSrc = actx.createMediaStreamSource(window._localMediaStream);
-              const delay = actx.createDelay(1.0);
-              delay.delayTime.value = 0.12;
-              const micGain = actx.createGain();
-              micGain.gain.value = 0.4;
-              micSrc.connect(delay);
-              delay.connect(micGain);
-              micGain.connect(dst);
-            } catch(_) {}
-          }
+          // Quick 0.12s connect chime that stops immediately
+          try {
+            const chimeOsc = actx.createOscillator();
+            const chimeGain = actx.createGain();
+            chimeOsc.type = 'sine';
+            chimeOsc.frequency.setValueAtTime(520, actx.currentTime);
+            chimeOsc.frequency.exponentialRampToValueAtTime(780, actx.currentTime + 0.1);
+            chimeGain.gain.setValueAtTime(0.03, actx.currentTime);
+            chimeGain.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.12);
+            chimeOsc.connect(chimeGain);
+            chimeGain.connect(dst);
+            chimeOsc.start();
+            chimeOsc.stop(actx.currentTime + 0.14);
+          } catch (_) {}
 
           dst.stream.getAudioTracks().forEach(function(t) {
             botPc.addTrack(t, dst.stream);
           });
-
-          if ('speechSynthesis' in window) {
-            try {
-              const u = new SpeechSynthesisUtterance('Sovra secure encrypted audio and video stream connected. Microphone is active.');
-              u.rate = 1.0;
-              u.volume = 0.8;
-              window.speechSynthesis.speak(u);
-            } catch(_) {}
-          }
         }
 
         // 2. Video responder track for video calls: 30fps animated canvas
