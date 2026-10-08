@@ -7111,10 +7111,10 @@ function renderHtml(
                       <option value="personal:self" selected>👤 ${hostUser ? escapeHtml(hostUser.displayName) : 'Personal Profile'}</option>
                     </optgroup>
                     <optgroup label="📄 Sovereign Pages">
-                      ${sovraDb.getAllPages().map(pg => `<option value="page:${pg.id}">📄 ${escapeHtml(pg.name)}</option>`).join('')}
+                      ${sovraDb.getAllPages().filter(pg => pg.ownerDid && pg.ownerDid === (hostUser ? hostUser.did : masterKey.did)).map(pg => `<option value="page:${pg.id}">📄 ${escapeHtml(pg.name)}</option>`).join('')}
                     </optgroup>
                     <optgroup label="📢 Broadcast Channels">
-                      ${sovraDb.getAllChannels().map(ch => `<option value="channel:${ch.id}">📢 ${escapeHtml(ch.name)}</option>`).join('')}
+                      ${sovraDb.getAllChannels().filter(ch => ch.ownerDid && ch.ownerDid === (hostUser ? hostUser.did : masterKey.did)).map(ch => `<option value="channel:${ch.id}">📢 ${escapeHtml(ch.name)}</option>`).join('')}
                     </optgroup>
                   </select>
                 </div>
@@ -11723,14 +11723,18 @@ function renderHtml(
         cardDeviceKey.dataset.fullValue = dKey;
       }
 
-      const composerAuthorSelect = document.getElementById('composerAuthorSelect');
-      if (composerAuthorSelect) {
-        const selfOpt = composerAuthorSelect.querySelector('option[value="personal:self"]');
-        if (selfOpt) {
-          selfOpt.textContent = '👤 ' + (myProfile.displayName || myProfile.name || 'Personal Profile');
+      if (typeof refreshComposerAuthorSelect === 'function') {
+        refreshComposerAuthorSelect();
+      } else {
+        const composerAuthorSelect = document.getElementById('composerAuthorSelect');
+        if (composerAuthorSelect) {
+          const selfOpt = composerAuthorSelect.querySelector('option[value="personal:self"]');
+          if (selfOpt) {
+            selfOpt.textContent = '👤 ' + (myProfile.displayName || myProfile.name || 'Personal Profile');
+          }
         }
       }
-      handleComposerAuthorChange(composerAuthorSelect ? composerAuthorSelect.value : 'personal:self');
+      handleComposerAuthorChange(document.getElementById('composerAuthorSelect') ? document.getElementById('composerAuthorSelect').value : 'personal:self');
 
       const myStoryAvatar = document.getElementById('myStoryAvatar');
       if (myStoryAvatar) {
@@ -21332,22 +21336,18 @@ function renderHtml(
       .then(function(res) { return res.json(); })
       .then(function(data) {
         if (data.ok && data.channel) {
-          socialOmniCatalog.channels.unshift(data.channel);
-          if (typeof allChannelsData !== 'undefined') allChannelsData.unshift(data.channel);
-          closeCreateChannelModal();
-          const authorSelect = document.getElementById('composerAuthorSelect');
-          if (authorSelect) {
-            let optGroup = authorSelect.querySelector('optgroup[label*="Broadcast Channels"]');
-            if (!optGroup) {
-              optGroup = document.createElement('optgroup');
-              optGroup.label = '📢 Broadcast Channels';
-              authorSelect.appendChild(optGroup);
-            }
-            const opt = document.createElement('option');
-            opt.value = 'channel:' + data.channel.id;
-            opt.textContent = '📢 ' + data.channel.name;
-            optGroup.appendChild(opt);
+          socialOmniCatalog.channels = socialOmniCatalog.channels || [];
+          const catIdx = socialOmniCatalog.channels.findIndex(function(c) { return c.id === data.channel.id; });
+          if (catIdx >= 0) socialOmniCatalog.channels[catIdx] = data.channel;
+          else socialOmniCatalog.channels.unshift(data.channel);
+
+          if (typeof allChannelsData !== 'undefined') {
+            const chIdx = allChannelsData.findIndex(function(c) { return c.id === data.channel.id; });
+            if (chIdx >= 0) allChannelsData[chIdx] = data.channel;
+            else allChannelsData.unshift(data.channel);
           }
+          closeCreateChannelModal();
+          if (typeof refreshComposerAuthorSelect === 'function') refreshComposerAuthorSelect();
           if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
           showAccountToast('🎉 Sovereign Channel ' + handle + ' created in Creator Hub!');
         } else {
@@ -21394,22 +21394,18 @@ function renderHtml(
       .then(function(res) { return res.json(); })
       .then(function(data) {
         if (data.ok && data.page) {
-          socialOmniCatalog.pages.unshift(data.page);
-          if (typeof allPagesData !== 'undefined') allPagesData.unshift(data.page);
-          closeCreatePageModal();
-          const authorSelect = document.getElementById('composerAuthorSelect');
-          if (authorSelect) {
-            let optGroup = authorSelect.querySelector('optgroup[label*="Sovereign Pages"]');
-            if (!optGroup) {
-              optGroup = document.createElement('optgroup');
-              optGroup.label = '🏢 Sovereign Pages';
-              authorSelect.appendChild(optGroup);
-            }
-            const opt = document.createElement('option');
-            opt.value = 'page:' + data.page.id;
-            opt.textContent = '🏢 ' + data.page.name;
-            optGroup.appendChild(opt);
+          socialOmniCatalog.pages = socialOmniCatalog.pages || [];
+          const catIdx = socialOmniCatalog.pages.findIndex(function(p) { return p.id === data.page.id; });
+          if (catIdx >= 0) socialOmniCatalog.pages[catIdx] = data.page;
+          else socialOmniCatalog.pages.unshift(data.page);
+
+          if (typeof allPagesData !== 'undefined') {
+            const pgIdx = allPagesData.findIndex(function(p) { return p.id === data.page.id; });
+            if (pgIdx >= 0) allPagesData[pgIdx] = data.page;
+            else allPagesData.unshift(data.page);
           }
+          closeCreatePageModal();
+          if (typeof refreshComposerAuthorSelect === 'function') refreshComposerAuthorSelect();
           if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
           showAccountToast('🎉 Sovereign Page ' + handle + ' created in Creator Hub!');
         } else {
@@ -21488,8 +21484,20 @@ function renderHtml(
     function renderCreatorHubEntities() {
       const container = document.getElementById('creatorHubEntitiesContainer');
       if (!container) return;
-      const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
-      const pages = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+      const currentDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) 
+        ? myProfile.did 
+        : (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did ? window.SOVRA_HOST_SESSION.did : null);
+
+      const allCh = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const allPg = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+
+      // Filter strictly to entities created by active user
+      const channels = allCh.filter(function(c) {
+        return currentDid && c.ownerDid && c.ownerDid === currentDid;
+      });
+      const pages = allPg.filter(function(p) {
+        return currentDid && p.ownerDid && p.ownerDid === currentDid;
+      });
 
       let html = '<div style="font-size: 0.82rem; font-weight: 700; color: #cbd5e1; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">' +
         '<span>📋 Your Active Entities (' + (channels.length + pages.length) + ')</span>' +
@@ -21497,8 +21505,9 @@ function renderHtml(
         '</div>';
 
       if (channels.length === 0 && pages.length === 0) {
-        html += '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 12px;">No channels or pages created yet. Use the buttons above to create your first decentralized channel or page!</div>';
+        html += '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 14px; background: rgba(255,255,255,0.02); border-radius: 10px;">You have not created any Sovereign Channels or Pages yet. Use the buttons above to build your sovereign decentralized presence!</div>';
         container.innerHTML = html;
+        if (typeof refreshComposerAuthorSelect === 'function') refreshComposerAuthorSelect();
         return;
       }
 
@@ -21543,6 +21552,7 @@ function renderHtml(
       html += '</div>';
 
       container.innerHTML = html;
+      if (typeof refreshComposerAuthorSelect === 'function') refreshComposerAuthorSelect();
     }
 
     // --- Instagram / Facebook Page Persona Switcher ---
@@ -21572,12 +21582,20 @@ function renderHtml(
     function renderSwitchPersonaList() {
       const container = document.getElementById('switchPersonaListContainer');
       if (!container) return;
+      const currentDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) 
+        ? myProfile.did 
+        : (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did ? window.SOVRA_HOST_SESSION.did : null);
       const myName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Profile';
       const myHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : currentUserHandle;
       const myAvatar = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : 'S';
       const myAvatarDataUrl = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) ? myProfile.avatarDataUrl : null;
       const isPersonalActive = (!currentActivePersona || currentActivePersona.type === 'personal');
-      const pages = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+      
+      const allPg = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+      // Strictly filter to Pages created by the active user
+      const pages = allPg.filter(function(p) {
+        return currentDid && p.ownerDid && p.ownerDid === currentDid;
+      });
 
       let html = '<div style="margin-bottom: 1rem;">' +
         '<div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Personal Identity</div>' +
@@ -21603,7 +21621,7 @@ function renderHtml(
         '<div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Sovereign Pages You Manage (' + pages.length + ')</div>';
 
       if (pages.length === 0) {
-        html += '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 14px; background: rgba(255,255,255,0.02); border-radius: 10px;">No Sovereign Pages created yet. You can create a Page for your organization or project!</div>';
+        html += '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 14px; background: rgba(255,255,255,0.02); border-radius: 10px;">No Sovereign Pages created yet. You can create a Page for your organization, business, or project!</div>';
       } else {
         html += '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
         for (let j = 0; j < pages.length; j++) {
@@ -21631,6 +21649,71 @@ function renderHtml(
       html += '</div>';
 
       container.innerHTML = html;
+    }
+
+    // Dynamic Author Persona Options Synchronizer
+    function refreshComposerAuthorSelect() {
+      const authorSelect = document.getElementById('composerAuthorSelect');
+      if (!authorSelect) return;
+      const currentDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) 
+        ? myProfile.did 
+        : (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did ? window.SOVRA_HOST_SESSION.did : null);
+      const myName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) 
+        ? (myProfile.displayName || myProfile.name) 
+        : 'Personal Profile';
+
+      // 1. Personal Account optgroup
+      let selfGroup = authorSelect.querySelector('optgroup[label*="Personal"]');
+      if (!selfGroup) {
+        selfGroup = document.createElement('optgroup');
+        selfGroup.label = '👤 Personal Account';
+        authorSelect.insertBefore(selfGroup, authorSelect.firstChild);
+      }
+      let selfOpt = selfGroup.querySelector('option[value="personal:self"]');
+      if (!selfOpt) {
+        selfOpt = document.createElement('option');
+        selfOpt.value = 'personal:self';
+        selfGroup.appendChild(selfOpt);
+      }
+      selfOpt.textContent = '👤 ' + myName;
+
+      // 2. Sovereign Pages optgroup - strictly user-owned pages
+      let pgGroup = authorSelect.querySelector('optgroup[label*="Pages"]');
+      if (!pgGroup) {
+        pgGroup = document.createElement('optgroup');
+        pgGroup.label = '📄 Sovereign Pages';
+        authorSelect.appendChild(pgGroup);
+      }
+      const allPg = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+      const myPages = allPg.filter(function(p) {
+        return currentDid && p.ownerDid && p.ownerDid === currentDid;
+      });
+      pgGroup.innerHTML = '';
+      for (let i = 0; i < myPages.length; i++) {
+        const opt = document.createElement('option');
+        opt.value = 'page:' + myPages[i].id;
+        opt.textContent = '📄 ' + myPages[i].name;
+        pgGroup.appendChild(opt);
+      }
+
+      // 3. Broadcast Channels optgroup - strictly user-owned channels
+      let chGroup = authorSelect.querySelector('optgroup[label*="Channels"]');
+      if (!chGroup) {
+        chGroup = document.createElement('optgroup');
+        chGroup.label = '📢 Broadcast Channels';
+        authorSelect.appendChild(chGroup);
+      }
+      const allCh = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const myChannels = allCh.filter(function(c) {
+        return currentDid && c.ownerDid && c.ownerDid === currentDid;
+      });
+      chGroup.innerHTML = '';
+      for (let j = 0; j < myChannels.length; j++) {
+        const opt = document.createElement('option');
+        opt.value = 'channel:' + myChannels[j].id;
+        opt.textContent = '📢 ' + myChannels[j].name;
+        chGroup.appendChild(opt);
+      }
     }
 
     function switchToPersona(val) {
@@ -24893,16 +24976,31 @@ async function startDevServer() {
         const parsed = JSON.parse(body);
         const principal = enforceAuth(req, res, parsed);
         if (!principal) return;
-        let handle = String(parsed.handle || '').trim();
-        if (!handle.startsWith('@')) handle = '@' + handle;
-        const reqName = String(parsed.name || 'Untitled Channel').trim();
+        const cleanHandle = String(parsed.handle || '').trim().replace(/^@+/, '');
+        if (!cleanHandle || cleanHandle.length < 2) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Valid channel handle required (min 2 characters)' }));
+          return;
+        }
+        const handle = '@' + cleanHandle.toLowerCase();
+        const reqName = String(parsed.name || '').trim();
+        if (!reqName || reqName.length < 2) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Valid channel name required (min 2 characters)' }));
+          return;
+        }
         const existing = dynamicSocialStore.channels.find(c => 
-          (c.handle && c.handle.toLowerCase() === handle.toLowerCase()) || 
-          (c.name && c.name.toLowerCase() === reqName.toLowerCase())
+          c.handle && c.handle.toLowerCase() === handle
         );
         if (existing) {
+          if (existing.ownerDid && existing.ownerDid !== principal.did) {
+            res.writeHead(409, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'A channel with this handle already exists' }));
+            return;
+          }
           existing.name = reqName;
           existing.desc = String(parsed.desc || existing.desc);
+          if (!existing.ownerDid) existing.ownerDid = principal.did;
           saveDynamicSocialState(dynamicSocialStore);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, channel: existing }));
@@ -24910,7 +25008,7 @@ async function startDevServer() {
         }
         const newChan: ChannelRecord = {
           id: 'ch-' + Date.now(),
-          handle: handle.toLowerCase(),
+          handle: handle,
           name: reqName,
           category: String(parsed.category || 'tech'),
           desc: String(parsed.desc || 'Sovereign channel'),
@@ -24979,8 +25077,19 @@ async function startDevServer() {
         const parsed = JSON.parse(body);
         const principal = enforceAuth(req, res, parsed);
         if (!principal) return;
-        let handle = String(parsed.handle || '').trim();
-        if (!handle.startsWith('@')) handle = '@' + handle;
+        const cleanHandle = String(parsed.handle || '').trim().replace(/^@+/, '');
+        if (!cleanHandle || cleanHandle.length < 2) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Valid page handle required (min 2 characters)' }));
+          return;
+        }
+        const handle = '@' + cleanHandle.toLowerCase();
+        const reqName = String(parsed.name || '').trim();
+        if (!reqName || reqName.length < 2) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Valid page name required (min 2 characters)' }));
+          return;
+        }
         const ctaLabels: Record<string, string> = {
           message: 'Send Message',
           website: 'Visit Website',
@@ -24988,10 +25097,29 @@ async function startDevServer() {
           tip: 'Tip Creator',
         };
         const ctaType = String(parsed.ctaType || 'message');
+        const existing = dynamicSocialStore.pages.find(p => 
+          p.handle && p.handle.toLowerCase() === handle
+        );
+        if (existing) {
+          if (existing.ownerDid && existing.ownerDid !== principal.did) {
+            res.writeHead(409, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'A page with this handle already exists' }));
+            return;
+          }
+          existing.name = reqName;
+          existing.bio = String(parsed.bio || existing.bio);
+          existing.cta = ctaLabels[ctaType] || existing.cta;
+          existing.ctaType = ctaType;
+          if (!existing.ownerDid) existing.ownerDid = principal.did;
+          saveDynamicSocialState(dynamicSocialStore);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, page: existing }));
+          return;
+        }
         const newPage: PageRecord = {
           id: 'pg-' + Date.now(),
-          handle: handle.toLowerCase(),
-          name: String(parsed.name || 'Untitled Page'),
+          handle: handle,
+          name: reqName,
           category: String(parsed.category || 'business'),
           bio: String(parsed.bio || 'Sovereign business page'),
           count: 1,

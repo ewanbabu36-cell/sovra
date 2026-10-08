@@ -690,15 +690,15 @@ export class SovraDatabaseEngine {
       chatMessages: [],
       posts: [],
       channels: [
-        { id: 'ch-alpha', handle: '@sovra_alpha', name: 'Sovra Alpha Radar', category: 'tech', desc: 'Cutting-edge P2P social dispatches', count: 14200, avatar: '📢', bg: '#0284c7', isSubbed: true, createdAt: Date.now() - 10000000 },
-        { id: 'ch-gaming', handle: '@web3_gaming', name: 'Web3 Arcade Live', category: 'gaming', desc: 'Multiplayer P2P tournaments & game clips', count: 8900, avatar: '🎮', bg: '#8b5cf6', isSubbed: false, createdAt: Date.now() - 8000000 },
-        { id: 'ch-news', handle: '@decentral_news', name: 'Global Mesh Dispatches', category: 'news', desc: 'Uncensored citizen dispatches over GossipSub', count: 24500, avatar: '📰', bg: '#10b981', isSubbed: false, createdAt: Date.now() - 6000000 },
-        { id: 'ch-music', handle: '@ambient_radio', name: '24/7 Lo-Fi Mesh Waves', category: 'music', desc: 'Continuous stream seeded across 40 nodes', count: 6200, avatar: '🎵', bg: '#f43f5e', isSubbed: true, createdAt: Date.now() - 4000000 },
+        { id: 'ch-alpha', handle: '@sovra_alpha', name: 'Sovra Alpha Radar', category: 'tech', desc: 'Cutting-edge P2P social dispatches', count: 14200, avatar: '📢', bg: '#0284c7', isSubbed: true, ownerDid: 'did:sovra:system', createdAt: Date.now() - 10000000 },
+        { id: 'ch-gaming', handle: '@web3_gaming', name: 'Web3 Arcade Live', category: 'gaming', desc: 'Multiplayer P2P tournaments & game clips', count: 8900, avatar: '🎮', bg: '#8b5cf6', isSubbed: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 8000000 },
+        { id: 'ch-news', handle: '@decentral_news', name: 'Global Mesh Dispatches', category: 'news', desc: 'Uncensored citizen dispatches over GossipSub', count: 24500, avatar: '📰', bg: '#10b981', isSubbed: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 6000000 },
+        { id: 'ch-music', handle: '@ambient_radio', name: '24/7 Lo-Fi Mesh Waves', category: 'music', desc: 'Continuous stream seeded across 40 nodes', count: 6200, avatar: '🎵', bg: '#f43f5e', isSubbed: true, ownerDid: 'did:sovra:system', createdAt: Date.now() - 4000000 },
       ],
       pages: [
-        { id: 'pg-metropolis', handle: '@metropolis_coffee', name: 'Metropolis Roastery', category: 'business', bio: 'Artisan cold brew with gigabit sovereign Wi-Fi', count: 3400, cta: 'Book Table', ctaType: 'book', avatar: '☕', bg: '#78350f', isFollowing: false, createdAt: Date.now() - 12000000 },
-        { id: 'pg-meshlabs', handle: '@mesh_labs', name: 'Mesh Labs AI', category: 'brand', bio: 'Local edge LLMs and private search models', count: 12400, cta: 'Visit Website', ctaType: 'website', avatar: '⚡', bg: '#4f46e5', isFollowing: true, createdAt: Date.now() - 9000000 },
-        { id: 'pg-bakery', handle: '@artisan_bakery', name: 'Sovereign Sourdough', category: 'business', bio: 'Fresh organic loaves delivered directly via P2P orders', count: 1850, cta: 'Send Message', ctaType: 'message', avatar: '🥖', bg: '#d97706', isFollowing: false, createdAt: Date.now() - 7000000 },
+        { id: 'pg-metropolis', handle: '@metropolis_coffee', name: 'Metropolis Roastery', category: 'business', bio: 'Artisan cold brew with gigabit sovereign Wi-Fi', count: 3400, cta: 'Book Table', ctaType: 'book', avatar: '☕', bg: '#78350f', isFollowing: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 12000000 },
+        { id: 'pg-meshlabs', handle: '@mesh_labs', name: 'Mesh Labs AI', category: 'brand', bio: 'Local edge LLMs and private search models', count: 12400, cta: 'Visit Website', ctaType: 'website', avatar: '⚡', bg: '#4f46e5', isFollowing: true, ownerDid: 'did:sovra:system', createdAt: Date.now() - 9000000 },
+        { id: 'pg-bakery', handle: '@artisan_bakery', name: 'Sovereign Sourdough', category: 'business', bio: 'Fresh organic loaves delivered directly via P2P orders', count: 1850, cta: 'Send Message', ctaType: 'message', avatar: '🥖', bg: '#d97706', isFollowing: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 7000000 },
       ],
       friend_relationships: [],
       follows: [],
@@ -762,29 +762,68 @@ export class SovraDatabaseEngine {
           posts: Array.isArray(parsed.posts) ? parsed.posts : [],
           channels: (() => {
             const list = Array.isArray(parsed.channels) ? parsed.channels : this.db.channels;
-            const seen = new Set<string>();
+            const seenIds = new Set<string>();
+            const seenHandles = new Set<string>();
             const deduped: ChannelRecord[] = [];
             for (const ch of list) {
-              const key = (ch.name || ch.handle || ch.id || '').trim().toLowerCase();
-              if (key && !seen.has(key)) {
-                seen.add(key);
-                deduped.push(ch);
+              if (!ch || !ch.id) continue;
+              const handle = (ch.handle || '').trim().toLowerCase();
+              const name = (ch.name || '').trim();
+              // Purge corrupted/forged handles or empty names
+              if (!handle || handle === '@' || handle.replace(/^@+/, '').length < 2) continue;
+              if (!name || (name === 'forged-channel' && handle === '@')) continue;
+              if (seenIds.has(ch.id) || seenHandles.has(handle)) continue;
+              seenIds.add(ch.id);
+              seenHandles.add(handle);
+              deduped.push(ch);
+            }
+            // Ensure core system broadcast channels are present without duplication
+            const seedChannels: ChannelRecord[] = [
+              { id: 'ch-alpha', handle: '@sovra_alpha', name: 'Sovra Alpha Radar', category: 'tech', desc: 'Cutting-edge P2P social dispatches', count: 14200, avatar: '📢', bg: '#0284c7', isSubbed: true, ownerDid: 'did:sovra:system', createdAt: Date.now() - 10000000 },
+              { id: 'ch-gaming', handle: '@web3_gaming', name: 'Web3 Arcade Live', category: 'gaming', desc: 'Multiplayer P2P tournaments & game clips', count: 8900, avatar: '🎮', bg: '#8b5cf6', isSubbed: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 8000000 },
+              { id: 'ch-news', handle: '@decentral_news', name: 'Global Mesh Dispatches', category: 'news', desc: 'Uncensored citizen dispatches over GossipSub', count: 24500, avatar: '📰', bg: '#10b981', isSubbed: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 6000000 },
+              { id: 'ch-music', handle: '@ambient_radio', name: '24/7 Lo-Fi Mesh Waves', category: 'music', desc: 'Continuous stream seeded across 40 nodes', count: 6200, avatar: '🎵', bg: '#f43f5e', isSubbed: true, ownerDid: 'did:sovra:system', createdAt: Date.now() - 4000000 },
+            ];
+            for (const sc of seedChannels) {
+              if (!seenIds.has(sc.id) && !seenHandles.has(sc.handle)) {
+                seenIds.add(sc.id);
+                seenHandles.add(sc.handle);
+                deduped.push(sc);
               }
             }
-            return deduped.length > 0 ? deduped : this.db.channels;
+            return deduped;
           })(),
           pages: (() => {
             const list = Array.isArray(parsed.pages) ? parsed.pages : this.db.pages;
-            const seen = new Set<string>();
+            const seenIds = new Set<string>();
+            const seenHandles = new Set<string>();
             const deduped: PageRecord[] = [];
             for (const pg of list) {
-              const key = (pg.name || pg.handle || pg.id || '').trim().toLowerCase();
-              if (key && !seen.has(key)) {
-                seen.add(key);
-                deduped.push(pg);
+              if (!pg || !pg.id) continue;
+              const handle = (pg.handle || '').trim().toLowerCase();
+              const name = (pg.name || '').trim();
+              // Purge corrupted/forged handles or empty names
+              if (!handle || handle === '@' || handle.replace(/^@+/, '').length < 2) continue;
+              if (!name || (name === 'Untitled Page' && handle === '@')) continue;
+              if (seenIds.has(pg.id) || seenHandles.has(handle)) continue;
+              seenIds.add(pg.id);
+              seenHandles.add(handle);
+              deduped.push(pg);
+            }
+            // Ensure core system sovereign pages are present without duplication
+            const seedPages: PageRecord[] = [
+              { id: 'pg-metropolis', handle: '@metropolis_coffee', name: 'Metropolis Roastery', category: 'business', bio: 'Artisan cold brew with gigabit sovereign Wi-Fi', count: 3400, cta: 'Book Table', ctaType: 'book', avatar: '☕', bg: '#78350f', isFollowing: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 12000000 },
+              { id: 'pg-meshlabs', handle: '@mesh_labs', name: 'Mesh Labs AI', category: 'brand', bio: 'Local edge LLMs and private search models', count: 12400, cta: 'Visit Website', ctaType: 'website', avatar: '⚡', bg: '#4f46e5', isFollowing: true, ownerDid: 'did:sovra:system', createdAt: Date.now() - 9000000 },
+              { id: 'pg-bakery', handle: '@artisan_bakery', name: 'Sovereign Sourdough', category: 'business', bio: 'Fresh organic loaves delivered directly via P2P orders', count: 1850, cta: 'Send Message', ctaType: 'message', avatar: '🥖', bg: '#d97706', isFollowing: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 7000000 },
+            ];
+            for (const sp of seedPages) {
+              if (!seenIds.has(sp.id) && !seenHandles.has(sp.handle)) {
+                seenIds.add(sp.id);
+                seenHandles.add(sp.handle);
+                deduped.push(sp);
               }
             }
-            return deduped.length > 0 ? deduped : this.db.pages;
+            return deduped;
           })(),
           friend_relationships: Array.isArray(parsed.friend_relationships) ? parsed.friend_relationships : [],
           follows: Array.isArray(parsed.follows) ? parsed.follows : [],
@@ -1836,40 +1875,46 @@ export class SovraDatabaseEngine {
 
   public getAllChannels(): ChannelRecord[] {
     this.load();
-    const seen = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenHandles = new Set<string>();
     const result: ChannelRecord[] = [];
     for (const c of this.db.channels) {
-      const key = (c.name || c.handle || c.id || '').trim().toLowerCase();
-      if (key && !seen.has(key)) {
-        seen.add(key);
-        result.push(c);
-      }
+      if (!c || !c.id) continue;
+      const handle = (c.handle || '').trim().toLowerCase();
+      if (!handle || handle === '@' || handle.replace(/^@+/, '').length < 2) continue;
+      if (seenIds.has(c.id) || seenHandles.has(handle)) continue;
+      seenIds.add(c.id);
+      seenHandles.add(handle);
+      result.push(c);
     }
     return result;
   }
 
   public getChannelById(id: string): ChannelRecord | undefined {
     this.load();
-    return this.db.channels.find(c => c.id === id || c.handle === id);
+    return this.getAllChannels().find(c => c.id === id || c.handle.toLowerCase() === id.toLowerCase());
   }
 
   public getAllPages(): PageRecord[] {
     this.load();
-    const seen = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenHandles = new Set<string>();
     const result: PageRecord[] = [];
     for (const p of this.db.pages) {
-      const key = (p.name || p.handle || p.id || '').trim().toLowerCase();
-      if (key && !seen.has(key)) {
-        seen.add(key);
-        result.push(p);
-      }
+      if (!p || !p.id) continue;
+      const handle = (p.handle || '').trim().toLowerCase();
+      if (!handle || handle === '@' || handle.replace(/^@+/, '').length < 2) continue;
+      if (seenIds.has(p.id) || seenHandles.has(handle)) continue;
+      seenIds.add(p.id);
+      seenHandles.add(handle);
+      result.push(p);
     }
     return result;
   }
 
   public getPageById(id: string): PageRecord | undefined {
     this.load();
-    return this.db.pages.find(p => p.id === id || p.handle === id);
+    return this.getAllPages().find(p => p.id === id || p.handle.toLowerCase() === id.toLowerCase());
   }
 
   public reportPost(postId: string, reporterDid: string, reason: string): { ok: boolean; reportsCount: number } {

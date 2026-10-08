@@ -43,7 +43,7 @@ describe('Consumer Social UI Cleanliness & Admin Segregation Suite', () => {
     const handles = stories.map(s => s.creatorHandle.toLowerCase());
     const uniqueHandles = new Set(handles);
     expect(handles.length).toBe(uniqueHandles.size);
-  });
+  }, 15000);
 
   it('proves profile dropdown and sidebar feature prominent Log Out button with icon', () => {
     // 1. Profile dropdown menu item

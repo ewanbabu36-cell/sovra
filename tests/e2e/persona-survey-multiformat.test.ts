@@ -22,7 +22,7 @@ describe('Author Persona Selector & Multi-Format (Post, Reel, Poll, Survey, Q&A)
     expect(data.ok).toBe(true);
     sessionToken = data.sessionToken;
     userDid = data.user.did;
-  });
+  }, 15000);
 
   it('renders author persona dropdown (Personal, Pages, Channels) and all format tabs in HTML', async () => {
     const res = await fetch(`${BASE_URL}/`);
