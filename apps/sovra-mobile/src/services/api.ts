@@ -488,26 +488,26 @@ export async function fetchMeshStatus(): Promise<MobileMeshStatus> {
       controls: data.controls,
     };
   } catch {
-    // Default offline mesh state when server unreachable
+    // Truthful offline state when server is unreachable
     return {
-      status: 'BLUETOOTH_MESH',
+      status: 'OFFLINE',
       diagnostics: {
-        nearbyPeersCount: 2,
-        authenticatedPeersCount: 2,
-        activeTransports: ['ble'],
+        nearbyPeersCount: 0,
+        authenticatedPeersCount: 0,
+        activeTransports: [],
         outboxPendingCount: 0,
-        relayQueueCount: 3,
-        totalBytesSent: 24000,
-        totalBytesReceived: 26000,
-        packetsRouted: 12,
-        duplicatePacketsDropped: 2,
-        lastSyncTimestamp: Date.now(),
-        currentNetworkStatus: 'BLUETOOTH_MESH',
+        relayQueueCount: 0,
+        totalBytesSent: 0,
+        totalBytesReceived: 0,
+        packetsRouted: 0,
+        duplicatePacketsDropped: 0,
+        lastSyncTimestamp: 0,
+        currentNetworkStatus: 'DISCONNECTED',
       },
       controls: {
-        bluetoothMeshEnabled: true,
-        discoverabilityEnabled: true,
-        relayParticipationEnabled: true,
+        bluetoothMeshEnabled: false,
+        discoverabilityEnabled: false,
+        relayParticipationEnabled: false,
         batteryProfile: 'BALANCED',
         privateRoutingOnly: false,
       },

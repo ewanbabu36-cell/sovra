@@ -29706,69 +29706,8 @@ async function startDevServer() {
 
           // Deliver message instantly to active realtime SSE subscriber
           broadcastChatEvent(record.recipientDid, record);
-
-          // Simulated dynamic peer response for direct chats with canonical demo peers
-          if (record.recipientDid === 'did:sovra:alice_ble' || record.recipientDid === 'did:sovra:bob_ble') {
-            const peerName = record.recipientDid === 'did:sovra:alice_ble' ? 'Alice Sovereign' : 'Bob Mesh Node';
-            setTimeout(() => {
-              try {
-                const directReplies = record.attachment
-                  ? [
-                      `Received attachment "${record.attachment.name}"! Decrypted and verified block integrity. 📎⚡`,
-                      `File "${record.attachment.name}" pinned to local IPFS blockstore. Looks great! 📦🔒`,
-                      `Got the file! SHA-256 fingerprint verified over direct BLE. ⚡`,
-                    ]
-                  : [
-                      'Got your message over direct BLE! Signal is strong. ⚡',
-                      'Ratchet session verified and synchronized. How is your node running? 🚀',
-                      'Decentralized packet acknowledged. E2EE keys matched! 🔒',
-                    ];
-                const replyText = directReplies[Math.floor(Math.random() * directReplies.length)];
-                const peerReply = sovraDb.appendMessage({
-                  id: 'msg_direct_reply_' + Date.now(),
-                  senderDid: record.recipientDid,
-                  recipientDid: record.senderDid,
-                  senderName: peerName,
-                  text: replyText,
-                  isAudio: false,
-                  audioDurationSec: 0,
-                  status: 'delivered',
-                  isBitChat: true,
-                  hopCount: 1,
-                });
-                broadcastChatEvent(record.senderDid, peerReply);
-              } catch (e) {}
-            }, 1500);
-          }
         } else if (record && record.recipientDid === 'channel:local_mesh') {
           broadcastChatEvent('channel:local_mesh', record);
-
-          // Simulated dynamic peer ACK on local mesh if not an automated test message
-          if (record.senderDid !== 'did:sovra:alice_ble' && !record.text.includes('test')) {
-            setTimeout(() => {
-              try {
-                const meshResponses = [
-                  'Mesh packet relayed via Direct BLE swarm (RSSI: -41 dBm). ⚡',
-                  'Ack received on hyperlocal channel. Packet TTL: 6 hops remaining. 📶',
-                  'Encrypted broadcast synced across nearby nodes. 🚀',
-                ];
-                const replyText = meshResponses[Math.floor(Math.random() * meshResponses.length)];
-                const ackMsg = sovraDb.appendMessage({
-                  id: 'msg_mesh_ack_' + Date.now(),
-                  senderDid: 'did:sovra:alice_ble',
-                  recipientDid: 'channel:local_mesh',
-                  senderName: 'Alice Sovereign',
-                  text: replyText,
-                  isAudio: false,
-                  audioDurationSec: 0,
-                  status: 'delivered',
-                  isBitChat: true,
-                  hopCount: 1,
-                });
-                broadcastChatEvent('channel:local_mesh', ackMsg);
-              } catch (e) {}
-            }, 1400);
-          }
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -29882,25 +29821,25 @@ async function startDevServer() {
           ok: true,
           peerId: binding.peerId,
           did: masterKey.did,
-          status: 'BLUETOOTH_MESH',
+          status: node ? 'ONLINE_IP_MESH' : 'ONLINE_IP',
           diagnostics: {
             peerId: binding.peerId,
             nearbyPeersCount: activePeers.length,
             authenticatedPeersCount: activePeers.length,
-            activeTransports: ['tcp', 'gossipsub', 'ble'],
+            activeTransports: node ? ['tcp', 'gossipsub', 'http'] : ['http', 'sse'],
             outboxPendingCount: 0,
             relayQueueCount: 0,
             totalBlocksStored: stats.totalBlocks,
-            totalBytesStored: Number(stats.totalBytes),
+            totalBytesStored: Number(stats?.totalBytes || 0),
             uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
             lastSyncTimestamp: Date.now(),
-            currentNetworkStatus: 'ONLINE_MESH',
+            currentNetworkStatus: node ? 'ONLINE_P2P' : 'ONLINE_IP',
           },
           controls: {
-            bluetoothMeshEnabled: true,
+            bluetoothMeshEnabled: false,
             discoverabilityEnabled: true,
-            relayParticipationEnabled: true,
-            batteryProfile: 'BALANCED',
+            relayParticipationEnabled: false,
+            batteryProfile: 'PERFORMANCE',
             privateRoutingOnly: false,
           },
         }),
