@@ -20794,47 +20794,62 @@ function renderHtml(
       }
 
       // 2. People You May Know / Suggested Section
-      if ((currentFriendsFilter === 'all' || currentFriendsFilter === 'suggestions') && suggestionsList.length > 0) {
+      if (currentFriendsFilter === 'all' || currentFriendsFilter === 'suggestions') {
         html += '<div>' +
-          '<div class="friends-section-title"><span>✨</span> <span>Discovered Peers on Mesh (' + suggestionsList.length + ')</span></div>' +
-          '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
-        for (const p of suggestionsList) {
-          const pName = String(p.displayName || p.name || 'Peer');
-          const cleanName = pName.replace(/"/g, '&quot;');
-          const avatarHtml = p.avatarDataUrl ?
-            '<img src="' + p.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" />' :
-            (p.avatar || 'P');
+          '<div class="friends-section-title"><span>✨</span> <span>Discovered Peers on Mesh (' + suggestionsList.length + ')</span></div>';
+        if (suggestionsList.length > 0) {
+          html += '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
+          for (const p of suggestionsList) {
+            const pName = String(p.displayName || p.name || 'Peer');
+            const cleanName = pName.replace(/"/g, '&quot;');
+            const avatarHtml = p.avatarDataUrl ?
+              '<img src="' + p.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" />' :
+              (p.avatar || 'P');
 
-          let actionBtnHtml = '';
-          if (p.relationshipStatus === 'pending_sent') {
-            actionBtnHtml = '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem; color: #f59e0b; border-color: rgba(245,158,11,0.4);" disabled>⏳ Requested</button>';
-          } else if (p.relationshipStatus === 'pending_received') {
-            actionBtnHtml = '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 0.85rem;" onclick="setFriendsFilter(&quot;requests&quot;)">Respond 📩</button>';
-          } else {
-            actionBtnHtml = '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="sendFriendRequest(&quot;' + p.did + '&quot;, &quot;' + cleanName + '&quot;)">+ Add Friend</button>';
-          }
+            let actionBtnHtml = '';
+            if (p.relationshipStatus === 'pending_sent') {
+              actionBtnHtml = '<button class="action-pill-btn action-pill-secondary" style="padding: 0.45rem 0.85rem; color: #f59e0b; border-color: rgba(245,158,11,0.4);" disabled>⏳ Requested</button>';
+            } else if (p.relationshipStatus === 'pending_received') {
+              actionBtnHtml = '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 0.85rem;" onclick="setFriendsFilter(&quot;requests&quot;)">Respond 📩</button>';
+            } else {
+              actionBtnHtml = '<button class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1rem; font-weight: 700;" onclick="sendFriendRequest(&quot;' + p.did + '&quot;, &quot;' + cleanName + '&quot;)">+ Add Friend</button>';
+            }
 
-          html += '<div class="friend-card">' +
-            '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
-              '<div style="position: relative;">' +
-                '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + (p.avatarBg || '#6366f1') + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(255,255,255,0.1); overflow: hidden;">' + avatarHtml + '</div>' +
-                '<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: ' + (p.isOnline ? '#10b981' : '#64748b') + '; border: 2px solid #111827;"></div>' +
-              '</div>' +
-              '<div>' +
-                '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
-                  '<span>' + pName + '</span>' +
-                  '<span style="font-size: 0.68rem; background: rgba(99,102,241,0.2); color: #a5b4fc; padding: 2px 6px; border-radius: 8px;">' + (p.device || 'Peer') + '</span>' +
+            html += '<div class="friend-card">' +
+              '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
+                '<div style="position: relative;">' +
+                  '<div style="width: 46px; height: 46px; border-radius: 50%; background: ' + (p.avatarBg || '#6366f1') + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; border: 2px solid rgba(255,255,255,0.1); overflow: hidden;">' + avatarHtml + '</div>' +
+                  '<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: ' + (p.isOnline ? '#10b981' : '#64748b') + '; border: 2px solid #111827;"></div>' +
                 '</div>' +
-                '<div style="font-size: 0.78rem; color: #94a3b8;">' + (p.handle || '@peer') + ' &bull; ' + (p.isOnline ? '<span style="color:#10b981;">Online</span>' : 'Offline') + '</div>' +
-                '<div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">⚡ Discovered via Wi-Fi Multicast / GossipSub</div>' +
+                '<div>' +
+                  '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">' +
+                    '<span>' + pName + '</span>' +
+                    '<span style="font-size: 0.68rem; background: rgba(99,102,241,0.2); color: #a5b4fc; padding: 2px 6px; border-radius: 8px;">' + (p.device || 'Peer') + '</span>' +
+                  '</div>' +
+                  '<div style="font-size: 0.78rem; color: #94a3b8;">' + (p.handle || '@peer') + ' &bull; ' + (p.isOnline ? '<span style="color:#10b981;">Online</span>' : 'Offline') + '</div>' +
+                  '<div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">⚡ Discovered via Wi-Fi Multicast / GossipSub</div>' +
+                '</div>' +
               '</div>' +
+              '<div style="display: flex; gap: 0.4rem; align-items: center;">' +
+                actionBtnHtml +
+              '</div>' +
+            '</div>';
+          }
+          html += '</div>';
+        } else {
+          html += '<div style="background: rgba(15,23,42,0.6); border: 1px dashed rgba(255,255,255,0.15); border-radius: 14px; padding: 2rem 1.5rem; text-align: center;">' +
+            '<div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📡</div>' +
+            '<div style="font-weight: 700; color: #fff; font-size: 1rem; margin-bottom: 0.35rem;">Scanning Local Mesh for Peers...</div>' +
+            '<div style="color: #94a3b8; font-size: 0.82rem; max-width: 420px; margin: 0 auto 0.85rem;">' +
+              'Zero central servers. Real peers connected to your Wi-Fi, hotspot, or Bluetooth mesh will appear here automatically in real time.' +
             '</div>' +
-            '<div style="display: flex; gap: 0.4rem; align-items: center;">' +
-              actionBtnHtml +
+            '<div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.25); color: #38bdf8; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">' +
+              '<span style="width: 6px; height: 6px; border-radius: 50%; background: #38bdf8; display: inline-block;"></span>' +
+              '<span>P2P GossipSub Swarm Active</span>' +
             '</div>' +
           '</div>';
         }
-        html += '</div></div>';
+        html += '</div>';
       }
 
       // 3. My Connected Friends Section
@@ -20877,7 +20892,7 @@ function renderHtml(
       if (!html) {
         html = '<div style="text-align: center; padding: 3rem 1rem; color: #64748b; font-size: 0.9rem;">' +
           '<div style="font-size: 2.2rem; margin-bottom: 0.5rem;">👥</div>' +
-          (q ? ('No peers or friends found matching "' + q.replace(/</g, '&lt;') + '".') : 'No peers or friend requests in this view yet.<br><span style="color: #94a3b8; font-size: 0.8rem;">Open app on Phone (http://10.96.44.224:3001) to connect over LAN!</span>') +
+          (q ? ('No peers or friends found matching "' + q.replace(/</g, '&lt;') + '".') : 'No peers or friend requests in this view yet.<br><span style="color: #94a3b8; font-size: 0.8rem;">Open app on Phone (http://' + (window.location.hostname || 'localhost') + ':3001) to connect over LAN!</span>') +
         '</div>';
       }
 

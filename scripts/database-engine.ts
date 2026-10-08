@@ -871,99 +871,64 @@ export class SovraDatabaseEngine {
       this.save();
     }
 
-    // Filter out test drill artifacts & deduplicate
-    const isTestArtifact = (p: ContactPeerRecord) => {
-      const s = ((p.handle || '') + ' ' + (p.name || '') + ' ' + (p.did || '')).toLowerCase();
-      return /(_[a-z0-9]{4,}|bb_|mu_|\d{4,}|attacker|victim|gate_|drill|test|dev_|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_mu|_e2e)/i.test(s);
+    // Helper to identify automated test artifacts
+    const isTestArtifact = (handle?: string, name?: string, did?: string, createdAt?: number) => {
+      // If created in the last 60 seconds, keep it (active in-progress automated test)
+      if (createdAt && (Date.now() - createdAt < 60000)) return false;
+      const h = (handle || '').toLowerCase().trim();
+      const n = (name || '').toLowerCase().trim();
+      const d = (did || '').toLowerCase().trim();
+      if (h === '@laptop_host') return false;
+      if (h === '@merajsharif' || h === '@ewan' || h === '@farhat' || h === '@meraj' || h === '@rahul_phone') return false;
+      return /(alice|bob|charlie|bb_|muw|_mu|\d{6,}|attacker|victim|gate_|drill|dev_\w{3,}|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_e2e|persona_author|test)/i.test(h + ' ' + n + ' ' + d);
     };
 
+    // Filter out test drill artifacts & deduplicate users
+    const uniqueUsers: UserRecord[] = [];
+    const seenUserHandles = new Set<string>();
+    const seenUserDids = new Set<string>();
+    for (let i = this.db.users.length - 1; i >= 0; i--) {
+      const u = this.db.users[i];
+      if (isTestArtifact(u.handle, u.displayName || u.name, u.did, u.createdAt)) continue;
+      if (u.handle === '@peer' || u.did === 'did:key:peer') continue;
+      const cleanH = (u.handle || '').toLowerCase().trim();
+      if (!seenUserHandles.has(cleanH) && !seenUserDids.has(u.did)) {
+        seenUserHandles.add(cleanH);
+        seenUserDids.add(u.did);
+        uniqueUsers.unshift(u);
+      }
+    }
+    this.db.users = uniqueUsers;
+
+    // Filter contacts & peers: remove test artifacts and legacy mock placeholders (did:key:peer, @alice_sovereign, @bob_mesh, @carol_sounds)
+    const legacyMockDids = new Set(['did:key:peer', 'did:sovra:alice_ble', 'did:sovra:bob_ble', 'did:sovra:carol_sounds']);
     const uniquePeers: ContactPeerRecord[] = [];
-    const seenHandles = new Set<string>();
-    const seenDids = new Set<string>();
+    const seenPeerHandles = new Set<string>();
+    const seenPeerDids = new Set<string>();
 
-    for (const p of this.db.contacts_and_peers) {
-      if (isTestArtifact(p)) continue;
-      const h = (p.handle || p.name || p.did).toLowerCase();
-      if (!seenHandles.has(h) && !seenDids.has(p.did)) {
-        seenHandles.add(h);
-        seenDids.add(p.did);
-        uniquePeers.push(p);
+    for (let i = this.db.contacts_and_peers.length - 1; i >= 0; i--) {
+      const p = this.db.contacts_and_peers[i];
+      if (legacyMockDids.has(p.did)) continue;
+      if (isTestArtifact(p.handle, p.name, p.did, p.lastSeenTimestamp)) continue;
+      const h = (p.handle || p.name || p.did).toLowerCase().trim();
+      if (!seenPeerHandles.has(h) && !seenPeerDids.has(p.did)) {
+        seenPeerHandles.add(h);
+        seenPeerDids.add(p.did);
+        uniquePeers.unshift(p);
       }
     }
-
-    // Ensure canonical mesh peers are always present
-    const canonicalPeers: ContactPeerRecord[] = [
-      {
-        did: 'did:sovra:alice_ble',
-        handle: '@alice_sovereign',
-        name: 'Alice Sovereign',
-        avatar: 'A',
-        avatarBg: '#ec4899',
-        role: 'Direct BLE',
-        rssi: -42,
-        distanceMeters: 2.5,
-        hops: 1,
-        isDirect: true,
-        isOnline: true,
-        lastSeen: 'Online',
-        bio: 'Sovereign P2P developer & mesh node operator',
-      },
-      {
-        did: 'did:sovra:bob_ble',
-        handle: '@bob_mesh',
-        name: 'Bob Mesh Node',
-        avatar: 'B',
-        avatarBg: '#6366f1',
-        role: 'Direct BLE',
-        rssi: -58,
-        distanceMeters: 4.2,
-        hops: 1,
-        isDirect: true,
-        isOnline: true,
-        lastSeen: 'Online',
-        bio: 'Multi-hop relay node & distributed storage provider',
-      },
-      {
-        did: 'did:sovra:carol_sounds',
-        handle: '@carol_sounds',
-        name: 'Carol Sounds',
-        avatar: 'C',
-        avatarBg: '#8b5cf6',
-        role: 'Direct BLE',
-        rssi: -72,
-        distanceMeters: 8.5,
-        hops: 2,
-        isDirect: false,
-        isOnline: true,
-        lastSeen: '5m ago',
-        bio: 'Independent audio creator on Sovra mesh',
-      },
-      {
-        did: 'did:sovra:rahul_sharma',
-        handle: '@rahul_sharma',
-        name: 'Rahul Sharma',
-        avatar: 'R',
-        avatarBg: '#10b981',
-        role: 'Direct BLE',
-        rssi: -38,
-        distanceMeters: 1.1,
-        hops: 1,
-        isDirect: true,
-        isOnline: true,
-        lastSeen: 'Online',
-        bio: 'Decentralized identity & zero-internet cryptography',
-      },
-    ];
-
-    for (const cp of canonicalPeers) {
-      if (!seenDids.has(cp.did)) {
-        seenDids.add(cp.did);
-        seenHandles.add(cp.handle.toLowerCase());
-        uniquePeers.push(cp);
-      }
-    }
-
     this.db.contacts_and_peers = uniquePeers;
+
+    // Clean friend relationships referencing non-existent or deleted test users
+    if (Array.isArray(this.db.friend_relationships)) {
+      this.db.friend_relationships = this.db.friend_relationships.filter(r => {
+        if (legacyMockDids.has(r.fromDid) || legacyMockDids.has(r.toDid)) return false;
+        if (isTestArtifact(undefined, undefined, r.fromDid) || isTestArtifact(undefined, undefined, r.toDid)) return false;
+        return true;
+      });
+    }
+
+    this.save();
 
     // Filter repetitive test messages
     this.db.chatMessages = this.db.chatMessages.filter(m => {
@@ -1340,9 +1305,22 @@ export class SovraDatabaseEngine {
   public getAllPeers(excludeDid?: string): ContactPeerRecord[] {
     this.load();
     if (!Array.isArray(this.db.contacts_and_peers)) this.db.contacts_and_peers = [];
+    const legacyMockDids = new Set(['did:key:peer', 'did:sovra:alice_ble', 'did:sovra:bob_ble', 'did:sovra:carol_sounds']);
+    const isTestArtifact = (handle?: string, name?: string, did?: string, createdAt?: number) => {
+      if (createdAt && (Date.now() - createdAt < 60000)) return false;
+      const h = (handle || '').toLowerCase().trim();
+      const n = (name || '').toLowerCase().trim();
+      const d = (did || '').toLowerCase().trim();
+      if (h === '@laptop_host') return false;
+      if (h === '@merajsharif' || h === '@ewan' || h === '@farhat' || h === '@meraj' || h === '@rahul_phone') return false;
+      return /(alice|bob|charlie|bb_|muw|_mu|\d{6,}|attacker|victim|gate_|drill|dev_\w{3,}|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_e2e|persona_author|test)/i.test(h + ' ' + n + ' ' + d);
+    };
+
     const existingDids = new Set(this.db.contacts_and_peers.map(p => p.did));
     let added = false;
     for (const u of (this.db.users || [])) {
+      if (legacyMockDids.has(u.did)) continue;
+      if (isTestArtifact(u.handle, u.displayName || u.name, u.did, u.createdAt)) continue;
       if (!existingDids.has(u.did)) {
         this.db.contacts_and_peers.push({
           did: u.did,
@@ -1366,8 +1344,9 @@ export class SovraDatabaseEngine {
     }
     if (added) this.save();
 
-    if (!excludeDid) return [...this.db.contacts_and_peers];
-    return this.db.contacts_and_peers.filter(p => p.did !== excludeDid);
+    const peers = this.db.contacts_and_peers.filter(p => !legacyMockDids.has(p.did) && !isTestArtifact(p.handle, p.name, p.did, p.lastSeenTimestamp));
+    if (!excludeDid) return [...peers];
+    return peers.filter(p => p.did !== excludeDid);
   }
 
   public setPeerOnlineStatus(did: string, isOnline: boolean): void {
