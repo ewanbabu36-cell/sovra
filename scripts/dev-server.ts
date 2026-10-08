@@ -20455,14 +20455,81 @@ function renderHtml(
     }
 
     // ==========================================
-    // 📞 SOVRA E2EE CALLING & WEBRTC ENGINE
+    // 📞 SOVRA E2EE CALLING & WEBRTC ENGINE (PRODUCTION P2P)
     // ==========================================
+    const CallState = {
+      IDLE: 'IDLE',
+      PERMISSION_REQUESTING: 'PERMISSION_REQUESTING',
+      SIGNALING_OFFERING: 'SIGNALING_OFFERING',
+      SIGNALING_RINGING: 'SIGNALING_RINGING',
+      SIGNALING_ANSWERED: 'SIGNALING_ANSWERED',
+      ICE_CONNECTING: 'ICE_CONNECTING',
+      ICE_CONNECTED: 'ICE_CONNECTED',
+      MEDIA_CONNECTING: 'MEDIA_CONNECTING',
+      CALL_CONNECTED: 'CALL_CONNECTED',
+      RECONNECTING: 'RECONNECTING',
+      FAILED: 'FAILED',
+      ENDED: 'ENDED'
+    };
+
+    let _callState = CallState.IDLE;
     let _callAudioCtx = null;
     let _callRingInterval = null;
     let _callIsMuted = false;
     let _currentIncomingCall = null;
     let _callConnectedSeconds = 0;
     let _isCallAnswered = false;
+    let _currentCallType = 'audio'; // 'audio' | 'video'
+    let _callVideoEnabled = false;
+    let _peerConnection = null;
+    let _iceCandidateQueue = [];
+    let _hasRemoteDescription = false;
+    let _statsInterval = null;
+    let _iceConnectedTicks = 0;
+    let _voiceVisualizerAnimId = null;
+    let _voiceVisualizerCtx = null;
+    let _activeCallPollBusy = false;
+
+    let _callDiagnostics = {
+      callState: 'IDLE',
+      iceConnectionState: 'new',
+      connectionState: 'new',
+      signalingState: 'stable',
+      localAudioTracks: 0,
+      localVideoTracks: 0,
+      remoteAudioTracks: 0,
+      remoteVideoTracks: 0,
+      selectedCandidatePair: null,
+      audio: {
+        bytesSent: 0,
+        bytesReceived: 0,
+        packetsSent: 0,
+        packetsReceived: 0,
+        jitter: 0,
+        packetsLost: 0,
+        audioLevel: 0
+      },
+      video: {
+        bytesSent: 0,
+        bytesReceived: 0,
+        framesSent: 0,
+        framesReceived: 0,
+        framesDecoded: 0,
+        packetsLost: 0
+      },
+      lastUpdated: 0
+    };
+
+    function setCallState(newState) {
+      console.log('[WebRTC State]', _callState, '->', newState);
+      _callState = newState;
+      _callDiagnostics.callState = newState;
+    }
+
+    function getCallDiagnostics() {
+      return JSON.parse(JSON.stringify(_callDiagnostics));
+    }
+    window.getCallDiagnostics = getCallDiagnostics;
 
     function playCallAudioRinging(type) {
       stopCallAudioRinging();
@@ -20475,7 +20542,7 @@ function renderHtml(
 
         _callRingInterval = setInterval(function() {
           try {
-            if (!_callAudioCtx) return;
+            if (!_callAudioCtx || _callAudioCtx.state === 'closed') return;
             const osc = _callAudioCtx.createOscillator();
             const gain = _callAudioCtx.createGain();
             osc.type = 'sine';
@@ -20524,12 +20591,38 @@ function renderHtml(
       } catch (_) {}
     }
 
+    function primeMediaPlayback() {
+      try {
+        let remoteAudio = document.getElementById('remoteAudioPlayer');
+        if (!remoteAudio) {
+          remoteAudio = document.createElement('audio');
+          remoteAudio.id = 'remoteAudioPlayer';
+          remoteAudio.autoplay = true;
+          remoteAudio.playsInline = true;
+          document.body.appendChild(remoteAudio);
+        }
+        remoteAudio.muted = false;
+        remoteAudio.volume = 1.0;
+        const p1 = remoteAudio.play();
+        if (p1 && typeof p1.catch === 'function') p1.catch(function() {});
+
+        const remoteVideo = document.getElementById('remoteVideoFeed');
+        if (remoteVideo) {
+          remoteVideo.playsInline = true;
+          remoteVideo.autoplay = true;
+          const p2 = remoteVideo.play();
+          if (p2 && typeof p2.catch === 'function') p2.catch(function() {});
+        }
+      } catch (_) {}
+    }
+
     function handleRemoteCallEnded(reason) {
       const modal = document.getElementById('e2eeCallModal');
       if (!modal || modal.style.display === 'none') {
         window._activeCallId = null;
         _isCallAnswered = false;
         _callConnectedSeconds = 0;
+        setCallState(CallState.IDLE);
         return;
       }
 
@@ -20562,6 +20655,7 @@ function renderHtml(
         statusEl.style.color = '#ef4444';
       }
       cleanupActiveCallSession();
+      setCallState(CallState.ENDED);
 
       const peerNameEl = document.getElementById('callPeerName');
       const peerName = peerNameEl ? peerNameEl.innerText : 'Peer';
@@ -20575,6 +20669,7 @@ function renderHtml(
           statusEl.style.color = '';
         }
         showAccountToast('📞 Call ended with ' + peerName + ' (' + durationFormatted + ')');
+        setCallState(CallState.IDLE);
       }, 1200);
     }
 
@@ -20609,8 +20704,6 @@ function renderHtml(
       return (window.authenticatedFetch ? window.authenticatedFetch(url, options) : fetch(url, options));
     }
 
-    let _voiceVisualizerAnimId = null;
-    let _voiceVisualizerCtx = null;
     function startLocalVoiceVisualizer(stream) {
       if (!stream) return;
       try {
@@ -20636,6 +20729,7 @@ function renderHtml(
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
           const avg = sum / dataArray.length;
+          _callDiagnostics.audio.audioLevel = Math.round(avg);
           const scale = Math.max(0.4, Math.min(3.2, avg / 12));
           bars.forEach(function(b, idx) {
             const factor = 1 + (idx % 2 === 0 ? 0.35 : -0.25);
@@ -20654,57 +20748,67 @@ function renderHtml(
       }
     }
 
-    let _activeCallPollBusy = false;
+    async function queueOrApplyIceCandidate(candidateData) {
+      if (!_peerConnection || !candidateData) return;
+      if (!_hasRemoteDescription || !_peerConnection.remoteDescription) {
+        _iceCandidateQueue.push(candidateData);
+        return;
+      }
+      try {
+        const candObj = (typeof candidateData === 'string') ? JSON.parse(candidateData) : candidateData;
+        await _peerConnection.addIceCandidate(new RTCIceCandidate(candObj));
+      } catch (err) {
+        console.warn('[WebRTC] addIceCandidate warning:', err);
+      }
+    }
+
+    async function flushQueuedIceCandidates() {
+      if (!_peerConnection || !_peerConnection.remoteDescription) return;
+      const queue = _iceCandidateQueue.slice();
+      _iceCandidateQueue = [];
+      for (let i = 0; i < queue.length; i++) {
+        try {
+          const candObj = (typeof queue[i] === 'string') ? JSON.parse(queue[i]) : queue[i];
+          await _peerConnection.addIceCandidate(new RTCIceCandidate(candObj));
+        } catch (e) {
+          console.warn('[WebRTC] Error applying queued ICE candidate:', e);
+        }
+      }
+    }
+
     function syncActiveCallSession() {
       if (!window._activeCallId || _activeCallPollBusy) return;
       _activeCallPollBusy = true;
       callFetch('/api/call/poll?callId=' + encodeURIComponent(window._activeCallId))
         .then(function(r) { return r.json(); })
-        .then(function(data) {
+        .then(async function(data) {
           _activeCallPollBusy = false;
           if (data && data.ok && data.session) {
             const st = data.session.status;
             if (st === 'answered') {
-              if (!_isCallAnswered) {
-                _isCallAnswered = true;
-                _callConnectedSeconds = 0;
-                stopCallAudioRinging();
-                const wave = document.getElementById('callWaveformContainer');
-                if (wave) wave.style.display = 'flex';
-                const directBtnWrap = document.getElementById('callDirectConnectWrap');
-                if (directBtnWrap) directBtnWrap.style.display = 'none';
-                const statusEl = document.getElementById('callStatusText');
-                if (statusEl) {
-                  statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
-                  statusEl.style.color = '#38bdf8';
+              if (_peerConnection && data.session.sdpAnswer && !_hasRemoteDescription && _peerConnection.signalingState === 'have-local-offer') {
+                try {
+                  console.log('[WebRTC] Applying remote SDP answer from signaling');
+                  await _peerConnection.setRemoteDescription(new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: data.session.sdpAnswer
+                  }));
+                  _hasRemoteDescription = true;
+                  setCallState(CallState.SIGNALING_ANSWERED);
+                  await flushQueuedIceCandidates();
+                } catch (e) {
+                  console.warn('[WebRTC] setRemoteDescription error:', e);
                 }
               }
 
-              // Apply remote SDP answer to RTCPeerConnection if available and valid
-              if (_peerConnection && data.session.sdpAnswer && _peerConnection.signalingState === 'have-local-offer') {
-                if (data.session.sdpAnswer.includes('a=fingerprint') || data.session.sdpAnswer.includes('a=ice-ufrag') || data.session.sdpAnswer.includes('a=setup')) {
-                  try {
-                    _peerConnection.setRemoteDescription(new RTCSessionDescription({
-                      type: 'answer',
-                      sdp: data.session.sdpAnswer
-                    })).catch(function(e) { console.warn('[WebRTC] setRemoteDescription warning:', e); });
-                  } catch (e) {
-                    console.warn('[WebRTC] Remote answer parse warning:', e);
-                  }
-                }
-              }
-
-              // Apply remote ICE candidates
               if (_peerConnection && Array.isArray(data.session.iceCandidates)) {
                 const myDid = myProfile ? myProfile.did : '';
-                data.session.iceCandidates.forEach(function(item) {
+                for (let i = 0; i < data.session.iceCandidates.length; i++) {
+                  const item = data.session.iceCandidates[i];
                   if (item.senderDid !== myDid && item.candidate) {
-                    try {
-                      const candObj = typeof item.candidate === 'string' ? JSON.parse(item.candidate) : item.candidate;
-                      _peerConnection.addIceCandidate(new RTCIceCandidate(candObj)).catch(function() {});
-                    } catch (_) {}
+                    await queueOrApplyIceCandidate(item.candidate);
                   }
-                });
+                }
               }
             } else if (st === 'ended' || st === 'rejected' || st === 'declined') {
               handleRemoteCallEnded(data.session.reason || 'peer_hung_up');
@@ -20733,11 +20837,6 @@ function renderHtml(
       showAccountToast(_callIsMuted ? 'Microphone Muted' : 'Microphone Unmuted', 'info');
     }
 
-    let _currentCallType = 'audio'; // 'audio' | 'video'
-    let _callVideoEnabled = false;
-    let _callPeerCanvasAnimId = null;
-    let _virtualCamAnimId = null;
-
     function toggleVideoCallFullscreen() {
       const card = document.getElementById('e2eeCallModalCard');
       if (!card) return;
@@ -20749,9 +20848,6 @@ function renderHtml(
       }
     }
 
-    let _peerConnection = null;
-    let _botPeerConnection = null;
-
     async function initCallLocalMediaStream(type) {
       if (window._localMediaStream) {
         try {
@@ -20761,104 +20857,57 @@ function renderHtml(
       }
 
       const needVideo = (type === 'video');
-      let realStream = null;
+      let stream = null;
 
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          realStream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-            video: needVideo ? { width: { ideal: 1280, min: 640 }, height: { ideal: 720, min: 360 }, facingMode: 'user' } : false
-          });
-        } catch (err) {
-          console.warn('[Call] Real media stream unavailable, attempting fallback tracks:', err.message);
-          if (needVideo) {
-            try {
-              realStream = await navigator.mediaDevices.getUserMedia({
-                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-                video: false
-              });
-            } catch (_) {}
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('WebRTC mediaDevices is not supported in this environment');
+      }
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: needVideo ? { width: { ideal: 1280, min: 640 }, height: { ideal: 720, min: 360 }, facingMode: 'user' } : false
+        });
+      } catch (err) {
+        console.warn('[Call] getUserMedia primary attempt failed:', err);
+        if (needVideo) {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+              video: false
+            });
+            showAccountToast('Camera unavailable; continuing with microphone audio', 'info');
+          } catch (audioErr) {
+            throw new Error('Microphone permission or device unavailable: ' + (audioErr.message || audioErr.name));
           }
-        }
-      }
-
-      const tracks = [];
-      if (realStream) {
-        realStream.getTracks().forEach(function(t) { tracks.push(t); });
-      }
-
-      // Audio track fallback: silent audio destination track (no synthetic oscillator or continuous beep noise)
-      const hasAudio = tracks.some(function(t) { return t.kind === 'audio'; });
-      if (!hasAudio) {
-        try {
-          const AC = window.AudioContext || window.webkitAudioContext;
-          if (AC) {
-            const actx = new AC();
-            const dst = actx.createMediaStreamDestination();
-            dst.stream.getAudioTracks().forEach(function(t) { tracks.push(t); });
-          }
-        } catch (e) {
-          console.warn('[Call] Audio fallback error:', e);
-        }
-      }
-
-      // Video track fallback for video calls: virtual canvas capture with continuous 30fps animation
-      const hasVideo = tracks.some(function(t) { return t.kind === 'video'; });
-      if (needVideo && !hasVideo) {
-        try {
-          const cvs = document.createElement('canvas');
-          cvs.width = 640;
-          cvs.height = 360;
-          const ctx = cvs.getContext('2d');
-          if (ctx && cvs.captureStream) {
-            let f = 0;
-            function drawSelfVirtualCam() {
-              if (!window._localMediaStream || _currentCallType !== 'video') return;
-              f++;
-              const grad = ctx.createLinearGradient(0, 0, 640, 360);
-              grad.addColorStop(0, '#0f172a');
-              grad.addColorStop(1, '#1e293b');
-              ctx.fillStyle = grad;
-              ctx.fillRect(0, 0, 640, 360);
-              ctx.beginPath();
-              ctx.arc(320, 160, 56, 0, Math.PI * 2);
-              ctx.fillStyle = '#0284c7';
-              ctx.fill();
-              ctx.lineWidth = 3;
-              ctx.strokeStyle = '#38bdf8';
-              ctx.stroke();
-              ctx.fillStyle = '#fff';
-              ctx.font = 'bold 36px sans-serif';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              const myInitial = (typeof myProfile !== 'undefined' && myProfile && myProfile.name ? myProfile.name.charAt(0).toUpperCase() : 'U');
-              ctx.fillText(myInitial, 320, 160);
-              ctx.font = '12px monospace';
-              ctx.fillStyle = '#38bdf8';
-              ctx.fillText('LOCAL CAM: 720p 30fps [E2EE ACTIVE]', 320, 260);
-              requestAnimationFrame(drawSelfVirtualCam);
+        } else {
+          if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) {
+              const actx = new AC();
+              const dst = actx.createMediaStreamDestination();
+              stream = dst.stream;
+              console.warn('[Call] Hardware microphone not found, using silent audio stream for WebRTC negotiation');
+            } else {
+              throw new Error('No audio recording devices found');
             }
-            drawSelfVirtualCam();
-            const vStream = cvs.captureStream(30);
-            vStream.getVideoTracks().forEach(function(t) { tracks.push(t); });
+          } else {
+            throw new Error('Microphone permission denied: ' + (err.message || err.name));
           }
-        } catch (e) {
-          console.warn('[Call] Video fallback error:', e);
         }
       }
 
-      const finalStream = new MediaStream(tracks);
-      window._localMediaStream = finalStream;
-
-      startLocalVoiceVisualizer(finalStream);
+      window._localMediaStream = stream;
+      startLocalVoiceVisualizer(stream);
 
       const localVideo = document.getElementById('localVideoFeed');
       if (localVideo) {
-        localVideo.srcObject = finalStream;
+        localVideo.srcObject = stream;
+        localVideo.muted = true;
         localVideo.play().catch(function() {});
       }
 
-      return finalStream;
+      return stream;
     }
 
     function createRTCPeerConnectionInstance() {
@@ -20866,10 +20915,16 @@ function renderHtml(
         try {
           _peerConnection.ontrack = null;
           _peerConnection.onicecandidate = null;
+          _peerConnection.oniceconnectionstatechange = null;
+          _peerConnection.onconnectionstatechange = null;
           _peerConnection.close();
         } catch (_) {}
         _peerConnection = null;
       }
+
+      _iceCandidateQueue = [];
+      _hasRemoteDescription = false;
+      _iceConnectedTicks = 0;
 
       let pc = null;
       try {
@@ -20882,212 +20937,297 @@ function renderHtml(
           ]
         });
       } catch (err) {
-        console.warn('[WebRTC] RTCPeerConnection instantiation warning:', err);
+        console.error('[WebRTC] RTCPeerConnection creation failed:', err);
         return null;
       }
 
       _peerConnection = pc;
 
-      pc.ontrack = function(event) {
-        console.log('[WebRTC] Remote track received:', event.track.kind, event.track.id);
-
-        if (!window._remoteMediaStream) {
-          window._remoteMediaStream = new MediaStream();
-        }
-
-        // Add track without replacing or dropping previous audio/video tracks
-        if (!window._remoteMediaStream.getTracks().some(t => t.id === event.track.id)) {
-          window._remoteMediaStream.addTrack(event.track);
-        }
-
-        if (event.streams && event.streams[0]) {
-          event.streams[0].getTracks().forEach(function(t) {
-            if (!window._remoteMediaStream.getTracks().some(existing => existing.id === t.id)) {
-              window._remoteMediaStream.addTrack(t);
-            }
-          });
-        }
-
-        const remoteVideo = document.getElementById('remoteVideoFeed');
-        if (remoteVideo) {
-          if (event.track.kind === 'video' && _callPeerCanvasAnimId) {
-            cancelAnimationFrame(_callPeerCanvasAnimId);
-            _callPeerCanvasAnimId = null;
-          }
-          remoteVideo.srcObject = window._remoteMediaStream;
-          remoteVideo.play().catch(function(e) { console.warn('Remote video play warning:', e); });
-        }
-
-        let remoteAudio = document.getElementById('remoteAudioPlayer');
-        if (!remoteAudio) {
-          remoteAudio = document.createElement('audio');
-          remoteAudio.id = 'remoteAudioPlayer';
-          remoteAudio.autoplay = true;
-          remoteAudio.playsInline = true;
-          document.body.appendChild(remoteAudio);
-        }
-        remoteAudio.srcObject = window._remoteMediaStream;
-        remoteAudio.volume = 1.0;
-        remoteAudio.play().catch(function(e) {
-          console.warn('Remote audio autoplay unlock attached:', e);
-          const unlock = function() {
-            remoteAudio.play().catch(function() {});
-            document.removeEventListener('click', unlock);
-            document.removeEventListener('touchstart', unlock);
-          };
-          document.addEventListener('click', unlock, { once: true });
-          document.addEventListener('touchstart', unlock, { once: true });
-        });
-
-        const fallback = document.getElementById('remoteVideoFallback');
-        if (fallback && _currentCallType === 'video' && window._remoteMediaStream.getVideoTracks().length > 0) {
-          fallback.style.display = 'none';
-        }
-      };
-
       pc.onicecandidate = function(event) {
         if (event.candidate && window._activeCallId) {
+          const candObj = event.candidate.toJSON ? event.candidate.toJSON() : event.candidate;
           callFetch('/api/call/candidate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               callId: window._activeCallId,
-              candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate
+              candidate: candObj
             })
-          }).catch(function() {});
+          }).catch(function(e) { console.warn('[WebRTC] Candidate POST error:', e); });
         }
+      };
+
+      pc.oniceconnectionstatechange = function() {
+        const ice = pc.iceConnectionState;
+        console.log('[WebRTC] ICE Connection State:', ice);
+        _callDiagnostics.iceConnectionState = ice;
+        handleIceConnectionStateChange(ice);
+      };
+
+      pc.onconnectionstatechange = function() {
+        const conn = pc.connectionState;
+        console.log('[WebRTC] Connection State:', conn);
+        _callDiagnostics.connectionState = conn;
+        handlePeerConnectionStateChange(conn);
+      };
+
+      pc.ontrack = function(event) {
+        console.log('[WebRTC] Remote track received:', event.track.kind, event.track.id, 'readyState:', event.track.readyState);
+        handleRemoteTrackReceived(event);
       };
 
       if (window._localMediaStream) {
         window._localMediaStream.getTracks().forEach(function(track) {
           try {
+            console.log('[WebRTC] addTrack to peerConnection:', track.kind, track.id);
             pc.addTrack(track, window._localMediaStream);
           } catch (e) {
-            console.warn('[WebRTC] addTrack warning:', e);
+            console.warn('[WebRTC] pc.addTrack error:', e);
           }
         });
       }
 
+      if (_statsInterval) clearInterval(_statsInterval);
+      _statsInterval = setInterval(pollWebRtcStats, 1200);
+
       return pc;
     }
 
-    async function startVirtualPeerLoopback(callerPc, offerSdp, callType, peerName) {
-      if (_botPeerConnection) {
-        try { _botPeerConnection.close(); } catch(_) {}
-        _botPeerConnection = null;
+    function handleRemoteTrackReceived(event) {
+      if (!window._remoteMediaStream) {
+        window._remoteMediaStream = new MediaStream();
       }
 
-      const botPc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-      });
-      _botPeerConnection = botPc;
+      if (!window._remoteMediaStream.getTracks().some(function(t) { return t.id === event.track.id; })) {
+        window._remoteMediaStream.addTrack(event.track);
+      }
 
-      try {
-        await botPc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offerSdp }));
-
-        // 1. Audio responder track: clean silent stream with quick 0.12s connect cue (no continuous oscillator beep or mic feedback loop)
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (AC) {
-          const actx = new AC();
-          if (actx.state === 'suspended') actx.resume();
-          const dst = actx.createMediaStreamDestination();
-
-          // Quick 0.12s connect chime that stops immediately
-          try {
-            const chimeOsc = actx.createOscillator();
-            const chimeGain = actx.createGain();
-            chimeOsc.type = 'sine';
-            chimeOsc.frequency.setValueAtTime(520, actx.currentTime);
-            chimeOsc.frequency.exponentialRampToValueAtTime(780, actx.currentTime + 0.1);
-            chimeGain.gain.setValueAtTime(0.03, actx.currentTime);
-            chimeGain.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.12);
-            chimeOsc.connect(chimeGain);
-            chimeGain.connect(dst);
-            chimeOsc.start();
-            chimeOsc.stop(actx.currentTime + 0.14);
-          } catch (_) {}
-
-          dst.stream.getAudioTracks().forEach(function(t) {
-            botPc.addTrack(t, dst.stream);
-          });
-        }
-
-        // 2. Video responder track for video calls: 30fps animated canvas
-        if (callType === 'video') {
-          const cvs = document.getElementById('peerVideoCanvas') || document.createElement('canvas');
-          cvs.width = 640;
-          cvs.height = 360;
-          const ctx = cvs.getContext('2d');
-          let frame = 0;
-          function renderBotPeerLoop() {
-            if (!_isCallAnswered || _currentCallType !== 'video') return;
-            frame++;
-            const grad = ctx.createRadialGradient(320, 180, 50, 320, 180, 360);
-            grad.addColorStop(0, '#0f172a');
-            grad.addColorStop(0.7, '#020617');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, 640, 360);
-
-            const initial = (peerName || 'P').charAt(0).toUpperCase();
-            const pulse = Math.sin(frame * 0.08) * 8;
-            ctx.beginPath();
-            ctx.arc(320, 140, 54 + pulse, 0, Math.PI * 2);
-            ctx.fillStyle = '#6366f1';
-            ctx.fill();
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 38px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(initial, 320, 140);
-
-            ctx.font = 'bold 16px sans-serif';
-            ctx.fillText(peerName || 'Peer', 320, 215);
-
-            for (let b = 0; b < 9; b++) {
-              const h = 8 + Math.abs(Math.sin(frame * 0.12 + b * 0.7)) * 22;
-              ctx.fillStyle = '#10b981';
-              ctx.fillRect(270 + b * 11, 245 - h / 2, 6, h);
-            }
-
-            ctx.font = '11px monospace';
-            ctx.fillStyle = '#38bdf8';
-            ctx.textAlign = 'left';
-            ctx.fillText('SOVRA E2EE STREAM • 1080p 30FPS ACTIVE', 20, 30);
-
-            requestAnimationFrame(renderBotPeerLoop);
+      if (event.streams && event.streams[0]) {
+        event.streams[0].getTracks().forEach(function(t) {
+          if (!window._remoteMediaStream.getTracks().some(function(existing) { return existing.id === t.id; })) {
+            window._remoteMediaStream.addTrack(t);
           }
-          renderBotPeerLoop();
-          const vStream = cvs.captureStream(30);
-          vStream.getVideoTracks().forEach(function(t) {
-            botPc.addTrack(t, vStream);
-          });
-        }
+        });
+      }
 
-        botPc.onicecandidate = function(e) {
-          if (e.candidate) callerPc.addIceCandidate(e.candidate).catch(function() {});
+      let remoteAudio = document.getElementById('remoteAudioPlayer');
+      if (!remoteAudio) {
+        remoteAudio = document.createElement('audio');
+        remoteAudio.id = 'remoteAudioPlayer';
+        remoteAudio.autoplay = true;
+        remoteAudio.playsInline = true;
+        document.body.appendChild(remoteAudio);
+      }
+      remoteAudio.srcObject = window._remoteMediaStream;
+      remoteAudio.muted = false;
+      remoteAudio.volume = 1.0;
+      remoteAudio.play().catch(function(e) {
+        console.warn('[WebRTC] Remote audio play() pending user interaction:', e);
+      });
+
+      const remoteVideo = document.getElementById('remoteVideoFeed');
+      if (remoteVideo) {
+        remoteVideo.srcObject = window._remoteMediaStream;
+        remoteVideo.playsInline = true;
+        remoteVideo.autoplay = true;
+        remoteVideo.play().catch(function(e) {
+          console.warn('[WebRTC] Remote video play() error:', e);
+        });
+
+        const fallback = document.getElementById('remoteVideoFallback');
+        if (fallback) {
+          const hasVideoTrack = window._remoteMediaStream.getVideoTracks().some(function(t) { return t.readyState === 'live'; });
+          if (hasVideoTrack && _currentCallType === 'video') {
+            fallback.style.display = 'none';
+          }
+        }
+      }
+
+      if (_callState !== CallState.CALL_CONNECTED) {
+        setCallState(CallState.MEDIA_CONNECTING);
+        const statusEl = document.getElementById('callStatusText');
+        if (statusEl) {
+          statusEl.innerText = 'Securing media streams...';
+          statusEl.style.color = '#34d399';
+        }
+      }
+    }
+
+    async function pollWebRtcStats() {
+      if (!_peerConnection) return;
+      try {
+        const statsReport = await _peerConnection.getStats();
+        let aBytesSent = 0, aBytesRecv = 0, aPktsSent = 0, aPktsRecv = 0;
+        let vBytesSent = 0, vBytesRecv = 0, vFramesSent = 0, vFramesRecv = 0;
+        let aJitter = 0, aPktsLost = 0, vPktsLost = 0;
+        let selectedCandidatePair = null;
+
+        statsReport.forEach(function(report) {
+          if (report.type === 'inbound-rtp') {
+            if (report.kind === 'audio' || report.mediaType === 'audio') {
+              aBytesRecv = report.bytesReceived || 0;
+              aPktsRecv = report.packetsReceived || 0;
+              aJitter = report.jitter || 0;
+              aPktsLost = report.packetsLost || 0;
+            } else if (report.kind === 'video' || report.mediaType === 'video') {
+              vBytesRecv = report.bytesReceived || 0;
+              vFramesRecv = report.framesDecoded || report.framesReceived || 0;
+              vPktsLost = report.packetsLost || 0;
+            }
+          } else if (report.type === 'outbound-rtp') {
+            if (report.kind === 'audio' || report.mediaType === 'audio') {
+              aBytesSent = report.bytesSent || 0;
+              aPktsSent = report.packetsSent || 0;
+            } else if (report.kind === 'video' || report.mediaType === 'video') {
+              vBytesSent = report.bytesSent || 0;
+              vFramesSent = report.framesSent || 0;
+            }
+          } else if (report.type === 'candidate-pair' && (report.selected || report.state === 'succeeded')) {
+            selectedCandidatePair = {
+              id: report.id,
+              state: report.state,
+              currentRoundTripTime: report.currentRoundTripTime,
+              nominated: report.nominated
+            };
+          }
+        });
+
+        _callDiagnostics.iceConnectionState = _peerConnection.iceConnectionState;
+        _callDiagnostics.connectionState = _peerConnection.connectionState;
+        _callDiagnostics.signalingState = _peerConnection.signalingState;
+        _callDiagnostics.localAudioTracks = window._localMediaStream ? window._localMediaStream.getAudioTracks().filter(function(t) { return t.readyState === 'live'; }).length : 0;
+        _callDiagnostics.localVideoTracks = window._localMediaStream ? window._localMediaStream.getVideoTracks().filter(function(t) { return t.readyState === 'live'; }).length : 0;
+        _callDiagnostics.remoteAudioTracks = window._remoteMediaStream ? window._remoteMediaStream.getAudioTracks().filter(function(t) { return t.readyState === 'live'; }).length : 0;
+        _callDiagnostics.remoteVideoTracks = window._remoteMediaStream ? window._remoteMediaStream.getVideoTracks().filter(function(t) { return t.readyState === 'live'; }).length : 0;
+        _callDiagnostics.selectedCandidatePair = selectedCandidatePair;
+
+        _callDiagnostics.audio = {
+          bytesSent: aBytesSent,
+          bytesReceived: aBytesRecv,
+          packetsSent: aPktsSent,
+          packetsReceived: aPktsRecv,
+          jitter: aJitter,
+          packetsLost: aPktsLost,
+          audioLevel: _callDiagnostics.audio.audioLevel || 0
         };
 
-        const answer = await botPc.createAnswer();
-        await botPc.setLocalDescription(answer);
-        await callerPc.setRemoteDescription(answer);
+        _callDiagnostics.video = {
+          bytesSent: vBytesSent,
+          bytesReceived: vBytesRecv,
+          framesSent: vFramesSent,
+          framesReceived: vFramesRecv,
+          framesDecoded: vFramesRecv,
+          packetsLost: vPktsLost
+        };
 
-        if (window._activeCallId) {
-          callFetch('/api/call/answer', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              callId: window._activeCallId,
-              answerSdp: answer.sdp
-            })
-          }).catch(function() {});
+        _callDiagnostics.lastUpdated = Date.now();
+
+        const isIceUp = (_peerConnection.iceConnectionState === 'connected' || _peerConnection.iceConnectionState === 'completed');
+        const hasRemoteTracks = (_callDiagnostics.remoteAudioTracks > 0 || _callDiagnostics.remoteVideoTracks > 0);
+        const hasPackets = (aPktsRecv > 0 || vBytesRecv > 0 || aBytesRecv > 0);
+
+        if (isIceUp && hasRemoteTracks && (_callState !== CallState.CALL_CONNECTED)) {
+          if (hasPackets || _iceConnectedTicks >= 2) {
+            setCallState(CallState.CALL_CONNECTED);
+            onCallMediaFlowConfirmed();
+          } else {
+            _iceConnectedTicks = (_iceConnectedTicks || 0) + 1;
+          }
         }
       } catch (err) {
-        console.warn('[Call] Loopback setup error:', err);
+        console.warn('[WebRTC] getStats polling error:', err);
       }
+    }
+
+    function handleIceConnectionStateChange(iceState) {
+      const statusEl = document.getElementById('callStatusText');
+
+      if (iceState === 'checking') {
+        if (_callState !== CallState.CALL_CONNECTED) {
+          setCallState(CallState.ICE_CONNECTING);
+          if (statusEl) {
+            statusEl.innerText = 'Establishing secure P2P link...';
+            statusEl.style.color = '#38bdf8';
+          }
+        }
+      } else if (iceState === 'connected' || iceState === 'completed') {
+        if (_callState !== CallState.CALL_CONNECTED) {
+          setCallState(CallState.ICE_CONNECTED);
+          if (statusEl) {
+            statusEl.innerText = 'Securing media streams...';
+            statusEl.style.color = '#34d399';
+          }
+        }
+      } else if (iceState === 'disconnected') {
+        setCallState(CallState.RECONNECTING);
+        if (statusEl) {
+          statusEl.innerText = 'Connection unstable • Reconnecting...';
+          statusEl.style.color = '#f59e0b';
+        }
+        if (_peerConnection && typeof _peerConnection.restartIce === 'function') {
+          try {
+            _peerConnection.restartIce();
+          } catch (_) {}
+        }
+      } else if (iceState === 'failed') {
+        setCallState(CallState.FAILED);
+        if (statusEl) {
+          statusEl.innerText = 'Call failed • ICE connection could not be established';
+          statusEl.style.color = '#ef4444';
+        }
+        showAccountToast('⚠️ Call connection failed', 'error');
+        setTimeout(function() {
+          endE2eeCall('ice_failed');
+        }, 2500);
+      }
+    }
+
+    function handlePeerConnectionStateChange(connState) {
+      if (connState === 'connected') {
+        _callDiagnostics.connectionState = 'connected';
+      } else if (connState === 'disconnected') {
+        setCallState(CallState.RECONNECTING);
+      } else if (connState === 'failed') {
+        setCallState(CallState.FAILED);
+        const statusEl = document.getElementById('callStatusText');
+        if (statusEl) {
+          statusEl.innerText = 'Connection lost';
+          statusEl.style.color = '#ef4444';
+        }
+        setTimeout(function() {
+          endE2eeCall('connection_failed');
+        }, 2000);
+      }
+    }
+
+    function onCallMediaFlowConfirmed() {
+      _isCallAnswered = true;
+      _callConnectedSeconds = 0;
+      stopCallAudioRinging();
+
+      const statusEl = document.getElementById('callStatusText');
+      const wave = document.getElementById('callWaveformContainer');
+      const directBtnWrap = document.getElementById('callDirectConnectWrap');
+      if (directBtnWrap) directBtnWrap.style.display = 'none';
+      if (wave) wave.style.display = 'flex';
+      if (statusEl) {
+        statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Direct';
+        statusEl.style.color = '#38bdf8';
+      }
+
+      const remoteAudio = document.getElementById('remoteAudioPlayer');
+      if (remoteAudio && window._remoteMediaStream) {
+        remoteAudio.srcObject = window._remoteMediaStream;
+        remoteAudio.muted = false;
+        remoteAudio.play().catch(function() {});
+      }
+      const remoteVideo = document.getElementById('remoteVideoFeed');
+      if (remoteVideo && window._remoteMediaStream) {
+        remoteVideo.srcObject = window._remoteMediaStream;
+        remoteVideo.play().catch(function() {});
+      }
+
+      showAccountToast('✓ Sovra E2EE Direct Stream Active', 'success');
     }
 
     async function setupLocalCameraStream() {
@@ -21095,8 +21235,9 @@ function renderHtml(
       if (!localVideo) return;
 
       if (window._localMediaStream && window._localMediaStream.getVideoTracks().length > 0) {
+        localVideo.srcObject = window._localMediaStream;
+        localVideo.muted = true;
         try {
-          localVideo.srcObject = window._localMediaStream;
           await localVideo.play();
           return;
         } catch (_) {}
@@ -21110,188 +21251,41 @@ function renderHtml(
           });
           window._localMediaStream = stream;
           localVideo.srcObject = stream;
+          localVideo.muted = true;
           await localVideo.play();
-          return;
         } catch (err) {
-          console.warn('[VideoCall] Real webcam unavailable, initializing virtual camera stream:', err);
+          console.warn('[VideoCall] Local webcam capture warning:', err);
         }
       }
-
-      initVirtualLocalCameraStream();
     }
 
     function initVirtualLocalCameraStream() {
-      const localVideo = document.getElementById('localVideoFeed');
-      if (!localVideo) return;
-      const cvs = document.createElement('canvas');
-      cvs.width = 320;
-      cvs.height = 240;
-      const ctx = cvs.getContext('2d');
-      if (!ctx || !cvs.captureStream) return;
-
-      let tick = 0;
-      if (_virtualCamAnimId) cancelAnimationFrame(_virtualCamAnimId);
-
-      function drawVirtualCam() {
-        if (!_callVideoEnabled || _currentCallType !== 'video') return;
-        tick++;
-        const grad = ctx.createLinearGradient(0, 0, 320, 240);
-        grad.addColorStop(0, '#0f172a');
-        grad.addColorStop(1, '#1e293b');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 320, 240);
-
-        const myName = (typeof myProfile !== 'undefined' && myProfile && myProfile.displayName) ? myProfile.displayName : 'Host';
-        const initial = myName.charAt(0).toUpperCase();
-
-        ctx.beginPath();
-        ctx.arc(160, 110, 42, 0, Math.PI * 2);
-        ctx.fillStyle = '#0284c7';
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#38bdf8';
-        ctx.stroke();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(initial, 160, 110);
-
-        const scanY = (tick * 2) % 240;
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
-        ctx.fillRect(0, scanY, 320, 4);
-
-        ctx.font = '10px monospace';
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillText('CAM: 720p 30fps [E2EE: Noise_XX]', 160, 190);
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText(myName + ' (Self)', 160, 210);
-
-        _virtualCamAnimId = requestAnimationFrame(drawVirtualCam);
-      }
-      drawVirtualCam();
-
-      try {
-        const stream = cvs.captureStream(30);
-        localVideo.srcObject = stream;
-        localVideo.play().catch(function() {});
-      } catch (_) {}
+      // Compatibility helper
+      console.log('[WebRTC] initVirtualLocalCameraStream invoked');
     }
 
     function setupRemotePeerVideoStream(peerName) {
       const remoteVideo = document.getElementById('remoteVideoFeed');
       const fallback = document.getElementById('remoteVideoFallback');
-      const canvas = document.getElementById('peerVideoCanvas');
-      if (!remoteVideo || !canvas) return;
+      if (!remoteVideo) return;
 
       const name = peerName || 'Peer';
       const initial = name.charAt(0).toUpperCase();
 
-      if (window._remoteMediaStream && window._remoteMediaStream.getVideoTracks().length > 0) {
+      const fallbackPeer = document.getElementById('remoteFallbackPeerName');
+      if (fallbackPeer) fallbackPeer.innerText = name;
+      const fallbackAvatar = document.getElementById('remoteFallbackAvatarIcon');
+      if (fallbackAvatar) fallbackAvatar.innerText = initial;
+
+      if (window._remoteMediaStream && window._remoteMediaStream.getVideoTracks().some(function(t) { return t.readyState === 'live'; })) {
         remoteVideo.srcObject = window._remoteMediaStream;
         if (fallback) fallback.style.display = 'none';
         remoteVideo.play().catch(function() {});
-        return;
-      }
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx || !canvas.captureStream) {
+      } else {
         if (fallback) fallback.style.display = 'flex';
-        return;
-      }
-
-      if (fallback) fallback.style.display = 'none';
-
-      let frame = 0;
-      if (_callPeerCanvasAnimId) cancelAnimationFrame(_callPeerCanvasAnimId);
-
-      function renderPeerFrame() {
-        if (_currentCallType !== 'video') return;
-        frame++;
-
-        const grad = ctx.createRadialGradient(320, 180, 50, 320, 180, 360);
-        grad.addColorStop(0, '#0f172a');
-        grad.addColorStop(0.6, '#090d16');
-        grad.addColorStop(1, '#020617');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 640, 360);
-
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
-        ctx.lineWidth = 1;
-        for (let x = 0; x < 640; x += 40) {
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, 360);
-          ctx.stroke();
+        if (window._remoteMediaStream) {
+          remoteVideo.srcObject = window._remoteMediaStream;
         }
-        for (let y = 0; y < 360; y += 40) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(640, y);
-          ctx.stroke();
-        }
-
-        const pulse = Math.sin(frame * 0.05) * 6;
-        ctx.beginPath();
-        ctx.arc(320, 140, 64 + pulse, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(320, 140, 78 - pulse * 0.5, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(192, 132, 252, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(320, 140, 52, 0, Math.PI * 2);
-        ctx.fillStyle = '#6366f1';
-        ctx.fill();
-        ctx.strokeStyle = '#818cf8';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 40px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(initial, 320, 140);
-
-        ctx.font = 'bold 18px sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(name, 320, 220);
-
-        const numBars = 7;
-        const startX = 320 - (numBars * 10) / 2;
-        for (let b = 0; b < numBars; b++) {
-          const h = 6 + Math.abs(Math.sin((frame * 0.1) + b * 0.8)) * 20;
-          ctx.fillStyle = '#34d399';
-          ctx.fillRect(startX + b * 10, 245 - h / 2, 5, h);
-        }
-
-        ctx.font = '11px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillText('SOVRA P2P E2EE STREAM • 1080p 30FPS', 20, 30);
-        ctx.fillStyle = '#94a3b8';
-        const now = new Date();
-        const timeStr = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' +
-                        (now.getMinutes() < 10 ? '0' : '') + now.getMinutes() + ':' +
-                        (now.getSeconds() < 10 ? '0' : '') + now.getSeconds();
-        ctx.fillText('TIME: ' + timeStr + ' • CIPHER: CHACHA20-POLY1305', 20, 46);
-
-        _callPeerCanvasAnimId = requestAnimationFrame(renderPeerFrame);
-      }
-      renderPeerFrame();
-
-      try {
-        const stream = canvas.captureStream(30);
-        remoteVideo.srcObject = stream;
-        remoteVideo.play().catch(function() {});
-      } catch (e) {
-        console.warn('[VideoCall] Canvas capture error:', e);
       }
     }
 
@@ -21330,14 +21324,6 @@ function renderHtml(
           videoBtn.style.background = '#202c33';
           videoBtn.style.color = '';
         }
-        if (_callPeerCanvasAnimId) {
-          cancelAnimationFrame(_callPeerCanvasAnimId);
-          _callPeerCanvasAnimId = null;
-        }
-        if (_virtualCamAnimId) {
-          cancelAnimationFrame(_virtualCamAnimId);
-          _virtualCamAnimId = null;
-        }
       }
     }
 
@@ -21346,7 +21332,7 @@ function renderHtml(
         _currentCallType = 'video';
         _callVideoEnabled = true;
         applyCallLayoutMode();
-        showAccountToast('📹 Video Call Enabled (HD Stream Active)', 'success');
+        showAccountToast('📹 Video Call Enabled (Direct Stream Active)', 'success');
         return;
       }
 
@@ -21385,35 +21371,29 @@ function renderHtml(
     }
 
     function cleanupActiveCallSession() {
+      if (_statsInterval) {
+        clearInterval(_statsInterval);
+        _statsInterval = null;
+      }
       if (_peerConnection) {
         try {
           _peerConnection.ontrack = null;
           _peerConnection.onicecandidate = null;
+          _peerConnection.oniceconnectionstatechange = null;
+          _peerConnection.onconnectionstatechange = null;
           _peerConnection.close();
         } catch (_) {}
         _peerConnection = null;
       }
-      if (_botPeerConnection) {
-        try {
-          _botPeerConnection.ontrack = null;
-          _botPeerConnection.onicecandidate = null;
-          _botPeerConnection.close();
-        } catch (_) {}
-        _botPeerConnection = null;
-      }
       _iceCandidateQueue = [];
+      _hasRemoteDescription = false;
+      _iceConnectedTicks = 0;
+
       if (_voiceVisualizerAnimId) {
         cancelAnimationFrame(_voiceVisualizerAnimId);
         _voiceVisualizerAnimId = null;
       }
-      if (_callPeerCanvasAnimId) {
-        cancelAnimationFrame(_callPeerCanvasAnimId);
-        _callPeerCanvasAnimId = null;
-      }
-      if (_virtualCamAnimId) {
-        cancelAnimationFrame(_virtualCamAnimId);
-        _virtualCamAnimId = null;
-      }
+
       if (window._localMediaStream) {
         try {
           window._localMediaStream.getTracks().forEach(function(t) { t.stop(); });
@@ -21426,6 +21406,7 @@ function renderHtml(
         } catch (_) {}
         window._remoteMediaStream = null;
       }
+
       const remoteAudio = document.getElementById('remoteAudioPlayer');
       if (remoteAudio) {
         remoteAudio.srcObject = null;
@@ -21457,32 +21438,17 @@ function renderHtml(
       }
       _currentCallType = 'audio';
       _callVideoEnabled = false;
+      setCallState(CallState.IDLE);
     }
 
     async function forceConnectCallTest() {
-      if (_isCallAnswered) return;
-      _isCallAnswered = true;
-      _callConnectedSeconds = 0;
-      stopCallAudioRinging();
-      const statusEl = document.getElementById('callStatusText');
-      const wave = document.getElementById('callWaveformContainer');
-      const directBtnWrap = document.getElementById('callDirectConnectWrap');
-      if (directBtnWrap) directBtnWrap.style.display = 'none';
-      if (wave) wave.style.display = 'flex';
-      if (statusEl) {
-        statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
+      console.log('[WebRTC] forceConnectCallTest triggered');
+      if (_peerConnection && typeof _peerConnection.restartIce === 'function') {
+        try {
+          _peerConnection.restartIce();
+          showAccountToast('ICE renegotiation triggered', 'info');
+        } catch (_) {}
       }
-      const videoTimer = document.getElementById('callVideoTimer');
-      if (videoTimer) videoTimer.innerText = '0:00';
-      applyCallLayoutMode();
-
-      // Ensure active audio and video streaming on manual connect
-      if (_peerConnection && _peerConnection.localDescription) {
-        const peerNameEl = document.getElementById('callPeerName');
-        const peerName = peerNameEl ? peerNameEl.innerText : 'Peer';
-        await startVirtualPeerLoopback(_peerConnection, _peerConnection.localDescription.sdp, _currentCallType, peerName);
-      }
-      showAccountToast('✓ Sovra Direct E2EE Call Connected!', 'success');
     }
 
     async function startE2eeCall(type) {
@@ -21492,6 +21458,8 @@ function renderHtml(
 
       _currentCallType = (type === 'video') ? 'video' : 'audio';
       _callVideoEnabled = (_currentCallType === 'video');
+
+      primeMediaPlayback();
 
       const avatarEl = document.getElementById('callAvatarIcon');
       if (avatarEl) {
@@ -21507,86 +21475,99 @@ function renderHtml(
 
       const statusEl = document.getElementById('callStatusText');
       if (statusEl) {
-        statusEl.innerText = 'Calling ' + (contact.name || 'peer').split(' ')[0] + '... Sovra Encrypted Call';
+        statusEl.innerText = 'Requesting permissions...';
         statusEl.style.color = '';
       }
       const wave = document.getElementById('callWaveformContainer');
       if (wave) wave.style.display = 'none';
 
       const directBtnWrap = document.getElementById('callDirectConnectWrap');
-      if (directBtnWrap) directBtnWrap.style.display = 'block';
+      if (directBtnWrap) directBtnWrap.style.display = 'none';
 
       document.getElementById('e2eeCallModal').style.display = 'flex';
       _isCallAnswered = false;
       _callConnectedSeconds = 0;
+      setCallState(CallState.PERMISSION_REQUESTING);
 
       applyCallLayoutMode();
 
-      // Play outgoing ring sound
-      playCallAudioRinging('outgoing');
-
-      // 1. Acquire local media stream (microphone & optional camera)
-      await initCallLocalMediaStream(_currentCallType);
-
-      // 2. Setup RTCPeerConnection and attach tracks
-      const pc = createRTCPeerConnectionInstance();
-
-      // 3. Generate real WebRTC Offer SDP
-      let offerSdp = '';
-      if (pc) {
-        try {
-          const offer = await pc.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: (_currentCallType === 'video')
-          });
-          await pc.setLocalDescription(offer);
-          offerSdp = offer.sdp || (pc.localDescription && pc.localDescription.sdp);
-        } catch (err) {
-          console.warn('[Call] WebRTC createOffer warning:', err);
+      let localStream = null;
+      try {
+        localStream = await initCallLocalMediaStream(_currentCallType);
+      } catch (permErr) {
+        console.error('[Call] Media permission error:', permErr);
+        if (statusEl) {
+          statusEl.innerText = '⚠️ ' + permErr.message;
+          statusEl.style.color = '#ef4444';
         }
-      }
-      if (!offerSdp) {
-        offerSdp = 'v=0\\r\\no=- 461173 2 IN IP4 127.0.0.1\\r\\ns=-\\r\\nt=0 0\\r\\na=sendrecv\\r\\nm=' + (type || 'audio') + ' 9 UDP/TLS/RTP/SAVPF 111';
+        showAccountToast('⚠️ ' + permErr.message, 'error');
+        setCallState(CallState.FAILED);
+        setTimeout(function() {
+          document.getElementById('e2eeCallModal').style.display = 'none';
+          cleanupActiveCallSession();
+        }, 3000);
+        return;
       }
 
-      // 4. Send WebRTC signaling offer to backend using authenticated callFetch
+      const pc = createRTCPeerConnectionInstance();
+      if (!pc) {
+        showAccountToast('Failed to initialize WebRTC engine', 'error');
+        endE2eeCall('pc_init_failed');
+        return;
+      }
+
+      setCallState(CallState.SIGNALING_OFFERING);
+      if (statusEl) {
+        statusEl.innerText = 'Generating secure offer...';
+      }
+
+      let offer = null;
+      try {
+        offer = await pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: (_currentCallType === 'video')
+        });
+        await pc.setLocalDescription(offer);
+      } catch (err) {
+        console.error('[Call] WebRTC createOffer failed:', err);
+        showAccountToast('WebRTC offer error: ' + err.message, 'error');
+        endE2eeCall('offer_creation_failed');
+        return;
+      }
+
+      const offerSdp = offer.sdp || (pc.localDescription && pc.localDescription.sdp);
+      if (!offerSdp) {
+        showAccountToast('Failed to generate valid WebRTC SDP offer', 'error');
+        endE2eeCall('empty_offer_sdp');
+        return;
+      }
+
+      playCallAudioRinging('outgoing');
+      if (statusEl) {
+        statusEl.innerText = 'Calling ' + (contact.name || 'peer').split(' ')[0] + '... Waiting for answer...';
+      }
+
       callFetch('/api/call/offer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipientDid: contact.did,
           offerSdp: offerSdp,
-          callType: type || 'audio',
+          callType: _currentCallType,
         }),
-      }).then(r => r.json()).then(async data => {
-        if (data.ok && data.session) {
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data && data.ok && data.session) {
           window._activeCallId = data.session.callId;
-
-          // If recipient is automated peer or demo user, launch virtual peer loopback for active audio/video
-          const isBot = (contact.did.includes('alice') || contact.did.includes('bob') || contact.did.includes('carol') || contact.did.includes('rahul') || contact.did.startsWith('channel:'));
-          if (isBot && pc) {
-            setTimeout(async function() {
-              if (!_isCallAnswered) {
-                _isCallAnswered = true;
-                _callConnectedSeconds = 0;
-                stopCallAudioRinging();
-                const stEl = document.getElementById('callStatusText');
-                const wav = document.getElementById('callWaveformContainer');
-                const dirWrap = document.getElementById('callDirectConnectWrap');
-                if (dirWrap) dirWrap.style.display = 'none';
-                if (wav) wav.style.display = 'flex';
-                if (stEl) {
-                  stEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
-                  stEl.style.color = '#38bdf8';
-                }
-                applyCallLayoutMode();
-                await startVirtualPeerLoopback(pc, offerSdp, _currentCallType, contact.name || 'Peer');
-                showAccountToast('✓ E2EE Voice & Video Call Connected', 'success');
-              }
-            }, 1200);
-          }
+          setCallState(CallState.SIGNALING_RINGING);
+        } else {
+          showAccountToast('Call rejected: ' + (data && data.error ? data.error : 'Network error'), 'error');
+          endE2eeCall('signaling_rejected');
         }
-      }).catch(err => console.warn('[Call] Offer error:', err));
+      }).catch(function(err) {
+        console.warn('[Call] Offer signaling error:', err);
+        showAccountToast('Signaling network error', 'error');
+        endE2eeCall('signaling_network_error');
+      });
 
       if (callTimerInterval) clearInterval(callTimerInterval);
       let ringSeconds = 0;
@@ -21597,8 +21578,8 @@ function renderHtml(
           const mins = Math.floor(_callConnectedSeconds / 60);
           const secs = _callConnectedSeconds % 60;
           const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
-          if (statusEl) {
-            statusEl.innerText = 'Connected (' + timeStr + ') • 🔒 Sovra E2EE Stream';
+          if (statusEl && _callState === CallState.CALL_CONNECTED) {
+            statusEl.innerText = 'Connected (' + timeStr + ') • 🔒 Sovra E2EE Direct';
           }
           const videoTimer = document.getElementById('callVideoTimer');
           if (videoTimer) videoTimer.innerText = timeStr;
@@ -21607,9 +21588,13 @@ function renderHtml(
         }
 
         ringSeconds++;
-        // Auto-connect fallback after 4 seconds of ringing so call never gets stuck
-        if (ringSeconds >= 4) {
-          forceConnectCallTest();
+        if (ringSeconds >= 45) {
+          if (statusEl) {
+            statusEl.innerText = 'No Answer • Peer did not respond';
+            statusEl.style.color = '#ef4444';
+          }
+          showAccountToast('📞 Peer did not answer', 'info');
+          endE2eeCall('no_answer');
           return;
         }
 
@@ -21617,7 +21602,7 @@ function renderHtml(
       }, 1000);
     }
 
-    function endE2eeCall() {
+    function endE2eeCall(reason) {
       stopCallAudioRinging();
       playCallDisconnectTone();
       if (callTimerInterval) {
@@ -21644,21 +21629,22 @@ function renderHtml(
         callFetch('/api/call/end', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ callId: terminatingCallId, reason: 'user_hung_up' }),
-        }).catch(err => console.warn('[Call] End error:', err));
+          body: JSON.stringify({ callId: terminatingCallId, reason: reason || 'user_hung_up' }),
+        }).catch(function(err) { console.warn('[Call] End error:', err); });
       }
 
       _isCallAnswered = false;
       _callConnectedSeconds = 0;
+      setCallState(CallState.ENDED);
 
       setTimeout(function() {
         document.getElementById('e2eeCallModal').style.display = 'none';
         if (statusEl) statusEl.style.color = '';
         showAccountToast('📞 Call ended (' + durationFormatted + ')');
-      }, 400);
+        setCallState(CallState.IDLE);
+      }, 500);
     }
 
-    // Recipient Incoming Call Handling
     function pollIncomingCalls() {
       if (document.hidden || !myProfile) return;
       if (window._activeCallId && document.getElementById('e2eeCallModal').style.display === 'flex') {
@@ -21669,7 +21655,7 @@ function renderHtml(
         .then(function(data) {
           if (data && data.ok && data.incomingCall) {
             const inc = data.incomingCall;
-            if (window._activeCallId === inc.callId) return; // already handling
+            if (window._activeCallId === inc.callId) return;
             _currentIncomingCall = inc;
             const incModal = document.getElementById('incomingCallModal');
             if (incModal && incModal.style.display !== 'flex') {
@@ -21692,7 +21678,6 @@ function renderHtml(
               playCallAudioRinging('incoming');
             }
           } else {
-            // No incoming call, close modal if it was active
             const incModal = document.getElementById('incomingCallModal');
             if (incModal && incModal.style.display === 'flex' && !_isCallAnswered) {
               incModal.style.display = 'none';
@@ -21712,7 +21697,8 @@ function renderHtml(
       const inc = _currentIncomingCall;
       window._activeCallId = inc.callId;
 
-      // Open active call modal
+      primeMediaPlayback();
+
       const avatarEl = document.getElementById('callAvatarIcon');
       if (avatarEl) {
         if (inc.callerAvatarDataUrl) {
@@ -21727,48 +21713,70 @@ function renderHtml(
 
       const statusEl = document.getElementById('callStatusText');
       if (statusEl) {
-        statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Stream';
+        statusEl.innerText = 'Connecting secure media...';
         statusEl.style.color = '#38bdf8';
       }
 
       const wave = document.getElementById('callWaveformContainer');
-      if (wave) wave.style.display = 'flex';
+      if (wave) wave.style.display = 'none';
 
       const directBtnWrap = document.getElementById('callDirectConnectWrap');
       if (directBtnWrap) directBtnWrap.style.display = 'none';
 
       document.getElementById('e2eeCallModal').style.display = 'flex';
-      _isCallAnswered = true;
+      _isCallAnswered = false;
       _callConnectedSeconds = 0;
       _currentCallType = (inc.callType === 'video') ? 'video' : 'audio';
       _callVideoEnabled = (_currentCallType === 'video');
+      setCallState(CallState.PERMISSION_REQUESTING);
       applyCallLayoutMode();
 
-      // 1. Acquire local media stream (microphone & optional camera)
-      await initCallLocalMediaStream(_currentCallType);
-
-      // 2. Setup RTCPeerConnection and attach tracks
-      const pc = createRTCPeerConnectionInstance();
-
-      // 3. Set remote offer & generate answer
-      let answerSdp = '';
-      if (pc) {
-        try {
-          if (inc.sdpOffer) {
-            await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: inc.sdpOffer }));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            answerSdp = answer.sdp || (pc.localDescription && pc.localDescription.sdp);
-          }
-        } catch (err) {
-          console.warn('[Call] WebRTC answer error:', err);
+      let localStream = null;
+      try {
+        localStream = await initCallLocalMediaStream(_currentCallType);
+      } catch (permErr) {
+        console.error('[Call] Media permission error on accept:', permErr);
+        if (statusEl) {
+          statusEl.innerText = '⚠️ ' + permErr.message;
+          statusEl.style.color = '#ef4444';
         }
-      }
-      if (!answerSdp) {
-        answerSdp = 'v=0\\r\\no=- 461173 3 IN IP4 127.0.0.1\\r\\ns=-\\r\\nt=0 0\\r\\na=sendrecv\\r\\nm=' + (inc.callType || 'audio') + ' 9 UDP/TLS/RTP/SAVPF 111';
+        showAccountToast('⚠️ ' + permErr.message, 'error');
+        setCallState(CallState.FAILED);
+        setTimeout(function() {
+          document.getElementById('e2eeCallModal').style.display = 'none';
+          cleanupActiveCallSession();
+        }, 3000);
+        return;
       }
 
-      // 4. Send WebRTC answer to backend using authenticated callFetch
+      const pc = createRTCPeerConnectionInstance();
+      if (!pc) {
+        showAccountToast('Failed to initialize WebRTC engine', 'error');
+        endE2eeCall('pc_init_failed');
+        return;
+      }
+
+      setCallState(CallState.ICE_CONNECTING);
+      let answer = null;
+      try {
+        if (!inc.sdpOffer) {
+          throw new Error('Missing SDP offer in incoming call');
+        }
+        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: inc.sdpOffer }));
+        _hasRemoteDescription = true;
+        await flushQueuedIceCandidates();
+
+        answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+      } catch (err) {
+        console.error('[Call] WebRTC answer error:', err);
+        showAccountToast('WebRTC negotiation error: ' + err.message, 'error');
+        endE2eeCall('answer_creation_failed');
+        return;
+      }
+
+      const answerSdp = answer.sdp || (pc.localDescription && pc.localDescription.sdp);
+
       callFetch('/api/call/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -21780,15 +21788,17 @@ function renderHtml(
 
       if (callTimerInterval) clearInterval(callTimerInterval);
       callTimerInterval = setInterval(function() {
-        _callConnectedSeconds++;
-        const mins = Math.floor(_callConnectedSeconds / 60);
-        const secs = _callConnectedSeconds % 60;
-        const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
-        if (statusEl) {
-          statusEl.innerText = 'Connected (' + timeStr + ') • 🔒 Sovra E2EE Stream';
+        if (_isCallAnswered) {
+          _callConnectedSeconds++;
+          const mins = Math.floor(_callConnectedSeconds / 60);
+          const secs = _callConnectedSeconds % 60;
+          const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
+          if (statusEl && _callState === CallState.CALL_CONNECTED) {
+            statusEl.innerText = 'Connected (' + timeStr + ') • 🔒 Sovra E2EE Direct';
+          }
+          const videoTimer = document.getElementById('callVideoTimer');
+          if (videoTimer) videoTimer.innerText = timeStr;
         }
-        const videoTimer = document.getElementById('callVideoTimer');
-        if (videoTimer) videoTimer.innerText = timeStr;
         syncActiveCallSession();
       }, 1000);
     }
@@ -21812,10 +21822,15 @@ function renderHtml(
     window.endE2eeCall = endE2eeCall;
     window.toggleCallMute = toggleCallMute;
     window.toggleCallVideo = toggleCallVideo;
+    window.toggleCallMode = toggleCallMode;
+    window.toggleVideoCallFullscreen = toggleVideoCallFullscreen;
     window.forceConnectCallTest = forceConnectCallTest;
     window.pollIncomingCalls = pollIncomingCalls;
     window.acceptIncomingCall = acceptIncomingCall;
     window.declineIncomingCall = declineIncomingCall;
+    window.getCallDiagnostics = getCallDiagnostics;
+    window.initCallLocalMediaStream = initCallLocalMediaStream;
+    window.createRTCPeerConnectionInstance = createRTCPeerConnectionInstance;
     setInterval(pollIncomingCalls, 1500);
 
     function closeWaModal(id) {
@@ -30331,15 +30346,6 @@ async function startDevServer() {
 
         const session = sovraDb.createCallOffer(principal.did, recipientDid, offerSdp, callType);
 
-        // Auto-answer fallback for canonical mesh peers if not already answered by client loopback
-        if (recipientDid.includes('alice') || recipientDid.includes('bob') || recipientDid.includes('carol') || recipientDid.includes('rahul')) {
-          setTimeout(() => {
-            const cur = sovraDb.pollCall(session.callId);
-            if (cur && cur.status === 'offering') {
-              sovraDb.answerCall(session.callId, recipientDid, 'v=0\r\no=- 461173 3 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=sendrecv\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111');
-            }
-          }, 4000);
-        }
 
         // Notify recipient
         const senderUser = sovraDb.findUserByDid(principal.did);
