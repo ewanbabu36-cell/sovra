@@ -2,10 +2,14 @@ package network.sovra.mobile
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Base64
 import android.view.View
 import android.webkit.*
@@ -120,7 +124,7 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl("file:///android_asset/index.html")
     }
 
-    private fun requestBlePermissions() {
+    fun requestBlePermissions() {
         val permissions = mutableListOf<String>()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -137,11 +141,40 @@ class MainActivity : AppCompatActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
             }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            }
         }
 
         if (permissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST_CODE)
         }
+    }
+
+    fun requestEnableBluetooth() {
+        try {
+            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+            startActivity(enableBtIntent)
+        } catch (e: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            } catch (e2: Exception) {}
+        }
+    }
+
+    fun openAppSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {}
+    }
+
+    fun openLocationSettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+        } catch (e: Exception) {}
     }
 
     override fun onRequestPermissionsResult(
@@ -188,6 +221,40 @@ class SovraBleJsBridge(
 
     @JavascriptInterface
     fun hasPermissions(): Boolean = bleModule.hasPermissions()
+
+    @JavascriptInterface
+    fun isLocationEnabled(): Boolean = bleModule.isLocationEnabled()
+
+    @JavascriptInterface
+    fun requiresLocationServices(): Boolean = bleModule.requiresLocationServices()
+
+    @JavascriptInterface
+    fun requestPermissions() {
+        activity.runOnUiThread {
+            activity.requestBlePermissions()
+        }
+    }
+
+    @JavascriptInterface
+    fun requestEnableBluetooth() {
+        activity.runOnUiThread {
+            activity.requestEnableBluetooth()
+        }
+    }
+
+    @JavascriptInterface
+    fun openAppSettings() {
+        activity.runOnUiThread {
+            activity.openAppSettings()
+        }
+    }
+
+    @JavascriptInterface
+    fun openLocationSettings() {
+        activity.runOnUiThread {
+            activity.openLocationSettings()
+        }
+    }
 
     @JavascriptInterface
     fun startAdvertising(serviceUuid: String, dataBase64: String): Boolean {

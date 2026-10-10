@@ -61,9 +61,11 @@ class SovraBleModule(private val context: Context) {
 
     private val activeConnections = ConcurrentHashMap<String, ActiveConnection>()
     private val discoveredDevices = ConcurrentHashMap<String, Long>()
+    private val discoveredNames = ConcurrentHashMap<String, String>()
 
     private var activeAdvertiser: BluetoothLeAdvertiser? = null
     private var advertiseCallback: AdvertiseCallback? = null
+    private var currentAdvertisedName: String? = null
     private var gattServer: BluetoothGattServer? = null
     private var isScanning = false
     private var scanCallback: ScanCallback? = null
@@ -101,6 +103,17 @@ class SovraBleModule(private val context: Context) {
             val bt = context.checkSelfPermission(Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED
             return fine && bt
         }
+    }
+
+    fun isLocationEnabled(): Boolean {
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.R) return true
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager ?: return false
+        return lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+               lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+    }
+
+    fun requiresLocationServices(): Boolean {
+        return Build.VERSION.SDK_INT <= Build.VERSION_CODES.R
     }
 
     private fun registerBluetoothStateReceiver() {
@@ -148,11 +161,17 @@ class SovraBleModule(private val context: Context) {
             return
         }
 
+        val cleanUsername = username?.trim()
+        // If advertiser is already actively transmitting this name, do not restart
+        if (activeAdvertiser != null && currentAdvertisedName == cleanUsername) {
+            Log.d(TAG, "BLE Advertiser already active for '$cleanUsername'; maintaining beacon")
+            callback(true, null)
+            return
+        }
+
         // Initialize GATT Server to handle incoming mesh connections
         setupGattServer()
 
-        // 1. Try to set the Bluetooth Adapter local device name to user's Sovra username
-        val cleanUsername = username?.trim()
         if (!cleanUsername.isNullOrEmpty()) {
             try {
                 adapter.name = cleanUsername
@@ -175,20 +194,25 @@ class SovraBleModule(private val context: Context) {
             .setTimeout(0)
             .build()
 
+        // ADV_IND packet (strictly <= 31 bytes):
+        // Service UUID (16 bytes) + flags (3 bytes) = 19 bytes <= 31 bytes
         val dataBuilder = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
             .addServiceUuid(ParcelUuid(serviceUuid))
 
+        // SCAN_RSP packet (strictly <= 31 bytes):
+        // To guarantee NEVER hitting ADVERTISE_FAILED_DATA_TOO_LARGE, we DO NOT call setIncludeDeviceName(true)
+        // when manufacturer data is present, as long phone names (15-20 bytes) + mfg data exceed 31 bytes.
         val scanResponseBuilder = AdvertiseData.Builder()
-            .setIncludeDeviceName(true)
+            .setIncludeDeviceName(false)
 
-        // 2. Add username to Manufacturer Specific Data (0x5356 = 'S','V' for Sovra)
         val nameBytes = (cleanUsername ?: "").toByteArray(Charsets.UTF_8)
         val mfgPayload = if (nameBytes.isNotEmpty()) {
-            if (nameBytes.size > 22) nameBytes.copyOf(22) else nameBytes
+            // Cap at 16 bytes so 16 + 2 (ID) + 2 (header) = 20 bytes <= 31 bytes
+            if (nameBytes.size > 16) nameBytes.copyOf(16) else nameBytes
         } else if (advertisementData.isNotEmpty()) {
-            if (advertisementData.size > 22) advertisementData.copyOf(22) else advertisementData
+            if (advertisementData.size > 16) advertisementData.copyOf(16) else advertisementData
         } else {
             null
         }
@@ -203,11 +227,34 @@ class SovraBleModule(private val context: Context) {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
                 Log.i(TAG, "BLE Peripheral Advertising started successfully on $serviceUuid (name='$cleanUsername')")
                 activeAdvertiser = advertiser
+                currentAdvertisedName = cleanUsername
                 callback(true, null)
             }
 
             override fun onStartFailure(errorCode: Int) {
                 Log.e(TAG, "BLE Peripheral Advertising failed with error code: $errorCode")
+                // Automatic Fallback for strict Bluetooth stacks:
+                // If primary advertising fails (e.g. DATA_TOO_LARGE code 1), retry with bare minimal payload
+                if (errorCode == AdvertiseCallback.ADVERTISE_FAILED_DATA_TOO_LARGE || errorCode == AdvertiseCallback.ADVERTISE_FAILED_INTERNAL_ERROR) {
+                    Log.w(TAG, "Retrying BLE advertising with minimal payload fallback...")
+                    try {
+                        advertiser.startAdvertising(settings, dataBuilder.build(), object : AdvertiseCallback() {
+                            override fun onStartSuccess(s: AdvertiseSettings?) {
+                                Log.i(TAG, "BLE Minimal Fallback Advertising succeeded!")
+                                activeAdvertiser = advertiser
+                                currentAdvertisedName = cleanUsername
+                                callback(true, null)
+                            }
+                            override fun onStartFailure(err: Int) {
+                                Log.e(TAG, "BLE Minimal Fallback Advertising also failed: $err")
+                                callback(false, "Advertising failed with code $err")
+                            }
+                        })
+                        return
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Fallback advertising exception: ${e.message}")
+                    }
+                }
                 callback(false, "Advertising failed with code $errorCode")
             }
         }
@@ -237,6 +284,7 @@ class SovraBleModule(private val context: Context) {
         } finally {
             activeAdvertiser = null
             advertiseCallback = null
+            currentAdvertisedName = null
         }
     }
 
@@ -261,7 +309,13 @@ class SovraBleModule(private val context: Context) {
             return
         }
 
-        stopScanning()
+        // Anti-throttling guard: If already scanning, keep scanner running!
+        // Android throttles apps that restart scanning more than 5 times in 30 seconds.
+        if (isScanning && scanCallback != null) {
+            Log.d(TAG, "BLE Scanner already running; keeping active scan alive")
+            callback(true, null)
+            return
+        }
 
         val serviceUuid = try {
             UUID.fromString(serviceUuidStr)
@@ -269,9 +323,13 @@ class SovraBleModule(private val context: Context) {
             SOVRA_SERVICE_UUID
         }
 
-        val filter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(serviceUuid))
-            .build()
+        // Broad multi-filter approach:
+        // Hardware filters with 128-bit UUIDs often drop packets on MediaTek/Qualcomm chips.
+        // We include both specific filters and a general filter, then validate accurately in software.
+        val filters = mutableListOf<ScanFilter>()
+        filters.add(ScanFilter.Builder().setServiceUuid(ParcelUuid(serviceUuid)).build())
+        filters.add(ScanFilter.Builder().setManufacturerData(0x5356, byteArrayOf()).build())
+        filters.add(ScanFilter.Builder().build())
 
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -284,18 +342,31 @@ class SovraBleModule(private val context: Context) {
                 val device = result.device ?: return
                 val address = device.address ?: return
                 val rssi = result.rssi
+                val scanRecord = result.scanRecord ?: return
 
-                // Duplicate throttling: only report once per 1000ms per MAC
-                val now = System.currentTimeMillis()
-                val lastSeen = discoveredDevices[address] ?: 0L
-                if (now - lastSeen < 1000) return
-                discoveredDevices[address] = now
+                // Software validation: verify if this is a Sovra mesh node
+                val serviceUuids = scanRecord.serviceUuids
+                val hasSovraUuid = serviceUuids?.any {
+                    it.uuid == serviceUuid ||
+                    it.uuid.toString().equals(serviceUuidStr, ignoreCase = true) ||
+                    it.uuid.toString().startsWith("00005356", ignoreCase = true)
+                } == true
 
-                val scanRecord = result.scanRecord
-                val serviceData = scanRecord?.getServiceData(ParcelUuid(serviceUuid)) ?: ByteArray(0)
-                
+                val mfgData = scanRecord.getManufacturerSpecificData(0x5356)
+                val hasSovraMfg = (mfgData != null && mfgData.isNotEmpty())
+
+                val rawName = scanRecord.deviceName ?: device.name ?: ""
+                val hasSovraName = rawName.contains("Sovra", ignoreCase = true) ||
+                                   rawName.contains("Peer", ignoreCase = true)
+
+                // Skip unrelated Bluetooth devices (headphones, TVs, fitness bands)
+                if (!hasSovraUuid && !hasSovraMfg && !hasSovraName) {
+                    return
+                }
+
+                val serviceData = scanRecord.getServiceData(ParcelUuid(serviceUuid)) ?: ByteArray(0)
+
                 // Extract custom username from 0x5356 Manufacturer Data if present
-                val mfgData = scanRecord?.getManufacturerSpecificData(0x5356)
                 val customName = if (mfgData != null && mfgData.isNotEmpty()) {
                     try {
                         String(mfgData, Charsets.UTF_8).trim()
@@ -306,23 +377,45 @@ class SovraBleModule(private val context: Context) {
 
                 val resolvedName = if (!customName.isNullOrBlank()) {
                     customName
+                } else if (rawName.isNotBlank()) {
+                    rawName
                 } else {
-                    val rawName = scanRecord?.deviceName ?: device.name
-                    if (!rawName.isNullOrBlank()) rawName else ("Peer " + address.take(8))
+                    "Peer " + address.take(8)
                 }
 
+                // Smart duplicate throttling:
+                // Only throttle if reported within last 1500ms AND the name has not improved
+                val now = System.currentTimeMillis()
+                val lastSeen = discoveredDevices[address] ?: 0L
+                val previousName = discoveredNames[address]
+                if (now - lastSeen < 1500 && previousName == resolvedName) {
+                    return
+                }
+                discoveredDevices[address] = now
+                discoveredNames[address] = resolvedName
+
+                Log.d(TAG, "Discovered Sovra Peer: $address (name='$resolvedName', rssi=$rssi)")
                 onDeviceDiscovered?.invoke(address, rssi, serviceData, resolvedName)
             }
 
             override fun onScanFailed(errorCode: Int) {
                 Log.e(TAG, "BLE Scan failed with errorCode: $errorCode")
+                isScanning = false
+                scanCallback = null
             }
         }
 
         this.scanCallback = cb
         this.isScanning = true
-        scanner.startScan(listOf(filter), settings, cb)
-        callback(true, null)
+        try {
+            scanner.startScan(filters, settings, cb)
+            callback(true, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "scanner.startScan exception: ${e.message}")
+            isScanning = false
+            scanCallback = null
+            callback(false, e.message)
+        }
     }
 
     @Synchronized

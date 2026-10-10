@@ -239,6 +239,12 @@
         </div>
       </div>
 
+      <!-- Center: BLE Mesh Live Status Pill -->
+      <div id="meshStatusPill" onclick="handleMeshBadgeClick(); event.stopPropagation();" style="display: flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 999px; padding: 4px 10px; cursor: pointer; max-width: 150px; overflow: hidden;" title="Tap to Manage Bluetooth / Rescan">
+        <span id="meshStatusDot" style="font-size: 10px; color: #38bdf8;">●</span>
+        <span id="meshStatusText" style="font-size: 11px; font-weight: 700; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">BLE Mesh (0)</span>
+      </div>
+
       <!-- Right: Mode Switcher & Direct Profile Button -->
       <div style="display: flex; align-items: center; gap: 8px;">
         <button id="modeSwitchBtn" class="mode-switch-btn" onclick="toggleUiMode(event)" title="Toggle Simple / Advance HUD Mode">
@@ -478,16 +484,27 @@
         try {
           const enabled = window.SovraBleNative.isBluetoothEnabled();
           const hasPerm = window.SovraBleNative.hasPermissions();
-          if (enabled && hasPerm) {
-            window.SovraBleNative.startScanning('00005356-0000-1000-8000-00805f9b34fb');
-            const unameB64 = btoa(unescape(encodeURIComponent(userProfile.name || 'Sovra Node')));
-            window.SovraBleNative.startAdvertising('00005356-0000-1000-8000-00805f9b34fb', unameB64);
-            updateMeshBadge('BLE Mesh (' + discoveredPeers.length + ' Peers)', true);
-          } else if (!enabled) {
+          const reqLoc = window.SovraBleNative.requiresLocationServices ? window.SovraBleNative.requiresLocationServices() : false;
+          const locEnabled = window.SovraBleNative.isLocationEnabled ? window.SovraBleNative.isLocationEnabled() : true;
+
+          if (!enabled) {
             updateMeshBadge('Bluetooth is OFF', false);
-          } else {
-            updateMeshBadge('Grant BLE Permissions', false);
+            return;
           }
+          if (!hasPerm) {
+            updateMeshBadge('Grant BLE Permissions', false);
+            return;
+          }
+          if (reqLoc && !locEnabled) {
+            updateMeshBadge('Turn ON Location (GPS)', false);
+            return;
+          }
+
+          // Start continuous BLE scanning & advertising with username payload
+          window.SovraBleNative.startScanning('00005356-0000-1000-8000-00805f9b34fb');
+          const unameB64 = btoa(unescape(encodeURIComponent(userProfile.name || 'Sovra Node')));
+          window.SovraBleNative.startAdvertising('00005356-0000-1000-8000-00805f9b34fb', unameB64);
+          updateMeshBadge('BLE Mesh (' + discoveredPeers.length + ' Peers)', true);
         } catch (e) {
           console.warn('[BLE] Bridge warning:', e);
         }
@@ -502,7 +519,7 @@
             window.SovraBleNative.startScanning('00005356-0000-1000-8000-00805f9b34fb');
             const unameB64 = btoa(unescape(encodeURIComponent(userProfile.name || 'Sovra Node')));
             window.SovraBleNative.startAdvertising('00005356-0000-1000-8000-00805f9b34fb', unameB64);
-          }, 300);
+          }, 200);
         } catch (e) {}
       }
       updateMeshBadge('Scanning BLE spectrum...', true);
@@ -630,7 +647,20 @@
       const dot = document.getElementById('meshStatusDot');
       const label = document.getElementById('meshStatusText');
       if (label) label.innerText = text;
-      if (dot) dot.style.color = isBle ? '#38bdf8' : '#4ade80';
+      if (dot) dot.style.color = isBle ? '#38bdf8' : '#f87171';
+    }
+
+    function handleMeshBadgeClick() {
+      if (!window.SovraBleNative) return;
+      if (!window.SovraBleNative.isBluetoothEnabled()) {
+        window.SovraBleNative.requestEnableBluetooth();
+      } else if (!window.SovraBleNative.hasPermissions()) {
+        window.SovraBleNative.requestPermissions();
+      } else if (window.SovraBleNative.requiresLocationServices && window.SovraBleNative.requiresLocationServices() && !window.SovraBleNative.isLocationEnabled()) {
+        window.SovraBleNative.openLocationSettings();
+      } else {
+        rescanRadar();
+      }
     }
 
     // ==========================================
@@ -1321,6 +1351,59 @@
     function renderRadarHtml() {
       const isAdvance = (currentUiMode === 'advance');
 
+      // Check real-world radio and permission status
+      const isBtEnabled = window.SovraBleNative ? window.SovraBleNative.isBluetoothEnabled() : true;
+      const hasBtPerms = window.SovraBleNative ? window.SovraBleNative.hasPermissions() : true;
+      const reqLoc = (window.SovraBleNative && window.SovraBleNative.requiresLocationServices) ? window.SovraBleNative.requiresLocationServices() : false;
+      const isLocEnabled = (window.SovraBleNative && window.SovraBleNative.isLocationEnabled) ? window.SovraBleNative.isLocationEnabled() : true;
+
+      let alertBanner = '';
+      if (!isBtEnabled) {
+        alertBanner = `
+          <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 12px;">
+            <div style="font-size: 26px; margin-bottom: 6px;">📶❌</div>
+            <div style="font-size: 14px; font-weight: 800; color: #f87171; margin-bottom: 4px;">Bluetooth Is Turned OFF</div>
+            <div style="font-size: 11px; color: #cbd5e1; line-height: 1.5; margin-bottom: 12px;">
+              Direct offline peer discovery requires Bluetooth Low Energy radio. Internet is not required.
+            </div>
+            <button onclick="if(window.SovraBleNative) window.SovraBleNative.requestEnableBluetooth()" style="background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 12px; font-weight: 800; cursor: pointer;">
+              ⚡ Turn ON Bluetooth Now
+            </button>
+          </div>
+        `;
+      } else if (!hasBtPerms) {
+        alertBanner = `
+          <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 12px;">
+            <div style="font-size: 26px; margin-bottom: 6px;">🛡️⚠️</div>
+            <div style="font-size: 14px; font-weight: 800; color: #fbbf24; margin-bottom: 4px;">Nearby Devices Permission Needed</div>
+            <div style="font-size: 11px; color: #cbd5e1; line-height: 1.5; margin-bottom: 12px;">
+              Android requires Nearby Devices permission to discover and connect with nearby phones offline.
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+              <button onclick="if(window.SovraBleNative) window.SovraBleNative.requestPermissions()" style="background: #f59e0b; color: #020617; border: none; border-radius: 8px; padding: 10px 18px; font-size: 12px; font-weight: 800; cursor: pointer;">
+                🛡️ Grant Permissions
+              </button>
+              <button onclick="if(window.SovraBleNative) window.SovraBleNative.openAppSettings()" style="background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 10px 14px; font-size: 11px; font-weight: 700; cursor: pointer;">
+                ⚙️ App Settings
+              </button>
+            </div>
+          </div>
+        `;
+      } else if (reqLoc && !isLocEnabled) {
+        alertBanner = `
+          <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 12px;">
+            <div style="font-size: 26px; margin-bottom: 6px;">📍⚠️</div>
+            <div style="font-size: 14px; font-weight: 800; color: #fbbf24; margin-bottom: 4px;">Location Toggle Required (Android 11 & Older)</div>
+            <div style="font-size: 11px; color: #cbd5e1; line-height: 1.5; margin-bottom: 12px;">
+              Your Android version requires the Location (GPS) switch to be ON in Quick Settings for Bluetooth discovery.
+            </div>
+            <button onclick="if(window.SovraBleNative) window.SovraBleNative.openLocationSettings()" style="background: #f59e0b; color: #020617; border: none; border-radius: 8px; padding: 10px 20px; font-size: 12px; font-weight: 800; cursor: pointer;">
+              📍 Open Location Settings
+            </button>
+          </div>
+        `;
+      }
+
       if (isAdvance) {
         // ========================================================
         // ADVANCE MODE: 3D TACTICAL MESH WAR TABLE (Ref Image 1) + COSMIC ORBITAL RADAR (Ref Image 3)
@@ -1353,6 +1436,8 @@
 
         return `
           <div style="display: flex; flex-direction: column; gap: 14px;">
+            ${alertBanner}
+
             <!-- Ref Image 1: 3D Tactical Mesh War Table -->
             <div class="tactical-table">
               <div class="tactical-grid"></div>
@@ -1401,8 +1486,10 @@
       let peersHtml = '';
       if (discoveredPeers.length === 0) {
         peersHtml = `
-          <div style="background: #182229; border-radius: 10px; padding: 16px; text-align: center; color: #8696a0; font-size: 12px; border: 1px dashed rgba(255,255,255,0.1);">
-            Scanning nearby devices... Bring another Sovra user within Bluetooth range to discover.
+          <div style="background: #182229; border-radius: 10px; padding: 18px; text-align: center; color: #8696a0; font-size: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+            <div style="font-size: 20px; margin-bottom: 6px;">📡</div>
+            <div style="font-weight: 700; color: #cbd5e1; margin-bottom: 4px;">Scanning nearby devices...</div>
+            <div>Make sure another phone has Sovra open within Bluetooth range (~30-50m). Zero internet needed!</div>
           </div>
         `;
       } else {
@@ -1415,7 +1502,7 @@
               <div style="flex: 1; min-width: 0;">
                 <div style="font-size: 14px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(p.name)}</div>
                 <div style="font-size: 11px; color: #38bdf8; margin-top: 2px;">
-                  Nearby • Direct Link
+                  Nearby • ~${p.distance}m • RSSI ${p.rssi} dBm
                 </div>
               </div>
             </div>
@@ -1428,13 +1515,16 @@
 
       return `
         <div style="display: flex; flex-direction: column; gap: 14px;">
+          ${alertBanner}
+
           <!-- Radar graphic -->
           <div style="background: #182229; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; border: 1px solid rgba(56, 189, 248, 0.2);">
             <div class="radar-circle">
               <span style="font-size: 24px;">📶</span>
             </div>
             <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-top: 8px;">Nearby Radar Active</div>
-            <div style="font-size: 11px; color: #8696a0; margin-top: 2px;">${discoveredPeers.length} Peer(s) detected nearby</div>
+            <div style="font-size: 11px; color: #8696a0; margin-top: 2px;">Broadcasting as: <strong style="color: #fff;">${escapeHtml(userProfile.name)}</strong></div>
+            <div style="font-size: 11px; color: #8696a0; margin-top: 2px;">${discoveredPeers.length} Peer(s) detected in physical range</div>
             <button onclick="rescanRadar()" style="margin-top: 10px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid #38bdf8; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer;">
               🔄 Rescan Radar
             </button>
@@ -1763,7 +1853,25 @@
       updateUiModeVisuals();
       switchTab('chats');
       initBleNative();
-      setInterval(initBleNative, 4000);
+      // Periodically check radio health without stopping and restarting BLE scans
+      setInterval(function() {
+        if (window.SovraBleNative) {
+          const enabled = window.SovraBleNative.isBluetoothEnabled();
+          const hasPerm = window.SovraBleNative.hasPermissions();
+          const reqLoc = window.SovraBleNative.requiresLocationServices ? window.SovraBleNative.requiresLocationServices() : false;
+          const locEnabled = window.SovraBleNative.isLocationEnabled ? window.SovraBleNative.isLocationEnabled() : true;
+
+          if (!enabled) {
+            updateMeshBadge('Bluetooth is OFF', false);
+          } else if (!hasPerm) {
+            updateMeshBadge('Grant BLE Permissions', false);
+          } else if (reqLoc && !locEnabled) {
+            updateMeshBadge('Turn ON Location (GPS)', false);
+          } else {
+            updateMeshBadge('BLE Mesh (' + discoveredPeers.length + ' Peers)', true);
+          }
+        }
+      }, 6000);
     });
   </script>
 </body>
