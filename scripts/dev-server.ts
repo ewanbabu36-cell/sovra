@@ -4191,10 +4191,10 @@ function renderHtml(
       }
       #currentUserPill,
       .header-avatar-wrap {
-        display: none !important;
+        display: inline-flex !important;
       }
       #bnav-chat {
-        display: none !important;
+        display: flex !important;
       }
       #headerChatBtn {
         display: flex !important;
@@ -9864,10 +9864,31 @@ function renderHtml(
     (function() {
       try {
         var isLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
-        var token = localStorage.getItem('sovra_session_token');
-        var profile = localStorage.getItem('sovra_user_profile');
-        if (isLoggedOut || !token || !profile) {
+        if (isLoggedOut) {
           document.documentElement.classList.add('sovra-unauthenticated');
+        } else {
+          var savedProfile = localStorage.getItem('sovra_user_profile');
+          if (!savedProfile) {
+            var isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            var autoName = isMob ? 'Mobile Peer' : 'Host Node';
+            var autoHandle = '@peer_' + Math.random().toString(36).substring(2, 7);
+            var autoProf = {
+              did: 'did:key:z6Mks' + Date.now(),
+              name: autoName,
+              displayName: autoName,
+              handle: autoHandle,
+              bio: 'Decentralized Sovereign Mesh Node',
+              avatar: isMob ? '📱' : '💻',
+              avatarBg: '#0284c7',
+              sessionToken: 'mesh_token_' + Date.now(),
+              balanceSov: 500.0,
+              isVerified: true
+            };
+            try {
+              localStorage.setItem('sovra_user_profile', JSON.stringify(autoProf));
+              localStorage.setItem('sovra_session_token', autoProf.sessionToken);
+            } catch(e) {}
+          }
         }
       } catch(e) {}
     })();
@@ -10009,6 +10030,10 @@ function renderHtml(
     <div class="app-center-stage">
       <!-- Center Sticky Top Header with Expansive Search -->
       <header class="app-top-header" onclick="handleDevHeaderContainerClick(event)">
+        <button type="button" class="header-menu-toggle-btn" onclick="toggleDevMainMenu(true); event.stopPropagation();" title="SOVRA Menu (☰)" aria-label="Open Menu" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #fff; border-radius: 10px; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; font-size: 1.25rem;">
+          ☰
+        </button>
+
         <!-- SOVRA Alien Glassmorphic Command Gateway: Unified Brand Capsule (Zero Hide) -->
         <div class="sovra-brand-capsule" onclick="toggleDevMainMenu(event); event.stopPropagation();" title="SOVRA Sovereign Mesh Core (Tap to Open Menu)" style="padding: 7px 18px; border-radius: 9999px;">
           <span class="sovra-core-brand-text" onclick="toggleDevMainMenu(event); event.stopPropagation();" title="SOVRA Main Menu" style="font-size: 1.15rem; letter-spacing: 0.14em;"><span class="sovra-s-lead-highlight">S</span>OVRA</span>
@@ -14947,6 +14972,15 @@ function renderHtml(
       handle: '${hostUser ? hostUser.handle : "@laptop_host"}',
       token: '${hostSessionToken}',
     };
+
+    // Pre-seed global user profile & tab state to prevent Temporal Dead Zone ReferenceErrors
+    var myProfile = null;
+    var currentProfileGridTab = 'posts';
+    var walletBalanceSov = 500.0;
+    try {
+      var _storedProfile = localStorage.getItem('sovra_user_profile');
+      if (_storedProfile) myProfile = JSON.parse(_storedProfile);
+    } catch(e) {}
 
     // ==========================================
     // 🔐 SOVRA ACCOUNT LIFECYCLE, QUICK LOCK & REMOTE WIPE ENGINE
@@ -20705,7 +20739,7 @@ function renderHtml(
     }
     let isSessionLockedState = false;
     let currentProfileWiped = false;
-    let myProfile = null;
+    if (!myProfile) myProfile = null;
     const isExplicitlyLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
     if (!isExplicitlyLoggedOut) {
       try {
@@ -25060,8 +25094,8 @@ function renderHtml(
     let feedPostsData = ${safeJsonForScript(livePosts)};
     let allPagesData = ${safeJsonForScript(sovraDb.getAllPages())};
     let allChannelsData = ${safeJsonForScript(sovraDb.getAllChannels())};
-    let currentProfileGridTab = 'posts';
-    let walletBalanceSov = (typeof myProfile !== 'undefined' && myProfile && typeof myProfile.balanceSov === 'number') ? myProfile.balanceSov : 500.0;
+    currentProfileGridTab = currentProfileGridTab || 'posts';
+    walletBalanceSov = (typeof myProfile !== 'undefined' && myProfile && typeof myProfile.balanceSov === 'number') ? myProfile.balanceSov : (walletBalanceSov || 500.0);
 
     // Unified Physics Particle Emitter (Spring Hearts, Floating Dopamine, Radial Micro-Particles)
     function spawnParticleBurst(x, y, container, badgeText) {
@@ -26158,7 +26192,7 @@ function renderHtml(
                   if (commentsBox) {
                     let cHtml = '';
                     if (p.comments && p.comments.length > 0) {
-                      cHtml = '<div style="color: #94a3b8; font-size: 0.8rem; font-weight: 500; cursor: pointer; margin-bottom: 4px;" onclick="focusFeedComment(\'' + p.id + '\')">View all ' + p.comments.length + ' comments</div>';
+                      cHtml = '<div style="color: #94a3b8; font-size: 0.8rem; font-weight: 500; cursor: pointer; margin-bottom: 4px;" onclick="focusFeedComment(&quot;' + p.id + '&quot;)">View all ' + p.comments.length + ' comments</div>';
                     }
                     p.comments.forEach(function(c) {
                       const isMe = (c.authorDid && c.authorDid === myDid) || c.author === (myProfile ? myProfile.name : 'You (Me)');
@@ -26452,12 +26486,12 @@ function renderHtml(
         '</div>' +
 
         '<div class="insta-comments-preview" id="comments-box-' + post.id + '">' +
-          (post.comments && post.comments.length > 0 ? '<div style="color: #94a3b8; font-size: 0.8rem; font-weight: 500; cursor: pointer; margin-bottom: 4px;" onclick="focusFeedComment(\'' + post.id + '\')">View all ' + post.comments.length + ' comments</div>' : '') +
+          (post.comments && post.comments.length > 0 ? '<div style="color: #94a3b8; font-size: 0.8rem; font-weight: 500; cursor: pointer; margin-bottom: 4px;" onclick="focusFeedComment(&quot;' + post.id + '&quot;)">View all ' + post.comments.length + ' comments</div>' : '') +
           commentsHtml +
         '</div>' +
 
         '<div class="insta-comment-input-box">' +
-          '<button type="button" class="insta-emoji-btn" onclick="document.getElementById(\'input-comment-' + post.id + '\').focus()" aria-label="Add emoji">😊</button>' +
+          '<button type="button" class="insta-emoji-btn" onclick="focusFeedComment(&quot;' + post.id + '&quot;)" aria-label="Add emoji">😊</button>' +
           '<input type="text" class="insta-comment-input" id="input-comment-' + post.id + '" placeholder="Add a comment...">' +
           '<button class="insta-post-btn btn-sub-comment-' + post.id + '">Post</button>' +
         '</div>';
