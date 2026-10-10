@@ -6130,7 +6130,7 @@ function renderHtml(
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: 9999999 !important;
     }
     .wa-modal-card {
       background: #111b21;
@@ -11638,6 +11638,10 @@ function renderHtml(
             <button class="chat-btn-round" style="background: #22c55e; color: #fff; width: 56px; height: 56px; font-size: 1.35rem; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.5);" title="Accept Call" onclick="acceptIncomingCall()">
               📞
             </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 6. New Direct Chat Picker Modal -->
       <div class="wa-modal-overlay" id="newChatPickerModal" style="display: none;" onclick="closeWaModal('newChatPickerModal')">
         <div class="wa-modal-card" style="max-width: 440px; width: 92vw;" onclick="event.stopPropagation()">
@@ -23996,6 +24000,12 @@ function renderHtml(
         }
       }
       window._currentActiveTab = tab;
+
+      if (tab !== 'chat') {
+        document.body.classList.remove('chat-open');
+        const wCont = document.querySelector('.whatsapp-container');
+        if (wCont) wCont.classList.remove('show-chat');
+      }
 
       for (const key of Object.keys(views)) {
         if (views[key]) views[key].style.display = key === tab ? 'flex' : 'none';
