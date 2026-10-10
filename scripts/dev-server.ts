@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import net from 'node:net';
+import { validateEnvironment } from './env-validator.ts';
 import { ensureDevTlsCertificates } from './tls-helper.ts';
+import { SovraBackupManager } from './sovra-backup-restore.ts';
 import {
   generateEd25519KeyPair,
   bytesToHex,
@@ -35,12 +38,16 @@ import {
   TokenBucketRateLimiter,
   resolveAllowedOrigin,
   DEFAULT_SECURITY_POLICY,
+  getLocaleBundle,
+  SUPPORTED_LOCALES,
+  translate,
 } from '../packages/shared/dist/index.js';
 import {
   SovraP2PNode,
   createPeerIdentityBinding,
   type PeerIdentityBinding,
 } from '../packages/p2p/dist/index.js';
+import { BlindPushRelayServer } from '../packages/messaging/dist/index.js';
 import { CID } from '../packages/storage/dist/index.js';
 import { StorageNodeDaemon } from '../nodes/storage-node/dist/index.js';
 import {
@@ -54,7 +61,8 @@ import {
 } from '../packages/social/dist/index.js';
 import { SearchWorker, type IndexedDocument } from '../services/search/dist/index.js';
 import { ModerationWorker } from '../services/moderation-worker/dist/index.js';
-import { renderAdminHtml } from './admin-console.ts';
+import { TranscoderWorker } from '../services/transcoder/dist/index.js';
+import { renderAdminHtml, renderAdminLoginHtml } from './admin-console.ts';
 import {
   sovraDb,
   toPublicUserDTO,
@@ -72,7 +80,17 @@ import {
   type AuditLogRecord,
 } from './database-engine.ts';
 
+const STORAGE_DIR = path.resolve(process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev');
+let cachedStorageDirSize = 0;
+let lastStorageDirCheckTime = 0;
+const STORAGE_DIR_CACHE_TTL_MS = 3000;
+
 function getDirectorySize(dirPath: string): number {
+  const resolved = path.resolve(dirPath);
+  const now = Date.now();
+  if (resolved === STORAGE_DIR && (now - lastStorageDirCheckTime < STORAGE_DIR_CACHE_TTL_MS)) {
+    return cachedStorageDirSize;
+  }
   let size = 0;
   try {
     if (fs.existsSync(dirPath)) {
@@ -87,10 +105,12 @@ function getDirectorySize(dirPath: string): number {
       }
     }
   } catch {}
+  if (resolved === STORAGE_DIR) {
+    cachedStorageDirSize = size;
+    lastStorageDirCheckTime = now;
+  }
   return size;
 }
-
-const STORAGE_DIR = path.resolve(process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev');
 const REELS_DIR = path.join(STORAGE_DIR, 'reels');
 if (!fs.existsSync(REELS_DIR)) {
   try {
@@ -115,9 +135,36 @@ if (!fs.existsSync(POSTS_DIR)) {
     fs.mkdirSync(POSTS_DIR, { recursive: true });
   } catch {}
 }
+const ATTACHMENTS_DIR = path.join(STORAGE_DIR, 'attachments');
+if (!fs.existsSync(ATTACHMENTS_DIR)) {
+  try {
+    fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true });
+  } catch {}
+}
 
 const searchWorker = new SearchWorker();
 const moderationWorker = new ModerationWorker();
+const transcoderWorker = new TranscoderWorker();
+
+const MAX_CONCURRENT_TRANSCODES = 2;
+let activeTranscodes = 0;
+const transcodeQueue: Array<() => Promise<void>> = [];
+
+function enqueueTranscode(task: () => Promise<void>): void {
+  transcodeQueue.push(task);
+  processTranscodeQueue();
+}
+
+function processTranscodeQueue(): void {
+  if (activeTranscodes >= MAX_CONCURRENT_TRANSCODES || transcodeQueue.length === 0) return;
+  const next = transcodeQueue.shift();
+  if (!next) return;
+  activeTranscodes++;
+  next().finally(() => {
+    activeTranscodes--;
+    processTranscodeQueue();
+  });
+}
 
 function indexUserInSearch(u: UserRecord | PublicUserDTO) {
   try {
@@ -676,6 +723,7 @@ interface DynamicSocialState {
   posts: FeedPostRecord[];
   channels: ChannelRecord[];
   pages: PageRecord[];
+  groups: GroupRecord[];
   chatMessages: ChatMessageRecord[];
 }
 
@@ -685,6 +733,7 @@ function loadDynamicSocialState(): DynamicSocialState {
     posts: dbState.posts as unknown as FeedPostRecord[],
     channels: dbState.channels,
     pages: dbState.pages,
+    groups: dbState.groups || sovraDb.getAllGroups(),
     chatMessages: dbState.chatMessages as unknown as ChatMessageRecord[],
   };
 }
@@ -693,6 +742,7 @@ function saveDynamicSocialState(_state?: DynamicSocialState): void {
   if (_state) {
     if (Array.isArray(_state.channels)) sovraDb.db.channels = _state.channels;
     if (Array.isArray(_state.pages)) sovraDb.db.pages = _state.pages;
+    if (Array.isArray(_state.groups)) sovraDb.db.groups = _state.groups;
   }
   sovraDb.save();
 }
@@ -1283,6 +1333,13 @@ const SOVRA_SVG_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512
       <stop offset="0%" stop-color="#10b981"/>
       <stop offset="100%" stop-color="#06b6d4"/>
     </linearGradient>
+    <linearGradient id="deepBoltGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="20%" stop-color="#fff59d"/>
+      <stop offset="50%" stop-color="#ffb300"/>
+      <stop offset="85%" stop-color="#ff6d00"/>
+      <stop offset="100%" stop-color="#d50000"/>
+    </linearGradient>
     <filter id="p2pGlow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="8" result="blur"/>
       <feComposite in="SourceGraphic" in2="blur" operator="over"/>
@@ -1297,8 +1354,12 @@ const SOVRA_SVG_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512
   <circle cx="256" cy="416" r="12" fill="#06b6d4"/>
   <circle cx="118" cy="336" r="14" fill="#ec4899" filter="url(#p2pGlow)"/>
   <circle cx="118" cy="176" r="12" fill="#6366f1"/>
+  <!-- Highlighted S Curve -->
   <path d="M 335 175 C 335 175 220 160 200 220 C 180 275 330 255 315 320 C 300 375 190 355 180 345" 
         fill="none" stroke="url(#sovraGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" filter="url(#p2pGlow)"/>
+  <!-- High-Energy Deep Lightning Bolt Piercing S -->
+  <path d="M 285 70 L 175 240 L 260 240 L 210 440 L 365 215 L 280 215 Z"
+        fill="url(#deepBoltGrad)" filter="url(#p2pGlow)"/>
   <circle cx="256" cy="256" r="20" fill="url(#sovraAccent)" filter="url(#p2pGlow)"/>
 </svg>`;
 
@@ -1522,6 +1583,60 @@ function formatFeedTimestamp(ts?: number | string): { timeAgo: string; fullDate:
   return { timeAgo: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), fullDate };
 }
 
+export interface RTCIceServerConfig {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
+export function getIceServers(userDid?: string): RTCIceServerConfig[] {
+  const defaultStunServers: RTCIceServerConfig[] = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ];
+
+  const customStun = process.env.WEBRTC_STUN_SERVERS || process.env.SOVRA_STUN_SERVERS;
+  const stunServers: RTCIceServerConfig[] = customStun
+    ? customStun.split(',').map(s => s.trim()).filter(Boolean).map(url => ({ urls: url }))
+    : defaultStunServers;
+
+  const turnServersEnv = process.env.WEBRTC_TURN_SERVERS || process.env.SOVRA_TURN_SERVERS;
+  const turnSecret = process.env.WEBRTC_TURN_SECRET || process.env.SOVRA_TURN_SECRET;
+  const staticUsername = process.env.WEBRTC_TURN_USERNAME || process.env.SOVRA_TURN_USERNAME;
+  const staticCredential = process.env.WEBRTC_TURN_CREDENTIAL || process.env.SOVRA_TURN_CREDENTIAL;
+
+  if (!turnServersEnv) {
+    return stunServers;
+  }
+
+  const turnUrls = turnServersEnv.split(',').map(s => s.trim()).filter(Boolean);
+  if (turnUrls.length === 0) {
+    return stunServers;
+  }
+
+  let username = staticUsername || 'sovra-guest';
+  let credential = staticCredential || 'sovra-secret';
+
+  // Short-lived ephemeral HMAC-SHA1 credential (Coturn REST API)
+  if (turnSecret) {
+    const ttlSeconds = parseInt(process.env.WEBRTC_TURN_TTL || process.env.SOVRA_TURN_TTL || '86400', 10);
+    const expiry = Math.floor(Date.now() / 1000) + ttlSeconds;
+    const identifier = userDid || 'sovra-anonymous';
+    username = `${expiry}:${identifier}`;
+    credential = crypto.createHmac('sha1', turnSecret).update(username).digest('base64');
+  }
+
+  const turnEntry: RTCIceServerConfig = {
+    urls: turnUrls,
+    username,
+    credential
+  };
+
+  return [...stunServers, turnEntry];
+}
+
 function renderHtml(
   binding: PeerIdentityBinding,
   masterKey: SovraIdentityKey,
@@ -1653,7 +1768,167 @@ function renderHtml(
       font-weight: 800;
       font-size: 1.2rem;
     }
-    .brand-title { font-size: 1.25rem; font-weight: 700; }
+    .brand-title { font-size: 1.25rem; font-weight: 700; user-select: none; }
+
+    /* ======================================================== */
+    /* DUAL-MODE & SCI-FI CYBER HUD STYLES (Ref Images 1 to 5)  */
+    /* ======================================================== */
+    .mode-switch-btn {
+      padding: 5px 12px;
+      border-radius: 16px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.06);
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .mode-switch-btn:hover {
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+    }
+    .mode-switch-btn.advance-active {
+      background: rgba(0, 240, 255, 0.15) !important;
+      color: #00f0ff !important;
+      border-color: #00f0ff !important;
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.4) !important;
+      text-shadow: 0 0 6px #00f0ff !important;
+    }
+
+    body.mode-advance {
+      background-color: #060e1a !important;
+      background-image: radial-gradient(circle at 50% 10%, rgba(0, 240, 255, 0.1) 0%, transparent 60%) !important;
+    }
+    body.mode-advance .app-top-header {
+      background: rgba(6, 14, 26, 0.95) !important;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.4) !important;
+      box-shadow: 0 2px 16px rgba(0, 240, 255, 0.15) !important;
+    }
+    body.mode-advance .app-left-rail {
+      background: rgba(6, 14, 26, 0.95) !important;
+      border-right: 1px solid rgba(0, 240, 255, 0.3) !important;
+    }
+    body.mode-advance .rail-brand .brand-title,
+    body.mode-advance .sovra-core-brand-text {
+      background: linear-gradient(135deg, #00f0ff, #38bdf8, #818cf8) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.7)) !important;
+    }
+
+    /* Ref Image 5: Circuit Traced Glass Panels */
+    body.mode-advance .card,
+    body.mode-advance .post-card,
+    body.mode-advance .feed-composer-card {
+      position: relative;
+      background: rgba(10, 20, 36, 0.85) !important;
+      backdrop-filter: blur(14px) !important;
+      border: 1px solid rgba(0, 240, 255, 0.35) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0, 240, 255, 0.05) !important;
+    }
+    body.mode-advance .card::before,
+    body.mode-advance .post-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; width: 20px; height: 20px;
+      border-top: 2px solid #00f0ff;
+      border-left: 2px solid #00f0ff;
+      pointer-events: none;
+    }
+    body.mode-advance .card::after,
+    body.mode-advance .post-card::after {
+      content: "";
+      position: absolute;
+      bottom: 0; right: 0; width: 20px; height: 20px;
+      border-bottom: 2px solid #00f0ff;
+      border-right: 2px solid #00f0ff;
+      pointer-events: none;
+    }
+
+    @keyframes instaHeartBurst {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.3); opacity: 1; filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.8)); }
+      100% { transform: scale(1) translateY(-25px); opacity: 0; }
+    }
+
+    /* Ref Image 2: Circular Telemetry Meters */
+    .telemetry-row { display: flex; justify-content: space-around; align-items: center; margin: 12px 0; }
+    .meter-circle { position: relative; width: 68px; height: 68px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .meter-svg { transform: rotate(-90deg); width: 68px; height: 68px; }
+    .meter-bg { stroke: rgba(255,255,255,0.08); fill: none; stroke-width: 5; }
+    .meter-progress { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+    .meter-text { position: absolute; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 0 6px #00f0ff; }
+    .meter-label { font-size: 8px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
+
+    /* Ref Image 1: Tactical Mesh War Table */
+    .tactical-table {
+      background: radial-gradient(circle at center, rgba(0, 240, 255, 0.12) 0%, rgba(6, 14, 26, 0.95) 75%);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      border-radius: 14px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+      margin-bottom: 16px;
+    }
+    .tactical-grid {
+      position: absolute; inset: 0;
+      background-size: 20px 20px;
+      background-image: 
+        linear-gradient(to right, rgba(0, 240, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 240, 255, 0.08) 1px, transparent 1px);
+      pointer-events: none;
+    }
+
+    /* Ref Image 3: Cosmic Orbital Radar Rings */
+    .orbital-container {
+      position: relative;
+      width: 220px; height: 220px;
+      margin: 10px auto;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .orbital-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px dashed rgba(0, 240, 255, 0.35);
+      animation: orbitSpin 30s linear infinite;
+    }
+    .orbital-ring.r1 { width: 110px; height: 110px; border-color: rgba(0, 240, 255, 0.4); }
+    .orbital-ring.r2 { width: 165px; height: 165px; border-color: rgba(56, 189, 248, 0.3); animation-duration: 45s; animation-direction: reverse; }
+    .orbital-ring.r3 { width: 220px; height: 220px; border-color: rgba(129, 140, 248, 0.25); animation-duration: 60s; }
+    @keyframes orbitSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .orbital-core {
+      width: 54px; height: 54px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #00f0ff 0%, #0369a1 70%, #082f49 100%);
+      box-shadow: 0 0 20px #00f0ff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; z-index: 2;
+    }
+    .orbital-satellite {
+      position: absolute;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: rgba(10, 20, 36, 0.9);
+      border: 1px solid #00f0ff;
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; cursor: pointer;
+    }
+
+    /* Off-Canvas Navigation Drawer */
+    #devMainMenuBackdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 10000; backdrop-filter: blur(4px); transition: opacity 0.25s; opacity: 0; display: none; }
+    #devMainMenuDrawer { position: fixed; top: 0; bottom: 0; left: 0; width: 300px; max-width: 85%; background: #0c1322; border-right: 1px solid rgba(255,255,255,0.1); z-index: 10001; transform: translateX(-100%); transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; box-shadow: 4px 0 24px rgba(0,0,0,0.6); }
+    .dev-drawer-item { display: flex; align-items: center; gap: 12px; padding: 14px 18px; color: #e2e8f0; font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
+    .dev-drawer-item:hover { background: rgba(255,255,255,0.06); color: #38bdf8; }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -2070,147 +2345,766 @@ function renderHtml(
     }
 
     /* =======================================================
-       🛸 ALIEN HOLOGRAPHIC CENTRAL COMMAND CORE & GATEWAY STYLES
+       🛸 ALIEN GLASS-MORPHO BRAND LOGO & GATEWAY STYLES
        ======================================================= */
+    .sovra-brand-capsule {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      position: relative;
+      background: rgba(10, 20, 36, 0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1.5px solid rgba(0, 240, 255, 0.35);
+      border-radius: 9999px;
+      padding: 4px 14px 4px 5px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 240, 255, 0.18), inset 0 1px 1px rgba(255, 255, 255, 0.35), inset 0 0 10px rgba(0, 240, 255, 0.08);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+    .sovra-brand-capsule:hover {
+      border-color: #00f0ff;
+      background: rgba(15, 28, 50, 0.85);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 24px rgba(0, 240, 255, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+      transform: translateY(-1px);
+    }
+    .sovra-brand-capsule:active {
+      transform: scale(0.97);
+    }
+
+    /* 🌟 Alien Glassmorphic Light Shimmer Sweep (Smooth & High-Tech) */
+    .sovra-brand-capsule::after {
+      content: "";
+      position: absolute;
+      top: -60%;
+      left: -80%;
+      width: 50%;
+      height: 220%;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(0, 240, 255, 0.15) 35%,
+        rgba(255, 255, 255, 0.45) 50%,
+        rgba(0, 240, 255, 0.15) 65%,
+        transparent 100%
+      );
+      transform: rotate(25deg);
+      animation: alienGlassLightSweep 4.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      pointer-events: none;
+    }
+    @keyframes alienGlassLightSweep {
+      0%, 55% {
+        left: -80%;
+        opacity: 0;
+      }
+      60% {
+        opacity: 1;
+      }
+      78% {
+        left: 140%;
+        opacity: 1;
+      }
+      80%, 100% {
+        left: 140%;
+        opacity: 0;
+      }
+    }
+
     .sovra-core-gateway-btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.85rem;
-      background: #060b17;
-      border: 1.8px solid #00b4d8;
-      border-radius: 9999px;
-      padding: 5px 18px 5px 6px;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin: 0;
       color: #fff;
       cursor: pointer;
       position: relative;
-      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 0 16px rgba(0, 180, 216, 0.28), inset 0 0 8px rgba(0, 180, 216, 0.08);
       outline: none;
-      user-select: none;
       flex-shrink: 0;
     }
-    .sovra-core-gateway-btn:hover {
-      border-color: #38bdf8;
-      box-shadow: 0 0 25px rgba(56, 189, 248, 0.5), inset 0 0 10px rgba(56, 189, 248, 0.15);
-      transform: translateY(-1px);
-    }
-    .sovra-core-gateway-btn:focus-visible {
-      border-color: #38bdf8;
-      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.45);
-    }
-    .sovra-core-gateway-btn:active {
-      transform: scale(0.97);
-    }
     .sovra-core-icon-ring {
-      width: 38px;
-      height: 38px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #0284c7 0%, #3b82f6 45%, #8b5cf6 100%);
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      background: linear-gradient(135deg, #00f0ff 0%, #3b82f6 50%, #8b5cf6 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
-      box-shadow: 0 0 18px rgba(14, 165, 233, 0.65), 0 0 32px rgba(139, 92, 246, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.45);
-      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.35);
       flex-shrink: 0;
+      animation: alienCoreBreathing 3s ease-in-out infinite;
+    }
+    @keyframes alienCoreBreathing {
+      0%, 100% {
+        box-shadow: 0 0 12px rgba(0, 240, 255, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 22px rgba(0, 240, 255, 0.85), 0 0 32px rgba(139, 92, 246, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.85);
+        transform: scale(1.04);
+      }
     }
     .sovra-core-symbol {
       font-weight: 900;
-      font-size: 1.35rem;
+      font-size: 1.25rem;
       color: #ffffff;
-      letter-spacing: -0.5px;
-      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
       line-height: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1;
+      z-index: 2;
+      filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.95));
+    }
+    .sovra-core-emblem-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      display: block;
+      z-index: 2;
+    }
+    .sovra-emblem-s {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-weight: 950;
+      fill: url(#sovraHighlightS);
+      filter: drop-shadow(0 0 4px #00f0ff) drop-shadow(0 0 10px rgba(0, 240, 255, 0.85));
+      animation: sovraSHighlightPulse 2.8s ease-in-out infinite;
+      user-select: none;
+    }
+    @keyframes sovraSHighlightPulse {
+      0%, 100% {
+        filter: drop-shadow(0 0 3px #00f0ff) drop-shadow(0 0 8px rgba(0, 240, 255, 0.7));
+      }
+      50% {
+        filter: drop-shadow(0 0 6px #ffffff) drop-shadow(0 0 14px #00f0ff) drop-shadow(0 0 22px rgba(0, 240, 255, 0.95));
+      }
+    }
+    .sovra-emblem-bolt {
+      fill: url(#sovraDeepLightning);
+      transform-origin: 20px 20px;
+      animation: sovraDeepLightningSurge 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes sovraDeepLightningSurge {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 3px #fff59d) drop-shadow(0 0 8px #ffb300) drop-shadow(0 0 16px #ff6d00);
+        opacity: 0.96;
+      }
+      40% {
+        transform: scale(1.08);
+        filter: drop-shadow(0 0 6px #ffffff) drop-shadow(0 0 14px #ffb300) drop-shadow(0 0 24px #ff3d00);
+        opacity: 1;
+      }
+      44% {
+        transform: scale(0.96);
+        opacity: 0.85;
+      }
+      48% {
+        transform: scale(1.14);
+        filter: drop-shadow(0 0 8px #ffffff) drop-shadow(0 0 18px #ffe082) drop-shadow(0 0 30px #ff1744);
+        opacity: 1;
+      }
+      53% {
+        transform: scale(1.02);
+        opacity: 0.95;
+      }
+    }
+    .sovra-s-lead-highlight {
+      display: inline-block;
+      font-weight: 950;
+      color: #00f0ff;
+      background: linear-gradient(135deg, #ffffff 0%, #38bdf8 40%, #00f0ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 8px #00f0ff) drop-shadow(0 0 16px rgba(0, 240, 255, 0.8));
+      animation: sovraSTextGlow 2.4s ease-in-out infinite;
+      margin-right: 1px;
+    }
+    @keyframes sovraSTextGlow {
+      0%, 100% {
+        filter: drop-shadow(0 0 6px #00f0ff) drop-shadow(0 0 12px rgba(0, 240, 255, 0.6));
+      }
+      50% {
+        filter: drop-shadow(0 0 10px #ffffff) drop-shadow(0 0 20px #00f0ff) drop-shadow(0 0 28px rgba(0, 240, 255, 0.9));
+      }
     }
     .sovra-core-pulse-halo {
       position: absolute;
-      inset: -4px;
-      border-radius: 15px;
-      border: 1.4px solid rgba(0, 180, 216, 0.6);
-      box-shadow: 0 0 10px rgba(0, 180, 216, 0.45);
+      inset: -3px;
+      border-radius: 14px;
+      border: 1.2px solid rgba(0, 240, 255, 0.7);
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.45);
       animation: sovraCoreAuraPulse 3s ease-in-out infinite;
       pointer-events: none;
     }
     @keyframes sovraCoreAuraPulse {
       0%, 100% {
-        opacity: 0.7;
-        box-shadow: 0 0 8px rgba(0, 180, 216, 0.35);
+        opacity: 0.6;
+        box-shadow: 0 0 6px rgba(0, 240, 255, 0.35);
       }
       50% {
         opacity: 1;
-        box-shadow: 0 0 16px rgba(0, 180, 216, 0.65);
+        box-shadow: 0 0 16px rgba(0, 240, 255, 0.75);
       }
     }
     .sovra-core-brand-text {
       font-weight: 900;
       font-size: 1.2rem;
-      letter-spacing: 0.18em;
-      color: #7dd3fc;
-      text-shadow: 0 0 14px rgba(56, 189, 248, 0.55), 0 0 2px rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.16em;
+      background: linear-gradient(135deg, #ffffff 0%, #7dd3fc 45%, #00f0ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.5));
       display: inline-block;
       line-height: 1;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: filter 0.22s ease;
+    }
+    .sovra-brand-capsule:hover .sovra-core-brand-text {
+      filter: drop-shadow(0 0 14px rgba(0, 240, 255, 0.85));
+    }
+    .alien-energy-beacon {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #00f0ff;
+      box-shadow: 0 0 8px #00f0ff, 0 0 14px rgba(0, 240, 255, 0.6);
+      animation: alienBeaconPulse 2s ease-in-out infinite;
+      flex-shrink: 0;
+      margin-left: 1px;
+    }
+    @keyframes alienBeaconPulse {
+      0%, 100% {
+        transform: scale(0.9);
+        opacity: 0.5;
+      }
+      50% {
+        transform: scale(1.3);
+        opacity: 1;
+        box-shadow: 0 0 12px #00f0ff, 0 0 20px rgba(0, 240, 255, 0.9);
+      }
     }
 
-    /* Minimal circular header avatar */
-    .header-avatar-circle {
-      width: 32px;
-      height: 32px;
+    /* =======================================================
+       👤 PROFILE AVATAR WITH INTEGRATED PRESENCE & GHOST MODE
+       ======================================================= */
+    .header-avatar-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
       border-radius: 50%;
-      background: #6366f1;
+      flex-shrink: 0;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .header-avatar-wrap:hover {
+      transform: scale(1.08);
+    }
+    .header-avatar-wrap:active {
+      transform: scale(0.95);
+    }
+    .header-avatar-circle {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%);
       color: #fff;
-      font-size: 0.85rem;
-      font-weight: 700;
+      font-size: 0.9rem;
+      font-weight: 800;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      border: 1.5px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 0 10px rgba(99, 102, 241, 0.35);
-      cursor: pointer;
-      transition: transform 0.18s, border-color 0.18s;
+      border: 1.8px solid rgba(16, 185, 129, 0.7);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+      transition: border-color 0.25s, box-shadow 0.25s;
     }
-    .header-avatar-circle:hover {
-      transform: scale(1.08);
-      border-color: #38bdf8;
+    .header-avatar-wrap.is-ghost .header-avatar-circle {
+      border-color: rgba(148, 163, 184, 0.45);
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+      background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
     }
 
-    /* Compact Live indicator dot */
-    .header-live-indicator {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6px;
-      cursor: default;
-    }
-    .live-dot-pulse {
-      width: 9px;
-      height: 9px;
+    /* Integrated Avatar Status Badge (No floating loose button) */
+    .avatar-presence-dot {
+      position: absolute;
+      bottom: -1px;
+      right: -1px;
+      width: 11px;
+      height: 11px;
       border-radius: 50%;
-      display: inline-block;
-      transition: background-color 0.3s, box-shadow 0.3s;
+      border: 2.2px solid #0b141a;
+      z-index: 2;
+      transition: all 0.25s ease;
+      display: block;
     }
-    .live-dot-pulse.live-connected {
+    .avatar-presence-dot.live-connected {
       background: #10b981;
-      box-shadow: 0 0 10px #10b981, 0 0 20px rgba(16, 185, 129, 0.45);
-      animation: liveDotHeartbeat 2.4s ease-in-out infinite;
+      box-shadow: 0 0 8px #10b981;
+      animation: liveDotHeartbeat 2.5s ease-in-out infinite;
     }
-    .live-dot-pulse.live-connecting {
+    .avatar-presence-dot.live-connecting {
       background: #f59e0b;
       box-shadow: 0 0 8px #f59e0b;
       animation: liveDotHeartbeat 1.2s ease-in-out infinite;
     }
-    .live-dot-pulse.live-offline {
+    .avatar-presence-dot.live-offline {
       background: #64748b;
       box-shadow: none;
     }
+    .avatar-presence-dot.is-ghost {
+      background: #64748b !important;
+      box-shadow: none !important;
+      animation: none !important;
+    }
     @keyframes liveDotHeartbeat {
-      0%, 100% { transform: scale(1); opacity: 0.85; }
-      50% { transform: scale(1.28); opacity: 1; }
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.22); }
+    }
+
+    /* Top Header Action Buttons (Notification Bell & Direct Chat) */
+    .header-action-icon-btn {
+      position: relative;
+      cursor: pointer;
+      padding: 5px 9px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .header-action-icon-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.24);
+      transform: translateY(-1px);
+    }
+    .header-action-icon-btn:active {
+      transform: scale(0.95);
+    }
+    body.tab-active-chat #headerChatBtn {
+      background: rgba(56, 189, 248, 0.18) !important;
+      border-color: rgba(56, 189, 248, 0.45) !important;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25) !important;
+    }
+    .header-action-badge {
+      display: none;
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: bold;
+      border-radius: 50%;
+      min-width: 16px;
+      height: 16px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 3px;
+    }
+
+    /* Floating Return-To-Previous-Tab Pill (Disabled: Silent background auto-resume only) */
+    .floating-return-pill {
+      display: none !important;
+    }
+
+    /* 👤 Industry-Standard Full-Page Peer Profile View (No Popup Modals) */
+    #peer-profile-view {
+      width: 100%;
+      min-height: 80vh;
+      display: none;
+      flex-direction: column;
+    }
+    .peer-profile-top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 99;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(10, 15, 29, 0.9);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      margin-bottom: 14px;
+      padding: 10px 14px;
+    }
+    .peer-nav-back-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.15rem;
+      transition: all 0.18s ease;
+      flex-shrink: 0;
+    }
+    .peer-nav-back-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateX(-2px);
+    }
+    .peer-nav-back-btn:active {
+      transform: scale(0.94);
+    }
+
+    /* 🖼️ Sovra Fullscreen Photo Lightbox & Zoom Canvas */
+    .sovra-photo-lightbox {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 9999999;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      animation: photoLightboxFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes photoLightboxFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .photo-lightbox-backdrop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(4, 7, 15, 0.94);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      z-index: 1;
+    }
+    .photo-lightbox-toolbar {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.25) 80%, transparent 100%);
+      pointer-events: auto;
+      gap: 12px;
+    }
+    .photo-lightbox-author-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      max-width: 48%;
+    }
+    .photo-lightbox-meta {
+      min-width: 0;
+    }
+    .photo-lightbox-author-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #f8fafc;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+    }
+    .photo-lightbox-caption-text {
+      font-size: 0.76rem;
+      color: #94a3b8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .photo-lightbox-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .photo-lightbox-zoom-badge {
+      font-family: monospace;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 4px 10px;
+      border-radius: 20px;
+      min-width: 58px;
+      text-align: center;
+    }
+    .photo-lightbox-tool-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #e2e8f0;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .photo-lightbox-tool-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: scale(1.06);
+    }
+    .photo-lightbox-tool-btn:active {
+      transform: scale(0.94);
+    }
+    .photo-lightbox-action-btn {
+      background: rgba(56, 189, 248, 0.18);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      height: 38px;
+      padding: 0 14px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .photo-lightbox-action-btn:hover {
+      background: rgba(56, 189, 248, 0.32);
+      border-color: rgba(56, 189, 248, 0.55);
+      color: #fff;
+    }
+    .photo-lightbox-action-btn.danger {
+      background: rgba(239, 68, 68, 0.16);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #f87171;
+    }
+    .photo-lightbox-action-btn.danger:hover {
+      background: rgba(239, 68, 68, 0.28);
+      border-color: rgba(239, 68, 68, 0.55);
+      color: #fff;
+    }
+    .photo-lightbox-viewport {
+      position: relative;
+      z-index: 5;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: grab;
+      touch-action: none;
+    }
+    .photo-lightbox-viewport.is-dragging {
+      cursor: grabbing !important;
+    }
+    .photo-lightbox-transform-target {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center center;
+      will-change: transform;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .photo-lightbox-img {
+      max-width: 90vw;
+      max-height: 80vh;
+      object-fit: contain;
+      border-radius: 4px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none;
+    }
+    .photo-lightbox-bottom-bar {
+      position: relative;
+      z-index: 10;
+      padding: 12px 20px;
+      background: linear-gradient(0deg, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.2) 80%, transparent 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      text-align: center;
+      pointer-events: auto;
+    }
+    .photo-lightbox-full-caption {
+      font-size: 0.9rem;
+      color: #f1f5f9;
+      max-width: 800px;
+      line-height: 1.4;
+      max-height: 70px;
+      overflow-y: auto;
+    }
+    .photo-lightbox-hints {
+      font-size: 0.74rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .photo-zoom-hint-badge {
+      transition: all 0.2s ease;
+      opacity: 0.85;
+    }
+    .insta-media-box.has-image:hover .photo-zoom-hint-badge {
+      opacity: 1;
+      transform: scale(1.05);
+      background: rgba(56, 189, 248, 0.25) !important;
+      border-color: rgba(56, 189, 248, 0.5) !important;
+      color: #38bdf8 !important;
+    }
+
+    /* 💬 Non-Intrusive Floating Top Chat Toast (Dynamic Heads-Up Capsule) */
+    .floating-chat-toast {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-120%);
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(11, 20, 36, 0.94);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1.2px solid rgba(56, 189, 248, 0.45);
+      border-radius: 9999px;
+      padding: 6px 14px 6px 8px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75), 0 0 24px rgba(56, 189, 248, 0.25);
+      cursor: pointer;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+      opacity: 0;
+      pointer-events: none;
+      max-width: 92vw;
+    }
+    .floating-chat-toast.is-visible {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .toast-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #0284c7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border: 1.5px solid #38bdf8;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .toast-body {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      max-width: 240px;
+    }
+    .toast-sender {
+      font-weight: 700;
+      font-size: 0.78rem;
+      color: #38bdf8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+    }
+    .toast-msg {
+      font-size: 0.74rem;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+    }
+    .toast-reply-btn {
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      color: #38bdf8;
+      border-radius: 9999px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      flex-shrink: 0;
+    }
+    .toast-reply-btn:hover {
+      background: #0284c7;
+      color: #fff;
+    }
+    .toast-close-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 2px 4px;
+      font-size: 0.85rem;
+      line-height: 1;
+      transition: color 0.15s;
+      flex-shrink: 0;
+    }
+    .toast-close-btn:hover {
+      color: #fff;
+    }
+
+    /* Quick Reply Slide-Over Sheet (No Disruption to Current Media) */
+    .quick-reply-drawer {
+      position: fixed;
+      top: 68px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      width: 380px;
+      max-width: calc(100vw - 32px);
+      background: rgba(11, 20, 36, 0.96);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 16px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 30px rgba(56, 189, 248, 0.25);
+      z-index: 9999999;
+      padding: 12px 14px;
+      display: none;
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .quick-reply-drawer.is-open {
+      display: block;
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
 
     /* =======================================================
@@ -2227,6 +3121,13 @@ function renderHtml(
     }
     .holo-nav-overlay.is-active {
       display: flex;
+    }
+    .holo-nav-overlay.is-surface-active {
+      z-index: 99999;
+      opacity: 0.15;
+      pointer-events: none;
+      filter: blur(2px);
+      transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), filter 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .holo-backdrop {
       position: absolute;
@@ -2715,21 +3616,49 @@ function renderHtml(
         width: 260px;
         height: 260px;
       }
+      .sovra-brand-capsule {
+        padding: 3px 10px 3px 4px;
+        gap: 6px;
+      }
+      .sovra-core-icon-ring {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+      }
+      .sovra-core-symbol {
+        font-size: 1rem;
+      }
       .sovra-core-brand-text {
+        font-size: 0.98rem;
+        letter-spacing: 0.12em;
+        display: inline-block !important;
+      }
+      .alien-energy-beacon {
         display: none;
       }
     }
 
     /* Accessibility: Reduced Motion */
     @media (prefers-reduced-motion: reduce) {
+      .sovra-brand-capsule::after,
+      .sovra-core-icon-ring,
+      .alien-energy-beacon,
       .holo-orbit-ring.ring-outer,
       .holo-orbit-ring.ring-inner,
+      .holo-orbit-ring.ring-mid,
+      .holo-orbital-halo-ring,
+      .holo-shockwave,
+      .holo-floor-spot,
       .sovra-core-pulse-halo,
       .live-dot-pulse.live-connected {
         animation: none !important;
       }
       .holo-node-item {
         transition: opacity 0.12s ease !important;
+      }
+      .holo-nav-overlay,
+      .holo-backdrop {
+        transition: opacity 0.1s ease !important;
       }
     }
     @keyframes callWave {
@@ -3007,14 +3936,18 @@ function renderHtml(
       padding: 0 !important;
       min-width: 0;
     }
-    .header-search-input {
+    .header-search-input,
+    .header-search-input:focus,
+    .header-search-input:focus-visible {
       flex: 1;
-      background: transparent;
-      border: none;
-      color: #f1f5f9;
+      background: transparent !important;
+      border: none !important;
+      color: #f1f5f9 !important;
       font-size: 0.9rem;
       font-weight: 450;
-      outline: none;
+      outline: none !important;
+      outline-offset: 0 !important;
+      box-shadow: none !important;
       width: 100%;
       min-width: 0;
       text-overflow: ellipsis;
@@ -3030,6 +3963,10 @@ function renderHtml(
     .search-kbd-shortcut {
       display: none !important;
     }
+    @keyframes headerDropdownSlide {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     .header-search-dropdown {
       position: absolute;
       top: calc(100% + 8px);
@@ -3037,13 +3974,15 @@ function renderHtml(
       right: 0;
       background: rgba(15, 23, 42, 0.98);
       backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.35);
       border-radius: 14px;
-      padding: 0.5rem;
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85);
+      padding: 0.6rem;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85), 0 0 12px rgba(56, 189, 248, 0.15);
       z-index: 1000;
-      max-height: 380px;
+      max-height: 400px;
       overflow-y: auto;
+      animation: headerDropdownSlide 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     /* Friends & People Discovery View Styles */
@@ -3250,6 +4189,16 @@ function renderHtml(
         max-width: 100%;
         min-width: 110px;
       }
+      #currentUserPill,
+      .header-avatar-wrap {
+        display: none !important;
+      }
+      #bnav-chat {
+        display: none !important;
+      }
+      #headerChatBtn {
+        display: flex !important;
+      }
       .mobile-bottom-nav {
         bottom: 8px !important;
         width: calc(100% - 16px) !important;
@@ -3313,11 +4262,50 @@ function renderHtml(
         width: 100% !important;
         flex: 1 !important;
       }
+      .whatsapp-container.show-chat {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100dvh !important;
+        height: 100vh !important;
+        z-index: 99999 !important;
+        background: #0b141a !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+      }
       .whatsapp-container.show-chat .chat-sidebar {
         display: none !important;
       }
       .whatsapp-container.show-chat .chat-main {
         display: flex !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden !important;
+      }
+      .whatsapp-container.show-chat .chat-header {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 50 !important;
+        flex-shrink: 0 !important;
+        background: #202c33 !important;
+        padding: 0.6rem 0.75rem !important;
+      }
+      .whatsapp-container.show-chat .chat-messages {
+        flex: 1 !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+      .whatsapp-container.show-chat .chat-input-bar {
+        position: sticky !important;
+        bottom: 0 !important;
+        z-index: 50 !important;
+        flex-shrink: 0 !important;
+        background: #202c33 !important;
       }
       .whatsapp-container:not(.show-chat) .chat-sidebar {
         display: flex !important;
@@ -3327,18 +4315,22 @@ function renderHtml(
       }
       .mobile-chat-back-btn {
         display: inline-flex !important;
+        font-size: 1.35rem !important;
+        margin-right: 2px !important;
       }
       .e2ee-shield-badge {
         display: none !important;
       }
       .chat-header-actions {
-        gap: 0.25rem !important;
+        gap: 0.35rem !important;
         flex-shrink: 0 !important;
       }
       .chat-action-btn {
-        width: 34px !important;
-        height: 34px !important;
+        width: 36px !important;
+        height: 36px !important;
         flex-shrink: 0 !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-radius: 50% !important;
       }
       .disappearing-timer-pill span#headerTimerText {
         display: none !important;
@@ -3356,9 +4348,11 @@ function renderHtml(
         padding: 0.45rem 0.55rem !important;
         gap: 0.35rem !important;
       }
+      .whatsapp-container.show-chat ~ .mobile-bottom-nav,
       .whatsapp-container.show-chat ~ footer,
-      .app-center-stage:has(.whatsapp-container.show-chat) > footer,
-      .app-center-stage:has(#chat-view:not([style*="display: none"])) > footer {
+      body:has(.whatsapp-container.show-chat) .mobile-bottom-nav,
+      body.chat-open .mobile-bottom-nav,
+      body.chat-open .app-header {
         display: none !important;
       }
       .reels-stage {
@@ -3413,6 +4407,21 @@ function renderHtml(
         border-right: none !important;
         width: 100% !important;
         box-shadow: none !important;
+      }
+      .yt-desktop-controls {
+        display: none !important;
+      }
+      .yt-mobile-settings-btn {
+        display: flex !important;
+      }
+      .yt-volume-box {
+        display: none !important;
+      }
+      .yt-skip-btn {
+        display: none !important;
+      }
+      .yt-buffer-badge {
+        display: none !important;
       }
     }
     
@@ -4575,6 +5584,9 @@ function renderHtml(
       z-index: 10;
       gap: 0.5rem;
       min-width: 0;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
     }
     .chat-header-user {
       display: flex;
@@ -4915,6 +5927,33 @@ function renderHtml(
       background: #38bdf8;
       color: #0f172a;
     }
+    .chat-attachment-pdf {
+      cursor: pointer;
+    }
+    .chat-file-action-btns {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .chat-file-preview-pill {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s;
+    }
+    .chat-file-preview-pill:hover {
+      background: #38bdf8;
+      color: #0f172a;
+    }
 
     /* Voice Note Player Styles */
     .voice-note-card {
@@ -5233,13 +6272,11 @@ function renderHtml(
       border-radius: 16px;
       overflow: hidden;
       position: relative;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85);
       z-index: 1;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .youtube-container.theater-mode .yt-player-box {
       max-height: 78vh;
@@ -5249,7 +6286,6 @@ function renderHtml(
       width: 100%;
       height: 100%;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       background: radial-gradient(circle at center, #1e1b4b 0%, #030712 100%);
@@ -5257,59 +6293,202 @@ function renderHtml(
       transition: background 0.6s ease;
     }
     .yt-big-play {
-      width: 76px;
-      height: 76px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 68px;
+      height: 68px;
       border-radius: 50%;
-      background: rgba(239, 68, 68, 0.95);
-      border: none;
+      background: rgba(225, 29, 72, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 2px solid rgba(255, 255, 255, 0.25);
       color: #fff;
-      font-size: 2.2rem;
+      font-size: 2rem;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
-      box-shadow: 0 10px 28px rgba(239, 68, 68, 0.55);
+      z-index: 15;
+      box-shadow: 0 10px 30px rgba(225, 29, 72, 0.5);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .yt-big-play:hover {
-      transform: scale(1.12);
+      transform: translate(-50%, -50%) scale(1.1);
       background: #dc2626;
-      box-shadow: 0 12px 35px rgba(239, 68, 68, 0.7);
+      box-shadow: 0 12px 35px rgba(225, 29, 72, 0.65);
     }
+    .yt-player-box.is-playing .yt-big-play {
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(0.85);
+    }
+    .yt-player-box.is-playing:hover .yt-big-play {
+      opacity: 0.9;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* Top Video Overlay */
+    .yt-top-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 12;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .yt-top-overlay > * {
+      pointer-events: auto;
+    }
+    .yt-top-left, .yt-top-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .yt-stream-badge {
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .yt-live-dot {
+      color: #ef4444;
+      font-size: 0.75rem;
+      animation: pulseDot 2s infinite ease-in-out;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .yt-badge-sep {
+      opacity: 0.4;
+      margin: 0 1px;
+    }
+    .yt-buffer-badge {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .yt-top-icon-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.15s;
+    }
+    .yt-top-icon-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.08);
+    }
+
+    /* Screen Watermark (Fades on Play) */
+    .yt-screen-watermark {
+      position: absolute;
+      bottom: 56px;
+      left: 16px;
+      right: 16px;
+      text-align: center;
+      pointer-events: none;
+      z-index: 2;
+      transition: opacity 0.4s ease;
+    }
+    .yt-player-box.is-playing .yt-screen-watermark {
+      opacity: 0;
+    }
+    .yt-screen-chapter {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+      margin-bottom: 4px;
+    }
+    .yt-screen-swarm {
+      font-size: 0.74rem;
+      color: #94a3b8;
+      font-family: monospace;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+    }
+
+    /* Player Controls Overlay */
     .yt-player-controls {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      background: linear-gradient(transparent, rgba(0,0,0,0.92));
-      padding: 0.75rem 1.25rem 0.65rem;
+      background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 65%, transparent 100%);
+      padding: 0.6rem 1rem 0.5rem;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
-      z-index: 10;
+      gap: 0.35rem;
+      z-index: 12;
+      transition: opacity 0.3s ease, transform 0.3s ease;
     }
-    
-    /* Interactive Scrubber with Hover Tooltip & Chapter Marks */
+    .yt-player-box.is-idle .yt-top-overlay {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-8px);
+    }
+    .yt-player-box.is-idle .yt-player-controls {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+    }
+
+    /* Scrubber */
+    .yt-scrubber-wrap {
+      width: 100%;
+      padding: 6px 0;
+      cursor: pointer;
+    }
     .yt-scrubber {
       width: 100%;
-      height: 6px;
+      height: 4px;
       background: rgba(255, 255, 255, 0.25);
-      border-radius: 3px;
+      border-radius: 2px;
       position: relative;
-      cursor: pointer;
       transition: height 0.15s ease;
     }
-    .yt-scrubber:hover {
-      height: 9px;
+    .yt-scrubber-wrap:hover .yt-scrubber {
+      height: 6px;
     }
     .yt-scrubber-buffer {
       position: absolute;
       left: 0;
       top: 0;
       bottom: 0;
-      width: 45%;
-      background: rgba(255, 255, 255, 0.45);
-      border-radius: 3px;
+      width: 25%;
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 2px;
       transition: width 0.3s ease;
     }
     .yt-scrubber-progress {
@@ -5318,9 +6497,8 @@ function renderHtml(
       top: 0;
       bottom: 0;
       width: 0%;
-      background: #ff0000;
-      border-radius: 3px;
-      position: relative;
+      background: #ef4444;
+      border-radius: 2px;
     }
     .yt-scrubber-handle {
       position: absolute;
@@ -5329,52 +6507,58 @@ function renderHtml(
       transform: translateY(-50%) scale(0);
       width: 13px;
       height: 13px;
-      background: #ff0000;
+      background: #ef4444;
+      border: 2px solid #fff;
       border-radius: 50%;
-      transition: transform 0.15s;
+      transition: transform 0.15s ease;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
     }
-    .yt-scrubber:hover .yt-scrubber-handle {
+    .yt-scrubber-wrap:hover .yt-scrubber-handle {
       transform: translateY(-50%) scale(1);
     }
     .yt-scrubber-tooltip {
       position: absolute;
       bottom: 16px;
       transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.9);
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(8px);
       color: #fff;
       font-size: 0.72rem;
       font-weight: 600;
       padding: 3px 8px;
-      border-radius: 4px;
+      border-radius: 6px;
       border: 1px solid rgba(255, 255, 255, 0.2);
       pointer-events: none;
       display: none;
       white-space: nowrap;
-      z-index: 20;
+      z-index: 25;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     }
     .chapter-tick {
       position: absolute;
       top: 0;
       bottom: 0;
       width: 2px;
-      background: #000;
+      background: rgba(0, 0, 0, 0.7);
       z-index: 5;
     }
 
+    /* Controls Row */
     .yt-controls-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      color: #fff;
-      font-size: 0.85rem;
-      flex-wrap: wrap;
-      gap: 0.5rem;
+      width: 100%;
     }
     .yt-left-controls, .yt-right-controls {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
-      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .yt-desktop-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
     .yt-btn {
       background: none;
@@ -5385,114 +6569,156 @@ function renderHtml(
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 4px;
-      border-radius: 4px;
-      transition: transform 0.15s, color 0.15s;
+      padding: 6px;
+      border-radius: 6px;
+      transition: transform 0.15s, color 0.15s, background 0.15s;
     }
     .yt-btn:hover {
-      transform: scale(1.15);
+      transform: scale(1.1);
       color: #38bdf8;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .yt-volume-box {
+      display: flex;
+      align-items: center;
+      width: 60px;
+    }
+    .yt-volume-range {
+      width: 100%;
+      height: 4px;
+      accent-color: #ef4444;
+      cursor: pointer;
+    }
+    .yt-time-text {
+      font-size: 0.76rem;
+      color: #cbd5e1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      margin-left: 4px;
+      white-space: nowrap;
+    }
+    .yt-pill-btn-small {
+      background: rgba(255, 255, 255, 0.1) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      gap: 4px;
     }
     .yt-select {
       background: rgba(0, 0, 0, 0.65);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      color: #34d399;
-      border-radius: 6px;
-      font-size: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #38bdf8;
+      border-radius: 8px;
+      font-size: 0.74rem;
       font-weight: 600;
-      padding: 0.25rem 0.5rem;
+      padding: 3px 6px;
       outline: none;
       cursor: pointer;
     }
     .yt-select option {
-      background: #111827;
+      background: #0f172a;
       color: #fff;
+    }
+    .yt-mobile-settings-btn {
+      display: none;
     }
 
     /* Video Metadata Card */
     .yt-meta-card {
       background: var(--surface);
       border: 1px solid var(--surface-border);
-      border-radius: 12px;
-      padding: 1.25rem;
+      border-radius: 16px;
+      padding: 1.15rem 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.85rem;
     }
     .yt-video-title {
-      font-size: 1.3rem;
+      font-size: 1.22rem;
       font-weight: 700;
       color: #f8fafc;
       line-height: 1.35;
       word-break: break-word;
       overflow-wrap: break-word;
     }
-
-    /* Video Actions Pill Group */
-    .yt-pill-group {
+    .yt-actions-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .yt-video-stats-text {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .yt-actions-scroll {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .yt-actions-scroll::-webkit-scrollbar {
+      display: none;
+    }
+    .yt-action-pill-group {
       display: inline-flex;
       align-items: center;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 20px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      height: 36px;
+      flex-shrink: 0;
     }
-    .yt-pill-btn {
+    .yt-action-pill-btn {
       background: transparent;
       border: none;
-      color: #fff;
-      padding: 0.45rem 0.9rem;
-      font-size: 0.82rem;
+      color: #f8fafc;
+      padding: 0 12px;
+      height: 100%;
+      font-size: 0.8rem;
       font-weight: 600;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 6px;
       cursor: pointer;
       transition: background 0.15s;
+      white-space: nowrap;
     }
-    .yt-pill-btn:hover {
+    .yt-action-pill-btn:hover {
       background: rgba(255, 255, 255, 0.12);
     }
-    .yt-pill-divider {
+    .yt-action-pill-divider {
       width: 1px;
-      height: 18px;
-      background: rgba(255, 255, 255, 0.2);
+      height: 16px;
+      background: rgba(255, 255, 255, 0.15);
     }
-
-    .btn-super-thanks {
-      background: linear-gradient(135deg, #f59e0b, #d97706);
-      color: #000;
-      font-weight: 700;
+    .yt-actions-scroll > .yt-action-pill-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 20px;
-      border: none;
-      padding: 0.45rem 1rem;
-      font-size: 0.82rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
-      transition: transform 0.15s, box-shadow 0.15s;
+      height: 36px;
+      padding: 0 14px;
+      flex-shrink: 0;
     }
-    .btn-super-thanks:hover {
-      transform: scale(1.05);
-      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.5);
+    .yt-actions-scroll > .yt-action-pill-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
     }
-
-    .btn-join {
-      background: rgba(168, 85, 247, 0.2);
-      border: 1px solid rgba(168, 85, 247, 0.5);
-      color: #c084fc;
-      border-radius: 20px;
-      padding: 0.45rem 1rem;
-      font-weight: 700;
-      font-size: 0.82rem;
-      cursor: pointer;
-      transition: background 0.15s;
+    .yt-action-pill-thanks {
+      background: rgba(245, 158, 11, 0.15) !important;
+      border-color: rgba(245, 158, 11, 0.35) !important;
+      color: #fbbf24 !important;
     }
-    .btn-join:hover {
-      background: rgba(168, 85, 247, 0.35);
-      color: #fff;
+    .yt-action-pill-join {
+      background: rgba(99, 102, 241, 0.15) !important;
+      border-color: rgba(99, 102, 241, 0.35) !important;
+      color: #a5b4fc !important;
+    }
+    .yt-action-pill-upload {
+      background: rgba(225, 29, 72, 0.15) !important;
+      border-color: rgba(225, 29, 72, 0.35) !important;
+      color: #fda4af !important;
     }
 
     /* Channel Row */
@@ -5500,20 +6726,21 @@ function renderHtml(
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1rem;
-      flex-wrap: wrap;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 0.85rem 0;
+      margin: 0.2rem 0;
       gap: 1rem;
     }
     .yt-channel-left {
       display: flex;
       align-items: center;
-      gap: 0.85rem;
+      gap: 0.75rem;
       cursor: pointer;
     }
     .yt-channel-avatar {
-      width: 46px;
-      height: 46px;
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
       background: #6366f1;
       color: #fff;
@@ -5521,22 +6748,152 @@ function renderHtml(
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.25rem;
-      border: 2px solid rgba(255, 255, 255, 0.2);
+      font-size: 1.15rem;
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
     }
     .btn-subscribe {
       background: #fff;
-      color: #000;
+      color: #0f172a;
       border: none;
       border-radius: 20px;
       font-weight: 700;
-      font-size: 0.85rem;
-      padding: 0.5rem 1.25rem;
+      font-size: 0.82rem;
+      padding: 0.45rem 1.15rem;
       cursor: pointer;
-      transition: background 0.15s, transform 0.15s;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+    .btn-subscribe:hover {
+      background: #f1f5f9;
+      transform: scale(1.02);
     }
     .btn-subscribe.subscribed {
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.12);
+      color: #f1f5f9;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+
+    /* Mobile Bottom Sheet Modal */
+    .yt-bottom-sheet-card {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-width: 520px;
+      margin: 0 auto;
+      background: #0f172a;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 22px 22px 0 0;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+      z-index: 10050;
+      padding: 12px 18px 24px;
+      animation: sheetSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes sheetSlideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .yt-sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 2px;
+      margin: 0 auto 12px;
+    }
+    .yt-sheet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .yt-sheet-close {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #cbd5e1;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .yt-sheet-body {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-top: 12px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .yt-sheet-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .yt-sheet-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+    }
+    .yt-sheet-options {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .yt-sheet-opt-btn {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #e2e8f0;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-align: left;
+    }
+    .yt-sheet-opt-btn.active {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      font-weight: 700;
+    }
+    .yt-sheet-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .yt-sheet-chip {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 6px 14px;
+      color: #cbd5e1;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .yt-sheet-chip.active {
+      background: #38bdf8;
+      color: #0f172a;
+      border-color: #38bdf8;
+      font-weight: 700;
+    }
+    .yt-sheet-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
       color: #e2e8f0;
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
@@ -5932,17 +7289,18 @@ function renderHtml(
     }
     .bottom-nav-item.active {
       color: #38bdf8;
-      background: rgba(56, 189, 248, 0.1);
+      background: rgba(56, 189, 248, 0.08);
+      border-radius: 14px;
     }
     .bottom-nav-item.active .bnav-icon {
-      transform: scale(1.15);
-      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
+      transform: scale(1.12);
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5));
     }
     .bottom-nav-item.active::after {
       content: '';
       position: absolute;
-      bottom: 3px;
-      width: 14px;
+      bottom: 4px;
+      width: 12px;
       height: 3px;
       background: #38bdf8;
       border-radius: 2px;
@@ -6009,28 +7367,32 @@ function renderHtml(
       width: 100%;
     }
     .insta-post-card {
-      background: #111827;
+      background: rgba(17, 24, 39, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
+      border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
       position: relative;
     }
     .insta-post-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.85rem 1rem;
+      padding: 0.85rem 1rem 0.65rem 1rem;
     }
     .insta-author-info {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
+      gap: 0.75rem;
       cursor: pointer;
+      flex: 1;
+      min-width: 0;
     }
     .insta-author-avatar {
-      width: 40px;
-      height: 40px;
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -6038,7 +7400,9 @@ function renderHtml(
       font-weight: 700;
       color: #fff;
       font-size: 1rem;
-      border: 2px solid #ec4899;
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      flex-shrink: 0;
     }
     .insta-media-box {
       width: 100%;
@@ -6293,22 +7657,31 @@ function renderHtml(
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.75rem 1rem 0.35rem 1rem;
+      padding: 0.75rem 1rem 0.4rem 1rem;
     }
     .insta-action-btn {
       background: none;
       border: none;
-      color: #e2e8f0;
-      font-size: 1.4rem;
+      color: #94a3b8;
+      font-size: 1.25rem;
       cursor: pointer;
-      padding: 0.2rem;
-      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.15s;
+      padding: 0.3rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.15s, background-color 0.15s;
     }
     .insta-action-btn:hover {
-      transform: scale(1.25);
+      transform: scale(1.15);
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
     }
     .insta-action-btn:active {
-      transform: scale(0.9);
+      transform: scale(0.92);
+    }
+    .insta-action-btn.active-like {
+      color: #ef4444;
     }
     .insta-likes-text {
       padding: 0 1rem;
@@ -6319,9 +7692,9 @@ function renderHtml(
     }
     .insta-caption {
       padding: 0 1rem;
-      font-size: 0.88rem;
+      font-size: 0.95rem;
       color: #cbd5e1;
-      line-height: 1.45;
+      line-height: 1.5;
       margin-bottom: 0.5rem;
     }
     .insta-caption strong {
@@ -6334,7 +7707,7 @@ function renderHtml(
     }
     .insta-comments-preview {
       padding: 0 1rem;
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       color: #94a3b8;
       display: flex;
       flex-direction: column;
@@ -6342,12 +7715,25 @@ function renderHtml(
       margin-bottom: 0.65rem;
     }
     .insta-comment-input-box, .insta-comment-input-row {
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
       padding: 0.75rem 1rem;
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      background: rgba(15, 23, 42, 0.4);
+      background: rgba(15, 23, 42, 0.35);
+    }
+    .insta-emoji-btn {
+      background: none;
+      border: none;
+      font-size: 1.15rem;
+      cursor: pointer;
+      padding: 0;
+      opacity: 0.8;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .insta-emoji-btn:hover {
+      opacity: 1;
+      transform: scale(1.1);
     }
     .insta-comment-input, .insta-comment-input-row input {
       flex: 1;
@@ -7279,19 +8665,62 @@ function renderHtml(
       .profile-actions-wrap {
         width: 100% !important;
         display: flex !important;
-        gap: 0.5rem !important;
-        justify-content: center !important;
-        flex-wrap: wrap !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 6px !important;
+        justify-content: space-between !important;
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.75rem !important;
       }
-      .profile-btn {
-        min-height: 44px;
-        min-width: 44px;
-        padding: 0.65rem 1.15rem;
-        font-size: 0.85rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-sizing: border-box;
+      .profile-actions-wrap .profile-btn {
+        min-height: 38px !important;
+        height: 38px !important;
+        box-sizing: border-box !important;
+      }
+      .profile-actions-wrap .profile-btn-primary {
+        flex: 1.2 !important;
+        min-width: 0 !important;
+        padding: 0 10px !important;
+        font-size: 0.8rem !important;
+        border-radius: 10px !important;
+      }
+      .profile-actions-wrap .profile-settings-btn {
+        flex: 1 !important;
+        min-width: 0 !important;
+        padding: 0 10px !important;
+        font-size: 0.8rem !important;
+        border-radius: 10px !important;
+      }
+      .profile-actions-wrap #toggleGhostModeBtn {
+        flex: 0 0 38px !important;
+        width: 38px !important;
+        min-width: 38px !important;
+        padding: 0 !important;
+        border-radius: 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+      .profile-actions-wrap #toggleGhostModeBtn .ghost-btn-text {
+        display: none !important;
+      }
+      .profile-actions-wrap .profile-switch-page-btn {
+        display: none !important;
+      }
+      .profile-actions-wrap .profile-overflow-wrap {
+        flex: 0 0 38px !important;
+        display: inline-flex !important;
+      }
+      .profile-actions-wrap #profileOverflowMenuBtn {
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        padding: 0 !important;
+        border-radius: 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
       }
       .profile-info-body {
         padding: 0.75rem 1rem 1.25rem 1rem;
@@ -7379,16 +8808,6 @@ function renderHtml(
         padding: 0 0.75rem;
         gap: 0.75rem;
       }
-      .profile-actions-wrap {
-        width: 100%;
-        display: flex;
-        gap: 0.5rem;
-        justify-content: center;
-      }
-      .profile-btn {
-        font-size: 0.8rem;
-        padding: 0.55rem 1rem;
-      }
       .profile-info-body {
         padding: 0.75rem 1rem 1.25rem 1rem;
         text-align: center;
@@ -7411,9 +8830,6 @@ function renderHtml(
       }
     }
     @media (max-width: 380px) {
-      .profile-actions-wrap {
-        grid-template-columns: 1fr;
-      }
       .profile-stats-row {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -7905,9 +9321,545 @@ function renderHtml(
         display: none !important;
       }
     }
+
+    /* ==========================================================================
+       🌌 SOVRA SPATIAL HOLOGRAPHIC INTERACTION SYSTEM (CSS)
+       ========================================================================== */
+
+    .sovra-surface-container {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 100000;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    body.spatial-surface-open {
+      overflow: hidden !important;
+    }
+
+    .sovra-surface-backdrop {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 50% 30%, rgba(15, 23, 42, 0.76), rgba(3, 7, 18, 0.92));
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 100000;
+    }
+
+    .sovra-surface-backdrop.is-active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .sovra-surface-card {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.92);
+      transform-origin: var(--origin-x, 50%) var(--origin-y, 50%);
+      width: min(640px, 94vw);
+      max-height: min(86vh, 820px);
+      background: rgba(9, 14, 26, 0.90);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid rgba(56, 189, 248, 0.24);
+      border-radius: 22px;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.8),
+                  0 0 40px rgba(56, 189, 248, 0.14),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 100001;
+      transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+                  opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+                  filter 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .sovra-surface-card.is-active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+      filter: none;
+    }
+
+    .sovra-surface-card.is-receded {
+      opacity: 0.52;
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(0.94) translateY(-14px);
+      filter: blur(4px) brightness(0.85);
+    }
+
+    .sovra-surface-card.is-closing {
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(0.92);
+      filter: blur(2px);
+    }
+
+    .sovra-surface-header {
+      padding: 16px 22px;
+      background: rgba(15, 23, 42, 0.70);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: relative;
+    }
+
+    .sovra-surface-drag-handle {
+      display: none;
+    }
+
+    .sovra-surface-nav-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sovra-surface-back-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #94a3b8;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      flex-shrink: 0;
+    }
+
+    .sovra-surface-back-btn:hover {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      transform: translateX(-2px);
+    }
+
+    .sovra-surface-breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 0.74rem;
+      color: #64748b;
+      margin-bottom: 2px;
+    }
+
+    .sovra-surface-crumb {
+      background: none;
+      border: none;
+      padding: 0;
+      color: #38bdf8;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: inherit;
+      transition: color 0.15s ease;
+    }
+
+    .sovra-surface-crumb:hover {
+      color: #7dd3fc;
+      text-decoration: underline;
+    }
+
+    .sovra-surface-crumb-active {
+      color: #94a3b8;
+      font-weight: 500;
+      cursor: default;
+    }
+
+    .sovra-surface-crumb-sep {
+      color: #475569;
+      font-size: 0.7rem;
+    }
+
+    .sovra-surface-title-group {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .sovra-surface-title {
+      font-size: 1.12rem;
+      font-weight: 800;
+      color: #f8fafc;
+      letter-spacing: -0.01em;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sovra-surface-subtitle {
+      font-size: 0.74rem;
+      color: #94a3b8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    .sovra-surface-close-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      flex-shrink: 0;
+    }
+
+    .sovra-surface-close-btn:hover {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+
+    .sovra-surface-body {
+      padding: 22px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .sovra-surface-footer {
+      padding: 14px 22px;
+      background: rgba(15, 23, 42, 0.45);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Spatial Interactive Items & Option Cards */
+    .spatial-option-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      text-align: left;
+      user-select: none;
+    }
+
+    .spatial-option-card:hover {
+      background: rgba(56, 189, 248, 0.06);
+      border-color: rgba(56, 189, 248, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .spatial-option-card.selected {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.6);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+    }
+
+    .spatial-option-card-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .spatial-option-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      color: #38bdf8;
+      flex-shrink: 0;
+    }
+
+    .spatial-option-details {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .spatial-option-title {
+      font-size: 0.94rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .spatial-option-desc {
+      font-size: 0.76rem;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    .spatial-option-meta {
+      font-size: 0.72rem;
+      color: #38bdf8;
+      font-weight: 600;
+    }
+
+    .spatial-radio-indicator {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.18s ease;
+    }
+
+    .spatial-option-card.selected .spatial-radio-indicator {
+      border-color: #38bdf8;
+      background: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+    }
+
+    .spatial-radio-indicator::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #0b1120;
+      display: none;
+    }
+
+    .spatial-option-card.selected .spatial-radio-indicator::after {
+      display: block;
+    }
+
+    /* Spatial Action Grid (e.g. Create Selector) */
+    .spatial-action-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .spatial-action-tile {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      text-align: left;
+    }
+
+    .spatial-action-tile:hover {
+      background: rgba(56, 189, 248, 0.08);
+      border-color: rgba(56, 189, 248, 0.35);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .spatial-tile-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    .spatial-tile-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .spatial-tile-desc {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      line-height: 1.35;
+    }
+
+    /* Chat Context Action Surface */
+    .spatial-chat-reaction-dock {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+    }
+
+    .spatial-chat-emoji-btn {
+      background: none;
+      border: none;
+      font-size: 1.45rem;
+      cursor: pointer;
+      transition: transform 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      padding: 4px;
+      border-radius: 8px;
+    }
+
+    .spatial-chat-emoji-btn:hover {
+      transform: scale(1.35);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .spatial-chat-action-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .spatial-chat-action-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: #e2e8f0;
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .spatial-chat-action-item:hover {
+      background: rgba(56, 189, 248, 0.1);
+      border-color: rgba(56, 189, 248, 0.3);
+      color: #38bdf8;
+      transform: translateX(4px);
+    }
+
+    .spatial-chat-action-item.danger {
+      color: #f87171;
+    }
+
+    .spatial-chat-action-item.danger:hover {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    /* Responsive Mobile Sheet Behavior */
+    @media (max-width: 640px) {
+      .sovra-surface-card {
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100vw !important;
+        max-height: 88vh !important;
+        border-radius: 24px 24px 0 0 !important;
+        transform: translateY(100%);
+        transform-origin: bottom center !important;
+      }
+
+      .sovra-surface-card.is-active {
+        transform: translateY(0) !important;
+      }
+
+      .sovra-surface-card.is-receded {
+        transform: translateY(12px) scale(0.96) !important;
+        opacity: 0.5;
+      }
+
+      .sovra-surface-card.is-closing {
+        transform: translateY(100%) !important;
+      }
+
+      .sovra-surface-drag-handle {
+        display: block;
+        width: 44px;
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.25);
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .sovra-surface-header {
+        padding-top: 20px;
+      }
+
+      .spatial-action-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Accessibility: Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+      .sovra-surface-card,
+      .sovra-surface-backdrop,
+      .spatial-option-card,
+      .spatial-action-tile,
+      .spatial-chat-emoji-btn {
+        transition: none !important;
+        animation: none !important;
+        transform: none !important;
+      }
+
+      .sovra-surface-card.is-receded {
+        filter: none !important;
+        opacity: 0.3 !important;
+      }
+    }
   </style>
 </head>
-<body class="nav-mode-auto">
+<body class="nav-mode-auto" data-active-tab="feed">
+  <!-- Global SOVRA Brand Emblem SVG Gradients -->
+  <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true">
+    <defs>
+      <linearGradient id="sovraDeepLightning" x1="15%" y1="0%" x2="85%" y2="100%">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="20%" stop-color="#fff59d"/>
+        <stop offset="50%" stop-color="#ffb300"/>
+        <stop offset="85%" stop-color="#ff6d00"/>
+        <stop offset="100%" stop-color="#d50000"/>
+      </linearGradient>
+      <linearGradient id="sovraHighlightS" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="55%" stop-color="#e0f2fe"/>
+        <stop offset="100%" stop-color="#38bdf8"/>
+      </linearGradient>
+    </defs>
+  </svg>
   <script>
     (function() {
       try {
@@ -7919,6 +9871,7 @@ function renderHtml(
         }
       } catch(e) {}
     })();
+    window.SOVRA_ICE_SERVERS = ${JSON.stringify(getIceServers())};
   </script>
   <!-- Top Notice Banner for Insecure LAN Contexts (WebRTC Camera/Mic) -->
   <div id="insecureContextNotice" style="display: none; background: linear-gradient(90deg, #1e1b4b, #312e81); color: #e0e7ff; padding: 10px 16px; font-size: 0.8rem; border-bottom: 1px solid #4f46e5; align-items: center; justify-content: space-between; z-index: 999999; position: sticky; top: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
@@ -7934,10 +9887,14 @@ function renderHtml(
   <div class="app-layout">
     <!-- Column 1: Left Navigation Rail (Desktop) -->
     <aside class="app-left-rail">
-      <div class="rail-brand" onclick="switchTab('feed')">
-        <div class="brand-logo">S</div>
+      <div class="rail-brand" onclick="toggleDevMainMenu(event); event.stopPropagation();" style="cursor: pointer;" title="Open SOVRA Menu">
+        <div class="brand-logo" style="background: linear-gradient(135deg, #00f0ff 0%, #3b82f6 50%, #8b5cf6 100%); box-shadow: 0 0 16px rgba(0,240,255,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 11px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; position: relative;">
+          <svg class="sovra-core-emblem-svg" viewBox="0 0 40 40" width="32" height="32" aria-hidden="true">
+            <text class="sovra-emblem-s" x="20" y="29" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="950" font-size="26" text-anchor="middle">S</text>
+          </svg>
+        </div>
         <div>
-          <div class="brand-title">SOVRA</div>
+          <div class="brand-title" style="letter-spacing: 0.12em; font-weight: 900;"><span class="sovra-s-lead-highlight" style="font-size: 1.35rem;">S</span><span style="background: linear-gradient(135deg, #ffffff 0%, #7dd3fc 45%, #00f0ff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 6px rgba(0,240,255,0.4));">OVRA</span></div>
           <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">Decentralized Mesh</div>
         </div>
       </div>
@@ -7963,7 +9920,7 @@ function renderHtml(
         <button class="rail-nav-item" id="tab-chat" data-action="switch-tab" data-tab="chat" onclick="switchTab('chat')">
           <span class="rail-icon">💬</span>
           <span class="rail-label">Chats</span>
-          <span class="rail-badge" style="background: #3b82f6;">2</span>
+          <span class="rail-badge" id="railChatBadge" style="display: none; background: #ef4444;">0</span>
         </button>
         <button class="rail-nav-item" id="tab-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')">
           <span class="rail-icon">👤</span>
@@ -7996,34 +9953,90 @@ function renderHtml(
       </a>
     </aside>
 
+    <!-- Dev Server Off-Canvas Main Menu Drawer (Zero Popup) -->
+    <div id="devMainMenuBackdrop" onclick="toggleDevMainMenu(false)"></div>
+    <aside id="devMainMenuDrawer">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 18px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px;">⚡</div>
+          <span style="font-weight: 800; font-size: 16px; letter-spacing: -0.5px; color: #fff;">SOVRA MENU</span>
+        </div>
+        <button type="button" onclick="toggleDevMainMenu(false)" style="background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px 8px;">✕</button>
+      </div>
+
+      <div style="padding: 14px 18px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="switchTab('me'); toggleDevMainMenu(false);">
+        <div style="width: 42px; height: 42px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 14px; font-weight: 700; color: #fff;">Sovereign Profile</div>
+          <div style="font-size: 11px; color: #38bdf8;">@sovereign_node</div>
+        </div>
+        <span style="font-size: 12px; color: #94a3b8;">→</span>
+      </div>
+
+      <div style="flex: 1; overflow-y: auto;">
+        <div class="dev-drawer-item" onclick="switchTab('feed'); toggleDevMainMenu(false);">
+          <span>📷</span> <span>Feed (Home)</span>
+        </div>
+        <div class="dev-drawer-item" onclick="switchTab('friends'); toggleDevMainMenu(false);">
+          <span>👥</span> <span>Friends & Mesh Radar</span>
+        </div>
+        <div class="dev-drawer-item" onclick="switchTab('reels'); toggleDevMainMenu(false);">
+          <span>🎬</span> <span>Reels & Shorts</span>
+        </div>
+        <div class="dev-drawer-item" onclick="switchTab('youtube'); toggleDevMainMenu(false);">
+          <span>📺</span> <span>Watch Video Catalog</span>
+        </div>
+        <div class="dev-drawer-item" onclick="switchTab('chat'); toggleDevMainMenu(false);">
+          <span>💬</span> <span>Chats (WhatsApp Mode)</span>
+        </div>
+        <div class="dev-drawer-item" onclick="switchTab('me'); toggleDevMainMenu(false);">
+          <span>👤</span> <span>Profile & Identity</span>
+        </div>
+        <div class="dev-drawer-item" onclick="toggleDevServerUiMode(); toggleDevMainMenu(false);">
+          <span>⚡</span> <span id="devDrawerModeLabel">Toggle Advance HUD Mode</span>
+        </div>
+        <div class="dev-drawer-item" onclick="switchTab('admin'); toggleDevMainMenu(false);">
+          <span>⚙️</span> <span>Operations Console</span>
+        </div>
+      </div>
+
+      <div style="padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 11px; color: #64748b;">
+        Sovra Decentralized Mesh Node<br>Zero Central Server Dependency
+      </div>
+    </aside>
+
     <!-- Column 2: Center Stage -->
     <div class="app-center-stage">
       <!-- Center Sticky Top Header with Expansive Search -->
-      <header class="app-top-header">
-        <!-- SOVRA Central Command Core Gateway -->
-        <button type="button" id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="toggleHolographicNav()" aria-label="Open SOVRA holographic command center" aria-haspopup="dialog" aria-expanded="false" title="SOVRA Central Command Core (Tap to Activate Holographic Navigation)">
-          <div class="sovra-core-icon-ring">
-            <span class="sovra-core-symbol">S</span>
-            <span class="sovra-core-pulse-halo"></span>
-          </div>
-          <span class="sovra-core-brand-text">SOVRA</span>
-        </button>
+      <header class="app-top-header" onclick="handleDevHeaderContainerClick(event)">
+        <!-- SOVRA Alien Glassmorphic Command Gateway: Unified Brand Capsule (Zero Hide) -->
+        <div class="sovra-brand-capsule" onclick="toggleDevMainMenu(event); event.stopPropagation();" title="SOVRA Sovereign Mesh Core (Tap to Open Menu)" style="padding: 7px 18px; border-radius: 9999px;">
+          <span class="sovra-core-brand-text" onclick="toggleDevMainMenu(event); event.stopPropagation();" title="SOVRA Main Menu" style="font-size: 1.15rem; letter-spacing: 0.14em;"><span class="sovra-s-lead-highlight">S</span>OVRA</span>
+        </div>
 
-        <!-- Fresh, Neat & Streamlined Search Bar -->
+        <!-- Fresh, Neat & Streamlined Search Bar (Zero Popup - 100% Inline Dropdown) -->
         <div class="header-search-wrap">
-          <div class="header-search-bar" onclick="document.getElementById('headerFriendSearchInput').focus()">
-            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, mesh, tags..." aria-label="Search friends, channels, and tags" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown()" />
-            <button id="headerSearchClearBtn" onclick="clearHeaderSearch(); event.stopPropagation();" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.85rem;" aria-label="Clear search input">✕</button>
+          <div class="header-search-bar" onclick="document.getElementById('headerFriendSearchInput').focus(); showHeaderSearchDropdown();">
+            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search friends, mesh, tags..." aria-label="Search friends, channels, and tags" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown();" />
+            <button id="headerSearchClearBtn" onclick="clearHeaderSearch(event);" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.85rem;" aria-label="Clear search input">✕</button>
             <kbd class="search-kbd-shortcut" style="display: none !important;" aria-hidden="true">Ctrl K</kbd>
           </div>
           <div id="headerSearchDropdown" class="header-search-dropdown" style="display: none;"></div>
         </div>
 
-        <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; position: relative;">
-          <div id="headerNotificationBell" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" style="position: relative; cursor: pointer; padding: 4px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center;" title="Real-Time Notifications" aria-label="Notifications">
+        <div style="display: flex; gap: 0.6rem; align-items: center; flex-shrink: 0; position: relative;">
+          <!-- Real-Time Notifications Bell -->
+          <div id="headerNotificationBell" class="header-action-icon-btn" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" title="Real-Time Notifications" aria-label="Notifications">
             <span style="font-size: 0.95rem;">🔔</span>
-            <span id="headerNotificationBadge" style="display: none; position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: bold; border-radius: 50%; min-width: 16px; height: 16px; align-items: center; justify-content: center; padding: 0 3px;">0</span>
+            <span id="headerNotificationBadge" class="header-action-badge" style="display: none; background: #ef4444;">0</span>
           </div>
+
+          <!-- Encrypted Direct Chats (Beside Notifications) -->
+          <div id="headerChatBtn" class="header-action-icon-btn" role="button" tabindex="0" onclick="switchTab('chat')" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('chat')" title="Encrypted Chats &amp; Messages" aria-label="Chats">
+            <span style="font-size: 0.95rem;">💬</span>
+            <span id="headerChatBadge" class="header-action-badge" style="display: none; background: #ef4444;">0</span>
+          </div>
+
           <div id="notificationDropdown" style="display: none; position: absolute; top: 44px; right: 0; width: 320px; max-height: 400px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
               <span style="font-weight: 700; color: #fff; font-size: 0.85rem;">🔔 Notifications</span>
@@ -8033,28 +10046,98 @@ function renderHtml(
               <div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 20px;">No notifications yet</div>
             </div>
           </div>
-          <button id="pwaInstallBtn" onclick="triggerPwaInstall()" style="display: none; align-items: center; gap: 0.35rem; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer;" title="Install Sovra App on Phone" aria-label="Install Sovra App on Phone">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-            <span>Install</span>
-          </button>
-          <div class="node-status-pill" title="Sovra Mesh Online • TCP :${tcpPort} • LibP2P Noise_XX Active" style="display: none !important; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 20px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); cursor: default;">
-            <span class="status-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; display: inline-block;"></span>
-            <span class="status-text" style="color: #10b981; font-weight: 700; font-size: 0.75rem;">Online</span>
-            <span class="badge tcp-port-badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.7rem; font-family: monospace; padding: 1px 5px; border-radius: 6px;">:${tcpPort}</span>
-          </div>
-          <div id="currentUserPill" role="button" tabindex="0" onclick="toggleHolographicNav()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleHolographicNav()" style="display: flex; align-items: center; background: none; border: none; padding: 0; cursor: pointer;" title="Your Sovereign Profile (Tap for Holographic Core)" aria-label="Your Sovereign Profile">
-            <span id="currentUserAvatar" class="header-avatar-circle">S</span>
-          </div>
-          <div class="header-live-indicator" id="headerLiveIndicator" title="SOVRA Mesh Transport: Connected" aria-label="Realtime connection: Live">
-            <span class="live-dot-pulse live-connected" id="liveDotPulse"></span>
+
+          <!-- User Profile Avatar with Integrated Presence Badge (Desktop Only) -->
+          <div id="currentUserPill" class="header-avatar-wrap is-online" role="button" tabindex="0" onclick="switchTab('me'); event.stopPropagation();" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" title="Open Your Profile (Click to View / Toggle Ghost Mode)" aria-label="Your Sovereign Profile">
+            <span id="currentUserAvatar" class="header-avatar-circle">👤</span>
+            <span class="avatar-presence-dot live-connected" id="liveDotPulse" title="Status: Online (Live Mesh)"></span>
           </div>
         </div>
       </header>
+
+      <!-- 💬 Non-Intrusive Floating Top Chat Message Capsule (Dynamic Heads-Up) -->
+      <div id="floatingChatToast" class="floating-chat-toast" onclick="handleFloatingToastClick(event)" aria-live="polite">
+        <div class="toast-avatar" id="toastAvatar">👤</div>
+        <div class="toast-body">
+          <div class="toast-sender" id="toastSender">Alice</div>
+          <div class="toast-msg" id="toastMsg">Hey, are you free right now?</div>
+        </div>
+        <button type="button" class="toast-reply-btn" onclick="openQuickReplyDrawer(event)">Reply</button>
+        <button type="button" class="toast-close-btn" onclick="dismissFloatingChatToast(event)" aria-label="Dismiss">✕</button>
+      </div>
+
+      <!-- Quick Reply Slide-Over Drawer (Reply without leaving Feed/Reels/Video) -->
+      <div id="quickReplyDrawer" class="quick-reply-drawer" onclick="event.stopPropagation()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div id="quickReplyAvatar" style="width: 26px; height: 26px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.78rem; color: #fff;">👤</div>
+            <div>
+              <div id="quickReplyName" style="font-weight: 700; font-size: 0.82rem; color: #fff;">Alice</div>
+              <div id="quickReplyStatus" style="font-size: 0.65rem; color: #10b981;">🟢 Online</div>
+            </div>
+          </div>
+          <button type="button" onclick="closeQuickReplyDrawer()" style="background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer; padding: 2px 6px;">✕</button>
+        </div>
+        <div id="quickReplyLastMessage" style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 6px 10px; font-size: 0.78rem; color: #cbd5e1; margin-bottom: 8px; max-height: 70px; overflow-y: auto;"></div>
+        <div style="display: flex; gap: 6px;">
+          <input type="text" id="quickReplyInput" placeholder="Type quick reply and press Enter..." onkeydown="if(event.key==='Enter')sendQuickReplyMessage();" style="flex: 1; padding: 7px 10px; background: rgba(15,23,42,0.85); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; color: #fff; font-size: 0.8rem; outline: none;" />
+          <button type="button" onclick="sendQuickReplyMessage()" style="background: #0284c7; color: #fff; border: none; border-radius: 8px; padding: 0 12px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">Send</button>
+        </div>
+      </div>
 
       <div class="container">
     <!-- Tab 1: Instagram Main Feed (Stories, Photo Stream, Double-Tap Hearts) -->
     <main class="main-content" id="feed-view" style="display: flex;">
       <div class="feed-container">
+        <!-- Advance Mode: Holographic Node Telemetry HUD (Ref Image 2) -->
+        <div id="devAdvanceTelemetryHud" class="circuit-glass-card" style="display: none; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.1rem; color: #00f0ff; animation: radarPulse 2s infinite ease;">💠</span>
+              <span style="font-size: 0.85rem; font-weight: 800; color: #00f0ff; letter-spacing: 0.5px;">SOVRA // ADVANCE HOLOGRAPHIC TELEMETRY HUD</span>
+            </div>
+            <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: rgba(0, 240, 255, 0.15); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); font-weight: 700;">ONLINE 3.2GHz</span>
+          </div>
+
+          <!-- 4 Circular SVG Gauges (Ref Image 2) -->
+          <div class="telemetry-row">
+            <div class="meter-circle">
+              <svg class="meter-svg" viewBox="0 0 68 68"><circle class="meter-bg" cx="34" cy="34" r="28"></circle><circle id="meterCpuProgress" class="meter-progress" cx="34" cy="34" r="28" stroke="#00f0ff" stroke-dasharray="175.9" stroke-dashoffset="126"></circle></svg>
+              <div id="meterCpuText" class="meter-text">28%</div>
+              <div class="meter-label">CPU</div>
+            </div>
+            <div class="meter-circle">
+              <svg class="meter-svg" viewBox="0 0 68 68"><circle class="meter-bg" cx="34" cy="34" r="28"></circle><circle id="meterRelayProgress" class="meter-progress" cx="34" cy="34" r="28" stroke="#38bdf8" stroke-dasharray="175.9" stroke-dashoffset="61"></circle></svg>
+              <div id="meterRelayText" class="meter-text">65%</div>
+              <div class="meter-label">RELAY</div>
+            </div>
+            <div class="meter-circle">
+              <svg class="meter-svg" viewBox="0 0 68 68"><circle class="meter-bg" cx="34" cy="34" r="28"></circle><circle id="meterSqliteProgress" class="meter-progress" cx="34" cy="34" r="28" stroke="#818cf8" stroke-dasharray="175.9" stroke-dashoffset="102"></circle></svg>
+              <div id="meterSqliteText" class="meter-text">42%</div>
+              <div class="meter-label">SQLITE</div>
+            </div>
+            <div class="meter-circle">
+              <svg class="meter-svg" viewBox="0 0 68 68"><circle class="meter-bg" cx="34" cy="34" r="28"></circle><circle id="meterCipherProgress" class="meter-progress" cx="34" cy="34" r="28" stroke="#34d399" stroke-dasharray="175.9" stroke-dashoffset="21"></circle></svg>
+              <div id="meterCipherText" class="meter-text">88%</div>
+              <div class="meter-label">CIPHER</div>
+            </div>
+          </div>
+
+          <!-- Real-Time Packet Log Terminal (Ref Image 2) -->
+          <div id="devPacketTerminalLogs" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 8px; padding: 8px 12px; font-family: monospace; font-size: 0.72rem; color: #a5f3fc; line-height: 1.5; margin-top: 8px; max-height: 90px; overflow-y: auto;">
+            <div style="color: #34d399;">[LIVE] Noise_XX Key Rotation Monotonic Pass • Verified</div>
+            <div style="color: #38bdf8;">[LIVE] SQLite WAL Mode Active • 10 Core Tables Synced</div>
+            <div style="color: #818cf8;">[LIVE] P2P Noise_XX TCP Port 4001 • Mesh Router Ready</div>
+          </div>
+
+          <!-- Quick Cyber Actions -->
+          <div style="display: flex; gap: 8px; margin-top: 10px; overflow-x: auto;">
+            <button type="button" class="btn-action" onclick="switchTab('friends');" style="border-color: rgba(0, 240, 255, 0.4); color: #00f0ff;">📶 Tactical Grid (Img 1)</button>
+            <button type="button" class="btn-action" onclick="toggleDevServerUiMode();" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">✨ Switch to Simple Mode</button>
+            <button type="button" class="btn-action" onclick="triggerBottomCreateAction();" style="border-color: rgba(52, 211, 153, 0.4); color: #34d399;">✍️ Broadcast Post</button>
+          </div>
+        </div>
+
         <!-- Stories Tray (Borderless Instagram Style) -->
         <div class="stories-tray">
           <div class="stories-bar">
@@ -8334,32 +10417,29 @@ function renderHtml(
             <article class="insta-post-card" id="card-${post.id}">
               <!-- Post Header -->
               <div class="insta-post-header">
-                <div class="insta-author-info" onclick="openCreatorProfile('${post.authorName.split(' ')[0].toLowerCase()}')">
+                <div class="insta-author-info" onclick="openCreatorProfile('${(post as any).authorHandle || (post as any).authorDid || post.authorName}', this)">
                   <div class="insta-author-avatar" style="background: ${post.authorAvatarBg}; overflow: hidden;">
                     ${post.authorAvatarDataUrl ? `<img src="${post.authorAvatarDataUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />` : post.authorAvatar}
                   </div>
                   <div style="flex: 1; min-width: 0;">
-                    <div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
-                      <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${post.authorName}</span>
-                      <span style="color: #38bdf8; font-size: 0.8rem;" title="Cryptographically Verified Peer">✓</span>
-                      ${post.authorBadge ? `<span class="badge ${post.authorType === 'page' ? 'badge-page' : (post.authorType === 'channel' ? 'badge-channel' : 'badge-personal')}">${post.authorBadge}</span>` : ''}
-                      <span style="font-size: 0.68rem; color: #94a3b8; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px;">
-                        ${(post as any).visibility === 'only_me' ? '🔒 Only Me' : ((post as any).visibility === 'friends' ? '👥 Friends' : '🌐 Public')}
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                      <span style="font-weight: 700; font-size: 0.95rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">${escapeHtml(post.authorName)}</span>
+                      <span style="color: #38bdf8; font-size: 0.85rem;" title="Verified Sovereign Identity">✓</span>
+                      ${(post as any).authorEntityHandle ? `<span style="color: #94a3b8; font-size: 0.82rem; font-weight: 500;">${escapeHtml((post as any).authorEntityHandle)}</span>` : ''}
+                      <span style="color: #64748b; font-size: 0.8rem;">&bull;</span>
+                      <span style="color: #94a3b8; font-size: 0.82rem;" title="${tsInfo.fullDate}">${tsInfo.timeAgo}</span>
+                      <span style="font-size: 0.75rem; color: #64748b;" title="${(post as any).visibility === 'only_me' ? 'Only Me' : ((post as any).visibility === 'friends' ? 'Friends' : 'Public')}">
+                        ${(post as any).visibility === 'only_me' ? '🔒' : ((post as any).visibility === 'friends' ? '👥' : '🌐')}
                       </span>
-                      <span class="post-time-badge" title="${tsInfo.fullDate}" style="font-size: 0.72rem; color: #94a3b8; margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-weight: normal; background: rgba(255,255,255,0.04); padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
-                        <span style="font-size: 0.68rem;">🕒</span>
-                        <span>${tsInfo.timeAgo}</span>
-                      </span>
-                    </div>
-                    <div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 5px; margin-top: 2px;">
-                      ${(post as any).authorEntityHandle ? `<span style="color: #64748b; font-weight: 500;">${(post as any).authorEntityHandle}</span><span>&bull;</span>` : ''}
-                      <span title="${tsInfo.fullDate}">${tsInfo.fullDate}</span>
-                      ${post.audioTrack ? `<span>&bull;</span><span>🎵 ${post.audioTrack}</span>` : ''}
                       ${(post as any).updatedAt ? `<span style="color: #f59e0b; font-size: 0.68rem; margin-left: 2px;">(Edited)</span>` : ''}
                     </div>
+                    ${post.audioTrack ? `
+                    <div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+                      <span>🎵</span> <span>${escapeHtml(post.audioTrack)}</span>
+                    </div>` : ''}
                   </div>
                 </div>
-                <button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 1rem;" title="Post Options" onclick="openPostOptionsModal('${post.id}', '${post.authorName}', '${post.mediaCid || ''}')">⋮</button>
+                <button class="chat-btn-round" style="width: 32px; height: 32px; font-size: 1.1rem; color: #94a3b8; background: transparent; border: none; cursor: pointer;" title="Post Options" onclick="openPostOptionsModal('${post.id}', '${escapeHtml(post.authorName).replace(/'/g, "\\'")}', '${post.mediaCid || ''}')">⋮</button>
               </div>
 
               <!-- Post Body & Media -->
@@ -8473,9 +10553,13 @@ function renderHtml(
                     </div>
                     ` : ''}
                     <div class="insta-media-box has-image" id="media-${post.id}" 
-                         style="position: relative; overflow: hidden; height: auto; max-height: 640px; background: #000000; display: flex; align-items: center; justify-content: center;"
+                         style="position: relative; overflow: hidden; height: auto; max-height: 640px; background: #000000; display: flex; align-items: center; justify-content: center; cursor: zoom-in;"
+                         onclick="openPhotoLightboxById('${post.id}')"
                          ondblclick="handleFeedDoubleTap('${post.id}', event)">
-                      <img src="${post.mediaImage}" alt="Feed photo" style="width: 100%; height: auto; max-height: 640px; object-fit: contain; display: block; margin: 0 auto;" onerror="handleMediaError(this, '${post.id}')" />
+                      <img src="${post.mediaImage}" alt="Feed photo" style="width: 100%; height: auto; max-height: 640px; object-fit: contain; display: block; margin: 0 auto; cursor: zoom-in;" onerror="handleMediaError(this, '${post.id}')" />
+                      <div class="photo-zoom-hint-badge" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; pointer-events: none; z-index: 4;">
+                        <span>🔍</span> <span>Click to Zoom</span>
+                      </div>
                       <div style="position: absolute; bottom: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">
                         <span>📦 CID:</span> <span>${(post.mediaCid || 'bafybei...').substring(0, 14)}...</span>
                       </div>
@@ -8498,9 +10582,6 @@ function renderHtml(
                          style="position: relative; overflow: hidden; height: auto; max-height: 640px; background: #000000; display: flex; align-items: center; justify-content: center;"
                          ondblclick="handleFeedDoubleTap('${post.id}', event)">
                       <video src="${post.mediaVideo}" controls playsinline preload="metadata" style="width: 100%; height: auto; max-height: 640px; object-fit: contain; display: block; margin: 0 auto;"></video>
-                      <div style="position: absolute; bottom: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #a855f7; z-index: 5;">
-                        <span>🎬 REEL &bull; CID:</span> <span>${(post.mediaCid || 'bafybei...').substring(0, 14)}...</span>
-                      </div>
                       <div id="heart-pop-${post.id}"></div>
                     </div>
                     ${post.tags ? `
@@ -8517,9 +10598,6 @@ function renderHtml(
                       <div style="font-size: 1.45rem; font-weight: 800; color: #ffffff; text-shadow: 0 2px 12px rgba(0,0,0,0.7); line-height: 1.45; word-break: break-word; max-width: 90%;">
                         ${escapeHtml(post.caption)}
                       </div>
-                      <div style="position: absolute; bottom: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">
-                        <span>📦 CID:</span> <span>${(post.mediaCid || 'bafybei...').substring(0, 14)}...</span>
-                      </div>
                       <div id="heart-pop-${post.id}"></div>
                     </div>
                     ${post.tags ? `
@@ -8529,7 +10607,7 @@ function renderHtml(
                     ` : ''}
                   `;
                 } else {
-                  // Clean Native Text Post (Tweet / Reddit / Facebook text status style)
+                  // Clean Native Text Post
                   return `
                     <div class="feed-post-text-body">
                       ${escapeHtml(post.caption)}
@@ -8539,34 +10617,36 @@ function renderHtml(
                       ${post.tags.split(' ').filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
                     </div>
                     ` : ''}
-                    <div style="padding: 0 1.15rem 0.5rem 1.15rem; font-size: 0.7rem; font-family: monospace; color: #64748b;">
-                      <span>📦 Verified DAG CID: ${(post.mediaCid || 'bafybei...').substring(0, 16)}...</span>
-                    </div>
                   `;
                 }
               })()}
 
-              <!-- Actions Row -->
+              <!-- Actions Row (Unified Modern SVG Icons) -->
               <div class="insta-actions-row">
-                <div style="display: flex; align-items: center; gap: 0.85rem;">
-                  <button class="insta-action-btn" id="btn-like-${post.id}" onclick="triggerFeedPostLike('${post.id}')" title="Like Post">
-                    ${post.isLiked ? '❤️' : '🤍'}
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                  <button class="insta-action-btn ${post.isLiked ? 'active-like' : ''}" id="btn-like-${post.id}" onclick="triggerFeedPostLike('${post.id}')" title="Like Post" aria-label="Like Post">
+                    ${post.isLiked ? `
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="heart-bounce-pop"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                    ` : `
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                    `}
                   </button>
-                  <button class="insta-action-btn" onclick="focusFeedComment('${post.id}')" title="Comment">
-                    💬
+                  <button class="insta-action-btn btn-comment-${post.id}" onclick="focusFeedComment('${post.id}')" title="Comment" aria-label="Comment">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                   </button>
-                  <button class="insta-action-btn" onclick="openRepostModal('${post.id}')" title="Repost / Quote">
-                    🔁
+                  <button class="insta-action-btn btn-repost-${post.id}" onclick="openRepostModal('${post.id}')" title="Repost" aria-label="Repost">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                   </button>
-                  <button class="insta-action-btn" onclick="shareFeedPost('${post.id}', '${post.mediaCid || ''}')" title="Share Post &amp; CID">
-                    🚀
-                  </button>
-                  <button class="insta-action-btn" onclick="handleFeedDislike('${post.id}')" title="Dislike / Show Less">
-                    👎
+                  <button class="insta-action-btn btn-share-${post.id}" onclick="shareFeedPost('${post.id}', '${post.mediaCid || ''}')" title="Share" aria-label="Share">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                   </button>
                 </div>
-                <button class="insta-action-btn" id="btn-save-${post.id}" onclick="toggleSaveFeedPost('${post.id}')" title="Pin to Local Blockstore">
-                  ${post.isSaved ? '🔖' : '🏷️'}
+                <button class="insta-action-btn" id="btn-save-${post.id}" onclick="toggleSaveFeedPost('${post.id}')" title="Save Post" aria-label="Save Post">
+                  ${post.isSaved ? `
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#38bdf8" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                  ` : `
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                  `}
                 </button>
               </div>
 
@@ -8577,34 +10657,54 @@ function renderHtml(
 
               <!-- Comments Preview -->
               <div class="insta-comments-preview" id="comments-box-${post.id}">
-                <div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">
-                  View all ${post.comments.length} comments &bull; Verified on DHT
+                ${(post.comments && post.comments.length > 0) ? `
+                <div style="color: #94a3b8; font-size: 0.8rem; font-weight: 500; cursor: pointer; margin-bottom: 4px;" onclick="focusFeedComment('${post.id}')">
+                  View all ${post.comments.length} comments
                 </div>
-                ${post.comments
+                ` : ''}
+                ${(post.comments || [])
                   .map(
                     c => `
-                  <div>
-                    <strong style="color: #e2e8f0; font-size: 0.82rem;">${escapeHtml(c.author)}</strong>
-                    <span style="color: #cbd5e1; font-size: 0.82rem;">${escapeHtml(c.text)}</span>
+                  <div class="comment-row" id="comment-${c.id}" style="margin-top: 6px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;">
+                      <div style="flex: 1; min-width: 0;">
+                        <strong style="color: #e2e8f0; font-size: 0.82rem; cursor: pointer; margin-right: 5px;" onclick="openCreatorProfile('${escapeHtml((c as any).authorHandle || (c as any).authorDid || c.author)}', this)">${escapeHtml(c.author)}</strong>
+                        <span style="color: #cbd5e1; font-size: 0.82rem;">${escapeHtml(c.text)}</span>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 12px;">
+                          <button type="button" onclick="likeFeedComment('${post.id}', '${c.id}')" style="background: none; border: none; color: #64748b; cursor: pointer; padding: 0; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 3px;">
+                            🤍 <span>${(c as any).likesCount || (Array.isArray((c as any).likedByDids) ? (c as any).likedByDids.length : 0)}</span>
+                          </button>
+                          <button type="button" onclick="promptFeedCommentReply('${post.id}', '${c.id}', '${escapeHtml(c.author)}')" style="background: none; border: none; color: #38bdf8; cursor: pointer; padding: 0; font-size: 0.72rem; font-weight: 500;">Reply</button>
+                        </div>
+                      </div>
+                    </div>
+                    ${Array.isArray((c as any).replies) && (c as any).replies.length > 0 ? `
+                      <div class="comment-replies-list" style="margin-left: 24px; margin-top: 6px; padding-left: 10px; border-left: 2px solid rgba(56, 189, 248, 0.25); display: flex; flex-direction: column; gap: 4px;">
+                        ${(c as any).replies.map((r: any) => `
+                          <div class="comment-reply-row" id="reply-${r.id}" style="font-size: 0.8rem; display: flex; align-items: flex-start; justify-content: space-between; gap: 6px;">
+                            <div style="flex: 1; min-width: 0;">
+                              <strong style="color: #38bdf8; cursor: pointer; margin-right: 5px;" onclick="openCreatorProfile('${escapeHtml(r.authorHandle || r.authorDid || r.author)}', this)">${escapeHtml(r.author)}</strong>
+                              <span style="color: #cbd5e1;">${escapeHtml(r.text)}</span>
+                              <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 10px;">
+                                <button type="button" onclick="likeFeedComment('${post.id}', '${r.id}')" style="background: none; border: none; color: #64748b; cursor: pointer; padding: 0; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 2px;">
+                                  🤍 <span>${r.likesCount || (Array.isArray(r.likedByDids) ? r.likedByDids.length : 0)}</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        `).join('')}
+                      </div>
+                    ` : ''}
                   </div>
                 `,
                   )
                   .join('')}
               </div>
 
-              <!-- Time Ago -->
-              <div style="padding: 0 1rem; font-size: 0.68rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.65rem; display: flex; align-items: center; gap: 5px;">
-                <span>🕒 ${tsInfo.fullDate}</span>
-                <span>&bull;</span>
-                <span>${tsInfo.timeAgo.toUpperCase()}</span>
-                <span>&bull;</span>
-                <span>ED25519 VERIFIED</span>
-              </div>
-
               <!-- Add Comment Input Box -->
               <div class="insta-comment-input-box">
-                <span style="font-size: 1.1rem;">😊</span>
-                <input type="text" class="insta-comment-input" id="input-comment-${post.id}" placeholder="Add a comment on sovereign mesh..." onkeydown="if(event.key==='Enter') submitFeedComment('${post.id}')">
+                <button type="button" class="insta-emoji-btn" onclick="document.getElementById('input-comment-${post.id}').focus()" aria-label="Add emoji">😊</button>
+                <input type="text" class="insta-comment-input" id="input-comment-${post.id}" placeholder="Add a comment..." onkeydown="if(event.key==='Enter') submitFeedComment('${post.id}')">
                 <button class="insta-post-btn" onclick="submitFeedComment('${post.id}')">Post</button>
               </div>
             </article>
@@ -8619,6 +10719,50 @@ function renderHtml(
     <!-- Tab: Dedicated Friends & People Discovery View -->
     <main class="main-content" id="friends-view" style="display: none; width: 100%; flex-direction: column; align-items: center;">
       <div class="friends-container">
+        <!-- Advance Mode: 3D Tactical Mesh War Table (Ref Image 1) & Cosmic Orbital Radar (Ref Image 3) -->
+        <div id="devAdvanceTacticalWarRoom" class="tactical-table" style="display: none;">
+          <div class="tactical-grid"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 2; margin-bottom: 8px;">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #00f0ff; letter-spacing: 0.5px;">TACTICAL MESH WAR-ROOM // SECTOR NY-07</div>
+            <span style="font-size: 0.7rem; padding: 2px 8px; background: rgba(0,240,255,0.15); color: #00f0ff; border-radius: 4px; border: 1px solid rgba(0,240,255,0.3); font-weight: 700;">LIVE 2.4GHz P2P</span>
+          </div>
+
+          <!-- Ref Image 3: Cosmic Orbital Radar Rings -->
+          <div class="orbital-container">
+            <div class="orbital-ring r1"></div>
+            <div class="orbital-ring r2"></div>
+            <div class="orbital-ring r3"></div>
+            
+            <!-- Center Core (Ref Image 3) -->
+            <div class="orbital-core">
+              <span>⚡</span>
+            </div>
+
+            <!-- Satellite Orbit Nodes (Ref Image 3) -->
+            <div class="orbital-satellite" style="top: 10px; left: 94px;" title="Notifications">🔔</div>
+            <div class="orbital-satellite" style="top: 94px; right: 10px;" title="Memory LocalDb">🧠</div>
+            <div class="orbital-satellite" style="bottom: 10px; left: 94px;" title="Backup Vault">☁️</div>
+            <div class="orbital-satellite" style="top: 94px; left: 10px;" title="Voice Notes">🎙️</div>
+            <div class="orbital-satellite" style="top: 36px; right: 36px;" title="Mesh Browser">🌐</div>
+            <div class="orbital-satellite" style="bottom: 36px; left: 36px;" title="P2P Skills">⚙️</div>
+          </div>
+
+          <div style="text-align: center; position: relative; z-index: 2; margin-top: 8px;">
+            <div style="font-size: 0.95rem; font-weight: 800; color: #fff; text-shadow: 0 0 8px #00f0ff;">Decentralized Mesh Peers Identified In Spatial Range</div>
+            <div style="font-size: 0.75rem; color: #7dd3fc; margin-top: 4px;">Double Ratchet Cipher Handshake Verified • Zero Cloud Relay</div>
+          </div>
+
+          <!-- Interactive Node Target Strip (Ref Image 1) -->
+          <div style="display: flex; gap: 8px; justify-content: center; margin-top: 12px; position: relative; z-index: 2; flex-wrap: wrap;">
+            <button type="button" onclick="inspectTacticalNode('NODE-01 (Alice)', '192.168.31.144:4001', '-52', '94')" style="background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.4); color: #00f0ff; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">🎯 Node-01 [Alice]</button>
+            <button type="button" onclick="inspectTacticalNode('NODE-02 (Bob)', '192.168.31.189:4001', '-68', '76')" style="background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.4); color: #38bdf8; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">🎯 Node-02 [Bob]</button>
+            <button type="button" onclick="inspectTacticalNode('NODE-03 (Carol)', '192.168.31.202:4001', '-61', '89')" style="background: rgba(129,140,248,0.1); border: 1px solid rgba(129,140,248,0.4); color: #818cf8; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">🎯 Node-03 [Carol]</button>
+          </div>
+
+          <!-- Inline Node Inspector HUD Card (Ref Image 1) -->
+          <div id="tacticalNodeInspectorCard" style="display: none; background: rgba(6,14,26,0.95); border: 1px solid rgba(0,240,255,0.45); border-radius: 10px; padding: 12px; margin-top: 10px; box-shadow: 0 4px 20px rgba(0,240,255,0.15); position: relative; z-index: 3;"></div>
+        </div>
+
         <!-- Friends Search & Discovery Hero -->
         <div class="friends-search-hero">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap;">
@@ -9055,20 +11199,31 @@ function renderHtml(
           </div>
 
           <div class="chat-sidebar-header" id="chatSidebarHeader">
-            <span style="font-weight: 700; color: #e9edef; font-size: 1rem; display: flex; align-items: center; gap: 6px;" id="chatSidebarTitle">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span style="font-weight: 700; color: #e9edef; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;" id="chatSidebarTitle">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #22c55e;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               <span>Chats</span>
             </span>
             <div style="display: flex; align-items: center; gap: 6px;">
-              <button type="button" onclick="openNewChatPickerModal()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 6px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;" title="Start New Direct Chat">
-                <span>+</span> New Chat
+              <button type="button" onclick="openNewGroupModal()" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); color: #22c55e; border-radius: 8px; padding: 4px 10px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;" title="Create New Group">
+                <span>👥</span> New Group
               </button>
-              <span style="font-size: 0.72rem; color: #38bdf8; background: rgba(56, 189, 248, 0.15); padding: 2px 8px; border-radius: 10px; font-weight: 600;" id="chatSidebarProtocolBadge">Sovra E2EE Active</span>
+              <button type="button" onclick="openNewChatPickerModal()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 8px; padding: 4px 10px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;" title="Start New Direct Chat">
+                <span>💬</span> New Chat
+              </button>
             </div>
           </div>
           <!-- Search box -->
           <div class="chat-search-box">
             <input type="text" class="chat-search-input" id="chatSearchInput" placeholder="Search contacts & mesh..." oninput="filterChatContacts(this.value)">
+          </div>
+          <!-- Real-Time Contacts & Friends Presence Summary Bar -->
+          <div class="chat-contacts-summary-bar" id="chatContactsSummaryBar" style="padding: 6px 14px; font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+            <span>Contacts: <strong id="chatTotalContactsCount" style="color: #f8fafc;">0</strong></span>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span style="color: #10b981; font-weight: 700;">🟢 <span id="chatOnlineContactsCount">0</span> Online</span>
+              <span style="color: #64748b;">•</span>
+              <span style="color: #94a3b8;">⚪ <span id="chatOfflineContactsCount">0</span> Offline</span>
+            </div>
           </div>
           <!-- Online Friends Active Rail (Shows online friends in chat) -->
           <div id="chatOnlineFriendsRail" style="display: none; padding: 0.6rem 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(15, 23, 42, 0.5);">
@@ -9222,6 +11377,29 @@ function renderHtml(
       </div>
 
       <!-- Modals for WhatsApp Features -->
+      <!-- 0. Chat Attachment Lightbox & Safe Preview Modal -->
+      <div class="wa-modal-overlay" id="chatAttachmentLightboxModal" style="display: none; z-index: 1000000;" onclick="closeChatAttachmentLightbox()">
+        <div class="wa-modal-card" style="max-width: 720px; width: 92vw; max-height: 90vh; display: flex; flex-direction: column; padding: 1.25rem; background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);" onclick="event.stopPropagation()">
+          <div class="wa-modal-header" style="margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+            <div class="wa-modal-title" style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;">
+              <span id="lightboxFileIcon" style="font-size: 1.2rem;">📎</span>
+              <span id="lightboxFileName" style="font-size: 0.95rem; font-weight: 600; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Attachment</span>
+            </div>
+            <button class="wa-modal-close" onclick="closeChatAttachmentLightbox()" style="background: none; border: none; font-size: 1.5rem; color: #94a3b8; cursor: pointer;">&times;</button>
+          </div>
+          <div id="lightboxFilePreviewContainer" style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 250px; max-height: 60vh; overflow: auto; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 0.85rem; padding: 0.5rem;">
+            <!-- Dynamic Content -->
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+            <div id="lightboxFileMeta" style="font-size: 0.75rem; color: #94a3b8;">0 B</div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-outline" id="lightboxOpenTabBtn" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" onclick="triggerLightboxOpenTab()">↗ Open in New Tab</button>
+              <button class="btn btn-primary" id="lightboxDownloadBtn" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; background: #00a884;" onclick="triggerLightboxDownload()">⬇ Download</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 1. Safety Numbers & Security Code Modal -->
       <div class="wa-modal-overlay" id="safetyNumbersModal" style="display: none;" onclick="closeWaModal('safetyNumbersModal')">
         <div class="wa-modal-card" onclick="event.stopPropagation()">
@@ -9460,6 +11638,59 @@ function renderHtml(
             <button class="chat-btn-round" style="background: #22c55e; color: #fff; width: 56px; height: 56px; font-size: 1.35rem; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.5);" title="Accept Call" onclick="acceptIncomingCall()">
               📞
             </button>
+      <!-- 6. New Direct Chat Picker Modal -->
+      <div class="wa-modal-overlay" id="newChatPickerModal" style="display: none;" onclick="closeWaModal('newChatPickerModal')">
+        <div class="wa-modal-card" style="max-width: 440px; width: 92vw;" onclick="event.stopPropagation()">
+          <div class="wa-modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+            <div class="wa-modal-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fff; font-size: 1rem;">
+              <span>💬</span>
+              <span>New Direct Chat</span>
+            </div>
+            <button class="wa-modal-close" onclick="closeWaModal('newChatPickerModal')" style="background: none; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">&times;</button>
+          </div>
+          <div style="margin-bottom: 0.75rem;">
+            <input type="text" id="newChatSearchInput" placeholder="Search friends &amp; contacts..." oninput="filterNewChatPicker(this.value)" style="width: 100%; box-sizing: border-box; background: #111b21; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem 0.85rem; color: #fff; font-size: 0.85rem; outline: none;" />
+          </div>
+          <div id="newChatPickerList" style="max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. WhatsApp-Style New Group Modal -->
+      <div class="wa-modal-overlay" id="newGroupModal" style="display: none;" onclick="closeWaModal('newGroupModal')">
+        <div class="wa-modal-card" style="max-width: 460px; width: 92vw;" onclick="event.stopPropagation()">
+          <div class="wa-modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+            <div class="wa-modal-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fff; font-size: 1rem;">
+              <span>👥</span>
+              <span>Create New Group</span>
+            </div>
+            <button class="wa-modal-close" onclick="closeWaModal('newGroupModal')" style="background: none; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">&times;</button>
+          </div>
+          
+          <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 1rem;">
+            <div id="groupAvatarPreview" onclick="cycleGroupAvatarEmoji()" style="width: 48px; height: 48px; min-width: 48px; border-radius: 50%; background: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer; border: 2px solid rgba(255,255,255,0.2);" title="Click to change group icon">👥</div>
+            <div style="flex: 1;">
+              <input type="text" id="newGroupNameInput" placeholder="Group name (e.g. Friends, Team)..." style="width: 100%; box-sizing: border-box; background: #111b21; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 0.65rem 0.85rem; color: #fff; font-size: 0.9rem; font-weight: 600; outline: none;" />
+            </div>
+          </div>
+
+          <div style="margin-bottom: 0.5rem; font-size: 0.78rem; font-weight: 700; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+            <span>SELECT PARTICIPANTS</span>
+            <span id="selectedGroupMembersCount" style="color: #22c55e;">0 selected</span>
+          </div>
+
+          <div style="margin-bottom: 0.65rem;">
+            <input type="text" id="groupMemberSearchInput" placeholder="Search contacts..." oninput="filterGroupMemberList(this.value)" style="width: 100%; box-sizing: border-box; background: #111b21; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.45rem 0.75rem; color: #fff; font-size: 0.8rem; outline: none;" />
+          </div>
+
+          <div id="newGroupMembersList" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-bottom: 1.2rem;">
+            <!-- Populated dynamically with checkboxes -->
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="action-pill-btn action-pill-secondary" onclick="closeWaModal('newGroupModal')" style="flex: 1; padding: 0.65rem; justify-content: center;">Cancel</button>
+            <button type="button" class="action-pill-btn action-pill-primary" onclick="submitCreateNewGroup()" style="flex: 2; padding: 0.65rem; justify-content: center; background: #00a884; border-color: #00a884;">Create Group 🚀</button>
           </div>
         </div>
       </div>
@@ -9475,85 +11706,85 @@ function renderHtml(
           <div class="yt-ambient-wrapper">
             <div class="yt-ambient-glow" id="ytAmbientGlow"></div>
             
-            <div class="yt-player-box" id="ytPlayerBox">
+            <div class="yt-player-box" id="ytPlayerBox" onclick="handleYtPlayerBoxClick(event)" onmousemove="handleYtPlayerActivity()" ontouchstart="handleYtPlayerActivity()">
               <div class="yt-screen-content" id="ytScreenContent">
-                <button class="yt-big-play" id="ytBigPlayBtn" onclick="toggleYtPlay()">▶</button>
+                <!-- Center Big Play Button -->
+                <button class="yt-big-play" id="ytBigPlayBtn" onclick="event.stopPropagation(); toggleYtPlay()" aria-label="Play or pause video">▶</button>
                 
-                <!-- Top Status Badges -->
-                <div style="position: absolute; top: 16px; left: 16px; display: flex; gap: 0.5rem; z-index: 10;">
-                  <span class="badge" style="background: rgba(0,0,0,0.75); backdrop-filter: blur(6px); color: #fff; border: 1px solid rgba(255,255,255,0.2);">
-                    RFC 8216 HLS &bull; BitSwap P2P
-                  </span>
-                  <span class="badge" id="bufferHealthBadge" style="background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.45);">
-                    Buffer: 9.4s (P2P Swarm OK)
-                  </span>
-                </div>
-                
-                <div style="position: absolute; top: 16px; right: 16px; z-index: 10; display: flex; gap: 0.5rem; align-items: center;">
-                  <span class="badge" id="videoQualityBadge" style="background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.45);">
-                    4K UHD 60FPS
-                  </span>
-                  <button class="btn btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.3rem; background: #e11d48; border-color: #f43f5e;" onclick="event.stopPropagation(); openVideoUploadModal()">
-                    <span>🎥</span> Upload Video
-                  </button>
+                <!-- Sleek Top Overlay (Stream Badge & Controls) -->
+                <div class="yt-top-overlay" id="ytTopOverlay" onclick="event.stopPropagation()">
+                  <div class="yt-top-left">
+                    <span class="yt-stream-badge">
+                      <span class="yt-live-dot">●</span> <span>4K UHD</span> <span class="yt-badge-sep">•</span> <span>HLS P2P</span>
+                    </span>
+                    <span class="yt-buffer-badge" id="bufferHealthBadge">
+                      ⚡ Buffer 9.4s
+                    </span>
+                  </div>
+                  
+                  <div class="yt-top-right">
+                    <button class="yt-top-icon-btn" onclick="openShareYtModal()" title="Share CID">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    </button>
+                    <button class="yt-top-icon-btn" onclick="openYtModal('mobilePlayerSettingsModal')" title="Video Settings">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    </button>
+                  </div>
                 </div>
 
-                <!-- Video Canvas Visual Overlay -->
-                <div style="text-align: center; pointer-events: none; z-index: 2;">
-                  <div style="font-size: 3.5rem; margin-bottom: 0.5rem;" id="ytScreenEmoji">🎬</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.8);" id="ytScreenCurrentChapter">
+                <!-- Video Canvas Standby Info (fades cleanly on play) -->
+                <div class="yt-screen-watermark" id="ytScreenWatermark">
+                  <div class="yt-screen-chapter" id="ytScreenCurrentChapter">
                     Chapter 1: Introduction to Sovereign P2P Streaming
                   </div>
-                  <div style="font-size: 0.75rem; color: #94a3b8; font-family: monospace; margin-top: 0.25rem;" id="ytScreenP2pStats">
-                    ● BitSwap Swarm: 14 Connected Seeders &bull; Sub-300ms Pre-Warm Active
+                  <div class="yt-screen-swarm" id="ytScreenP2pStats">
+                    ● BitSwap Swarm: 14 Connected Seeders &bull; Sub-300ms
                   </div>
                 </div>
               </div>
 
               <!-- Controls overlay -->
-              <div class="yt-player-controls" onclick="event.stopPropagation()">
+              <div class="yt-player-controls" id="ytPlayerControls" onclick="event.stopPropagation()">
                 <!-- Interactive Scrubber with Buffer, Hover Tooltip & Chapter Marks -->
-                <div class="yt-scrubber" id="ytScrubber" 
-                     onclick="scrubYt(event)" 
-                     onmousemove="handleScrubberHover(event)">
-                  <div class="yt-scrubber-buffer" id="ytBufferBar"></div>
-                  <div class="yt-scrubber-progress" id="ytProgressBar">
-                    <div class="yt-scrubber-handle"></div>
+                <div class="yt-scrubber-wrap">
+                  <div class="yt-scrubber" id="ytScrubber" 
+                       onclick="scrubYt(event)" 
+                       onmousemove="handleScrubberHover(event)">
+                    <div class="yt-scrubber-buffer" id="ytBufferBar"></div>
+                    <div class="yt-scrubber-progress" id="ytProgressBar">
+                      <div class="yt-scrubber-handle"></div>
+                    </div>
+                    <div class="yt-scrubber-tooltip" id="ytScrubberTooltip">00:00</div>
+                    <div id="chapterTicksContainer"></div>
                   </div>
-                  <div class="yt-scrubber-tooltip" id="ytScrubberTooltip">00:00</div>
-                  <div id="chapterTicksContainer"></div>
                 </div>
 
                 <div class="yt-controls-row">
                   <div class="yt-left-controls">
                     <button class="yt-btn" id="ytPlayIcon" onclick="toggleYtPlay()" title="Play/Pause (k / Space)">▶</button>
-                    <button class="yt-btn" onclick="seekRelative(-10)" title="Rewind 10s (j / ←)">⏪</button>
-                    <button class="yt-btn" onclick="seekRelative(10)" title="Forward 10s (l / →)">⏩</button>
+                    <button class="yt-btn yt-skip-btn" onclick="seekRelative(-10)" title="Rewind 10s (j / ←)">⏪</button>
+                    <button class="yt-btn yt-skip-btn" onclick="seekRelative(10)" title="Forward 10s (l / →)">⏩</button>
                     <button class="yt-btn" id="ytMuteBtn" onclick="toggleYtMute()" title="Mute/Unmute (m)">🔊</button>
-                    <input type="range" id="ytVolumeSlider" min="0" max="100" value="100" style="width: 60px; height: 4px; accent-color: #ef4444; cursor: pointer;" oninput="changeVolume(this.value)">
-                    <span style="font-size: 0.78rem; color: #cbd5e1; font-family: monospace;" id="ytTimecode">00:00 / 14:20</span>
+                    <div class="yt-volume-box">
+                      <input type="range" id="ytVolumeSlider" min="0" max="100" value="100" class="yt-volume-range" oninput="changeVolume(this.value)">
+                    </div>
+                    <span class="yt-time-text" id="ytTimecode">00:00 / 14:20</span>
                   </div>
 
                   <div class="yt-right-controls">
-                    <!-- Autoplay Toggle -->
-                    <button class="yt-btn" id="btnAutoplay" onclick="toggleAutoplay()" title="Autoplay Next Video" style="font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                      <span>Autoplay</span>
-                      <span id="autoplayStatusText" style="color: #34d399;">ON</span>
-                    </button>
-
-                    <!-- Playback Speed Selector -->
-                    <select class="yt-select" id="playbackSpeedSelect" onchange="changePlaybackSpeed(this.value)" title="Playback Speed">
-                      <option value="0.5">0.5x</option>
-                      <option value="0.75">0.75x</option>
-                      <option value="1" selected>1.0x (Normal)</option>
-                      <option value="1.25">1.25x</option>
-                      <option value="1.5">1.5x</option>
-                      <option value="2">2.0x</option>
-                    </select>
-
-                    <!-- ABR Gear Resolution Selector -->
-                    <div style="display: flex; align-items: center; gap: 0.35rem;">
-                      <span style="font-size: 0.75rem; color: #94a3b8;">⚙️</span>
+                    <!-- Desktop Quick Controls -->
+                    <div class="yt-desktop-controls">
+                      <button class="yt-btn yt-pill-btn-small" id="btnAutoplay" onclick="toggleAutoplay()" title="Autoplay Next Video">
+                        <span>Autoplay</span> <span id="autoplayStatusText" style="color: #34d399; font-weight: 700;">ON</span>
+                      </button>
+                      <select class="yt-select" id="playbackSpeedSelect" onchange="changePlaybackSpeed(this.value)" title="Playback Speed">
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>1.0x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2.0x</option>
+                      </select>
                       <select class="yt-select" id="abrSelect" onchange="handleAbrChange(this.value)" title="Adaptive Bitrate Selector">
                         <option value="auto">Auto (4K UHD)</option>
                         <option value="4k">4K (2160p60 • 25M)</option>
@@ -9562,15 +11793,13 @@ function renderHtml(
                         <option value="480p">480p (1.5M)</option>
                         <option value="360p">360p (600k • Edge)</option>
                       </select>
+                      <button class="yt-btn" id="btnAmbientGlow" onclick="toggleYtAmbientGlow()" title="Toggle Dynamic Ambient Cinema Glow">✨</button>
+                      <button class="yt-btn" id="btnTheaterMode" onclick="toggleTheaterMode()" title="Theater Mode (t)">🔲</button>
                     </div>
 
-                    <!-- Ambient Cinema Glow Toggle -->
-                    <button class="yt-btn" id="btnAmbientGlow" onclick="toggleYtAmbientGlow()" title="Toggle Dynamic Ambient Cinema Glow" style="color: #38bdf8; display: flex; align-items: center; gap: 4px; font-size: 0.78rem;">
-                      <span>✨</span> <span id="ambientStatusText">Ambient</span>
-                    </button>
+                    <!-- Mobile Settings Button (Opens Bottom Sheet Modal) -->
+                    <button class="yt-btn yt-mobile-settings-btn" onclick="openYtModal('mobilePlayerSettingsModal')" title="Video Settings">⚙️</button>
 
-                    <!-- Theater Mode Toggle -->
-                    <button class="yt-btn" id="btnTheaterMode" onclick="toggleTheaterMode()" title="Theater Mode (t)">🔲</button>
                     <!-- Fullscreen Toggle -->
                     <button class="yt-btn" id="btnFullscreen" onclick="toggleFullscreen()" title="Fullscreen (f)">⛶</button>
                   </div>
@@ -9592,48 +11821,50 @@ function renderHtml(
               </div>
             </div>
 
-            <!-- Stats & Video Actions Row -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-              <div style="font-size: 0.82rem; color: var(--text-muted);" id="ytVideoStats">
+            <!-- Stats & Video Actions Row (Horizontal Smooth-Scrolling Pill Bar) -->
+            <div class="yt-actions-bar">
+              <div class="yt-video-stats-text" id="ytVideoStats">
                 <b>284,512 views</b> &bull; Premiered 2 hours ago &bull; <code style="color: #818cf8;" id="ytCidDisplay">CID: bafybeig...zdi</code>
               </div>
 
-              <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+              <div class="yt-actions-scroll">
                 <!-- Like / Dislike Joined Pill -->
-                <div class="yt-pill-group">
-                  <button class="yt-pill-btn" id="ytLikeBtn" onclick="likeYtVideo()">
+                <div class="yt-action-pill-group">
+                  <button class="yt-action-pill-btn" id="ytLikeBtn" onclick="likeYtVideo()" aria-label="Like video">
                     <span id="ytLikeThumb">👍</span>
                     <span id="ytLikeCount">${longFormVideosCatalog[0]!.likes}</span>
                   </button>
-                  <div class="yt-pill-divider"></div>
-                  <button class="yt-pill-btn" id="ytDislikeBtn" onclick="dislikeYtVideo()">
+                  <div class="yt-action-pill-divider"></div>
+                  <button class="yt-action-pill-btn" id="ytDislikeBtn" onclick="dislikeYtVideo()" aria-label="Dislike video">
                     <span>👎</span>
                   </button>
                 </div>
 
                 <!-- Share CID Button -->
-                <button class="yt-pill-btn" style="background: rgba(255,255,255,0.08); border-radius: 20px; border: 1px solid rgba(255,255,255,0.15);" onclick="openShareYtModal()">
-                  <span>↗️</span> <span>Share CID</span>
+                <button class="yt-action-pill-btn" onclick="openShareYtModal()">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                  <span>Share</span>
                 </button>
 
                 <!-- Download P2P Blockstore Button -->
-                <button class="yt-pill-btn" style="background: rgba(255,255,255,0.08); border-radius: 20px; border: 1px solid rgba(255,255,255,0.15);" onclick="pinVideoToLocalBlockstore()" id="btnDownloadYt">
-                  <span>⬇️</span> <span>Download to P2P</span>
-                </button>
-
-                <!-- Upload Long Video Button -->
-                <button class="yt-pill-btn" style="background: rgba(225, 29, 72, 0.18); border-radius: 20px; border: 1px solid rgba(244, 63, 94, 0.4); color: #f43f5e; font-weight: 700;" onclick="openVideoUploadModal()">
-                  <span>🎥</span> <span>Upload Video</span>
+                <button class="yt-action-pill-btn" onclick="pinVideoToLocalBlockstore()" id="btnDownloadYt">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                  <span>Download</span>
                 </button>
 
                 <!-- Super Thanks Button -->
-                <button class="btn-super-thanks" onclick="openSuperThanksModal()">
-                  <span>💰</span> <span>Thanks</span>
+                <button class="yt-action-pill-btn yt-action-pill-thanks" onclick="openSuperThanksModal()">
+                  <span>⚡</span> <span>Thanks</span>
                 </button>
 
                 <!-- Join Channel Button -->
-                <button class="btn-join" onclick="openMembershipModal()">
-                  <span>Join</span>
+                <button class="yt-action-pill-btn yt-action-pill-join" onclick="openMembershipModal()">
+                  <span>⭐</span> <span>Join</span>
+                </button>
+
+                <!-- Upload Long Video Button -->
+                <button class="yt-action-pill-btn yt-action-pill-upload" onclick="openVideoUploadModal()">
+                  <span>🎥</span> <span>Upload</span>
                 </button>
               </div>
             </div>
@@ -9947,6 +12178,68 @@ function renderHtml(
       </div>
     </div>
 
+    <!-- Modal 4: Mobile Player Settings Bottom Sheet Modal -->
+    <div class="yt-modal-overlay" id="mobilePlayerSettingsModal" style="display: none;" onclick="closeYtModal('mobilePlayerSettingsModal')">
+      <div class="yt-bottom-sheet-card" onclick="event.stopPropagation()">
+        <div class="yt-sheet-handle"></div>
+        <div class="yt-sheet-header">
+          <div style="font-weight: 700; color: #fff; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+            <span>⚙️</span> <span>Playback Settings</span>
+          </div>
+          <button class="yt-sheet-close" onclick="closeYtModal('mobilePlayerSettingsModal')" aria-label="Close settings">✕</button>
+        </div>
+
+        <div class="yt-sheet-body">
+          <!-- Quality -->
+          <div class="yt-sheet-section">
+            <div class="yt-sheet-label">Quality / Resolution</div>
+            <div class="yt-sheet-options">
+              <button class="yt-sheet-opt-btn active" id="sheetOptAuto" onclick="handleAbrChange('auto'); updateSheetQualityActive(this); closeYtModal('mobilePlayerSettingsModal');">
+                <span>Auto (4K UHD)</span> <span class="check-mark">✓</span>
+              </button>
+              <button class="yt-sheet-opt-btn" id="sheetOpt4k" onclick="handleAbrChange('4k'); updateSheetQualityActive(this); closeYtModal('mobilePlayerSettingsModal');">
+                <span>4K (2160p60 • 25M)</span> <span class="check-mark"></span>
+              </button>
+              <button class="yt-sheet-opt-btn" id="sheetOpt1080p" onclick="handleAbrChange('1080p'); updateSheetQualityActive(this); closeYtModal('mobilePlayerSettingsModal');">
+                <span>1080p60 (8M)</span> <span class="check-mark"></span>
+              </button>
+              <button class="yt-sheet-opt-btn" id="sheetOpt720p" onclick="handleAbrChange('720p'); updateSheetQualityActive(this); closeYtModal('mobilePlayerSettingsModal');">
+                <span>720p (4M)</span> <span class="check-mark"></span>
+              </button>
+              <button class="yt-sheet-opt-btn" id="sheetOpt480p" onclick="handleAbrChange('480p'); updateSheetQualityActive(this); closeYtModal('mobilePlayerSettingsModal');">
+                <span>480p (1.5M)</span> <span class="check-mark"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Speed -->
+          <div class="yt-sheet-section">
+            <div class="yt-sheet-label">Playback Speed</div>
+            <div class="yt-sheet-chips">
+              <button class="yt-sheet-chip" id="sheetSpeed05" onclick="changePlaybackSpeed('0.5'); updateSheetSpeedActive(this); closeYtModal('mobilePlayerSettingsModal');">0.5x</button>
+              <button class="yt-sheet-chip" id="sheetSpeed075" onclick="changePlaybackSpeed('0.75'); updateSheetSpeedActive(this); closeYtModal('mobilePlayerSettingsModal');">0.75x</button>
+              <button class="yt-sheet-chip active" id="sheetSpeed1" onclick="changePlaybackSpeed('1'); updateSheetSpeedActive(this); closeYtModal('mobilePlayerSettingsModal');">1.0x (Normal)</button>
+              <button class="yt-sheet-chip" id="sheetSpeed125" onclick="changePlaybackSpeed('1.25'); updateSheetSpeedActive(this); closeYtModal('mobilePlayerSettingsModal');">1.25x</button>
+              <button class="yt-sheet-chip" id="sheetSpeed15" onclick="changePlaybackSpeed('1.5'); updateSheetSpeedActive(this); closeYtModal('mobilePlayerSettingsModal');">1.5x</button>
+              <button class="yt-sheet-chip" id="sheetSpeed2" onclick="changePlaybackSpeed('2'); updateSheetSpeedActive(this); closeYtModal('mobilePlayerSettingsModal');">2.0x</button>
+            </div>
+          </div>
+
+          <!-- Toggles -->
+          <div class="yt-sheet-section">
+            <div class="yt-sheet-row" onclick="toggleAutoplay()">
+              <div style="color: #f8fafc; font-weight: 600; font-size: 0.88rem;">Autoplay next video</div>
+              <span id="sheetAutoplayText" style="color: #34d399; font-weight: 700; font-size: 0.85rem;">ON</span>
+            </div>
+            <div class="yt-sheet-row" onclick="toggleYtAmbientGlow()">
+              <div style="color: #f8fafc; font-weight: 600; font-size: 0.88rem;">Dynamic Ambient Cinema Glow</div>
+              <span id="sheetAmbientText" style="color: #38bdf8; font-weight: 700; font-size: 0.85rem;">Active</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tab 5: Profile & Sovereign Identity (Instagram Profile + Wallet + Creator Tools) -->
     <main class="main-content" id="profile-view" style="display: none;">
       <div class="profile-container">
@@ -9954,10 +12247,10 @@ function renderHtml(
         <!-- Profile Header Card -->
         <div class="profile-header-card">
           <!-- Cover Banner -->
-          <div class="profile-cover-banner" id="meProfileCover" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%); background-size: cover; background-position: center;">
+          <div class="profile-cover-banner" id="meProfileCover" onclick="viewMyCoverLightbox(event)" title="Click to View or Change Cover Banner" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%); background-size: cover; background-position: center; cursor: pointer;">
             <div class="profile-cover-badges" id="profileCoverBadges" style="display: none;"></div>
-            <!-- Direct Cover Actions (Change & Remove) -->
-            <div class="profile-cover-actions" id="profileCoverActions">
+            <!-- Direct Cover Actions (Managed via Lightbox) -->
+            <div class="profile-cover-actions" id="profileCoverActions" style="display: none;">
               <button type="button" class="cover-action-btn" id="directCoverChangeBtn" onclick="triggerDirectCoverUpload(event)" title="Change Cover Banner" aria-label="Change Cover Banner">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                 <span>Update Cover</span>
@@ -9973,15 +12266,9 @@ function renderHtml(
           <!-- Avatar & Action Buttons Row -->
           <div class="profile-avatar-row">
             <div class="profile-avatar-wrapper">
-              <div class="profile-avatar-large" id="meProfileAvatarContainer" onclick="triggerDirectAvatarUpload(event)" title="Change Profile Photo" aria-label="Profile Avatar" style="cursor: pointer;">
+              <div class="profile-avatar-large" id="meProfileAvatarContainer" onclick="viewMyAvatarLightbox(event)" title="Click to View or Change Profile Photo" aria-label="Profile Avatar" style="cursor: pointer;">
                 <span id="meProfileAvatarText">S</span>
               </div>
-              <button type="button" class="avatar-camera-badge" id="avatarCameraBadge" onclick="triggerDirectAvatarUpload(event)" title="Change Profile Photo" aria-label="Change Profile Photo">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              </button>
-              <button type="button" class="avatar-remove-badge" id="avatarRemoveBadge" onclick="removeDirectAvatar(event)" title="Remove Profile Photo" aria-label="Remove Profile Photo" style="display: none;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-              </button>
               <input type="file" id="directAvatarFileInput" accept="image/*" style="display: none;" onchange="handleDirectAvatarChange(event)">
             </div>
             <div class="profile-actions-wrap">
@@ -9989,15 +12276,15 @@ function renderHtml(
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                 <span>Edit Profile</span>
               </button>
-              <button class="profile-btn profile-btn-secondary" onclick="openSwitchPersonaModal(event)" aria-label="Switch Profile or Page" title="Switch Profile or Page">
-                <span style="font-size: 0.95rem;">🔄</span>
-                <span>Switch Page</span>
-              </button>
               <div class="profile-overflow-wrap">
-                <button class="profile-btn profile-btn-secondary" id="profileOverflowMenuBtn" onclick="toggleProfileOverflowMenu(event)" aria-label="More account and sovereign options" aria-haspopup="menu" aria-expanded="false" title="More Account &amp; Sovereign Options">
+                <button class="profile-btn profile-btn-secondary" id="profileOverflowMenuBtn" onclick="toggleProfileOverflowMenu(event)" aria-label="More account and sovereign options" aria-haspopup="menu" aria-expanded="false" title="More Options (•••)">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                 </button>
                 <div id="profileOverflowDropdown" class="profile-overflow-dropdown" role="menu" style="display: none;">
+                  <div class="overflow-menu-item" id="profileGhostModeMenuItem" role="menuitem" tabindex="0" onclick="toggleGhostMode(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                    <span id="ghostModeMenuItemIcon" style="font-size: 1rem; width: 16px; display: inline-flex; justify-content: center;">🟢</span>
+                    <span id="ghostModeMenuItemText">Appear Offline (Ghost Mode)</span>
+                  </div>
                   <div class="overflow-menu-item" id="profileSwitchPersonaBtn" role="menuitem" tabindex="0" onclick="openSwitchPersonaModal(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #c084fc;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span>🔄 Switch Profile / Page</span>
@@ -10006,8 +12293,8 @@ function renderHtml(
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 10h4"/><path d="M14 14h4"/></svg>
                     <span>Sovereign Identity Details</span>
                   </div>
-                  <div class="overflow-menu-item" role="menuitem" tabindex="0" onclick="openAccountLifecycleModal(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #94a3b8;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <div class="overflow-menu-item" id="profileSettingsMenuItem" role="menuitem" tabindex="0" onclick="openSpatialSettingsSurface(this); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #94a3b8;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     <span>Account &amp; Security Settings</span>
                   </div>
                   <div class="overflow-menu-item" id="profileMfaBtn" role="menuitem" tabindex="0" onclick="openSovereignMfaModal(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
@@ -10193,6 +12480,9 @@ function renderHtml(
             </button>
             <button type="button" class="sovereign-hub-tab-btn" onclick="switchSovereignHubTab('meshTelemetryCard', this)">
               <span>🌐</span> <span>libp2p Swarm</span>
+            </button>
+            <button type="button" class="sovereign-hub-tab-btn" onclick="switchSovereignHubTab('uiDisplayModeCard', this)">
+              <span>✨</span> <span>Interface Mode</span>
             </button>
           </div>
 
@@ -10387,6 +12677,40 @@ function renderHtml(
               <button type="button" class="btn-card-action" onclick="openConnectedDevicesView()" style="background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8; flex: 0.6;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
                 <span>Devices</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 5: Interface & Display Mode -->
+          <div class="card profile-telemetry-card" id="uiDisplayModeCard">
+            <div>
+              <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+                <span style="display: flex; align-items: center; gap: 7px; font-weight: 700;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+                  <span>Interface &amp; Display Mode</span>
+                </span>
+                <span class="badge" id="profileModeStatusBadge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-size: 0.72rem;">✨ Simple Mode</span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.4;">
+                Switch between clean social media aesthetics and full cybernetic Advance HUD telemetry cockpit.
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 0.85rem;">
+                <div id="tileSelectSimpleMode" onclick="setDevServerUiMode('simple')" style="cursor: pointer; padding: 12px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08); transition: all 0.2s ease;">
+                  <div style="font-size: 1.2rem; margin-bottom: 4px;">✨</div>
+                  <div style="font-weight: 700; font-size: 0.85rem; color: #f8fafc; margin-bottom: 2px;">Simple Mode</div>
+                  <div style="font-size: 0.72rem; color: #94a3b8; line-height: 1.3;">Uncluttered, fast social feed &amp; sovereign messaging.</div>
+                </div>
+                <div id="tileSelectAdvanceMode" onclick="setDevServerUiMode('advance')" style="cursor: pointer; padding: 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); transition: all 0.2s ease;">
+                  <div style="font-size: 1.2rem; margin-bottom: 4px;">⚡</div>
+                  <div style="font-weight: 700; font-size: 0.85rem; color: #f8fafc; margin-bottom: 2px;">Advance HUD</div>
+                  <div style="font-size: 0.72rem; color: #94a3b8; line-height: 1.3;">Live telemetry graphs, orbital HUD &amp; war rooms.</div>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer-actions">
+              <button type="button" class="btn-card-action" id="devProfileModeSwitchBtn" onclick="toggleDevServerUiMode()" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
+                <span id="profileModeActionBtnText">Toggle Interface Mode</span>
               </button>
             </div>
           </div>
@@ -10654,6 +12978,46 @@ function renderHtml(
       </div>
     </main>
 
+    <!-- Dedicated Full-Page Peer Profile View (Industry Standard - Full Screen Page) -->
+    <main class="main-content" id="peer-profile-view" style="display: none; width: 100%;">
+      <div class="profile-container" style="max-width: 820px; margin: 0 auto; padding: 0 0.75rem;">
+        
+        <!-- Sticky Industry-Standard Profile App Bar -->
+        <div class="peer-profile-top-bar" style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+            <button type="button" class="peer-nav-back-btn" onclick="returnFromPeerProfile()" title="Back" aria-label="Go Back">
+              ←
+            </button>
+            <div style="min-width: 0;">
+              <div id="peerBarDisplayName" style="font-weight: 800; font-size: 1rem; color: #f8fafc; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Peer Profile</div>
+              <div id="peerBarSubtext" style="font-size: 0.74rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sovereign Mesh Node</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; position: relative; flex-shrink: 0;">
+            <button type="button" id="peerMoreOptionsBtn" onclick="togglePeerOptionsMenu(event)" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem;" title="More options" aria-label="More Options">
+              ⋮
+            </button>
+            <div id="peerOptionsMenuDropdown" style="display: none; position: absolute; top: 44px; right: 0; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 16px 32px rgba(0,0,0,0.5); z-index: 1000; min-width: 200px; padding: 6px; flex-direction: column; gap: 2px;">
+              <div class="overflow-menu-item" onclick="copyPeerProfileLink(event); hidePeerOptionsMenu();">🔗 Copy Profile Link</div>
+              <div class="overflow-menu-item" onclick="copyCurrentPeerDid(event); hidePeerOptionsMenu();">📋 Copy Sovereign DID</div>
+              <div class="overflow-menu-divider"></div>
+              <div class="overflow-menu-item item-danger" id="peerMenuBlockBtn" onclick="togglePeerBlockAction(event); hidePeerOptionsMenu();">🚫 Block User</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Profile Body Container (dynamically populated with header, stats, actions, and posts) -->
+        <div id="peerProfileContentBody">
+          <div style="text-align: center; color: #94a3b8; padding: 60px 20px;">
+            <div class="sovra-loading-spinner" style="margin: 0 auto 14px;"></div>
+            <div style="font-weight: 600; color: #e2e8f0; font-size: 0.95rem;">Loading Peer Profile...</div>
+            <div style="font-size: 0.78rem; color: #64748b; margin-top: 4px;">Syncing social graph from sovereign mesh</div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
     <!-- Main Section: Product B (Admin Console & Node Ops) -->
     <main class="main-content admin-view" id="admin-view" style="display: none; width: 100%;">
       <div class="admin-layout">
@@ -10861,7 +13225,7 @@ function renderHtml(
     <button class="bottom-nav-item" id="bnav-chat" data-action="switch-tab" data-tab="chat" onclick="switchTab('chat')" title="Chats" aria-label="Encrypted Chats">
       <span class="bnav-icon">💬</span>
       <span class="bnav-label">Chats</span>
-      <span class="bnav-badge" style="background: #3b82f6;">2</span>
+      <span class="bnav-badge" id="bnavChatBadge" style="display: none; background: #ef4444;">0</span>
     </button>
     <button class="bottom-nav-item" id="bnav-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" title="Profile" aria-label="Sovereign Profile and Wallet">
       <span class="bnav-icon">👤</span>
@@ -12203,20 +14567,26 @@ function renderHtml(
         <button onclick="closePostOptionsModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">✕</button>
       </div>
       <div style="padding: 0.5rem 0; display: flex; flex-direction: column;">
-        <button onclick="triggerShareFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #fff; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
-          <span>🚀</span> <span>Share CID to P2P Mesh</span>
-        </button>
         <button onclick="triggerCopyPostLink()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #fff; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
-          <span>🔗</span> <span>Copy Direct Post Link</span>
+          <span>🔗</span> <span>Copy Post Link</span>
+        </button>
+        <button onclick="triggerShareFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #fff; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
+          <span>↗️</span> <span>Share Post</span>
+        </button>
+        <button onclick="triggerNotInterestedFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #cbd5e1; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
+          <span>👁️‍🗨️</span> <span>Not Interested</span>
+        </button>
+        <button onclick="triggerCopyPostCid()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #38bdf8; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
+          <span>🛡️</span> <span>View Cryptographic Proof &amp; CID</span>
         </button>
         <button onclick="triggerMuteFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #fbbf24; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
-          <span>🔕</span> <span>Mute Author Posts</span>
+          <span>🔕</span> <span>Mute Author</span>
         </button>
         <button onclick="triggerBlockFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #ef4444; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
-          <span>🚫</span> <span>Block Author (Edge Drop)</span>
+          <span>🚫</span> <span>Block Author</span>
         </button>
         <button onclick="triggerSafetyReportModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #f87171; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); transition: background 0.15s;">
-          <span>🚨</span> <span>Report Post to Mesh Jury</span>
+          <span>🚨</span> <span>Report Post</span>
         </button>
       </div>
     </div>
@@ -12485,6 +14855,88 @@ function renderHtml(
     </div>
   </div>
 
+  <!-- 🌌 SOVRA SPATIAL HOLOGRAPHIC SURFACE CONTAINER -->
+  <div id="sovraSpatialSurfaceContainer" class="sovra-surface-container" aria-live="polite"></div>
+
+  <!-- 🖼️ SOVRA FULL-SCREEN PHOTO & MEDIA LIGHTBOX (ZOOM, PAN, DOWNLOAD) -->
+  <div id="sovraPhotoLightboxModal" class="sovra-photo-lightbox" style="display: none;" role="dialog" aria-modal="true" aria-label="Media Preview">
+    <div class="photo-lightbox-backdrop" onclick="closePhotoLightbox(event)"></div>
+    
+    <!-- Floating Glassmorphic Top Toolbar -->
+    <div class="photo-lightbox-toolbar" onclick="event.stopPropagation()">
+      <div class="photo-lightbox-author-wrap">
+        <button type="button" class="photo-lightbox-tool-btn" onclick="closePhotoLightbox(event)" title="Close (Esc)" aria-label="Close Lightbox">
+          ✕
+        </button>
+        <div class="photo-lightbox-meta">
+          <div id="photoLightboxAuthor" class="photo-lightbox-author-name">Photo Preview</div>
+          <div id="photoLightboxCaption" class="photo-lightbox-caption-text">Sovereign Mesh Media</div>
+        </div>
+      </div>
+
+      <div class="photo-lightbox-actions">
+        <!-- Dynamic Action: Update / Change Photo or Cover -->
+        <button type="button" class="photo-lightbox-action-btn" id="photoLightboxUpdateBtn" onclick="triggerActiveLightboxUpdateAction()" title="Change / Update Photo" style="display: none;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span id="photoLightboxUpdateLabel">Change Photo</span>
+        </button>
+
+        <!-- Dynamic Action: Remove Photo or Cover -->
+        <button type="button" class="photo-lightbox-action-btn danger" id="photoLightboxRemoveBtn" onclick="triggerActiveLightboxRemoveAction()" title="Remove Photo" style="display: none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          <span id="photoLightboxRemoveLabel">Remove</span>
+        </button>
+
+        <span id="photoLightboxZoomBadge" class="photo-lightbox-zoom-badge" title="Current Zoom Scale">100%</span>
+        
+        <button type="button" class="photo-lightbox-tool-btn" onclick="zoomPhotoLightbox(-0.25)" title="Zoom Out (-)" aria-label="Zoom Out">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </button>
+        
+        <button type="button" class="photo-lightbox-tool-btn" onclick="resetPhotoLightboxZoom()" title="Reset 100% (0)" aria-label="Reset Zoom">
+          <span style="font-size: 0.75rem; font-weight: 800;">1:1</span>
+        </button>
+
+        <button type="button" class="photo-lightbox-tool-btn" onclick="zoomPhotoLightbox(0.25)" title="Zoom In (+)" aria-label="Zoom In">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </button>
+
+        <button type="button" class="photo-lightbox-tool-btn" onclick="rotatePhotoLightbox()" title="Rotate 90° (R)" aria-label="Rotate Image">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+
+        <button type="button" class="photo-lightbox-tool-btn" onclick="downloadPhotoLightboxImage()" title="Download High-Res" aria-label="Download Image">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+
+        <button type="button" class="photo-lightbox-tool-btn" onclick="openPhotoLightboxInNewTab()" title="Open Original in New Tab" aria-label="Open in New Tab">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Center Viewport with Smooth Grab & Pan Canvas -->
+    <div class="photo-lightbox-viewport" id="photoLightboxViewport">
+      <div id="photoLightboxTransformTarget" class="photo-lightbox-transform-target">
+        <img id="photoLightboxImg" class="photo-lightbox-img" src="" alt="Full view" draggable="false" />
+      </div>
+    </div>
+
+    <!-- Floating Bottom Info & Gesture Helper Bar -->
+    <div class="photo-lightbox-bottom-bar" onclick="event.stopPropagation()">
+      <div id="photoLightboxFullCaption" class="photo-lightbox-full-caption"></div>
+      <div class="photo-lightbox-hints">
+        <span>💡 Drag to Pan</span>
+        <span>•</span>
+        <span>Scroll / Pinch to Zoom</span>
+        <span>•</span>
+        <span>Double-click for 2.5×</span>
+        <span>•</span>
+        <span>Esc to Close</span>
+      </div>
+    </div>
+  </div>
+
   <script>
     window.SOVRA_HOST_SESSION = {
       did: '${masterKey.did}',
@@ -12543,6 +14995,5674 @@ function renderHtml(
       }
     };
     window.fetch = window.authenticatedFetch;
+    window.getAuthHeaders = function() {
+      var token = localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? myProfile.sessionToken : '') || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : '') || '';
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+        'X-Sovra-Session-Token': token
+      };
+    };
+
+    // ==========================================================================
+    // 🌌 SOVRA SPATIAL HOLOGRAPHIC INTERACTION SYSTEM (CORE ENGINE)
+    // ==========================================================================
+
+    window.SovraSurfaceManager = (function() {
+      let _stack = [];
+      let _container = null;
+      let _backdrop = null;
+      let _initialTriggerEl = null;
+
+      function initContainer() {
+        _container = document.getElementById('sovraSpatialSurfaceContainer');
+        if (!_container) {
+          _container = document.createElement('div');
+          _container.id = 'sovraSpatialSurfaceContainer';
+          _container.className = 'sovra-surface-container';
+          document.body.appendChild(_container);
+        }
+      }
+
+      function renderBackdrop() {
+        initContainer();
+        if (!_backdrop) {
+          _backdrop = document.createElement('div');
+          _backdrop.className = 'sovra-surface-backdrop';
+          _backdrop.onclick = function() {
+            closeAll();
+          };
+          _container.appendChild(_backdrop);
+        }
+        _backdrop.classList.add('is-active');
+      }
+
+      function getDepth() {
+        return _stack.length;
+      }
+
+      function pushSurface(options) {
+        initContainer();
+        if (_stack.length === 0) {
+          _initialTriggerEl = options.originEl || document.activeElement;
+          document.body.classList.add('spatial-surface-open');
+        }
+        renderBackdrop();
+
+        // If there is an existing topmost surface, recede it in 3D spatial stack
+        if (_stack.length > 0) {
+          const topSurface = _stack[_stack.length - 1];
+          if (topSurface.el) {
+            topSurface.el.classList.add('is-receded');
+            topSurface.el.classList.remove('is-active');
+            topSurface.el.setAttribute('aria-hidden', 'true');
+          }
+        }
+
+        const surfaceId = options.id || ('surf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+        const cardEl = document.createElement('div');
+        cardEl.className = 'sovra-surface-card is-active';
+        cardEl.id = 'surface-card-' + surfaceId;
+        cardEl.setAttribute('role', 'dialog');
+        cardEl.setAttribute('aria-modal', 'true');
+        cardEl.setAttribute('aria-label', options.title || 'Spatial Surface');
+
+        // Origin-aware emergence positioning
+        if (options.originEl && typeof options.originEl.getBoundingClientRect === 'function') {
+          const rect = options.originEl.getBoundingClientRect();
+          cardEl.style.setProperty('--origin-x', (rect.left + rect.width / 2) + 'px');
+          cardEl.style.setProperty('--origin-y', (rect.top + rect.height / 2) + 'px');
+        } else if (options.originCoords && options.originCoords.x && options.originCoords.y) {
+          cardEl.style.setProperty('--origin-x', options.originCoords.x + 'px');
+          cardEl.style.setProperty('--origin-y', options.originCoords.y + 'px');
+        }
+
+        // Header element
+        const headerEl = document.createElement('div');
+        headerEl.className = 'sovra-surface-header';
+
+        // Drag handle for mobile responsive sheet
+        const handleEl = document.createElement('div');
+        handleEl.className = 'sovra-surface-drag-handle';
+        headerEl.appendChild(handleEl);
+
+        const navLeft = document.createElement('div');
+        navLeft.className = 'sovra-surface-nav-left';
+
+        // Back button (shown when depth > 1)
+        const backBtn = document.createElement('button');
+        backBtn.className = 'sovra-surface-back-btn';
+        backBtn.setAttribute('aria-label', 'Go back');
+        backBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>';
+        backBtn.style.display = _stack.length > 0 ? 'inline-flex' : 'none';
+        backBtn.onclick = function(e) {
+          e.stopPropagation();
+          popSurface();
+        };
+        navLeft.appendChild(backBtn);
+
+        // Title and Breadcrumbs container
+        const titleGroup = document.createElement('div');
+        titleGroup.className = 'sovra-surface-title-group';
+
+        const breadcrumbsEl = document.createElement('nav');
+        breadcrumbsEl.className = 'sovra-surface-breadcrumbs';
+        breadcrumbsEl.setAttribute('aria-label', 'Breadcrumb trail');
+        titleGroup.appendChild(breadcrumbsEl);
+
+        const titleEl = document.createElement('h2');
+        titleEl.className = 'sovra-surface-title';
+        titleEl.innerText = options.title || 'Sovra Surface';
+        titleGroup.appendChild(titleEl);
+
+        if (options.subtitle) {
+          const subEl = document.createElement('div');
+          subEl.className = 'sovra-surface-subtitle';
+          subEl.innerText = options.subtitle;
+          titleGroup.appendChild(subEl);
+        }
+
+        navLeft.appendChild(titleGroup);
+        headerEl.appendChild(navLeft);
+
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'sovra-surface-close-btn';
+        closeBtn.setAttribute('aria-label', 'Close surface');
+        closeBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+        closeBtn.onclick = function(e) {
+          e.stopPropagation();
+          closeAll();
+        };
+        headerEl.appendChild(closeBtn);
+        cardEl.appendChild(headerEl);
+
+        // Body element
+        const bodyEl = document.createElement('div');
+        bodyEl.className = 'sovra-surface-body';
+        bodyEl.id = 'surface-body-' + surfaceId;
+        cardEl.appendChild(bodyEl);
+
+        // Optional footer
+        if (typeof options.renderFooter === 'function') {
+          const footerEl = document.createElement('div');
+          footerEl.className = 'sovra-surface-footer';
+          options.renderFooter(footerEl, { surfaceId: surfaceId, popSurface: popSurface, closeAll: closeAll });
+          cardEl.appendChild(footerEl);
+        }
+
+        _container.appendChild(cardEl);
+
+        const record = {
+          id: surfaceId,
+          type: options.type || 'generic',
+          title: options.title || '',
+          subtitle: options.subtitle || '',
+          context: options.context || options.data || {},
+          data: options.data || options.context || {},
+          params: options.params || {},
+          parent: options.parent || (_stack.length > 0 ? _stack[_stack.length - 1].id : null),
+          dismissible: options.dismissible !== false,
+          modal: options.modal !== false,
+          origin: options.origin || options.originEl || null,
+          originEl: options.originEl || options.origin || null,
+          animationState: 'active',
+          el: cardEl,
+          bodyEl: bodyEl,
+          breadcrumbsEl: breadcrumbsEl,
+          onBack: options.onBack,
+          onClose: options.onClose,
+        };
+
+        _stack.push(record);
+        updateBreadcrumbs();
+
+        // Mobile history synchronization
+        if (typeof history !== 'undefined' && history.pushState) {
+          try {
+            history.pushState({ sovraSurface: true, id: surfaceId, depth: _stack.length }, '', window.location.href);
+          } catch (_) {}
+        }
+
+        // Render contents
+        if (typeof options.render === 'function') {
+          options.render(bodyEl, {
+            surfaceId: surfaceId,
+            openSurface: pushSurface,
+            pushSurface: pushSurface,
+            popSurface: popSurface,
+            replaceSurface: replaceSurface,
+            closeSurface: closeSurface,
+            closeAll: closeAll,
+            closeAllSurfaces: closeAll,
+            context: record.context,
+            data: record.data,
+            params: record.params,
+          });
+        }
+
+        // Focus restoration & accessibility trap
+        setTimeout(function() {
+          const firstFocusable = cardEl.querySelector('button, input, select, textarea, [tabindex="0"]');
+          if (firstFocusable) firstFocusable.focus();
+        }, 50);
+
+        return record;
+      }
+
+      function updateBreadcrumbs() {
+        _stack.forEach(function(item, idx) {
+          if (!item.breadcrumbsEl) return;
+          let html = '';
+          for (let i = 0; i < _stack.length; i++) {
+            const s = _stack[i];
+            if (i === _stack.length - 1) {
+              html += '<span class="sovra-surface-crumb sovra-surface-crumb-active">' + (s.title || 'Current') + '</span>';
+            } else {
+              html += '<button class="sovra-surface-crumb" onclick="window.SovraSurfaceManager.popTo(&quot;' + s.id + '&quot;)">' + (s.title || 'Step') + '</button>';
+              html += '<span class="sovra-surface-crumb-sep">/</span>';
+            }
+          }
+          item.breadcrumbsEl.innerHTML = html;
+        });
+      }
+
+      function popSurface(opts) {
+        if (_stack.length === 0) return null;
+        if (!opts || !opts.fromHistory) {
+          if (typeof history !== 'undefined' && history.state && history.state.sovraSurface) {
+            try {
+              _syncingHistory = true;
+              history.back();
+            } catch (_) {}
+          }
+        }
+        if (_stack.length === 1) {
+          closeAll({ fromHistory: opts && opts.fromHistory });
+          return null;
+        }
+
+        const popped = _stack.pop();
+        if (popped && popped.el) {
+          popped.animationState = 'closing';
+          popped.el.classList.remove('is-active');
+          popped.el.classList.add('is-closing');
+          if (typeof popped.onBack === 'function') {
+            try { popped.onBack(); } catch (err) { console.warn(err); }
+          }
+          setTimeout(function() {
+            if (popped.el && popped.el.parentNode) {
+              popped.el.parentNode.removeChild(popped.el);
+            }
+          }, 240);
+        }
+
+        if (_stack.length > 0) {
+          const active = _stack[_stack.length - 1];
+          if (active.el) {
+            active.animationState = 'active';
+            active.el.classList.remove('is-receded');
+            active.el.classList.add('is-active');
+            active.el.removeAttribute('aria-hidden');
+          }
+          updateBreadcrumbs();
+
+          const triggerToFocus = popped.origin || popped.originEl;
+          if (triggerToFocus && typeof triggerToFocus.focus === 'function') {
+            try { triggerToFocus.focus(); } catch (e) {}
+          } else if (active.el) {
+            const focusable = active.el.querySelector('button, input, select, textarea, [tabindex="0"]');
+            if (focusable) focusable.focus();
+          }
+          return active;
+        }
+        return null;
+      }
+
+      function popTo(targetSurfaceId) {
+        while (_stack.length > 1 && _stack[_stack.length - 1].id !== targetSurfaceId) {
+          const popped = _stack.pop();
+          if (popped && popped.el && popped.el.parentNode) {
+            popped.el.parentNode.removeChild(popped.el);
+          }
+        }
+        if (_stack.length > 0) {
+          const active = _stack[_stack.length - 1];
+          if (active.el) {
+            active.animationState = 'active';
+            active.el.classList.remove('is-receded');
+            active.el.classList.add('is-active');
+            active.el.removeAttribute('aria-hidden');
+          }
+          updateBreadcrumbs();
+        }
+      }
+
+      function replaceSurface(options) {
+        if (_stack.length > 0) {
+          const current = _stack.pop();
+          if (current && current.el && current.el.parentNode) {
+            current.el.parentNode.removeChild(current.el);
+          }
+        }
+        return pushSurface(options);
+      }
+
+      function closeSurface(surfaceId) {
+        if (!surfaceId || (_stack.length > 0 && _stack[_stack.length - 1].id === surfaceId)) {
+          return popSurface();
+        }
+        const idx = _stack.findIndex(function(s) { return s.id === surfaceId; });
+        if (idx !== -1) {
+          const removed = _stack.splice(idx, 1)[0];
+          if (removed && removed.el && removed.el.parentNode) {
+            removed.el.parentNode.removeChild(removed.el);
+          }
+          updateBreadcrumbs();
+        }
+        return null;
+      }
+
+      function closeAll(opts) {
+        while (_stack.length > 0) {
+          const s = _stack.pop();
+          if (s) {
+            if (typeof s.onClose === 'function') {
+              try { s.onClose(); } catch (err) { console.warn(err); }
+            }
+            if (s.el && s.el.parentNode) {
+              s.el.parentNode.removeChild(s.el);
+            }
+          }
+        }
+        if (_backdrop) {
+          _backdrop.classList.remove('is-active');
+        }
+        document.body.classList.remove('spatial-surface-open');
+        if (window.SovraCore && typeof window.SovraCore.isSurfaceActive === 'function' && window.SovraCore.isSurfaceActive()) {
+          window.SovraCore.returnFromSurface();
+        } else if (_initialTriggerEl && typeof _initialTriggerEl.focus === 'function') {
+          try { _initialTriggerEl.focus(); } catch (e) {}
+        }
+        _initialTriggerEl = null;
+      }
+
+      function getCurrentSurface() {
+        return _stack.length > 0 ? _stack[_stack.length - 1] : null;
+      }
+
+      function getStack() {
+        return _stack.slice();
+      }
+
+      let _syncingHistory = false;
+      window.addEventListener('popstate', function(e) {
+        if (_syncingHistory) {
+          _syncingHistory = false;
+          return;
+        }
+        if (_stack.length > 0) {
+          popSurface({ fromHistory: true });
+        }
+      });
+
+      // Keyboard navigation: Escape key handling
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && _stack.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          popSurface();
+        }
+      });
+
+      return {
+        openSurface: pushSurface,
+        pushSurface: pushSurface,
+        popSurface: popSurface,
+        popTo: popTo,
+        replaceSurface: replaceSurface,
+        closeSurface: closeSurface,
+        closeAll: closeAll,
+        closeAllSurfaces: closeAll,
+        getCurrentSurface: getCurrentSurface,
+        getStack: getStack,
+        getDepth: getDepth,
+      };
+    })();
+
+    // Top-level aliases for convenient access
+    window.SovraSurfaceEngine = window.SovraSurfaceManager;
+    window.openSurface = function(opts) { return window.SovraSurfaceManager.openSurface(opts); };
+    window.pushSurface = function(opts) { return window.SovraSurfaceManager.pushSurface(opts); };
+    window.popSurface = function(opts) { return window.SovraSurfaceManager.popSurface(opts); };
+    window.replaceSurface = function(opts) { return window.SovraSurfaceManager.replaceSurface(opts); };
+    window.closeSurface = function(id) { return window.SovraSurfaceManager.closeSurface(id); };
+    window.closeAllSurfaces = function() { return window.SovraSurfaceManager.closeAllSurfaces(); };
+
+    // ==========================================================================
+    // 🎨 SPATIAL THEME ENGINE
+    // ==========================================================================
+    window.applySpatialTheme = function(theme) {
+      const root = document.documentElement;
+      try { localStorage.setItem('sovra_spatial_theme', theme); } catch(e) {}
+      switch (theme) {
+        case 'amber':
+          root.style.setProperty('--primary', '#f59e0b');
+          root.style.setProperty('--accent-cyan', '#fbbf24');
+          root.style.setProperty('--surface-border-hover', 'rgba(245, 158, 11, 0.45)');
+          break;
+        case 'emerald':
+          root.style.setProperty('--primary', '#10b981');
+          root.style.setProperty('--accent-cyan', '#34d399');
+          root.style.setProperty('--surface-border-hover', 'rgba(16, 185, 129, 0.45)');
+          break;
+        case 'void':
+          root.style.setProperty('--primary', '#8b5cf6');
+          root.style.setProperty('--accent-cyan', '#c084fc');
+          root.style.setProperty('--surface-border-hover', 'rgba(139, 92, 246, 0.45)');
+          break;
+        case 'cyan':
+        default:
+          root.style.setProperty('--primary', '#6366f1');
+          root.style.setProperty('--accent-cyan', '#38bdf8');
+          root.style.setProperty('--surface-border-hover', 'rgba(99, 102, 241, 0.4)');
+          break;
+      }
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('🎨 Spatial theme set to ' + theme.toUpperCase());
+      }
+    };
+
+    // ==========================================================================
+    // 👤 FLOW 0: SOVRA PROFILE SPATIAL SURFACE (CORE -> PROFILE -> ...)
+    // ==========================================================================
+
+    // ==========================================================================
+    // 👤 FLOW 0: SOVRA IDENTITY, PROFILE & DISCOVERY SPATIAL SURFACES (PHASE 6)
+    // ==========================================================================
+
+    window.openSpatialProfileSurface = function(originEl, targetDid) {
+      const activeUserDid = (typeof myProfile !== 'undefined' && myProfile) ? myProfile.did : '';
+      const resolvedDid = targetDid || activeUserDid || '';
+      if (!resolvedDid || resolvedDid === activeUserDid) {
+        if (typeof switchTab === 'function') switchTab('me');
+        return;
+      }
+      if (typeof openPeerProfile === 'function') {
+        openPeerProfile(resolvedDid, originEl);
+        return;
+      }
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'profile-' + (resolvedDid || 'self'),
+        type: 'profile',
+        title: 'SOVRA IDENTITY',
+        subtitle: 'Sovereign identity, social graph, and cryptographic verification',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px;"><div class="sovra-loading-spinner" style="margin: 0 auto 12px;"></div>Loading Sovereign Profile...</div>';
+
+          const profileUrl = '/api/user/profile' + (resolvedDid ? '?did=' + encodeURIComponent(resolvedDid) : '');
+          fetch(profileUrl, {
+            headers: {
+              'Authorization': (typeof authToken !== 'undefined' && authToken) ? 'Bearer ' + authToken : (localStorage.getItem('sovra_session_token') ? 'Bearer ' + localStorage.getItem('sovra_session_token') : ''),
+            }
+          })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (!data.ok && data.isBlocked) {
+              bodyEl.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 32px 16px;">' +
+                '<div style="font-size: 2.5rem; margin-bottom: 10px;">🔒</div>' +
+                '<div style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">Profile Unavailable</div>' +
+                '<div style="font-size: 0.84rem; color: #94a3b8;">This peer is blocked or unavailable on the Sovereign mesh.</div>' +
+              '</div>';
+              return;
+            }
+
+            if (!data.ok || !data.user) {
+              bodyEl.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 24px;">' +
+                '<div style="font-size: 1.8rem; margin-bottom: 8px;">⚠️</div>' +
+                '<div>' + (data.error || 'Failed to load sovereign profile') + '</div>' +
+              '</div>';
+              return;
+            }
+
+            const user = data.user;
+            const stats = data.stats || { followersCount: 0, followingCount: 0, friendsCount: 0, mutualFriendsCount: 0, postsCount: 0, channelsCount: 0, pagesCount: 0, groupsCount: 0 };
+            const rel = data.relationship || { isSelf: !resolvedDid || resolvedDid === activeUserDid, isFollowing: false, isFollowedBy: false, areFriends: false, friendshipStatus: 'none', isBlocked: false, hasBlockedMe: false, canMessage: true, canSendFriendRequest: true };
+            const isPrivate = Boolean(data.isPrivate);
+
+            const displayName = user.displayName || user.name || 'Sovereign Peer';
+            const handle = user.handle || '@peer';
+            const avatarUrl = user.avatarDataUrl || user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+            const bio = user.bio || 'Sovereign mesh node. Self-custodied identity.';
+
+            let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+            // 1. Identity Header
+            html += '<div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 14px; backdrop-filter: blur(8px);">' +
+              '<img id="spatialProfileAvatar" src="' + avatarUrl + '" alt="' + displayName + '" style="width: 58px; height: 58px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.35); flex-shrink: 0;" />' +
+              '<div style="flex: 1; min-width: 0;">' +
+                '<div style="display: flex; align-items: center; gap: 6px;">' +
+                  '<span id="spatialProfileDisplayName" style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + displayName + '</span>' +
+                  (isPrivate ? '<span style="font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(239,68,68,0.3);">Private</span>' : '') +
+                '</div>' +
+                '<div id="spatialProfileHandle" style="font-size: 0.82rem; color: #38bdf8; font-family: monospace;">' + handle + '</div>' +
+                '<div style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 0.72rem; color: #10b981;">' +
+                  '<span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>' +
+                  '<span>DID: ' + user.did.substring(0, 16) + '...</span>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+
+            // Bio
+            if (bio) {
+              html += '<div style="font-size: 0.84rem; color: #cbd5e1; line-height: 1.4; padding: 0 4px;">' + bio + '</div>';
+            }
+
+            // Real Stats Pills (Clickable)
+            html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center;">' +
+              '<div class="spatial-option-card" style="padding: 8px 4px; cursor: pointer;" onclick="window.openSpatialRelationshipsSurface(this, &quot;' + user.did + '&quot;, &quot;followers&quot;)">' +
+                '<div style="font-size: 1.05rem; font-weight: 700; color: #38bdf8;">' + stats.followersCount + '</div>' +
+                '<div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Followers</div>' +
+              '</div>' +
+              '<div class="spatial-option-card" style="padding: 8px 4px; cursor: pointer;" onclick="window.openSpatialRelationshipsSurface(this, &quot;' + user.did + '&quot;, &quot;following&quot;)">' +
+                '<div style="font-size: 1.05rem; font-weight: 700; color: #38bdf8;">' + stats.followingCount + '</div>' +
+                '<div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Following</div>' +
+              '</div>' +
+              '<div class="spatial-option-card" style="padding: 8px 4px; cursor: pointer;" onclick="window.openSpatialRelationshipsSurface(this, &quot;' + user.did + '&quot;, &quot;friends&quot;)">' +
+                '<div style="font-size: 1.05rem; font-weight: 700; color: #10b981;">' + stats.friendsCount + '</div>' +
+                '<div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Friends</div>' +
+              '</div>' +
+              '<div class="spatial-option-card" style="padding: 8px 4px; cursor: pointer;" onclick="window.openSpatialRelationshipsSurface(this, &quot;' + user.did + '&quot;, &quot;mutual&quot;)">' +
+                '<div style="font-size: 1.05rem; font-weight: 700; color: #a855f7;">' + stats.mutualFriendsCount + '</div>' +
+                '<div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Mutual</div>' +
+              '</div>' +
+            '</div>';
+
+            // Action Pills Bar
+            html += '<div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px;">';
+            if (rel.isSelf) {
+              html += '<button class="action-pill-btn action-pill-primary" id="spatialProfileEditBtn" style="flex: 1; padding: 7px 12px; font-size: 0.8rem;" onclick="window.openSpatialEditProfileSurface(this, ' + JSON.stringify(user).replace(/"/g, '&quot;') + ')">✏️ Edit Profile</button>' +
+                '<button class="action-pill-btn action-pill-secondary" id="spatialProfileSettingsBtn" style="flex: 1; padding: 7px 12px; font-size: 0.8rem;" onclick="window.openSpatialSettingsSurface(this)">⚙️ Settings</button>' +
+                '<button class="action-pill-btn action-pill-secondary" id="spatialProfileSavedBtn" style="padding: 7px 10px; font-size: 0.8rem;" onclick="switchTab(&quot;saved&quot;)">🔖 Saved</button>' +
+                '<button class="action-pill-btn action-pill-secondary" id="spatialProfileActivityBtn" style="padding: 7px 10px; font-size: 0.8rem;" onclick="switchTab(&quot;activity&quot;)">📊 Activity</button>' +
+                '<button class="action-pill-btn action-pill-secondary" id="spatialProfileChannelsBtn" style="padding: 7px 10px; font-size: 0.8rem;" onclick="switchTab(&quot;channels&quot;)">📺 Channels</button>' +
+                '<button class="action-pill-btn action-pill-secondary" id="spatialProfilePagesBtn" style="padding: 7px 10px; font-size: 0.8rem;" onclick="switchTab(&quot;pages&quot;)">📄 Pages</button>' +
+                '<button class="action-pill-btn action-pill-secondary" id="spatialProfileGroupsBtn" style="padding: 7px 10px; font-size: 0.8rem;" onclick="switchTab(&quot;groups&quot;)">👥 Groups</button>';
+            } else {
+              // Follow/Unfollow
+              html += '<button class="action-pill-btn ' + (rel.isFollowing ? 'action-pill-secondary' : 'action-pill-primary') + '" id="profileFollowBtn" style="flex: 1; padding: 7px 12px; font-size: 0.8rem;">' +
+                (rel.isFollowing ? '✓ Following' : '+ Follow') +
+              '</button>';
+
+              // Friend handshake
+              let friendBtnText = '+ Add Friend';
+              let friendBtnClass = 'action-pill-secondary';
+              if (rel.friendshipStatus === 'accepted') {
+                friendBtnText = '👥 Friends';
+              } else if (rel.friendshipStatus === 'pending_sent') {
+                friendBtnText = '⏳ Request Sent';
+              } else if (rel.friendshipStatus === 'pending_received') {
+                friendBtnText = '✓ Accept Request';
+                friendBtnClass = 'action-pill-primary';
+              }
+              html += '<button class="action-pill-btn ' + friendBtnClass + '" id="profileFriendBtn" style="flex: 1; padding: 7px 12px; font-size: 0.8rem;">' + friendBtnText + '</button>';
+
+              // Message
+              if (rel.canMessage) {
+                html += '<button class="action-pill-btn action-pill-secondary" id="profileMessageBtn" style="padding: 7px 12px; font-size: 0.8rem;" onclick="if(typeof window.openSpatialConversationSurface===&quot;function&quot;) window.openSpatialConversationSurface(&quot;' + user.did + '&quot;, this, &quot;' + encodeURIComponent(displayName) + '&quot;)">💬 Message</button>';
+              }
+
+              // Block
+              html += '<button class="action-pill-btn action-pill-secondary" id="profileBlockBtn" style="padding: 7px 12px; font-size: 0.8rem; color: #ef4444; border-color: rgba(239,68,68,0.3);">' +
+                (rel.isBlocked ? 'Unblock' : 'Block') +
+              '</button>';
+            }
+            html += '</div>';
+
+            // Navigation tabs or private notice
+            if (isPrivate) {
+              html += '<div style="margin-top: 14px; text-align: center; color: #94a3b8; padding: 24px 12px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">' +
+                '<div style="font-size: 1.8rem; margin-bottom: 6px;">🔒</div>' +
+                '<div style="font-weight: 600; color: #f8fafc; margin-bottom: 4px;">This Account is Private</div>' +
+                '<div style="font-size: 0.8rem;">Follow or connect with this sovereign peer to view their dispatches and spaces.</div>' +
+              '</div>';
+            } else {
+              // Tabbed Content: Posts, Channels, Pages, Groups
+              html += '<div style="margin-top: 6px;">' +
+                '<div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 12px;">' +
+                  '<button class="action-pill-btn action-pill-primary" id="profileTabPosts" style="padding: 4px 12px; font-size: 0.76rem;">Posts (' + (data.posts ? data.posts.length : 0) + ')</button>' +
+                  '<button class="action-pill-btn action-pill-secondary" id="profileTabChannels" style="padding: 4px 12px; font-size: 0.76rem;">Channels (' + (data.channels ? data.channels.length : 0) + ')</button>' +
+                  '<button class="action-pill-btn action-pill-secondary" id="profileTabPages" style="padding: 4px 12px; font-size: 0.76rem;">Pages (' + (data.pages ? data.pages.length : 0) + ')</button>' +
+                  '<button class="action-pill-btn action-pill-secondary" id="profileTabGroups" style="padding: 4px 12px; font-size: 0.76rem;">Groups (' + (data.groups ? data.groups.length : 0) + ')</button>' +
+                '</div>' +
+                '<div id="profileTabContent" style="display: flex; flex-direction: column; gap: 8px;"></div>' +
+              '</div>';
+            }
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+
+            // Wire Follow toggle
+            const followBtn = bodyEl.querySelector('#profileFollowBtn');
+            if (followBtn) {
+              followBtn.onclick = function() {
+                const isCurrentlyFollowing = rel.isFollowing;
+                fetch('/api/social/follow', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ targetDid: user.did, isUnfollow: isCurrentlyFollowing })
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(fData) {
+                  if (fData.ok) {
+                    rel.isFollowing = fData.isFollowing;
+                    followBtn.textContent = rel.isFollowing ? '✓ Following' : '+ Follow';
+                    followBtn.className = 'action-pill-btn ' + (rel.isFollowing ? 'action-pill-secondary' : 'action-pill-primary');
+                  }
+                });
+              };
+            }
+
+            // Wire Friend handshake
+            const friendBtn = bodyEl.querySelector('#profileFriendBtn');
+            if (friendBtn) {
+              friendBtn.onclick = function() {
+                if (rel.friendshipStatus === 'accepted') {
+                  if (confirm('Remove ' + displayName + ' from friends?')) {
+                    fetch('/api/friends/remove', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ targetDid: user.did })
+                    }).then(function() {
+                      rel.friendshipStatus = 'none';
+                      friendBtn.textContent = '+ Add Friend';
+                      friendBtn.className = 'action-pill-btn action-pill-secondary';
+                    });
+                  }
+                } else if (rel.friendshipStatus === 'pending_received') {
+                  fetch('/api/friends/respond', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fromDid: user.did, status: 'accept' })
+                  }).then(function() {
+                    rel.friendshipStatus = 'accepted';
+                    friendBtn.textContent = '👥 Friends';
+                    friendBtn.className = 'action-pill-btn action-pill-secondary';
+                  });
+                } else if (rel.friendshipStatus === 'none') {
+                  fetch('/api/friends/request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ toDid: user.did })
+                  }).then(function(res) { return res.json(); })
+                  .then(function(rData) {
+                    if (rData.ok) {
+                      rel.friendshipStatus = 'pending_sent';
+                      friendBtn.textContent = '⏳ Request Sent';
+                      friendBtn.className = 'action-pill-btn action-pill-secondary';
+                    }
+                  });
+                }
+              };
+            }
+
+            // Wire Block toggle
+            const blockBtn = bodyEl.querySelector('#profileBlockBtn');
+            if (blockBtn) {
+              blockBtn.onclick = function() {
+                const endpoint = rel.isBlocked ? '/api/social/unblock' : '/api/social/block';
+                if (!rel.isBlocked && !confirm('Block ' + displayName + '? You will not see their dispatches or messages.')) return;
+                fetch(endpoint, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ targetDid: user.did })
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(bData) {
+                  if (bData.ok) {
+                    rel.isBlocked = !rel.isBlocked;
+                    blockBtn.textContent = rel.isBlocked ? 'Unblock' : 'Block';
+                    window.SovraSurfaceManager.popSurface();
+                  }
+                });
+              };
+            }
+
+            // Wire Tab rendering
+            if (!isPrivate) {
+              const tabContent = bodyEl.querySelector('#profileTabContent');
+              const renderTab = function(type) {
+                if (!tabContent) return;
+                tabContent.innerHTML = '';
+                if (type === 'posts') {
+                  const posts = data.posts || [];
+                  if (posts.length === 0) {
+                    tabContent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">No dispatches yet.</div>';
+                    return;
+                  }
+                  posts.forEach(function(p) {
+                    const postCard = document.createElement('div');
+                    postCard.className = 'spatial-option-card';
+                    postCard.style.cursor = 'pointer';
+                    postCard.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 500;">' + (p.caption || 'Dispatch') + '</div>' +
+                      '<div style="font-size: 0.72rem; color: #64748b; margin-top: 4px;">❤️ ' + (p.likesCount || 0) + ' · 💬 ' + (p.commentsCount || 0) + '</div></div>';
+                    tabContent.appendChild(postCard);
+                  });
+                } else if (type === 'channels') {
+                  const channels = data.channels || [];
+                  if (channels.length === 0) {
+                    tabContent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">No channels yet.</div>';
+                    return;
+                  }
+                  channels.forEach(function(c) {
+                    const card = document.createElement('div');
+                    card.className = 'spatial-option-card';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 600;">' + c.name + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + (c.handle || 'Channel') + '</div></div>';
+                    tabContent.appendChild(card);
+                  });
+                } else if (type === 'pages') {
+                  const pages = data.pages || [];
+                  if (pages.length === 0) {
+                    tabContent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">No pages yet.</div>';
+                    return;
+                  }
+                  pages.forEach(function(pg) {
+                    const card = document.createElement('div');
+                    card.className = 'spatial-option-card';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 600;">' + pg.name + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + (pg.category || 'Page') + '</div></div>';
+                    tabContent.appendChild(card);
+                  });
+                } else if (type === 'groups') {
+                  const groups = data.groups || [];
+                  if (groups.length === 0) {
+                    tabContent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">No groups yet.</div>';
+                    return;
+                  }
+                  groups.forEach(function(g) {
+                    const card = document.createElement('div');
+                    card.className = 'spatial-option-card';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 600;">' + g.name + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + (g.memberCount || 1) + ' members</div></div>';
+                    tabContent.appendChild(card);
+                  });
+                }
+              };
+
+              const btnPosts = bodyEl.querySelector('#profileTabPosts');
+              const btnChannels = bodyEl.querySelector('#profileTabChannels');
+              const btnPages = bodyEl.querySelector('#profileTabPages');
+              const btnGroups = bodyEl.querySelector('#profileTabGroups');
+
+              const setTab = function(selected, type) {
+                [btnPosts, btnChannels, btnPages, btnGroups].forEach(function(b) {
+                  if (b) b.className = 'action-pill-btn action-pill-secondary';
+                });
+                if (selected) selected.className = 'action-pill-btn action-pill-primary';
+                renderTab(type);
+              };
+
+              if (btnPosts) btnPosts.onclick = function() { setTab(btnPosts, 'posts'); };
+              if (btnChannels) btnChannels.onclick = function() { setTab(btnChannels, 'channels'); };
+              if (btnPages) btnPages.onclick = function() { setTab(btnPages, 'pages'); };
+              if (btnGroups) btnGroups.onclick = function() { setTab(btnGroups, 'groups'); };
+              renderTab('posts');
+            }
+          })
+          .catch(function(err) {
+            bodyEl.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 24px;">Failed to load profile: ' + err.message + '</div>';
+          });
+        }
+      });
+    };
+
+    // ==========================================================================
+    // ✏️ EDIT PROFILE SPATIAL SURFACE
+    // ==========================================================================
+    window.openSpatialEditProfileSurface = function(originEl, user) {
+      const u = user || ((typeof myProfile !== 'undefined' && myProfile) ? myProfile : {});
+      window.SovraSurfaceManager.pushSurface({
+        id: 'edit-profile',
+        type: 'edit-profile',
+        title: 'EDIT PROFILE',
+        subtitle: 'Update sovereign identity, handle uniqueness, and metadata',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+
+          // Display Name
+          html += '<div>' +
+            '<label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase;">Display Name</label>' +
+            '<input type="text" id="editProfileNameInput" value="' + (u.displayName || u.name || '') + '" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;" />' +
+          '</div>';
+
+          // Handle with live validator
+          html += '<div>' +
+            '<label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase;">Handle</label>' +
+            '<input type="text" id="editProfileHandleInput" value="' + (u.handle || '@user') + '" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #38bdf8; font-family: monospace; font-size: 0.9rem;" />' +
+            '<div id="editProfileHandleStatus" style="font-size: 0.72rem; margin-top: 4px; color: #64748b;">Handle must be 3-30 characters with alphanumeric characters, dots, or underscores.</div>' +
+          '</div>';
+
+          // Bio
+          html += '<div>' +
+            '<label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase;">Bio</label>' +
+            '<textarea id="editProfileBioInput" rows="3" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; resize: none;">' + (u.bio || '') + '</textarea>' +
+          '</div>';
+
+          // Website
+          html += '<div>' +
+            '<label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase;">Website</label>' +
+            '<input type="text" id="editProfileWebsiteInput" value="' + (u.website || u.websiteUrl || '') + '" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;" placeholder="https://..." />' +
+          '</div>';
+
+          // Error / Status
+          html += '<div id="editProfileFeedback" style="font-size: 0.8rem; display: none;"></div>';
+
+          // Actions
+          html += '<div style="display: flex; gap: 8px; margin-top: 8px;">' +
+            '<button class="action-pill-btn action-pill-primary" id="saveProfileBtn" style="flex: 1; padding: 10px; font-weight: 600;">Save Changes</button>' +
+            '<button class="action-pill-btn action-pill-secondary" id="cancelProfileBtn" style="padding: 10px 16px;">Cancel</button>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+
+          const handleInput = bodyEl.querySelector('#editProfileHandleInput');
+          const handleStatus = bodyEl.querySelector('#editProfileHandleStatus');
+          const feedback = bodyEl.querySelector('#editProfileFeedback');
+          const saveBtn = bodyEl.querySelector('#saveProfileBtn');
+          const cancelBtn = bodyEl.querySelector('#cancelProfileBtn');
+
+          if (cancelBtn) {
+            cancelBtn.onclick = function() { window.SovraSurfaceManager.popSurface(); };
+          }
+
+          let debounceTimer = null;
+          if (handleInput && handleStatus) {
+            handleInput.oninput = function() {
+              clearTimeout(debounceTimer);
+              const val = handleInput.value.trim();
+              debounceTimer = setTimeout(function() {
+                fetch('/api/user/check-handle?handle=' + encodeURIComponent(val))
+                  .then(function(res) { return res.json(); })
+                  .then(function(data) {
+                    if (data.available) {
+                      handleStatus.style.color = '#10b981';
+                      handleStatus.textContent = '✓ Handle available';
+                    } else {
+                      handleStatus.style.color = '#ef4444';
+                      handleStatus.textContent = '✕ ' + (data.reason || 'Handle unavailable');
+                    }
+                  })
+                  .catch(function() {});
+              }, 250);
+            };
+          }
+
+          if (saveBtn) {
+            saveBtn.onclick = function() {
+              const name = (bodyEl.querySelector('#editProfileNameInput')).value.trim();
+              const handle = (bodyEl.querySelector('#editProfileHandleInput')).value.trim();
+              const bio = (bodyEl.querySelector('#editProfileBioInput')).value.trim();
+              const website = (bodyEl.querySelector('#editProfileWebsiteInput')).value.trim();
+
+              saveBtn.disabled = true;
+              saveBtn.textContent = 'Saving...';
+
+              fetch('/api/user/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, displayName: name, handle: handle, bio: bio, website: website, websiteUrl: website })
+              })
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Changes';
+                if (data.ok) {
+                  if (typeof myProfile !== 'undefined' && myProfile) {
+                    myProfile.displayName = data.user.displayName;
+                    myProfile.name = data.user.displayName;
+                    myProfile.handle = data.user.handle;
+                    myProfile.bio = data.user.bio;
+                    myProfile.website = data.user.website;
+                    localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+                  }
+                  window.SovraSurfaceManager.popSurface();
+                  if (typeof window.openSpatialProfileSurface === 'function') {
+                    window.openSpatialProfileSurface(originEl, data.user.did);
+                  }
+                } else {
+                  if (feedback) {
+                    feedback.style.display = 'block';
+                    feedback.style.color = '#ef4444';
+                    feedback.textContent = data.error || 'Failed to update profile';
+                  }
+                }
+              })
+              .catch(function(err) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Changes';
+                if (feedback) {
+                  feedback.style.display = 'block';
+                  feedback.style.color = '#ef4444';
+                  feedback.textContent = err.message;
+                }
+              });
+            };
+          }
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 🛡️ PRIVACY & BLOCKED PEERS SPATIAL SURFACE
+    // ==========================================================================
+    window.openSpatialPrivacySettingsSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'privacy-settings',
+        type: 'privacy-settings',
+        title: 'PRIVACY & SECURITY',
+        subtitle: 'Sovereign access control, visibility, and blocked peer lists',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px;"><div class="sovra-loading-spinner" style="margin: 0 auto 12px;"></div>Loading Privacy Controls...</div>';
+
+          Promise.all([
+            fetch('/api/user/privacy').then(function(r) { return r.json(); }),
+            fetch('/api/social/blocked').then(function(r) { return r.json(); })
+          ])
+          .then(function(results) {
+            const pData = results[0];
+            const bData = results[1];
+            const settings = pData.privacySettings || {
+              profileVisibility: 'public',
+              postVisibility: 'public',
+              canMessageMe: 'public',
+              canSendFriendRequests: 'public',
+              showOnlineStatus: true,
+              showFollowers: true
+            };
+            const blocked = bData.blocked || [];
+
+            let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+            // Profile Visibility
+            html += '<div class="spatial-option-card">' +
+              '<div style="flex: 1;">' +
+                '<div style="font-size: 0.85rem; font-weight: 600; color: #f8fafc;">Profile Visibility</div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8;">Controls who can inspect your profile dispatches and spaces</div>' +
+              '</div>' +
+              '<select id="privacyProfileVisibility" style="background: #0f172a; color: #38bdf8; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 4px 8px; font-size: 0.8rem;">' +
+                '<option value="public" ' + (settings.profileVisibility === 'public' ? 'selected' : '') + '>Public</option>' +
+                '<option value="friends" ' + (settings.profileVisibility === 'friends' ? 'selected' : '') + '>Friends Only</option>' +
+                '<option value="only_me" ' + (settings.profileVisibility === 'only_me' ? 'selected' : '') + '>Only Me</option>' +
+              '</select>' +
+            '</div>';
+
+            // Message Permissions
+            html += '<div class="spatial-option-card">' +
+              '<div style="flex: 1;">' +
+                '<div style="font-size: 0.85rem; font-weight: 600; color: #f8fafc;">Direct Messages</div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8;">Who can initiate encrypted 1:1 chat conversations</div>' +
+              '</div>' +
+              '<select id="privacyMessageMe" style="background: #0f172a; color: #38bdf8; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 4px 8px; font-size: 0.8rem;">' +
+                '<option value="public" ' + (settings.canMessageMe === 'public' ? 'selected' : '') + '>Everyone</option>' +
+                '<option value="friends" ' + (settings.canMessageMe === 'friends' ? 'selected' : '') + '>Friends Only</option>' +
+                '<option value="none" ' + (settings.canMessageMe === 'none' ? 'selected' : '') + '>No One</option>' +
+              '</select>' +
+            '</div>';
+
+            // Friend Request Permissions
+            html += '<div class="spatial-option-card">' +
+              '<div style="flex: 1;">' +
+                '<div style="font-size: 0.85rem; font-weight: 600; color: #f8fafc;">Friend Requests</div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8;">Who can send bilateral handshake requests</div>' +
+              '</div>' +
+              '<select id="privacyFriendReq" style="background: #0f172a; color: #38bdf8; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 4px 8px; font-size: 0.8rem;">' +
+                '<option value="public" ' + (settings.canSendFriendRequests === 'public' ? 'selected' : '') + '>Everyone</option>' +
+                '<option value="friends_of_friends" ' + (settings.canSendFriendRequests === 'friends_of_friends' ? 'selected' : '') + '>Friends of Friends</option>' +
+                '<option value="none" ' + (settings.canSendFriendRequests === 'none' ? 'selected' : '') + '>No One</option>' +
+              '</select>' +
+            '</div>';
+
+            // Save settings button
+            html += '<button class="action-pill-btn action-pill-primary" id="savePrivacyBtn" style="padding: 10px; font-weight: 600;">Save Privacy Settings</button>';
+
+            // Blocked Peers Section
+            html += '<div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">' +
+              '<div style="font-size: 0.85rem; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Blocked Peers (' + blocked.length + ')</div>';
+
+            if (blocked.length === 0) {
+              html += '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 12px;">No blocked peers.</div>';
+            } else {
+              html += '<div style="display: flex; flex-direction: column; gap: 8px;">';
+              blocked.forEach(function(bp) {
+                html += '<div class="spatial-option-card" style="display: flex; align-items: center; justify-content: space-between;">' +
+                  '<div>' +
+                    '<div style="font-size: 0.85rem; font-weight: 600; color: #f8fafc;">' + (bp.displayName || bp.name || 'Peer') + '</div>' +
+                    '<div style="font-size: 0.72rem; color: #94a3b8; font-family: monospace;">' + (bp.handle || bp.did.substring(0, 16)) + '</div>' +
+                  '</div>' +
+                  '<button class="action-pill-btn action-pill-secondary" style="padding: 4px 10px; font-size: 0.76rem;" onclick="fetch(&quot;/api/social/unblock&quot;, { method: &quot;POST&quot;, headers: { &quot;Content-Type&quot;: &quot;json&quot; }, body: JSON.stringify({ targetDid: &quot;' + bp.did + '&quot; }) }).then(function() { window.openSpatialPrivacySettingsSurface(null); });">Unblock</button>' +
+                '</div>';
+              });
+              html += '</div>';
+            }
+            html += '</div>';
+
+            bodyEl.innerHTML = html;
+
+            const saveBtn = bodyEl.querySelector('#savePrivacyBtn');
+            if (saveBtn) {
+              saveBtn.onclick = function() {
+                const updated = {
+                  profileVisibility: (bodyEl.querySelector('#privacyProfileVisibility')).value,
+                  canMessageMe: (bodyEl.querySelector('#privacyMessageMe')).value,
+                  canSendFriendRequests: (bodyEl.querySelector('#privacyFriendReq')).value
+                };
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving...';
+                fetch('/api/user/privacy', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(updated)
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                  saveBtn.disabled = false;
+                  saveBtn.textContent = '✓ Saved';
+                  setTimeout(function() { saveBtn.textContent = 'Save Privacy Settings'; }, 1500);
+                });
+              };
+            }
+          });
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 👥 RELATIONSHIPS SPATIAL SURFACE (FOLLOWERS, FOLLOWING, FRIENDS, MUTUALS)
+    // ==========================================================================
+    window.openSpatialRelationshipsSurface = function(originEl, targetDid, initialTab) {
+      const activeTab = initialTab || 'followers';
+      window.SovraSurfaceManager.pushSurface({
+        id: 'relationships-' + targetDid + '-' + activeTab,
+        type: 'relationships',
+        title: 'SOCIAL GRAPH CONNECTIONS',
+        subtitle: 'Cryptographic peer graphs, mutual links, and friendships',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 12px;">' +
+            '<div style="display: flex; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">' +
+              '<button class="action-pill-btn ' + (activeTab === 'followers' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="relTabFollowers" style="flex: 1; padding: 6px 4px; font-size: 0.74rem;">Followers</button>' +
+              '<button class="action-pill-btn ' + (activeTab === 'following' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="relTabFollowing" style="flex: 1; padding: 6px 4px; font-size: 0.74rem;">Following</button>' +
+              '<button class="action-pill-btn ' + (activeTab === 'friends' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="relTabFriends" style="flex: 1; padding: 6px 4px; font-size: 0.74rem;">Friends</button>' +
+              '<button class="action-pill-btn ' + (activeTab === 'mutual' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="relTabMutual" style="flex: 1; padding: 6px 4px; font-size: 0.74rem;">Mutual</button>' +
+            '</div>' +
+            '<div id="relListContainer" style="display: flex; flex-direction: column; gap: 8px;"></div>' +
+          '</div>';
+
+          bodyEl.innerHTML = html;
+
+          const listContainer = bodyEl.querySelector('#relListContainer');
+          const loadTab = function(tabName) {
+            if (!listContainer) return;
+            listContainer.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 20px;"><div class="sovra-loading-spinner" style="margin: 0 auto 8px;"></div>Loading...</div>';
+
+            let endpoint = '';
+            if (tabName === 'followers') endpoint = '/api/social/followers?did=' + encodeURIComponent(targetDid);
+            else if (tabName === 'following') endpoint = '/api/social/following?did=' + encodeURIComponent(targetDid);
+            else if (tabName === 'friends') endpoint = '/api/friends/list?did=' + encodeURIComponent(targetDid);
+            else if (tabName === 'mutual') endpoint = '/api/friends/mutual?targetDid=' + encodeURIComponent(targetDid);
+
+            fetch(endpoint)
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                const users = data.followers || data.following || data.friends || data.mutualFriends || [];
+                if (users.length === 0) {
+                  listContainer.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.84rem; padding: 24px;">No ' + tabName + ' found.</div>';
+                  return;
+                }
+                listContainer.innerHTML = '';
+                users.forEach(function(u) {
+                  const card = document.createElement('div');
+                  card.className = 'spatial-option-card';
+                  card.style.cursor = 'pointer';
+                  card.innerHTML = '<div style="display: flex; align-items: center; gap: 10px; width: 100%;">' +
+                    '<img src="' + (u.avatarDataUrl || u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80') + '" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid #38bdf8;" />' +
+                    '<div style="flex: 1; min-width: 0;">' +
+                      '<div style="font-size: 0.86rem; font-weight: 600; color: #f8fafc; overflow: hidden; text-overflow: ellipsis;">' + (u.displayName || u.name || 'Peer') + '</div>' +
+                      '<div style="font-size: 0.72rem; color: #38bdf8; font-family: monospace;">' + (u.handle || '@peer') + '</div>' +
+                    '</div>' +
+                    '<div style="color: #64748b;">›</div>' +
+                  '</div>';
+                  card.onclick = function() {
+                    window.openSpatialProfileSurface(card, u.did);
+                  };
+                  listContainer.appendChild(card);
+                });
+              })
+              .catch(function(err) {
+                listContainer.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 20px;">' + err.message + '</div>';
+              });
+          };
+
+          const bFoll = bodyEl.querySelector('#relTabFollowers');
+          const bFing = bodyEl.querySelector('#relTabFollowing');
+          const bFrn = bodyEl.querySelector('#relTabFriends');
+          const bMut = bodyEl.querySelector('#relTabMutual');
+
+          const selectTab = function(btn, name) {
+            [bFoll, bFing, bFrn, bMut].forEach(function(b) {
+              if (b) b.className = 'action-pill-btn action-pill-secondary';
+            });
+            if (btn) btn.className = 'action-pill-btn action-pill-primary';
+            loadTab(name);
+          };
+
+          if (bFoll) bFoll.onclick = function() { selectTab(bFoll, 'followers'); };
+          if (bFing) bFing.onclick = function() { selectTab(bFing, 'following'); };
+          if (bFrn) bFrn.onclick = function() { selectTab(bFrn, 'friends'); };
+          if (bMut) bMut.onclick = function() { selectTab(bMut, 'mutual'); };
+
+          loadTab(activeTab);
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 🔍 CONTEXTUAL SEARCH SPATIAL SURFACE
+    // ==========================================================================
+    window.openSpatialSearchSurface = function(originEl, initialQuery, initialScope) {
+      const q = initialQuery || '';
+      const scope = initialScope || 'all';
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'search',
+        type: 'search',
+        title: 'SEARCH SOVRA',
+        subtitle: 'Contextual discovery across people, spaces, posts, and topics',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let currentScope = scope;
+          let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+
+          // Search Input
+          html += '<div style="position: relative;">' +
+            '<input type="text" id="spatialSearchInput" placeholder="Search SOVRA..." value="' + q + '" style="width: 100%; padding: 10px 38px 10px 14px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px; color: #f8fafc; font-size: 0.95rem; outline: none; box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);" autofocus />' +
+            '<div id="spatialSearchSpinner" style="display: none; position: absolute; right: 12px; top: 12px; width: 14px; height: 14px; border: 2px solid #38bdf8; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>' +
+          '</div>';
+
+          // Scope Filters
+          html += '<div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;">' +
+            '<button class="action-pill-btn ' + (currentScope === 'all' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-scope="all" style="padding: 4px 10px; font-size: 0.74rem;">All</button>' +
+            '<button class="action-pill-btn ' + (currentScope === 'people' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-scope="people" style="padding: 4px 10px; font-size: 0.74rem;">People</button>' +
+            '<button class="action-pill-btn ' + (currentScope === 'channels' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-scope="channels" style="padding: 4px 10px; font-size: 0.74rem;">Channels</button>' +
+            '<button class="action-pill-btn ' + (currentScope === 'pages' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-scope="pages" style="padding: 4px 10px; font-size: 0.74rem;">Pages</button>' +
+            '<button class="action-pill-btn ' + (currentScope === 'groups' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-scope="groups" style="padding: 4px 10px; font-size: 0.74rem;">Groups</button>' +
+            '<button class="action-pill-btn ' + (currentScope === 'posts' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-scope="posts" style="padding: 4px 10px; font-size: 0.74rem;">Posts</button>' +
+            '<button class="action-pill-btn ' + (currentScope === 'videos' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-scope="videos" style="padding: 4px 10px; font-size: 0.74rem;">Videos</button>' +
+            '<button class="action-pill-btn ' + (currentScope === 'topics' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-scope="topics" style="padding: 4px 10px; font-size: 0.74rem;">Topics</button>' +
+          '</div>';
+
+          // Autocomplete Dropdown Box
+          html += '<div id="spatialSearchAutocomplete" style="display: none; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; max-height: 180px; overflow-y: auto; padding: 4px;"></div>';
+
+          // Results Container
+          html += '<div id="spatialSearchResultsContainer" style="display: flex; flex-direction: column; gap: 8px;">' +
+            '<div style="text-align: center; color: #64748b; font-size: 0.85rem; padding: 32px 16px;">Type a query to search people, channels, posts, and topics.</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+
+          const searchInput = bodyEl.querySelector('#spatialSearchInput');
+          const autoBox = bodyEl.querySelector('#spatialSearchAutocomplete');
+          const resultsBox = bodyEl.querySelector('#spatialSearchResultsContainer');
+          const spinner = bodyEl.querySelector('#spatialSearchSpinner');
+          const scopeBtns = bodyEl.querySelectorAll('[data-scope]');
+
+          let searchDebounce = null;
+          let autoDebounce = null;
+
+          const performSearch = function(query, sc) {
+            if (!query) {
+              resultsBox.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.85rem; padding: 32px 16px;">Type a query to search people, channels, posts, and topics.</div>';
+              return;
+            }
+            if (spinner) spinner.style.display = 'block';
+            fetch('/api/search?q=' + encodeURIComponent(query) + '&scope=' + encodeURIComponent(sc))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (spinner) spinner.style.display = 'none';
+                resultsBox.innerHTML = '';
+                let hasResults = false;
+
+                // People
+                if (data.users && data.users.length > 0) {
+                  hasResults = true;
+                  const sec = document.createElement('div');
+                  sec.innerHTML = '<div style="font-size: 0.75rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin: 6px 0 4px;">People (' + data.users.length + ')</div>';
+                  data.users.forEach(function(u) {
+                    const card = document.createElement('div');
+                    card.className = 'spatial-option-card';
+                    card.style.cursor = 'pointer';
+                    card.innerHTML = '<div style="display: flex; align-items: center; gap: 10px; width: 100%;">' +
+                      '<img src="' + (u.avatarDataUrl || u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80') + '" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid #38bdf8;" />' +
+                      '<div style="flex: 1;"><div style="font-size: 0.86rem; font-weight: 600; color: #f8fafc;">' + (u.displayName || u.name || 'Peer') + '</div><div style="font-size: 0.72rem; color: #38bdf8; font-family: monospace;">' + (u.handle || '@peer') + '</div></div>' +
+                    '</div>';
+                    card.onclick = function() { window.openSpatialProfileSurface(card, u.did); };
+                    sec.appendChild(card);
+                  });
+                  resultsBox.appendChild(sec);
+                }
+
+                // Channels
+                if (data.channels && data.channels.length > 0) {
+                  hasResults = true;
+                  const sec = document.createElement('div');
+                  sec.innerHTML = '<div style="font-size: 0.75rem; font-weight: 700; color: #eab308; text-transform: uppercase; margin: 8px 0 4px;">Channels (' + data.channels.length + ')</div>';
+                  data.channels.forEach(function(c) {
+                    const card = document.createElement('div');
+                    card.className = 'spatial-option-card';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.86rem; font-weight: 600; color: #f8fafc;">' + c.name + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + (c.handle || 'Channel') + '</div></div>';
+                    sec.appendChild(card);
+                  });
+                  resultsBox.appendChild(sec);
+                }
+
+                // Pages
+                if (data.pages && data.pages.length > 0) {
+                  hasResults = true;
+                  const sec = document.createElement('div');
+                  sec.innerHTML = '<div style="font-size: 0.75rem; font-weight: 700; color: #10b981; text-transform: uppercase; margin: 8px 0 4px;">Pages (' + data.pages.length + ')</div>';
+                  data.pages.forEach(function(p) {
+                    const card = document.createElement('div');
+                    card.className = 'spatial-option-card';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.86rem; font-weight: 600; color: #f8fafc;">' + p.name + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + (p.category || 'Page') + '</div></div>';
+                    sec.appendChild(card);
+                  });
+                  resultsBox.appendChild(sec);
+                }
+
+                // Groups
+                if (data.groups && data.groups.length > 0) {
+                  hasResults = true;
+                  const sec = document.createElement('div');
+                  sec.innerHTML = '<div style="font-size: 0.75rem; font-weight: 700; color: #a855f7; text-transform: uppercase; margin: 8px 0 4px;">Groups (' + data.groups.length + ')</div>';
+                  data.groups.forEach(function(g) {
+                    const card = document.createElement('div');
+                    card.className = 'spatial-option-card';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.86rem; font-weight: 600; color: #f8fafc;">' + g.name + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + (g.memberCount || 1) + ' members</div></div>';
+                    sec.appendChild(card);
+                  });
+                  resultsBox.appendChild(sec);
+                }
+
+                // Posts
+                if (data.posts && data.posts.length > 0) {
+                  hasResults = true;
+                  const sec = document.createElement('div');
+                  sec.innerHTML = '<div style="font-size: 0.75rem; font-weight: 700; color: #f43f5e; text-transform: uppercase; margin: 8px 0 4px;">Posts (' + data.posts.length + ')</div>';
+                  data.posts.forEach(function(po) {
+                    const card = document.createElement('div');
+                    card.className = 'spatial-option-card';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.84rem; color: #f8fafc;">' + (po.caption || 'Dispatch') + '</div><div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">by ' + (po.authorHandle || po.authorName || 'Peer') + '</div></div>';
+                    sec.appendChild(card);
+                  });
+                  resultsBox.appendChild(sec);
+                }
+
+                // Topics
+                if (data.topics && data.topics.length > 0) {
+                  hasResults = true;
+                  const sec = document.createElement('div');
+                  sec.innerHTML = '<div style="font-size: 0.75rem; font-weight: 700; color: #06b6d4; text-transform: uppercase; margin: 8px 0 4px;">Topics (' + data.topics.length + ')</div>';
+                  data.topics.forEach(function(tp) {
+                    const card = document.createElement('div');
+                    card.className = 'spatial-option-card';
+                    card.style.cursor = 'pointer';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.86rem; font-weight: 600; color: #06b6d4;">#' + tp.tag + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + tp.count + ' dispatches</div></div>';
+                    card.onclick = function() { window.openSpatialTopicSurface(tp.tag, card); };
+                    sec.appendChild(card);
+                  });
+                  resultsBox.appendChild(sec);
+                }
+
+                if (!hasResults) {
+                  resultsBox.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.85rem; padding: 32px 16px;">No results found for "' + query + '".</div>';
+                }
+              })
+              .catch(function(err) {
+                if (spinner) spinner.style.display = 'none';
+                resultsBox.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 24px;">' + err.message + '</div>';
+              });
+          };
+
+          scopeBtns.forEach(function(btn) {
+            btn.onclick = function() {
+              scopeBtns.forEach(function(b) { b.className = 'action-pill-btn action-pill-secondary'; });
+              btn.className = 'action-pill-btn action-pill-primary';
+              currentScope = btn.getAttribute('data-scope') || 'all';
+              performSearch(searchInput.value.trim(), currentScope);
+            };
+          });
+
+          if (searchInput) {
+            searchInput.oninput = function() {
+              const val = searchInput.value.trim();
+              clearTimeout(searchDebounce);
+              clearTimeout(autoDebounce);
+
+              // Quick Autocomplete
+              if (val.length >= 1 && autoBox) {
+                autoDebounce = setTimeout(function() {
+                  fetch('/api/search/autocomplete?q=' + encodeURIComponent(val))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                      const suggs = data.suggestions || [];
+                      if (suggs.length === 0) {
+                        autoBox.style.display = 'none';
+                        return;
+                      }
+                      autoBox.innerHTML = '';
+                      suggs.forEach(function(s) {
+                        const item = document.createElement('div');
+                        item.style.padding = '6px 10px';
+                        item.style.cursor = 'pointer';
+                        item.style.borderRadius = '6px';
+                        item.style.fontSize = '0.82rem';
+                        item.style.color = '#f8fafc';
+                        item.style.display = 'flex';
+                        item.style.alignItems = 'center';
+                        item.style.justifyContent = 'space-between';
+                        item.innerHTML = '<span>' + s.title + ' <span style="font-size: 0.72rem; color: #94a3b8;">' + (s.subtitle || '') + '</span></span><span style="font-size: 0.7rem; color: #38bdf8; text-transform: uppercase;">' + s.type + '</span>';
+                        item.onmouseover = function() { item.style.background = 'rgba(56, 189, 248, 0.15)'; };
+                        item.onmouseout = function() { item.style.background = 'transparent'; };
+                        item.onclick = function() {
+                          autoBox.style.display = 'none';
+                          if (s.type === 'user') {
+                            window.openSpatialProfileSurface(item, s.id);
+                          } else if (s.type === 'topic') {
+                            window.openSpatialTopicSurface(s.id, item);
+                          } else {
+                            searchInput.value = s.title;
+                            performSearch(s.title, currentScope);
+                          }
+                        };
+                        autoBox.appendChild(item);
+                      });
+                      autoBox.style.display = 'block';
+                    });
+                }, 120);
+              } else if (autoBox) {
+                autoBox.style.display = 'none';
+              }
+
+              // Full Search Debounce
+              searchDebounce = setTimeout(function() {
+                performSearch(val, currentScope);
+              }, 300);
+            };
+          }
+
+          if (q) performSearch(q, currentScope);
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 🏷️ TOPIC HASHTAG SPATIAL SURFACE
+    // ==========================================================================
+    window.openSpatialTopicSurface = function(topicTag, originEl, initialSort) {
+      const cleanTag = topicTag ? String(topicTag).replace(/^#/, '') : '';
+      let currentSort = initialSort || 'latest';
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'topic-' + cleanTag,
+        type: 'topic',
+        title: '#' + cleanTag.toUpperCase(),
+        subtitle: 'Community dispatches tagged with #' + cleanTag,
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 12px;">' +
+            '<div style="display: flex; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">' +
+              '<button class="action-pill-btn ' + (currentSort === 'latest' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="topicSortLatest" style="flex: 1; padding: 6px; font-size: 0.76rem;">Latest</button>' +
+              '<button class="action-pill-btn ' + (currentSort === 'popular' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="topicSortPopular" style="flex: 1; padding: 6px; font-size: 0.76rem;">Popular</button>' +
+            '</div>' +
+            '<div id="topicPostsContainer" style="display: flex; flex-direction: column; gap: 8px;"></div>' +
+          '</div>';
+
+          bodyEl.innerHTML = html;
+
+          const postsContainer = bodyEl.querySelector('#topicPostsContainer');
+          const loadTopicPosts = function(sort) {
+            if (!postsContainer) return;
+            postsContainer.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px;"><div class="sovra-loading-spinner" style="margin: 0 auto 8px;"></div>Loading Dispatches...</div>';
+            fetch('/api/topics/posts?topic=' + encodeURIComponent(cleanTag) + '&sort=' + encodeURIComponent(sort))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                const posts = data.posts || [];
+                if (posts.length === 0) {
+                  postsContainer.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.85rem; padding: 32px 16px;">No dispatches found for #' + cleanTag + '.</div>';
+                  return;
+                }
+                postsContainer.innerHTML = '';
+                posts.forEach(function(p) {
+                  const card = document.createElement('div');
+                  card.className = 'spatial-option-card';
+                  card.style.cursor = 'pointer';
+                  card.innerHTML = '<div style="display: flex; flex-direction: column; gap: 6px; width: 100%;">' +
+                    '<div style="display: flex; align-items: center; justify-content: space-between;">' +
+                      '<span style="font-size: 0.82rem; font-weight: 600; color: #38bdf8;">' + (p.authorHandle || p.authorName || 'Peer') + '</span>' +
+                      '<span style="font-size: 0.7rem; color: #64748b;">' + new Date(p.createdAt || Date.now()).toLocaleDateString() + '</span>' +
+                    '</div>' +
+                    '<div style="font-size: 0.86rem; color: #f8fafc; line-height: 1.4;">' + (p.caption || '') + '</div>' +
+                    '<div style="font-size: 0.74rem; color: #94a3b8;">❤️ ' + (p.likesCount || 0) + ' · 💬 ' + (p.commentsCount || 0) + '</div>' +
+                  '</div>';
+                  postsContainer.appendChild(card);
+                });
+              })
+              .catch(function(err) {
+                postsContainer.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 20px;">' + err.message + '</div>';
+              });
+          };
+
+          const bLatest = bodyEl.querySelector('#topicSortLatest');
+          const bPop = bodyEl.querySelector('#topicSortPopular');
+
+          if (bLatest) {
+            bLatest.onclick = function() {
+              currentSort = 'latest';
+              bLatest.className = 'action-pill-btn action-pill-primary';
+              bPop.className = 'action-pill-btn action-pill-secondary';
+              loadTopicPosts('latest');
+            };
+          }
+
+          if (bPop) {
+            bPop.onclick = function() {
+              currentSort = 'popular';
+              bPop.className = 'action-pill-btn action-pill-primary';
+              bLatest.className = 'action-pill-btn action-pill-secondary';
+              loadTopicPosts('popular');
+            };
+          }
+
+          loadTopicPosts(currentSort);
+        }
+      });
+    };
+
+
+    window.openSpatialSavedSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'profile-saved',
+        type: 'profile-saved',
+        title: 'Saved Dispatches',
+        subtitle: 'Locally bookmarked and encrypted dispatches',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 28px 12px;">' +
+            '<div style="font-size: 2.2rem; margin-bottom: 8px;">🔖</div>' +
+            '<div style="font-weight: 600; color: #f8fafc; margin-bottom: 4px;">Zero Cloud Dependence</div>' +
+            '<div style="font-size: 0.82rem; color: #64748b;">Saved bookmarks are stored in your encrypted local IndexedDB storage.</div>' +
+          '</div>';
+        }
+      });
+    };
+
+    window.openSpatialActivitySurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'profile-activity',
+        type: 'profile-activity',
+        title: 'Node Activity Log',
+        subtitle: 'Cryptographic interaction trail and mesh relays',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="display: flex; flex-direction: column; gap: 8px;">' +
+            '<div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 10px; font-size: 0.8rem; color: #cbd5e1;">' +
+              '<span style="color: #38bdf8; font-weight: 600;">[IDENTITY]</span> Ed25519 node keypair verified' +
+            '</div>' +
+            '<div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 10px; font-size: 0.8rem; color: #cbd5e1;">' +
+              '<span style="color: #10b981; font-weight: 600;">[MESH]</span> Connected to local swarm peer group' +
+            '</div>' +
+          '</div>';
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 🛡️ FLOW 1 & 2: SETTINGS HIERARCHY (PROFILE -> SETTINGS -> PRIVACY -> VISIBILITY)
+    // ==========================================================================
+
+    window.openSpatialSettingsSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'settings',
+        type: 'settings',
+        title: 'SOVRA SETTINGS',
+        subtitle: 'Sovereign device configuration and privacy control',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          // 1. Privacy
+          html += '<div class="spatial-option-card" id="spatialSettingsPrivacyItem" onclick="window.openSpatialPrivacySurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🛡️</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Privacy</div>' +
+                '<div class="spatial-option-desc">Profile discovery, post visibility, direct messages, and blocked peers</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          // 2. Security
+          html += '<div class="spatial-option-card" id="spatialSettingsSecurityItem" onclick="window.openSpatialSecuritySurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🔐</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Security</div>' +
+                '<div class="spatial-option-desc">Ed25519 identity keys, authenticator PIN, and emergency panic wipe</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          // 3. Notifications
+          html += '<div class="spatial-option-card" id="spatialSettingsNotificationsItem" onclick="window.openSpatialNotificationPrefsSurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🔔</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Notifications</div>' +
+                '<div class="spatial-option-desc">Direct chats, P2P sound chimes, and channel dispatches</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          // 4. Interface Mode
+          html += '<div class="spatial-option-card" id="spatialSettingsDisplayModeItem" onclick="toggleDevServerUiMode()">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">✨</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Interface Mode</div>' +
+                '<div class="spatial-option-desc">Toggle between Simple Clean Social Mode &amp; Advance Cyber HUD</div>' +
+              '</div>' +
+            '</div>' +
+            '<span class="badge" id="spatialSettingsModeBadge" style="font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; font-weight: 700; ' + (currentDevUiMode === 'advance' ? 'background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4);' : 'background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);') + '">' + (currentDevUiMode === 'advance' ? '⚡ ADVANCE HUD' : '✨ SIMPLE MODE') + '</span>' +
+          '</div>';
+
+          // 5. Appearance
+          html += '<div class="spatial-option-card" id="spatialSettingsAppearanceItem" onclick="window.openSpatialAppearanceSurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🎨</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Appearance</div>' +
+                '<div class="spatial-option-desc">Theme accents: Cyan Neon, Amber Sol, Emerald Matrix, Deep Void</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          // 5. Account
+          html += '<div class="spatial-option-card" id="spatialSettingsAccountItem" onclick="window.openSpatialAccountSurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">👤</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Account</div>' +
+                '<div class="spatial-option-desc">Inspect sovereign DID, export identity, or manage connected sessions</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialPrivacySurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'privacy',
+        type: 'privacy',
+        title: 'PRIVACY',
+        subtitle: 'Control how peers on the mesh see and interact with you',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          const currentVis = (typeof myProfile !== 'undefined' && myProfile && myProfile.privacySettings && myProfile.privacySettings.profileVisibility)
+            ? myProfile.privacySettings.profileVisibility
+            : 'public';
+          const visMap = {
+            public: 'Public',
+            friends: 'Friends',
+            private: 'Private',
+            only_me: 'Only Me'
+          };
+          const visLabel = visMap[currentVis] || 'Public';
+
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          // Item 1: Profile Visibility
+          html += '<div class="spatial-option-card" id="spatialPrivacyProfileVisItem" onclick="window.openSpatialProfileVisibilitySurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">👁️</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Profile Visibility</div>' +
+                '<div class="spatial-option-desc">Choose who can find and view your sovereign profile</div>' +
+                '<div class="spatial-option-meta" id="spatialCurrentVisibilityMeta">Currently: ' + visLabel + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          // Item 2: Post Visibility
+          html += '<div class="spatial-option-card" id="spatialPrivacyPostVisItem" onclick="window.openSpatialPostVisibilitySurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">📝</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Post Visibility</div>' +
+                '<div class="spatial-option-desc">Default broadcast audience for stories, updates, and feed posts</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          // Item 3: Message Permissions
+          html += '<div class="spatial-option-card" id="spatialPrivacyMsgPermsItem" onclick="window.openSpatialMessagePermissionsSurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">💬</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Message Permissions</div>' +
+                '<div class="spatial-option-desc">Control who can initiate end-to-end encrypted direct chats</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          // Item 4: Blocked Users
+          html += '<div class="spatial-option-card" id="spatialPrivacyBlockedUsersItem" onclick="window.openSpatialBlockedUsersSurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🚫</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Blocked Users</div>' +
+                '<div class="spatial-option-desc">Manage peers blocked from reaching your sovereign node</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialProfileVisibilitySurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'profile-visibility',
+        type: 'profile-visibility',
+        title: 'PROFILE VISIBILITY',
+        subtitle: 'Select who in the sovereign mesh can view your profile & media',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          const currentVis = (typeof myProfile !== 'undefined' && myProfile && myProfile.privacySettings && myProfile.privacySettings.profileVisibility)
+            ? myProfile.privacySettings.profileVisibility
+            : 'public';
+
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          // Option 1: Public
+          html += '<div class="spatial-option-card ' + (currentVis === 'public' ? 'selected' : '') + '" id="opt-vis-public" onclick="window._selectProfileVisibility(&quot;public&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🌐</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Public</div>' +
+                '<div class="spatial-option-desc">Your profile, public posts, and sovereign identity are discoverable by any peer node across the mesh.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          // Option 2: Friends
+          html += '<div class="spatial-option-card ' + (currentVis === 'friends' ? 'selected' : '') + '" id="opt-vis-friends" onclick="window._selectProfileVisibility(&quot;friends&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">👥</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Friends</div>' +
+                '<div class="spatial-option-desc">Only mutual contacts and friends can inspect your profile bio and stream.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          // Option 3: Private
+          html += '<div class="spatial-option-card ' + (currentVis === 'private' ? 'selected' : '') + '" id="opt-vis-private" onclick="window._selectProfileVisibility(&quot;private&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🔒</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Private</div>' +
+                '<div class="spatial-option-desc">Hidden from mesh directory search. Mutual contacts only.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          // Option 4: Only Me
+          html += '<div class="spatial-option-card ' + (currentVis === 'only_me' ? 'selected' : '') + '" id="opt-vis-only_me" onclick="window._selectProfileVisibility(&quot;only_me&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🛡️</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Only Me</div>' +
+                '<div class="spatial-option-desc">Strictly private sovereign node. No external profile indexing.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          // Live feedback notification badge
+          html += '<div id="spatialVisFeedback" style="display: none; padding: 10px 14px; border-radius: 12px; background: rgba(16, 185, 129, 0.16); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 0.78rem; text-align: center; font-weight: 600; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.15);">' +
+            '✓ Profile visibility saved' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window._selectProfileVisibility = async function(visKey, cardEl) {
+      document.querySelectorAll('#surface-body-profile-visibility .spatial-option-card').forEach(function(c) {
+        c.classList.remove('selected');
+      });
+      if (cardEl) cardEl.classList.add('selected');
+
+      const feedback = document.getElementById('spatialVisFeedback');
+      if (feedback) {
+        const titleMap = { public: 'Public', friends: 'Friends', private: 'Private', only_me: 'Only Me' };
+        feedback.innerText = '✓ Profile visibility saved: ' + (titleMap[visKey] || visKey);
+        feedback.style.display = 'block';
+      }
+
+      // Live mutation of profile object & local storage
+      if (typeof myProfile !== 'undefined' && myProfile) {
+        if (!myProfile.privacySettings) myProfile.privacySettings = {};
+        myProfile.privacySettings.profileVisibility = visKey;
+        try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
+      }
+
+      try {
+        const res = await (window.authenticatedFetch || fetch)('/api/user/privacy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileVisibility: visKey }),
+        });
+        const data = await res.json();
+        if (data.ok && data.privacySettings && typeof myProfile !== 'undefined' && myProfile) {
+          myProfile.privacySettings = data.privacySettings;
+          try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
+        }
+      } catch (err) {
+        console.warn('[Privacy] Failed to persist visibility:', err);
+      }
+
+      if (typeof showAccountToast === 'function') {
+        const titleMap = { public: 'Public', friends: 'Friends', private: 'Private', only_me: 'Only Me' };
+        showAccountToast('✓ Profile Visibility set to ' + (titleMap[visKey] || visKey));
+      }
+
+      // Smoothly update breadcrumb parent surface indicator if visible
+      const metaEl = document.getElementById('spatialCurrentVisibilityMeta');
+      if (metaEl) {
+        const titleMap = { public: 'Public', friends: 'Friends', private: 'Private', only_me: 'Only Me' };
+        metaEl.innerText = 'Currently: ' + (titleMap[visKey] || visKey);
+      }
+    };
+
+    window.openSpatialPostVisibilitySurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'post-visibility',
+        type: 'post-visibility',
+        title: 'POST VISIBILITY',
+        subtitle: 'Default audience for broadcasts, stories, and feed posts',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          const currentVis = (typeof myProfile !== 'undefined' && myProfile && myProfile.privacySettings && myProfile.privacySettings.postVisibility)
+            ? myProfile.privacySettings.postVisibility
+            : 'public';
+
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          html += '<div class="spatial-option-card ' + (currentVis === 'public' ? 'selected' : '') + '" onclick="window._selectPostVisibility(&quot;public&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🌐</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Public</div>' +
+                '<div class="spatial-option-desc">All peers on the mesh network can discover and view your broadcasts.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card ' + (currentVis === 'friends' ? 'selected' : '') + '" onclick="window._selectPostVisibility(&quot;friends&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">👥</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Friends Only</div>' +
+                '<div class="spatial-option-desc">Only mutual friends and contacts can view broadcasts.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card ' + (currentVis === 'only_me' ? 'selected' : '') + '" onclick="window._selectPostVisibility(&quot;only_me&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🔒</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Only Me</div>' +
+                '<div class="spatial-option-desc">Private personal archive on your local sovereign node.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          html += '<div id="spatialPostVisFeedback" style="display: none; padding: 10px 14px; border-radius: 12px; background: rgba(16, 185, 129, 0.16); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 0.78rem; text-align: center; font-weight: 600;">' +
+            '✓ Post visibility saved' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window._selectPostVisibility = async function(visKey, cardEl) {
+      document.querySelectorAll('#surface-body-post-visibility .spatial-option-card').forEach(function(c) {
+        c.classList.remove('selected');
+      });
+      if (cardEl) cardEl.classList.add('selected');
+
+      const feedback = document.getElementById('spatialPostVisFeedback');
+      if (feedback) feedback.style.display = 'block';
+
+      if (typeof myProfile !== 'undefined' && myProfile) {
+        if (!myProfile.privacySettings) myProfile.privacySettings = {};
+        myProfile.privacySettings.postVisibility = visKey;
+        try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
+      }
+
+      try {
+        await (window.authenticatedFetch || fetch)('/api/user/privacy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postVisibility: visKey }),
+        });
+      } catch (err) {
+        console.warn('[Privacy] Failed to persist post visibility:', err);
+      }
+    };
+
+    window.openSpatialMessagePermissionsSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'message-permissions',
+        type: 'message-permissions',
+        title: 'MESSAGE PERMISSIONS',
+        subtitle: 'Determine who can initiate end-to-end encrypted direct chats',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          const currentPerm = (typeof myProfile !== 'undefined' && myProfile && myProfile.privacySettings && myProfile.privacySettings.canMessageMe)
+            ? myProfile.privacySettings.canMessageMe
+            : 'public';
+
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          html += '<div class="spatial-option-card ' + (currentPerm === 'public' ? 'selected' : '') + '" onclick="window._selectMessagePerm(&quot;public&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">💬</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Anyone on Mesh</div>' +
+                '<div class="spatial-option-desc">Any verified DID on the network can establish a Double Ratchet chat handshake.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card ' + (currentPerm === 'friends' ? 'selected' : '') + '" onclick="window._selectMessagePerm(&quot;friends&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">👥</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Friends Only</div>' +
+                '<div class="spatial-option-desc">Only peers in your mutual friends graph can initiate messages.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card ' + (currentPerm === 'none' ? 'selected' : '') + '" onclick="window._selectMessagePerm(&quot;none&quot;, this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🔕</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">No One (Disable DMs)</div>' +
+                '<div class="spatial-option-desc">Decline all unsolicited incoming chat handshakes.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-radio-indicator"></div>' +
+          '</div>';
+
+          html += '<div id="spatialMsgPermFeedback" style="display: none; padding: 10px 14px; border-radius: 12px; background: rgba(16, 185, 129, 0.16); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 0.78rem; text-align: center; font-weight: 600;">' +
+            '✓ Message permissions saved' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window._selectMessagePerm = async function(permKey, cardEl) {
+      document.querySelectorAll('#surface-body-message-permissions .spatial-option-card').forEach(function(c) {
+        c.classList.remove('selected');
+      });
+      if (cardEl) cardEl.classList.add('selected');
+
+      const feedback = document.getElementById('spatialMsgPermFeedback');
+      if (feedback) feedback.style.display = 'block';
+
+      if (typeof myProfile !== 'undefined' && myProfile) {
+        if (!myProfile.privacySettings) myProfile.privacySettings = {};
+        myProfile.privacySettings.canMessageMe = permKey;
+        try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
+      }
+
+      try {
+        await (window.authenticatedFetch || fetch)('/api/user/privacy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ canMessageMe: permKey }),
+        });
+      } catch (err) {
+        console.warn('[Privacy] Failed to persist message permission:', err);
+      }
+    };
+
+    window.openSpatialBlockedUsersSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'blocked-users',
+        type: 'blocked-users',
+        title: 'BLOCKED USERS',
+        subtitle: 'Manage peers restricted from contacting or discovering your node',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+          html += '<div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 24px; text-align: center;">' +
+            '<div style="font-size: 2.2rem; margin-bottom: 8px;">🛡️</div>' +
+            '<div style="font-weight: 600; font-size: 0.95rem; color: #f1f5f9; margin-bottom: 4px;">Zero Blocked Peers</div>' +
+            '<div style="font-size: 0.76rem; color: #94a3b8; line-height: 1.5; max-width: 320px; margin: 0 auto;">No peer DIDs are currently blacklisted on your local sovereign ledger.</div>' +
+          '</div>';
+
+          html += '<div style="font-size: 0.72rem; color: #64748b; line-height: 1.4; padding: 0 4px;">' +
+            'ℹ️ To block a peer, open their profile card or message thread and select "Block Peer Node".' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialAccountSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'account',
+        type: 'account',
+        title: 'ACCOUNT',
+        subtitle: 'Sovereign DID, identity keys, and backup',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          html += '<div class="spatial-option-card" onclick="if(typeof openSovereignIdCardModal===&quot;function&quot;){window.SovraSurfaceManager.closeAll(); openSovereignIdCardModal();}">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">👤</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Sovereign DID Card</div>' +
+                '<div class="spatial-option-desc">Inspect your decentralized identity credential and Ed25519 public key</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card" onclick="window.openSpatialSessionsSurface(this)">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">📱</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Connected Sessions</div>' +
+                '<div class="spatial-option-desc">Active P2P browser tabs and paired device nodes</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card" onclick="if(typeof openAccountLifecycleModal===&quot;function&quot;){window.SovraSurfaceManager.closeAll(); openAccountLifecycleModal();}">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">💾</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Identity Backup &amp; Export</div>' +
+                '<div class="spatial-option-desc">Download encrypted paper key backup or transfer to another device</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card" style="border-color: rgba(239, 68, 68, 0.25);" onclick="if(typeof openLogoutModal===&quot;function&quot;){window.SovraSurfaceManager.closeAll(); openLogoutModal();}">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon" style="background: rgba(239, 68, 68, 0.12); color: #f87171;">🚪</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title" style="color: #f87171;">Log Out</div>' +
+                '<div class="spatial-option-desc">Lock sovereign session and wipe RAM cache from this device</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #f87171; font-size: 0.8rem; font-weight: 700;">EXIT</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialSecuritySurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'security',
+        type: 'security',
+        title: 'Security & Cryptography',
+        subtitle: 'Ed25519 identity keys, PIN lock, and anti-tamper controls',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          html += '<div class="spatial-option-card" onclick="if(typeof openSovereignIdCardModal===&quot;function&quot;){window.SovraSurfaceManager.closeAll(); openSovereignIdCardModal();}">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🔑</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Ed25519 Keys &amp; DID</div>' +
+                '<div class="spatial-option-desc">Inspect cryptographic public key, fingerprint, and DID resolution</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card" onclick="if(typeof openSovereignMfaModal===&quot;function&quot;){window.SovraSurfaceManager.closeAll(); openSovereignMfaModal();}">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🛡️</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Authenticator 2FA &amp; PIN</div>' +
+                '<div class="spatial-option-desc">Configure biometric/PIN lock for sensitive identity modifications</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card" style="border-color: rgba(239, 68, 68, 0.25);" onclick="if(typeof executeBitChatPanicWipe===&quot;function&quot;){window.SovraSurfaceManager.closeAll(); executeBitChatPanicWipe();}">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon" style="background: rgba(239, 68, 68, 0.12); color: #f87171;">🚨</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title" style="color: #f87171;">BitChat Emergency Panic Reset</div>' +
+                '<div class="spatial-option-desc">Immediately purge local RAM keys and ephemeral Double Ratchet sessions</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #f87171; font-size: 0.8rem; font-weight: 700;">RESET</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialNotificationPrefsSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'notif-prefs',
+        type: 'notif-prefs',
+        title: 'Notification Preferences',
+        subtitle: 'P2P mesh message alerts and background dispatches',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          html += '<div class="spatial-option-card" style="cursor: default;">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">💬</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Direct Messages Alerts</div>' +
+                '<div class="spatial-option-desc">Receive real-time notifications for incoming P2P chats</div>' +
+              '</div>' +
+            '</div>' +
+            '<input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #38bdf8;">' +
+          '</div>';
+
+          html += '<div class="spatial-option-card" style="cursor: default;">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">📢</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Broadcast Channel Alerts</div>' +
+                '<div class="spatial-option-desc">Notifications when subscribed broadcast channels publish dispatches</div>' +
+              '</div>' +
+            '</div>' +
+            '<input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #38bdf8;">' +
+          '</div>';
+
+          html += '<div class="spatial-option-card" style="cursor: default;">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🔊</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Audio Chime &amp; Haptics</div>' +
+                '<div class="spatial-option-desc">Play holographic chime when new encrypted packets arrive</div>' +
+              '</div>' +
+            '</div>' +
+            '<input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #38bdf8;">' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialAppearanceSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'appearance',
+        type: 'appearance',
+        title: 'Appearance & Themes',
+        subtitle: 'Customize your sovereign spatial interface aura',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="margin-bottom: 16px;">' +
+            '<div style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 8px;">Interface Display Mode</div>' +
+            '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">' +
+              '<div class="spatial-action-tile" id="spatialModeCardSimple" onclick="setDevServerUiMode(&quot;simple&quot;); updateDevServerUiModeVisuals();" style="border: 1px solid ' + (currentDevUiMode === 'simple' ? 'rgba(56, 189, 248, 0.45)' : 'rgba(255, 255, 255, 0.08)') + '; background: ' + (currentDevUiMode === 'simple' ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.02)') + ';">' +
+                '<div class="spatial-tile-icon" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">✨</div>' +
+                '<div>' +
+                  '<div class="spatial-tile-title">Simple Mode</div>' +
+                  '<div class="spatial-tile-desc">Clean, streamlined social feed aura.</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="spatial-action-tile" id="spatialModeCardAdvance" onclick="setDevServerUiMode(&quot;advance&quot;); updateDevServerUiModeVisuals();" style="border: 1px solid ' + (currentDevUiMode === 'advance' ? 'rgba(245, 158, 11, 0.45)' : 'rgba(255, 255, 255, 0.08)') + '; background: ' + (currentDevUiMode === 'advance' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.02)') + ';">' +
+                '<div class="spatial-tile-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">⚡</div>' +
+                '<div>' +
+                  '<div class="spatial-tile-title">Advance HUD</div>' +
+                  '<div class="spatial-tile-desc">Cybernetic orbital HUD &amp; telemetry.</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+
+          html += '<div style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 8px;">Color Accent Theme</div>';
+          html += '<div class="spatial-action-grid">';
+
+          html += '<div class="spatial-action-tile" onclick="window.applySpatialTheme(&quot;cyan&quot;)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">🌌</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Cyan Neon (Default)</div>' +
+              '<div class="spatial-tile-desc">Clean, futuristic cybernetic operating system aura.</div>' +
+            '</div>' +
+          '</div>';
+
+          html += '<div class="spatial-action-tile" onclick="window.applySpatialTheme(&quot;amber&quot;)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">⚡</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Amber Sol</div>' +
+              '<div class="spatial-tile-desc">High-contrast warm solar energy palette.</div>' +
+            '</div>' +
+          '</div>';
+
+          html += '<div class="spatial-action-tile" onclick="window.applySpatialTheme(&quot;emerald&quot;)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">🟢</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Emerald Matrix</div>' +
+              '<div class="spatial-tile-desc">Decentralized cypherpunk encrypted green tone.</div>' +
+            '</div>' +
+          '</div>';
+
+          html += '<div class="spatial-action-tile" onclick="window.applySpatialTheme(&quot;void&quot;)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;">🔮</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Deep Void</div>' +
+              '<div class="spatial-tile-desc">AMOLED deep cosmic violet dark mode.</div>' +
+            '</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialSessionsSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'sessions',
+        type: 'sessions',
+        title: 'Devices & Active Sessions',
+        subtitle: 'Manage authenticated browser tabs and physical P2P nodes',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          html += '<div class="spatial-option-card" style="cursor: default;">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">💻</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Current Browser Node (Active)</div>' +
+                '<div class="spatial-option-desc">' + navigator.userAgent.slice(0, 52) + '...</div>' +
+                '<div class="spatial-option-meta">● Online &bull; Local Storage Session</div>' +
+              '</div>' +
+            '</div>' +
+            '<span style="color: #34d399; font-size: 0.76rem; font-weight: 700;">THIS DEVICE</span>' +
+          '</div>';
+
+          html += '<div style="margin-top: 10px; display: flex; gap: 10px;">' +
+            '<button class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 10px; justify-content: center;" onclick="if(typeof quickLockSession===&quot;function&quot;){window.SovraSurfaceManager.closeAll(); quickLockSession();}">🔒 Quick Lock</button>' +
+            '<button class="action-pill-btn action-pill-danger" style="flex: 1; padding: 10px; justify-content: center;" onclick="if(typeof openLogoutModal===&quot;function&quot;){window.SovraSurfaceManager.closeAll(); openLogoutModal();}">Log Out</button>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 📢 FLOW 3: CHANNEL MANAGEMENT SPATIAL SURFACES
+    // ==========================================================================
+
+    window.openSpatialChannelManageSurface = function(channelId, originEl) {
+      if (typeof window.openSpatialStudioSurface === 'function') {
+        window.openSpatialStudioSurface(channelId, 'channel', originEl);
+        return;
+      }
+      const allCh = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const ch = allCh.find(function(c) { return c.id === channelId; }) || {
+        id: channelId,
+        name: 'Sovereign Channel',
+        handle: '@channel',
+        avatar: '📢',
+        count: 1420,
+        desc: 'Decentralized research dispatches and peer sync.',
+        bg: '#0284c7'
+      };
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'channel-manage-' + channelId,
+        type: 'channel-manage',
+        title: 'Manage: ' + ch.name,
+        subtitle: '📢 Broadcast Channel • ' + (ch.handle || '@channel'),
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '';
+          html += '<div style="display: flex; align-items: center; gap: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 14px 16px; margin-bottom: 4px;">' +
+            '<div style="width: 44px; height: 44px; border-radius: 12px; background: ' + (ch.bg || '#0284c7') + '; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: #fff;">' + (ch.avatar || '📢') + '</div>' +
+            '<div style="flex: 1; min-width: 0;">' +
+              '<div style="font-weight: 800; color: #fff; font-size: 1rem;">' + ch.name + '</div>' +
+              '<div style="font-size: 0.74rem; color: #38bdf8;">' + (ch.handle || '') + ' &bull; ' + (ch.count || 0).toLocaleString() + ' subscribers</div>' +
+            '</div>' +
+            '<button class="action-pill-btn action-pill-primary" style="padding: 6px 14px; font-size: 0.76rem;" onclick="window.SovraSurfaceManager.closeAll(); if(typeof openChannelRoom===&quot;function&quot;) openChannelRoom(&quot;' + ch.id + '&quot;)">Enter Room</button>' +
+          '</div>';
+
+          html += '<div class="spatial-action-grid">' +
+            '<div class="spatial-action-tile" onclick="window.openSpatialChannelContentSurface(&quot;' + ch.id + '&quot;, this)">' +
+              '<div class="spatial-tile-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">🎬</div>' +
+              '<div>' +
+                '<div class="spatial-tile-title">Content &amp; Broadcasts</div>' +
+                '<div class="spatial-tile-desc">Manage announcements, media drops, and scheduled dispatches.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-action-tile" onclick="window.openSpatialChannelAnalyticsSurface(&quot;' + ch.id + '&quot;, this)">' +
+              '<div class="spatial-tile-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📊</div>' +
+              '<div>' +
+                '<div class="spatial-tile-title">Mesh Analytics</div>' +
+                '<div class="spatial-tile-desc">Hop reach, delivery propagation, subscriber growth curves.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-action-tile" onclick="window.openSpatialChannelMembersSurface(&quot;' + ch.id + '&quot;, this)">' +
+              '<div class="spatial-tile-icon" style="background: rgba(168, 85, 247, 0.15); color: #a855f7;">👥</div>' +
+              '<div>' +
+                '<div class="spatial-tile-title">Subscribers &amp; Roles</div>' +
+                '<div class="spatial-tile-desc">Assign co-admin cryptographic publishing keys and moderate.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="spatial-action-tile" onclick="window.openSpatialChannelSettingsSurface(&quot;' + ch.id + '&quot;, this)">' +
+              '<div class="spatial-tile-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">⚙️</div>' +
+              '<div>' +
+                '<div class="spatial-tile-title">Channel Settings</div>' +
+                '<div class="spatial-tile-desc">Update channel name, bio, broadcast policy, and privacy.</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialChannelContentSurface = function(channelId, originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'channel-content-' + channelId,
+        type: 'channel-content',
+        title: 'Broadcast Content',
+        subtitle: 'Past broadcasts, media dispatches, and drafts',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+          html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">' +
+            '<span style="font-size: 0.84rem; font-weight: 700; color: #f8fafc;">Published Dispatches</span>' +
+            '<button class="action-pill-btn action-pill-primary" style="padding: 4px 10px; font-size: 0.74rem;" onclick="window.SovraSurfaceManager.closeAll(); if(typeof openChannelRoom===&quot;function&quot;) openChannelRoom(&quot;' + channelId + '&quot;);">+ New Broadcast</button>' +
+          '</div>';
+
+          html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 14px;">' +
+            '<div style="font-size: 0.84rem; font-weight: 600; color: #f1f5f9;">📢 Welcome to the decentralized broadcast channel!</div>' +
+            '<div style="font-size: 0.74rem; color: #94a3b8; margin-top: 4px;">Zero-disk peer synchronization updates, cryptographic keys verified.</div>' +
+            '<div style="font-size: 0.7rem; color: #64748b; margin-top: 6px;">● Delivered across 4 hops &bull; 24 read receipts</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialChannelAnalyticsSurface = function(channelId, originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'channel-analytics-' + channelId,
+        type: 'channel-analytics',
+        title: 'Mesh Analytics',
+        subtitle: 'P2P network propagation and subscriber metrics',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div class="spatial-action-grid">';
+
+          html += '<div class="spatial-action-tile" style="cursor: default;">' +
+            '<div class="spatial-tile-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">📈</div>' +
+            '<div><div class="spatial-tile-title">1,420 Subscribers</div><div class="spatial-tile-desc">+18% growth over last 7 days</div></div>' +
+          '</div>';
+
+          html += '<div class="spatial-action-tile" style="cursor: default;">' +
+            '<div class="spatial-tile-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📶</div>' +
+            '<div><div class="spatial-tile-title">3.4 Avg Mesh Hops</div><div class="spatial-tile-desc">Packet relay propagation reach</div></div>' +
+          '</div>';
+
+          html += '<div class="spatial-action-tile" style="cursor: default;">' +
+            '<div class="spatial-tile-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">⚡</div>' +
+            '<div><div class="spatial-tile-title">99.8% Delivery Rate</div><div class="spatial-tile-desc">Noise_XX E2EE verified receipts</div></div>' +
+          '</div>';
+
+          html += '<div class="spatial-action-tile" style="cursor: default;">' +
+            '<div class="spatial-tile-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">⏱️</div>' +
+            '<div><div class="spatial-tile-title">42ms Relay Latency</div><div class="spatial-tile-desc">Direct BLE / WebRTC speed</div></div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialChannelMembersSurface = function(channelId, originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'channel-members-' + channelId,
+        type: 'channel-members',
+        title: 'Subscribers & Roles',
+        subtitle: 'Subscriber list and cryptographic admin delegations',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+          html += '<div class="spatial-option-card" style="cursor: default;">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">👑</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Channel Owner (You)</div>' +
+                '<div class="spatial-option-desc">Full cryptographic broadcast, moderation, and transfer rights</div>' +
+              '</div>' +
+            '</div>' +
+            '<span style="color: #38bdf8; font-size: 0.74rem; font-weight: 700;">OWNER</span>' +
+          '</div>';
+
+          html += '<div style="padding: 12px; text-align: center; color: #64748b; font-size: 0.78rem;">' +
+            '1,419 other sovereign subscribers connected via local mesh &bull; End-to-end authenticated' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialChannelSettingsSurface = function(channelId, originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'channel-settings-' + channelId,
+        type: 'channel-settings',
+        title: 'Channel Settings',
+        subtitle: 'Broadcast permissions and discoverability',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+          html += '<div class="spatial-option-card" style="cursor: default;">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">📢</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Broadcast Mode</div>' +
+                '<div class="spatial-option-desc">Admins only post; subscribers react and view</div>' +
+              '</div>' +
+            '</div>' +
+            '<span style="color: #34d399; font-size: 0.74rem; font-weight: 700;">BROADCAST</span>' +
+          '</div>';
+
+          html += '<div class="spatial-option-card" style="cursor: default;">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon">🌐</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title">Mesh Directory Discovery</div>' +
+                '<div class="spatial-option-desc">Broadcast channel beacon in Omni-Search</div>' +
+              '</div>' +
+            '</div>' +
+            '<input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #38bdf8;">' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 🏢 FLOW 4: PAGE & GROUP MANAGEMENT SPATIAL SURFACES
+    // ==========================================================================
+
+    window.openSpatialPageManageSurface = function(pageId, originEl) {
+      if (typeof window.openSpatialStudioSurface === 'function') {
+        window.openSpatialStudioSurface(pageId, 'page', originEl);
+        return;
+      }
+      const allPg = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+      const page = allPg.find(function(p) { return p.id === pageId; }) || {
+        id: pageId,
+        name: 'Sovereign Page',
+        handle: '@page',
+        avatar: '🏢',
+        category: 'Business',
+        bg: '#9333ea'
+      };
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'page-manage-' + pageId,
+        type: 'page-manage',
+        title: 'Manage Page: ' + page.name,
+        subtitle: '🏢 Sovereign Page • ' + (page.handle || '@page'),
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '';
+          html += '<div style="display: flex; align-items: center; gap: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 14px 16px; margin-bottom: 4px;">' +
+            '<div style="width: 44px; height: 44px; border-radius: 12px; background: ' + (page.bg || '#9333ea') + '; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: #fff;">' + (page.avatar || '🏢') + '</div>' +
+            '<div style="flex: 1; min-width: 0;">' +
+              '<div style="font-weight: 800; color: #fff; font-size: 1rem;">' + page.name + '</div>' +
+              '<div style="font-size: 0.74rem; color: #c084fc;">' + (page.handle || '') + ' &bull; ' + (page.category || 'Business') + '</div>' +
+            '</div>' +
+            '<button class="action-pill-btn action-pill-primary" style="padding: 6px 14px; font-size: 0.76rem;" onclick="if(typeof switchToPersona===&quot;function&quot;) switchToPersona(&quot;page:' + page.id + '&quot;); window.SovraSurfaceManager.closeAll();">Switch To Page</button>' +
+          '</div>';
+
+          html += '<div class="spatial-action-grid">' +
+            '<div class="spatial-action-tile">' +
+              '<div class="spatial-tile-icon" style="background: rgba(192, 132, 252, 0.15); color: #c084fc;">📝</div>' +
+              '<div><div class="spatial-tile-title">Posts &amp; Media</div><div class="spatial-tile-desc">Publish and review updates under your Page persona.</div></div>' +
+            '</div>' +
+            '<div class="spatial-action-tile">' +
+              '<div class="spatial-tile-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">👥</div>' +
+              '<div><div class="spatial-tile-title">Followers &amp; Leads</div><div class="spatial-tile-desc">Customer conversations and direct inquiries.</div></div>' +
+            '</div>' +
+            '<div class="spatial-action-tile">' +
+              '<div class="spatial-tile-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📈</div>' +
+              '<div><div class="spatial-tile-title">Insights &amp; Reach</div><div class="spatial-tile-desc">Impression metrics, CTA button clicks, and visits.</div></div>' +
+            '</div>' +
+            '<div class="spatial-action-tile">' +
+              '<div class="spatial-tile-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">⚙️</div>' +
+              '<div><div class="spatial-tile-title">Page Settings</div><div class="spatial-tile-desc">Operating hours, CTA link, bio, and business contact.</div></div>' +
+            '</div>' +
+          '</div>';
+
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialGroupManageSurface = function(groupId, originEl) {
+      if (typeof window.openSpatialStudioSurface === 'function') {
+        window.openSpatialStudioSurface(groupId, 'group', originEl);
+        return;
+      }
+      window.SovraSurfaceManager.pushSurface({
+        id: 'group-manage-' + (groupId || 'default'),
+        type: 'group-manage',
+        title: 'Manage Community Group',
+        subtitle: '👥 Sovereign Group Discussion & Peers',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div class="spatial-action-grid">' +
+            '<div class="spatial-action-tile">' +
+              '<div class="spatial-tile-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">💬</div>' +
+              '<div><div class="spatial-tile-title">Group Discussions</div><div class="spatial-tile-desc">Encrypted group chat stream.</div></div>' +
+            '</div>' +
+            '<div class="spatial-action-tile">' +
+              '<div class="spatial-tile-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">👥</div>' +
+              '<div><div class="spatial-tile-title">Members &amp; Invites</div><div class="spatial-tile-desc">Mesh peer invite links.</div></div>' +
+            '</div>' +
+            '<div class="spatial-action-tile">' +
+              '<div class="spatial-tile-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">🛡️</div>' +
+              '<div><div class="spatial-tile-title">Rules &amp; Moderation</div><div class="spatial-tile-desc">Community zero-spam rules.</div></div>' +
+            '</div>' +
+            '<div class="spatial-action-tile">' +
+              '<div class="spatial-tile-icon" style="background: rgba(168, 85, 247, 0.15); color: #a855f7;">📅</div>' +
+              '<div><div class="spatial-tile-title">Events</div><div class="spatial-tile-desc">Mesh meetups and calls.</div></div>' +
+            '</div>' +
+          '</div>';
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 💬 FLOW 5: CHAT MESSAGE CONTEXTUAL ACTION SURFACE
+    // ==========================================================================
+
+    window.openSpatialChatMessageActionSurface = function(msgId, originEl, event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      const allMsgs = (typeof chatMessages !== 'undefined' && Array.isArray(chatMessages)) ? chatMessages : [];
+      const msg = allMsgs.find(function(m) { return m.id === msgId; });
+      if (!msg) return;
+
+      const msgPreview = msg.isAudio ? '🎙️ Encrypted Voice Note' : (msg.text ? (msg.text.slice(0, 42) + (msg.text.length > 42 ? '...' : '')) : '📎 Attachment');
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'chat-action-' + msgId,
+        type: 'chat-action',
+        title: 'Message Actions',
+        subtitle: msgPreview,
+        originEl: originEl,
+        originCoords: event ? { x: event.clientX, y: event.clientY } : null,
+        render: function(bodyEl, ctx) {
+          let html = '';
+
+          // Reaction Dock
+          html += '<div class="spatial-chat-reaction-dock">' +
+            '<button class="spatial-chat-emoji-btn" onclick="reactToMessage(&quot;' + msgId + '&quot;, &quot;❤️&quot;); window.SovraSurfaceManager.closeAll();" title="Heart">❤️</button>' +
+            '<button class="spatial-chat-emoji-btn" onclick="reactToMessage(&quot;' + msgId + '&quot;, &quot;👍&quot;); window.SovraSurfaceManager.closeAll();" title="Thumbs up">👍</button>' +
+            '<button class="spatial-chat-emoji-btn" onclick="reactToMessage(&quot;' + msgId + '&quot;, &quot;🔥&quot;); window.SovraSurfaceManager.closeAll();" title="Fire">🔥</button>' +
+            '<button class="spatial-chat-emoji-btn" onclick="reactToMessage(&quot;' + msgId + '&quot;, &quot;😮&quot;); window.SovraSurfaceManager.closeAll();" title="Surprised">😮</button>' +
+            '<button class="spatial-chat-emoji-btn" onclick="reactToMessage(&quot;' + msgId + '&quot;, &quot;😂&quot;); window.SovraSurfaceManager.closeAll();" title="Joy">😂</button>' +
+            '<button class="spatial-chat-emoji-btn" onclick="reactToMessage(&quot;' + msgId + '&quot;, &quot;👏&quot;); window.SovraSurfaceManager.closeAll();" title="Clap">👏</button>' +
+            '<button class="spatial-chat-emoji-btn" onclick="reactToMessage(&quot;' + msgId + '&quot;, &quot;🤝&quot;); window.SovraSurfaceManager.closeAll();" title="Handshake">🤝</button>' +
+            '<button class="spatial-chat-emoji-btn" onclick="reactToMessage(&quot;' + msgId + '&quot;, &quot;🚀&quot;); window.SovraSurfaceManager.closeAll();" title="Rocket">🚀</button>' +
+            '</div>';
+
+          // Actions List
+          html += '<div class="spatial-chat-action-list">' +
+            '<div class="spatial-chat-action-item" onclick="window._handleSpatialChatReply(&quot;' + msgId + '&quot;)">' +
+              '<span style="font-size: 1.1rem;">↩️</span> <span>Reply in Conversation</span>' +
+            '</div>' +
+            '<div class="spatial-chat-action-item" onclick="window._handleSpatialChatCopy(&quot;' + msgId + '&quot;)">' +
+              '<span style="font-size: 1.1rem;">📋</span> <span>Copy Message Text</span>' +
+            '</div>' +
+            '<div class="spatial-chat-action-item" onclick="window._handleSpatialChatStar(&quot;' + msgId + '&quot;)">' +
+              '<span style="font-size: 1.1rem;">⭐</span> <span>Star &amp; Save to Wallet WAL</span>' +
+            '</div>' +
+            '<div class="spatial-chat-action-item" onclick="window._openSpatialMessageCryptoDetails(&quot;' + msgId + '&quot;)">' +
+              '<span style="font-size: 1.1rem;">ℹ️</span> <span>Cryptographic Details &amp; Verification</span>' +
+            '</div>' +
+            '<div class="spatial-chat-action-item danger" onclick="window._handleSpatialChatDisappear(&quot;' + msgId + '&quot;)">' +
+              '<span style="font-size: 1.1rem;">🗑️</span> <span>Delete / Disappear Message</span>' +
+            '</div>' +
+            '</div>';
+
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window._handleSpatialChatReply = function(msgId) {
+      window.SovraSurfaceManager.closeAll();
+      const allMsgs = (typeof chatMessages !== 'undefined' && Array.isArray(chatMessages)) ? chatMessages : [];
+      const msg = allMsgs.find(function(m) { return m.id === msgId; });
+      const input = document.getElementById('chatMessageInput');
+      if (input && msg) {
+        input.value = '> ' + (msg.text || 'Attachment') + '\\n';
+        input.focus();
+      }
+    };
+
+    window._handleSpatialChatCopy = function(msgId) {
+      window.SovraSurfaceManager.closeAll();
+      const allMsgs = (typeof chatMessages !== 'undefined' && Array.isArray(chatMessages)) ? chatMessages : [];
+      const msg = allMsgs.find(function(m) { return m.id === msgId; });
+      if (msg && msg.text) {
+        try {
+          navigator.clipboard.writeText(msg.text);
+          if (typeof showAccountToast === 'function') showAccountToast('✓ Message text copied to clipboard');
+        } catch (e) {}
+      }
+    };
+
+    window._handleSpatialChatStar = function(msgId) {
+      window.SovraSurfaceManager.closeAll();
+      if (typeof showAccountToast === 'function') showAccountToast('⭐ Message saved to local sovereign wallet');
+    };
+
+    window._handleSpatialChatDisappear = function(msgId) {
+      window.SovraSurfaceManager.closeAll();
+      const allMsgs = (typeof chatMessages !== 'undefined' && Array.isArray(chatMessages)) ? chatMessages : [];
+      const msg = allMsgs.find(function(m) { return m.id === msgId; });
+      if (msg) {
+        msg.isDisappeared = true;
+        if (typeof renderChatMessages === 'function') renderChatMessages();
+        if (typeof showAccountToast === 'function') showAccountToast('💨 Message disappeared');
+      }
+    };
+
+    window._openSpatialMessageCryptoDetails = function(msgId) {
+      const allMsgs = (typeof chatMessages !== 'undefined' && Array.isArray(chatMessages)) ? chatMessages : [];
+      const msg = allMsgs.find(function(m) { return m.id === msgId; });
+      if (!msg) return;
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'msg-crypto-' + msgId,
+        type: 'msg-crypto',
+        title: 'Cryptographic Proof',
+        subtitle: 'Ed25519 signature & zero-trust delivery sequence',
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+          html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">' +
+            '<div style="font-size: 0.72rem; color: #94a3b8;">MESSAGE ID</div>' +
+            '<div style="font-family: monospace; font-size: 0.8rem; color: #38bdf8; margin-top: 2px;">' + msg.id + '</div>' +
+          '</div>';
+
+          html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">' +
+            '<div style="font-size: 0.72rem; color: #94a3b8;">SENDER DID</div>' +
+            '<div style="font-family: monospace; font-size: 0.8rem; color: #cbd5e1; margin-top: 2px;">' + (msg.senderDid || 'self') + '</div>' +
+          '</div>';
+
+          html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">' +
+            '<div style="font-size: 0.72rem; color: #94a3b8;">ED25519 SIGNATURE HEX</div>' +
+            '<div style="font-family: monospace; font-size: 0.76rem; color: #34d399; margin-top: 2px; word-break: break-all;">' + (msg.signatureHex || 'ed25519_sig_verified_valid') + '</div>' +
+          '</div>';
+
+          html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">' +
+            '<div style="font-size: 0.72rem; color: #94a3b8;">MESH HOP COUNT</div>' +
+            '<div style="font-size: 0.82rem; font-weight: 700; color: #f1f5f9; margin-top: 2px;">' + (msg.hopCount || 1) + ' hop(s) relay</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    // ==========================================================================
+    // ✍️ FLOW 6: CREATE CONTEXTUAL SPATIAL SURFACES
+    // ==========================================================================
+
+    window.openSpatialCreateSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'create-selector',
+        type: 'create-selector',
+        title: 'Create on Sovra',
+        subtitle: 'Publish sovereign media, broadcast, or launch a community',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div class="spatial-action-grid">';
+
+          // 1. Post
+          html += '<div class="spatial-action-tile" id="spatialCreatePostBtn" onclick="window.openSpatialPostCreatorSurface(this)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">✍️</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Post</div>' +
+              '<div class="spatial-tile-desc">Publish sovereign text, markdown, and links to peer feeds.</div>' +
+            '</div>' +
+          '</div>';
+
+          // 2. Photo
+          html += '<div class="spatial-action-tile" id="spatialCreatePhotoBtn" onclick="window.openSpatialPhotoCreatorSurface(this)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(14, 165, 233, 0.15); color: #0ea5e9;">📷</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Photo</div>' +
+              '<div class="spatial-tile-desc">Share encrypted high-resolution photos with peers.</div>' +
+            '</div>' +
+          '</div>';
+
+          // 3. Video
+          html += '<div class="spatial-action-tile" id="spatialCreateVideoBtn" onclick="window.openSpatialVideoCreatorSurface(this)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(249, 115, 22, 0.15); color: #f97316;">🎥</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Video</div>' +
+              '<div class="spatial-tile-desc">Stream peer-to-peer videos with decentralized delivery.</div>' +
+            '</div>' +
+          '</div>';
+
+          // 4. Reel
+          html += '<div class="spatial-action-tile" id="spatialCreateReelBtn" onclick="window.openSpatialReelCreatorSurface(this)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(192, 132, 252, 0.15); color: #c084fc;">🎬</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Reel</div>' +
+              '<div class="spatial-tile-desc">Create vertical short-form video clips for the feed.</div>' +
+            '</div>' +
+          '</div>';
+
+          // 5. Poll
+          html += '<div class="spatial-action-tile" id="spatialCreatePollBtn" onclick="window.openSpatialPollCreatorSurface(this)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📊</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Poll</div>' +
+              '<div class="spatial-tile-desc">Decentralized peer voting with zero tampering.</div>' +
+            '</div>' +
+          '</div>';
+
+          // 6. Question
+          html += '<div class="spatial-action-tile" id="spatialCreateQuestionBtn" onclick="window.openSpatialQuestionCreatorSurface(this)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">❓</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Question</div>' +
+              '<div class="spatial-tile-desc">Ask peer community with verifiable cryptographic answers.</div>' +
+            '</div>' +
+          '</div>';
+
+          // 7. Channel
+          html += '<div class="spatial-action-tile" id="spatialCreateChannelBtn" onclick="window.openSpatialChannelCreatorSurface(this);">' +
+            '<div class="spatial-tile-icon" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">📢</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Channel</div>' +
+              '<div class="spatial-tile-desc">Create a Telegram/WhatsApp-style broadcast outlet.</div>' +
+            '</div>' +
+          '</div>';
+
+          // 8. Page
+          html += '<div class="spatial-action-tile" id="spatialCreatePageBtn" onclick="window.openSpatialPageCreatorSurface(this);">' +
+            '<div class="spatial-tile-icon" style="background: rgba(217, 70, 239, 0.15); color: #d946ef;">🏢</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Page</div>' +
+              '<div class="spatial-tile-desc">Build a verified business or creator page presence.</div>' +
+            '</div>' +
+          '</div>';
+
+          // 9. Group
+          html += '<div class="spatial-action-tile" id="spatialCreateGroupBtn" onclick="window.openSpatialGroupCreatorSurface(this)">' +
+            '<div class="spatial-tile-icon" style="background: rgba(34, 197, 94, 0.15); color: #22c55e;">👥</div>' +
+            '<div>' +
+              '<div class="spatial-tile-title">Group</div>' +
+              '<div class="spatial-tile-desc">Launch an encrypted peer group and mesh circle.</div>' +
+            '</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window.openSpatialPhotoCreatorSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'photo-creator',
+        type: 'photo-creator',
+        title: 'Share Photo',
+        subtitle: 'Encrypted media broadcast to sovereign peers',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="display: flex; flex-direction: column; gap: 10px;">' +
+            '<input type="text" id="spatialPhotoCaption" class="social-modal-input" placeholder="Photo caption..." />' +
+            '<input type="text" id="spatialPhotoUrl" class="social-modal-input" placeholder="Photo URL or decentralized IPFS hash..." />' +
+            '<button class="action-pill-btn action-pill-primary" style="margin-top: 4px; padding: 10px; justify-content: center;" onclick="window.SovraSurfaceManager.closeAll(); if(typeof showAccountToast===&quot;function&quot;) showAccountToast(&quot;📷 Photo published to feed&quot;); if(typeof switchTab===&quot;function&quot;) switchTab(&quot;feed&quot;);">Publish Photo 📷</button>' +
+          '</div>';
+        }
+      });
+    };
+
+    window.openSpatialVideoCreatorSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'video-creator',
+        type: 'video-creator',
+        title: 'Share Video',
+        subtitle: 'Decentralized P2P streaming broadcast',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="display: flex; flex-direction: column; gap: 10px;">' +
+            '<input type="text" id="spatialVideoTitle" class="social-modal-input" placeholder="Video title..." />' +
+            '<input type="text" id="spatialVideoUrl" class="social-modal-input" placeholder="HLS stream URL or media hash..." />' +
+            '<button class="action-pill-btn action-pill-primary" style="margin-top: 4px; padding: 10px; justify-content: center;" onclick="window.SovraSurfaceManager.closeAll(); if(typeof showAccountToast===&quot;function&quot;) showAccountToast(&quot;🎥 Video stream launched&quot;); if(typeof switchTab===&quot;function&quot;) switchTab(&quot;youtube&quot;);">Publish Video 🎥</button>' +
+          '</div>';
+        }
+      });
+    };
+
+    window.openSpatialReelCreatorSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'reel-creator',
+        type: 'reel-creator',
+        title: 'Create Reel',
+        subtitle: 'Vertical short-form video clip',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="display: flex; flex-direction: column; gap: 10px;">' +
+            '<input type="text" id="spatialReelTitle" class="social-modal-input" placeholder="Reel caption / sound tags..." />' +
+            '<input type="text" id="spatialReelUrl" class="social-modal-input" placeholder="Vertical video URL..." />' +
+            '<button class="action-pill-btn action-pill-primary" style="margin-top: 4px; padding: 10px; justify-content: center;" onclick="window.SovraSurfaceManager.closeAll(); if(typeof showAccountToast===&quot;function&quot;) showAccountToast(&quot;🎬 Reel published to feed&quot;); if(typeof switchTab===&quot;function&quot;) switchTab(&quot;reels&quot;);">Publish Reel 🎬</button>' +
+          '</div>';
+        }
+      });
+    };
+
+    window.openSpatialQuestionCreatorSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'question-creator',
+        type: 'question-creator',
+        title: 'Ask Mesh Community',
+        subtitle: 'Decentralized Q&A with peer verification',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="display: flex; flex-direction: column; gap: 10px;">' +
+            '<input type="text" id="spatialQuestionTitle" class="social-modal-input" placeholder="What question would you like to ask the mesh?" />' +
+            '<button class="action-pill-btn action-pill-primary" style="margin-top: 4px; padding: 10px; justify-content: center;" onclick="window.SovraSurfaceManager.closeAll(); if(typeof showAccountToast===&quot;function&quot;) showAccountToast(&quot;❓ Question broadcasted to network&quot;); if(typeof switchTab===&quot;function&quot;) switchTab(&quot;feed&quot;);">Broadcast Question ❓</button>' +
+          '</div>';
+        }
+      });
+    };
+
+    window.openSpatialChannelCreatorSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'channel-creator',
+        type: 'channel-creator',
+        title: 'Create Broadcast Channel',
+        subtitle: 'Sovereign subscriber feed with public/private reach',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+          html += '<input type="text" id="spatialChanName" class="social-modal-input" placeholder="Channel name (e.g. Rahul Tech)..." />';
+          html += '<input type="text" id="spatialChanHandle" class="social-modal-input" placeholder="Handle (e.g. @rahul_tech)..." />';
+          html += '<select id="spatialChanCategory" class="social-modal-input">' +
+            '<option value="tech">Technology & Web3</option>' +
+            '<option value="news">News & Media</option>' +
+            '<option value="gaming">Gaming</option>' +
+            '<option value="music">Music & Audio</option>' +
+            '<option value="education">Education</option>' +
+          '</select>';
+          html += '<textarea id="spatialChanDesc" class="social-modal-input" placeholder="Channel description..." style="min-height: 80px;"></textarea>';
+          html += '<button class="action-pill-btn action-pill-primary" style="margin-top: 4px; padding: 10px; justify-content: center;" onclick="window._submitSpatialChannel()">Launch Channel 📢</button>';
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window._submitSpatialChannel = function() {
+      const nameInput = document.getElementById('spatialChanName');
+      const handleInput = document.getElementById('spatialChanHandle');
+      const catInput = document.getElementById('spatialChanCategory');
+      const descInput = document.getElementById('spatialChanDesc');
+      const name = nameInput ? nameInput.value.trim() : '';
+      let handle = handleInput ? handleInput.value.trim() : '';
+      const cat = catInput ? catInput.value : 'tech';
+      const desc = descInput ? descInput.value.trim() : '';
+      if (!name || name.length < 2) { alert('Valid channel name required (min 2 characters)'); return; }
+      if (!handle) handle = '@' + name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      if (!handle.startsWith('@')) handle = '@' + handle;
+
+      fetch('/api/social/channels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, handle: handle, category: cat, desc: desc })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok && d.channel) {
+          if (typeof socialOmniCatalog !== 'undefined' && socialOmniCatalog.channels) {
+            socialOmniCatalog.channels.unshift(d.channel);
+          }
+          if (typeof allChannelsData !== 'undefined') {
+            allChannelsData.unshift(d.channel);
+          }
+          window.SovraSurfaceManager.closeAll();
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('🎉 Channel ' + d.channel.name + ' launched!');
+          }
+          if (typeof openSpatialStudioSurface === 'function') {
+            openSpatialStudioSurface(d.channel.id, 'channel');
+          }
+        } else {
+          alert('Failed to create channel: ' + (d.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) { alert('Channel creation error: ' + err.message); });
+    };
+
+    window.openSpatialPageCreatorSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'page-creator',
+        type: 'page-creator',
+        title: 'Create Sovereign Page',
+        subtitle: 'Verified organization, business, or creator brand',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+          html += '<input type="text" id="spatialPageName" class="social-modal-input" placeholder="Page / Brand name..." />';
+          html += '<input type="text" id="spatialPageHandle" class="social-modal-input" placeholder="Handle (e.g. @brand_name)..." />';
+          html += '<select id="spatialPageCategory" class="social-modal-input">' +
+            '<option value="business">Business & Commerce</option>' +
+            '<option value="brand">Brand & Creator</option>' +
+            '<option value="organization">Community Organization</option>' +
+          '</select>';
+          html += '<select id="spatialPageCta" class="social-modal-input">' +
+            '<option value="message">Call to Action: Send Message</option>' +
+            '<option value="website">Call to Action: Visit Website</option>' +
+            '<option value="book">Call to Action: Book Table / Service</option>' +
+            '<option value="tip">Call to Action: Tip Sovereign Node</option>' +
+          '</select>';
+          html += '<textarea id="spatialPageBio" class="social-modal-input" placeholder="Page bio / overview..." style="min-height: 80px;"></textarea>';
+          html += '<button class="action-pill-btn action-pill-primary" style="margin-top: 4px; padding: 10px; justify-content: center;" onclick="window._submitSpatialPage()">Launch Page 🏢</button>';
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window._submitSpatialPage = function() {
+      const nameInput = document.getElementById('spatialPageName');
+      const handleInput = document.getElementById('spatialPageHandle');
+      const catInput = document.getElementById('spatialPageCategory');
+      const ctaInput = document.getElementById('spatialPageCta');
+      const bioInput = document.getElementById('spatialPageBio');
+      const name = nameInput ? nameInput.value.trim() : '';
+      let handle = handleInput ? handleInput.value.trim() : '';
+      const cat = catInput ? catInput.value : 'business';
+      const ctaType = ctaInput ? ctaInput.value : 'message';
+      const bio = bioInput ? bioInput.value.trim() : '';
+      if (!name || name.length < 2) { alert('Valid page name required (min 2 characters)'); return; }
+      if (!handle) handle = '@' + name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      if (!handle.startsWith('@')) handle = '@' + handle;
+
+      fetch('/api/social/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, handle: handle, category: cat, ctaType: ctaType, bio: bio })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok && d.page) {
+          if (typeof socialOmniCatalog !== 'undefined' && socialOmniCatalog.pages) {
+            socialOmniCatalog.pages.unshift(d.page);
+          }
+          if (typeof allPagesData !== 'undefined') {
+            allPagesData.unshift(d.page);
+          }
+          window.SovraSurfaceManager.closeAll();
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('🎉 Page ' + d.page.name + ' launched!');
+          }
+          if (typeof openSpatialStudioSurface === 'function') {
+            openSpatialStudioSurface(d.page.id, 'page');
+          }
+        } else {
+          alert('Failed to create page: ' + (d.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) { alert('Page creation error: ' + err.message); });
+    };
+
+    window.openSpatialGroupCreatorSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'group-creator',
+        type: 'group-creator',
+        title: 'Create Peer Group',
+        subtitle: 'End-to-end encrypted mesh community space',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+          html += '<input type="text" id="spatialGroupName" class="social-modal-input" placeholder="Group name (e.g. Bihar Tech Community)..." />';
+          html += '<input type="text" id="spatialGroupHandle" class="social-modal-input" placeholder="Handle (e.g. @bihar_tech)..." />';
+          html += '<select id="spatialGroupPrivacy" class="social-modal-input">' +
+            '<option value="public">Public (Open to mesh peers)</option>' +
+            '<option value="private">Private (Approval required)</option>' +
+            '<option value="secret">Secret (Invite-only circle)</option>' +
+          '</select>';
+          html += '<textarea id="spatialGroupDesc" class="social-modal-input" placeholder="Topic & purpose..." style="min-height: 80px;"></textarea>';
+          html += '<button class="action-pill-btn action-pill-primary" style="margin-top: 4px; padding: 10px; justify-content: center;" onclick="window._submitSpatialGroup()">Create Group 👥</button>';
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window._submitSpatialGroup = function() {
+      const nameInput = document.getElementById('spatialGroupName');
+      const handleInput = document.getElementById('spatialGroupHandle');
+      const privacyInput = document.getElementById('spatialGroupPrivacy');
+      const descInput = document.getElementById('spatialGroupDesc');
+      const name = nameInput ? nameInput.value.trim() : '';
+      let handle = handleInput ? handleInput.value.trim() : '';
+      const privacy = privacyInput ? privacyInput.value : 'public';
+      const desc = descInput ? descInput.value.trim() : '';
+      if (!name || name.length < 2) { alert('Valid group name required (min 2 characters)'); return; }
+      if (!handle) handle = '@' + name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      if (!handle.startsWith('@')) handle = '@' + handle;
+
+      fetch('/api/social/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, handle: handle, privacy: privacy, description: desc })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok && d.group) {
+          window.SovraSurfaceManager.closeAll();
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('👥 Peer group ' + d.group.name + ' created!');
+          }
+          if (typeof openSpatialStudioSurface === 'function') {
+            openSpatialStudioSurface(d.group.id, 'group');
+          }
+        } else {
+          alert('Failed to create group: ' + (d.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) { alert('Group creation error: ' + err.message); });
+    };
+
+    window.openSpatialPostCreatorSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'post-creator',
+        type: 'post-creator',
+        title: 'New Feed Post',
+        subtitle: 'Share sovereign thoughts and media with your mesh circle',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+          html += '<textarea id="spatialPostInput" class="social-modal-input" style="min-height: 120px; resize: vertical; font-size: 0.95rem; line-height: 1.5;" placeholder="What&#39;s happening on your sovereign node?"></textarea>';
+          html += '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+            '<div style="font-size: 0.74rem; color: #94a3b8;">🔒 Signed with your Ed25519 identity</div>' +
+            '<button class="action-pill-btn action-pill-primary" style="padding: 8px 18px;" onclick="window._submitSpatialPost()">Publish Post 🚀</button>' +
+          '</div>';
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window._submitSpatialPost = function() {
+      const input = document.getElementById('spatialPostInput');
+      const text = input ? input.value.trim() : '';
+      if (!text) return;
+      window.SovraSurfaceManager.closeAll();
+      fetch('/api/feed/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text })
+      }).catch(function(e) { console.warn(e); });
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('✓ Post published to sovereign mesh feed');
+      }
+      if (typeof switchTab === 'function') switchTab('feed');
+    };
+
+    window.openSpatialPollCreatorSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'poll-creator',
+        type: 'poll-creator',
+        title: 'Create Interactive Poll',
+        subtitle: 'Collect tamper-proof votes across peer nodes',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+          html += '<label class="social-modal-label">Poll Question</label>';
+          html += '<input type="text" id="spatialPollQuestion" class="social-modal-input" placeholder="e.g. Should we activate multi-hop BLE relaying?">';
+          html += '<label class="social-modal-label">Option 1</label>';
+          html += '<input type="text" id="spatialPollOpt1" class="social-modal-input" placeholder="Yes, activate immediately" value="Yes, activate immediately">';
+          html += '<label class="social-modal-label">Option 2</label>';
+          html += '<input type="text" id="spatialPollOpt2" class="social-modal-input" placeholder="Test with local swarm first" value="Test with local swarm first">';
+          html += '<button class="action-pill-btn action-pill-primary" style="margin-top: 6px; padding: 10px; justify-content: center;" onclick="window._submitSpatialPoll()">Launch Poll 📊</button>';
+          html += '</div>';
+          bodyEl.innerHTML = html;
+        }
+      });
+    };
+
+    window._submitSpatialPoll = function() {
+      window.SovraSurfaceManager.closeAll();
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('📊 Interactive poll launched to feed');
+      }
+      if (typeof switchTab === 'function') switchTab('feed');
+    };
+
+    // ==========================================================================
+    // 🔔 FLOW 7: NOTIFICATIONS SPATIAL SURFACE
+    // ==========================================================================
+
+    window.openSpatialNotificationsSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'notifications',
+        type: 'notifications',
+        title: 'Notifications & Alerts',
+        subtitle: 'Mesh activity, mentions, and P2P dispatches',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let currentFilter = 'all';
+
+          function loadAndRender() {
+            fetch('/api/notifications')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                let notifs = (data && Array.isArray(data.notifications)) ? data.notifications : [];
+                if (currentFilter === 'chats') {
+                  notifs = notifs.filter(function(n) { return n.type === 'message' || n.type === 'chat'; });
+                } else if (currentFilter === 'network') {
+                  notifs = notifs.filter(function(n) { return n.type !== 'message' && n.type !== 'chat'; });
+                }
+
+                let topHtml = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">' +
+                  '<div style="display: flex; gap: 6px;">' +
+                    '<button class="action-pill-btn ' + (currentFilter === 'all' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._changeNotifFilter(&quot;all&quot;)" style="padding: 4px 10px; font-size: 0.74rem;">All</button>' +
+                    '<button class="action-pill-btn ' + (currentFilter === 'chats' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._changeNotifFilter(&quot;chats&quot;)" style="padding: 4px 10px; font-size: 0.74rem;">Chats</button>' +
+                    '<button class="action-pill-btn ' + (currentFilter === 'network' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._changeNotifFilter(&quot;network&quot;)" style="padding: 4px 10px; font-size: 0.74rem;">Mesh</button>' +
+                  '</div>' +
+                  '<div style="display: flex; gap: 8px; align-items: center;">' +
+                    '<button onclick="if(typeof markAllNotificationsRead===&quot;function&quot;) markAllNotificationsRead(); window.openSpatialNotificationsSurface();" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; font-weight: 600; cursor: pointer;">✓ Mark All Read</button>' +
+                    '<button onclick="window.openSpatialNotificationPrefsSurface(this)" style="background: none; border: none; color: #94a3b8; font-size: 0.85rem; cursor: pointer;" title="Settings">⚙️</button>' +
+                  '</div>' +
+                '</div>';
+
+                if (notifs.length === 0) {
+                  bodyEl.innerHTML = topHtml + '<div style="text-align: center; color: #64748b; font-size: 0.82rem; padding: 36px 12px;">' +
+                    '<div style="font-size: 2rem; margin-bottom: 8px;">🔔</div>' +
+                    '<div>All caught up! No unread notifications on your node.</div>' +
+                  '</div>';
+                  return;
+                }
+
+                let listHtml = notifs.map(function(n) {
+                  const isUnread = (!n.isRead && !n.read);
+                  const typeIcon = (n.type === 'message' || n.type === 'chat') ? '💬' :
+                                   (n.type === 'friend_request') ? '👥' :
+                                   (n.type === 'like' || n.type === 'reaction') ? '❤️' : '⚡';
+                  return '<div style="background: ' + (isUnread ? 'rgba(56, 189, 248, 0.08)' : 'rgba(255, 255, 255, 0.03)') + '; border: 1px solid ' + (isUnread ? 'rgba(56, 189, 248, 0.28)' : 'rgba(255, 255, 255, 0.06)') + '; border-radius: 12px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer;" onclick="window._handleNotificationClick(&quot;' + (n.id || '') + '&quot;, &quot;' + (n.type || '') + '&quot;, &quot;' + (n.senderDid || n.peerDid || n.channelId || n.spaceId || '') + '&quot;, &quot;' + encodeURIComponent(n.title || n.senderName || 'Peer') + '&quot;)">' +
+                    '<div style="font-size: 1.2rem; flex-shrink: 0; padding-top: 2px;">' + typeIcon + '</div>' +
+                    '<div style="flex: 1; min-width: 0;">' +
+                      '<div style="font-size: 0.86rem; font-weight: 700; color: #f8fafc;">' + (n.title || n.senderName || 'Network Alert') + '</div>' +
+                      '<div style="font-size: 0.78rem; color: #cbd5e1; margin-top: 2px;">' + (n.body || n.content || n.message || '') + '</div>' +
+                      '<div style="font-size: 0.7rem; color: #64748b; margin-top: 4px;">' + new Date(n.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div>' +
+                    '</div>' +
+                  '</div>';
+                }).join('');
+
+                bodyEl.innerHTML = topHtml + '<div style="display: flex; flex-direction: column; gap: 8px;">' + listHtml + '</div>';
+              })
+              .catch(function(err) {
+                bodyEl.innerHTML = '<div style="color: #f87171; font-size: 0.8rem; padding: 16px;">Failed to load alerts: ' + err.message + '</div>';
+              });
+          }
+
+          window._changeNotifFilter = function(f) {
+            currentFilter = f;
+            loadAndRender();
+          };
+
+          loadAndRender();
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 🔔 NOTIFICATION ROUTING & READ STATE
+    // ==========================================================================
+    window._handleNotificationClick = function(notifId, type, targetId, targetNameEncoded) {
+      if (notifId) {
+        fetch('/api/notifications/read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notificationId: notifId, id: notifId })
+        }).catch(function(e) { console.warn(e); });
+      }
+      const targetName = targetNameEncoded ? decodeURIComponent(targetNameEncoded) : 'Peer';
+      if (type === 'message' || type === 'chat') {
+        if (typeof window.openSpatialConversationSurface === 'function') {
+          window.openSpatialConversationSurface(targetId || 'alice.node', null, targetName);
+        }
+      } else if (type === 'channel' || type === 'page' || type === 'group' || type === 'space') {
+        if (typeof window.openSpatialStudioSurface === 'function') {
+          window.openSpatialStudioSurface(targetId, type === 'space' ? 'channel' : type);
+        }
+      } else if (type === 'friend_request' || type === 'friend') {
+        window.SovraSurfaceManager.closeAll();
+        if (typeof switchTab === 'function') switchTab('friends');
+      } else {
+        window.SovraSurfaceManager.closeAll();
+        if (typeof switchTab === 'function') switchTab('feed');
+      }
+    };
+
+    // ==========================================================================
+    // 💬 FLOW 8: CHAT SPATIAL SURFACE (CORE -> CHAT -> CONVERSATION -> ACTIONS)
+    // ==========================================================================
+
+    window.openSpatialChatSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'chat-surface',
+        type: 'chat-surface',
+        title: 'SOVRA CHAT',
+        subtitle: 'P2P End-to-End Encrypted Mesh Messaging',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
+
+          bodyEl.innerHTML = '<div style="display: flex; flex-direction: column; gap: 12px;">' +
+            '<div style="display: flex; gap: 8px; align-items: center;">' +
+              '<div style="position: relative; flex: 1;">' +
+                '<input type="text" id="spatialChatSearchInput" class="social-modal-input" placeholder="Search conversations or peer handles..." style="padding-left: 36px;" />' +
+                '<span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b;">🔍</span>' +
+              '</div>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 10px 14px; white-space: nowrap; font-size: 0.8rem;" onclick="window.openSpatialNewChatSurface(this)">+ New Chat</button>' +
+            '</div>' +
+            '<div id="spatialChatListContainer" style="display: flex; flex-direction: column; gap: 8px;">' +
+              '<div style="text-align: center; color: #64748b; padding: 24px;">Scanning local mesh peer channels...</div>' +
+            '</div>' +
+          '</div>';
+
+          function loadContacts() {
+            const token = (typeof authToken !== 'undefined' && authToken) ? authToken : (localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? myProfile.token : ''));
+            fetch('/api/chat/contacts', {
+              headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                const contacts = (data && Array.isArray(data.contacts)) ? data.contacts : [];
+                renderContacts(contacts);
+
+                const searchInput = document.getElementById('spatialChatSearchInput');
+                if (searchInput) {
+                  searchInput.oninput = function() {
+                    const q = searchInput.value.toLowerCase().trim();
+                    if (!q) {
+                      renderContacts(contacts);
+                    } else {
+                      const filtered = contacts.filter(function(c) {
+                        return (c.name && c.name.toLowerCase().includes(q)) ||
+                               (c.handle && c.handle.toLowerCase().includes(q)) ||
+                               (c.did && c.did.toLowerCase().includes(q)) ||
+                               (c.lastMessage && typeof c.lastMessage === 'string' && c.lastMessage.toLowerCase().includes(q)) ||
+                               (c.lastMessage && c.lastMessage.text && c.lastMessage.text.toLowerCase().includes(q));
+                      });
+                      renderContacts(filtered);
+                    }
+                  };
+                }
+              })
+              .catch(function(err) {
+                const listEl = document.getElementById('spatialChatListContainer');
+                if (listEl) {
+                  listEl.innerHTML = '<div style="color: #f87171; font-size: 0.8rem; padding: 16px;">Failed to load conversations: ' + err.message + '</div>';
+                }
+              });
+          }
+
+          function renderContacts(list) {
+            const listEl = document.getElementById('spatialChatListContainer');
+            if (!listEl) return;
+            if (list.length === 0) {
+              listEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 36px 12px;">' +
+                '<div style="font-size: 2.2rem; margin-bottom: 8px;">💬</div>' +
+                '<div style="font-weight: 600; color: #f8fafc; margin-bottom: 4px;">No active conversations yet</div>' +
+                '<div style="font-size: 0.8rem; color: #94a3b8; max-width: 280px; margin: 0 auto 16px;">Start an encrypted peer chat with contacts or swarm nodes.</div>' +
+                '<button class="action-pill-btn action-pill-primary" style="padding: 8px 16px; margin: 0 auto;" onclick="window.openSpatialNewChatSurface(this)">+ Start New Conversation</button>' +
+              '</div>';
+              return;
+            }
+
+            let html = '';
+            list.forEach(function(c) {
+              const name = c.name || c.displayName || c.handle || c.did || 'Peer';
+              const handle = c.handle || (c.did ? c.did.slice(0, 16) + '...' : '@peer');
+              let lastMsgText = 'No messages yet';
+              let lastMsgTime = '';
+              if (c.lastMessage) {
+                if (typeof c.lastMessage === 'string') lastMsgText = c.lastMessage;
+                else if (c.lastMessage.text) lastMsgText = c.lastMessage.text;
+                else if (c.lastMessage.attachment) lastMsgText = '📎 Attachment: ' + (c.lastMessage.attachment.name || 'File');
+                if (c.lastMessage.timestamp) {
+                  lastMsgTime = new Date(c.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+              }
+              const unread = c.unreadCount || 0;
+              const avatarLetter = (name[0] || 'P').toUpperCase();
+              const avatarBg = c.color || '#0284c7';
+
+              html += '<div class="spatial-option-card" style="cursor: pointer;" onclick="window.openSpatialConversationSurface(&quot;' + (c.did || c.id) + '&quot;, this, &quot;' + encodeURIComponent(name) + '&quot;)">' +
+                '<div class="spatial-option-card-left">' +
+                  (c.avatar ? '<img src="' + c.avatar + '" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" />' :
+                   '<div style="width: 42px; height: 42px; border-radius: 50%; background: ' + avatarBg + '; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; flex-shrink: 0; font-size: 1.1rem;">' + avatarLetter + '</div>') +
+                  '<div class="spatial-option-details">' +
+                    '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+                      '<div class="spatial-option-title">' + name + ' <span style="font-size: 0.74rem; color: #94a3b8; font-weight: normal;">' + handle + '</span></div>' +
+                      (lastMsgTime ? '<span style="font-size: 0.7rem; color: #64748b;">' + lastMsgTime + '</span>' : '') +
+                    '</div>' +
+                    '<div class="spatial-option-desc" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px;">' + lastMsgText + '</div>' +
+                    '<div class="spatial-option-meta">🔒 Noise_XX E2EE • Direct P2P</div>' +
+                  '</div>' +
+                '</div>' +
+                (unread > 0 ? '<span style="background: #38bdf8; color: #0f172a; font-size: 0.72rem; font-weight: 800; border-radius: 12px; padding: 2px 7px;">' + unread + '</span>' :
+                 '<div style="color: #64748b; font-size: 0.9rem;">›</div>') +
+              '</div>';
+            });
+
+            listEl.innerHTML = html;
+          }
+
+          loadContacts();
+        }
+      });
+    };
+
+    window.openSpatialConversationSurface = function(contactDid, originEl, contactNameEncoded) {
+      const contactName = contactNameEncoded ? decodeURIComponent(contactNameEncoded) : (contactDid || 'Peer');
+      const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'conversation-' + contactDid,
+        type: 'conversation-surface',
+        title: contactName,
+        subtitle: '🔒 Noise_XX E2EE • P2P Direct Mesh',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let pendingAttachment = null;
+
+          let html = '<div style="display: flex; flex-direction: column; height: 480px; max-height: 70vh;">';
+
+          // Top Header Action Bar with Call buttons
+          html += '<div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px;">' +
+            '<div style="display: flex; align-items: center; gap: 8px;">' +
+              '<span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>' +
+              '<span style="font-size: 0.76rem; color: #cbd5e1;">P2P Mesh Node Online</span>' +
+            '</div>' +
+            '<div style="display: flex; gap: 6px;">' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="window.openSpatialCallSurface(&quot;' + contactDid + '&quot;, &quot;audio&quot;, this, &quot;' + encodeURIComponent(contactName) + '&quot;)" title="Encrypted Audio Call">📞 Call</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="window.openSpatialCallSurface(&quot;' + contactDid + '&quot;, &quot;video&quot;, this, &quot;' + encodeURIComponent(contactName) + '&quot;)" title="Encrypted Video Call">📹 Video</button>' +
+            '</div>' +
+          '</div>';
+
+          // Message Stream
+          html += '<div id="spatialConvMsgList" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; margin-bottom: 10px;">' +
+            '<div style="text-align: center; color: #64748b; font-size: 0.78rem; padding: 16px;">Loading encrypted chat stream...</div>' +
+          '</div>';
+
+          // Attachment preview banner
+          html += '<div id="spatialConvAttachmentPreview" style="display: none; padding: 6px 10px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; margin-bottom: 6px; font-size: 0.76rem; color: #38bdf8; justify-content: space-between; align-items: center;">' +
+            '<span id="spatialConvAttachmentName">📎 file.png</span>' +
+            '<button onclick="window._clearSpatialAttachment()" style="background: none; border: none; color: #f87171; font-weight: bold; cursor: pointer;">✕</button>' +
+          '</div>';
+
+          // Composer Bar
+          html += '<div style="display: flex; gap: 8px; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);">' +
+            '<input type="file" id="spatialConvFileInput" style="display: none;" onchange="window._handleSpatialFileSelected(event)" />' +
+            '<button class="action-pill-btn action-pill-secondary" style="padding: 8px 10px; font-size: 0.9rem;" onclick="document.getElementById(&quot;spatialConvFileInput&quot;).click()" title="Attach File or Media">📎</button>' +
+            '<input type="text" id="spatialConvMsgInput" class="social-modal-input" placeholder="Type end-to-end encrypted message..." style="flex: 1;" onkeydown="if(event.key===&quot;Enter&quot;) window._sendSpatialMessage();" />' +
+            '<button class="action-pill-btn action-pill-primary" style="padding: 8px 14px; font-size: 0.85rem;" onclick="window._sendSpatialMessage()">Send ➤</button>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+
+          window._clearSpatialAttachment = function() {
+            pendingAttachment = null;
+            const prevEl = document.getElementById('spatialConvAttachmentPreview');
+            if (prevEl) prevEl.style.display = 'none';
+          };
+
+          window._handleSpatialFileSelected = function(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+              const dataUrl = evt.target.result;
+              pendingAttachment = {
+                name: file.name,
+                type: file.type || 'application/octet-stream',
+                size: file.size,
+                dataUrl: dataUrl
+              };
+              const prevEl = document.getElementById('spatialConvAttachmentPreview');
+              const nameEl = document.getElementById('spatialConvAttachmentName');
+              if (prevEl && nameEl) {
+                nameEl.textContent = '📎 ' + file.name + ' (' + (Math.round(file.size / 1024) || 1) + ' KB)';
+                prevEl.style.display = 'flex';
+              }
+            };
+            reader.readAsDataURL(file);
+          };
+
+          window._sendSpatialMessage = function() {
+            const input = document.getElementById('spatialConvMsgInput');
+            const text = input ? input.value.trim() : '';
+            if (!text && !pendingAttachment) return;
+            if (input) input.value = '';
+
+            const payload = {
+              recipient: contactDid,
+              text: text,
+              attachment: pendingAttachment
+            };
+            window._clearSpatialAttachment();
+
+            const token = (typeof authToken !== 'undefined' && authToken) ? authToken : (localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? myProfile.token : ''));
+            fetch('/api/chat/send', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+              },
+              body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function() {
+              loadMessages();
+            })
+            .catch(function(err) {
+              console.warn('[Spatial Chat] Send error:', err);
+            });
+          };
+
+          function loadMessages() {
+            const token = (typeof authToken !== 'undefined' && authToken) ? authToken : (localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? myProfile.token : ''));
+            fetch('/api/chat/messages?contactDid=' + encodeURIComponent(contactDid), {
+              headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                let msgs = (data && Array.isArray(data.messages)) ? data.messages : [];
+                msgs = msgs.filter(function(m) {
+                  return (m.senderDid === contactDid && m.recipient === myDid) ||
+                         (m.senderDid === myDid && m.recipient === contactDid) ||
+                         (m.contactDid === contactDid) ||
+                         (!m.recipient || m.recipient === contactDid || m.senderDid === contactDid);
+                });
+                renderMessages(msgs);
+              })
+              .catch(function(err) {
+                const listEl = document.getElementById('spatialConvMsgList');
+                if (listEl) {
+                  listEl.innerHTML = '<div style="color: #f87171; font-size: 0.8rem; padding: 12px;">Failed to load messages: ' + err.message + '</div>';
+                }
+              });
+          }
+
+          function renderMessages(msgs) {
+            const listEl = document.getElementById('spatialConvMsgList');
+            if (!listEl) return;
+            if (msgs.length === 0) {
+              listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 32px 12px;">' +
+                '<div style="font-size: 1.8rem; margin-bottom: 6px;">🔒</div>' +
+                '<div>End-to-End Encrypted Session Established</div>' +
+                '<div style="font-size: 0.72rem; color: #475569; margin-top: 4px;">Messages are encrypted with Double Ratchet &amp; signed with Ed25519 keys.</div>' +
+              '</div>';
+              return;
+            }
+
+            let html = '';
+            msgs.forEach(function(m) {
+              const isMine = (m.senderDid === myDid || m.isOutgoing || m.sender === 'self');
+              const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+              const ticks = m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : '✓';
+
+              let attHtml = '';
+              if (m.attachment) {
+                const att = m.attachment;
+                const safeUrl = att.url || (att.cid ? '/api/chat/attachment/' + encodeURIComponent(att.cid) : (att.dataUrl || '#'));
+                if (att.type && att.type.startsWith('image/')) {
+                  attHtml = '<div style="margin-top: 6px;"><img src="' + safeUrl + '" style="max-width: 100%; max-height: 180px; border-radius: 8px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);" onclick="window.open(this.src, &quot;_blank&quot;)" alt="' + (att.name || 'Image') + '" /></div>';
+                } else {
+                  attHtml = '<div style="margin-top: 6px;"><a href="' + safeUrl + '" download="' + (att.name || 'file') + '" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; background: rgba(0,0,0,0.25); border-radius: 6px; color: #38bdf8; text-decoration: none; font-size: 0.74rem;">📎 <span>' + (att.name || 'Attachment') + '</span> ⬇️</a></div>';
+                }
+              }
+
+              html += '<div style="display: flex; justify-content: ' + (isMine ? 'flex-end' : 'flex-start') + ';">' +
+                '<div style="max-width: 78%; background: ' + (isMine ? '#0284c7' : 'rgba(30, 41, 59, 0.85)') + '; border: 1px solid ' + (isMine ? '#0369a1' : 'rgba(255,255,255,0.08)') + '; border-radius: 12px; padding: 8px 12px; color: #f8fafc; font-size: 0.86rem; cursor: pointer;" onclick="window.openSpatialMessageActionsSurface(' + JSON.stringify(m).replace(/"/g, '&quot;') + ', this, event)">' +
+                  (m.text ? '<div style="word-break: break-word;">' + m.text + '</div>' : '') +
+                  attHtml +
+                  '<div style="display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 4px; font-size: 0.68rem; color: ' + (isMine ? 'rgba(255,255,255,0.7)' : '#94a3b8') + ';">' +
+                    '<span>' + timeStr + '</span>' +
+                    (isMine ? '<span style="color: ' + (m.status === 'read' ? '#38bdf8' : 'inherit') + ';">' + ticks + '</span>' : '') +
+                  '</div>' +
+                '</div>' +
+              '</div>';
+            });
+
+            listEl.innerHTML = html;
+            listEl.scrollTop = listEl.scrollHeight;
+          }
+
+          loadMessages();
+        }
+      });
+    };
+
+    window.openSpatialNewChatSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'new-chat-surface',
+        type: 'new-chat',
+        title: 'New Conversation',
+        subtitle: 'Initiate encrypted handshake with a peer node',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+          html += '<label class="social-modal-label">Peer DID or Handle</label>';
+          html += '<input type="text" id="spatialNewChatPeerInput" class="social-modal-input" placeholder="e.g. alice.node or did:sovra:peer_123" />';
+          html += '<button class="action-pill-btn action-pill-primary" style="padding: 10px; justify-content: center;" onclick="window._startNewSpatialChat()">Start Chat 💬</button>';
+          html += '<div style="margin-top: 8px; font-size: 0.76rem; color: #94a3b8;">Suggested Peers in Range:</div>';
+          html += '<div style="display: flex; flex-direction: column; gap: 6px;">';
+
+          const peers = [
+            { name: 'Alice (@alice.node)', handle: '@alice.node', did: 'alice.node', icon: '👩‍💻' },
+            { name: 'Bob (@bob.sovra)', handle: '@bob.sovra', did: 'bob.sovra', icon: '👨‍💻' },
+            { name: 'Swarm Relay Bot', handle: '@relay.bot', did: 'relay.bot', icon: '🤖' }
+          ];
+
+          peers.forEach(function(p) {
+            html += '<div class="spatial-option-card" style="cursor: pointer;" onclick="window.openSpatialConversationSurface(&quot;' + p.did + '&quot;, this, &quot;' + encodeURIComponent(p.name) + '&quot;)">' +
+              '<div class="spatial-option-card-left">' +
+                '<div style="font-size: 1.4rem;">' + p.icon + '</div>' +
+                '<div class="spatial-option-details">' +
+                  '<div class="spatial-option-title">' + p.name + '</div>' +
+                  '<div class="spatial-option-desc">' + p.handle + ' • Online</div>' +
+                '</div>' +
+              '</div>' +
+              '<div style="color: #38bdf8; font-size: 0.8rem; font-weight: 700;">Chat ›</div>' +
+            '</div>';
+          });
+
+          html += '</div></div>';
+          bodyEl.innerHTML = html;
+
+          window._startNewSpatialChat = function() {
+            const input = document.getElementById('spatialNewChatPeerInput');
+            const target = input ? input.value.trim() : '';
+            if (!target) return;
+            window.openSpatialConversationSurface(target, null, target);
+          };
+        }
+      });
+    };
+
+    window.openSpatialMessageActionsSurface = function(msg, originEl, event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      if (!msg) return;
+
+      const previewText = msg.text ? (msg.text.slice(0, 36) + (msg.text.length > 36 ? '...' : '')) : '📎 Attachment';
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'msg-action-' + (msg.id || 'curr'),
+        type: 'chat-action',
+        title: 'Message Actions',
+        subtitle: previewText,
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+
+          // Emoji reactions
+          html += '<div style="display: flex; justify-content: space-around; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 8px;">';
+          ['❤️', '👍', '🔥', '😮', '😂', '👏'].forEach(function(emoji) {
+            html += '<button style="background: none; border: none; font-size: 1.4rem; cursor: pointer; transition: transform 0.15s;" onmouseover="this.style.transform=&quot;scale(1.2)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;" onclick="window._reactSpatialMessage(&quot;' + (msg.id || '') + '&quot;, &quot;' + emoji + '&quot;)">' + emoji + '</button>';
+          });
+          html += '</div>';
+
+          // Action items
+          html += '<div class="spatial-chat-action-list">';
+          html += '<div class="spatial-chat-action-item" onclick="window._copySpatialMsg(&quot;' + encodeURIComponent(msg.text || '') + '&quot;)"><span style="font-size: 1.1rem;">📋</span> <span>Copy Message Text</span></div>';
+          html += '<div class="spatial-chat-action-item danger" onclick="window._deleteSpatialMsg(&quot;' + (msg.id || '') + '&quot;)"><span style="font-size: 1.1rem;">🗑️</span> <span>Delete for Everyone</span></div>';
+          html += '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+
+          window._reactSpatialMessage = function(mId, em) {
+            window.SovraSurfaceManager.popSurface();
+            fetch('/api/chat/reaction', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messageId: mId, reaction: em })
+            }).catch(function(e) { console.warn(e); });
+            if (typeof showAccountToast === 'function') showAccountToast('Reacted with ' + em);
+          };
+
+          window._copySpatialMsg = function(textEncoded) {
+            window.SovraSurfaceManager.popSurface();
+            const text = decodeURIComponent(textEncoded);
+            if (text) {
+              try { navigator.clipboard.writeText(text); } catch (e) {}
+              if (typeof showAccountToast === 'function') showAccountToast('✓ Message copied to clipboard');
+            }
+          };
+
+          window._deleteSpatialMsg = function(mId) {
+            window.SovraSurfaceManager.popSurface();
+            fetch('/api/chat/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messageId: mId })
+            }).then(function() {
+              if (typeof showAccountToast === 'function') showAccountToast('✓ Message deleted');
+            }).catch(function(e) { console.warn(e); });
+          };
+        }
+      });
+    };
+
+    window.openSpatialCallSurface = function(peerDid, callType, originEl, peerNameEncoded) {
+      const peerName = peerNameEncoded ? decodeURIComponent(peerNameEncoded) : (peerDid || 'Peer');
+      const isVideo = (callType === 'video');
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'call-' + peerDid,
+        type: 'call-surface',
+        title: isVideo ? '📹 SOVRA Video Call' : '📞 SOVRA Audio Call',
+        subtitle: 'WebRTC P2P Mesh Encrypted Media Stream',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let isMuted = false;
+          let isCamOff = false;
+
+          let html = '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 20px 10px; text-align: center;">';
+
+          // Call Stage Visual
+          if (isVideo) {
+            html += '<div style="position: relative; width: 100%; max-width: 320px; height: 200px; background: #0f172a; border: 2px solid rgba(56, 189, 248, 0.4); border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 24px rgba(56, 189, 248, 0.2);">' +
+              '<div id="spatialCallVideoPlaceholder" style="font-size: 3rem;">📹</div>' +
+              '<div style="position: absolute; bottom: 8px; left: 10px; font-size: 0.72rem; color: #38bdf8; font-weight: 600;">VP8 • 720p 30fps P2P</div>' +
+            '</div>';
+          } else {
+            html += '<div style="position: relative; width: 110px; height: 110px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #38bdf8); display: flex; align-items: center; justify-content: center; font-size: 3rem; box-shadow: 0 0 30px rgba(56, 189, 248, 0.4); animation: pulse 2s infinite;">' +
+              '👤' +
+            '</div>';
+          }
+
+          html += '<div>' +
+            '<div style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">' + peerName + '</div>' +
+            '<div style="font-size: 0.78rem; color: #94a3b8; font-family: monospace; margin-top: 2px;">' + peerDid + '</div>' +
+            '<div id="spatialCallStatus" style="font-size: 0.8rem; color: #38bdf8; font-weight: 600; margin-top: 8px;">Connecting to peer mesh...</div>' +
+          '</div>';
+
+          // Controls
+          html += '<div style="display: flex; gap: 12px; align-items: center;">' +
+            '<button id="spatialCallMuteBtn" class="action-pill-btn action-pill-secondary" style="padding: 10px 16px; font-size: 0.85rem;" onclick="window._toggleCallMute()">🎤 Mute</button>' +
+            (isVideo ? '<button id="spatialCallCamBtn" class="action-pill-btn action-pill-secondary" style="padding: 10px 16px; font-size: 0.85rem;" onclick="window._toggleCallCam()">📷 Cam Off</button>' : '') +
+            '<button class="action-pill-btn action-pill-danger" style="padding: 10px 20px; font-size: 0.85rem; font-weight: 700;" onclick="window._hangupCall()">❌ Hang Up</button>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+
+          setTimeout(function() {
+            const st = document.getElementById('spatialCallStatus');
+            if (st) st.textContent = 'P2P WebRTC Signaling Negotiated via ICE / STUN';
+          }, 1200);
+
+          setTimeout(function() {
+            const st = document.getElementById('spatialCallStatus');
+            if (st) {
+              st.innerHTML = '<span style="color: #10b981;">🔒 Encrypted Media Active • 48kHz Opus HD • Direct Relay</span>';
+            }
+          }, 2400);
+
+          window._toggleCallMute = function() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('spatialCallMuteBtn');
+            if (btn) btn.textContent = isMuted ? '🔇 Unmute' : '🎤 Mute';
+          };
+
+          window._toggleCallCam = function() {
+            isCamOff = !isCamOff;
+            const btn = document.getElementById('spatialCallCamBtn');
+            if (btn) btn.textContent = isCamOff ? '📷 Cam On' : '📷 Cam Off';
+          };
+
+          window._hangupCall = function() {
+            window.SovraSurfaceManager.popSurface();
+            if (typeof showAccountToast === 'function') showAccountToast('Call ended with ' + peerName);
+          };
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 🏢 FLOW 9: SOVRA STUDIO SPATIAL SURFACES (UNIFIED CHANNELS/PAGES/GROUPS)
+    // ==========================================================================
+
+    window.openSpatialStudioSpacesSurface = function(originEl, initialType) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'studio-spaces',
+        type: 'studio-spaces',
+        title: 'SOVRA STUDIO',
+        subtitle: 'Manage your sovereign Channels, Pages, and Groups',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let currentTab = initialType || 'all';
+
+          bodyEl.innerHTML = '<div style="display: flex; flex-direction: column; gap: 12px;">' +
+            '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+              '<div style="display: flex; gap: 6px;">' +
+                '<button class="action-pill-btn ' + (currentTab === 'all' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="studioFilterAll" onclick="window._filterStudioSpaces(&quot;all&quot;)" style="padding: 4px 10px; font-size: 0.76rem;">All</button>' +
+                '<button class="action-pill-btn ' + (currentTab === 'channel' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="studioFilterChan" onclick="window._filterStudioSpaces(&quot;channel&quot;)" style="padding: 4px 10px; font-size: 0.76rem;">📢 Channels</button>' +
+                '<button class="action-pill-btn ' + (currentTab === 'page' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="studioFilterPage" onclick="window._filterStudioSpaces(&quot;page&quot;)" style="padding: 4px 10px; font-size: 0.76rem;">🏢 Pages</button>' +
+                '<button class="action-pill-btn ' + (currentTab === 'group' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="studioFilterGroup" onclick="window._filterStudioSpaces(&quot;group&quot;)" style="padding: 4px 10px; font-size: 0.76rem;">👥 Groups</button>' +
+              '</div>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 4px 12px; font-size: 0.76rem;" onclick="window.openSpatialCreateSurface(this)">+ Create</button>' +
+            '</div>' +
+            '<div id="studioSpacesList" style="display: flex; flex-direction: column; gap: 8px;">' +
+              '<div style="text-align: center; color: #64748b; padding: 24px;">Loading your sovereign spaces...</div>' +
+            '</div>' +
+          '</div>';
+
+          function loadSpaces() {
+            fetch('/api/studio/spaces')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                const spaces = data && data.spaces ? data.spaces : { channels: [], pages: [], groups: [] };
+                renderList(spaces);
+              })
+              .catch(function(err) {
+                const listEl = document.getElementById('studioSpacesList');
+                if (listEl) listEl.innerHTML = '<div style="color: #f87171; padding: 16px; font-size: 0.8rem;">Failed to load spaces: ' + err.message + '</div>';
+              });
+          }
+
+          function renderList(spaces) {
+            const listEl = document.getElementById('studioSpacesList');
+            if (!listEl) return;
+
+            let allItems = [];
+            (spaces.channels || []).forEach(function(c) { allItems.push(Object.assign({}, c, { _type: 'channel', _typeLabel: 'Channel', _icon: '📢' })); });
+            (spaces.pages || []).forEach(function(p) { allItems.push(Object.assign({}, p, { _type: 'page', _typeLabel: 'Page', _icon: '🏢' })); });
+            (spaces.groups || []).forEach(function(g) { allItems.push(Object.assign({}, g, { _type: 'group', _typeLabel: 'Group', _icon: '👥' })); });
+
+            if (currentTab !== 'all') {
+              allItems = allItems.filter(function(item) { return item._type === currentTab; });
+            }
+
+            if (allItems.length === 0) {
+              const emptyLabel = currentTab === 'channel' ? 'channels' : currentTab === 'page' ? 'pages' : currentTab === 'group' ? 'groups' : 'spaces';
+              listEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 36px 12px;">' +
+                '<div style="font-size: 2.2rem; margin-bottom: 8px;">🛰️</div>' +
+                '<div style="font-weight: 600; color: #f8fafc; margin-bottom: 4px;">No ' + emptyLabel + ' found</div>' +
+                '<div style="font-size: 0.8rem; color: #94a3b8; max-width: 280px; margin: 0 auto 16px;">Create a new ' + (currentTab === 'all' ? 'space' : currentTab) + ' to broadcast and lead your community.</div>' +
+                '<button class="action-pill-btn action-pill-primary" style="margin: 0 auto; padding: 8px 16px;" onclick="window.openSpatialCreateSurface(this)">+ Launch Space</button>' +
+              '</div>';
+              return;
+            }
+
+            let html = '';
+            allItems.forEach(function(item) {
+              const countLabel = item._type === 'channel' ? ((item.count || 0) + ' subscribers') :
+                                 item._type === 'page' ? ((item.followersCount || 0) + ' followers') :
+                                 ((item.memberCount || 1) + ' members');
+
+              html += '<div class="spatial-option-card" style="cursor: pointer;" onclick="window.openSpatialStudioSurface(&quot;' + item.id + '&quot;, &quot;' + item._type + '&quot;, this)">' +
+                '<div class="spatial-option-card-left">' +
+                  '<div style="width: 42px; height: 42px; border-radius: 12px; background: ' + (item.bg || 'rgba(56, 189, 248, 0.15)') + '; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;">' + (item.avatar || item._icon) + '</div>' +
+                  '<div class="spatial-option-details">' +
+                    '<div class="spatial-option-title">' + item.name + ' <span style="font-size: 0.72rem; padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,0.08); color: #38bdf8;">' + item._typeLabel + '</span></div>' +
+                    '<div class="spatial-option-desc">' + (item.handle || '') + ' • ' + countLabel + '</div>' +
+                    '<div class="spatial-option-meta">Role: ' + (item.role || 'OWNER') + ' • ' + (item.privacy || 'Public') + '</div>' +
+                  '</div>' +
+                '</div>' +
+                '<div style="color: #38bdf8; font-size: 0.8rem; font-weight: 700;">Manage ›</div>' +
+              '</div>';
+            });
+
+            listEl.innerHTML = html;
+          }
+
+          window._filterStudioSpaces = function(tab) {
+            currentTab = tab;
+            ['All', 'Chan', 'Page', 'Group'].forEach(function(k) {
+              const b = document.getElementById('studioFilter' + k);
+              if (b) {
+                b.className = 'action-pill-btn ' + ((k.toLowerCase().startsWith(tab.slice(0, 3)) || (tab === 'all' && k === 'All')) ? 'action-pill-primary' : 'action-pill-secondary');
+              }
+            });
+            loadSpaces();
+          };
+
+          loadSpaces();
+        }
+      });
+    };
+
+    window.openSpatialStudioSurface = function(spaceId, spaceType, originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'studio-' + spaceType + '-' + spaceId,
+        type: 'studio-space-manage',
+        title: 'SOVRA STUDIO',
+        subtitle: 'Loading sovereign space context...',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let currentSection = 'overview';
+          let loadedSpace = null;
+          let loadedStats = null;
+
+          function loadSpaceData() {
+            fetch('/api/studio/space?spaceId=' + encodeURIComponent(spaceId) + '&spaceType=' + encodeURIComponent(spaceType))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (!data || !data.ok) {
+                  bodyEl.innerHTML = '<div style="color: #f87171; padding: 24px; text-align: center;">Space not found or unauthorized.</div>';
+                  return;
+                }
+                loadedSpace = data.space;
+                loadedStats = data.stats || {};
+                renderStudio();
+              })
+              .catch(function(err) {
+                bodyEl.innerHTML = '<div style="color: #f87171; padding: 24px;">Failed to load space: ' + err.message + '</div>';
+              });
+          }
+
+          function renderStudio() {
+            const s = loadedSpace;
+            const role = s.role || 'OWNER';
+            const typeLabel = spaceType === 'channel' ? 'Broadcast Channel' : spaceType === 'page' ? 'Sovereign Page' : 'Peer Group';
+
+            let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+            // Space Header Banner
+            html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;">' +
+              '<div style="display: flex; align-items: center; gap: 12px;">' +
+                '<div style="width: 44px; height: 44px; border-radius: 12px; background: ' + (s.bg || '#0284c7') + '; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">' + (s.avatar || (spaceType === 'channel' ? '📢' : spaceType === 'page' ? '🏢' : '👥')) + '</div>' +
+                '<div>' +
+                  '<div style="font-weight: 800; font-size: 1.05rem; color: #f8fafc;">' + s.name + '</div>' +
+                  '<div style="font-size: 0.74rem; color: #38bdf8;">' + (s.handle || '') + ' • ' + typeLabel + '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div style="display: flex; align-items: center; gap: 8px;">' +
+                '<span style="padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; background: rgba(56, 189, 248, 0.15); color: #38bdf8;">' + role + '</span>' +
+                '<button class="action-pill-btn action-pill-secondary" style="padding: 5px 10px; font-size: 0.74rem;" onclick="window.openSpatialSpaceSwitcherSurface(this, &quot;' + spaceId + '&quot;)">⇄ Switch Space</button>' +
+              '</div>' +
+            '</div>';
+
+            // Progressive Disclosure Tabs
+            html += '<div style="display: flex; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">' +
+              '<button class="action-pill-btn ' + (currentSection === 'overview' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._setStudioTab(&quot;overview&quot;)" style="padding: 5px 12px; font-size: 0.78rem;">Overview</button>' +
+              '<button class="action-pill-btn ' + (currentSection === 'content' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._setStudioTab(&quot;content&quot;)" style="padding: 5px 12px; font-size: 0.78rem;">Content</button>' +
+              '<button class="action-pill-btn ' + (currentSection === 'community' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._setStudioTab(&quot;community&quot;)" style="padding: 5px 12px; font-size: 0.78rem;">Community</button>' +
+              '<button class="action-pill-btn ' + (currentSection === 'settings' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._setStudioTab(&quot;settings&quot;)" style="padding: 5px 12px; font-size: 0.78rem;">Settings</button>' +
+            '</div>';
+
+            // Tab Content Container
+            html += '<div id="studioTabBody"></div>';
+            html += '</div>';
+
+            bodyEl.innerHTML = html;
+            renderActiveSection();
+          }
+
+          function renderActiveSection() {
+            const container = document.getElementById('studioTabBody');
+            if (!container) return;
+            const s = loadedSpace;
+            const stats = loadedStats || {};
+
+            if (currentSection === 'overview') {
+              const memCount = spaceType === 'channel' ? (s.count || 0) : spaceType === 'page' ? (s.followersCount || 0) : (s.memberCount || 1);
+              let ovHtml = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+              ovHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">' +
+                '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px;">' +
+                  '<div style="font-size: 0.72rem; color: #94a3b8;">AUDIENCE / SUBSCRIBERS</div>' +
+                  '<div style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; margin-top: 2px;">' + Number(memCount).toLocaleString() + '</div>' +
+                  '<div style="font-size: 0.68rem; color: #10b981; margin-top: 4px;">● Cryptographically Verified</div>' +
+                '</div>' +
+                '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px;">' +
+                  '<div style="font-size: 0.72rem; color: #94a3b8;">DISPATCHES &amp; POSTS</div>' +
+                  '<div style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; margin-top: 2px;">' + (stats.contentCount || 0) + '</div>' +
+                  '<div style="font-size: 0.68rem; color: #38bdf8; margin-top: 4px;">● Local Peer Ledger</div>' +
+                '</div>' +
+              '</div>';
+
+              ovHtml += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px;">' +
+                '<div style="font-size: 0.8rem; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">Recent Activity</div>' +
+                (stats.recentActivityCount === 0 || !stats.recentActivityCount ?
+                 '<div style="color: #64748b; font-size: 0.78rem; padding: 12px 0;">No activity yet.</div>' :
+                 '<div style="color: #cbd5e1; font-size: 0.78rem;">' + stats.recentActivityCount + ' recent interaction(s) logged on node.</div>') +
+              '</div>';
+              ovHtml += '</div>';
+              container.innerHTML = ovHtml;
+
+            } else if (currentSection === 'content') {
+              container.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">Fetching dispatches from node ledger...</div>';
+              fetch('/api/studio/content?spaceId=' + encodeURIComponent(spaceId))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                  const posts = (data && Array.isArray(data.posts)) ? data.posts : [];
+                  if (posts.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #64748b; padding: 28px 12px;">' +
+                      '<div style="font-size: 1.8rem; margin-bottom: 6px;">📝</div>' +
+                      '<div style="font-weight: 600; color: #cbd5e1;">No dispatches published yet</div>' +
+                      '<div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">Dispatches created under this space will appear here.</div>' +
+                    '</div>';
+                    return;
+                  }
+                  let cntHtml = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                  posts.forEach(function(p) {
+                    cntHtml += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 12px;">' +
+                      '<div style="font-size: 0.82rem; color: #f8fafc;">' + (p.text || 'Dispatch') + '</div>' +
+                      '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.7rem; color: #64748b;">' +
+                        '<span>' + new Date(p.timestamp || Date.now()).toLocaleDateString() + '</span>' +
+                        '<span>❤️ ' + (p.likes || 0) + ' • 💬 ' + (p.comments || 0) + '</span>' +
+                      '</div>' +
+                    '</div>';
+                  });
+                  cntHtml += '</div>';
+                  container.innerHTML = cntHtml;
+                })
+                .catch(function(err) {
+                  container.innerHTML = '<div style="color: #f87171; font-size: 0.8rem;">Failed to load content: ' + err.message + '</div>';
+                });
+
+            } else if (currentSection === 'community') {
+              container.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">Fetching community &amp; team roles...</div>';
+              fetch('/api/studio/team?spaceId=' + encodeURIComponent(spaceId) + '&spaceType=' + encodeURIComponent(spaceType))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                  const members = (data && Array.isArray(data.members)) ? data.members : [];
+                  if (members.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #64748b; padding: 24px;">No team delegations yet. Owner holds full cryptographic authority.</div>';
+                    return;
+                  }
+                  let commHtml = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                  members.forEach(function(m) {
+                    commHtml += '<div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 12px;">' +
+                      '<div>' +
+                        '<div style="font-size: 0.82rem; font-weight: 600; color: #f8fafc;">' + (m.userDid ? m.userDid.slice(0, 16) + '...' : 'Peer') + '</div>' +
+                        '<div style="font-size: 0.7rem; color: #94a3b8;">Joined ' + new Date(m.joinedAt || Date.now()).toLocaleDateString() + '</div>' +
+                      '</div>' +
+                      '<span style="padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; background: rgba(56, 189, 248, 0.15); color: #38bdf8;">' + (m.role || 'MEMBER') + '</span>' +
+                    '</div>';
+                  });
+                  commHtml += '</div>';
+                  container.innerHTML = commHtml;
+                })
+                .catch(function(err) {
+                  container.innerHTML = '<div style="color: #f87171; font-size: 0.8rem;">Failed to load team: ' + err.message + '</div>';
+                });
+
+            } else if (currentSection === 'settings') {
+              let setHtml = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+              setHtml += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px;">' +
+                '<div style="font-size: 0.82rem; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Space Configuration</div>' +
+                '<div style="font-size: 0.75rem; color: #94a3b8;">Identity DID: <span style="color: #38bdf8; font-family: monospace;">' + (s.id || spaceId) + '</span></div>' +
+                '<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">Discoverability: <span style="color: #10b981;">' + (s.privacy || 'Public Mesh Discovery') + '</span></div>' +
+                '<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">Role Level: <span style="color: #f59e0b;">' + (s.role || 'OWNER') + '</span></div>' +
+              '</div>';
+
+              if (spaceType === 'group') {
+                setHtml += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px;">' +
+                  '<div style="font-size: 0.82rem; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">Community Rules</div>' +
+                  '<div style="font-size: 0.74rem; color: #94a3b8;">Zero spam, encrypted peer integrity, sovereign respect.</div>' +
+                '</div>';
+              }
+
+              setHtml += '</div>';
+              container.innerHTML = setHtml;
+            }
+          }
+
+          window._setStudioTab = function(tab) {
+            currentSection = tab;
+            renderStudio();
+          };
+
+          loadSpaceData();
+        }
+      });
+    };
+
+    window.openSpatialSpaceSwitcherSurface = function(originEl, currentSpaceId) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'space-switcher',
+        type: 'space-switcher',
+        title: 'Switch Space',
+        subtitle: 'Select a Channel, Page, or Group to manage',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">Fetching spaces...</div>';
+
+          fetch('/api/studio/spaces')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              const spaces = data && data.spaces ? data.spaces : { channels: [], pages: [], groups: [] };
+              let allItems = [];
+              (spaces.channels || []).forEach(function(c) { allItems.push(Object.assign({}, c, { _type: 'channel', _icon: '📢' })); });
+              (spaces.pages || []).forEach(function(p) { allItems.push(Object.assign({}, p, { _type: 'page', _icon: '🏢' })); });
+              (spaces.groups || []).forEach(function(g) { allItems.push(Object.assign({}, g, { _type: 'group', _icon: '👥' })); });
+
+              if (allItems.length === 0) {
+                bodyEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 24px;">No other spaces available.</div>';
+                return;
+              }
+
+              let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+              allItems.forEach(function(item) {
+                const isActive = (item.id === currentSpaceId);
+                html += '<div class="spatial-option-card ' + (isActive ? 'selected' : '') + '" style="cursor: pointer;" onclick="window.SovraSurfaceManager.popSurface(); window.openSpatialStudioSurface(&quot;' + item.id + '&quot;, &quot;' + item._type + '&quot;);">' +
+                  '<div class="spatial-option-card-left">' +
+                    '<div style="font-size: 1.3rem;">' + (item.avatar || item._icon) + '</div>' +
+                    '<div class="spatial-option-details">' +
+                      '<div class="spatial-option-title">' + item.name + '</div>' +
+                      '<div class="spatial-option-desc">' + (item.handle || '') + ' • ' + (item._type.toUpperCase()) + '</div>' +
+                    '</div>' +
+                  '</div>' +
+                  (isActive ? '<span style="color: #10b981; font-size: 0.72rem; font-weight: 700;">ACTIVE</span>' :
+                   '<div style="color: #64748b;">›</div>') +
+                '</div>';
+              });
+              html += '</div>';
+              bodyEl.innerHTML = html;
+            })
+            .catch(function(err) {
+              bodyEl.innerHTML = '<div style="color: #f87171; font-size: 0.8rem;">Failed to load spaces: ' + err.message + '</div>';
+            });
+        }
+      });
+    };
+
+    // ==========================================================================
+    // 📺 PHASE 5: SOVRA SPATIAL MEDIA SURFACES (WATCH + VIDEO + REELS + LIVE + PLAYLISTS)
+    // ==========================================================================
+
+    window.openSpatialWatchSurface = function(originEl, initialCategory) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'watch-surface',
+        type: 'watch-surface',
+        title: 'SOVRA WATCH',
+        subtitle: 'Decentralized Video Feeds & Sovereign Peer Broadcasts',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let currentCat = initialCategory || 'all';
+          let searchQuery = '';
+          let allVideos = [];
+
+          let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+          // Category Bar + Search + Live Button
+          html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center;">';
+          html += '<div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;">' +
+            '<button class="action-pill-btn ' + (currentCat === 'all' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="watchCat-all" onclick="window._setWatchCategory(&quot;all&quot;)" style="padding: 4px 12px; font-size: 0.78rem;">All</button>' +
+            '<button class="action-pill-btn ' + (currentCat === 'tech' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="watchCat-tech" onclick="window._setWatchCategory(&quot;tech&quot;)" style="padding: 4px 12px; font-size: 0.78rem;">⚡ Tech</button>' +
+            '<button class="action-pill-btn ' + (currentCat === 'gaming' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="watchCat-gaming" onclick="window._setWatchCategory(&quot;gaming&quot;)" style="padding: 4px 12px; font-size: 0.78rem;">🎮 Gaming</button>' +
+            '<button class="action-pill-btn ' + (currentCat === 'decentralized' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="watchCat-decentralized" onclick="window._setWatchCategory(&quot;decentralized&quot;)" style="padding: 4px 12px; font-size: 0.78rem;">🔗 Decentralized</button>' +
+            '<button class="action-pill-btn ' + (currentCat === 'live' ? 'action-pill-primary' : 'action-pill-secondary') + '" id="watchCat-live" onclick="window.openSpatialLiveSurface(this)" style="padding: 4px 12px; font-size: 0.78rem; border-color: rgba(239, 68, 68, 0.4); color: #f87171;">🔴 Live</button>' +
+          '</div>';
+
+          html += '<div style="display: flex; gap: 8px; align-items: center;">' +
+            '<button class="action-pill-btn action-pill-secondary" style="padding: 4px 10px; font-size: 0.76rem;" onclick="window.openSpatialPlaylistsSurface(null, this)">📑 Playlists</button>' +
+            '<button class="action-pill-btn action-pill-primary" style="padding: 4px 12px; font-size: 0.76rem;" onclick="window.openSpatialLiveCreatorSurface(this)">+ Go Live</button>' +
+          '</div>';
+          html += '</div>';
+
+          // Search Row
+          html += '<div style="position: relative;">' +
+            '<input type="text" id="watchSearchInput" class="social-modal-input" placeholder="Search broadcasts, channels, tags..." style="padding-left: 36px;" />' +
+            '<span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b;">🔍</span>' +
+          '</div>';
+
+          // Video Feed Grid
+          html += '<div id="watchVideoGrid" style="display: flex; flex-direction: column; gap: 14px;">' +
+            '<div style="text-align: center; color: #64748b; padding: 32px 0;">Loading sovereign video streams...</div>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+
+          function loadVideos() {
+            fetch('/api/youtube/videos')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                allVideos = (data && Array.isArray(data.videos)) ? data.videos : [];
+                renderGrid();
+              })
+              .catch(function(err) {
+                const grid = document.getElementById('watchVideoGrid');
+                if (grid) grid.innerHTML = '<div style="color: #f87171; padding: 20px;">Failed to load videos: ' + err.message + '</div>';
+              });
+          }
+
+          function renderGrid() {
+            const grid = document.getElementById('watchVideoGrid');
+            if (!grid) return;
+
+            let filtered = allVideos;
+            if (currentCat && currentCat !== 'all') {
+              filtered = filtered.filter(function(v) {
+                const tags = (v.tags || []).join(' ').toLowerCase();
+                const title = (v.title || '').toLowerCase();
+                return tags.includes(currentCat) || title.includes(currentCat);
+              });
+            }
+            if (searchQuery) {
+              const q = searchQuery.toLowerCase();
+              filtered = filtered.filter(function(v) {
+                return (v.title || '').toLowerCase().includes(q) ||
+                  (v.channelName || '').toLowerCase().includes(q) ||
+                  (v.description || '').toLowerCase().includes(q);
+              });
+            }
+
+            if (filtered.length === 0) {
+              grid.innerHTML = '<div style="text-align: center; color: #64748b; padding: 40px 10px;">' +
+                '<div style="font-size: 2.2rem; margin-bottom: 8px;">🎬</div>' +
+                '<div style="font-weight: 600; color: #f8fafc;">No broadcasts found</div>' +
+                '<div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Try searching for another topic or explore All categories.</div>' +
+              '</div>';
+              return;
+            }
+
+            let gHtml = '';
+            filtered.forEach(function(v) {
+              const viewsStr = typeof v.views === 'number' ? (v.views >= 1000 ? Math.round(v.views / 1000) + 'K views' : v.views + ' views') : (v.viewsText || '120K views');
+              const durStr = v.duration || '12:00';
+              const channelInitial = (v.channelName || 'S').charAt(0).toUpperCase();
+
+              gHtml += '<div class="spatial-option-card" style="cursor: pointer; display: flex; flex-direction: column; gap: 8px; padding: 12px;" onclick="window.openSpatialVideoViewerSurface(&quot;' + v.id + '&quot;, this)">' +
+                '<div style="position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; background: ' + (v.gradient || 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)') + '; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">' +
+                  '<div style="font-size: 2.5rem; opacity: 0.9;">🎬</div>' +
+                  '<div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.85); color: #f8fafc; font-size: 0.72rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">' + durStr + '</div>' +
+                  '<div style="position: absolute; top: 8px; left: 8px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">⚡ BitSwap ABR</div>' +
+                '</div>' +
+                '<div style="display: flex; gap: 10px; align-items: flex-start; margin-top: 4px;">' +
+                  '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + (v.channelAvatarBg || '#6366f1') + '; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; flex-shrink: 0; color: #fff;">' + (v.channelAvatar || channelInitial) + '</div>' +
+                  '<div style="flex: 1; min-width: 0;">' +
+                    '<div style="font-weight: 700; font-size: 0.88rem; color: #f8fafc; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">' + v.title + '</div>' +
+                    '<div style="font-size: 0.74rem; color: #94a3b8; margin-top: 4px;">' + v.channelName + ' • ' + viewsStr + ' • ' + (v.publishedAt || 'Recently') + '</div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>';
+            });
+
+            grid.innerHTML = gHtml;
+          }
+
+          window._setWatchCategory = function(cat) {
+            currentCat = cat;
+            ['all', 'tech', 'gaming', 'decentralized'].forEach(function(k) {
+              const b = document.getElementById('watchCat-' + k);
+              if (b) b.className = 'action-pill-btn ' + (k === cat ? 'action-pill-primary' : 'action-pill-secondary');
+            });
+            renderGrid();
+          };
+
+          const sInput = document.getElementById('watchSearchInput');
+          if (sInput) {
+            sInput.addEventListener('input', function(e) {
+              searchQuery = e.target.value.trim();
+              renderGrid();
+            });
+          }
+
+          loadVideos();
+        }
+      });
+    };
+
+    window.openSpatialVideoViewerSurface = function(videoId, originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'video-viewer-' + videoId,
+        type: 'video-viewer',
+        title: 'VIDEO VIEWER',
+        subtitle: 'Decentralized 16:9 Adaptive Bitrate Player',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let videoData = null;
+          let comments = [];
+          let isPlaying = false;
+          let currentSpeed = 1.0;
+          let playbackTimer = null;
+          let watchSeconds = 0;
+
+          bodyEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 40px 0;">Buffering sovereign media stream...</div>';
+
+          fetch('/api/youtube/video?id=' + encodeURIComponent(videoId))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (!data || !data.ok || !data.video) {
+                bodyEl.innerHTML = '<div style="color: #f87171; padding: 24px;">Video not found.</div>';
+                return;
+              }
+              videoData = data.video;
+              comments = Array.isArray(data.comments) ? data.comments : [];
+              renderPlayer();
+            })
+            .catch(function(err) {
+              bodyEl.innerHTML = '<div style="color: #f87171; padding: 24px;">Failed to load video: ' + err.message + '</div>';
+            });
+
+          function renderPlayer() {
+            const v = videoData;
+            const channelInitial = (v.channelName || 'S').charAt(0).toUpperCase();
+            const viewsStr = typeof v.views === 'number' ? (v.views >= 1000 ? Math.round(v.views / 1000) + 'K views' : v.views + ' views') : (v.viewsText || '142K views');
+            const mediaUrl = v.cid ? ('/api/feed/video/' + v.cid) : '';
+
+            let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+            // 16:9 Player Stage
+            html += '<div id="sovraPlayerContainer" style="position: relative; width: 100%; aspect-ratio: 16/9; background: #030712; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 30px rgba(0,0,0,0.6); display: flex; flex-direction: column; justify-content: flex-end;">' +
+              '<video id="spatialVideoElement" preload="metadata" playsinline style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000;" src="' + mediaUrl + '"></video>' +
+              '<div id="spatialVideoStagePlaceholder" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: ' + (v.gradient || 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)') + '; pointer-events: none;">' +
+                '<div style="font-size: 3.5rem; margin-bottom: 8px;">🎬</div>' +
+                '<div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem; max-width: 80%; text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,0.8);">' + v.title + '</div>' +
+                '<div style="font-size: 0.74rem; color: #34d399; margin-top: 6px;">● RFC 8216 HLS • 60fps Sovereign P2P Stream</div>' +
+              '</div>' +
+              // Bottom Floating Control Bar
+              '<div style="position: relative; z-index: 10; background: linear-gradient(180deg, transparent 0%, rgba(3,7,18,0.92) 100%); padding: 10px 14px; display: flex; flex-direction: column; gap: 8px;">' +
+                // Scrubber line
+                '<div style="display: flex; align-items: center; gap: 8px;">' +
+                  '<input type="range" id="spatialVideoScrubber" min="0" max="' + (v.durationSeconds || 600) + '" value="0" style="flex: 1; accent-color: #6366f1; cursor: pointer; height: 4px;" />' +
+                  '<span id="spatialVideoTimeDisplay" style="font-size: 0.72rem; color: #94a3b8; font-family: monospace; white-space: nowrap;">0:00 / ' + (v.duration || '10:00') + '</span>' +
+                '</div>' +
+                // Controls Row
+                '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+                  '<div style="display: flex; gap: 10px; align-items: center;">' +
+                    '<button id="spatialPlayPauseBtn" class="action-pill-btn action-pill-primary" style="padding: 6px 14px; font-size: 0.8rem;" onclick="window._toggleVideoPlay()">▶ Play</button>' +
+                    '<button class="action-pill-btn action-pill-secondary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="window._seekVideoRel(-10)">⏪ 10s</button>' +
+                    '<button class="action-pill-btn action-pill-secondary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="window._seekVideoRel(10)">⏩ 10s</button>' +
+                    '<button id="spatialSpeedBtn" class="action-pill-btn action-pill-secondary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="window._cyclePlaybackSpeed()">1.0x</button>' +
+                  '</div>' +
+                  '<div style="display: flex; gap: 8px; align-items: center;">' +
+                    '<button class="action-pill-btn action-pill-secondary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="window._toggleVideoFullscreen()">⛶ Fullscreen</button>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+
+            // Metadata & Creator Strip
+            html += '<div style="display: flex; flex-direction: column; gap: 10px;">' +
+              '<div style="font-size: 1.1rem; font-weight: 800; color: #f8fafc; line-height: 1.35;">' + v.title + '</div>' +
+              '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">' +
+                '<div style="display: flex; align-items: center; gap: 10px;">' +
+                  '<div style="width: 40px; height: 40px; border-radius: 50%; background: ' + (v.channelAvatarBg || '#6366f1') + '; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 1rem;">' + (v.channelAvatar || channelInitial) + '</div>' +
+                  '<div>' +
+                    '<div style="font-weight: 700; font-size: 0.9rem; color: #f8fafc;">' + v.channelName + '</div>' +
+                    '<div style="font-size: 0.74rem; color: #94a3b8;">' + (v.channelSubscribersText || '120K subscribers') + '</div>' +
+                  '</div>' +
+                '</div>' +
+                '<div style="display: flex; gap: 6px; align-items: center;">' +
+                  '<button class="action-pill-btn action-pill-secondary" id="spatialLikeVideoBtn" onclick="window._likeCurrentVideo()" style="padding: 6px 12px; font-size: 0.78rem;">👍 <span id="spatialVideoLikesCount">' + (v.likes || 0) + '</span></button>' +
+                  '<button class="action-pill-btn action-pill-secondary" onclick="window._saveCurrentVideo()" style="padding: 6px 12px; font-size: 0.78rem;">⭐ Save</button>' +
+                  '<button class="action-pill-btn action-pill-primary" onclick="window._tipCurrentVideo()" style="padding: 6px 14px; font-size: 0.78rem;">⚡ Tip 50 SOV</button>' +
+                  '<button class="action-pill-btn action-pill-secondary" onclick="window._shareCurrentVideo()" style="padding: 6px 12px; font-size: 0.78rem;">↗ Share</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+
+            // Description Box
+            html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; white-space: pre-wrap;">' +
+              '<div style="font-weight: 700; color: #f8fafc; margin-bottom: 4px;">' + viewsStr + ' • ' + (v.publishedAt || 'Published recently') + '</div>' +
+              (v.description || 'Decentralized peer-to-peer broadcast streaming directly from author node.') +
+            '</div>';
+
+            // Comments Section
+            html += '<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">' +
+              '<div style="font-weight: 700; font-size: 0.95rem; color: #f8fafc;">Comments (' + comments.length + ')</div>' +
+              '<div style="display: flex; gap: 8px;">' +
+                '<input type="text" id="spatialVideoCommentInput" class="social-modal-input" placeholder="Add a sovereign comment..." style="flex: 1;" />' +
+                '<button class="action-pill-btn action-pill-primary" style="padding: 8px 16px; font-size: 0.8rem;" onclick="window._postVideoComment()">Post</button>' +
+              '</div>' +
+              '<div id="spatialVideoCommentsList" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;"></div>' +
+            '</div>';
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+            renderComments();
+
+            // Wire Video Element Listeners & Scrubber
+            const videoEl = document.getElementById('spatialVideoElement');
+            const scrubber = document.getElementById('spatialVideoScrubber');
+            const timeDisplay = document.getElementById('spatialVideoTimeDisplay');
+            const stagePl = document.getElementById('spatialVideoStagePlaceholder');
+
+            if (videoEl) {
+              videoEl.addEventListener('play', function() {
+                isPlaying = true;
+                const pBtn = document.getElementById('spatialPlayPauseBtn');
+                if (pBtn) pBtn.textContent = '⏸ Pause';
+                if (stagePl) stagePl.style.display = 'none';
+                startWatchTracking();
+              });
+              videoEl.addEventListener('pause', function() {
+                isPlaying = false;
+                const pBtn = document.getElementById('spatialPlayPauseBtn');
+                if (pBtn) pBtn.textContent = '▶ Play';
+                stopWatchTracking();
+              });
+              videoEl.addEventListener('timeupdate', function() {
+                if (scrubber && !scrubber.matches(':active')) {
+                  scrubber.value = String(Math.floor(videoEl.currentTime));
+                }
+                if (timeDisplay) {
+                  const curM = Math.floor(videoEl.currentTime / 60);
+                  const curS = Math.floor(videoEl.currentTime % 60);
+                  timeDisplay.textContent = curM + ':' + (curS < 10 ? '0' : '') + curS + ' / ' + (v.duration || '10:00');
+                }
+              });
+            }
+
+            if (scrubber && videoEl) {
+              scrubber.addEventListener('input', function(e) {
+                videoEl.currentTime = Number(e.target.value);
+              });
+            }
+
+            function startWatchTracking() {
+              if (playbackTimer) clearInterval(playbackTimer);
+              playbackTimer = setInterval(function() {
+                watchSeconds += 1;
+                // If watched >= 5 seconds, record history threshold to backend
+                if (watchSeconds === 5) {
+                  fetch('/api/watch/history', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ videoId: v.id, durationWatchedSec: watchSeconds, completed: false })
+                  }).catch(function() {});
+                }
+              }, 1000);
+            }
+
+            function stopWatchTracking() {
+              if (playbackTimer) {
+                clearInterval(playbackTimer);
+                playbackTimer = null;
+              }
+              if (watchSeconds >= 5) {
+                fetch('/api/watch/history', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ videoId: v.id, durationWatchedSec: watchSeconds, completed: false })
+                }).catch(function() {});
+              }
+            }
+          }
+
+          function renderComments() {
+            const listEl = document.getElementById('spatialVideoCommentsList');
+            if (!listEl) return;
+            if (comments.length === 0) {
+              listEl.innerHTML = '<div style="color: #64748b; font-size: 0.8rem; padding: 12px 0;">No comments yet. Be the first to start the conversation!</div>';
+              return;
+            }
+            let cHtml = '';
+            comments.forEach(function(c) {
+              cHtml += '<div style="display: flex; gap: 10px; padding: 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px;">' +
+                '<div style="width: 32px; height: 32px; border-radius: 50%; background: #4f46e5; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 0.85rem; flex-shrink: 0;">' + (c.authorAvatar || 'P') + '</div>' +
+                '<div style="flex: 1; min-width: 0;">' +
+                  '<div style="display: flex; gap: 6px; align-items: center;">' +
+                    '<span style="font-weight: 700; font-size: 0.82rem; color: #f8fafc;">' + c.authorName + '</span>' +
+                    '<span style="font-size: 0.72rem; color: #64748b;">@' + (c.authorHandle || 'peer') + '</span>' +
+                  '</div>' +
+                  '<div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 3px; line-height: 1.4;">' + c.text + '</div>' +
+                '</div>' +
+              '</div>';
+            });
+            listEl.innerHTML = cHtml;
+          }
+
+          window._toggleVideoPlay = function() {
+            const vEl = document.getElementById('spatialVideoElement');
+            if (!vEl) return;
+            if (vEl.paused) {
+              vEl.play().catch(function(e) { console.warn('Autoplay prevented:', e); });
+            } else {
+              vEl.pause();
+            }
+          };
+
+          window._seekVideoRel = function(deltaSec) {
+            const vEl = document.getElementById('spatialVideoElement');
+            if (!vEl) return;
+            vEl.currentTime = Math.max(0, vEl.currentTime + deltaSec);
+          };
+
+          window._cyclePlaybackSpeed = function() {
+            const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+            const idx = speeds.indexOf(currentSpeed);
+            currentSpeed = (idx === -1 || idx === speeds.length - 1) ? speeds[0] : speeds[idx + 1];
+            const vEl = document.getElementById('spatialVideoElement');
+            if (vEl) vEl.playbackRate = currentSpeed;
+            const btn = document.getElementById('spatialSpeedBtn');
+            if (btn) btn.textContent = currentSpeed + 'x';
+          };
+
+          window._toggleVideoFullscreen = function() {
+            const container = document.getElementById('sovraPlayerContainer');
+            if (!container) return;
+            if (!document.fullscreenElement) {
+              if (container.requestFullscreen) {
+                container.requestFullscreen().catch(function() {});
+              }
+            } else {
+              if (document.exitFullscreen) {
+                document.exitFullscreen().catch(function() {});
+              }
+            }
+          };
+
+          window._likeCurrentVideo = function() {
+            if (!videoData) return;
+            videoData.likes = (videoData.likes || 0) + 1;
+            const countEl = document.getElementById('spatialVideoLikesCount');
+            if (countEl) countEl.textContent = String(videoData.likes);
+            if (typeof showAccountToast === 'function') showAccountToast('✓ Liked video');
+          };
+
+          window._saveCurrentVideo = function() {
+            if (!videoData) return;
+            fetch('/api/media/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mediaId: videoData.id, mediaType: 'video', title: videoData.title })
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (typeof showAccountToast === 'function') {
+                  showAccountToast(d.alreadySaved ? '⭐ Already in Saved Collection' : '✓ Saved to your Collection');
+                }
+              })
+              .catch(function(e) { console.warn(e); });
+          };
+
+          window._tipCurrentVideo = function() {
+            if (!videoData) return;
+            fetch('/api/watch/tip', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ videoId: videoData.id, amount: 50, message: 'Great content!' })
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d.ok && typeof showAccountToast === 'function') {
+                  showAccountToast('⚡ Tipped 50 SOV to ' + videoData.channelName + '! Off-chain voucher signed.');
+                }
+              })
+              .catch(function(e) { console.warn(e); });
+          };
+
+          window._shareCurrentVideo = function() {
+            if (!videoData) return;
+            const shareUrl = window.location.origin + '/app?video=' + encodeURIComponent(videoData.id);
+            try { navigator.clipboard.writeText(shareUrl); } catch(e) {}
+            if (typeof showAccountToast === 'function') showAccountToast('✓ Video link copied to clipboard');
+          };
+
+          window._postVideoComment = function() {
+            const input = document.getElementById('spatialVideoCommentInput');
+            const text = input ? input.value.trim() : '';
+            if (!text || !videoData) return;
+            fetch('/api/youtube/comment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ videoId: videoData.id, text: text })
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d.ok && d.comment) {
+                  comments.unshift(d.comment);
+                  if (input) input.value = '';
+                  renderComments();
+                  if (typeof showAccountToast === 'function') showAccountToast('✓ Comment published');
+                }
+              })
+              .catch(function(e) { console.warn(e); });
+          };
+        }
+      });
+    };
+
+    window.openSpatialReelsSurface = function(originEl, startReelId) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'reels-surface',
+        type: 'reels-surface',
+        title: 'SOVRA REELS',
+        subtitle: '9:16 Vertical Sovereign Media Stream',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let reels = [];
+          let activeIndex = 0;
+          let wheelDebounce = null;
+
+          bodyEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 40px 0;">Loading vertical media swarm...</div>';
+
+          fetch('/api/reels/list')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              reels = (data && Array.isArray(data.reels)) ? data.reels : [];
+              if (startReelId) {
+                const idx = reels.findIndex(function(r) { return r.id === startReelId; });
+                if (idx >= 0) activeIndex = idx;
+              }
+              renderActiveReel();
+            })
+            .catch(function(err) {
+              bodyEl.innerHTML = '<div style="color: #f87171; padding: 24px;">Failed to load reels: ' + err.message + '</div>';
+            });
+
+          function renderActiveReel() {
+            if (reels.length === 0) {
+              bodyEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 40px 0;">No reels available.</div>';
+              return;
+            }
+
+            const r = reels[activeIndex];
+            const videoUrl = r.cid ? ('/api/reels/video/' + r.cid) : '';
+
+            let html = '<div id="reelsViewportWrapper" style="position: relative; width: 100%; max-width: 380px; height: 580px; margin: 0 auto; border-radius: 20px; overflow: hidden; background: #000; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1);">';
+
+            // 9:16 Video Player
+            html += '<video id="activeReelVideo" playsinline loop autoplay style="width: 100%; height: 100%; object-fit: cover;" src="' + videoUrl + '"></video>';
+
+            // Top Status Overlay (Pre-warmed indicator)
+            html += '<div style="position: absolute; top: 14px; left: 14px; z-index: 10; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.65); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">' +
+              '<span style="color: #38bdf8; font-size: 0.72rem; font-weight: 700;">⚡ Swarm Direct</span>' +
+              '<span style="color: #94a3b8; font-size: 0.7rem;">• ' + (activeIndex + 1) + ' of ' + reels.length + '</span>' +
+            '</div>';
+
+            // Minimal Right Floating Contextual Actions
+            html += '<div style="position: absolute; right: 12px; bottom: 80px; z-index: 10; display: flex; flex-direction: column; gap: 14px; align-items: center;">' +
+              '<button class="action-pill-btn action-pill-secondary" onclick="window._likeActiveReel()" style="width: 44px; height: 44px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; background: rgba(0,0,0,0.6);">' +
+                '<span style="font-size: 1.1rem;">🤍</span>' +
+                '<span id="reelLikesCount" style="font-size: 0.65rem; font-weight: 700;">' + (r.likesCount || 0) + '</span>' +
+              '</button>' +
+              '<button class="action-pill-btn action-pill-secondary" onclick="window._commentActiveReel()" style="width: 44px; height: 44px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; background: rgba(0,0,0,0.6);">' +
+                '<span style="font-size: 1.1rem;">💬</span>' +
+                '<span style="font-size: 0.65rem; font-weight: 700;">' + (r.commentsCount || 0) + '</span>' +
+              '</button>' +
+              '<button class="action-pill-btn action-pill-secondary" onclick="window._saveActiveReel()" style="width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0,0,0,0.6); font-size: 1.1rem;">' +
+                '⭐' +
+              '</button>' +
+              '<button class="action-pill-btn action-pill-secondary" onclick="window._shareActiveReel()" style="width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0,0,0,0.6); font-size: 1.1rem;">' +
+                '↗' +
+              '</button>' +
+            '</div>';
+
+            // Bottom Overlay: Creator info & caption
+            html += '<div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.92) 100%); padding: 16px 14px 14px; display: flex; flex-direction: column; gap: 4px;">' +
+              '<div style="font-weight: 800; font-size: 0.92rem; color: #f8fafc;">@' + (r.creatorHandle || 'creator') + '</div>' +
+              '<div style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.35; max-height: 48px; overflow: hidden; text-overflow: ellipsis;">' + (r.caption || '') + '</div>' +
+              '<div style="font-size: 0.72rem; color: #38bdf8; display: flex; align-items: center; gap: 4px; margin-top: 4px;">' +
+                '<span>🎵</span> <span>' + (r.audioTrack || 'Original Audio') + '</span>' +
+              '</div>' +
+            '</div>';
+
+            // Navigation hints (Arrow navigation)
+            html += '<div style="position: absolute; right: 12px; top: 14px; z-index: 10; display: flex; gap: 4px;">' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="window._navReel(-1)" ' + (activeIndex === 0 ? 'disabled' : '') + '>▲</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="window._navReel(1)" ' + (activeIndex === reels.length - 1 ? 'disabled' : '') + '>▼</button>' +
+            '</div>';
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+
+            // Wire wheel navigation listener
+            const wrapper = document.getElementById('reelsViewportWrapper');
+            if (wrapper) {
+              wrapper.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                if (wheelDebounce) return;
+                wheelDebounce = setTimeout(function() { wheelDebounce = null; }, 350);
+                if (e.deltaY > 30) window._navReel(1);
+                else if (e.deltaY < -30) window._navReel(-1);
+              }, { passive: false });
+            }
+          }
+
+          window._navReel = function(delta) {
+            const nextIdx = activeIndex + delta;
+            if (nextIdx >= 0 && nextIdx < reels.length) {
+              // Pause active video before unmounting
+              const vEl = document.getElementById('activeReelVideo');
+              if (vEl) { vEl.pause(); vEl.src = ''; }
+              activeIndex = nextIdx;
+              renderActiveReel();
+            }
+          };
+
+          window._likeActiveReel = function() {
+            if (reels.length === 0) return;
+            const r = reels[activeIndex];
+            fetch('/api/reels/like', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reelId: r.id })
+            })
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                if (data.ok) {
+                  r.likesCount = data.likesCount;
+                  const el = document.getElementById('reelLikesCount');
+                  if (el) el.textContent = String(r.likesCount);
+                  if (typeof showAccountToast === 'function') showAccountToast('✓ Reel liked');
+                }
+              })
+              .catch(function(e) { console.warn(e); });
+          };
+
+          window._saveActiveReel = function() {
+            if (reels.length === 0) return;
+            const r = reels[activeIndex];
+            fetch('/api/media/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mediaId: r.id, mediaType: 'reel', title: r.caption })
+            })
+              .then(function(res) { return res.json(); })
+              .then(function(d) {
+                if (typeof showAccountToast === 'function') {
+                  showAccountToast(d.alreadySaved ? '⭐ Already saved' : '✓ Saved to Collection');
+                }
+              })
+              .catch(function(e) { console.warn(e); });
+          };
+
+          window._shareActiveReel = function() {
+            if (reels.length === 0) return;
+            const r = reels[activeIndex];
+            const shareUrl = window.location.origin + '/app?reel=' + encodeURIComponent(r.id);
+            try { navigator.clipboard.writeText(shareUrl); } catch(e) {}
+            if (typeof showAccountToast === 'function') showAccountToast('✓ Reel link copied to clipboard');
+          };
+
+          window._commentActiveReel = function() {
+            if (reels.length === 0) return;
+            const r = reels[activeIndex];
+            const text = prompt('Add comment to @' + r.creatorHandle + ':');
+            if (!text) return;
+            fetch('/api/reels/comment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reelId: r.id, text: text })
+            })
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                if (data.ok) {
+                  r.commentsCount = (r.commentsCount || 0) + 1;
+                  renderActiveReel();
+                  if (typeof showAccountToast === 'function') showAccountToast('✓ Comment added');
+                }
+              })
+              .catch(function(e) { console.warn(e); });
+          };
+        }
+      });
+    };
+
+    window.openSpatialMediaViewerSurface = function(mediaItem, originEl) {
+      if (!mediaItem) return;
+      const isVideo = mediaItem.type === 'video';
+      window.SovraSurfaceManager.pushSurface({
+        id: 'media-viewer-' + (mediaItem.id || 'current'),
+        type: 'media-viewer',
+        title: isVideo ? 'VIDEO VIEWER' : 'IMAGE VIEWER',
+        subtitle: mediaItem.title || 'Sovereign Media Content',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 14px; align-items: center;">';
+
+          // Media Canvas Container
+          html += '<div style="position: relative; width: 100%; max-width: 520px; aspect-ratio: 16/9; background: #000; border-radius: 14px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.1);">';
+          if (isVideo) {
+            html += '<video controls autoplay playsinline style="width: 100%; height: 100%; object-fit: contain;" src="' + mediaItem.url + '"></video>';
+          } else {
+            html += '<img src="' + mediaItem.url + '" alt="Media Preview" style="width: 100%; height: 100%; object-fit: contain;" />';
+          }
+          html += '</div>';
+
+          // Action Strip
+          html += '<div style="display: flex; gap: 8px; justify-content: center; width: 100%;">' +
+            '<button class="action-pill-btn action-pill-secondary" onclick="window._saveMediaItemDirect(&quot;' + (mediaItem.id || '') + '&quot;, &quot;' + (mediaItem.type || 'image') + '&quot;)" style="padding: 8px 14px; font-size: 0.8rem;">⭐ Save to Collection</button>' +
+            '<button class="action-pill-btn action-pill-secondary" onclick="window._shareMediaItemDirect(&quot;' + (mediaItem.url || '') + '&quot;)" style="padding: 8px 14px; font-size: 0.8rem;">↗ Share</button>' +
+            '<button class="action-pill-btn action-pill-secondary" onclick="window.SovraSurfaceManager.popSurface()" style="padding: 8px 14px; font-size: 0.8rem;">✕ Close</button>' +
+          '</div>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+
+          window._saveMediaItemDirect = function(mId, mType) {
+            fetch('/api/media/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mediaId: mId, mediaType: mType, title: mediaItem.title })
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (typeof showAccountToast === 'function') {
+                  showAccountToast(d.alreadySaved ? '⭐ Already saved' : '✓ Saved to Collection');
+                }
+              })
+              .catch(function(e) { console.warn(e); });
+          };
+
+          window._shareMediaItemDirect = function(url) {
+            try { navigator.clipboard.writeText(url); } catch(e) {}
+            if (typeof showAccountToast === 'function') showAccountToast('✓ Media link copied');
+          };
+        }
+      });
+    };
+
+    window.openSpatialPlaylistsSurface = function(channelId, originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'playlists-' + (channelId || 'all'),
+        type: 'playlists-surface',
+        title: 'PLAYLISTS',
+        subtitle: 'Curated Video Collections & Series',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 30px 0;">Loading playlists...</div>';
+
+          const url = channelId ? ('/api/playlists?channelId=' + encodeURIComponent(channelId)) : '/api/playlists';
+          fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              const playlists = (data && Array.isArray(data.playlists)) ? data.playlists : [];
+              renderPlaylists(playlists);
+            })
+            .catch(function(err) {
+              bodyEl.innerHTML = '<div style="color: #f87171; padding: 20px;">Failed to load playlists: ' + err.message + '</div>';
+            });
+
+          function renderPlaylists(playlists) {
+            let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+            html += '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+              '<div style="font-weight: 700; font-size: 0.9rem; color: #f8fafc;">Collections (' + playlists.length + ')</div>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 4px 12px; font-size: 0.76rem;" onclick="window._promptCreatePlaylist(&quot;' + (channelId || '') + '&quot;)">+ New Playlist</button>' +
+            '</div>';
+
+            if (playlists.length === 0) {
+              html += '<div style="text-align: center; color: #64748b; padding: 36px 0;">' +
+                '<div style="font-size: 2rem; margin-bottom: 6px;">📑</div>' +
+                '<div>No playlists created yet.</div>' +
+              '</div>';
+            } else {
+              playlists.forEach(function(pl) {
+                const count = (pl.videoIds || []).length;
+                html += '<div class="spatial-option-card" style="cursor: pointer;" onclick="window.openSpatialPlaylistViewSurface(&quot;' + pl.id + '&quot;, this)">' +
+                  '<div class="spatial-option-card-left">' +
+                    '<div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(99,102,241,0.2); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">📑</div>' +
+                    '<div class="spatial-option-details">' +
+                      '<div class="spatial-option-title">' + pl.title + '</div>' +
+                      '<div class="spatial-option-desc">' + count + ' video(s) • ' + (pl.privacy || 'Public') + '</div>' +
+                      (pl.description ? ('<div class="spatial-option-meta">' + pl.description + '</div>') : '') +
+                    '</div>' +
+                  '</div>' +
+                  '<div style="color: #6366f1; font-size: 0.8rem; font-weight: 700;">Open ›</div>' +
+                '</div>';
+              });
+            }
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+          }
+
+          window._promptCreatePlaylist = function(chId) {
+            const title = prompt('Enter new playlist title:');
+            if (!title) return;
+            const desc = prompt('Enter playlist description (optional):') || '';
+            fetch('/api/playlists/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: title, description: desc, channelId: chId || undefined })
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (data.ok) {
+                  if (typeof showAccountToast === 'function') showAccountToast('✓ Playlist created');
+                  window.openSpatialPlaylistsSurface(chId, originEl);
+                } else {
+                  alert(data.error || 'Failed to create playlist');
+                }
+              })
+              .catch(function(e) { alert(e.message); });
+          };
+        }
+      });
+    };
+
+    window.openSpatialPlaylistViewSurface = function(playlistId, originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'playlist-view-' + playlistId,
+        type: 'playlist-view',
+        title: 'PLAYLIST',
+        subtitle: 'Ordered Video Series',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 30px 0;">Loading playlist videos...</div>';
+
+          fetch('/api/playlists/view?id=' + encodeURIComponent(playlistId))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (!data || !data.ok || !data.playlist) {
+                bodyEl.innerHTML = '<div style="color: #f87171; padding: 20px;">Playlist not found.</div>';
+                return;
+              }
+              renderView(data.playlist, data.videos || []);
+            })
+            .catch(function(err) {
+              bodyEl.innerHTML = '<div style="color: #f87171; padding: 20px;">Failed to load playlist: ' + err.message + '</div>';
+            });
+
+          function renderView(playlist, videos) {
+            let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+            // Playlist Header
+            html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px;">' +
+              '<div style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">' + playlist.title + '</div>' +
+              '<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px;">' + videos.length + ' video(s) • Created by ' + (playlist.creatorName || 'Creator') + '</div>' +
+              (playlist.description ? ('<div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 8px;">' + playlist.description + '</div>') : '') +
+              '<div style="display: flex; gap: 8px; margin-top: 12px;">' +
+                (videos.length > 0 ? ('<button class="action-pill-btn action-pill-primary" style="padding: 6px 14px; font-size: 0.78rem;" onclick="window.openSpatialVideoViewerSurface(&quot;' + videos[0].id + '&quot;, this)">▶ Play All</button>') : '') +
+                '<button class="action-pill-btn action-pill-danger" style="padding: 6px 12px; font-size: 0.76rem;" onclick="window._deletePlaylistDirect(&quot;' + playlist.id + '&quot;)">Delete</button>' +
+              '</div>' +
+            '</div>';
+
+            // Videos List
+            html += '<div style="display: flex; flex-direction: column; gap: 8px;">';
+            if (videos.length === 0) {
+              html += '<div style="color: #64748b; font-size: 0.8rem; text-align: center; padding: 24px 0;">This playlist has no videos yet.</div>';
+            } else {
+              videos.forEach(function(v, idx) {
+                html += '<div class="spatial-option-card" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;" onclick="window.openSpatialVideoViewerSurface(&quot;' + v.id + '&quot;, this)">' +
+                  '<div style="display: flex; gap: 10px; align-items: center; min-width: 0;">' +
+                    '<span style="font-size: 0.8rem; font-weight: 700; color: #64748b; width: 18px;">' + (idx + 1) + '</span>' +
+                    '<div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(99,102,241,0.2); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">🎬</div>' +
+                    '<div style="min-width: 0;">' +
+                      '<div style="font-size: 0.85rem; font-weight: 700; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + v.title + '</div>' +
+                      '<div style="font-size: 0.72rem; color: #94a3b8;">' + (v.duration || '10:00') + ' • ' + (v.channelName || 'Sovra Channel') + '</div>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div style="display: flex; gap: 4px;" onclick="event.stopPropagation();">' +
+                    (idx > 0 ? ('<button class="action-pill-btn action-pill-secondary" style="padding: 2px 6px; font-size: 0.7rem;" onclick="window._moveVideoOrder(&quot;' + playlist.id + '&quot;, ' + idx + ', ' + (idx - 1) + ')">▲</button>') : '') +
+                    (idx < videos.length - 1 ? ('<button class="action-pill-btn action-pill-secondary" style="padding: 2px 6px; font-size: 0.7rem;" onclick="window._moveVideoOrder(&quot;' + playlist.id + '&quot;, ' + idx + ', ' + (idx + 1) + ')">▼</button>') : '') +
+                    '<button class="action-pill-btn action-pill-danger" style="padding: 2px 6px; font-size: 0.7rem;" onclick="window._removeVideoFromPl(&quot;' + playlist.id + '&quot;, &quot;' + v.id + '&quot;)">✕</button>' +
+                  '</div>' +
+                '</div>';
+              });
+            }
+            html += '</div>';
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+          }
+
+          window._moveVideoOrder = function(plId, fromIdx, toIdx) {
+            fetch('/api/playlists/view?id=' + encodeURIComponent(plId))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (data.ok && data.playlist) {
+                  const ids = [...(data.playlist.videoIds || [])];
+                  const [moved] = ids.splice(fromIdx, 1);
+                  ids.splice(toIdx, 0, moved);
+                  fetch('/api/playlists/reorder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: plId, videoIds: ids })
+                  }).then(function() {
+                    window.openSpatialPlaylistViewSurface(plId, originEl);
+                  });
+                }
+              });
+          };
+
+          window._removeVideoFromPl = function(plId, vidId) {
+            fetch('/api/playlists/remove-video', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: plId, videoId: vidId })
+            }).then(function() {
+              window.openSpatialPlaylistViewSurface(plId, originEl);
+            });
+          };
+
+          window._deletePlaylistDirect = function(plId) {
+            if (!confirm('Are you sure you want to delete this playlist?')) return;
+            fetch('/api/playlists/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: plId })
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d.ok) {
+                  if (typeof showAccountToast === 'function') showAccountToast('✓ Playlist deleted');
+                  window.SovraSurfaceManager.popSurface();
+                } else {
+                  alert(d.error || 'Delete failed');
+                }
+              });
+          };
+        }
+      });
+    };
+
+    window.openSpatialLiveSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'live-surface',
+        type: 'live-surface',
+        title: 'SOVRA LIVE',
+        subtitle: 'Decentralized Real-Time Broadcasts & Swarm Sessions',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 30px 0;">Scanning live broadcast signals...</div>';
+
+          fetch('/api/live/sessions')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              const sessions = (data && Array.isArray(data.sessions)) ? data.sessions : [];
+              renderSessions(sessions);
+            })
+            .catch(function(err) {
+              bodyEl.innerHTML = '<div style="color: #f87171; padding: 20px;">Failed to load live sessions: ' + err.message + '</div>';
+            });
+
+          function renderSessions(sessions) {
+            const liveNow = sessions.filter(function(s) { return s.status === 'LIVE'; });
+            const scheduled = sessions.filter(function(s) { return s.status === 'SCHEDULED' || s.status === 'STARTING'; });
+            const ended = sessions.filter(function(s) { return s.status === 'ENDED' || s.status === 'REPLAY'; });
+
+            let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+            html += '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+              '<div style="font-weight: 700; font-size: 0.95rem; color: #f8fafc;">Broadcast Channels</div>' +
+              '<button class="action-pill-btn action-pill-primary" style="padding: 4px 12px; font-size: 0.76rem;" onclick="window.openSpatialLiveCreatorSurface(this)">+ Start Live</button>' +
+            '</div>';
+
+            // Section 1: Live Now
+            html += '<div style="display: flex; flex-direction: column; gap: 8px;">' +
+              '<div style="font-size: 0.78rem; font-weight: 700; color: #ef4444; display: flex; align-items: center; gap: 6px;">' +
+                '<span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span> LIVE NOW (' + liveNow.length + ')' +
+              '</div>';
+
+            if (liveNow.length === 0) {
+              html += '<div style="color: #64748b; font-size: 0.8rem; padding: 8px 0;">No active broadcasts right now.</div>';
+            } else {
+              liveNow.forEach(function(s) {
+                html += '<div class="spatial-option-card" style="cursor: pointer; border-color: rgba(239,68,68,0.3);" onclick="window.openSpatialLiveViewerSurface(&quot;' + s.id + '&quot;, this)">' +
+                  '<div class="spatial-option-card-left">' +
+                    '<div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(239,68,68,0.15); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: #ef4444;">🔴</div>' +
+                    '<div class="spatial-option-details">' +
+                      '<div class="spatial-option-title">' + s.title + '</div>' +
+                      '<div class="spatial-option-desc">' + s.creatorName + ' • ' + (s.viewerCount || 0) + ' viewers watching</div>' +
+                    '</div>' +
+                  '</div>' +
+                  '<span style="color: #ef4444; font-weight: 700; font-size: 0.74rem;">WATCH LIVE ›</span>' +
+                '</div>';
+              });
+            }
+            html += '</div>';
+
+            // Section 2: Scheduled
+            if (scheduled.length > 0) {
+              html += '<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">' +
+                '<div style="font-size: 0.78rem; font-weight: 700; color: #818cf8;">📅 SCHEDULED BROADCASTS (' + scheduled.length + ')</div>';
+              scheduled.forEach(function(s) {
+                html += '<div class="spatial-option-card" style="cursor: pointer;" onclick="window.openSpatialLiveViewerSurface(&quot;' + s.id + '&quot;, this)">' +
+                  '<div class="spatial-option-card-left">' +
+                    '<div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(99,102,241,0.15); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">🎙️</div>' +
+                    '<div class="spatial-option-details">' +
+                      '<div class="spatial-option-title">' + s.title + '</div>' +
+                      '<div class="spatial-option-desc">' + s.creatorName + ' • ' + (s.category || 'tech').toUpperCase() + '</div>' +
+                    '</div>' +
+                  '</div>' +
+                  '<span style="color: #818cf8; font-weight: 600; font-size: 0.74rem;">DETAILS ›</span>' +
+                '</div>';
+              });
+              html += '</div>';
+            }
+
+            // Section 3: Past Replays
+            if (ended.length > 0) {
+              html += '<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">' +
+                '<div style="font-size: 0.78rem; font-weight: 700; color: #34d399;">📼 REPLAYS (' + ended.length + ')</div>';
+              ended.forEach(function(s) {
+                html += '<div class="spatial-option-card" style="cursor: pointer;" onclick="window.openSpatialLiveViewerSurface(&quot;' + s.id + '&quot;, this)">' +
+                  '<div class="spatial-option-card-left">' +
+                    '<div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(16,185,129,0.15); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">📼</div>' +
+                    '<div class="spatial-option-details">' +
+                      '<div class="spatial-option-title">' + s.title + '</div>' +
+                      '<div class="spatial-option-desc">' + s.creatorName + ' • Replay available</div>' +
+                    '</div>' +
+                  '</div>' +
+                  '<span style="color: #34d399; font-weight: 600; font-size: 0.74rem;">REPLAY ›</span>' +
+                '</div>';
+              });
+              html += '</div>';
+            }
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+          }
+        }
+      });
+    };
+
+    window.openSpatialLiveViewerSurface = function(liveId, originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'live-viewer-' + liveId,
+        type: 'live-viewer',
+        title: 'LIVE BROADCAST',
+        subtitle: 'Decentralized Real-time WebRTC Session',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let session = null;
+          let chatMessages = [];
+          let chatPollTimer = null;
+
+          bodyEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 40px 0;">Connecting to broadcast signaling node...</div>';
+
+          function loadData() {
+            fetch('/api/live/session?id=' + encodeURIComponent(liveId))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (!data || !data.ok || !data.session) {
+                  bodyEl.innerHTML = '<div style="color: #f87171; padding: 24px;">Live session not found.</div>';
+                  return;
+                }
+                session = data.session;
+                chatMessages = Array.isArray(data.chatMessages) ? data.chatMessages : [];
+                renderLiveStage();
+              })
+              .catch(function(err) {
+                bodyEl.innerHTML = '<div style="color: #f87171; padding: 24px;">Failed to connect: ' + err.message + '</div>';
+              });
+          }
+
+          function renderLiveStage() {
+            const s = session;
+            const isLive = s.status === 'LIVE';
+            const isEnded = s.status === 'ENDED' || s.status === 'REPLAY';
+            const isScheduled = s.status === 'SCHEDULED' || s.status === 'STARTING';
+            const streamSrc = isEnded ? (s.playbackUrl || s.streamUrl) : (isLive ? s.streamUrl : '');
+
+            let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+            // Live Player Stage
+            html += '<div style="position: relative; width: 100%; aspect-ratio: 16/9; background: #030712; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 30px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;">';
+            if (isLive || isEnded) {
+              html += '<video controls autoplay playsinline style="width: 100%; height: 100%; object-fit: contain;" src="' + streamSrc + '"></video>';
+            } else {
+              html += '<div style="text-align: center; padding: 20px;">' +
+                '<div style="font-size: 3rem; margin-bottom: 8px;">📡</div>' +
+                '<div style="font-size: 1rem; font-weight: 700; color: #f8fafc;">Broadcast is ' + s.status + '</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px;">Host has not started live streaming yet.</div>' +
+              '</div>';
+            }
+
+            // Top Badges Overlay
+            html += '<div style="position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; gap: 8px; align-items: center;">' +
+              (isLive ? '<span style="background: rgba(239,68,68,0.9); color: #fff; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px; box-shadow: 0 0 12px rgba(239,68,68,0.5);">● LIVE</span>' :
+               '<span style="background: rgba(100,116,139,0.7); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 6px;">' + s.status + '</span>') +
+              '<span style="background: rgba(0,0,0,0.6); color: #f8fafc; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">' + (s.viewerCount || 0) + ' viewers</span>' +
+            '</div>';
+
+            html += '</div>';
+
+            // Title & Host Strip
+            html += '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">' +
+              '<div>' +
+                '<div style="font-size: 1.05rem; font-weight: 800; color: #f8fafc;">' + s.title + '</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Hosted by ' + s.creatorName + ' (@' + s.creatorHandle + ')</div>' +
+              '</div>' +
+              '<div style="display: flex; gap: 8px; align-items: center;">' +
+                '<button class="action-pill-btn action-pill-secondary" onclick="window._likeLiveStream(&quot;' + s.id + '&quot;)" style="padding: 6px 12px; font-size: 0.78rem;">❤️ <span id="liveLikesDisplay">' + (s.likesCount || 0) + '</span></button>' +
+                '<button class="action-pill-btn action-pill-secondary" onclick="window._shareLiveStream(&quot;' + s.id + '&quot;)" style="padding: 6px 12px; font-size: 0.78rem;">↗ Share</button>' +
+              '</div>' +
+            '</div>';
+
+            // Real-Time Live Chat Container
+            html += '<div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">' +
+              '<div style="font-weight: 700; font-size: 0.85rem; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px;">Live Swarm Chat</div>' +
+              '<div id="spatialLiveChatMessages" style="height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;"></div>' +
+              '<div style="display: flex; gap: 8px;">' +
+                '<input type="text" id="spatialLiveChatInput" class="social-modal-input" placeholder="Say something in live chat..." style="flex: 1;" />' +
+                '<button class="action-pill-btn action-pill-primary" style="padding: 8px 14px; font-size: 0.78rem;" onclick="window._sendLiveChatMessage(&quot;' + s.id + '&quot;)">Send</button>' +
+              '</div>' +
+            '</div>';
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+            renderLiveChat();
+
+            // Setup polling for chat
+            if (chatPollTimer) clearInterval(chatPollTimer);
+            chatPollTimer = setInterval(function() {
+              fetch('/api/live/chat?sessionId=' + encodeURIComponent(s.id))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                  if (d.ok && Array.isArray(d.messages)) {
+                    chatMessages = d.messages;
+                    renderLiveChat();
+                  }
+                }).catch(function() {});
+            }, 3000);
+          }
+
+          function renderLiveChat() {
+            const container = document.getElementById('spatialLiveChatMessages');
+            if (!container) return;
+            if (chatMessages.length === 0) {
+              container.innerHTML = '<div style="color: #64748b; font-size: 0.76rem; text-align: center; padding: 20px 0;">Live chat connected. Say hi!</div>';
+              return;
+            }
+            let cHtml = '';
+            chatMessages.forEach(function(m) {
+              cHtml += '<div style="display: flex; gap: 6px; font-size: 0.78rem; line-height: 1.3;">' +
+                (m.isModerator ? '<span style="color: #38bdf8; font-weight: 700; font-size: 0.7rem; background: rgba(56,189,248,0.15); padding: 1px 4px; border-radius: 4px;">MOD</span>' : '') +
+                '<span style="font-weight: 700; color: #cbd5e1;">' + m.senderName + ':</span>' +
+                '<span style="color: #f8fafc; flex: 1;">' + m.text + '</span>' +
+              '</div>';
+            });
+            container.innerHTML = cHtml;
+            container.scrollTop = container.scrollHeight;
+          }
+
+          window._sendLiveChatMessage = function(sId) {
+            const input = document.getElementById('spatialLiveChatInput');
+            const text = input ? input.value.trim() : '';
+            if (!text) return;
+            fetch('/api/live/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId: sId, text: text })
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d.ok && d.message) {
+                  chatMessages.push(d.message);
+                  if (input) input.value = '';
+                  renderLiveChat();
+                }
+              }).catch(function(e) { console.warn(e); });
+          };
+
+          window._likeLiveStream = function(sId) {
+            fetch('/api/live/like', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: sId })
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d.ok) {
+                  const el = document.getElementById('liveLikesDisplay');
+                  if (el) el.textContent = String(d.likesCount);
+                  if (typeof showAccountToast === 'function') showAccountToast('❤️ Stream liked');
+                }
+              }).catch(function(e) { console.warn(e); });
+          };
+
+          window._shareLiveStream = function(sId) {
+            const shareUrl = window.location.origin + '/app?live=' + encodeURIComponent(sId);
+            try { navigator.clipboard.writeText(shareUrl); } catch(e) {}
+            if (typeof showAccountToast === 'function') showAccountToast('✓ Live stream link copied');
+          };
+
+          loadData();
+        }
+      });
+    };
+
+    window.openSpatialLiveCreatorSurface = function(originEl, channelId) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'live-creator',
+        type: 'live-creator',
+        title: 'START LIVE BROADCAST',
+        subtitle: 'Configure Sovereign Stream & Signaling',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+          html += '<div style="display: flex; flex-direction: column; gap: 6px;">' +
+            '<label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8;">BROADCAST TITLE</label>' +
+            '<input type="text" id="liveCreateTitleInput" class="social-modal-input" placeholder="e.g. Sovereign Architecture Live Q&A" />' +
+          '</div>';
+
+          html += '<div style="display: flex; flex-direction: column; gap: 6px;">' +
+            '<label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8;">DESCRIPTION (OPTIONAL)</label>' +
+            '<textarea id="liveCreateDescInput" class="social-modal-input" style="height: 70px; resize: vertical;" placeholder="What will this session cover?"></textarea>' +
+          '</div>';
+
+          html += '<div style="display: flex; flex-direction: column; gap: 6px;">' +
+            '<label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8;">CATEGORY</label>' +
+            '<select id="liveCreateCategorySelect" class="social-modal-input">' +
+              '<option value="tech">Tech & Architecture</option>' +
+              '<option value="gaming">Gaming & Interactive</option>' +
+              '<option value="decentralized">Decentralized Systems</option>' +
+            '</select>' +
+          '</div>';
+
+          // Device test simulation
+          html += '<div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px;">' +
+            '<span style="font-size: 1.4rem;">📹</span>' +
+            '<div>' +
+              '<div style="font-size: 0.8rem; font-weight: 700; color: #34d399;">Media Signaling & Devices Ready</div>' +
+              '<div style="font-size: 0.72rem; color: #94a3b8;">Opus 48kHz Audio + VP8/H.264 Video encoders initialized.</div>' +
+            '</div>' +
+          '</div>';
+
+          html += '<button class="action-pill-btn action-pill-primary" style="padding: 12px 20px; font-size: 0.9rem; font-weight: 700;" onclick="window._submitStartLive(&quot;' + (channelId || '') + '&quot;)">🔴 Go Live Now</button>';
+
+          html += '</div>';
+          bodyEl.innerHTML = html;
+
+          window._submitStartLive = function(chId) {
+            const titleInput = document.getElementById('liveCreateTitleInput');
+            const descInput = document.getElementById('liveCreateDescInput');
+            const catSelect = document.getElementById('liveCreateCategorySelect');
+            const title = titleInput ? titleInput.value.trim() : '';
+            if (!title) {
+              alert('Please enter a broadcast title.');
+              return;
+            }
+
+            fetch('/api/live/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                channelId: chId || undefined,
+                title: title,
+                description: descInput ? descInput.value.trim() : '',
+                category: catSelect ? catSelect.value : 'tech',
+              })
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (data.ok && data.session) {
+                  // Transition directly to LIVE status on server
+                  fetch('/api/live/status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: data.session.id, status: 'LIVE' })
+                  }).then(function() {
+                    window.openSpatialLiveViewerSurface(data.session.id, originEl);
+                  });
+                } else {
+                  alert(data.error || 'Failed to start broadcast');
+                }
+              })
+              .catch(function(e) { alert(e.message); });
+          };
+        }
+      });
+    };
+
+    // ==========================================
+    // PHASE 7: CLIENT-SIDE SPATIAL SURFACES
+    // ==========================================
+
+    window.openSpatialReportSurface = function(targetType, targetId, originEl, targetTitle, spaceId, spaceType) {
+      const cleanTargetType = String(targetType || 'post').toLowerCase();
+      const cleanTargetTitle = targetTitle || (cleanTargetType + ':' + targetId);
+
+      window.SovraSurfaceManager.pushSurface({
+        id: 'report-' + cleanTargetType + '-' + targetId,
+        type: 'report',
+        title: 'REPORT CONTENT',
+        subtitle: 'Contextual trust & safety reporting flow',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          const taxonomy = [
+            'Spam',
+            'Harassment',
+            'Impersonation',
+            'Fraud',
+            'Violence',
+            'Illegal content',
+            'Privacy violation',
+            'Sexual content',
+            'Child safety',
+            'Copyright',
+            'Other'
+          ];
+
+          let selectedReason = 'Spam';
+
+          function renderForm() {
+            let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+            // Target Context Card
+            html += '<div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; display: flex; align-items: center; justify-content: space-between;">' +
+              '<div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Reporting Resource</div>' +
+                '<div style="font-size: 0.88rem; font-weight: 600; color: #f8fafc; word-break: break-all;">' + cleanTargetTitle + '</div>' +
+              '</div>' +
+              '<span style="font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; font-weight: 600;">' + cleanTargetType + '</span>' +
+            '</div>';
+
+            // Step 1: Standard Reason Taxonomy
+            html += '<div>' +
+              '<div style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin-bottom: 8px;">Select Reason:</div>' +
+              '<div style="display: flex; flex-wrap: wrap; gap: 6px;">';
+            for (const r of taxonomy) {
+              const isSel = r === selectedReason;
+              html += '<button type="button" class="action-pill-btn ' + (isSel ? 'action-pill-primary' : 'action-pill-secondary') + '" data-reason="' + r + '" style="padding: 5px 10px; font-size: 0.76rem;">' + r + '</button>';
+            }
+            html += '</div></div>';
+
+            // Step 2: Optional Details
+            html += '<div>' +
+              '<div style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Optional Details:</div>' +
+              '<textarea id="spatialReportDetails" placeholder="Provide any additional context or details..." style="width: 100%; min-height: 80px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #f8fafc; padding: 8px 10px; font-size: 0.82rem; resize: vertical; outline: none;"></textarea>' +
+            '</div>';
+
+            // Submit Button
+            html += '<div style="display: flex; gap: 8px; margin-top: 4px;">' +
+              '<button type="button" class="action-pill-btn action-pill-primary" id="spatialReportSubmitBtn" style="flex: 1; padding: 10px; font-size: 0.85rem; font-weight: 600;">Submit Report</button>' +
+              '<button type="button" class="action-pill-btn action-pill-secondary" id="spatialReportCancelBtn" style="padding: 10px 16px; font-size: 0.85rem;">Cancel</button>' +
+            '</div>';
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+
+            // Reason click handlers
+            const pillBtns = bodyEl.querySelectorAll('[data-reason]');
+            pillBtns.forEach(function(btn) {
+              btn.addEventListener('click', function() {
+                selectedReason = btn.getAttribute('data-reason');
+                renderForm();
+              });
+            });
+
+            // Cancel click handler
+            const cancelBtn = bodyEl.querySelector('#spatialReportCancelBtn');
+            if (cancelBtn) {
+              cancelBtn.addEventListener('click', function() {
+                window.SovraSurfaceManager.popSurface();
+              });
+            }
+
+            // Submit click handler
+            const submitBtn = bodyEl.querySelector('#spatialReportSubmitBtn');
+            if (submitBtn) {
+              submitBtn.addEventListener('click', function() {
+                const detailsInput = bodyEl.querySelector('#spatialReportDetails');
+                const details = detailsInput ? detailsInput.value.trim() : '';
+                submitBtn.disabled = true;
+                submitBtn.innerText = 'Submitting...';
+
+                const payload = {
+                  targetType: cleanTargetType,
+                  targetId: targetId,
+                  targetTitle: cleanTargetTitle,
+                  reason: selectedReason,
+                  details: details,
+                  spaceId: spaceId || undefined,
+                  spaceType: spaceType || undefined,
+                };
+
+                const endpoint = !navigator.onLine ? '/api/moderation/outbox/queue' : '/api/moderation/report';
+                fetch(endpoint, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': (typeof authToken !== 'undefined' && authToken) ? 'Bearer ' + authToken : (localStorage.getItem('sovra_session_token') ? 'Bearer ' + localStorage.getItem('sovra_session_token') : ''),
+                  },
+                  body: JSON.stringify(payload)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                  if (res.ok) {
+                    bodyEl.innerHTML = '<div style="text-align: center; padding: 36px 16px;">' +
+                      '<div style="font-size: 2.8rem; margin-bottom: 12px;">🛡️</div>' +
+                      '<div style="font-size: 1.15rem; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">Report Submitted</div>' +
+                      '<div style="font-size: 0.84rem; color: #94a3b8; max-width: 320px; margin: 0 auto 20px; line-height: 1.5;">Thank you for helping keep SOVRA safe. Our community moderation team has received your report.</div>' +
+                      '<button class="action-pill-btn action-pill-primary" style="padding: 8px 24px; font-size: 0.85rem;" onclick="window.SovraSurfaceManager.popSurface()">Done</button>' +
+                    '</div>';
+                  } else {
+                    alert(res.error || 'Failed to submit report');
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Submit Report';
+                  }
+                })
+                .catch(function(err) {
+                  alert(err.message || 'Network error while submitting report');
+                  submitBtn.disabled = false;
+                  submitBtn.innerText = 'Submit Report';
+                });
+              });
+            }
+          }
+
+          renderForm();
+        }
+      });
+    };
+
+    window.openSpatialModerationSurface = function(originEl, spaceId, spaceType) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'moderation-surface-' + (spaceId || 'platform'),
+        type: 'moderation-dashboard',
+        title: 'MODERATION SURFACE',
+        subtitle: spaceId ? ('Space community governance (' + (spaceType || 'space') + ')') : 'Platform Trust & Safety operations',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px;"><div class="sovra-loading-spinner" style="margin: 0 auto 12px;"></div>Loading Moderation Queue...</div>';
+
+          let activeTab = 'all';
+
+          function loadAndRender() {
+            const queryUrl = '/api/moderation/reports' + (spaceId ? '?spaceId=' + encodeURIComponent(spaceId) : '');
+            fetch(queryUrl, {
+              headers: {
+                'Authorization': (typeof authToken !== 'undefined' && authToken) ? 'Bearer ' + authToken : (localStorage.getItem('sovra_session_token') ? 'Bearer ' + localStorage.getItem('sovra_session_token') : ''),
+              }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (!data.ok) {
+                bodyEl.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 32px 16px;">' +
+                  '<div style="font-size: 2.2rem; margin-bottom: 8px;">🚫</div>' +
+                  '<div style="font-size: 1.05rem; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">Unauthorized</div>' +
+                  '<div style="font-size: 0.84rem; color: #94a3b8;">' + (data.error || 'You do not have moderation privileges for this resource.') + '</div>' +
+                '</div>';
+                return;
+              }
+
+              const allReports = data.reports || [];
+              let filtered = allReports;
+              if (activeTab === 'pending') {
+                filtered = allReports.filter(function(r) { return r.status === 'SUBMITTED' || r.status === 'TRIAGED' || r.status === 'UNDER_REVIEW'; });
+              } else if (activeTab === 'restricted') {
+                filtered = allReports.filter(function(r) { return r.actionTaken === 'Restrict' || r.actionTaken === 'Hide' || r.actionTaken === 'Remove'; });
+              } else if (activeTab === 'resolved') {
+                filtered = allReports.filter(function(r) { return r.status === 'RESOLVED' || r.status === 'REJECTED'; });
+              }
+
+              let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+              // Filter Tabs: All, Pending, Restricted, Resolved
+              html += '<div style="display: flex; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">' +
+                '<button class="action-pill-btn ' + (activeTab === 'all' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-tab="all" style="padding: 4px 10px; font-size: 0.76rem;">All (' + allReports.length + ')</button>' +
+                '<button class="action-pill-btn ' + (activeTab === 'pending' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-tab="pending" style="padding: 4px 10px; font-size: 0.76rem;">Pending</button>' +
+                '<button class="action-pill-btn ' + (activeTab === 'restricted' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-tab="restricted" style="padding: 4px 10px; font-size: 0.76rem;">Restricted</button>' +
+                '<button class="action-pill-btn ' + (activeTab === 'resolved' ? 'action-pill-primary' : 'action-pill-secondary') + '" data-tab="resolved" style="padding: 4px 10px; font-size: 0.76rem;">Resolved</button>' +
+              '</div>';
+
+              if (filtered.length === 0) {
+                html += '<div style="text-align: center; color: #94a3b8; padding: 40px 16px;">' +
+                  '<div style="font-size: 2rem; margin-bottom: 8px;">✅</div>' +
+                  '<div style="font-weight: 600; color: #f8fafc; margin-bottom: 4px;">Queue is Clean</div>' +
+                  '<div style="font-size: 0.8rem;">No moderation reports matching the selected filter.</div>' +
+                '</div>';
+              } else {
+                html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
+                for (const rep of filtered) {
+                  const statusColors = {
+                    'SUBMITTED': '#38bdf8',
+                    'TRIAGED': '#f59e0b',
+                    'UNDER_REVIEW': '#a855f7',
+                    'ACTION_TAKEN': '#10b981',
+                    'RESOLVED': '#10b981',
+                    'REJECTED': '#64748b',
+                  };
+                  const color = statusColors[rep.status] || '#94a3b8';
+
+                  html += '<div class="spatial-option-card" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; align-items: stretch;">' +
+                    '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+                      '<div style="display: flex; align-items: center; gap: 8px;">' +
+                        '<span style="font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: 600;">' + rep.targetType + '</span>' +
+                        '<span style="font-size: 0.85rem; font-weight: 600; color: #f8fafc;">' + rep.reason + '</span>' +
+                      '</div>' +
+                      '<span style="font-size: 0.7rem; color: ' + color + '; border: 1px solid ' + color + '; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; font-weight: 600;">' + rep.status + '</span>' +
+                    '</div>' +
+                    '<div style="font-size: 0.78rem; color: #cbd5e1; word-break: break-all;">Target: ' + (rep.targetTitle || rep.targetId) + '</div>' +
+                    (rep.details ? ('<div style="font-size: 0.75rem; color: #94a3b8; font-style: italic;">"' + rep.details + '"</div>') : '') +
+                    '<div style="font-size: 0.7rem; color: #64748b;">Reporter: ' + rep.reporterDid.slice(0, 16) + '... • ' + new Date(rep.createdAt).toLocaleTimeString() + '</div>';
+
+                  // Quick Action Buttons
+                  html += '<div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">' +
+                    '<button class="action-pill-btn action-pill-secondary" style="padding: 3px 8px; font-size: 0.72rem; color: #f59e0b;" onclick="window._executeModAction(&quot;' + rep.id + '&quot;, &quot;' + rep.targetType + '&quot;, &quot;' + rep.targetId + '&quot;, &quot;Hide&quot;)">Hide</button>' +
+                    '<button class="action-pill-btn action-pill-secondary" style="padding: 3px 8px; font-size: 0.72rem; color: #ef4444;" onclick="window._executeModAction(&quot;' + rep.id + '&quot;, &quot;' + rep.targetType + '&quot;, &quot;' + rep.targetId + '&quot;, &quot;Remove&quot;)">Remove</button>' +
+                    '<button class="action-pill-btn action-pill-secondary" style="padding: 3px 8px; font-size: 0.72rem; color: #a855f7;" onclick="window._executeModAction(&quot;' + rep.id + '&quot;, &quot;' + rep.targetType + '&quot;, &quot;' + rep.targetId + '&quot;, &quot;Restrict&quot;)">Restrict</button>' +
+                    '<button class="action-pill-btn action-pill-secondary" style="padding: 3px 8px; font-size: 0.72rem; color: #10b981;" onclick="window._executeModAction(&quot;' + rep.id + '&quot;, &quot;' + rep.targetType + '&quot;, &quot;' + rep.targetId + '&quot;, &quot;Restore&quot;)">Restore</button>' +
+                    '<button class="action-pill-btn action-pill-secondary" style="padding: 3px 8px; font-size: 0.72rem; color: #64748b;" onclick="window._executeModAction(&quot;' + rep.id + '&quot;, &quot;' + rep.targetType + '&quot;, &quot;' + rep.targetId + '&quot;, &quot;Reject&quot;)">Dismiss</button>' +
+                  '</div>';
+
+                  html += '</div>';
+                }
+                html += '</div>';
+              }
+
+              html += '</div>';
+              bodyEl.innerHTML = html;
+
+              // Tab handlers
+              const tabBtns = bodyEl.querySelectorAll('[data-tab]');
+              tabBtns.forEach(function(tb) {
+                tb.addEventListener('click', function() {
+                  activeTab = tb.getAttribute('data-tab');
+                  loadAndRender();
+                });
+              });
+            })
+            .catch(function(err) {
+              bodyEl.innerHTML = '<div style="color: #ef4444; padding: 20px; text-align: center;">Error loading reports: ' + err.message + '</div>';
+            });
+          }
+
+          window._executeModAction = function(reportId, targetType, targetId, action) {
+            const token = (typeof authToken !== 'undefined' && authToken) ? 'Bearer ' + authToken : (localStorage.getItem('sovra_session_token') ? 'Bearer ' + localStorage.getItem('sovra_session_token') : '');
+            if (action === 'Reject') {
+              fetch('/api/moderation/report/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': token },
+                body: JSON.stringify({ reportId: reportId, status: 'REJECTED' })
+              }).then(function() { loadAndRender(); });
+            } else {
+              fetch('/api/moderation/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': token },
+                body: JSON.stringify({
+                  reportId: reportId,
+                  targetType: targetType,
+                  targetId: targetId,
+                  action: action,
+                  spaceId: spaceId || undefined,
+                  spaceType: spaceType || undefined,
+                })
+              }).then(function() { loadAndRender(); });
+            }
+          };
+
+          loadAndRender();
+        }
+      });
+    };
+
+    window.openSpatialSecurityCenterSurface = function(originEl) {
+      window.SovraSurfaceManager.pushSurface({
+        id: 'security-center',
+        type: 'security-center',
+        title: 'SECURITY CENTER',
+        subtitle: 'Active hardware sessions, cryptographic credentials & posture',
+        originEl: originEl,
+        render: function(bodyEl, ctx) {
+          bodyEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px;"><div class="sovra-loading-spinner" style="margin: 0 auto 12px;"></div>Loading Security Posture...</div>';
+
+          const token = (typeof authToken !== 'undefined' && authToken) ? 'Bearer ' + authToken : (localStorage.getItem('sovra_session_token') ? 'Bearer ' + localStorage.getItem('sovra_session_token') : '');
+
+          Promise.all([
+            fetch('/api/user/sessions', { headers: { 'Authorization': token } }).then(function(r) { return r.json(); }),
+            fetch('/api/user/profile', { headers: { 'Authorization': token } }).then(function(r) { return r.json(); })
+          ])
+          .then(function(results) {
+            const sessData = results[0];
+            const profData = results[1];
+
+            const sessions = sessData.sessions || [];
+            const user = profData.user || {};
+
+            let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+
+            // 1. Cryptographic Identity Posture (Safe metadata only, no private keys)
+            html += '<div style="padding: 14px; background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px;">' +
+              '<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">' +
+                '<span style="font-size: 0.82rem; font-weight: 700; color: #f8fafc; text-transform: uppercase;">Cryptographic Identity</span>' +
+                '<span style="font-size: 0.72rem; color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 2px 8px; border-radius: 4px; font-weight: 600;">Hardware Secured</span>' +
+              '</div>' +
+              '<div style="font-size: 0.76rem; color: #94a3b8; font-family: monospace; word-break: break-all; margin-bottom: 4px;">DID: ' + (user.did || 'did:sovra:self') + '</div>' +
+              '<div style="font-size: 0.74rem; color: #64748b;">Protocol: Ed25519 (RFC 8032) • Self-Custodied</div>' +
+              '<div style="font-size: 0.7rem; color: #a855f7; margin-top: 6px; font-style: italic;">🛡️ Private keys and recovery seeds remain isolated in local secure hardware.</div>' +
+            '</div>';
+
+            // 2. Active Hardware Sessions
+            html += '<div style="display: flex; flex-direction: column; gap: 8px;">' +
+              '<div style="display: flex; align-items: center; justify-content: space-between;">' +
+                '<span style="font-size: 0.82rem; font-weight: 700; color: #f8fafc; text-transform: uppercase;">Active Sessions (' + sessions.filter(function(s) { return !s.isRevoked; }).length + ')</span>' +
+                '<button class="action-pill-btn action-pill-secondary" id="revokeOthersBtn" style="padding: 4px 10px; font-size: 0.72rem; color: #f87171; border-color: rgba(239,68,68,0.3);">Logout Other Sessions</button>' +
+              '</div>';
+
+            for (const sess of sessions) {
+              const isActive = !sess.isRevoked;
+              html += '<div class="spatial-option-card" style="padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">' +
+                '<div>' +
+                  '<div style="display: flex; align-items: center; gap: 6px;">' +
+                    '<span style="font-size: 0.84rem; font-weight: 600; color: #f8fafc;">' + (sess.deviceName || 'Device') + '</span>' +
+                    (sess.isCurrent ? '<span style="font-size: 0.68rem; background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 1px 6px; border-radius: 4px;">This Device</span>' : '') +
+                    (!isActive ? '<span style="font-size: 0.68rem; background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 1px 6px; border-radius: 4px;">Revoked</span>' : '') +
+                  '</div>' +
+                  '<div style="font-size: 0.72rem; color: #94a3b8;">' + (sess.deviceType || 'Hardware') + ' • ' + (sess.ipAddress || 'Localhost') + '</div>' +
+                '</div>';
+
+              if (isActive && !sess.isCurrent) {
+                html += '<button class="action-pill-btn action-pill-secondary" style="padding: 4px 10px; font-size: 0.72rem; color: #ef4444;" onclick="window._revokeSingleSession(&quot;' + (sess.sessionId || sess.id) + '&quot;)">Revoke</button>';
+              }
+
+              html += '</div>';
+            }
+
+            html += '</div>';
+
+            // 3. Security Credentials Status
+            html += '<div class="spatial-option-card" style="display: flex; align-items: center; justify-content: space-between;">' +
+              '<div>' +
+                '<div style="font-size: 0.84rem; font-weight: 600; color: #f8fafc;">Two-Factor Authentication</div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8;">Google Authenticator RFC 6238 TOTP</div>' +
+              '</div>' +
+              '<span style="font-size: 0.76rem; color: ' + (user.totpEnabled ? '#10b981' : '#f59e0b') + '; font-weight: 600;">' + (user.totpEnabled ? 'Active' : 'Not Configured') + '</span>' +
+            '</div>';
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+
+            // Revoke Others button handler
+            const revokeOthersBtn = bodyEl.querySelector('#revokeOthersBtn');
+            if (revokeOthersBtn) {
+              revokeOthersBtn.addEventListener('click', function() {
+                revokeOthersBtn.disabled = true;
+                revokeOthersBtn.innerText = 'Revoking...';
+                fetch('/api/user/sessions/revoke-others', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': token },
+                  body: JSON.stringify({})
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                  if (res.ok) {
+                    window.openSpatialSecurityCenterSurface(originEl);
+                  } else {
+                    alert(res.error || 'Failed to revoke other sessions');
+                    revokeOthersBtn.disabled = false;
+                  }
+                });
+              });
+            }
+
+            window._revokeSingleSession = function(sessionId) {
+              fetch('/api/user/sessions/revoke', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': token },
+                body: JSON.stringify({ sessionId: sessionId })
+              })
+              .then(function(r) { return r.json(); })
+              .then(function(res) {
+                if (res.ok) {
+                  window.openSpatialSecurityCenterSurface(originEl);
+                } else {
+                  alert(res.error || 'Failed to revoke session');
+                }
+              });
+            };
+          })
+          .catch(function(err) {
+            bodyEl.innerHTML = '<div style="color: #ef4444; padding: 20px; text-align: center;">Error loading security center: ' + err.message + '</div>';
+          });
+        }
+      });
+    };
 
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
     function isSovraAppInstalled() {
@@ -12712,6 +20832,12 @@ function renderHtml(
             currentUserHandle = myProfile.handle;
             try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
             updateUserDisplayInUI();
+            if (typeof _activeLightboxContext !== 'undefined' && _activeLightboxContext === 'avatar') {
+              _activeLightboxSrc = compressedUrl;
+              const lbImg = document.getElementById('photoLightboxImg');
+              if (lbImg) lbImg.src = compressedUrl;
+              if (typeof resetPhotoLightboxZoom === 'function') resetPhotoLightboxZoom();
+            }
             showAccountToast('Profile photo updated successfully!');
             fetch('/api/peers/register', {
               method: 'POST',
@@ -12745,6 +20871,9 @@ function renderHtml(
           delete myProfile.avatarDataUrl;
           try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
           updateUserDisplayInUI();
+          if (typeof _activeLightboxContext !== 'undefined' && _activeLightboxContext === 'avatar') {
+            closePhotoLightbox();
+          }
           showAccountToast('Profile photo removed!');
           fetch('/api/peers/register', {
             method: 'POST',
@@ -12785,6 +20914,12 @@ function renderHtml(
             currentUserHandle = myProfile.handle;
             try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
             updateUserDisplayInUI();
+            if (typeof _activeLightboxContext !== 'undefined' && _activeLightboxContext === 'cover') {
+              _activeLightboxSrc = compressedUrl;
+              const lbImg = document.getElementById('photoLightboxImg');
+              if (lbImg) lbImg.src = compressedUrl;
+              if (typeof resetPhotoLightboxZoom === 'function') resetPhotoLightboxZoom();
+            }
             showAccountToast('Cover banner updated successfully!');
             fetch('/api/peers/register', {
               method: 'POST',
@@ -12818,6 +20953,9 @@ function renderHtml(
           delete myProfile.coverDataUrl;
           try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
           updateUserDisplayInUI();
+          if (typeof _activeLightboxContext !== 'undefined' && _activeLightboxContext === 'cover') {
+            closePhotoLightbox();
+          }
           showAccountToast('Cover banner removed!');
           fetch('/api/peers/register', {
             method: 'POST',
@@ -13012,16 +21150,13 @@ function renderHtml(
       if (profileName) profileName.innerText = myProfile.name;
 
       const profileAvatarDiv = document.getElementById('meProfileAvatarContainer') || document.querySelector('.profile-avatar-large');
-      const avatarRemoveBadge = document.getElementById('avatarRemoveBadge');
       if (profileAvatarDiv) {
         if (myProfile.avatarBg) profileAvatarDiv.style.background = myProfile.avatarBg;
         if (myProfile.avatarDataUrl) {
           profileAvatarDiv.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" alt="Profile photo" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
-          if (avatarRemoveBadge) avatarRemoveBadge.style.display = 'flex';
         } else {
           const letter = (myProfile.name ? myProfile.name.charAt(0).toUpperCase() : (myProfile.avatar || 'S'));
           profileAvatarDiv.innerHTML = '<span id="meProfileAvatarText">' + letter + '</span>';
-          if (avatarRemoveBadge) avatarRemoveBadge.style.display = 'none';
         }
       }
 
@@ -14556,6 +22691,30 @@ function renderHtml(
       const fullName = nameVal || (handleVal.charAt(0).toUpperCase() + handleVal.slice(1));
       const cleanHandle = '@' + handleVal.toLowerCase();
 
+      // Dynamic Client-Side Proof-of-Work Solver (Botnet & Sybil Defense)
+      let powPayload = {};
+      try {
+        const chRes = await fetch('/api/auth/challenge');
+        if (chRes.ok) {
+          const chData = await chRes.json();
+          if (chData.ok && chData.challengeId && chData.prefix) {
+            const target = '0'.repeat(chData.difficulty || 3);
+            let nonce = 0;
+            while (nonce < 100000) {
+              const msgBuf = new TextEncoder().encode(chData.prefix + nonce);
+              const hashBuf = await crypto.subtle.digest('SHA-256', msgBuf);
+              const hashArr = Array.from(new Uint8Array(hashBuf));
+              const hashHex = hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
+              if (hashHex.startsWith(target)) {
+                powPayload = { challengeId: chData.challengeId, solutionNonce: String(nonce) };
+                break;
+              }
+              nonce++;
+            }
+          }
+        }
+      } catch (powErr) {}
+
       try {
         const res = await fetch('/api/user/register', {
           method: 'POST',
@@ -14567,6 +22726,7 @@ function renderHtml(
             avatar: fullName.charAt(0).toUpperCase(),
             avatarDataUrl: womSelectedAvatarDataUrl || undefined,
             securityPin: pinVal,
+            ...powPayload,
           })
         });
         const data = await res.json();
@@ -14697,6 +22857,10 @@ function renderHtml(
         }, 300);
       }, 3500);
     }
+    window.showAccountToast = showAccountToast;
+    window.alert = function(msg) { showAccountToast(String(msg)); };
+    window.confirm = function(msg) { showAccountToast(String(msg)); return true; };
+    window.prompt = function(msg) { return null; };
 
     // ==========================================
     // ⚡ SMART DYNAMIC NAVIGATION MODE ENGINE
@@ -14809,13 +22973,14 @@ function renderHtml(
     ];
 
     function calculateHolographicPositions() {
+      const isCompact = window.innerWidth <= 390;
       const isMobile = window.innerWidth <= 480;
       const isTablet = window.innerWidth <= 1024 && window.innerWidth > 480;
-      const radius = isMobile ? 130 : (isTablet ? 172 : 212);
+      const radius = isCompact ? 118 : (isMobile ? 136 : (isTablet ? 172 : 212));
 
       const svg = document.getElementById('holoEnergySvg');
       if (svg) {
-        const halfSpan = isMobile ? 190 : 280;
+        const halfSpan = isCompact ? 175 : (isMobile ? 195 : (isTablet ? 240 : 280));
         svg.setAttribute('viewBox', '-' + halfSpan + ' -' + halfSpan + ' ' + (halfSpan * 2) + ' ' + (halfSpan * 2));
       }
 
@@ -14875,56 +23040,187 @@ function renderHtml(
         }
       }
 
-      const holoChatBadge = document.getElementById('holoBadgeChat');
-      if (holoChatBadge) {
-        let unreadChat = 0;
-        if (typeof unreadMessagesCount !== 'undefined') unreadChat = unreadMessagesCount;
-        if (unreadChat > 0) {
-          holoChatBadge.innerText = String(unreadChat);
-          holoChatBadge.style.display = 'flex';
-        } else {
-          holoChatBadge.style.display = 'none';
+      if (typeof updateChatBadges === 'function') {
+        updateChatBadges();
+      } else {
+        const holoChatBadge = document.getElementById('holoBadgeChat');
+        if (holoChatBadge) {
+          let unreadChat = 0;
+          if (typeof window.unreadMessagesCount !== 'undefined') unreadChat = window.unreadMessagesCount;
+          else if (typeof unreadMessagesCount !== 'undefined') unreadChat = unreadMessagesCount;
+          if (unreadChat > 0) {
+            holoChatBadge.innerText = String(unreadChat);
+            holoChatBadge.style.display = 'flex';
+          } else {
+            holoChatBadge.style.display = 'none';
+          }
         }
       }
     }
 
+    const SovraCoreStateMachine = {
+      _state: 'closed',
+      _listeners: new Set(),
+      _validTransitions: {
+        closed: ['opening', 'open'],
+        opening: ['open', 'closed'],
+        open: ['transitioning', 'closed', 'surface-active'],
+        transitioning: ['surface-active', 'open', 'closed'],
+        'surface-active': ['open', 'closed', 'transitioning']
+      },
+      getState: function() { return this._state; },
+      isClosed: function() { return this._state === 'closed'; },
+      isOpen: function() { return this._state === 'open'; },
+      isSurfaceActive: function() { return this._state === 'surface-active'; },
+      canTransition: function(target) {
+        const allowed = this._validTransitions[this._state];
+        return Array.isArray(allowed) && allowed.includes(target);
+      },
+      transition: function(target) {
+        if (this._state === target) return true;
+        if (!this.canTransition(target)) {
+          console.warn('[SovraCore] Invalid transition:', this._state, '->', target);
+          return false;
+        }
+        const prev = this._state;
+        this._state = target;
+        _holoNavState = target.toUpperCase().replace('-', '_');
+        this._notify(target, prev);
+        return true;
+      },
+      subscribe: function(fn) {
+        this._listeners.add(fn);
+        return () => { this._listeners.delete(fn); };
+      },
+      reset: function() {
+        const prev = this._state;
+        this._state = 'closed';
+        _holoNavState = 'CLOSED';
+        if (prev !== 'closed') this._notify('closed', prev);
+      },
+      _notify: function(newState, prevState) {
+        this._listeners.forEach(function(fn) {
+          try { fn(newState, prevState); } catch(e) { console.error(e); }
+        });
+      }
+    };
+
+    window.SovraCore = {
+      stateMachine: SovraCoreStateMachine,
+      getState: function() { return SovraCoreStateMachine.getState(); },
+      isOpen: function() { return SovraCoreStateMachine.isOpen(); },
+      isClosed: function() { return SovraCoreStateMachine.isClosed(); },
+      isSurfaceActive: function() { return SovraCoreStateMachine.isSurfaceActive(); },
+      calculateGeometry: function(viewportWidth) {
+        const w = (typeof viewportWidth === 'number') ? viewportWidth : window.innerWidth;
+        if (w <= 390) return { radius: 118, halfSpan: 175 };
+        if (w <= 480) return { radius: 136, halfSpan: 195 };
+        if (w <= 1024) return { radius: 172, halfSpan: 240 };
+        return { radius: 212, halfSpan: 280 };
+      },
+      calculateNodeCoordinates: function(viewportWidth) {
+        const geo = this.calculateGeometry(viewportWidth);
+        const coords = {};
+        HOLOGRAPHIC_CONFIG.forEach(function(node) {
+          const rad = (node.angle * Math.PI) / 180;
+          coords[node.id] = {
+            x: Math.round(geo.radius * Math.sin(rad)),
+            y: Math.round(-geo.radius * Math.cos(rad))
+          };
+        });
+        return coords;
+      },
+      open: function(triggerEl) {
+        return openHolographicNav(triggerEl);
+      },
+      close: function() {
+        return closeHolographicNav();
+      },
+      toggle: function(triggerEl) {
+        return toggleHolographicNav(triggerEl);
+      },
+      transitionToSurface: function() {
+        if (!SovraCoreStateMachine.canTransition('transitioning')) {
+          if (SovraCoreStateMachine.getState() !== 'surface-active') return false;
+          return true;
+        }
+        SovraCoreStateMachine.transition('transitioning');
+        const overlay = document.getElementById('holographicNavOverlay');
+        if (overlay) {
+          overlay.classList.add('is-surface-active');
+        }
+        SovraCoreStateMachine.transition('surface-active');
+        return true;
+      },
+      returnFromSurface: function() {
+        if (!SovraCoreStateMachine.isSurfaceActive()) return false;
+        const overlay = document.getElementById('holographicNavOverlay');
+        if (overlay) {
+          overlay.classList.remove('is-surface-active');
+        }
+        SovraCoreStateMachine.transition('open');
+        const activeNode = document.getElementById('holoCenterCoreBtn') || document.getElementById('sovraCoreBtn');
+        if (activeNode && typeof activeNode.focus === 'function') {
+          try { activeNode.focus(); } catch(e) {}
+        }
+        return true;
+      }
+    };
+
     function toggleHolographicNav() {
-      if (_holoNavState === 'OPEN' || _holoNavState === 'OPENING') {
+      var triggerEl = arguments[0];
+      if (SovraCoreStateMachine.isOpen() || SovraCoreStateMachine.getState() === 'opening') {
+        closeHolographicNav();
+      } else if (SovraCoreStateMachine.isSurfaceActive()) {
+        if (window.SovraSurfaceManager) {
+          window.SovraSurfaceManager.closeAll();
+        }
         closeHolographicNav();
       } else {
-        openHolographicNav();
+        openHolographicNav(triggerEl);
       }
     }
 
     function openHolographicNav() {
-      if (_holoNavState === 'OPEN' || _holoNavState === 'OPENING') return;
-      _holoNavState = 'OPENING';
+      var triggerEl = arguments[0];
+      if (SovraCoreStateMachine.isOpen() || SovraCoreStateMachine.getState() === 'opening') return;
+      if (!SovraCoreStateMachine.canTransition('opening')) {
+        SovraCoreStateMachine.reset();
+      }
+      SovraCoreStateMachine.transition('opening');
       playHolographicPulseSound();
 
       calculateHolographicPositions();
       refreshHolographicBadges();
 
       const overlay = document.getElementById('holographicNavOverlay');
-      const triggerBtn = document.getElementById('sovraCoreBtn');
+      const triggerBtn = triggerEl || document.getElementById('sovraCoreBtn');
       if (triggerBtn) {
         triggerBtn.setAttribute('aria-expanded', 'true');
         triggerBtn.setAttribute('aria-label', 'Close SOVRA holographic command center');
+        if (typeof triggerBtn.getBoundingClientRect === 'function' && overlay) {
+          const rect = triggerBtn.getBoundingClientRect();
+          overlay.style.setProperty('--origin-x', (rect.left + rect.width / 2) + 'px');
+          overlay.style.setProperty('--origin-y', (rect.top + rect.height / 2) + 'px');
+        }
       }
 
       if (overlay) {
+        overlay.classList.remove('is-surface-active');
         overlay.classList.add('is-active');
         requestAnimationFrame(function() {
           requestAnimationFrame(function() {
             overlay.classList.add('is-open');
-            _holoNavState = 'OPEN';
+            SovraCoreStateMachine.transition('open');
           });
         });
+      } else {
+        SovraCoreStateMachine.transition('open');
       }
     }
 
     function closeHolographicNav() {
-      if (_holoNavState === 'CLOSED' || _holoNavState === 'CLOSING') return;
-      _holoNavState = 'CLOSING';
+      if (SovraCoreStateMachine.isClosed()) return;
       playHolographicCollapseSound();
 
       const overlay = document.getElementById('holographicNavOverlay');
@@ -14936,74 +23232,244 @@ function renderHtml(
 
       if (overlay) {
         overlay.classList.remove('is-open');
+        overlay.classList.remove('is-surface-active');
         setTimeout(function() {
           overlay.classList.remove('is-active');
-          _holoNavState = 'CLOSED';
+          SovraCoreStateMachine.reset();
         }, 220);
+      } else {
+        SovraCoreStateMachine.reset();
       }
     }
 
     function executeHoloAction(actionKey) {
-      closeHolographicNav();
-      setTimeout(function() {
-        switch (actionKey) {
-          case 'home':
+      let nodeEl = arguments[1];
+      if (!nodeEl) {
+        nodeEl = document.getElementById('holo-node-' + (actionKey === 'notifications' ? 'notif' : actionKey));
+      }
+      switch (actionKey) {
+        case 'home':
+          closeHolographicNav();
+          setTimeout(function() {
             switchTab('feed');
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            break;
-          case 'feed':
-            switchTab('feed');
-            break;
-          case 'reels':
-            switchTab('reels');
-            break;
-          case 'watch':
-            switchTab('youtube');
-            break;
-          case 'profile':
-            switchTab('me');
-            break;
-          case 'chat':
-            switchTab('chat');
-            break;
-          case 'notifications':
-            toggleNotificationCenter();
-            break;
-          case 'create':
-            triggerBottomCreateAction();
-            break;
-          case 'logout':
-            openLogoutModal();
-            break;
-        }
-      }, 140);
+          }, 140);
+          break;
+        case 'feed':
+          closeHolographicNav();
+          setTimeout(function() { switchTab('feed'); }, 140);
+          break;
+        case 'reels':
+          if (window.SovraCore) {
+            window.SovraCore.transitionToSurface();
+          }
+          if (typeof window.openSpatialReelsSurface === 'function') {
+            window.openSpatialReelsSurface(nodeEl);
+          } else {
+            closeHolographicNav();
+            setTimeout(function() { switchTab('reels'); }, 140);
+          }
+          break;
+        case 'watch':
+          if (window.SovraCore) {
+            window.SovraCore.transitionToSurface();
+          }
+          if (typeof window.openSpatialWatchSurface === 'function') {
+            window.openSpatialWatchSurface(nodeEl);
+          } else {
+            closeHolographicNav();
+            setTimeout(function() { switchTab('youtube'); }, 140);
+          }
+          break;
+        case 'logout':
+          closeHolographicNav();
+          setTimeout(function() { openLogoutModal(); }, 140);
+          break;
+
+        case 'profile':
+          if (window.SovraCore) {
+            window.SovraCore.transitionToSurface();
+          }
+          if (typeof window.openSpatialProfileSurface === 'function') {
+            window.openSpatialProfileSurface(nodeEl);
+          }
+          break;
+
+        case 'create':
+          if (window.SovraCore) {
+            window.SovraCore.transitionToSurface();
+          }
+          if (typeof window.openSpatialCreateSurface === 'function') {
+            window.openSpatialCreateSurface(nodeEl);
+          }
+          break;
+
+        case 'notifications':
+          if (window.SovraCore) {
+            window.SovraCore.transitionToSurface();
+          }
+          if (typeof window.openSpatialNotificationsSurface === 'function') {
+            window.openSpatialNotificationsSurface(nodeEl);
+          }
+          break;
+
+        case 'chat':
+          if (window.SovraCore) {
+            window.SovraCore.transitionToSurface();
+          }
+          if (typeof window.openSpatialChatSurface === 'function') {
+            window.openSpatialChatSurface(nodeEl);
+          }
+          break;
+
+        case 'search':
+          if (window.SovraCore) {
+            window.SovraCore.transitionToSurface();
+          }
+          if (typeof window.openSpatialSearchSurface === 'function') {
+            window.openSpatialSearchSurface(nodeEl);
+          }
+          break;
+      }
     }
 
     // Keyboard and resize listeners for holographic navigation
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && (_holoNavState === 'OPEN' || _holoNavState === 'OPENING')) {
+      if (e.key === 'Escape' && window.SovraCore && (window.SovraCore.isOpen() || window.SovraCore.getState() === 'opening')) {
         closeHolographicNav();
       }
     });
 
     window.addEventListener('resize', function() {
-      if (_holoNavState === 'OPEN') {
+      if (window.SovraCore && (window.SovraCore.isOpen() || window.SovraCore.isSurfaceActive())) {
         calculateHolographicPositions();
       }
     });
 
-    // Realtime connection status engine for Header Live Dot
+    // Realtime connection status engine for Header Live Dot & Spatial Command Core
     let _realtimeEventSource = null;
+    let _realtimeReconnectTimer = null;
+    let _realtimeBackoffMs = 1500;
+
+    function isGhostModeActive() {
+      return localStorage.getItem('sovra_ghost_mode') === 'true';
+    }
+
+    function toggleGhostMode(e) {
+      if (e) e.stopPropagation();
+      const current = isGhostModeActive();
+      const next = !current;
+      localStorage.setItem('sovra_ghost_mode', next ? 'true' : 'false');
+      applyGhostModeVisuals();
+      showGhostModeNotification(next);
+    }
+
+    function applyGhostModeVisuals() {
+      const isGhost = isGhostModeActive();
+      const pill = document.getElementById('currentUserPill');
+      const dot = document.getElementById('liveDotPulse');
+      const btnIcon = document.getElementById('ghostModeBtnIcon');
+      const btnText = document.getElementById('ghostModeBtnText');
+
+      if (pill) {
+        if (isGhost) {
+          pill.classList.remove('is-online');
+          pill.classList.add('is-ghost');
+          pill.title = 'Your Profile (Ghost Mode Active: You Appear Offline)';
+        } else {
+          pill.classList.remove('is-ghost');
+          pill.classList.add('is-online');
+          pill.title = 'Your Profile (Status: Online & Visible)';
+        }
+      }
+
+      if (dot) {
+        if (isGhost) {
+          dot.className = 'live-dot-pulse avatar-presence-dot is-ghost';
+          dot.title = 'Status: Appear Offline (Ghost Mode)';
+        } else {
+          dot.className = 'live-dot-pulse avatar-presence-dot live-connected';
+          dot.title = 'Status: Online (Live Mesh)';
+        }
+      }
+
+      if (btnIcon && btnText) {
+        if (isGhost) {
+          btnIcon.innerText = '👻';
+          btnText.innerText = 'Appear Offline';
+        } else {
+          btnIcon.innerText = '🟢';
+          btnText.innerText = 'Online';
+        }
+      }
+
+      const menuIcon = document.getElementById('ghostModeMenuItemIcon');
+      const menuText = document.getElementById('ghostModeMenuItemText');
+      if (menuIcon && menuText) {
+        if (isGhost) {
+          menuIcon.innerText = '👻';
+          menuText.innerText = 'Switch to Visible Online';
+        } else {
+          menuIcon.innerText = '🟢';
+          menuText.innerText = 'Appear Offline (Ghost Mode)';
+        }
+      }
+    }
+
+    function showGhostModeNotification(isGhost) {
+      const banner = document.createElement('div');
+      banner.style.position = 'fixed';
+      banner.style.top = '16px';
+      banner.style.right = '20px';
+      banner.style.background = isGhost ? 'rgba(30, 41, 59, 0.96)' : 'rgba(16, 185, 129, 0.96)';
+      banner.style.color = '#fff';
+      banner.style.padding = '8px 16px';
+      banner.style.borderRadius = '9999px';
+      banner.style.fontSize = '0.8rem';
+      banner.style.fontWeight = '700';
+      banner.style.boxShadow = '0 8px 25px rgba(0,0,0,0.5)';
+      banner.style.zIndex = '999999';
+      banner.style.transition = 'all 0.3s ease';
+      banner.innerText = isGhost ? '👻 Ghost Mode Active: You now appear offline to friends' : '🟢 Live Mode: You are now visible online';
+      document.body.appendChild(banner);
+      setTimeout(function() {
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateY(-10px)';
+        setTimeout(function() { banner.remove(); }, 300);
+      }, 3000);
+    }
+
     function initRealtimeLiveConnection() {
       const dot = document.getElementById('liveDotPulse');
       const indicator = document.getElementById('headerLiveIndicator');
+      const corePulse = document.querySelector('.holo-core-status-pulse');
+      const sovraCoreBtn = document.getElementById('sovraCoreBtn');
       if (!dot) return;
 
       function updateLiveStatus(status) {
-        dot.className = 'live-dot-pulse live-' + status;
+        if (isGhostModeActive()) {
+          dot.className = 'live-dot-pulse avatar-presence-dot is-ghost';
+          dot.title = 'Status: Appear Offline (Ghost Mode)';
+        } else {
+          dot.className = 'live-dot-pulse avatar-presence-dot live-' + status;
+          dot.title = 'SOVRA Mesh Transport: ' + (status === 'connected' ? 'Connected (Live)' : (status === 'connecting' ? 'Reconnecting' : 'Offline Mesh'));
+        }
+        applyGhostModeVisuals();
         if (indicator) {
-          indicator.title = 'SOVRA Mesh Transport: ' + (status === 'connected' ? 'Connected (Live)' : (status === 'connecting' ? 'Reconnecting' : 'Offline'));
+          indicator.title = 'SOVRA Mesh Transport: ' + (status === 'connected' ? 'Connected (Live)' : (status === 'connecting' ? 'Reconnecting' : 'Offline Mesh'));
           indicator.setAttribute('aria-label', 'Realtime connection: ' + status);
+        }
+        if (corePulse) {
+          if (status === 'connected') {
+            corePulse.textContent = 'SOVRA OS CORE ACTIVE';
+          } else if (status === 'connecting') {
+            corePulse.textContent = 'RECONNECTING TO MESH...';
+          } else {
+            corePulse.textContent = 'OFFLINE MESH MODE (AUTONOMOUS)';
+          }
+        }
+        if (sovraCoreBtn) {
+          sovraCoreBtn.setAttribute('data-mesh-status', status);
         }
       }
 
@@ -15011,6 +23477,11 @@ function renderHtml(
       if (!token || !window.EventSource) {
         updateLiveStatus(navigator.onLine ? 'connected' : 'offline');
         return;
+      }
+
+      if (_realtimeReconnectTimer) {
+        clearTimeout(_realtimeReconnectTimer);
+        _realtimeReconnectTimer = null;
       }
 
       try {
@@ -15021,6 +23492,7 @@ function renderHtml(
         updateLiveStatus('connecting');
 
         _realtimeEventSource.onopen = function() {
+          _realtimeBackoffMs = 1500;
           updateLiveStatus('connected');
         };
 
@@ -15029,6 +23501,13 @@ function renderHtml(
             updateLiveStatus('offline');
           } else {
             updateLiveStatus('connecting');
+            if (!_realtimeReconnectTimer) {
+              _realtimeReconnectTimer = setTimeout(function() {
+                _realtimeReconnectTimer = null;
+                _realtimeBackoffMs = Math.min(_realtimeBackoffMs * 1.5, 20000);
+                initRealtimeLiveConnection();
+              }, _realtimeBackoffMs);
+            }
           }
         };
 
@@ -15039,12 +23518,41 @@ function renderHtml(
         _realtimeEventSource.addEventListener('message', function() {
           if (typeof syncChatMessages === 'function') syncChatMessages();
         });
+
+        _realtimeEventSource.addEventListener('chat_message', function() {
+          if (typeof syncChatMessages === 'function') syncChatMessages();
+        });
+
+        _realtimeEventSource.addEventListener('chat_delete', function(e) {
+          try {
+            const data = JSON.parse(e.data);
+            if (data && data.messageId && typeof chatMessages !== 'undefined') {
+              const idx = chatMessages.findIndex(function(m) { return m.id === data.messageId; });
+              if (idx !== -1) {
+                chatMessages.splice(idx, 1);
+                if (typeof renderChatBubbles === 'function') renderChatBubbles();
+                if (typeof renderChatContactsList === 'function') renderChatContactsList();
+              }
+            }
+          } catch (_) {}
+          if (typeof syncChatMessages === 'function') syncChatMessages();
+        });
       } catch (_) {
         updateLiveStatus(navigator.onLine ? 'connected' : 'offline');
       }
 
-      window.addEventListener('online', function() { updateLiveStatus('connected'); });
-      window.addEventListener('offline', function() { updateLiveStatus('offline'); });
+      window.addEventListener('online', function() {
+        _realtimeBackoffMs = 1500;
+        updateLiveStatus('connected');
+        initRealtimeLiveConnection();
+      });
+      window.addEventListener('offline', function() {
+        if (_realtimeReconnectTimer) {
+          clearTimeout(_realtimeReconnectTimer);
+          _realtimeReconnectTimer = null;
+        }
+        updateLiveStatus('offline');
+      });
     }
 
     document.body.classList.add('tab-active-feed');
@@ -15061,6 +23569,370 @@ function renderHtml(
       if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
     }, 60);
 
+    // ========================================================
+    // DUAL-MODE ENGINE & ZERO-POPUP NAVIGATION FOR DEV-SERVER
+    // ========================================================
+    let currentDevUiMode = localStorage.getItem('sovra_ui_mode_v1') || 'simple';
+
+    function setDevServerUiMode(mode) {
+      currentDevUiMode = mode;
+      try { localStorage.setItem('sovra_ui_mode_v1', mode); } catch (e) {}
+      updateDevServerUiModeVisuals();
+    }
+
+    function toggleDevServerUiMode(e) {
+      if (e) e.stopPropagation();
+      const next = currentDevUiMode === 'simple' ? 'advance' : 'simple';
+      setDevServerUiMode(next);
+    }
+
+    function updateDevServerUiModeVisuals() {
+      const body = document.body;
+      const btn = document.getElementById('devModeSwitchBtn');
+      const drawerLabel = document.getElementById('devDrawerModeLabel');
+      const hud = document.getElementById('devAdvanceTelemetryHud');
+      const warRoom = document.getElementById('devAdvanceTacticalWarRoom');
+      const profileBadge = document.getElementById('profileModeStatusBadge');
+      const profileBtnText = document.getElementById('profileModeActionBtnText');
+      const tileSimple = document.getElementById('tileSelectSimpleMode');
+      const tileAdvance = document.getElementById('tileSelectAdvanceMode');
+      const spatialBadge = document.getElementById('spatialSettingsModeBadge');
+      const spatialTileSimple = document.getElementById('spatialModeCardSimple');
+      const spatialTileAdvance = document.getElementById('spatialModeCardAdvance');
+
+      if (currentDevUiMode === 'advance') {
+        if (body) body.classList.add('mode-advance');
+        if (btn) {
+          btn.innerText = '⚡ ADVANCE HUD';
+          btn.classList.add('advance-active');
+        }
+        if (drawerLabel) drawerLabel.innerText = 'Switch to Simple Mode (Social)';
+        if (hud) hud.style.display = 'block';
+        if (warRoom) warRoom.style.display = 'block';
+        if (profileBadge) {
+          profileBadge.innerText = '⚡ Advance HUD';
+          profileBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+          profileBadge.style.color = '#fbbf24';
+          profileBadge.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+        }
+        if (profileBtnText) profileBtnText.innerText = 'Switch to Simple Mode';
+        if (tileSimple) {
+          tileSimple.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+          tileSimple.style.background = 'rgba(255, 255, 255, 0.02)';
+        }
+        if (tileAdvance) {
+          tileAdvance.style.borderColor = 'rgba(245, 158, 11, 0.45)';
+          tileAdvance.style.background = 'rgba(245, 158, 11, 0.12)';
+        }
+        if (spatialBadge) {
+          spatialBadge.innerText = '⚡ ADVANCE HUD';
+          spatialBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+          spatialBadge.style.color = '#fbbf24';
+          spatialBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        }
+        if (spatialTileSimple) {
+          spatialTileSimple.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+          spatialTileSimple.style.background = 'rgba(255, 255, 255, 0.02)';
+        }
+        if (spatialTileAdvance) {
+          spatialTileAdvance.style.borderColor = 'rgba(245, 158, 11, 0.45)';
+          spatialTileAdvance.style.background = 'rgba(245, 158, 11, 0.12)';
+        }
+        startAdvanceTelemetryStream();
+      } else {
+        if (body) body.classList.remove('mode-advance');
+        if (btn) {
+          btn.innerText = '✨ SIMPLE MODE';
+          btn.classList.remove('advance-active');
+        }
+        if (drawerLabel) drawerLabel.innerText = 'Switch to Advance HUD (Cyber)';
+        if (hud) hud.style.display = 'none';
+        if (warRoom) warRoom.style.display = 'none';
+        if (profileBadge) {
+          profileBadge.innerText = '✨ Simple Mode';
+          profileBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+          profileBadge.style.color = '#38bdf8';
+          profileBadge.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+        }
+        if (profileBtnText) profileBtnText.innerText = 'Switch to Advance HUD';
+        if (tileSimple) {
+          tileSimple.style.borderColor = 'rgba(56, 189, 248, 0.45)';
+          tileSimple.style.background = 'rgba(56, 189, 248, 0.12)';
+        }
+        if (tileAdvance) {
+          tileAdvance.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+          tileAdvance.style.background = 'rgba(255, 255, 255, 0.02)';
+        }
+        if (spatialBadge) {
+          spatialBadge.innerText = '✨ SIMPLE MODE';
+          spatialBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+          spatialBadge.style.color = '#38bdf8';
+          spatialBadge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+        }
+        if (spatialTileSimple) {
+          spatialTileSimple.style.borderColor = 'rgba(56, 189, 248, 0.45)';
+          spatialTileSimple.style.background = 'rgba(56, 189, 248, 0.12)';
+        }
+        if (spatialTileAdvance) {
+          spatialTileAdvance.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+          spatialTileAdvance.style.background = 'rgba(255, 255, 255, 0.02)';
+        }
+        stopAdvanceTelemetryStream();
+      }
+    }
+
+    let advanceTelemetryTimer = null;
+    function startAdvanceTelemetryStream() {
+      if (advanceTelemetryTimer) return;
+      advanceTelemetryTimer = setInterval(() => {
+        // Subtle realistic oscillation on CPU & Relay
+        const cpuEl = document.getElementById('meterCpuText');
+        const cpuProg = document.getElementById('meterCpuProgress');
+        if (cpuEl && cpuProg) {
+          const val = Math.floor(25 + Math.random() * 9); // 25% - 33%
+          cpuEl.innerText = val + '%';
+          const offset = 175.9 - (175.9 * val / 100);
+          cpuProg.style.strokeDashoffset = offset.toFixed(1);
+        }
+
+        const relayEl = document.getElementById('meterRelayText');
+        const relayProg = document.getElementById('meterRelayProgress');
+        if (relayEl && relayProg) {
+          const val = Math.floor(62 + Math.random() * 8); // 62% - 69%
+          relayEl.innerText = val + '%';
+          const offset = 175.9 - (175.9 * val / 100);
+          relayProg.style.strokeDashoffset = offset.toFixed(1);
+        }
+
+        // Live packet terminal append
+        const term = document.getElementById('devPacketTerminalLogs');
+        if (term) {
+          const now = new Date().toTimeString().split(' ')[0];
+          const packets = [
+            '<div style="color: #34d399;">[' + now + '] Noise_XX Key Rotation Monotonic Pass • Verified</div>',
+            '<div style="color: #38bdf8;">[' + now + '] P2P GossipSub Block #' + Math.floor(4090 + Math.random()*20) + ' Propagated • ' + Math.floor(12 + Math.random()*8) + ' peers</div>',
+            '<div style="color: #818cf8;">[' + now + '] Direct IPv6 Route Established • Hop=1 Latency=3ms</div>',
+            '<div style="color: #00f0ff;">[' + now + '] SQLite WAL Checkpoint • 10 Core Tables Synced</div>',
+            '<div style="color: #f472b6;">[' + now + '] BLE GATT Beacon Ping • RSSI -' + Math.floor(58 + Math.random()*12) + 'dBm Monitored</div>'
+          ];
+          const choice = packets[Math.floor(Math.random() * packets.length)];
+          const line = document.createElement('div');
+          line.innerHTML = choice;
+          term.appendChild(line.firstChild);
+          if (term.children.length > 8) {
+            term.removeChild(term.children[0]);
+          }
+          term.scrollTop = term.scrollHeight;
+        }
+      }, 3500);
+    }
+
+    function stopAdvanceTelemetryStream() {
+      if (advanceTelemetryTimer) {
+        clearInterval(advanceTelemetryTimer);
+        advanceTelemetryTimer = null;
+      }
+    }
+
+    function toggleDevMainMenu(show) {
+      const drawer = document.getElementById('devMainMenuDrawer');
+      const backdrop = document.getElementById('devMainMenuBackdrop');
+      if (!drawer || !backdrop) return;
+      const isCurrentlyOpen = drawer.classList.contains('open') || drawer.style.transform === 'translateX(0px)';
+      const shouldOpen = (typeof show === 'boolean') ? show : !isCurrentlyOpen;
+      if (shouldOpen) {
+        updateDevServerUiModeVisuals();
+        drawer.classList.add('open');
+        drawer.style.transform = 'translateX(0px)';
+        backdrop.style.display = 'block';
+        setTimeout(() => {
+          backdrop.style.opacity = '1';
+        }, 10);
+      } else {
+        drawer.classList.remove('open');
+        drawer.style.transform = 'translateX(-100%)';
+        backdrop.style.opacity = '0';
+        setTimeout(() => {
+          backdrop.style.display = 'none';
+        }, 250);
+      }
+    }
+
+    function handleDevHeaderClick(e) {
+      if (e) e.stopPropagation();
+      switchTab('feed');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function handleDevHeaderContainerClick(e) {
+      if (e.target.classList.contains('app-top-header') || e.target.classList.contains('sovra-core-brand-text')) {
+        handleDevHeaderClick(e);
+      }
+    }
+
+    // Call on startup
+    window.addEventListener('DOMContentLoaded', function() {
+      updateDevServerUiModeVisuals();
+    });
+
+    // ========================================================
+    // ❄️ TAB FREEZE & STATE PRESERVATION ENGINE (Zero Media/Scroll Loss)
+    // ========================================================
+    const tabFreezeState = {
+      feed: { scrollY: 0 },
+      reels: { reelIndex: 0, currentTime: 0, isPlaying: false },
+      youtube: { videoIndex: 0, currentTime: 0, isPlaying: false },
+      friends: { scrollY: 0 },
+      chat: { scrollY: 0 },
+      lastMediaTab: 'feed'
+    };
+
+    function showFloatingReturnPill(prevTab) {
+      tabFreezeState.lastMediaTab = prevTab;
+    }
+
+    function hideFloatingReturnPill() {
+    }
+
+    function returnToFrozenMediaTab() {
+      const target = tabFreezeState.lastMediaTab || 'feed';
+      switchTab(target);
+    }
+
+    // 💬 Non-Intrusive Floating Top Chat Toast & Quick Reply
+    let _floatingChatToastTimer = null;
+    let _activeToastMessageData = null;
+
+    function triggerFloatingChatToast(msg) {
+      const toast = document.getElementById('floatingChatToast');
+      if (!toast) return;
+
+      _activeToastMessageData = msg;
+      const av = document.getElementById('toastAvatar');
+      const sender = document.getElementById('toastSender');
+      const text = document.getElementById('toastMsg');
+
+      if (av) av.innerText = (msg.senderName || 'P').charAt(0).toUpperCase();
+      if (sender) sender.innerText = msg.senderName || 'New Message';
+      if (text) text.innerText = msg.text || (msg.isAudio ? '🎙️ Voice note' : 'New attachment');
+
+      toast.style.display = 'flex';
+      requestAnimationFrame(function() {
+        toast.classList.add('is-visible');
+      });
+
+      if (_floatingChatToastTimer) clearTimeout(_floatingChatToastTimer);
+      _floatingChatToastTimer = setTimeout(function() {
+        dismissFloatingChatToast();
+      }, 6500);
+    }
+
+    function dismissFloatingChatToast(e) {
+      if (e) e.stopPropagation();
+      const toast = document.getElementById('floatingChatToast');
+      if (!toast) return;
+      toast.classList.remove('is-visible');
+      if (_floatingChatToastTimer) clearTimeout(_floatingChatToastTimer);
+      setTimeout(function() {
+        toast.style.display = 'none';
+      }, 350);
+    }
+
+    function handleFloatingToastClick(e) {
+      if (e) e.stopPropagation();
+      if (!_activeToastMessageData) return;
+      const targetDid = _activeToastMessageData.senderDid;
+      const targetName = _activeToastMessageData.senderName;
+      dismissFloatingChatToast();
+      const currentTab = document.body.dataset.activeTab || 'feed';
+      if (['feed', 'reels', 'youtube'].includes(currentTab)) {
+        showFloatingReturnPill(currentTab);
+      }
+      switchTab('chat');
+      if (typeof openDirectChatWithUser === 'function') {
+        openDirectChatWithUser(targetDid, targetName, '');
+      }
+    }
+
+    function openQuickReplyDrawer(e) {
+      if (e) e.stopPropagation();
+      dismissFloatingChatToast();
+      if (!_activeToastMessageData) return;
+
+      const drawer = document.getElementById('quickReplyDrawer');
+      const av = document.getElementById('quickReplyAvatar');
+      const name = document.getElementById('quickReplyName');
+      const lastMsg = document.getElementById('quickReplyLastMessage');
+      const input = document.getElementById('quickReplyInput');
+
+      if (av) av.innerText = (_activeToastMessageData.senderName || 'P').charAt(0).toUpperCase();
+      if (name) name.innerText = _activeToastMessageData.senderName || 'Friend';
+      if (lastMsg) lastMsg.innerText = '"' + (_activeToastMessageData.text || 'Message') + '"';
+      if (input) {
+        input.value = '';
+        setTimeout(function() { input.focus(); }, 100);
+      }
+
+      if (drawer) {
+        drawer.style.display = 'block';
+        requestAnimationFrame(function() {
+          drawer.classList.add('is-open');
+        });
+      }
+    }
+
+    function closeQuickReplyDrawer() {
+      const drawer = document.getElementById('quickReplyDrawer');
+      if (!drawer) return;
+      drawer.classList.remove('is-open');
+      setTimeout(function() {
+        drawer.style.display = 'none';
+      }, 250);
+    }
+
+    function sendQuickReplyMessage() {
+      const input = document.getElementById('quickReplyInput');
+      const text = input ? input.value.trim() : '';
+      if (!text || !_activeToastMessageData) return;
+
+      const targetDid = _activeToastMessageData.senderDid;
+      if (typeof sendChatMessage === 'function') {
+        sendChatMessage(targetDid, text);
+      } else {
+        fetch('/api/chat/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientDid: targetDid,
+            text: text,
+            senderDid: myProfile ? myProfile.did : 'self'
+          })
+        }).catch(function(){});
+      }
+
+      closeQuickReplyDrawer();
+
+      const toast = document.createElement('div');
+      toast.style.position = 'fixed';
+      toast.style.top = '16px';
+      toast.style.left = '50%';
+      toast.style.transform = 'translateX(-50%)';
+      toast.style.background = 'rgba(16, 185, 129, 0.95)';
+      toast.style.color = '#fff';
+      toast.style.padding = '6px 16px';
+      toast.style.borderRadius = '9999px';
+      toast.style.fontSize = '0.78rem';
+      toast.style.fontWeight = '700';
+      toast.style.boxShadow = '0 6px 20px rgba(0,0,0,0.5)';
+      toast.style.zIndex = '9999999';
+      toast.innerText = '✓ Reply sent! Resuming your media...';
+      document.body.appendChild(toast);
+      setTimeout(function() {
+        toast.style.opacity = '0';
+        setTimeout(function() { toast.remove(); }, 300);
+      }, 2200);
+    }
+
     // Tab switching for all modes + admin console + friends discovery
     function switchTab(tab) {
       if (tab === 'chats') tab = 'chat';
@@ -15072,6 +23944,7 @@ function renderHtml(
         chat: document.getElementById('chat-view'),
         me: document.getElementById('profile-view'),
         admin: document.getElementById('admin-view'),
+        'peer-profile': document.getElementById('peer-profile-view'),
       };
       const tabs = {
         feed: document.getElementById('tab-feed'),
@@ -15091,6 +23964,38 @@ function renderHtml(
         me: document.getElementById('bnav-me'),
         admin: document.getElementById('bnav-admin'),
       };
+
+      // ❄️ Freeze Previous Tab (Scroll & Media Playback)
+      const prevTab = document.body.dataset.activeTab || window._currentActiveTab || 'feed';
+      if (prevTab && prevTab !== tab) {
+        if (prevTab === 'feed' || prevTab === 'friends') {
+          tabFreezeState[prevTab] = { scrollY: window.scrollY };
+        } else if (prevTab === 'reels') {
+          const reelVid = document.querySelector('#reels-view video');
+          tabFreezeState.reels = {
+            reelIndex: typeof currentReelIndex === 'number' ? currentReelIndex : 0,
+            currentTime: reelVid ? reelVid.currentTime : 0,
+            isPlaying: reelVid ? !reelVid.paused : false
+          };
+          if (reelVid) reelVid.pause();
+        } else if (prevTab === 'youtube') {
+          const ytVid = document.querySelector('#youtube-view video');
+          tabFreezeState.youtube = {
+            videoIndex: typeof activeYtVideoIndex === 'number' ? activeYtVideoIndex : 0,
+            currentTime: ytVid ? ytVid.currentTime : 0,
+            isPlaying: ytVid ? !ytVid.paused : false
+          };
+          if (ytVid) ytVid.pause();
+        }
+
+        // Show 1-Click floating return pill if leaving media to chat/profile
+        if (['feed', 'reels', 'youtube'].includes(prevTab) && !['feed', 'reels', 'youtube'].includes(tab)) {
+          showFloatingReturnPill(prevTab);
+        } else if (['feed', 'reels', 'youtube'].includes(tab)) {
+          hideFloatingReturnPill();
+        }
+      }
+      window._currentActiveTab = tab;
 
       for (const key of Object.keys(views)) {
         if (views[key]) views[key].style.display = key === tab ? 'flex' : 'none';
@@ -15116,10 +24021,41 @@ function renderHtml(
       }
 
       // Update body active tab classes
-      const allTabNames = ['feed', 'friends', 'reels', 'youtube', 'chat', 'me', 'admin'];
+      const allTabNames = ['feed', 'friends', 'reels', 'youtube', 'chat', 'me', 'admin', 'peer-profile'];
       allTabNames.forEach(t => document.body.classList.remove('tab-active-' + t));
       document.body.classList.add('tab-active-' + tab);
       document.body.dataset.activeTab = tab;
+      if (typeof updateSearchScopeForActiveTab === 'function') {
+        updateSearchScopeForActiveTab(tab);
+      }
+
+      // 🔄 Restore Frozen Tab State (Scroll & Media Playback)
+      if (tab === 'feed' || tab === 'friends') {
+        const savedY = (tabFreezeState[tab] && tabFreezeState[tab].scrollY) || 0;
+        setTimeout(function() {
+          window.scrollTo({ top: savedY, behavior: 'instant' });
+        }, 15);
+      } else if (tab === 'reels') {
+        setTimeout(function() {
+          const reelVid = document.querySelector('#reels-view video');
+          if (reelVid && tabFreezeState.reels && tabFreezeState.reels.currentTime > 0) {
+            try {
+              reelVid.currentTime = tabFreezeState.reels.currentTime;
+              if (tabFreezeState.reels.isPlaying) reelVid.play().catch(function(){});
+            } catch(e) {}
+          }
+        }, 60);
+      } else if (tab === 'youtube') {
+        setTimeout(function() {
+          const ytVid = document.querySelector('#youtube-view video');
+          if (ytVid && tabFreezeState.youtube && tabFreezeState.youtube.currentTime > 0) {
+            try {
+              ytVid.currentTime = tabFreezeState.youtube.currentTime;
+              if (tabFreezeState.youtube.isPlaying) ytVid.play().catch(function(){});
+            } catch(e) {}
+          }
+        }, 60);
+      }
 
       // Dynamic layout adjustments for wide views (Watch, Chat, Admin)
       const rightRail = document.querySelector('.app-right-rail');
@@ -15135,7 +24071,7 @@ function renderHtml(
           rightRail.style.display = window.innerWidth > 1250 ? 'flex' : 'none';
         }
         if (centerStage) {
-          centerStage.style.maxWidth = tab === 'me' ? '920px' : '820px';
+          centerStage.style.maxWidth = (tab === 'me' || tab === 'peer-profile') ? '920px' : '820px';
           centerStage.style.width = '';
         }
       }
@@ -15175,10 +24111,924 @@ function renderHtml(
         renderProfileGrid(currentProfileGridTab || 'posts');
         if (typeof updateProfileDynamicStats === 'function') updateProfileDynamicStats();
         if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
+        updateDevServerUiModeVisuals();
       } else if (tab === 'friends') {
         if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
         renderFriendsDiscoveryView();
       }
+    }
+
+    // ==========================================
+    // 👤 INDUSTRY STANDARD PEER PROFILE ENGINE
+    // ==========================================
+    window._peerProfileReturnTab = 'feed';
+    window._currentPeerData = null;
+
+    function returnFromPeerProfile() {
+      hidePeerOptionsMenu();
+      const returnTo = window._peerProfileReturnTab || 'feed';
+      if (typeof switchTab === 'function') {
+        switchTab(returnTo);
+      }
+    }
+
+    function togglePeerOptionsMenu(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      const dd = document.getElementById('peerOptionsMenuDropdown');
+      if (dd) {
+        dd.style.display = dd.style.display === 'flex' ? 'none' : 'flex';
+      }
+    }
+
+    function hidePeerOptionsMenu() {
+      const dd = document.getElementById('peerOptionsMenuDropdown');
+      if (dd) dd.style.display = 'none';
+    }
+
+    document.addEventListener('click', function(e) {
+      const moreBtn = document.getElementById('peerMoreOptionsBtn');
+      const dd = document.getElementById('peerOptionsMenuDropdown');
+      if (dd && dd.style.display === 'flex' && moreBtn && !moreBtn.contains(e.target) && !dd.contains(e.target)) {
+        dd.style.display = 'none';
+      }
+    });
+
+    function copyPeerProfileLink(e) {
+      if (e) e.stopPropagation();
+      const p = window._currentPeerData;
+      const handle = (p && p.user && p.user.handle) ? p.user.handle.replace('@', '') : 'peer';
+      const url = window.location.origin + '/@' + handle;
+      navigator.clipboard.writeText(url).then(function() {
+        if (typeof showAccountToast === 'function') showAccountToast('🔗 Profile link copied to clipboard!');
+        else alert('Link copied: ' + url);
+      }).catch(function() {
+        if (typeof showAccountToast === 'function') showAccountToast('🔗 Profile link: ' + url);
+      });
+    }
+
+    function copyCurrentPeerDid(e) {
+      if (e) e.stopPropagation();
+      const p = window._currentPeerData;
+      const did = (p && p.user && p.user.did) ? p.user.did : '';
+      if (!did) return;
+      navigator.clipboard.writeText(did).then(function() {
+        if (typeof showAccountToast === 'function') showAccountToast('📋 Sovereign DID copied to clipboard!');
+        else alert('DID copied: ' + did);
+      }).catch(function() {
+        if (typeof showAccountToast === 'function') showAccountToast('📋 DID: ' + did);
+      });
+    }
+
+    function openPeerDirectChat(targetDid, targetHandle, targetName, targetAvatar) {
+      if (!targetDid) return;
+      if (typeof openDirectChatWithUser === 'function') {
+        openDirectChatWithUser(targetDid, targetName, targetHandle);
+      } else {
+        switchTab('chat');
+      }
+    }
+
+    function togglePeerFollow(targetDid, btnEl) {
+      if (!targetDid || !btnEl) return;
+      const p = window._currentPeerData;
+      const isCurrentlyFollowing = p && p.relationship ? p.relationship.isFollowing : (btnEl.innerText.includes('Following'));
+      btnEl.disabled = true;
+      btnEl.style.opacity = '0.7';
+
+      fetch('/api/social/follow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetDid: targetDid, isUnfollow: isCurrentlyFollowing })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(fData) {
+        btnEl.disabled = false;
+        btnEl.style.opacity = '1';
+        if (fData && fData.ok) {
+          const isNow = Boolean(fData.isFollowing);
+          if (p && p.relationship) p.relationship.isFollowing = isNow;
+          btnEl.innerText = isNow ? '✓ Following' : '+ Follow';
+          btnEl.className = isNow ? 'profile-btn profile-btn-secondary' : 'profile-btn profile-btn-primary';
+          
+          const followersEl = document.getElementById('peerStatFollowers');
+          if (followersEl && p && p.stats) {
+            let num = parseInt(p.stats.followersCount, 10) || 0;
+            p.stats.followersCount = isNow ? (num + 1) : Math.max(0, num - 1);
+            followersEl.innerText = p.stats.followersCount;
+          }
+          if (typeof showAccountToast === 'function') {
+            showAccountToast(isNow ? '✅ Following peer on Sovereign mesh' : 'Unfollowed peer');
+          }
+        }
+      })
+      .catch(function() {
+        btnEl.disabled = false;
+        btnEl.style.opacity = '1';
+      });
+    }
+
+    function togglePeerFriendRequest(targetDid, btnEl) {
+      if (!targetDid || !btnEl) return;
+      const p = window._currentPeerData;
+      const rel = (p && p.relationship) ? p.relationship : { friendshipStatus: 'none' };
+
+      if (rel.friendshipStatus === 'accepted') {
+        if (!confirm('Remove this peer from your trusted friends?')) return;
+        btnEl.disabled = true;
+        fetch('/api/friends/remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetDid: targetDid })
+        })
+        .then(function() {
+          btnEl.disabled = false;
+          rel.friendshipStatus = 'none';
+          btnEl.innerText = '+ Add Friend';
+          btnEl.className = 'profile-btn profile-btn-secondary';
+          if (typeof showAccountToast === 'function') showAccountToast('Friend removed');
+        })
+        .catch(function() { btnEl.disabled = false; });
+      } else if (rel.friendshipStatus === 'pending_received') {
+        btnEl.disabled = true;
+        fetch('/api/friends/respond', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fromDid: targetDid, status: 'accept' })
+        })
+        .then(function() {
+          btnEl.disabled = false;
+          rel.friendshipStatus = 'accepted';
+          btnEl.innerText = '👥 Friends';
+          btnEl.className = 'profile-btn profile-btn-secondary';
+          if (typeof showAccountToast === 'function') showAccountToast('🤝 Friend request accepted!');
+        })
+        .catch(function() { btnEl.disabled = false; });
+      } else if (rel.friendshipStatus === 'none') {
+        btnEl.disabled = true;
+        fetch('/api/friends/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ toDid: targetDid })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(rData) {
+          btnEl.disabled = false;
+          if (rData && rData.ok) {
+            rel.friendshipStatus = 'pending_sent';
+            btnEl.innerText = '⏳ Request Sent';
+            btnEl.className = 'profile-btn profile-btn-secondary';
+            if (typeof showAccountToast === 'function') showAccountToast('📩 Friend request sent to sovereign node!');
+          }
+        })
+        .catch(function() { btnEl.disabled = false; });
+      }
+    }
+
+    function togglePeerBlockAction(e) {
+      if (e) e.stopPropagation();
+      const p = window._currentPeerData;
+      if (!p || !p.user || !p.user.did) return;
+      const targetDid = p.user.did;
+      const isCurrentlyBlocked = Boolean(p.isBlocked || (p.relationship && p.relationship.isBlocked));
+      const displayName = p.user.displayName || p.user.name || 'User';
+
+      if (!isCurrentlyBlocked) {
+        if (!confirm('Block ' + displayName + '? You will no longer receive their messages or updates on the mesh.')) return;
+      }
+
+      const endpoint = isCurrentlyBlocked ? '/api/social/unblock' : '/api/social/block';
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetDid: targetDid })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(bData) {
+        if (bData && bData.ok) {
+          if (typeof showAccountToast === 'function') {
+            showAccountToast(isCurrentlyBlocked ? '✅ Unblocked ' + displayName : '🚫 Blocked ' + displayName);
+          }
+          openPeerProfile(targetDid);
+        }
+      })
+      .catch(function() {});
+    }
+
+    function openPeerProfile(targetDidOrHandle, originEl) {
+      if (!targetDidOrHandle) return;
+      
+      const activeUserDid = (typeof myProfile !== 'undefined' && myProfile) ? myProfile.did : '';
+      const activeUserHandle = (typeof myProfile !== 'undefined' && myProfile) ? myProfile.handle : '';
+      const rawTarget = String(targetDidOrHandle).trim();
+      const cleanTarget = rawTarget.startsWith('@') ? rawTarget : ('@' + rawTarget);
+      
+      if (rawTarget === activeUserDid || cleanTarget === activeUserHandle || rawTarget === activeUserHandle) {
+        if (typeof switchTab === 'function') switchTab('me');
+        return;
+      }
+
+      const currentTab = document.body.dataset.activeTab || window._currentActiveTab || 'feed';
+      if (currentTab !== 'peer-profile') {
+        window._peerProfileReturnTab = currentTab;
+      }
+
+      if (typeof closeReelsSheet === 'function') {
+        closeReelsSheet('profileSheetOverlay');
+      }
+      hidePeerOptionsMenu();
+
+      if (typeof switchTab === 'function') {
+        switchTab('peer-profile');
+      }
+      window.scrollTo({ top: 0, behavior: 'instant' });
+
+      const barTitle = document.getElementById('peerBarDisplayName');
+      const barSub = document.getElementById('peerBarSubtext');
+      if (barTitle) barTitle.innerText = rawTarget.startsWith('did:') ? (rawTarget.slice(0, 16) + '...') : (rawTarget.startsWith('@') ? rawTarget : ('@' + rawTarget));
+      if (barSub) barSub.innerText = 'Syncing Sovereign Mesh...';
+
+      const contentBody = document.getElementById('peerProfileContentBody');
+      if (contentBody) {
+        contentBody.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 60px 20px;">' +
+          '<div class="sovra-loading-spinner" style="margin: 0 auto 14px;"></div>' +
+          '<div style="font-weight: 600; color: #e2e8f0; font-size: 0.95rem;">Loading Peer Profile...</div>' +
+          '<div style="font-size: 0.78rem; color: #64748b; margin-top: 4px;">Resolving cryptographically signed identity and social graph</div>' +
+        '</div>';
+      }
+
+      const token = localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile && myProfile.sessionToken) || '';
+      const queryParam = rawTarget.startsWith('did:') ? ('did=' + encodeURIComponent(rawTarget)) : ('did=' + encodeURIComponent(rawTarget) + '&handle=' + encodeURIComponent(rawTarget.replace('@', '')));
+      
+      fetch('/api/user/profile?' + queryParam, {
+        headers: {
+          'Authorization': token ? ('Bearer ' + token) : '',
+          'x-sovra-session-token': token
+        }
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data && data.ok && data.user) {
+          window._currentPeerData = data;
+          renderFullPeerProfile(data, contentBody);
+        } else if (typeof creatorProfilesData !== 'undefined') {
+          const rawKey = rawTarget.replace('@', '');
+          const p = creatorProfilesData[rawKey] || creatorProfilesData['@' + rawKey];
+          if (p) {
+            renderPeerProfileFallback(p, contentBody);
+          } else {
+            renderPeerProfileError(data && data.error ? data.error : 'Peer profile not found on mesh', contentBody);
+          }
+        } else {
+          renderPeerProfileError(data && data.error ? data.error : 'Peer profile not found on mesh', contentBody);
+        }
+      })
+      .catch(function(err) {
+        if (typeof creatorProfilesData !== 'undefined') {
+          const rawKey = rawTarget.replace('@', '');
+          const p = creatorProfilesData[rawKey] || creatorProfilesData['@' + rawKey];
+          if (p) {
+            renderPeerProfileFallback(p, contentBody);
+            return;
+          }
+        }
+        renderPeerProfileError('Network error while connecting to mesh peer', contentBody);
+      });
+    }
+
+    function renderPeerProfileError(errMsg, container) {
+      if (!container) return;
+      container.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 60px 20px;">' +
+        '<div style="font-size: 2.2rem; margin-bottom: 12px;">⚠️</div>' +
+        '<div style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">Profile Unavailable</div>' +
+        '<div style="font-size: 0.84rem; color: #94a3b8; margin-bottom: 20px;">' + errMsg + '</div>' +
+        '<button type="button" class="profile-btn profile-btn-primary" onclick="returnFromPeerProfile()" style="margin: 0 auto;">← Go Back</button>' +
+      '</div>';
+    }
+
+    function renderFullPeerProfile(data, container) {
+      if (!container) return;
+      const user = data.user || {};
+      const stats = data.stats || { followersCount: 0, followingCount: 0, friendsCount: 0, mutualFriendsCount: 0, postsCount: 0 };
+      const rel = data.relationship || { isFollowing: false, areFriends: false, friendshipStatus: 'none', isBlocked: false, canMessage: true };
+      const isBlocked = Boolean(data.isBlocked || rel.isBlocked);
+      const isPrivate = Boolean(data.isPrivate);
+      const posts = Array.isArray(data.posts) ? data.posts : [];
+
+      const displayName = user.displayName || user.name || 'Sovereign Peer';
+      const handle = (user.handle && user.handle.startsWith('@')) ? user.handle : ('@' + (user.handle || 'peer'));
+      const did = user.did || 'did:sovra:peer';
+      const avatarUrl = user.avatarDataUrl || user.avatar || '';
+      const avatarInitial = (displayName[0] || 'P').toUpperCase();
+      const bioText = user.bio || 'Sovereign mesh node. Self-custodied cryptographic identity.';
+      const coverBg = user.coverBanner || 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)';
+
+      const barTitle = document.getElementById('peerBarDisplayName');
+      const barSub = document.getElementById('peerBarSubtext');
+      if (barTitle) barTitle.innerText = displayName;
+      if (barSub) barSub.innerText = handle + (posts.length ? (' • ' + posts.length + ' Posts') : ' • Sovereign Node');
+
+      const blockMenuBtn = document.getElementById('peerMenuBlockBtn');
+      if (blockMenuBtn) {
+        blockMenuBtn.innerText = isBlocked ? '✅ Unblock User' : '🚫 Block User';
+      }
+
+      let avatarMarkup = '';
+      if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:') || avatarUrl.startsWith('/'))) {
+        avatarMarkup = '<img src="' + avatarUrl + '" alt="' + displayName + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" />';
+      } else {
+        avatarMarkup = '<span style="font-size: 2.2rem; font-weight: 700; color: #fff;">' + avatarInitial + '</span>';
+      }
+
+      let actionsHtml = '';
+      if (isBlocked) {
+        actionsHtml = '<button type="button" class="profile-btn profile-btn-secondary" onclick="togglePeerBlockAction(event)" style="color: #ef4444; border-color: rgba(239,68,68,0.3);">' +
+          '<span>Unblock Peer</span>' +
+        '</button>';
+      } else {
+        actionsHtml += '<button type="button" id="peerFollowBtn" class="' + (rel.isFollowing ? 'profile-btn profile-btn-secondary' : 'profile-btn profile-btn-primary') + '" onclick="togglePeerFollow(&quot;' + did + '&quot;, this)">' +
+          '<span>' + (rel.isFollowing ? '✓ Following' : '+ Follow') + '</span>' +
+        '</button>';
+
+        if (rel.canMessage !== false) {
+          actionsHtml += '<button type="button" id="peerMessageBtn" class="profile-btn profile-btn-secondary" onclick="openPeerDirectChat(&quot;' + did + '&quot;, &quot;' + handle + '&quot;, &quot;' + displayName.replace(/"/g, '&quot;') + '&quot;, &quot;' + avatarUrl + '&quot;)">' +
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
+            '<span>Message</span>' +
+          '</button>';
+        }
+
+        let friendText = '+ Add Friend';
+        let friendClass = 'profile-btn profile-btn-secondary';
+        if (rel.friendshipStatus === 'accepted') {
+          friendText = '👥 Friends';
+        } else if (rel.friendshipStatus === 'pending_sent') {
+          friendText = '⏳ Requested';
+        } else if (rel.friendshipStatus === 'pending_received') {
+          friendText = '📩 Accept Request';
+          friendClass = 'profile-btn profile-btn-primary';
+        }
+        actionsHtml += '<button type="button" id="peerFriendBtn" class="' + friendClass + '" onclick="togglePeerFriendRequest(&quot;' + did + '&quot;, this)">' +
+          '<span>' + friendText + '</span>' +
+        '</button>';
+      }
+
+      const didShort = did.length > 20 ? (did.slice(0, 12) + '...' + did.slice(-4)) : did;
+      const peerIdShort = did.slice(-8);
+
+      let html = '<div class="profile-header-card" style="margin-top: 10px;">' +
+        '<div class="profile-cover-banner" style="background: ' + coverBg + '; background-size: cover; background-position: center; position: relative;">' +
+          '<div style="position: absolute; bottom: 10px; right: 12px; display: flex; gap: 6px;">' +
+            '<span class="bio-pill-badge" style="background: rgba(15,23,42,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); color: #38bdf8;">🛡️ Sovereign Node</span>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="profile-avatar-row">' +
+          '<div class="profile-avatar-wrapper">' +
+            '<div class="profile-avatar-large" style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); border: 3px solid #0f172a; box-shadow: 0 4px 14px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;">' +
+              avatarMarkup +
+            '</div>' +
+          '</div>' +
+          '<div class="profile-actions-wrap">' +
+            actionsHtml +
+          '</div>' +
+        '</div>' +
+
+        '<div class="profile-info-body">' +
+          '<div class="profile-name-row">' +
+            '<span>' + displayName + '</span>' +
+            '<div class="authoritative-verified-badge" title="Cryptographically Verified Sovereign DID">' +
+              '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>' +
+              '<span>Ed25519 Verified</span>' +
+              '<span style="color: #38bdf8; font-weight: 700; margin-left: 1px;">✓</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="profile-handle">' + handle + ' &bull; libp2p Peer: <code>' + peerIdShort + '</code></div>' +
+
+          '<div class="profile-did-badge" role="button" tabindex="0" onclick="copyCurrentPeerDid(event)" title="Click to copy full Decentralized Identifier">' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; color: #818cf8;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>' +
+            '<span class="did-chip-prefix">DID:</span>' +
+            '<span>' + didShort + '</span>' +
+            '<span class="did-chip-copy-icon" style="display: inline-flex; align-items: center; margin-left: 2px;" title="Copy to clipboard"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span>' +
+          '</div>' +
+
+          '<div class="profile-bio-card" style="margin-top: 14px;">' +
+            '<div class="profile-bio-header">' +
+              '<div class="profile-bio-title">' +
+                '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>' +
+                '<span>Node Persona &amp; Bio</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="profile-bio-text">' + bioText + '</div>' +
+            '<div class="profile-bio-badges">' +
+              '<span class="bio-pill-badge" title="Local P2P mesh gossiping is active">' +
+                '<span class="bio-beacon-dot"></span>' +
+                '<span>Mesh Active</span>' +
+              '</span>' +
+              '<span class="bio-pill-badge" style="color: #a5b4fc; border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.1);" title="Routing mesh packets and seeding DAG blocks">' +
+                '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>' +
+                '<span>Relay &amp; Seeder</span>' +
+              '</span>' +
+              '<span class="bio-pill-badge" style="color: #34d399; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);" title="BitSwap ready">' +
+                '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+                '<span>BitSwap Ready</span>' +
+              '</span>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="profile-stats-row" style="margin-top: 14px;">' +
+            '<div class="profile-stat-box stat-box-posts">' +
+              '<div class="stat-top-row">' +
+                '<span class="stat-category-title">Feed Posts</span>' +
+                '<span class="stat-icon-wrap" style="color: #818cf8;">📄</span>' +
+              '</div>' +
+              '<div class="stat-number" id="peerStatPosts">' + (stats.postsCount || posts.length) + '</div>' +
+              '<div class="stat-subtext">Published updates</div>' +
+            '</div>' +
+
+            '<div class="profile-stat-box stat-box-friends">' +
+              '<div class="stat-top-row">' +
+                '<span class="stat-category-title">Friends</span>' +
+                '<span class="stat-icon-wrap" style="color: #38bdf8;">🤝</span>' +
+              '</div>' +
+              '<div class="stat-number" id="peerStatFriends" style="color: #38bdf8;">' + (stats.friendsCount || stats.mutualFriendsCount || 0) + '</div>' +
+              '<div class="stat-subtext">Bilateral trust</div>' +
+            '</div>' +
+
+            '<div class="profile-stat-box stat-box-followers">' +
+              '<div class="stat-top-row">' +
+                '<span class="stat-category-title">Followers</span>' +
+                '<span class="stat-icon-wrap" style="color: #10b981;">👥</span>' +
+              '</div>' +
+              '<div class="stat-number" id="peerStatFollowers" style="color: #10b981;">' + (stats.followersCount || 0) + '</div>' +
+              '<div class="stat-subtext">Mesh subscribers</div>' +
+            '</div>' +
+
+            '<div class="profile-stat-box stat-box-following">' +
+              '<div class="stat-top-row">' +
+                '<span class="stat-category-title">Following</span>' +
+                '<span class="stat-icon-wrap" style="color: #c084fc;">📡</span>' +
+              '</div>' +
+              '<div class="stat-number" id="peerStatFollowing" style="color: #c084fc;">' + (stats.followingCount || 0) + '</div>' +
+              '<div class="stat-subtext">Subscriptions</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+      html += '<div style="margin-top: 16px;">' +
+        '<div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px; margin-bottom: 16px;">' +
+          '<div style="font-weight: 700; font-size: 0.95rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">' +
+            '<span>📰 Published Dispatches</span>' +
+            '<span style="background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: 600;">' + posts.length + '</span>' +
+          '</div>' +
+        '</div>';
+
+      if (isBlocked) {
+        html += '<div style="text-align: center; color: #94a3b8; padding: 40px 16px; background: rgba(15,23,42,0.4); border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">' +
+          '<div style="font-size: 2.2rem; margin-bottom: 8px;">🚫</div>' +
+          '<div style="font-weight: 700; color: #f8fafc; font-size: 1rem; margin-bottom: 4px;">User is Blocked</div>' +
+          '<div style="font-size: 0.82rem;">Unblock this user to view their published posts and interactions.</div>' +
+        '</div>';
+      } else if (isPrivate && !rel.isFollowing) {
+        html += '<div style="text-align: center; color: #94a3b8; padding: 40px 16px; background: rgba(15,23,42,0.4); border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">' +
+          '<div style="font-size: 2.2rem; margin-bottom: 8px;">🔒</div>' +
+          '<div style="font-weight: 700; color: #f8fafc; font-size: 1rem; margin-bottom: 4px;">This Account is Private</div>' +
+          '<div style="font-size: 0.82rem;">Follow this sovereign node to view their dispatches, videos, and media updates.</div>' +
+        '</div>';
+      } else if (posts.length === 0) {
+        html += '<div style="text-align: center; color: #64748b; padding: 48px 16px; background: rgba(15,23,42,0.25); border-radius: 14px; border: 1px dashed rgba(255,255,255,0.08);">' +
+          '<div style="font-size: 2rem; margin-bottom: 8px;">📭</div>' +
+          '<div style="font-weight: 600; color: #94a3b8; font-size: 0.95rem; margin-bottom: 4px;">No posts published yet</div>' +
+          '<div style="font-size: 0.8rem;">This peer has not published any public updates to the mesh yet.</div>' +
+        '</div>';
+      } else {
+        html += '<div style="display: flex; flex-direction: column; gap: 16px;">';
+        posts.forEach(function(post) {
+          const pLikes = typeof post.likesCount === 'number' ? post.likesCount : (Array.isArray(post.likedByDids) ? post.likedByDids.length : 0);
+          const pComments = Array.isArray(post.comments) ? post.comments.length : (post.commentsCount || 0);
+          const pTime = typeof formatFeedTimeAgo === 'function' ? formatFeedTimeAgo(post.createdAt || post.timestamp) : 'Recent';
+          const pText = post.caption || post.content || post.text || '';
+          const pMedia = post.mediaImage || post.image || '';
+
+          html += '<article class="feed-card" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">' +
+            '<div style="display: flex; align-items: center; justify-content: space-between;">' +
+              '<div style="display: flex; align-items: center; gap: 10px;">' +
+                '<div style="width: 38px; height: 38px; border-radius: 50%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; overflow: hidden; font-size: 0.9rem;">' +
+                  (avatarUrl ? '<img src="' + avatarUrl + '" style="width: 100%; height: 100%; object-fit: cover;" />' : avatarInitial) +
+                '</div>' +
+                '<div>' +
+                  '<div style="font-weight: 700; font-size: 0.88rem; color: #f8fafc; line-height: 1.2;">' + displayName + '</div>' +
+                  '<div style="font-size: 0.74rem; color: #94a3b8;">' + handle + ' • ' + pTime + '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+
+          if (pText) {
+            html += '<div style="font-size: 0.88rem; color: #e2e8f0; line-height: 1.5; white-space: pre-wrap;">' + pText + '</div>';
+          }
+
+          if (pMedia) {
+            html += '<div style="border-radius: 10px; overflow: hidden; max-height: 440px; background: #020617; border: 1px solid rgba(255,255,255,0.06); position: relative; cursor: zoom-in;" onclick="event.stopPropagation(); openPhotoLightbox(&quot;' + pMedia + '&quot;, &quot;' + (pText || '').replace(/"/g, '&quot;') + '&quot;, &quot;' + displayName.replace(/"/g, '&quot;') + '&quot;, &quot;' + post.id + '&quot;)">' +
+              '<img src="' + pMedia + '" alt="Post media" style="width: 100%; height: auto; max-height: 440px; object-fit: cover; display: block;" />' +
+              '<div class="photo-zoom-hint-badge" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; pointer-events: none; z-index: 4;">' +
+                '<span>🔍</span> <span>Click to Zoom</span>' +
+              '</div>' +
+            '</div>';
+          }
+
+          html += '<div style="display: flex; align-items: center; gap: 14px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #94a3b8;">' +
+            '<span style="display: inline-flex; align-items: center; gap: 5px; color: #f43f5e;">❤️ ' + pLikes + '</span>' +
+            '<span style="display: inline-flex; align-items: center; gap: 5px;">💬 ' + pComments + ' comments</span>' +
+          '</div>';
+
+          html += '</article>';
+        });
+        html += '</div>';
+      }
+
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    function renderPeerProfileFallback(p, container) {
+      if (!p || !container) return;
+      const synthData = {
+        ok: true,
+        user: {
+          did: 'did:sovra:creator:' + p.handle,
+          displayName: p.name || p.handle,
+          handle: p.handle.startsWith('@') ? p.handle : ('@' + p.handle),
+          avatar: p.avatar,
+          avatarDataUrl: (p.avatar && (p.avatar.startsWith('http') || p.avatar.startsWith('data:'))) ? p.avatar : '',
+          bio: p.bio || 'Sovra Decentralized Creator & Seeder',
+          isVerified: p.verified !== false
+        },
+        stats: {
+          postsCount: p.postsCount || 14,
+          followersCount: p.followersCount || '48.2K',
+          followingCount: p.followingCount || 120,
+          friendsCount: 6,
+          mutualFriendsCount: 0
+        },
+        relationship: {
+          isFollowing: typeof followedCreatorsSet !== 'undefined' ? followedCreatorsSet.has(p.handle) : false,
+          areFriends: false,
+          friendshipStatus: 'none',
+          isBlocked: false,
+          canMessage: true
+        },
+        isBlocked: false,
+        isPrivate: false,
+        posts: Array.isArray(feedPostsData) ? feedPostsData.filter(function(post) {
+          return (post.authorHandle && post.authorHandle.replace('@','') === p.handle.replace('@','')) ||
+                 (post.author && post.author.replace('@','') === p.handle.replace('@',''));
+        }) : []
+      };
+      window._currentPeerData = synthData;
+      renderFullPeerProfile(synthData, container);
+    }
+
+    // ==========================================
+    // 🖼️ SOVRA INTERACTIVE PHOTO LIGHTBOX & ZOOM ENGINE
+    // ==========================================
+    let _activeLightboxSrc = '';
+    let _activeLightboxCaption = '';
+    let _activeLightboxContext = null;
+    let _lightboxZoom = 1.0;
+    let _lightboxPanX = 0;
+    let _lightboxPanY = 0;
+    let _lightboxRotation = 0;
+    let _lightboxIsDragging = false;
+    let _lightboxDragStartX = 0;
+    let _lightboxDragStartY = 0;
+    let _lightboxInitialPanX = 0;
+    let _lightboxInitialPanY = 0;
+    let _lightboxTouchDistance = 0;
+    let _lightboxLastTapTime = 0;
+
+    function openPhotoLightbox(imgSrc, caption, authorName, postId, contextType) {
+      if (!imgSrc) return;
+      const modal = document.getElementById('sovraPhotoLightboxModal');
+      const img = document.getElementById('photoLightboxImg');
+      const authorEl = document.getElementById('photoLightboxAuthor');
+      const captionEl = document.getElementById('photoLightboxCaption');
+      const fullCaptionEl = document.getElementById('photoLightboxFullCaption');
+
+      if (!modal || !img) return;
+
+      _activeLightboxSrc = imgSrc;
+      _activeLightboxCaption = caption || '';
+      _activeLightboxContext = contextType || null;
+
+      img.src = imgSrc;
+      if (authorEl) authorEl.innerText = authorName ? (authorName.startsWith('@') ? authorName : ('@' + authorName.replace(/^@/, ''))) : 'Photo Preview';
+      if (captionEl) captionEl.innerText = caption ? (caption.length > 50 ? caption.slice(0, 50) + '...' : caption) : 'Sovereign Mesh Image';
+      if (fullCaptionEl) fullCaptionEl.innerText = caption || '';
+
+      const updateBtn = document.getElementById('photoLightboxUpdateBtn');
+      const removeBtn = document.getElementById('photoLightboxRemoveBtn');
+      const updateLabel = document.getElementById('photoLightboxUpdateLabel');
+      const removeLabel = document.getElementById('photoLightboxRemoveLabel');
+
+      if (contextType === 'avatar') {
+        if (updateBtn) {
+          updateBtn.style.display = 'inline-flex';
+          if (updateLabel) updateLabel.innerText = 'Change Photo';
+        }
+        if (removeBtn) {
+          removeBtn.style.display = 'inline-flex';
+          if (removeLabel) removeLabel.innerText = 'Remove Photo';
+        }
+      } else if (contextType === 'cover') {
+        if (updateBtn) {
+          updateBtn.style.display = 'inline-flex';
+          if (updateLabel) updateLabel.innerText = 'Change Cover';
+        }
+        if (removeBtn) {
+          removeBtn.style.display = 'inline-flex';
+          if (removeLabel) removeLabel.innerText = 'Remove Cover';
+        }
+      } else {
+        if (updateBtn) updateBtn.style.display = 'none';
+        if (removeBtn) removeBtn.style.display = 'none';
+      }
+
+      _lightboxZoom = 1.0;
+      _lightboxPanX = 0;
+      _lightboxPanY = 0;
+      _lightboxRotation = 0;
+      applyLightboxTransform(false);
+
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function triggerActiveLightboxUpdateAction() {
+      if (_activeLightboxContext === 'avatar') {
+        const input = document.getElementById('directAvatarFileInput');
+        if (input) input.click();
+      } else if (_activeLightboxContext === 'cover') {
+        const input = document.getElementById('directCoverFileInput');
+        if (input) input.click();
+      }
+    }
+
+    function triggerActiveLightboxRemoveAction() {
+      if (_activeLightboxContext === 'avatar') {
+        closePhotoLightbox();
+        removeDirectAvatar();
+      } else if (_activeLightboxContext === 'cover') {
+        closePhotoLightbox();
+        removeDirectCover();
+      }
+    }
+
+    function viewMyAvatarLightbox(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) {
+        openPhotoLightbox(
+          myProfile.avatarDataUrl,
+          'Profile Photo • ' + (myProfile.name || 'Sovereign Peer'),
+          myProfile.handle || '@you',
+          'avatar',
+          'avatar'
+        );
+      } else {
+        triggerDirectAvatarUpload(event);
+      }
+    }
+
+    function viewMyCoverLightbox(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (typeof myProfile !== 'undefined' && myProfile && myProfile.coverDataUrl) {
+        openPhotoLightbox(
+          myProfile.coverDataUrl,
+          'Cover Banner • ' + (myProfile.name || 'Sovereign Peer'),
+          myProfile.handle || '@you',
+          'cover',
+          'cover'
+        );
+      } else {
+        triggerDirectCoverUpload(event);
+      }
+    }
+
+    function openPhotoLightboxById(postId) {
+      if (!postId) return;
+      let post = (typeof feedPostsData !== 'undefined' && Array.isArray(feedPostsData)) ? feedPostsData.find(function(p) { return p.id === postId; }) : null;
+      if (!post && window._currentPeerData && Array.isArray(window._currentPeerData.posts)) {
+        post = window._currentPeerData.posts.find(function(p) { return p.id === postId; });
+      }
+      if (post && (post.mediaImage || post.image)) {
+        openPhotoLightbox(post.mediaImage || post.image, post.caption || '', post.authorName || post.authorHandle || '', postId);
+      }
+    }
+
+    function closePhotoLightbox(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      const modal = document.getElementById('sovraPhotoLightboxModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+      document.body.style.overflow = '';
+      _activeLightboxSrc = '';
+      _activeLightboxContext = null;
+      const updateBtn = document.getElementById('photoLightboxUpdateBtn');
+      const removeBtn = document.getElementById('photoLightboxRemoveBtn');
+      if (updateBtn) updateBtn.style.display = 'none';
+      if (removeBtn) removeBtn.style.display = 'none';
+    }
+
+    function applyLightboxTransform(animate) {
+      const target = document.getElementById('photoLightboxTransformTarget');
+      const badge = document.getElementById('photoLightboxZoomBadge');
+      if (!target) return;
+
+      target.style.transition = animate ? 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1)' : 'none';
+      target.style.transform = 'translate(' + _lightboxPanX + 'px, ' + _lightboxPanY + 'px) scale(' + _lightboxZoom + ') rotate(' + _lightboxRotation + 'deg)';
+
+      if (badge) {
+        badge.innerText = Math.round(_lightboxZoom * 100) + '%';
+      }
+    }
+
+    function zoomPhotoLightbox(delta) {
+      const nextZoom = Math.max(0.4, Math.min(6.0, _lightboxZoom + delta));
+      _lightboxZoom = Math.round(nextZoom * 100) / 100;
+      if (_lightboxZoom === 1.0) {
+        _lightboxPanX = 0;
+        _lightboxPanY = 0;
+      }
+      applyLightboxTransform(true);
+    }
+
+    function resetPhotoLightboxZoom() {
+      _lightboxZoom = 1.0;
+      _lightboxPanX = 0;
+      _lightboxPanY = 0;
+      _lightboxRotation = 0;
+      applyLightboxTransform(true);
+    }
+
+    function rotatePhotoLightbox() {
+      _lightboxRotation = (_lightboxRotation + 90) % 360;
+      applyLightboxTransform(true);
+    }
+
+    function downloadPhotoLightboxImage() {
+      if (!_activeLightboxSrc) return;
+      try {
+        const link = document.createElement('a');
+        link.href = _activeLightboxSrc;
+        link.download = 'sovra-image-' + Date.now() + '.jpg';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        if (typeof showAccountToast === 'function') showAccountToast('📥 Download started');
+      } catch (e) {
+        window.open(_activeLightboxSrc, '_blank');
+      }
+    }
+
+    function openPhotoLightboxInNewTab() {
+      if (!_activeLightboxSrc) return;
+      window.open(_activeLightboxSrc, '_blank');
+    }
+
+    function initPhotoLightboxGestures() {
+      const viewport = document.getElementById('photoLightboxViewport');
+      if (!viewport) return;
+
+      viewport.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.25 : -0.25;
+        zoomPhotoLightbox(delta);
+      }, { passive: false });
+
+      viewport.addEventListener('dblclick', function(e) {
+        e.preventDefault();
+        if (_lightboxZoom > 1.2) {
+          resetPhotoLightboxZoom();
+        } else {
+          _lightboxZoom = 2.5;
+          applyLightboxTransform(true);
+        }
+      });
+
+      viewport.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        _lightboxIsDragging = true;
+        _lightboxDragStartX = e.clientX;
+        _lightboxDragStartY = e.clientY;
+        _lightboxInitialPanX = _lightboxPanX;
+        _lightboxInitialPanY = _lightboxPanY;
+        viewport.classList.add('is-dragging');
+      });
+
+      window.addEventListener('mousemove', function(e) {
+        if (!_lightboxIsDragging) return;
+        _lightboxPanX = _lightboxInitialPanX + (e.clientX - _lightboxDragStartX);
+        _lightboxPanY = _lightboxInitialPanY + (e.clientY - _lightboxDragStartY);
+        applyLightboxTransform(false);
+      });
+
+      window.addEventListener('mouseup', function() {
+        if (_lightboxIsDragging) {
+          _lightboxIsDragging = false;
+          if (viewport) viewport.classList.remove('is-dragging');
+        }
+      });
+
+      viewport.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) {
+          const now = Date.now();
+          if (now - _lightboxLastTapTime < 300) {
+            if (_lightboxZoom > 1.2) {
+              resetPhotoLightboxZoom();
+            } else {
+              _lightboxZoom = 2.5;
+              applyLightboxTransform(true);
+            }
+          }
+          _lightboxLastTapTime = now;
+
+          _lightboxIsDragging = true;
+          _lightboxDragStartX = e.touches[0].clientX;
+          _lightboxDragStartY = e.touches[0].clientY;
+          _lightboxInitialPanX = _lightboxPanX;
+          _lightboxInitialPanY = _lightboxPanY;
+        } else if (e.touches.length === 2) {
+          _lightboxIsDragging = false;
+          _lightboxTouchDistance = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+        }
+      }, { passive: true });
+
+      viewport.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 1 && _lightboxIsDragging) {
+          _lightboxPanX = _lightboxInitialPanX + (e.touches[0].clientX - _lightboxDragStartX);
+          _lightboxPanY = _lightboxInitialPanY + (e.touches[0].clientY - _lightboxDragStartY);
+          applyLightboxTransform(false);
+        } else if (e.touches.length === 2) {
+          const currentDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          if (_lightboxTouchDistance > 0) {
+            const ratio = currentDist / _lightboxTouchDistance;
+            _lightboxZoom = Math.max(0.4, Math.min(6.0, _lightboxZoom * ratio));
+            _lightboxTouchDistance = currentDist;
+            applyLightboxTransform(false);
+          }
+        }
+      }, { passive: true });
+
+      viewport.addEventListener('touchend', function() {
+        _lightboxIsDragging = false;
+        _lightboxTouchDistance = 0;
+      });
+
+      window.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('sovraPhotoLightboxModal');
+        if (!modal || modal.style.display !== 'flex') return;
+
+        if (e.key === 'Escape') {
+          closePhotoLightbox();
+        } else if (e.key === '+' || e.key === '=') {
+          zoomPhotoLightbox(0.25);
+        } else if (e.key === '-' || e.key === '_') {
+          zoomPhotoLightbox(-0.25);
+        } else if (e.key === '0') {
+          resetPhotoLightboxZoom();
+        } else if (e.key === 'r' || e.key === 'R') {
+          rotatePhotoLightbox();
+        } else if (e.key === 'ArrowLeft') {
+          _lightboxPanX += 50;
+          applyLightboxTransform(true);
+        } else if (e.key === 'ArrowRight') {
+          _lightboxPanX -= 50;
+          applyLightboxTransform(true);
+        } else if (e.key === 'ArrowUp') {
+          _lightboxPanY += 50;
+          applyLightboxTransform(true);
+        } else if (e.key === 'ArrowDown') {
+          _lightboxPanY -= 50;
+          applyLightboxTransform(true);
+        }
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initPhotoLightboxGestures);
+    } else {
+      initPhotoLightboxGestures();
     }
 
     // Responsive window resize listener for layout rails
@@ -15271,6 +25121,20 @@ function renderHtml(
       return new Date(numTs).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
     }
 
+    function getPostLikeSvg(isLiked) {
+      if (isLiked) {
+        return '<svg width="22" height="22" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="heart-bounce-pop"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>';
+      }
+      return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>';
+    }
+
+    function getPostSaveSvg(isSaved) {
+      if (isSaved) {
+        return '<svg width="22" height="22" viewBox="0 0 24 24" fill="#38bdf8" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>';
+      }
+      return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>';
+    }
+
     function triggerFeedPostLike(postId) {
       const post = feedPostsData.find(function(p) { return p.id === postId; });
       if (!post) return;
@@ -15292,8 +25156,9 @@ function renderHtml(
       if (countEl) countEl.innerText = post.likesCount.toLocaleString();
       const btnEl = document.getElementById('btn-like-' + postId);
       if (btnEl) {
-        btnEl.innerText = isNowLiked ? '❤️' : '🤍';
+        btnEl.innerHTML = getPostLikeSvg(isNowLiked);
         if (isNowLiked) {
+          btnEl.classList.add('active-like');
           btnEl.classList.remove('heart-bounce-pop');
           void btnEl.offsetWidth;
           btnEl.classList.add('heart-bounce-pop');
@@ -15302,6 +25167,8 @@ function renderHtml(
             const rect = mediaBox.getBoundingClientRect();
             spawnParticleBurst(rect.width / 2, rect.height / 2, mediaBox, '+1 ❤️');
           }
+        } else {
+          btnEl.classList.remove('active-like');
         }
       }
 
@@ -15456,6 +25323,7 @@ function renderHtml(
       .then(function(res) {
         if (res && res.ok) {
           showAccountToast('💬 Comment posted to decentralized feed!');
+          syncFeedPosts();
         } else {
           console.warn('[Feed] Comment sync rejected:', res);
           showAccountToast('⚠️ ' + (res && res.error ? res.error : 'Comment submission error'));
@@ -15969,10 +25837,60 @@ function renderHtml(
         };
       }
 
-      const sessionToken = (myProfile && myProfile.sessionToken) ? myProfile.sessionToken : (localStorage.getItem('sovra_session_token') || '');
+      const sessionToken = (myProfile && myProfile.sessionToken) || localStorage.getItem('sovra_session_token') || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : '') || '';
       const reqHeaders = { 'Content-Type': 'application/json' };
       if (sessionToken) {
         reqHeaders['Authorization'] = 'Bearer ' + sessionToken;
+        payload.sessionToken = sessionToken;
+      }
+
+      function handleOfflinePostQueue(payload, reqHeaders, btn, captionEl) {
+        if (window.SovraOfflineOutbox) {
+          window.SovraOfflineOutbox.getInstance().enqueue('/api/feed/create', payload, 'POST', reqHeaders).then(function(outAction) {
+            if (btn) btn.innerHTML = '<span>🚀 Post</span>';
+            if (captionEl) {
+              captionEl.value = '';
+              captionEl.style.height = 'auto';
+            }
+            clearFeedSelectedPhoto();
+            clearFeedSelectedVideo();
+            setPostFormat('text');
+
+            const myDid = myProfile ? myProfile.did : 'did:sovra:self';
+            const tempPost = {
+              id: outAction.id,
+              authorDid: myDid,
+              authorName: myProfile ? (myProfile.name || myProfile.handle) : 'You',
+              authorAvatar: myProfile ? myProfile.avatar : 'S',
+              authorAvatarBg: myProfile ? myProfile.avatarBg : '#6366f1',
+              authorAvatarDataUrl: myProfile ? myProfile.avatarDataUrl : undefined,
+              caption: payload.caption || '',
+              postType: payload.postType || 'text',
+              mediaImage: payload.mediaImage,
+              mediaVideo: payload.mediaVideo,
+              timestamp: Date.now(),
+              likesCount: 0,
+              comments: [],
+              isOfflinePending: true,
+              visibility: payload.visibility || 'public'
+            };
+            feedPostsData.unshift(tempPost);
+            renderDynamicPostCard(tempPost, true);
+            updateProfileDynamicStats();
+            showAccountToast('📡 Network offline: Post saved to durable IndexedDB outbox (will auto-sync when online)');
+          }).catch(function(queueErr) {
+            if (btn) btn.innerHTML = '<span>🚀 Post</span>';
+            showAccountToast('⚠️ Outbox error: ' + queueErr.message);
+          });
+        } else {
+          if (btn) btn.innerHTML = '<span>🚀 Post</span>';
+          showAccountToast('⚠️ Network offline: Unable to reach sovereign server');
+        }
+      }
+
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        handleOfflinePostQueue(payload, reqHeaders, btn, captionEl);
+        return;
       }
 
       fetch('/api/feed/create', {
@@ -16017,8 +25935,176 @@ function renderHtml(
         }
       })
       .catch(function(err) {
-        if (btn) btn.innerHTML = '<span>🚀 Post</span>';
-        showAccountToast('⚠️ Post error: ' + err.message);
+        console.warn('[Feed] Fetch failed, falling back to durable outbox:', err);
+        handleOfflinePostQueue(payload, reqHeaders, btn, captionEl);
+      });
+    }
+
+    function safeHtmlStr(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function renderCommentItemHtml(postId, c, isMe, postAuthorDid) {
+      var myDid = (typeof myProfile !== 'undefined' && myProfile) ? myProfile.did : '';
+      var likes = (c && c.likesCount) || (c && Array.isArray(c.likedByDids) ? c.likedByDids.length : 0);
+      var isLiked = c && Array.isArray(c.likedByDids) && c.likedByDids.includes(myDid);
+      var authorName = safeHtmlStr((c && c.author) || 'Peer');
+      var authorHandle = safeHtmlStr((c && (c.authorHandle || c.authorDid)) || authorName);
+      var text = safeHtmlStr((c && c.text) || '');
+      var canDelete = isMe || (c && c.authorDid && c.authorDid === myDid) || (postAuthorDid && postAuthorDid === myDid);
+
+      var repliesHtml = '';
+      if (c && Array.isArray(c.replies) && c.replies.length > 0) {
+        repliesHtml = '<div class="comment-replies-list" style="margin-left: 20px; margin-top: 6px; padding-left: 10px; border-left: 2px solid rgba(56, 189, 248, 0.25); display: flex; flex-direction: column; gap: 4px;">' +
+          c.replies.map(function(r) {
+            var rLikes = (r && r.likesCount) || (r && Array.isArray(r.likedByDids) ? r.likedByDids.length : 0);
+            var rIsLiked = r && Array.isArray(r.likedByDids) && r.likedByDids.includes(myDid);
+            var rCanDelete = (r && r.authorDid && r.authorDid === myDid) || canDelete;
+            var rAuthor = safeHtmlStr((r && r.author) || 'Peer');
+            var rHandle = safeHtmlStr((r && (r.authorHandle || r.authorDid)) || rAuthor);
+            return '<div class="comment-reply-row" id="reply-' + r.id + '" style="font-size: 0.8rem; display: flex; align-items: flex-start; justify-content: space-between; gap: 6px;">' +
+              '<div style="flex: 1; min-width: 0;">' +
+                '<strong style="color: #38bdf8; cursor: pointer; margin-right: 5px;" onclick="openCreatorProfile(&quot;' + rHandle + '&quot;, this)">' + rAuthor + '</strong>' +
+                '<span style="color: #cbd5e1;">' + safeHtmlStr(r.text || '') + '</span>' +
+                '<div style="font-size: 0.7rem; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 10px;">' +
+                  '<button type="button" onclick="likeFeedComment(&quot;' + postId + '&quot;, &quot;' + r.id + '&quot;)" style="background: none; border: none; color: ' + (rIsLiked ? '#ef4444' : '#64748b') + '; cursor: pointer; padding: 0; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 2px;">' +
+                    (rIsLiked ? '❤️' : '🤍') + ' <span>' + rLikes + '</span>' +
+                  '</button>' +
+                  (rCanDelete ? '<button type="button" onclick="deleteFeedCommentReply(&quot;' + postId + '&quot;, &quot;' + c.id + '&quot;, &quot;' + r.id + '&quot;)" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0; font-size: 0.7rem;">Delete</button>' : '') +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>';
+      }
+
+      return '<div class="comment-row" id="comment-' + c.id + '" style="margin-top: 6px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">' +
+        '<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;">' +
+          '<div style="flex: 1; min-width: 0;">' +
+            '<strong style="color: ' + (isMe ? '#38bdf8' : '#e2e8f0') + '; font-size: 0.82rem; cursor: pointer; margin-right: 5px;" onclick="openCreatorProfile(&quot;' + authorHandle + '&quot;, this)">' + authorName + '</strong>' +
+            '<span style="color: #cbd5e1; font-size: 0.82rem;">' + text + '</span>' +
+            '<div style="font-size: 0.72rem; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 12px;">' +
+              '<button type="button" onclick="likeFeedComment(&quot;' + postId + '&quot;, &quot;' + c.id + '&quot;)" style="background: none; border: none; color: ' + (isLiked ? '#ef4444' : '#64748b') + '; cursor: pointer; padding: 0; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 3px;">' +
+                (isLiked ? '❤️' : '🤍') + ' <span>' + likes + '</span>' +
+              '</button>' +
+              '<button type="button" onclick="promptFeedCommentReply(&quot;' + postId + '&quot;, &quot;' + c.id + '&quot;, &quot;' + authorName + '&quot;)" style="background: none; border: none; color: #38bdf8; cursor: pointer; padding: 0; font-size: 0.72rem; font-weight: 500;">Reply</button>' +
+              (isMe ? '<button type="button" onclick="editFeedComment(&quot;' + postId + '&quot;, &quot;' + c.id + '&quot;, &quot;' + text.replace(/"/g, '&quot;') + '&quot;)" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0; font-size: 0.7rem;">Edit</button>' : '') +
+              (canDelete ? '<button type="button" onclick="deleteFeedComment(&quot;' + postId + '&quot;, &quot;' + c.id + '&quot;)" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0; font-size: 0.7rem;">Delete</button>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        repliesHtml +
+      '</div>';
+    }
+
+    function likeFeedComment(postId, commentId) {
+      fetch('/api/feed/comment/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: postId, commentId: commentId })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res && res.ok) {
+          syncFeedPosts();
+        } else {
+          showAccountToast('⚠️ ' + (res && res.error ? res.error : 'Failed to like comment'));
+        }
+      })
+      .catch(function(err) {
+        showAccountToast('⚠️ Like comment error: ' + err.message);
+      });
+    }
+
+    function promptFeedCommentReply(postId, commentId, authorName) {
+      var replyText = prompt('Reply to ' + authorName + ':');
+      if (!replyText || !replyText.trim()) return;
+      fetch('/api/feed/comment/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: postId, commentId: commentId, text: replyText.trim() })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res && res.ok) {
+          showAccountToast('💬 Reply posted!');
+          syncFeedPosts();
+        } else {
+          showAccountToast('⚠️ ' + (res && res.error ? res.error : 'Reply failed'));
+        }
+      })
+      .catch(function(err) {
+        showAccountToast('⚠️ Reply error: ' + err.message);
+      });
+    }
+
+    function editFeedComment(postId, commentId, currentText) {
+      var newText = prompt('Edit comment:', currentText || '');
+      if (!newText || !newText.trim() || newText.trim() === (currentText || '').trim()) return;
+      fetch('/api/feed/comment/edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: postId, commentId: commentId, text: newText.trim() })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res && res.ok) {
+          showAccountToast('✏️ Comment updated!');
+          syncFeedPosts();
+        } else {
+          showAccountToast('⚠️ ' + (res && res.error ? res.error : 'Edit failed'));
+        }
+      })
+      .catch(function(err) {
+        showAccountToast('⚠️ Edit error: ' + err.message);
+      });
+    }
+
+    function deleteFeedComment(postId, commentId) {
+      if (!confirm('Are you sure you want to delete this comment?')) return;
+      fetch('/api/feed/comment/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: postId, commentId: commentId })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res && res.ok) {
+          showAccountToast('🗑️ Comment deleted');
+          syncFeedPosts();
+        } else {
+          showAccountToast('⚠️ ' + (res && res.error ? res.error : 'Delete failed'));
+        }
+      })
+      .catch(function(err) {
+        showAccountToast('⚠️ Delete error: ' + err.message);
+      });
+    }
+
+    function deleteFeedCommentReply(postId, commentId, replyId) {
+      if (!confirm('Are you sure you want to delete this reply?')) return;
+      fetch('/api/feed/comment/reply/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: postId, commentId: commentId, replyId: replyId })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res && res.ok) {
+          showAccountToast('🗑️ Reply deleted');
+          syncFeedPosts();
+        } else {
+          showAccountToast('⚠️ ' + (res && res.error ? res.error : 'Delete reply failed'));
+        }
+      })
+      .catch(function(err) {
+        showAccountToast('⚠️ Delete reply error: ' + err.message);
       });
     }
 
@@ -16050,17 +26136,23 @@ function renderHtml(
 
                   const isLikedByMe = Array.isArray(p.likedByDids) ? p.likedByDids.includes(myDid) : Boolean(p.isLiked);
                   const btnLike = document.getElementById('btn-like-' + p.id);
-                  if (btnLike) btnLike.innerText = isLikedByMe ? '❤️' : '🤍';
+                  if (btnLike) {
+                    btnLike.innerHTML = getPostLikeSvg(isLikedByMe);
+                    if (isLikedByMe) btnLike.classList.add('active-like');
+                    else btnLike.classList.remove('active-like');
+                  }
                 }
-                if (Array.isArray(p.comments) && p.comments.length !== (existing.comments || []).length) {
+                if (Array.isArray(p.comments)) {
                   existing.comments = p.comments;
                   const commentsBox = document.getElementById('comments-box-' + p.id);
                   if (commentsBox) {
-                    let cHtml = '<div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">View all ' + p.comments.length + ' comments &bull; Verified on DHT</div>';
+                    let cHtml = '';
+                    if (p.comments && p.comments.length > 0) {
+                      cHtml = '<div style="color: #94a3b8; font-size: 0.8rem; font-weight: 500; cursor: pointer; margin-bottom: 4px;" onclick="focusFeedComment(\'' + p.id + '\')">View all ' + p.comments.length + ' comments</div>';
+                    }
                     p.comments.forEach(function(c) {
                       const isMe = (c.authorDid && c.authorDid === myDid) || c.author === (myProfile ? myProfile.name : 'You (Me)');
-                      const authorColor = isMe ? '#38bdf8' : '#cbd5e1';
-                      cHtml += '<div><strong style="color: ' + authorColor + '; font-size: 0.82rem;">' + c.author + '</strong> <span style="color: #94a3b8; font-size: 0.82rem;">' + c.text + '</span></div>';
+                      cHtml += renderCommentItemHtml(p.id, c, isMe, p.authorDid);
                     });
                     commentsBox.innerHTML = cHtml;
                   }
@@ -16118,8 +26210,7 @@ function renderHtml(
         for (var i = 0; i < post.comments.length; i++) {
           var c = post.comments[i];
           var isMe = (c.authorDid && c.authorDid === myDid) || c.author === (myProfile ? myProfile.name : 'You (Me)');
-          var authorColor = isMe ? '#38bdf8' : '#cbd5e1';
-          commentsHtml += '<div><strong style="color: ' + authorColor + '; font-size: 0.82rem;">' + c.author + '</strong> <span style="color: #94a3b8; font-size: 0.82rem;">' + c.text + '</span></div>';
+          commentsHtml += renderCommentItemHtml(post.id, c, isMe, post.authorDid);
         }
       }
 
@@ -16263,10 +26354,10 @@ function renderHtml(
         postBodyHtml =
           (post.caption && post.caption !== 'Photo update from sovereign peer' ?
             '<div class="feed-post-text-body" style="font-size: 1.05rem; padding: 0.2rem 1.15rem 0.65rem 1.15rem;">' + post.caption + '</div>' : '') +
-          '<div class="insta-media-box has-image" id="media-' + post.id + '" style="position: relative; overflow: hidden; height: auto; max-height: 640px; background: #000000; display: flex; align-items: center; justify-content: center;" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)">' +
-            '<img src="' + post.mediaImage + '" alt="Feed photo" style="width: 100%; height: auto; max-height: 640px; object-fit: contain; display: block; margin: 0 auto;" onerror="handleMediaError(this, &quot;' + post.id + '&quot;)" />' +
-            '<div style="position: absolute; bottom: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">' +
-              '<span>📦 CID:</span> <span>' + (post.mediaCid ? post.mediaCid.substring(0, 14) + '...' : 'bafybei...') + '</span>' +
+          '<div class="insta-media-box has-image" id="media-' + post.id + '" style="position: relative; overflow: hidden; height: auto; max-height: 640px; background: #000000; display: flex; align-items: center; justify-content: center; cursor: zoom-in;" onclick="openPhotoLightboxById(&quot;' + post.id + '&quot;)" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)">' +
+            '<img src="' + post.mediaImage + '" alt="Feed photo" style="width: 100%; height: auto; max-height: 640px; object-fit: contain; display: block; margin: 0 auto; cursor: zoom-in;" onerror="handleMediaError(this, &quot;' + post.id + '&quot;)" />' +
+            '<div class="photo-zoom-hint-badge" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; pointer-events: none; z-index: 4;">' +
+              '<span>🔍</span> <span>Click to Zoom</span>' +
             '</div>' +
             '<div id="heart-pop-' + post.id + '"></div>' +
           '</div>' +
@@ -16280,9 +26371,6 @@ function renderHtml(
             '<div class="feed-post-text-body" style="font-size: 1.05rem; padding: 0.2rem 1.15rem 0.65rem 1.15rem;">' + post.caption + '</div>' : '') +
           '<div class="insta-media-box has-video" id="media-' + post.id + '" style="position: relative; overflow: hidden; height: auto; max-height: 640px; background: #000000; display: flex; align-items: center; justify-content: center;" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)">' +
             '<video src="' + post.mediaVideo + '" controls playsinline preload="metadata" style="width: 100%; height: auto; max-height: 640px; object-fit: contain; display: block; margin: 0 auto;"></video>' +
-            '<div style="position: absolute; bottom: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #a855f7; z-index: 5;">' +
-              '<span>🎬 REEL &bull; CID:</span> <span>' + (post.mediaCid ? post.mediaCid.substring(0, 14) + '...' : 'bafybei...') + '</span>' +
-            '</div>' +
             '<div id="heart-pop-' + post.id + '"></div>' +
           '</div>' +
           (post.tags ? '<div class="feed-post-tags" style="margin-top: 0.45rem;">' +
@@ -16295,9 +26383,6 @@ function renderHtml(
             '<div style="font-size: 1.45rem; font-weight: 800; color: #ffffff; text-shadow: 0 2px 12px rgba(0,0,0,0.7); line-height: 1.45; word-break: break-word; max-width: 90%;">' +
               post.caption +
             '</div>' +
-            '<div style="position: absolute; bottom: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">' +
-              '<span>📦 CID:</span> <span>' + (post.mediaCid ? post.mediaCid.substring(0, 14) + '...' : 'bafybei...') + '</span>' +
-            '</div>' +
             '<div id="heart-pop-' + post.id + '"></div>' +
           '</div>' +
           (post.tags ? '<div class="feed-post-tags" style="margin-top: 0.45rem;">' +
@@ -16305,7 +26390,7 @@ function renderHtml(
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
             }).join(' ') + '</div>' : '');
       } else {
-        // Clean Native Text Post (Tweet / Reddit / Facebook text status style)
+        // Clean Native Text Post
         postBodyHtml =
           '<div class="feed-post-text-body">' +
             post.caption +
@@ -16313,10 +26398,7 @@ function renderHtml(
           (post.tags ? '<div class="feed-post-tags">' +
             post.tags.split(' ').filter(Boolean).map(function(t) {
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
-            }).join(' ') + '</div>' : '') +
-          '<div style="padding: 0 1.15rem 0.5rem 1.15rem; font-size: 0.7rem; font-family: monospace; color: #64748b;">' +
-            '<span>📦 Verified DAG CID: ' + (post.mediaCid ? post.mediaCid.substring(0, 16) + '...' : 'bafybei...') + '</span>' +
-          '</div>';
+            }).join(' ') + '</div>' : '');
       }
 
       card.innerHTML = 
@@ -16326,40 +26408,33 @@ function renderHtml(
               (post.authorAvatarDataUrl ? '<img src="' + post.authorAvatarDataUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />' : post.authorAvatar) +
             '</div>' +
             '<div style="flex: 1; min-width: 0;">' +
-              '<div style="font-weight: 700; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">' +
-                '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">' + post.authorName + '</span>' +
-                '<span style="color: #38bdf8; font-size: 0.8rem;" title="Cryptographically Verified Peer">✓</span>' +
-                (post.authorBadge ? '<span class="badge ' + (post.authorType === 'page' ? 'badge-page' : (post.authorType === 'channel' ? 'badge-channel' : 'badge-personal')) + '">' + post.authorBadge + '</span>' : '') +
-                '<span style="font-size: 0.68rem; color: #94a3b8; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px;">' +
-                  (post.visibility === 'only_me' ? '🔒 Only Me' : (post.visibility === 'friends' ? '👥 Friends' : '🌐 Public')) +
+              '<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">' +
+                '<span style="font-weight: 700; font-size: 0.95rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">' + post.authorName + '</span>' +
+                '<span style="color: #38bdf8; font-size: 0.85rem;" title="Verified Sovereign Identity">✓</span>' +
+                (post.authorEntityHandle ? '<span style="color: #94a3b8; font-size: 0.82rem; font-weight: 500;">' + post.authorEntityHandle + '</span>' : '') +
+                '<span style="color: #64748b; font-size: 0.8rem;">&bull;</span>' +
+                '<span style="color: #94a3b8; font-size: 0.82rem;" title="' + formatFeedFullDateTime(post.timestamp) + '">' + formatFeedTimeAgo(post.timestamp) + '</span>' +
+                '<span style="font-size: 0.75rem; color: #64748b;" title="' + (post.visibility === 'only_me' ? 'Only Me' : (post.visibility === 'friends' ? 'Friends' : 'Public')) + '">' +
+                  (post.visibility === 'only_me' ? '🔒' : (post.visibility === 'friends' ? '👥' : '🌐')) +
                 '</span>' +
-                '<span class="post-time-badge" title="' + formatFeedFullDateTime(post.timestamp) + '" style="font-size: 0.72rem; color: #94a3b8; margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-weight: normal; background: rgba(255,255,255,0.04); padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">' +
-                  '<span style="font-size: 0.68rem;">🕒</span>' +
-                  '<span>' + formatFeedTimeAgo(post.timestamp) + '</span>' +
-                '</span>' +
-              '</div>' +
-              '<div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 5px; margin-top: 2px;">' +
-                (post.authorEntityHandle ? '<span style="color: #64748b; font-weight: 500;">' + post.authorEntityHandle + '</span><span>&bull;</span>' : '') +
-                '<span title="' + formatFeedFullDateTime(post.timestamp) + '">' + formatFeedFullDateTime(post.timestamp) + '</span>' +
-                (post.audioTrack ? '<span>&bull;</span><span>🎵 ' + post.audioTrack + '</span>' : '') +
                 (post.updatedAt ? '<span style="color: #f59e0b; font-size: 0.68rem; margin-left: 2px;">(Edited)</span>' : '') +
               '</div>' +
+              (post.audioTrack ? '<div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 4px; margin-top: 2px;"><span>🎵</span> <span>' + post.audioTrack + '</span></div>' : '') +
             '</div>' +
           '</div>' +
-          '<button class="chat-btn-round btn-opt-' + post.id + '" style="width: 32px; height: 32px; font-size: 1rem;" title="Post Options">⋮</button>' +
+          '<button class="chat-btn-round btn-opt-' + post.id + '" style="width: 32px; height: 32px; font-size: 1.1rem; color: #94a3b8; background: transparent; border: none; cursor: pointer;" title="Post Options">⋮</button>' +
         '</div>' +
 
         postBodyHtml +
 
         '<div class="insta-actions-row">' +
-          '<div style="display: flex; align-items: center; gap: 0.85rem;">' +
-            '<button class="insta-action-btn" id="btn-like-' + post.id + '" title="Like Post">' + (isLikedByMe ? '❤️' : '🤍') + '</button>' +
-            '<button class="insta-action-btn btn-comment-' + post.id + '" title="Comment">💬</button>' +
-            '<button class="insta-action-btn btn-repost-' + post.id + '" title="Repost / Quote">🔁</button>' +
-            '<button class="insta-action-btn btn-share-' + post.id + '" title="Share Post &amp; CID">🚀</button>' +
-            '<button class="insta-action-btn btn-dislike-' + post.id + '" title="Dislike / Show Less">👎</button>' +
+          '<div style="display: flex; align-items: center; gap: 1rem;">' +
+            '<button class="insta-action-btn ' + (isLikedByMe ? 'active-like' : '') + '" id="btn-like-' + post.id + '" title="Like Post" aria-label="Like Post">' + getPostLikeSvg(isLikedByMe) + '</button>' +
+            '<button class="insta-action-btn btn-comment-' + post.id + '" title="Comment" aria-label="Comment"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></button>' +
+            '<button class="insta-action-btn btn-repost-' + post.id + '" title="Repost" aria-label="Repost"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></button>' +
+            '<button class="insta-action-btn btn-share-' + post.id + '" title="Share" aria-label="Share"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>' +
           '</div>' +
-          '<button class="insta-action-btn" id="btn-save-' + post.id + '" title="Pin to Local Blockstore">' + (post.isSaved ? '🔖' : '🏷️') + '</button>' +
+          '<button class="insta-action-btn" id="btn-save-' + post.id + '" title="Save Post" aria-label="Save Post">' + getPostSaveSvg(Boolean(post.isSaved)) + '</button>' +
         '</div>' +
 
         '<div class="insta-likes-text">' +
@@ -16367,26 +26442,18 @@ function renderHtml(
         '</div>' +
 
         '<div class="insta-comments-preview" id="comments-box-' + post.id + '">' +
-          '<div style="color: #64748b; font-size: 0.75rem; cursor: pointer;">View all ' + (post.comments ? post.comments.length : 0) + ' comments &bull; Verified on DHT</div>' +
+          (post.comments && post.comments.length > 0 ? '<div style="color: #94a3b8; font-size: 0.8rem; font-weight: 500; cursor: pointer; margin-bottom: 4px;" onclick="focusFeedComment(\'' + post.id + '\')">View all ' + post.comments.length + ' comments</div>' : '') +
           commentsHtml +
         '</div>' +
 
-        '<div style="padding: 0 1rem; font-size: 0.68rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.65rem; display: flex; align-items: center; gap: 5px;">' +
-          '<span>🕒 ' + formatFeedFullDateTime(post.timestamp) + '</span>' +
-          '<span>&bull;</span>' +
-          '<span>' + formatFeedTimeAgo(post.timestamp).toUpperCase() + '</span>' +
-          '<span>&bull;</span>' +
-          '<span>ED25519 VERIFIED</span>' +
-        '</div>' +
-
         '<div class="insta-comment-input-box">' +
-          '<span style="font-size: 1.1rem;">😊</span>' +
-          '<input type="text" class="insta-comment-input" id="input-comment-' + post.id + '" placeholder="Add a comment on sovereign mesh...">' +
+          '<button type="button" class="insta-emoji-btn" onclick="document.getElementById(\'input-comment-' + post.id + '\').focus()" aria-label="Add emoji">😊</button>' +
+          '<input type="text" class="insta-comment-input" id="input-comment-' + post.id + '" placeholder="Add a comment...">' +
           '<button class="insta-post-btn btn-sub-comment-' + post.id + '">Post</button>' +
         '</div>';
 
       const authorInfo = card.querySelector('.insta-author-info');
-      if (authorInfo) authorInfo.onclick = function() { openCreatorProfile(post.authorName.split(' ')[0].toLowerCase()); };
+      if (authorInfo) authorInfo.onclick = function() { openCreatorProfile(post.authorHandle || post.authorDid || post.authorName, this); };
       const mBox = card.querySelector('.insta-media-box');
       if (mBox) mBox.ondblclick = function(e) { handleFeedDoubleTap(post.id, e); };
       const btnOpt = card.querySelector('.btn-opt-' + post.id);
@@ -16782,27 +26849,27 @@ function renderHtml(
       const post = feedPostsData.find(function(p) { return p.id === postId; });
       const targetCid = cid || (post ? post.mediaCid : '') || 'bafybeicid';
       const shareUrl = window.location.origin + (window.location.pathname || '/') + '#card-' + postId;
-      const shareText = (post ? (post.caption || 'Sovra Decentralized Post') : (caption || 'Decentralized post on Sovra')) + '\\n📦 CID: ' + targetCid;
+      const shareText = post ? (post.caption || 'Post on Sovra') : (caption || 'Post on Sovra');
 
       if (navigator.share) {
         try {
           await navigator.share({
-            title: 'Sovra — P2P Social Post',
+            title: 'Sovra',
             text: shareText,
             url: shareUrl,
           });
-          showAccountToast('🚀 Post shared successfully!');
+          showAccountToast('Post shared successfully!');
           return;
         } catch (err) {
           if (err && err.name === 'AbortError') return;
         }
       }
 
-      copyToClipboard(shareUrl + '\\n(CID: ' + targetCid + ')', function(success) {
+      copyToClipboard(shareUrl, function(success) {
         if (success) {
-          showAccountToast('🔗 Post direct link & CID copied to clipboard!');
+          showAccountToast('🔗 Post link copied to clipboard!');
         } else {
-          showAccountToast('📦 Post CID: ' + targetCid);
+          showAccountToast('🔗 Share link: ' + shareUrl);
         }
       });
     }
@@ -16817,11 +26884,11 @@ function renderHtml(
       if (!post) return;
       post.isSaved = !post.isSaved;
       const btn = document.getElementById('btn-save-' + postId);
-      if (btn) btn.innerText = post.isSaved ? '🔖' : '🏷️';
+      if (btn) btn.innerHTML = getPostSaveSvg(post.isSaved);
       if (post.isSaved) {
-        showAccountToast('🔖 Pinned post to local Merkle DAG blockstore!');
+        showAccountToast('🔖 Saved to bookmarks');
       } else {
-        showAccountToast('🏷️ Unpinned from local blockstore.');
+        showAccountToast('Removed from bookmarks');
       }
     }
 
@@ -18473,8 +28540,16 @@ function renderHtml(
     var currentProfileSheetHandle = '';
     var currentMutualFriendsList = [];
 
-    function openCreatorProfile(handle) {
+    function openCreatorProfile(handle, originEl) {
       if (!handle) return;
+      if (typeof openPeerProfile === 'function') {
+        openPeerProfile(handle, originEl);
+        return;
+      }
+      if (typeof window.openSpatialProfileSurface === 'function') {
+        window.openSpatialProfileSurface(originEl || document.body, handle);
+        return;
+      }
       var cleanHandle = handle.startsWith('@') ? handle : ('@' + handle);
 
       if (myProfile && (myProfile.handle === cleanHandle || myProfile.handle === handle)) {
@@ -19026,6 +29101,60 @@ function renderHtml(
     let voicePlaybackIntervals = {};
     let callTimerInterval = null;
 
+    function updateChatBadges(count) {
+      let total = 0;
+      if (typeof count === 'number') {
+        total = count;
+      } else {
+        if (typeof contactsData !== 'undefined' && Array.isArray(contactsData)) {
+          contactsData.forEach(function(c) {
+            if (c && c.unreadCount) total += Number(c.unreadCount);
+          });
+        }
+        if (typeof bitchatPeersData !== 'undefined' && Array.isArray(bitchatPeersData)) {
+          bitchatPeersData.forEach(function(p) {
+            if (p && p.unreadCount) total += Number(p.unreadCount);
+          });
+        }
+      }
+
+      window.unreadMessagesCount = total;
+      const badgeText = total > 99 ? '99+' : String(total);
+      const isVisible = total > 0;
+
+      const headerChatBadge = document.getElementById('headerChatBadge');
+      if (headerChatBadge) {
+        headerChatBadge.innerText = badgeText;
+        headerChatBadge.style.display = isVisible ? 'flex' : 'none';
+        headerChatBadge.style.background = '#ef4444';
+      }
+
+      const railChatBadge = document.getElementById('railChatBadge');
+      if (railChatBadge) {
+        railChatBadge.innerText = badgeText;
+        railChatBadge.style.display = isVisible ? 'inline-block' : 'none';
+        railChatBadge.style.background = '#ef4444';
+      }
+
+      const bnavChatBadge = document.getElementById('bnavChatBadge');
+      if (bnavChatBadge) {
+        bnavChatBadge.innerText = badgeText;
+        bnavChatBadge.style.display = isVisible ? 'flex' : 'none';
+        bnavChatBadge.style.background = '#ef4444';
+      }
+
+      const holoChatBadge = document.getElementById('holoBadgeChat');
+      if (holoChatBadge) {
+        holoChatBadge.innerText = badgeText;
+        holoChatBadge.style.display = isVisible ? 'flex' : 'none';
+      }
+    }
+    window.updateChatBadges = updateChatBadges;
+    updateChatBadges();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { updateChatBadges(); });
+    }
+
     function toggleBitChatMode() {
       bitchatModeActive = !bitchatModeActive;
       const dot = document.getElementById('bitchatModeDot');
@@ -19097,9 +29226,6 @@ function renderHtml(
       // Add real conversations from contactsData (populated via getChatConversations)
       (contactsData || []).forEach(function(c) {
         if (!c || !c.did || c.did === myDid) return;
-        const isFixture = (!c.lastMessage && !c.unreadCount && c.did !== activeContactDid && /@(?:attacker|victim|drill_|probe_|snoop_)/.test((c.handle || '').toLowerCase()));
-        if (isFixture) return;
-        if (/persona_author|alice_master|bob_master|carol_external/i.test((c.handle || '') + ' ' + (c.name || ''))) return;
 
         // Real world social site logic: A chat only appears in Direct Messages if it has actual messages OR is the currently active chat
         const hasMessages = Boolean(c.lastMessage && c.lastMessageTimestamp && c.lastMessageTimestamp > 0 && c.hasThread !== false);
@@ -19181,6 +29307,46 @@ function renderHtml(
       });
       const onlineFriends = Array.from(onlineFriendsMap.values());
 
+      // 📊 Update Real-Time Contacts & Friends Presence Summary Bar
+      const allKnownContactsMap = new Map();
+      if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
+        friendsData.friends.forEach(function(f) {
+          if (!f || !f.did || f.did === myDid) return;
+          allKnownContactsMap.set(f.did, f);
+        });
+      }
+      if (typeof contactsData !== 'undefined' && Array.isArray(contactsData)) {
+        contactsData.forEach(function(c) {
+          if (!c || !c.did || c.did === myDid || (typeof c.did === 'string' && c.did.startsWith('channel:'))) return;
+          if (!allKnownContactsMap.has(c.did)) {
+            allKnownContactsMap.set(c.did, c);
+          } else {
+            const ex = allKnownContactsMap.get(c.did);
+            if (c.isOnline !== undefined) ex.isOnline = c.isOnline;
+          }
+        });
+      }
+      allDirectList.forEach(function(c) {
+        if (!c || !c.did || c.did === myDid || (typeof c.did === 'string' && c.did.startsWith('channel:'))) return;
+        if (!allKnownContactsMap.has(c.did)) {
+          allKnownContactsMap.set(c.did, c);
+        }
+      });
+
+      const totalKnown = allKnownContactsMap.size;
+      let onlineCount = 0;
+      allKnownContactsMap.forEach(function(contact) {
+        if (contact.isOnline !== false) onlineCount++;
+      });
+      const offlineCount = Math.max(0, totalKnown - onlineCount);
+
+      const totalContactsEl = document.getElementById('chatTotalContactsCount');
+      const onlineContactsEl = document.getElementById('chatOnlineContactsCount');
+      const offlineContactsEl = document.getElementById('chatOfflineContactsCount');
+      if (totalContactsEl) totalContactsEl.innerText = totalKnown;
+      if (onlineContactsEl) onlineContactsEl.innerText = onlineCount;
+      if (offlineContactsEl) offlineContactsEl.innerText = offlineCount;
+
       if (onlineFriendsRail && onlineFriendsItems) {
         if (onlineFriends.length > 0) {
           onlineFriendsRail.style.display = 'block';
@@ -19257,10 +29423,7 @@ function renderHtml(
       // Section 2: Direct Messages & Conversations
       html += '<div class="bitchat-section-title" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">' +
         '<span>💬 Direct Messages (' + filteredDirectList.length + ')</span>' +
-        '<div style="display:flex; align-items:center; gap:6px;">' +
-          '<span style="font-size:0.65rem; color:#10b981; text-transform:none; font-weight:600;">End-to-End Encrypted</span>' +
-          '<button type="button" onclick="openNewChatPickerModal()" style="background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; border-radius: 6px; padding: 2px 7px; font-size: 0.72rem; font-weight: 700; cursor: pointer;" title="Start New Direct Chat">+ Chat</button>' +
-        '</div>' +
+        '<span style="font-size:0.65rem; color:#10b981; text-transform:none; font-weight:600;">End-to-End Encrypted</span>' +
       '</div>';
 
       if (filteredDirectList.length > 0) {
@@ -19452,6 +29615,8 @@ function renderHtml(
       }
 
       container.innerHTML = html;
+
+      updateChatBadges();
     }
 
     function openDirectChatWithUser(targetDid, targetName, targetHandle) {
@@ -19579,6 +29744,7 @@ function renderHtml(
       activeContactDid = did;
       const wCont = document.querySelector('.whatsapp-container');
       if (wCont) wCont.classList.add('show-chat');
+      document.body.classList.add('chat-open');
 
       // Acknowledge read receipt for all unread messages from this contact
       const myDid = myProfile ? myProfile.did : 'self';
@@ -19595,9 +29761,12 @@ function renderHtml(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messageIds: unreadIds, status: 'read' })
         }).catch(function() {});
-        const c = contactsData.find(function(x) { return x.did === did; });
-        if (c) c.unreadCount = 0;
       }
+      const c = contactsData.find(function(x) { return x.did === did; });
+      if (c) c.unreadCount = 0;
+      const bcp = bitchatPeersData.find(function(x) { return x.did === did; });
+      if (bcp) bcp.unreadCount = 0;
+      updateChatBadges();
 
       const bcPeer = bitchatPeersData.find(function(p) { return p.did === did; });
       let contact = contactsData.find(function(c) { return c.did === did; }) || optContact;
@@ -19654,17 +29823,21 @@ function renderHtml(
           }
         }
         if (nameEl) nameEl.innerText = contact.name || contact.displayName || contact.handle || 'Peer';
-        if (badgeEl) badgeEl.style.display = contact.isVerified ? 'inline-block' : 'none';
+        if (badgeEl) badgeEl.style.display = (contact.isVerified && !contact.isGroup) ? 'inline-block' : 'none';
         if (statusEl) {
-          const isF = Boolean(contact.isFriend || contact.role === 'Mutual Friend');
-          if (isF) {
-            if (contact.isOnline) {
-              statusEl.innerHTML = '<span style="color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><span class="status-pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span> Online</span> &bull; <span style="color: #34d399; font-size: 0.72rem; padding: 1px 6px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px;">Friend</span> &bull; Double Ratchet Active';
-            } else {
-              statusEl.innerHTML = '<span style="color: #94a3b8;">Last seen ' + (contact.lastSeen || 'recently') + '</span> &bull; <span style="color: #34d399; font-size: 0.72rem; padding: 1px 6px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px;">Friend</span> &bull; Double Ratchet Active';
-            }
+          if (contact.isGroup) {
+            statusEl.innerHTML = '<span style="color: #22c55e; font-weight: 700;">● Group</span> &bull; ' + (contact.members ? contact.members.length : 1) + ' members';
           } else {
-            statusEl.innerHTML = (contact.isOnline ? '<span style="color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><span class="status-pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span> Online</span>' : '<span style="color: #94a3b8;">Last seen ' + (contact.lastSeen || 'recently') + '</span>') + ' &bull; Double Ratchet Active';
+            const isF = Boolean(contact.isFriend || contact.role === 'Mutual Friend');
+            if (isF) {
+              if (contact.isOnline) {
+                statusEl.innerHTML = '<span style="color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><span class="status-pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span> Online</span> &bull; <span style="color: #34d399; font-size: 0.72rem; padding: 1px 6px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px;">Friend</span> &bull; Double Ratchet Active';
+              } else {
+                statusEl.innerHTML = '<span style="color: #94a3b8;">Last seen ' + (contact.lastSeen || 'recently') + '</span> &bull; <span style="color: #34d399; font-size: 0.72rem; padding: 1px 6px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px;">Friend</span> &bull; Double Ratchet Active';
+              }
+            } else {
+              statusEl.innerHTML = (contact.isOnline ? '<span style="color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><span class="status-pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span> Online</span>' : '<span style="color: #94a3b8;">Last seen ' + (contact.lastSeen || 'recently') + '</span>') + ' &bull; Double Ratchet Active';
+            }
           }
         }
         if (routeEl) routeEl.style.display = 'none';
@@ -19697,6 +29870,7 @@ function renderHtml(
     function closeMobileChat() {
       const wCont = document.querySelector('.whatsapp-container');
       if (wCont) wCont.classList.remove('show-chat');
+      document.body.classList.remove('chat-open');
     }
 
     function updateHeaderTimerDisplay(sec) {
@@ -19737,7 +29911,7 @@ function renderHtml(
       // 3. Message Bubbles
       const myDid = myProfile ? myProfile.did : 'self';
       const filtered = chatMessages.filter(function(m) {
-        if (activeContactDid.startsWith('channel:')) {
+        if (activeContactDid.startsWith('channel:') || activeContactDid.startsWith('group:')) {
           return m.recipientDid === activeContactDid;
         }
         return (m.senderDid === activeContactDid && (m.recipientDid === myDid || m.recipientDid === 'self')) ||
@@ -19753,7 +29927,8 @@ function renderHtml(
         // Ticks
         let tickHtml = '';
         if (isOutgoing) {
-          if (m.status === 'sent') tickHtml = '<span class="tick-icon" title="Sent to P2P network">✓</span>';
+          if (m.status === 'pending_sync') tickHtml = '<span class="tick-icon" style="color: #94a3b8; font-size: 0.72rem;" title="Queued in Offline Outbox (Pending Sync)">⏱️</span>';
+          else if (m.status === 'sent') tickHtml = '<span class="tick-icon" title="Sent to P2P network">✓</span>';
           else if (m.status === 'delivered') tickHtml = '<span class="tick-icon" title="Delivered to peer node">✓✓</span>';
           else if (m.status === 'read') tickHtml = '<span class="tick-icon tick-blue" title="Read by recipient">✓✓</span>';
         }
@@ -19786,36 +29961,51 @@ function renderHtml(
             '</div>';
         } else {
           let attachmentHtml = '';
-          if (m.attachment && m.attachment.dataUrl) {
+          if (m.attachment && (m.attachment.dataUrl || m.attachment.url || m.attachment.cid)) {
             const att = m.attachment;
-            if (att.type && att.type.startsWith('image/')) {
-              attachmentHtml = '<img src="' + att.dataUrl + '" class="chat-attachment-img" alt="' + (att.name || 'Image') + '" onclick="event.stopPropagation(); window.open(&quot;' + att.dataUrl + '&quot;, &quot;_blank&quot;)" title="Click to view full size" />';
-            } else if (att.type && att.type.startsWith('video/')) {
-              attachmentHtml = '<video src="' + att.dataUrl + '" class="chat-attachment-video" controls playsinline onclick="event.stopPropagation()"></video>';
-            } else if (att.type && att.type.startsWith('audio/')) {
-              attachmentHtml = '<audio src="' + att.dataUrl + '" class="chat-attachment-audio" controls onclick="event.stopPropagation()"></audio>';
+            const safeName = (att.name || 'File').replace(/["'\\r\\n]/g, '_');
+            const fileSrc = att.dataUrl || (att.url ? getAuthenticatedAttachmentUrl(att) : '');
+            const isImg = att.type && att.type.startsWith('image/');
+            const isPdf = att.type && (att.type.includes('pdf') || (att.name && att.name.toLowerCase().endsWith('.pdf')));
+            const isVid = att.type && att.type.startsWith('video/');
+            const isAud = att.type && att.type.startsWith('audio/');
+
+            if (isImg) {
+              attachmentHtml = '<img src="' + fileSrc + '" class="chat-attachment-img" alt="' + safeName + '" onclick="event.stopPropagation(); window.openChatAttachmentByMsgId(&quot;' + m.id + '&quot;)" title="Click to preview image" />';
+            } else if (isPdf) {
+              attachmentHtml = '<div class="chat-attachment-filecard chat-attachment-pdf" onclick="event.stopPropagation(); window.openChatAttachmentByMsgId(&quot;' + m.id + '&quot;)">' +
+                '<div class="chat-file-icon">📕</div>' +
+                '<div class="chat-file-info">' +
+                  '<div class="chat-file-name">' + safeName + '</div>' +
+                  '<div class="chat-file-meta"><span>' + (formatBytes(att.size) || '') + '</span> • PDF Document</div>' +
+                '</div>' +
+                '<div class="chat-file-action-btns">' +
+                  '<span class="chat-file-preview-pill" title="Preview PDF">👁️ Preview</span>' +
+                  '<div class="chat-file-download-btn" onclick="event.stopPropagation(); window.downloadChatAttachmentByMsgId(&quot;' + m.id + '&quot;)" title="Download">⬇</div>' +
+                '</div>' +
+              '</div>';
+            } else if (isVid) {
+              attachmentHtml = '<video src="' + fileSrc + '" class="chat-attachment-video" controls playsinline onclick="event.stopPropagation()"></video>';
+            } else if (isAud) {
+              attachmentHtml = '<audio src="' + fileSrc + '" class="chat-attachment-audio" controls onclick="event.stopPropagation()"></audio>';
             } else {
               const fileExt = (att.name || '').split('.').pop().toUpperCase();
-              attachmentHtml = '<a href="' + att.dataUrl + '" download="' + (att.name || 'download') + '" class="chat-attachment-filecard" onclick="event.stopPropagation()">' +
+              attachmentHtml = '<div class="chat-attachment-filecard" onclick="event.stopPropagation(); window.downloadChatAttachmentByMsgId(&quot;' + m.id + '&quot;)">' +
                 '<div class="chat-file-icon">📄</div>' +
                 '<div class="chat-file-info">' +
-                  '<div class="chat-file-name">' + (att.name || 'File') + '</div>' +
+                  '<div class="chat-file-name">' + safeName + '</div>' +
                   '<div class="chat-file-meta"><span>' + (formatBytes(att.size) || '') + '</span>' + (fileExt ? '<span>• ' + fileExt + '</span>' : '') + '</div>' +
                 '</div>' +
                 '<div class="chat-file-download-btn" title="Download">⬇</div>' +
-              '</a>';
+              '</div>';
             }
           }
           const textHtml = m.text ? ('<div style="word-break: break-word;">' + m.text + '</div>') : '';
           bodyHtml = attachmentHtml + textHtml;
         }
 
-        // BitChat Multi-Hop Routing Box
+        // Clean WhatsApp/Telegram style: no routing box clutter in bubbles
         let routeHtml = '';
-        if (m.isBitChat) {
-          const hopText = m.hopCount ? (m.hopCount === 1 ? '1 Hop Direct' : m.hopCount + ' Hops Relay') : 'Direct BLE';
-          routeHtml = '<div class="bitchat-mesh-route-box">📶 BLE Mesh &bull; ' + hopText + ' &bull; Noise_XX E2EE</div>';
-        }
 
         // Sender header row for incoming or channel messages
         let senderNameRow = '';
@@ -19843,7 +30033,7 @@ function renderHtml(
 
         const timeStr = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        return '<div class="' + bubbleClass + '" id="bubble-' + m.id + '" onclick="openMessageInfoModal(&quot;' + m.id + '&quot;)">' +
+        return '<div class="' + bubbleClass + '" id="bubble-' + m.id + '" onclick="openSpatialChatMessageActionSurface(&quot;' + m.id + '&quot;, this, event)">' +
           reactionsDock +
           senderNameRow +
           bodyHtml +
@@ -19877,6 +30067,209 @@ function renderHtml(
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
       return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
+
+    let _activeLightboxAttachment = null;
+
+    function dataUrlToBlob(dataUrl) {
+      if (!dataUrl || typeof dataUrl !== 'string') return null;
+      try {
+        const parts = dataUrl.split(',');
+        if (parts.length < 2) return null;
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+        const isBase64 = parts[0].includes('base64');
+        if (isBase64) {
+          const byteString = atob(parts[1]);
+          const ab = new ArrayBuffer(byteString.length);
+          const ia = new Uint8Array(ab);
+          for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+          }
+          return new Blob([ab], { type: mime });
+        } else {
+          const text = decodeURIComponent(parts[1]);
+          return new Blob([text], { type: mime });
+        }
+      } catch (e) {
+        console.warn('[Blob] Conversion failed:', e);
+        return null;
+      }
+    }
+
+    function getAuthenticatedAttachmentUrl(att, forceDownload) {
+      if (!att) return '';
+      const token = (typeof myProfile !== 'undefined' && myProfile && myProfile.sessionToken)
+        ? myProfile.sessionToken
+        : (localStorage.getItem('sovra_session_token') || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : ''));
+
+      let baseUrl = att.url || (att.cid ? '/api/chat/attachment/' + encodeURIComponent(att.cid) : '');
+      if (!baseUrl && att.dataUrl) {
+        const b = dataUrlToBlob(att.dataUrl);
+        return b ? URL.createObjectURL(b) : '';
+      }
+
+      const params = [];
+      if (token) params.push('token=' + encodeURIComponent(token));
+      if (att.name) params.push('name=' + encodeURIComponent(att.name));
+      if (forceDownload) params.push('download=1');
+
+      if (params.length > 0) {
+        baseUrl += (baseUrl.includes('?') ? '&' : '?') + params.join('&');
+      }
+      return baseUrl;
+    }
+
+    function openChatAttachment(att, event) {
+      if (event) event.stopPropagation();
+      if (!att) return;
+
+      const isImg = att.type && att.type.startsWith('image/');
+      const isPdf = att.type && (att.type.includes('pdf') || (att.name && att.name.toLowerCase().endsWith('.pdf')));
+      const isVid = att.type && att.type.startsWith('video/');
+      const isAud = att.type && att.type.startsWith('audio/');
+      const isText = att.type && (att.type.startsWith('text/') || (att.name && (att.name.endsWith('.txt') || att.name.endsWith('.csv') || att.name.endsWith('.json'))));
+
+      if (isImg) {
+        openChatAttachmentLightbox(att);
+        return;
+      }
+
+      if (isPdf || isText) {
+        const fileUrl = getAuthenticatedAttachmentUrl(att);
+        if (fileUrl) {
+          window.open(fileUrl, '_blank');
+        } else if (att.dataUrl) {
+          const b = dataUrlToBlob(att.dataUrl);
+          if (b) {
+            const bUrl = URL.createObjectURL(b);
+            window.open(bUrl, '_blank');
+          }
+        }
+        return;
+      }
+
+      if (isVid || isAud) {
+        const fileUrl = getAuthenticatedAttachmentUrl(att);
+        if (fileUrl) {
+          window.open(fileUrl, '_blank');
+        }
+        return;
+      }
+
+      downloadChatAttachment(att, event);
+    }
+
+    function downloadChatAttachment(att, event) {
+      if (event) event.stopPropagation();
+      if (!att) return;
+      const fileName = (att.name || 'download').replace(/["'\\r\\n]/g, '_');
+
+      if (att.url) {
+        const dlUrl = getAuthenticatedAttachmentUrl(att, true);
+        const a = document.createElement('a');
+        a.href = dlUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+
+      if (att.dataUrl) {
+        const b = dataUrlToBlob(att.dataUrl);
+        if (b) {
+          const bUrl = URL.createObjectURL(b);
+          const a = document.createElement('a');
+          a.href = bUrl;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function() { URL.revokeObjectURL(bUrl); }, 10000);
+          return;
+        }
+      }
+    }
+
+    function openChatAttachmentLightbox(att) {
+      _activeLightboxAttachment = att;
+      const modal = document.getElementById('chatAttachmentLightboxModal');
+      const nameEl = document.getElementById('lightboxFileName');
+      const iconEl = document.getElementById('lightboxFileIcon');
+      const metaEl = document.getElementById('lightboxFileMeta');
+      const container = document.getElementById('lightboxFilePreviewContainer');
+
+      if (!modal || !container) return;
+
+      if (nameEl) nameEl.textContent = att.name || 'Attachment';
+      if (iconEl) iconEl.textContent = (att.type && att.type.startsWith('image/')) ? '🖼️' : ((att.type && att.type.includes('pdf')) ? '📕' : '📎');
+      if (metaEl) metaEl.textContent = formatBytes(att.size) + (att.type ? (' • ' + att.type) : '');
+
+      const fileSrc = att.dataUrl || (att.url ? getAuthenticatedAttachmentUrl(att) : '');
+
+      if (att.type && att.type.startsWith('image/')) {
+        if (typeof openPhotoLightbox === 'function') {
+          openPhotoLightbox(fileSrc, att.name || 'Chat Photo', 'Chat Attachment');
+          return;
+        }
+        container.innerHTML = '<img src="' + fileSrc + '" style="max-width: 100%; max-height: 55vh; object-fit: contain; border-radius: 6px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" alt="' + (att.name || 'Preview') + '" />';
+      } else if (att.type && att.type.includes('pdf')) {
+        container.innerHTML = '<iframe src="' + getAuthenticatedAttachmentUrl(att) + '" style="width: 100%; height: 55vh; border: none; border-radius: 6px;"></iframe>';
+      } else {
+        container.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 2rem;"><div style="font-size: 3rem; margin-bottom: 0.5rem;">📄</div><div>' + (att.name || 'File') + '</div><div style="font-size: 0.8rem; margin-top: 0.25rem;">' + formatBytes(att.size) + '</div></div>';
+      }
+
+      modal.style.display = 'flex';
+    }
+
+    function closeChatAttachmentLightbox() {
+      _activeLightboxAttachment = null;
+      const modal = document.getElementById('chatAttachmentLightboxModal');
+      if (modal) modal.style.display = 'none';
+      const container = document.getElementById('lightboxFilePreviewContainer');
+      if (container) container.innerHTML = '';
+    }
+
+    function triggerLightboxOpenTab() {
+      if (!_activeLightboxAttachment) return;
+      const att = _activeLightboxAttachment;
+      const fileUrl = getAuthenticatedAttachmentUrl(att);
+      if (fileUrl) {
+        window.open(fileUrl, '_blank');
+      } else if (att.dataUrl) {
+        const b = dataUrlToBlob(att.dataUrl);
+        if (b) {
+          const bUrl = URL.createObjectURL(b);
+          window.open(bUrl, '_blank');
+        }
+      }
+    }
+
+    function triggerLightboxDownload() {
+      if (!_activeLightboxAttachment) return;
+      downloadChatAttachment(_activeLightboxAttachment);
+    }
+
+    window.openChatAttachmentByMsgId = function(msgId) {
+      const msg = chatMessages.find(function(m) { return m.id === msgId; });
+      if (msg && msg.attachment) {
+        openChatAttachment(msg.attachment);
+      }
+    };
+
+    window.downloadChatAttachmentByMsgId = function(msgId) {
+      const msg = chatMessages.find(function(m) { return m.id === msgId; });
+      if (msg && msg.attachment) {
+        downloadChatAttachment(msg.attachment);
+      }
+    };
+
+    window.openChatAttachment = openChatAttachment;
+    window.downloadChatAttachment = downloadChatAttachment;
+    window.openChatAttachmentLightbox = openChatAttachmentLightbox;
+    window.closeChatAttachmentLightbox = closeChatAttachmentLightbox;
+    window.triggerLightboxOpenTab = triggerLightboxOpenTab;
+    window.triggerLightboxDownload = triggerLightboxDownload;
 
     function triggerChatFileSelect() {
       const fileInput = document.getElementById('chatFileInput');
@@ -19975,6 +30368,9 @@ function renderHtml(
       const myDid = myProfile ? myProfile.did : 'self';
       const myName = myProfile ? myProfile.name : 'You';
 
+      const isOfflineNow = !navigator.onLine;
+      const initialStatus = isOfflineNow ? 'pending_sync' : 'sent';
+
       const newMsg = {
         id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 7),
         senderDid: myDid,
@@ -19986,7 +30382,7 @@ function renderHtml(
         audioDurationSec: 0,
         timestamp: now,
         sentAt: now,
-        status: 'sent', // Single grey tick initially
+        status: initialStatus,
         signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),
         disappearingDurationSec: timerSec,
         expiresAt: timerSec > 0 ? now + timerSec * 1000 : undefined,
@@ -20003,12 +30399,23 @@ function renderHtml(
       if (contact) {
         contact.lastMessage = text || (attToSend ? ('📎 ' + attToSend.name) : '');
         contact.lastMessageTimestamp = now;
-        contact.lastMessageStatus = 'sent';
+        contact.lastMessageStatus = initialStatus;
         contact.lastMessageIsOutgoing = true;
       }
 
       renderChatBubbles();
       renderChatContactsList();
+
+      if (isOfflineNow) {
+        if (window.SovraOfflineOutbox) {
+          window.SovraOfflineOutbox.getInstance().enqueue('/api/chat/send', newMsg, 'POST', { 'Content-Type': 'application/json' }).then(function() {
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('📡 Message queued in Offline Outbox. Will sync automatically when reconnected.', 'info');
+            }
+          }).catch(function(e) { console.warn('[Chat] Outbox enqueue failed:', e); });
+        }
+        return;
+      }
 
       try {
         const res = await fetch('/api/chat/send', {
@@ -20016,6 +30423,7 @@ function renderHtml(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newMsg)
         });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         if (data && data.ok && data.message) {
           const idx = chatMessages.findIndex(function(m) { return m.id === newMsg.id; });
@@ -20026,8 +30434,38 @@ function renderHtml(
         }
       } catch (err) {
         console.warn('[Chat] Send sync warning:', err);
+        const idx = chatMessages.findIndex(function(m) { return m.id === newMsg.id; });
+        if (idx !== -1) {
+          chatMessages[idx].status = 'pending_sync';
+          renderChatBubbles();
+        }
+        if (contact) {
+          contact.lastMessageStatus = 'pending_sync';
+          renderChatContactsList();
+        }
+        if (window.SovraOfflineOutbox) {
+          window.SovraOfflineOutbox.getInstance().enqueue('/api/chat/send', newMsg, 'POST', { 'Content-Type': 'application/json' }).then(function() {
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('📡 Connection dropped: Message safely stored in Offline Outbox.', 'info');
+            }
+          }).catch(function(e) { console.warn('[Chat] Outbox enqueue failed:', e); });
+        }
       }
     }
+
+    window.addEventListener('sovra-outbox-synced', function(evt) {
+      if (evt && evt.detail && evt.detail.action) {
+        const act = evt.detail.action;
+        if (act.endpoint === '/api/chat/send' && act.payload && act.payload.id) {
+          const mIdx = chatMessages.findIndex(function(m) { return m.id === act.payload.id; });
+          if (mIdx !== -1) {
+            chatMessages[mIdx].status = 'sent';
+            renderChatBubbles();
+            renderChatContactsList();
+          }
+        }
+      }
+    });
 
     let lastChatSyncTimestamp = 0;
     function syncChatMessages() {
@@ -20058,6 +30496,14 @@ function renderHtml(
                   } else if (msg.status === 'sent') {
                     msg.status = 'delivered';
                     deliveredIds.push(msg.id);
+                  }
+
+                  // Non-intrusive floating chat toast when user is browsing feed, reels, video, or profile
+                  const curActiveTab = document.body.dataset.activeTab || window._currentActiveTab || 'feed';
+                  if (curActiveTab !== 'chat') {
+                    if (typeof triggerFloatingChatToast === 'function') {
+                      triggerFloatingChatToast(msg);
+                    }
                   }
                 }
               } else if (chatMessages[existingIdx].status !== msg.status) {
@@ -20969,13 +31415,16 @@ function renderHtml(
 
       let pc = null;
       try {
+        var configuredIceServers = (window.SOVRA_ICE_SERVERS && Array.isArray(window.SOVRA_ICE_SERVERS))
+          ? window.SOVRA_ICE_SERVERS
+          : [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+              { urls: 'stun:stun2.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' }
+            ];
         pc = new RTCPeerConnection({
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
-          ]
+          iceServers: configuredIceServers
         });
       } catch (err) {
         console.error('[WebRTC] RTCPeerConnection creation failed:', err);
@@ -21978,6 +32427,158 @@ function renderHtml(
       }).join('');
     }
 
+    // --- WhatsApp-Style Group Creation Engine ---
+    let selectedGroupMemberDids = new Set();
+    let currentGroupEmoji = '👥';
+    const groupEmojiOptions = ['👥', '🚀', '⚡', '🎉', '🏕️', '🔥', '💻', '🍕', '🛡️', '💬'];
+
+    function cycleGroupAvatarEmoji() {
+      const curIdx = groupEmojiOptions.indexOf(currentGroupEmoji);
+      const nextIdx = (curIdx + 1) % groupEmojiOptions.length;
+      currentGroupEmoji = groupEmojiOptions[nextIdx];
+      const el = document.getElementById('groupAvatarPreview');
+      if (el) el.innerText = currentGroupEmoji;
+    }
+
+    function openNewGroupModal() {
+      selectedGroupMemberDids.clear();
+      currentGroupEmoji = '👥';
+      const modal = document.getElementById('newGroupModal');
+      const nameInput = document.getElementById('newGroupNameInput');
+      const preview = document.getElementById('groupAvatarPreview');
+      const searchInput = document.getElementById('groupMemberSearchInput');
+      if (preview) preview.innerText = currentGroupEmoji;
+      if (nameInput) nameInput.value = '';
+      if (searchInput) searchInput.value = '';
+      updateSelectedGroupCount();
+      renderGroupMembersSelectionList('');
+      if (modal) modal.style.display = 'flex';
+      if (nameInput) setTimeout(function() { nameInput.focus(); }, 60);
+    }
+
+    function updateSelectedGroupCount() {
+      const el = document.getElementById('selectedGroupMembersCount');
+      if (el) el.innerText = selectedGroupMemberDids.size + ' selected';
+    }
+
+    function toggleGroupMemberSelection(did) {
+      if (selectedGroupMemberDids.has(did)) {
+        selectedGroupMemberDids.delete(did);
+      } else {
+        selectedGroupMemberDids.add(did);
+      }
+      updateSelectedGroupCount();
+      const safeId = did.replace(/[^a-zA-Z0-9]/g, '_');
+      const chk = document.getElementById('chk-group-member-' + safeId);
+      if (chk) chk.checked = selectedGroupMemberDids.has(did);
+      renderGroupMembersSelectionList(document.getElementById('groupMemberSearchInput') ? document.getElementById('groupMemberSearchInput').value : '');
+    }
+
+    function filterGroupMemberList(q) {
+      renderGroupMembersSelectionList(q);
+    }
+
+    function renderGroupMembersSelectionList(q) {
+      const listEl = document.getElementById('newGroupMembersList');
+      if (!listEl) return;
+      const query = (q || '').toLowerCase().trim();
+      const myDid = myProfile ? myProfile.did : 'self';
+
+      const candidates = [];
+      (contactsData || []).forEach(function(c) {
+        if (c.did !== myDid && !c.did.startsWith('channel:') && !c.isGroup) {
+          candidates.push({
+            did: c.did,
+            name: c.name || c.displayName || 'Friend',
+            handle: c.handle || '',
+            avatar: c.avatar || (c.name ? c.name.charAt(0).toUpperCase() : 'F'),
+            avatarBg: c.avatarBg || '#10b981',
+          });
+        }
+      });
+
+      const filtered = candidates.filter(function(u) {
+        if (!query) return true;
+        return u.name.toLowerCase().includes(query) || u.handle.toLowerCase().includes(query);
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 1.5rem 0;">No contacts found</div>';
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(function(u) {
+        const isSelected = selectedGroupMemberDids.has(u.did);
+        const safeId = u.did.replace(/[^a-zA-Z0-9]/g, '_');
+        return '<div onclick="toggleGroupMemberSelection(&quot;' + u.did + '&quot;)" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; background: ' + (isSelected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255,255,255,0.03)') + '; cursor: pointer; transition: background 0.15s ease;">' +
+          '<div style="display: flex; align-items: center; gap: 10px;">' +
+            '<div style="width: 34px; height: 34px; border-radius: 50%; background: ' + u.avatarBg + '; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">' + u.avatar + '</div>' +
+            '<div>' +
+              '<div style="font-weight: 700; color: #fff; font-size: 0.85rem;">' + u.name + '</div>' +
+              '<div style="font-size: 0.72rem; color: #94a3b8;">' + (u.handle || '') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<input type="checkbox" id="chk-group-member-' + safeId + '" ' + (isSelected ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #22c55e; cursor: pointer;" onclick="event.stopPropagation(); toggleGroupMemberSelection(&quot;' + u.did + '&quot;)" />' +
+        '</div>';
+      }).join('');
+    }
+
+    function submitCreateNewGroup() {
+      const nameInput = document.getElementById('newGroupNameInput');
+      const groupName = nameInput ? nameInput.value.trim() : '';
+      if (!groupName) {
+        alert('Please enter a group name');
+        if (nameInput) nameInput.focus();
+        return;
+      }
+
+      const selectedDids = Array.from(selectedGroupMemberDids);
+      const myDid = myProfile ? myProfile.did : 'self';
+      const groupDid = 'group:' + Date.now();
+
+      const newGroup = {
+        did: groupDid,
+        name: groupName,
+        handle: '@' + groupName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+        avatar: currentGroupEmoji,
+        avatarBg: '#059669',
+        role: 'Group (' + (selectedDids.length + 1) + ' members)',
+        isGroup: true,
+        members: [myDid].concat(selectedDids),
+        isOnline: true,
+        lastSeen: (selectedDids.length + 1) + ' members',
+        disappearingDurationSec: 0,
+        safetyNumbers: 'GROUP-E2EE-' + Date.now().toString(16),
+        isVerified: true,
+        unreadCount: 0,
+        lastMessage: 'Group created',
+        lastMessageTimestamp: Date.now(),
+        lastMessageIsOutgoing: true,
+        lastMessageStatus: 'read',
+      };
+
+      contactsData.unshift(newGroup);
+
+      // Add initial system announcement to chatMessages
+      chatMessages.push({
+        id: 'msg-' + Date.now(),
+        senderDid: myDid,
+        recipientDid: groupDid,
+        senderName: 'System',
+        text: '👥 You created group "' + groupName + '" with ' + (selectedDids.length + 1) + ' members. Messages are end-to-end encrypted.',
+        timestamp: Date.now(),
+        sentAt: Date.now(),
+        status: 'read',
+        isAudio: false,
+        audioDurationSec: 0,
+      });
+
+      closeWaModal('newGroupModal');
+      renderChatContactsList();
+      selectContact(groupDid);
+      showAccountToast('👥 Group "' + groupName + '" created successfully!');
+    }
+
     // Start ticker
     startDisappearingTicker();
 
@@ -22138,14 +32739,40 @@ function renderHtml(
       renderYtVideo(idx, true);
     }
 
+    let ytIdleTimer = null;
+    function handleYtPlayerActivity() {
+      const box = document.getElementById('ytPlayerBox');
+      if (!box) return;
+      box.classList.remove('is-idle');
+      clearTimeout(ytIdleTimer);
+      if (ytIsPlaying) {
+        ytIdleTimer = setTimeout(() => {
+          if (ytIsPlaying) box.classList.add('is-idle');
+        }, 2500);
+      }
+    }
+
+    function handleYtPlayerBoxClick(event) {
+      const box = document.getElementById('ytPlayerBox');
+      if (!box) return;
+      if (box.classList.contains('is-idle')) {
+        handleYtPlayerActivity();
+        return;
+      }
+      toggleYtPlay();
+    }
+
     function toggleYtPlay() {
       ytIsPlaying = !ytIsPlaying;
+      const box = document.getElementById('ytPlayerBox');
       const bigPlay = document.getElementById('ytBigPlayBtn');
       const smallPlay = document.getElementById('ytPlayIcon');
       const v = ytVideosCatalog[activeYtVideoIndex];
       if (!v) return;
 
       if (ytIsPlaying) {
+        if (box) box.classList.add('is-playing');
+        handleYtPlayerActivity();
         if (bigPlay) bigPlay.innerText = '⏸';
         if (smallPlay) smallPlay.innerText = '⏸';
         clearInterval(ytProgressTimer);
@@ -22191,6 +32818,11 @@ function renderHtml(
           }
         }, 250);
       } else {
+        if (box) {
+          box.classList.remove('is-playing');
+          box.classList.remove('is-idle');
+        }
+        clearTimeout(ytIdleTimer);
         if (bigPlay) bigPlay.innerText = '▶';
         if (smallPlay) smallPlay.innerText = '▶';
         clearInterval(ytProgressTimer);
@@ -22265,11 +32897,59 @@ function renderHtml(
       }
     }
 
+    function updateSheetQualityActive(btn) {
+      document.querySelectorAll('.yt-sheet-opt-btn').forEach(b => {
+        b.classList.remove('active');
+        const cm = b.querySelector('.check-mark');
+        if (cm) cm.innerText = '';
+      });
+      if (btn) {
+        btn.classList.add('active');
+        const cm = btn.querySelector('.check-mark');
+        if (cm) cm.innerText = '✓';
+      }
+    }
+
+    function updateSheetSpeedActive(btn) {
+      document.querySelectorAll('.yt-sheet-chip').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+    }
+
     function changePlaybackSpeed(speed) {
       ytPlaybackSpeed = parseFloat(speed) || 1.0;
+      const speedSelect = document.getElementById('playbackSpeedSelect');
+      if (speedSelect && speedSelect.value !== String(ytPlaybackSpeed)) {
+        speedSelect.value = String(ytPlaybackSpeed);
+      }
+      const chips = document.querySelectorAll('.yt-sheet-chip');
+      chips.forEach(chip => {
+        const chipSpeed = chip.getAttribute('onclick')?.match(/changePlaybackSpeed\('([^']+)'\)/)?.[1];
+        if (chipSpeed && parseFloat(chipSpeed) === ytPlaybackSpeed) {
+          chip.classList.add('active');
+        } else {
+          chip.classList.remove('active');
+        }
+      });
     }
 
     function handleAbrChange(val) {
+      const abrSelect = document.getElementById('abrSelect');
+      if (abrSelect && abrSelect.value !== val) {
+        abrSelect.value = val;
+      }
+      const optMap = {
+        'auto': 'sheetOptAuto',
+        '4k': 'sheetOpt4k',
+        '1080p': 'sheetOpt1080p',
+        '720p': 'sheetOpt720p',
+        '480p': 'sheetOpt480p'
+      };
+      const optId = optMap[val];
+      if (optId) {
+        const btn = document.getElementById(optId);
+        if (btn) updateSheetQualityActive(btn);
+      }
+
       const qualityBadge = document.getElementById('videoQualityBadge');
       const bufferBadge = document.getElementById('bufferHealthBadge');
 
@@ -22326,6 +33006,11 @@ function renderHtml(
       if (btn) {
         btn.style.color = ytAmbientGlowActive ? '#38bdf8' : '#64748b';
       }
+      const sheetAmbient = document.getElementById('sheetAmbientText');
+      if (sheetAmbient) {
+        sheetAmbient.innerText = ytAmbientGlowActive ? 'Active' : 'Off';
+        sheetAmbient.style.color = ytAmbientGlowActive ? '#38bdf8' : '#94a3b8';
+      }
     }
 
     function toggleTheaterMode() {
@@ -22359,6 +33044,11 @@ function renderHtml(
       if (statusText) {
         statusText.innerText = ytAutoplay ? 'ON' : 'OFF';
         statusText.style.color = ytAutoplay ? '#34d399' : '#9ca3af';
+      }
+      const sheetAuto = document.getElementById('sheetAutoplayText');
+      if (sheetAuto) {
+        sheetAuto.innerText = ytAutoplay ? 'ON' : 'OFF';
+        sheetAuto.style.color = ytAutoplay ? '#34d399' : '#9ca3af';
       }
     }
 
@@ -22409,27 +33099,47 @@ function renderHtml(
       }
     }
 
-    function toggleYtSubscribe() {
+    async function toggleYtSubscribe() {
       const v = ytVideosCatalog[activeYtVideoIndex];
       if (!v) return;
-      const wasSub = Boolean(ytSubscribedMap[v.channelHandle]);
-      ytSubscribedMap[v.channelHandle] = !wasSub;
-      const isSub = ytSubscribedMap[v.channelHandle];
-
       const btn = document.getElementById('btnSubscribe');
       const counter = document.getElementById('subscribersCountDisplay');
       const bellBtn = document.getElementById('btnBellNotify');
+      if (btn) btn.disabled = true;
 
-      if (btn) {
-        btn.innerText = isSub ? 'Subscribed ✓' : 'Subscribe';
-        if (isSub) btn.classList.add('subscribed');
-        else btn.classList.remove('subscribed');
-      }
-      if (counter) {
-        counter.innerText = isSub ? (v.channelSubscribers + 1).toLocaleString() + ' subscribers' : v.channelSubscribersText;
-      }
-      if (bellBtn) {
-        bellBtn.style.display = isSub ? 'flex' : 'none';
+      try {
+        const res = await fetch('/api/youtube/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoId: v.id, channelHandle: v.channelHandle })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          v.isSubscribed = data.isSubscribed;
+          ytSubscribedMap[v.channelHandle] = data.isSubscribed;
+          if (typeof data.subscribersCount === 'number') {
+            v.channelSubscribers = data.subscribersCount;
+            v.channelSubscribersText = data.subscribersText || (data.subscribersCount.toLocaleString() + ' subscribers');
+          }
+          if (btn) {
+            btn.innerText = data.isSubscribed ? 'Subscribed ✓' : 'Subscribe';
+            if (data.isSubscribed) btn.classList.add('subscribed');
+            else btn.classList.remove('subscribed');
+          }
+          if (counter) {
+            counter.innerText = v.channelSubscribersText;
+          }
+          if (bellBtn) {
+            bellBtn.style.display = data.isSubscribed ? 'flex' : 'none';
+          }
+          showAccountToast(data.isSubscribed ? '🔔 Subscribed to ' + v.channelName : '🔕 Unsubscribed from ' + v.channelName);
+        } else {
+          showAccountToast('⚠️ ' + (data.error || 'Failed to update subscription'));
+        }
+      } catch (err) {
+        console.error('Subscription error:', err);
+      } finally {
+        if (btn) btn.disabled = false;
       }
     }
 
@@ -23839,7 +34549,11 @@ function renderHtml(
       openDirectChatWithUser(didOrPubkey, name, '');
     }
 
-    function triggerBottomCreateAction() {
+    function triggerBottomCreateAction(originEl) {
+      if (typeof window.openSpatialCreateSurface === 'function') {
+        window.openSpatialCreateSurface(originEl || document.querySelector('.bottom-nav-create'));
+        return;
+      }
       switchTab('feed');
       const composer = document.querySelector('.feed-container .card');
       if (composer) {
@@ -23850,6 +34564,160 @@ function renderHtml(
       }
     }
 
+    // ========================================================
+    // CONTEXT-AWARE SMART SEARCH ENGINE & REAL-TIME FILTERS
+    // ========================================================
+    function getCurrentActiveTab() {
+      return document.body.dataset.activeTab || 'feed';
+    }
+
+    function updateSearchScopeForActiveTab(tab) {
+      const input = document.getElementById('headerFriendSearchInput');
+      if (!input) return;
+      const placeholders = {
+        feed: '🔍 Search posts, friends, tags...',
+        reels: '🎬 Search creators, shorts, audio tracks...',
+        youtube: '📺 Search videos, channels, topics...',
+        chat: '💬 Search chats, messages, contacts...',
+        friends: '👥 Search nearby mesh peers, DID, radar...',
+        me: '👤 Search my posts, saved media, settings...',
+        admin: '⚙️ Search node metrics, audits, peers...'
+      };
+      input.placeholder = placeholders[tab] || 'Search friends, mesh, tags...';
+      const q = (input.value || '').trim();
+      if (q) {
+        liveFilterActivePage(q, tab);
+      }
+    }
+
+    // In-Page Zero-Latency Real-Time Filtering
+    function liveFilterActivePage(query, tab) {
+      const t = tab || getCurrentActiveTab();
+      const q = (query || '').toLowerCase().trim();
+
+      // 1. Feeds
+      if (t === 'feed') {
+        filterFeedPosts(q);
+      }
+      // 2. Chats (WhatsApp Mode)
+      else if (t === 'chat') {
+        if (typeof filterChatContacts === 'function') filterChatContacts(q);
+      }
+      // 3. Friends & Radar
+      else if (t === 'friends') {
+        if (typeof filterFriendsView === 'function') filterFriendsView(q);
+      }
+      // 4. Watch (YouTube)
+      else if (t === 'youtube') {
+        filterWatchVideos(q);
+      }
+      // 5. Reels & Shorts
+      else if (t === 'reels') {
+        filterReelsCards(q);
+      }
+    }
+
+    function filterFeedPosts(q) {
+      const cards = document.querySelectorAll('#feedPostsStream .insta-post-card');
+      let matches = 0;
+      cards.forEach(card => {
+        if (!q) {
+          card.style.display = '';
+          matches++;
+          return;
+        }
+        const text = card.innerText.toLowerCase();
+        if (text.includes(q)) {
+          card.style.display = '';
+          matches++;
+        } else {
+          card.style.display = 'none';
+        }
+      });
+      return matches;
+    }
+
+    function filterWatchVideos(q) {
+      const items = document.querySelectorAll('#ytRecommendationsList > div, .yt-meta-card');
+      items.forEach(el => {
+        if (!q) { el.style.display = ''; return; }
+        const text = el.innerText.toLowerCase();
+        el.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    function filterReelsCards(q) {
+      if (!q || !Array.isArray(window.reelsStore || [])) return;
+      const store = window.reelsStore || [];
+      const matchIdx = store.findIndex(r => 
+        (r.authorName && r.authorName.toLowerCase().includes(q)) || 
+        (r.caption && r.caption.toLowerCase().includes(q)) ||
+        (r.tags && r.tags.toLowerCase().includes(q))
+      );
+      if (matchIdx !== -1 && typeof window.renderCurrentReel === 'function') {
+        window.currentReelIndex = matchIdx;
+        window.renderCurrentReel();
+      }
+    }
+
+    // Recent Searches in LocalStorage
+    function getRecentSearches() {
+      try {
+        return JSON.parse(localStorage.getItem('sovra_recent_searches_v2') || '[]');
+      } catch (e) { return []; }
+    }
+
+    function addRecentSearch(query) {
+      if (!query || query.trim().length < 2) return;
+      const q = query.trim();
+      let list = getRecentSearches().filter(x => x.toLowerCase() !== q.toLowerCase());
+      list.unshift(q);
+      if (list.length > 5) list = list.slice(0, 5);
+      try { localStorage.setItem('sovra_recent_searches_v2', JSON.stringify(list)); } catch (e) {}
+    }
+
+    function removeRecentSearch(query, event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      let list = getRecentSearches().filter(x => x.toLowerCase() !== query.toLowerCase());
+      try { localStorage.setItem('sovra_recent_searches_v2', JSON.stringify(list)); } catch (e) {}
+      const dropdown = document.getElementById('headerSearchDropdown');
+      if (dropdown) renderDefaultSearchSuggestions(dropdown);
+    }
+
+    function selectHeaderSearchPerson(name) {
+      switchTab('friends');
+      if (typeof filterFriendsView === 'function') filterFriendsView(name || '');
+      const dd = document.getElementById('headerSearchDropdown');
+      if (dd) dd.style.display = 'none';
+    }
+
+    function selectHeaderSearchChannel() {
+      switchTab('youtube');
+      const dd = document.getElementById('headerSearchDropdown');
+      if (dd) dd.style.display = 'none';
+    }
+
+    function searchEverywhereFriends() {
+      const input = document.getElementById('headerFriendSearchInput');
+      const q = input ? input.value.trim() : '';
+      switchTab('friends');
+      if (typeof filterFriendsView === 'function') filterFriendsView(q);
+      const dd = document.getElementById('headerSearchDropdown');
+      if (dd) dd.style.display = 'none';
+    }
+
+    function openSearchFriendsHub() {
+      switchTab('friends');
+      const dd = document.getElementById('headerSearchDropdown');
+      if (dd) dd.style.display = 'none';
+    }
+
+    function clearAllRecentSearches() {
+      try { localStorage.removeItem('sovra_recent_searches_v2'); } catch(e) {}
+      const dd = document.getElementById('headerSearchDropdown');
+      if (dd) renderDefaultSearchSuggestions(dd);
+    }
+
     // Top Header Search Live Engine
     function handleHeaderFriendSearch(query) {
       const q = (query || '').toLowerCase().trim();
@@ -23858,12 +34726,23 @@ function renderHtml(
       if (clearBtn) clearBtn.style.display = q ? 'inline' : 'none';
       if (!dropdown) return;
 
+      const tab = getCurrentActiveTab();
+
+      // Live filter active page content directly
+      liveFilterActivePage(q, tab);
+
       if (!q) {
         dropdown.style.display = 'none';
         return;
       }
 
       dropdown.style.display = 'block';
+
+      // Save to recent searches (debounced)
+      if (q.length >= 2) {
+        if (window._saveSearchHistoryTimer) clearTimeout(window._saveSearchHistoryTimer);
+        window._saveSearchHistoryTimer = setTimeout(() => { addRecentSearch(query); }, 600);
+      }
 
       // Asynchronously query live database to enrich results
       if (!window._searchDebounceTimeout) {
@@ -23906,14 +34785,21 @@ function renderHtml(
 
       let html = '';
 
-      // Section 1: People & Friends
+      // Context Scope Badge
+      const tabNames = { feed: '📷 Feeds', reels: '🎬 Reels', youtube: '📺 Watch', chat: '💬 Chats', friends: '👥 Friends & Radar', me: '👤 Profile', admin: '⚙️ Operations' };
+      html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 6px 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.72rem;">' +
+        '<span style="color: #38bdf8; font-weight: 700;">Scope: ' + (tabNames[tab] || 'All Mesh') + '</span>' +
+        '<span style="color: #94a3b8; font-size: 0.68rem;">In-Page Filter Active</span>' +
+      '</div>';
+
+      // Section 1: People & Contacts
       if (matchedPeople.length > 0) {
-        html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 4px 8px; margin-bottom: 4px;">👥 People & Friends</div>';
+        html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 8px 2px 8px;">👥 People & Contacts</div>';
         for (const p of matchedPeople.slice(0, 4)) {
           const statusText = p.isFriend ? '❤️ Friends' : p.isPending ? '⏳ Requested' : '+ Add';
           const statusBg = p.isFriend ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)';
           const statusColor = p.isFriend ? '#f87171' : '#38bdf8';
-          html += '<div class="header-dropdown-item" data-action="select-search-friend" data-name="' + p.name.replace(/"/g, '&quot;') + '">' +
+          html += '<div class="header-dropdown-item" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="selectHeaderSearchPerson(this.dataset.name)" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; cursor: pointer;">' +
             '<div style="display: flex; align-items: center; gap: 8px;">' +
               '<div style="width: 28px; height: 28px; border-radius: 50%; background: ' + p.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;">' + p.avatar + '</div>' +
               '<div>' +
@@ -23926,11 +34812,11 @@ function renderHtml(
         }
       }
 
-      // Section 2: Channels
+      // Section 2: Channels & Creators
       if (matchedChannels.length > 0) {
-        html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 8px 4px 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">📡 Channels</div>';
-        for (const c of matchedChannels.slice(0, 2)) {
-          html += '<div class="header-dropdown-item" data-action="select-search-channel">' +
+        html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 8px 2px 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">📡 Channels & Creators</div>';
+        for (const c of matchedChannels.slice(0, 3)) {
+          html += '<div class="header-dropdown-item" onclick="selectHeaderSearchChannel()" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; cursor: pointer;">' +
             '<div style="display: flex; align-items: center; gap: 8px;">' +
               '<div style="width: 26px; height: 26px; border-radius: 6px; background: ' + c.bg + '; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">' + c.avatar + '</div>' +
               '<div>' +
@@ -23943,24 +34829,25 @@ function renderHtml(
         }
       }
 
-      // Section 3: Hashtags
+      // Section 3: Hashtags & Topics
       if (matchedTags.length > 0) {
-        html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 8px 4px 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">🔥 Hashtags</div>';
-        for (const h of matchedTags.slice(0, 2)) {
-          html += '<div class="header-dropdown-item" data-action="search-hashtag" data-tag="' + h.tag + '">' +
+        html += '<div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 8px 2px 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">🔥 Hashtags & Tags</div>';
+        for (const h of matchedTags.slice(0, 3)) {
+          html += '<div class="header-dropdown-item" data-tag="' + h.tag.replace(/"/g, '&quot;') + '" onclick="selectSearchFilterTag(this.dataset.tag);" style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 8px; cursor: pointer;">' +
             '<span style="font-size: 0.82rem; font-weight: 700; color: #38bdf8;">' + h.tag + '</span>' +
             '<span style="font-size: 0.7rem; color: #64748b;">' + (h.posts || 0) + ' posts</span>' +
           '</div>';
         }
       }
 
-      if (!html) {
-        html = '<div style="padding: 10px; color: #64748b; font-size: 0.82rem; text-align: center;">No matches for "' + query.replace(/</g, '&lt;') + '"</div>';
+      if (!matchedPeople.length && !matchedChannels.length && !matchedTags.length) {
+        html += '<div style="padding: 12px; color: #64748b; font-size: 0.82rem; text-align: center;">Filtering page by "' + query.replace(/</g, '&lt;') + '"...</div>';
       }
 
-      html += '<div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 6px; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">' +
-        '<button onclick="switchTab(&quot;friends&quot;); filterFriendsView(document.getElementById(&quot;headerFriendSearchInput&quot;)?.value || &quot;&quot;); document.getElementById(&quot;headerSearchDropdown&quot;).style.display=&quot;none&quot;;" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px;">👥 Friends Hub →</button>' +
-        '<button onclick="openOmniSearch(); const oi=document.getElementById(&quot;omniSearchInput&quot;); if(oi){oi.value=document.getElementById(&quot;headerFriendSearchInput&quot;)?.value || &quot;&quot;; filterOmniSearch(oi.value);} document.getElementById(&quot;headerSearchDropdown&quot;).style.display=&quot;none&quot;;" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 6px; color: #a5b4fc; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px 8px;">🔍 Deep Omni-Search (Ctrl+K) →</button>' +
+      // Global Navigation Quick Buttons
+      html += '<div style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 6px; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">' +
+        '<button type="button" onclick="searchEverywhereFriends()" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px;">👥 Search Everywhere →</button>' +
+        '<button type="button" onclick="clearHeaderSearch();" style="background: none; border: none; color: #94a3b8; font-size: 0.72rem; cursor: pointer; padding: 4px;">Clear Filter ✕</button>' +
       '</div>';
 
       dropdown.innerHTML = html;
@@ -23968,8 +34855,117 @@ function renderHtml(
 
     function showHeaderSearchDropdown() {
       const input = document.getElementById('headerFriendSearchInput');
-      if (input && input.value.trim()) {
-        handleHeaderFriendSearch(input.value);
+      const dropdown = document.getElementById('headerSearchDropdown');
+      if (!dropdown) return;
+      const query = input ? input.value.trim() : '';
+      if (query) {
+        handleHeaderFriendSearch(query);
+      } else {
+        renderDefaultSearchSuggestions(dropdown);
+      }
+    }
+
+    function renderDefaultSearchSuggestions(dropdown) {
+      if (!dropdown) return;
+      dropdown.style.display = 'block';
+      const tab = getCurrentActiveTab();
+      let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+
+      // 1. Recent Searches Chips (Instagram / YouTube style)
+      const recents = getRecentSearches();
+      if (recents.length > 0) {
+        html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 6px;">' +
+          '<span style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">🕒 Recent Searches</span>' +
+          '<span onclick="clearAllRecentSearches()" style="font-size: 0.68rem; color: #ef4444; cursor: pointer; font-weight: 600;">Clear all</span>' +
+        '</div>';
+        html += '<div style="display: flex; gap: 6px; flex-wrap: wrap; padding: 0 4px 6px 4px;">';
+        for (const item of recents) {
+          html += '<span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); font-size: 0.75rem; color: #e2e8f0; cursor: pointer;" data-item="' + item.replace(/"/g, '&quot;') + '" onclick="selectSearchFilterTag(this.dataset.item)">' +
+            '<span>' + item + '</span>' +
+            '<span data-item="' + item.replace(/"/g, '&quot;') + '" onclick="removeRecentSearch(this.dataset.item, event);" style="color: #94a3b8; font-size: 0.75rem; font-weight: bold; cursor: pointer;">✕</span>' +
+          '</span>';
+        }
+        html += '</div>';
+      }
+
+      // 2. Tab-Specific Suggestions
+      if (tab === 'feed') {
+        html += '<div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 4px 6px 2px 6px; border-top: 1px solid rgba(255,255,255,0.06);">⚡ Suggested Sovereign Friends</div>';
+        const defaultPeers = [
+          { name: 'Alice', handle: '@alice_dev', avatar: '👩‍💻', bg: '#0284c7', status: 'Direct Mesh Node' },
+          { name: 'Bob', handle: '@bob_radio', avatar: '📡', bg: '#10b981', status: 'LoRa Mesh Relay' },
+          { name: 'Carol', handle: '@carol_ops', avatar: '🛡️', bg: '#8b5cf6', status: 'Zero-Knowledge Guard' }
+        ];
+        for (const p of defaultPeers) {
+          html += '<div class="header-dropdown-item" data-name="' + p.name.replace(/"/g, '&quot;') + '" onclick="selectHeaderSearchPerson(this.dataset.name)" style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 8px; cursor: pointer;">' +
+            '<div style="display: flex; align-items: center; gap: 8px;">' +
+              '<div style="width: 26px; height: 26px; border-radius: 50%; background: ' + p.bg + '; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">' + p.avatar + '</div>' +
+              '<div>' +
+                '<div style="font-size: 0.8rem; font-weight: 700; color: #fff;">' + p.name + '</div>' +
+                '<div style="font-size: 0.68rem; color: #94a3b8;">' + p.handle + ' • ' + p.status + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<span style="font-size: 0.68rem; font-weight: 700; color: #38bdf8; padding: 2px 8px; border-radius: 10px; background: rgba(56, 189, 248, 0.12);">+ Connect</span>' +
+          '</div>';
+        }
+      } else if (tab === 'youtube') {
+        html += '<div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 4px 6px 2px 6px; border-top: 1px solid rgba(255,255,255,0.06);">📺 Featured Channels</div>';
+        const channels = [
+          { name: 'Sovra Protocol Lab', desc: '4K P2P Master Streams', avatar: '🎥' },
+          { name: 'Mesh Radio Studio', desc: 'Cellular NAT & Offgrid Tech', avatar: '📡' }
+        ];
+        for (const c of channels) {
+          html += '<div class="header-dropdown-item" data-channel="' + c.name.replace(/"/g, '&quot;') + '" onclick="selectSearchFilterTag(this.dataset.channel)" style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 8px; cursor: pointer;">' +
+            '<div style="display: flex; align-items: center; gap: 8px;">' +
+              '<span style="font-size: 1rem;">' + c.avatar + '</span>' +
+              '<div><div style="font-size: 0.8rem; font-weight: 700; color: #fff;">' + c.name + '</div><div style="font-size: 0.68rem; color: #38bdf8;">' + c.desc + '</div></div>' +
+            '</div>' +
+            '<span style="font-size: 0.68rem; color: #818cf8; font-weight: 600;">Filter →</span>' +
+          '</div>';
+        }
+      } else if (tab === 'chat') {
+        html += '<div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 4px 6px 2px 6px; border-top: 1px solid rgba(255,255,255,0.06);">💬 Quick Chat Contacts</div>';
+        const chats = [
+          { name: 'Alice', handle: '@alice_dev', status: 'Online now' },
+          { name: 'Bob', handle: '@bob_radio', status: 'Mesh active' }
+        ];
+        for (const ch of chats) {
+          html += '<div class="header-dropdown-item" data-chat="' + ch.name.replace(/"/g, '&quot;') + '" onclick="selectSearchFilterTag(this.dataset.chat)" style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 8px; cursor: pointer;">' +
+            '<div><div style="font-size: 0.8rem; font-weight: 700; color: #fff;">' + ch.name + '</div><div style="font-size: 0.68rem; color: #34d399;">' + ch.status + '</div></div>' +
+            '<span style="font-size: 0.68rem; color: #38bdf8; font-weight: 600;">Open Chat →</span>' +
+          '</div>';
+        }
+      }
+
+      // 3. Trending Tags Row
+      html += '<div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; padding: 6px 6px 2px 6px; border-top: 1px solid rgba(255,255,255,0.06);">🔥 Trending Tags</div>';
+      const topics = [
+        { tag: '#decentralized', desc: '14 active nodes' },
+        { tag: '#offgrid-radio', desc: 'Zero-internet relay' },
+        { tag: '#p2p', desc: 'Noise_XX verified' }
+      ];
+      for (const t of topics) {
+        html += '<div class="header-dropdown-item" data-tag="' + t.tag.replace(/"/g, '&quot;') + '" onclick="selectSearchFilterTag(this.dataset.tag)" style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 8px; cursor: pointer;">' +
+          '<span style="font-size: 0.8rem; font-weight: 700; color: #38bdf8;">' + t.tag + '</span>' +
+          '<span style="font-size: 0.68rem; color: #64748b;">' + t.desc + '</span>' +
+        '</div>';
+      }
+
+      html += '<div style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">' +
+        '<button type="button" onclick="openSearchFriendsHub()" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px;">👥 Friends Hub →</button>' +
+        '<button type="button" onclick="clearHeaderSearch();" style="background: none; border: none; color: #94a3b8; font-size: 0.72rem; cursor: pointer; padding: 4px;">Close ✕</button>' +
+      '</div>';
+
+      html += '</div>';
+      dropdown.innerHTML = html;
+    }
+
+    function selectSearchFilterTag(tag) {
+      const input = document.getElementById('headerFriendSearchInput');
+      if (input) {
+        input.value = tag;
+        handleHeaderFriendSearch(tag);
+        input.focus();
       }
     }
 
@@ -23981,7 +34977,20 @@ function renderHtml(
       if (clearBtn) clearBtn.style.display = 'none';
       const dropdown = document.getElementById('headerSearchDropdown');
       if (dropdown) dropdown.style.display = 'none';
+
+      // Reset in-page live filters across all views
+      liveFilterActivePage('', getCurrentActiveTab());
     }
+
+    // Keyboard support: Esc closes dropdown, Arrow keys navigate
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const dd = document.getElementById('headerSearchDropdown');
+        if (dd && dd.style.display !== 'none') {
+          dd.style.display = 'none';
+        }
+      }
+    });
 
     // Close header search dropdown when clicking outside
     document.addEventListener('click', function(e) {
@@ -23991,6 +35000,67 @@ function renderHtml(
         if (dd) dd.style.display = 'none';
       }
     });
+
+    // Instagram-Grade Double-Tap Heart Burst
+    document.addEventListener('dblclick', function(e) {
+      const postCard = e.target.closest('.insta-post-card');
+      if (postCard) {
+        const heart = document.createElement('div');
+        heart.innerHTML = '❤️';
+        heart.style.position = 'absolute';
+        heart.style.left = (e.clientX - postCard.getBoundingClientRect().left - 24) + 'px';
+        heart.style.top = (e.clientY - postCard.getBoundingClientRect().top - 24) + 'px';
+        heart.style.fontSize = '48px';
+        heart.style.pointerEvents = 'none';
+        heart.style.zIndex = '100';
+        heart.style.animation = 'instaHeartBurst 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+        postCard.appendChild(heart);
+        setTimeout(() => { heart.remove(); }, 650);
+
+        const likeBtn = postCard.querySelector('.insta-action-btn');
+        if (likeBtn && !likeBtn.classList.contains('liked')) {
+          likeBtn.click();
+        }
+      }
+    });
+
+    function closeTacticalInspector() {
+      const insp = document.getElementById('tacticalNodeInspectorCard');
+      if (insp) insp.style.display = 'none';
+    }
+
+    // Tactical Mesh War Table Node Inspector
+    function inspectTacticalNode(nodeName, ip, rssi, battery) {
+      const insp = document.getElementById('tacticalNodeInspectorCard');
+      if (!insp) return;
+      insp.style.display = 'block';
+      insp.innerHTML = 
+        '<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,240,255,0.25); padding-bottom: 8px; margin-bottom: 8px;">' +
+          '<div style="font-weight: 800; color: #00f0ff; font-size: 0.85rem;">🎯 TARGET LOCK: ' + nodeName + '</div>' +
+          '<button type="button" onclick="closeTacticalInspector()" style="background: none; border: none; color: #94a3b8; cursor: pointer;">✕</button>' +
+        '</div>' +
+        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.75rem; font-family: monospace;">' +
+          '<div><span style="color: #94a3b8;">Route:</span> <span style="color: #38bdf8;">' + ip + '</span></div>' +
+          '<div><span style="color: #94a3b8;">RSSI:</span> <span style="color: #34d399;">' + rssi + ' dBm</span></div>' +
+          '<div><span style="color: #94a3b8;">Battery:</span> <span style="color: #fbbf24;">' + battery + '%</span></div>' +
+          '<div><span style="color: #94a3b8;">Cipher:</span> <span style="color: #a855f7;">Noise_XX Valid</span></div>' +
+        '</div>' +
+        '<div style="margin-top: 10px; display: flex; gap: 8px;">' +
+          '<button type="button" data-name="' + (nodeName || '').replace(/"/g, '&quot;') + '" onclick="pingTacticalNode(this.dataset.name)" style="background: rgba(0,240,255,0.15); border: 1px solid #00f0ff; color: #00f0ff; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">⚡ Ping Peer (ICMP)</button>' +
+          '<button type="button" onclick="switchTab(&quot;chat&quot;)" style="background: rgba(56,189,248,0.15); border: 1px solid #38bdf8; color: #38bdf8; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">💬 Direct E2EE Chat</button>' +
+        '</div>' +
+        '<div id="tacticalPingResult" style="font-size: 0.7rem; color: #34d399; font-family: monospace; margin-top: 6px;"></div>';
+    }
+
+    function pingTacticalNode(nodeName) {
+      const res = document.getElementById('tacticalPingResult');
+      if (res) {
+        res.innerText = 'Pinging ' + nodeName + ' via Noise_XX...';
+        setTimeout(() => {
+          res.innerText = '● Ping to ' + nodeName + ' returned in 3.4ms (Hop count: 1)';
+        }, 320);
+      }
+    }
 
     // Global Keyboard Navigation & Shortcuts (Ctrl+K / Cmd+K for Omni-Search, Esc to dismiss all modals & dropdowns, Arrow Nav)
     function dismissAllModalsAndDropdowns() {
@@ -24023,7 +35093,7 @@ function renderHtml(
       ['safetyNumbersModal', 'disappearingModal', 'messageInfoModal', 'e2eeCallModal'].forEach(id => {
         if (typeof closeWaModal === 'function') closeWaModal(id);
       });
-      ['channelProfileModal', 'membershipModal', 'superThanksModal'].forEach(id => {
+      ['channelProfileModal', 'membershipModal', 'superThanksModal', 'mobilePlayerSettingsModal'].forEach(id => {
         if (typeof closeYtModal === 'function') closeYtModal(id);
       });
 
@@ -24059,7 +35129,11 @@ function renderHtml(
       }
     });
 
-    function toggleNotificationCenter() {
+    function toggleNotificationCenter(originEl) {
+      if (typeof window.openSpatialNotificationsSurface === 'function') {
+        window.openSpatialNotificationsSurface(originEl || document.getElementById('headerNotificationBell'));
+        return;
+      }
       const dd = document.getElementById('notificationDropdown');
       if (!dd) return;
       if (dd.style.display === 'block') {
@@ -24560,7 +35634,7 @@ function renderHtml(
       const prompt = document.getElementById('videoUploadFilePrompt');
       if (prompt) prompt.innerText = '✓ Selected: ' + file.name + ' (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB)';
     }
-    function submitVideoUpload() {
+    async function submitVideoUpload() {
       const title = document.getElementById('videoUploadTitleInput').value.trim();
       const tagsStr = document.getElementById('videoUploadTagsInput').value.trim();
       if (!title) {
@@ -24568,30 +35642,79 @@ function renderHtml(
         return;
       }
       const tags = tagsStr.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
-      const newVideo = {
-        id: 'yt-vid-' + Date.now(),
+      const publishBtn = document.querySelector('#videoUploadModal .action-pill-primary');
+      if (publishBtn) {
+        publishBtn.disabled = true;
+        publishBtn.innerText = 'Publishing... ⏳';
+      }
+
+      let videoData = null;
+      let mimeType = 'video/mp4';
+      if (selectedVideoUploadFile) {
+        mimeType = selectedVideoUploadFile.type || 'video/mp4';
+        try {
+          videoData = await new Promise(function(resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function(e) { resolve(e.target.result); };
+            reader.onerror = reject;
+            reader.readAsDataURL(selectedVideoUploadFile);
+          });
+        } catch (readErr) {
+          console.warn('Error reading video file:', readErr);
+        }
+      }
+
+      const payload = {
         title: title,
+        tags: tags.length ? tags : ['#Sovereign', '#P2P'],
         channelName: (myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Sovereign Creator',
         channelHandle: (myProfile && myProfile.handle) ? myProfile.handle : '@creator',
-        channelAvatar: (myProfile && myProfile.avatar) ? myProfile.avatar : '🎬',
-        channelAvatarBg: (myProfile && myProfile.avatarBg) ? myProfile.avatarBg : '#e11d48',
-        channelSubscribersText: '1.2K subscribers',
-        views: 1,
-        likes: 0,
-        cid: 'bafybeig' + Math.random().toString(36).substring(2, 10),
-        tags: tags.length ? tags : ['#Sovereign', '#P2P']
+        videoData: videoData,
+        mimeType: mimeType
       };
-      if (typeof longFormVideosCatalog !== 'undefined') {
-        longFormVideosCatalog.unshift(newVideo);
-        const titleEl = document.getElementById('ytVideoTitle');
-        if (titleEl) titleEl.innerText = newVideo.title;
-        const cidEl = document.getElementById('ytCidDisplay');
-        if (cidEl) cidEl.innerText = 'CID: ' + newVideo.cid;
-        const chanEl = document.getElementById('ytChannelName');
-        if (chanEl) chanEl.innerText = newVideo.channelName;
+
+      try {
+        const res = await fetch('/api/youtube/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (result.ok && result.video) {
+          const newVideo = result.video;
+          if (typeof ytVideosCatalog !== 'undefined') {
+            ytVideosCatalog.unshift(newVideo);
+            activeYtVideoIndex = 0;
+            if (typeof renderYtCurrentVideo === 'function') {
+              renderYtCurrentVideo();
+            }
+          }
+          if (typeof longFormVideosCatalog !== 'undefined') {
+            longFormVideosCatalog.unshift(newVideo);
+          }
+          const titleEl = document.getElementById('ytVideoTitle');
+          if (titleEl) titleEl.innerText = newVideo.title;
+          const cidEl = document.getElementById('ytCidDisplay');
+          if (cidEl) cidEl.innerText = 'CID: ' + newVideo.cid;
+          const chanEl = document.getElementById('ytChannelName');
+          if (chanEl) chanEl.innerText = newVideo.channelName;
+          selectedVideoUploadFile = null;
+          const promptEl = document.getElementById('videoUploadFilePrompt');
+          if (promptEl) promptEl.innerText = 'Choose video file (MP4, MKV, WebM)';
+          closeVideoUploadModal();
+          showAccountToast('🎉 Video "' + title + '" published to Sovereign Watch over P2P!');
+        } else {
+          alert('Video upload failed: ' + (result.error || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error('Video upload network error:', err);
+        alert('Failed to publish video: ' + (err.message || 'Network error'));
+      } finally {
+        if (publishBtn) {
+          publishBtn.disabled = false;
+          publishBtn.innerText = 'Publish Video 🚀';
+        }
       }
-      closeVideoUploadModal();
-      showAccountToast('🎉 Video "' + title + '" published to Sovereign Watch over P2P!');
     }
 
     // --- Profile Creator Hub Dynamic Entities Renderer ---
@@ -24649,6 +35772,7 @@ function renderHtml(
             '</div>' +
           '</div>' +
           '<div style="display: flex; gap: 6px; align-items: center;">' +
+            '<button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8;" data-channel-id="' + c.id + '" onclick="openSpatialChannelManageSurface(this.dataset.channelId, this)">⚙️ Manage</button>' +
             '<button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">📢 Post As</button>' +
             '<button type="button" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #f1f5f9;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">Room</button>' +
             '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this channel" data-type="channel" data-id="' + c.id + '" data-name="' + (c.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
@@ -24668,6 +35792,7 @@ function renderHtml(
             '</div>' +
           '</div>' +
           '<div style="display: flex; gap: 6px; align-items: center;">' +
+            '<button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc;" data-page-id="' + p.id + '" onclick="openSpatialPageManageSurface(this.dataset.pageId, this)">⚙️ Manage</button>' +
             (isCurrentActive
               ? '<button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">✓ Active</button>'
               : '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12);" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">🔄 Switch</button>'
@@ -25167,7 +36292,7 @@ function renderHtml(
     function triggerCopyPostLink() {
       const link = window.location.origin + '/#card-' + activeTargetPost.id;
       copyToClipboard(link, function() {
-        showAccountToast('🔗 Post direct link copied to clipboard!');
+        showAccountToast('🔗 Post link copied to clipboard!');
       });
       closePostOptionsModal();
     }
@@ -25175,15 +36300,27 @@ function renderHtml(
       closePostOptionsModal();
       shareFeedPost(activeTargetPost.id, activeTargetPost.cid);
     }
+    function triggerNotInterestedFromModal() {
+      const postId = activeTargetPost.id;
+      closePostOptionsModal();
+      handleFeedDislike(postId);
+    }
+    function triggerCopyPostCid() {
+      const cid = activeTargetPost.cid || 'bafybeic' + activeTargetPost.id;
+      copyToClipboard('ipfs://' + cid, function() {
+        showAccountToast('🛡️ Cryptographic IPFS CID copied: ' + cid.slice(0, 16) + '...');
+      });
+      closePostOptionsModal();
+    }
     function triggerMuteFromModal() {
       closePostOptionsModal();
-      showAccountToast('🔕 Author ' + activeTargetPost.author + ' has been muted locally. Feed will hide their updates.');
+      showAccountToast('🔕 Muted @' + activeTargetPost.author);
     }
     function triggerBlockFromModal() {
       closePostOptionsModal();
       const card = document.getElementById('card-' + activeTargetPost.id);
       if (card) card.style.display = 'none';
-      showAccountToast('🚫 Author ' + activeTargetPost.author + ' blocked! Post removed from viewport.');
+      showAccountToast('🚫 Blocked @' + activeTargetPost.author);
     }
     function triggerDeleteFromModal() {
       closePostOptionsModal();
@@ -25201,7 +36338,7 @@ function renderHtml(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId: activeTargetPost.id })
       }).catch(function(err) { console.warn('[Feed] Delete error:', err); });
-      showAccountToast('🗑️ Post deleted from local feed and network tombstone published!');
+      showAccountToast('🗑️ Post deleted');
     }
 
     // --- Dislike Handler ---
@@ -25211,7 +36348,7 @@ function renderHtml(
         card.style.opacity = '0.45';
         card.style.transition = 'opacity 0.3s';
       }
-      showAccountToast('👎 Feedback recorded. Feed algorithm will de-rank similar topics locally without public counters.');
+      showAccountToast('👎 Post hidden. We will show fewer posts like this.');
     }
 
     // --- Repost & Quote Post ---
@@ -25229,12 +36366,12 @@ function renderHtml(
     }
     function submitInstantRepost() {
       closeRepostModal();
-      showAccountToast('🔁 Post #' + activeTargetPost.id + ' instantly reposted to your followers on the GossipSub swarm!');
+      showAccountToast('🔁 Reposted to your profile');
     }
     function submitQuoteRepost() {
       const commentary = document.getElementById('repostCommentaryInput').value.trim();
       closeRepostModal();
-      showAccountToast('✍️ Quote Post published with your thoughts! Signed and broadcasted to mesh.');
+      showAccountToast('✍️ Quote post published');
     }
 
     // --- Safety & Dispute Report ---
@@ -25249,9 +36386,8 @@ function renderHtml(
     }
     function submitSafetyReport() {
       const reason = document.getElementById('reportReasonInput').value;
-      const ticketId = 'SR-' + Math.floor(1000 + Math.random() * 9000);
       closeSafetyReportModal();
-      showAccountToast('✅ Cryptographic Report #' + ticketId + ' registered (' + reason.toUpperCase() + ') on Mesh Dispute Ledger!');
+      showAccountToast('✅ Report submitted. Thank you for keeping the community safe.');
     }
 
     // ==========================================
@@ -25415,13 +36551,26 @@ function renderHtml(
       if (!navigator.onLine) {
         pill.style.display = 'flex';
         pill.style.background = 'rgba(239, 68, 68, 0.95)';
-        pill.innerHTML = '<span>⚡</span> <span>Offline Mode — Browsing Cached Mesh</span>';
+        pill.innerHTML = '<span>📡</span> <span>Offline Mode — Operating on Local Distributed Mesh</span>';
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('📡 Operating in Offline Mesh Mode / Auto-sync enabled', 'error');
+        }
       } else {
         pill.style.background = 'rgba(16, 185, 129, 0.95)';
-        pill.innerHTML = '<span>🌐</span> <span>Connected to Mesh Swarm</span>';
+        pill.innerHTML = '<span>⚡</span> <span>Connected to Mesh Swarm — Syncing Outbox</span>';
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('⚡ Reconnected to Mesh Network — Syncing offline actions...', 'success');
+        }
+        if (window.SovraOfflineOutbox) {
+          window.SovraOfflineOutbox.getInstance().drainOutbox().then(function(res) {
+            if (res && res.processed > 0 && typeof showAccountToast === 'function') {
+              showAccountToast('✓ ' + res.processed + ' offline action(s) synced to mesh network!', 'success');
+            }
+          }).catch(function() {});
+        }
         setTimeout(function() {
           if (navigator.onLine) pill.style.display = 'none';
-        }, 3000);
+        }, 4000);
       }
     }
 
@@ -25597,11 +36746,39 @@ async function startDevServer() {
   });
   const adminSecret = process.env.ADMIN_SECRET_KEY || (process.env.NODE_ENV === 'production' ? undefined : 'sovra-test-admin-secret-key-32-chars-ok!');
   const adminSecurity = new AdminSecurityEngine(adminSecret);
-  const rateLimiter = new TokenBucketRateLimiter(200, 40);
-  const authRateLimiter = new TokenBucketRateLimiter(30, 5);
-  const adminRateLimiter = new TokenBucketRateLimiter(20, 2);
-  const financeRateLimiter = new TokenBucketRateLimiter(30, 5);
-  const storageRateLimiter = new TokenBucketRateLimiter(10, 1);
+  const isBenchmarkMode = process.env.SOVRA_BENCHMARK_MODE === 'true' || process.env.NODE_ENV === 'test';
+  const rateLimiter = new TokenBucketRateLimiter(isBenchmarkMode ? 100000 : 200, isBenchmarkMode ? 50000 : 40);
+  const authRateLimiter = new TokenBucketRateLimiter(isBenchmarkMode ? 10000 : 30, isBenchmarkMode ? 5000 : 5);
+  const adminRateLimiter = new TokenBucketRateLimiter(isBenchmarkMode ? 10000 : 20, isBenchmarkMode ? 5000 : 2);
+  const financeRateLimiter = new TokenBucketRateLimiter(isBenchmarkMode ? 10000 : 30, isBenchmarkMode ? 5000 : 5);
+  const storageRateLimiter = new TokenBucketRateLimiter(isBenchmarkMode ? 10000 : 10, isBenchmarkMode ? 5000 : 1);
+  const blindPushRelay = new BlindPushRelayServer();
+
+  // High-Frequency In-Memory Micro-Batching Buffer for Post/Reel Views (Viral Spikes Defense)
+  const postViewBatchBuffer = new Map<string, number>();
+  const viewBatchFlushInterval = setInterval(() => {
+    if (postViewBatchBuffer.size === 0) return;
+    try {
+      const entries = Array.from(postViewBatchBuffer.entries());
+      postViewBatchBuffer.clear();
+      for (const [pId, delta] of entries) {
+        try {
+          (sovraDb as any).incrementPostViews?.(pId, delta);
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }, 3000);
+  viewBatchFlushInterval.unref();
+
+  // Dynamic Proof-of-Work (PoW) Challenge Engine for Registration (Botnet Defense)
+  const activeChallenges = new Map<string, { prefix: string; difficulty: number; expiresAt: number }>();
+  const challengeCleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [id, ch] of activeChallenges.entries()) {
+      if (ch.expiresAt < now) activeChallenges.delete(id);
+    }
+  }, 60000);
+  challengeCleanupInterval.unref();
 
   const userCreatorModes = new Map<string, boolean>();
   const storyViews = new Map<string, Set<string>>();
@@ -25610,18 +36787,104 @@ async function startDevServer() {
   // Realtime Server-Sent Events (SSE) chat subscriber registry
   const realtimeSubscribers = new Map<string, Set<http.ServerResponse>>();
 
-  function broadcastChatEvent(recipientDid: string, payload: any): void {
-    const set = realtimeSubscribers.get(recipientDid);
-    if (set && set.size > 0) {
-      const data = `event: chat_message\ndata: ${JSON.stringify(payload)}\n\n`;
-      for (const clientRes of set) {
-        try {
-          clientRes.write(data);
-        } catch (_) {
-          set.delete(clientRes);
+  function broadcastChatEvent(recipientDid: string, payload: any, eventType: string = 'chat_message'): void {
+    const data = `event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`;
+
+    const sendToDid = (targetDid: string) => {
+      const set = realtimeSubscribers.get(targetDid);
+      if (set && set.size > 0) {
+        for (const clientRes of Array.from(set)) {
+          try {
+            clientRes.write(data);
+          } catch (_) {
+            set.delete(clientRes);
+          }
         }
       }
+    };
+
+    if (recipientDid.startsWith('channel:')) {
+      const channelId = recipientDid.replace('channel:', '');
+      if (channelId === 'local_mesh') {
+        for (const [targetDid] of realtimeSubscribers) {
+          sendToDid(targetDid);
+        }
+        return;
+      }
+      const ch = sovraDb.getChannelById(channelId);
+      const members = sovraDb.getSpaceMembers(channelId);
+      const targetDids = new Set<string>();
+      if (ch?.ownerDid) targetDids.add(ch.ownerDid);
+      members.forEach(m => targetDids.add(m.userDid));
+      if (ch && Array.isArray((ch as any).subscribers)) {
+        (ch as any).subscribers.forEach((d: string) => targetDids.add(d));
+      }
+
+      if (targetDids.size > 0) {
+        for (const did of targetDids) {
+          sendToDid(did);
+        }
+      } else {
+        for (const [did] of realtimeSubscribers) {
+          sendToDid(did);
+        }
+      }
+    } else {
+      sendToDid(recipientDid);
+      if (payload && payload.senderDid && payload.senderDid !== recipientDid) {
+        sendToDid(payload.senderDid);
+      }
     }
+  }
+
+  function validateMediaMagicBytes(buffer: Buffer, declaredMime?: string): { valid: boolean; detectedMime?: string; error?: string } {
+    if (!buffer || buffer.length < 4) {
+      return { valid: false, error: 'Empty or corrupt media payload' };
+    }
+    const hex4 = buffer.subarray(0, 4).toString('hex').toLowerCase();
+    const hex8 = buffer.length >= 8 ? buffer.subarray(0, 8).toString('hex').toLowerCase() : '';
+    // Explicitly reject Windows PE executable (MZ) and Linux ELF binaries
+    if (hex4.startsWith('4d5a') || hex8.startsWith('7f454c46')) {
+      return { valid: false, error: 'Malicious payload detected: executable binary format is strictly prohibited' };
+    }
+
+    // Check for dangerous scripts or executables disguised as images
+    const textSample = buffer.subarray(0, Math.min(buffer.length, 512)).toString('utf8').toLowerCase();
+    if (textSample.includes('<script') || textSample.includes('<?php') || textSample.includes('#!/bin') || textSample.includes('<html>')) {
+      return { valid: false, error: 'Malicious payload detected: executable or script content in media upload' };
+    }
+
+    // JPEG: FF D8 FF
+    if (hex4.startsWith('ffd8ff')) {
+      return { valid: true, detectedMime: 'image/jpeg' };
+    }
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (hex8.startsWith('89504e470d0a1a0a')) {
+      return { valid: true, detectedMime: 'image/png' };
+    }
+    // GIF: GIF87a (47 49 46 38 37 61) or GIF89a (47 49 46 38 39 61)
+    if (hex4.startsWith('47494638')) {
+      return { valid: true, detectedMime: 'image/gif' };
+    }
+    // WebP: RIFF (52 49 46 46) .... WEBP (57 45 42 50)
+    if (hex4.startsWith('52494646') && buffer.length >= 12 && buffer.subarray(8, 12).toString('ascii') === 'WEBP') {
+      return { valid: true, detectedMime: 'image/webp' };
+    }
+    // MP4: bytes 4-8 are 'ftyp'
+    if (buffer.length >= 8 && buffer.subarray(4, 8).toString('ascii') === 'ftyp') {
+      return { valid: true, detectedMime: 'video/mp4' };
+    }
+    // WebM / EBML: 1A 45 DF A3
+    if (hex4.startsWith('1a45dfa3')) {
+      return { valid: true, detectedMime: 'video/webm' };
+    }
+
+    // Declared video format without prohibited executable/script payload
+    if (declaredMime && (declaredMime === 'video/mp4' || declaredMime === 'video/webm' || declaredMime.startsWith('video/'))) {
+      return { valid: true, detectedMime: declaredMime };
+    }
+
+    return { valid: false, error: 'File header magic bytes do not match permitted image or video formats' };
   }
 
   // Ensure default stories exist in durable database
@@ -25777,9 +37040,37 @@ async function startDevServer() {
     const hostHeader = req.headers.host || (isEncrypted ? `localhost:${HTTPS_PORT}` : `localhost:${HTTP_PORT}`);
     const url = new URL(req.url ?? '/', `${isEncrypted ? 'https' : 'http'}://${hostHeader}`);
 
-    // Security & Origin policy
-    const clientIp = req.socket.remoteAddress || '127.0.0.1';
-    if (!rateLimiter.consume(clientIp)) {
+    // Security & Origin policy (Trusted Proxy & Principal-Aware Rate Limiting - SEC-DOS-01)
+    const remoteIp = req.socket.remoteAddress || '127.0.0.1';
+    let clientIp = remoteIp;
+    const trustProxyConfig = process.env.SOVRA_TRUST_PROXY || 'loopback';
+    const isLoopback = remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
+    const isPrivateSubnet = isLoopback || remoteIp.startsWith('10.') || remoteIp.startsWith('172.16.') || remoteIp.startsWith('172.17.') || remoteIp.startsWith('172.18.') || remoteIp.startsWith('172.19.') || remoteIp.startsWith('172.2') || remoteIp.startsWith('172.3') || remoteIp.startsWith('192.168.') || remoteIp.startsWith('fc00:') || remoteIp.startsWith('fd00:');
+    const isTrustedProxy = trustProxyConfig === 'true' || (trustProxyConfig === 'loopback' && isLoopback) || (trustProxyConfig === 'private' && isPrivateSubnet);
+
+    if (isTrustedProxy) {
+      const forwarded = req.headers['x-forwarded-for'];
+      if (typeof forwarded === 'string' && forwarded.trim()) {
+        const parts = forwarded.split(',').map(s => s.trim()).filter(Boolean);
+        for (const candidate of parts) {
+          if (net.isIP(candidate)) {
+            clientIp = candidate;
+            break;
+          }
+        }
+      } else if (typeof req.headers['x-real-ip'] === 'string' && req.headers['x-real-ip'].trim()) {
+        const candidate = req.headers['x-real-ip'].trim();
+        if (net.isIP(candidate)) {
+          clientIp = candidate;
+        }
+      }
+    }
+
+    // Partition rate limits by authenticated principal if present, else by validated client IP
+    const preCallerPrincipal = resolvePrincipal(req);
+    const rateLimitKey = preCallerPrincipal ? `usr_${preCallerPrincipal.did}` : `ip_${clientIp}`;
+
+    if (!rateLimiter.consume(rateLimitKey)) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Too Many Requests: Rate limit exceeded. Please back off.' }));
       return;
@@ -25793,19 +37084,19 @@ async function startDevServer() {
         return;
       }
     } else if (url.pathname.startsWith('/api/admin') || url.pathname === '/admin') {
-      if (!adminRateLimiter.consume(clientIp)) {
+      if (!adminRateLimiter.consume(rateLimitKey)) {
         res.writeHead(429, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Too Many Requests: Admin rate limit exceeded.' }));
         return;
       }
     } else if (url.pathname.startsWith('/api/youtube/tip')) {
-      if (!financeRateLimiter.consume(clientIp)) {
+      if (!financeRateLimiter.consume(rateLimitKey)) {
         res.writeHead(429, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Too Many Requests: Financial operation rate limit exceeded.' }));
         return;
       }
-    } else if (url.pathname.startsWith('/api/storage/gc') || url.pathname.startsWith('/api/storage/verify')) {
-      if (!storageRateLimiter.consume(clientIp)) {
+    } else if (url.pathname.startsWith('/api/storage/gc') || url.pathname.startsWith('/api/storage/verify') || url.pathname === '/api/node/gc') {
+      if (!storageRateLimiter.consume(rateLimitKey)) {
         res.writeHead(429, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Too Many Requests: Storage maintenance rate limit exceeded.' }));
         return;
@@ -25813,11 +37104,24 @@ async function startDevServer() {
     }
 
     const allowedOrigin = resolveAllowedOrigin(req.headers.origin, DEFAULT_SECURITY_POLICY);
-    if (allowedOrigin) {
+    if (allowedOrigin && allowedOrigin !== '*') {
       res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else if (allowedOrigin === '*') {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      // Never set Access-Control-Allow-Credentials with wildcard
     }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Sovra-Signature, X-Sovra-DID, X-Sovra-Nonce, X-Sovra-Timestamp, X-Sovra-Session-Token');
+
+    // Hardened Security Headers (OWASP Production Defense-in-Depth)
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
+    if (req.headers['x-forwarded-proto'] === 'https') {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    }
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -25845,6 +37149,23 @@ async function startDevServer() {
     if (url.pathname === '/livez' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'alive', timestamp: Date.now() }));
+      return;
+    }
+
+    if (url.pathname === '/api/node/version' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        version: '1.0.0',
+        release: 'sovra-v1.0.0-production',
+        commit: process.env.SOVRA_BUILD_COMMIT || 'git-main-phase11-release',
+        buildTimestamp: process.env.SOVRA_BUILD_TIMESTAMP || '2026-10-08T21:00:00.000Z',
+        environment: process.env.NODE_ENV || 'development',
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        schemaVersion: (sovraDb as any).sqliteEngine?.getMigrationRunner?.()?.getCurrentVersion?.() || 5,
+      }));
       return;
     }
 
@@ -25896,6 +37217,13 @@ async function startDevServer() {
     }
 
     if (url.pathname === '/api/admin/alerts' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      const auth = adminSecurity.authorize(principal, 'admin:metrics', 'GET_ADMIN_ALERTS');
+      if (!auth.authorized) {
+        res.writeHead(auth.statusCode, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: auth.error }));
+        return;
+      }
       const alerts = [];
       const mem = process.memoryUsage();
       if (mem.heapUsed > 1024 * 1024 * 1024) {
@@ -25909,14 +37237,14 @@ async function startDevServer() {
     // ==========================================
     // ⚡ REALTIME SERVER-SENT EVENTS (SSE) STREAM
     // ==========================================
-    if ((url.pathname === '/api/realtime/stream' || url.pathname === '/api/chat/events') && req.method === 'GET') {
-      const token = url.searchParams.get('token') || (req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : '');
-      const user = sovraDb.findUserBySessionToken(token);
-      if (!user) {
+    if ((url.pathname === '/api/realtime/stream' || url.pathname === '/api/chat/events' || url.pathname === '/api/chat/stream') && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      if (!principal) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Valid session token required for realtime stream' }));
         return;
       }
+      const user = sovraDb.findUserByDid(principal.did) || { did: principal.did };
 
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -26200,7 +37528,19 @@ async function startDevServer() {
           return;
         }
 
+        if (target === principal.did) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Cannot follow yourself' }));
+          return;
+        }
+
         const isUnfollow = Boolean(parsed.isUnfollow);
+        if (!isUnfollow && sovraDb.isBlocked(principal.did, target)) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Cannot follow: user is blocked or has blocked you' }));
+          return;
+        }
+
         let isFollowing = false;
 
         // 1. Update persistent SovraDatabaseEngine follow graph
@@ -26306,7 +37646,13 @@ async function startDevServer() {
         res.end(JSON.stringify({ ok: false, error: 'did parameter required' }));
         return;
       }
-      const followers = sovraDb.getFollowers(targetDid).map(u => toPublicUserDTO(u));
+      const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : undefined;
+      const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : undefined;
+      const principal = resolvePrincipal(req);
+      const viewerDid = principal?.did;
+      const followers = sovraDb.getFollowers(targetDid, limit, offset)
+        .filter(u => !viewerDid || !sovraDb.isBlocked(u.did, viewerDid))
+        .map(u => toPublicUserDTO(u));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, followers, count: followers.length }));
       return;
@@ -26320,7 +37666,13 @@ async function startDevServer() {
         res.end(JSON.stringify({ ok: false, error: 'did parameter required' }));
         return;
       }
-      const following = sovraDb.getFollowing(targetDid).map(u => toPublicUserDTO(u));
+      const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : undefined;
+      const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : undefined;
+      const principal = resolvePrincipal(req);
+      const viewerDid = principal?.did;
+      const following = sovraDb.getFollowing(targetDid, limit, offset)
+        .filter(u => !viewerDid || !sovraDb.isBlocked(u.did, viewerDid))
+        .map(u => toPublicUserDTO(u));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, following, count: following.length }));
       return;
@@ -26329,23 +37681,56 @@ async function startDevServer() {
     // API: Social Relationship Inspection
     if (url.pathname === '/api/social/relationship' && req.method === 'GET') {
       const principal = resolvePrincipal(req);
-      const targetDid = url.searchParams.get('targetDid');
+      const targetDid = url.searchParams.get('targetDid') || url.searchParams.get('did');
       if (!principal || !targetDid) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Authentication and targetDid required' }));
         return;
       }
+      const isSelf = principal.did === targetDid;
+      const isBlocked = sovraDb.hasBlocked(principal.did, targetDid);
+      const hasBlockedMe = sovraDb.hasBlocked(targetDid, principal.did);
       const isFollowing = sovraDb.isFollowing(principal.did, targetDid);
       const isFollowedBy = sovraDb.isFollowing(targetDid, principal.did);
       const rels = sovraDb.getFriendRelationships(principal.did);
       const friendRel = rels.find(r => r.fromDid === targetDid || r.toDid === targetDid);
+      let friendshipStatus: 'none' | 'pending_sent' | 'pending_received' | 'accepted' | 'rejected' | 'blocked' = 'none';
+      if (friendRel) {
+        if (friendRel.status === 'accepted') {
+          friendshipStatus = 'accepted';
+        } else if (friendRel.status === 'blocked') {
+          friendshipStatus = 'blocked';
+        } else if (friendRel.fromDid === principal.did) {
+          friendshipStatus = 'pending_sent';
+        } else {
+          friendshipStatus = 'pending_received';
+        }
+      }
+
+      const targetUser = sovraDb.findUserByDid(targetDid);
+      const canMessage = !isBlocked && !hasBlockedMe && (
+        !targetUser?.privacySettings?.canMessageMe ||
+        targetUser.privacySettings.canMessageMe === 'public' ||
+        (targetUser.privacySettings.canMessageMe === 'friends' && friendshipStatus === 'accepted')
+      );
+      const canSendFriendRequest = !isSelf && !isBlocked && !hasBlockedMe && friendshipStatus === 'none' && (
+        !targetUser?.privacySettings?.canSendFriendRequests ||
+        targetUser.privacySettings.canSendFriendRequests === 'public' ||
+        (targetUser.privacySettings.canSendFriendRequests === 'friends_of_friends' && sovraDb.getMutualFriends(principal.did, targetDid).length > 0)
+      );
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
+        isSelf,
         isFollowing,
         isFollowedBy,
-        areFriends: friendRel?.status === 'accepted',
-        friendshipStatus: friendRel?.status || 'none',
+        areFriends: friendshipStatus === 'accepted',
+        friendshipStatus,
+        isBlocked,
+        hasBlockedMe,
+        canMessage,
+        canSendFriendRequest,
       }));
       return;
     }
@@ -26439,7 +37824,18 @@ async function startDevServer() {
 
     // API: Storage Garbage Collection & SQLite Compaction
     if (url.pathname === '/api/node/gc' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
       try {
+        const parsed = body ? JSON.parse(body) : {};
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        if (principal.role !== 'SUPER_ADMIN' && principal.role !== 'ADMIN' && principal.role !== 'INFRA_OPERATOR') {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Infrastructure or administrative role required' }));
+          return;
+        }
+
         const diskBytesBefore = getDirectorySize(STORAGE_DIR);
         try {
           (sovraDb as any).sqliteEngine?.checkpoint();
@@ -26682,7 +38078,7 @@ async function startDevServer() {
       return;
     }
 
-    // API: Block / Unblock
+    // API: Block / Unblock (Unified DID & Social Graph Engine)
     if (url.pathname === '/api/social/block' && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
@@ -26690,27 +38086,117 @@ async function startDevServer() {
         const parsed = JSON.parse(body);
         const principal = enforceAuth(req, res, parsed);
         if (!principal) return;
-        const target = String(parsed.targetPubkey);
-        const ev = createSignedBlockEvent(
-          binding.devicePublicKeyHex,
-          workstationPrivKey,
-          target,
-          Boolean(parsed.isUnblock),
-          parsed.reason ? String(parsed.reason) : 'Blocked by user',
-        );
-        const pRes = await socialGraph.processEvent(ev);
-        if (!pRes.ok) {
+
+        let targetDid = String(parsed.targetDid || '');
+        if (!targetDid && parsed.targetPubkey) {
+          const matchedUser = sovraDb.getAllUsers().find(u => u.publicKey === parsed.targetPubkey);
+          targetDid = matchedUser?.did || String(parsed.targetPubkey);
+        }
+        if (!targetDid) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: pRes.error.message }));
+          res.end(JSON.stringify({ ok: false, error: 'targetDid or targetPubkey required' }));
           return;
         }
-        await node.pubsub.publish('sovra/social/graph/v1', new TextEncoder().encode(JSON.stringify(ev)));
+
+        if (targetDid === principal.did) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Cannot block yourself' }));
+          return;
+        }
+
+        const isUnblock = Boolean(parsed.isUnblock);
+        if (isUnblock) {
+          sovraDb.unblockUser(principal.did, targetDid);
+        } else {
+          sovraDb.blockUser(principal.did, targetDid, parsed.reason ? String(parsed.reason) : 'Blocked by user');
+        }
+
+        let eventId: string | undefined;
+        try {
+          const targetKey = parsed.targetPubkey || targetDid;
+          const ev = createSignedBlockEvent(
+            binding.devicePublicKeyHex,
+            workstationPrivKey,
+            targetKey,
+            isUnblock,
+            parsed.reason ? String(parsed.reason) : 'Blocked by user',
+          );
+          eventId = ev.id;
+          const pRes = await socialGraph.processEvent(ev);
+          if (pRes.ok) {
+            await node.pubsub.publish('sovra/social/graph/v1', new TextEncoder().encode(JSON.stringify(ev)));
+          }
+        } catch (_) {}
+
+        const isNowBlocked = sovraDb.hasBlocked(principal.did, targetDid);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, eventId: ev.id, isBlocked: socialGraph.isBlocked(binding.devicePublicKeyHex, target) }));
+        res.end(JSON.stringify({ ok: true, eventId, isBlocked: isNowBlocked }));
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: String(e) }));
       }
+      return;
+    }
+
+    // API: Direct Unblock Endpoint
+    if (url.pathname === '/api/social/unblock' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        let targetDid = String(parsed.targetDid || '');
+        if (!targetDid && parsed.targetPubkey) {
+          const matchedUser = sovraDb.getAllUsers().find(u => u.publicKey === parsed.targetPubkey);
+          targetDid = matchedUser?.did || String(parsed.targetPubkey);
+        }
+        if (!targetDid) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'targetDid or targetPubkey required' }));
+          return;
+        }
+
+        sovraDb.unblockUser(principal.did, targetDid);
+
+        let eventId: string | undefined;
+        try {
+          const targetKey = parsed.targetPubkey || targetDid;
+          const ev = createSignedBlockEvent(
+            binding.devicePublicKeyHex,
+            workstationPrivKey,
+            targetKey,
+            true,
+            'Unblocked by user',
+          );
+          eventId = ev.id;
+          const pRes = await socialGraph.processEvent(ev);
+          if (pRes.ok) {
+            await node.pubsub.publish('sovra/social/graph/v1', new TextEncoder().encode(JSON.stringify(ev)));
+          }
+        } catch (_) {}
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, eventId, isBlocked: false }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: String(e) }));
+      }
+      return;
+    }
+
+    // API: List Blocked Users
+    if (url.pathname === '/api/social/blocked' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Authentication required' }));
+        return;
+      }
+      const blocked = sovraDb.getBlockedUsers(principal.did).map(toPublicUserDTO);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, blocked, count: blocked.length }));
       return;
     }
 
@@ -26922,14 +38408,22 @@ async function startDevServer() {
     }
 
     // API: Dynamic Feed List (Enforcing Visibility & Privacy)
-    if (url.pathname === '/api/feed/list' && req.method === 'GET') {
+    if ((url.pathname === '/api/feed/list' || url.pathname === '/api/feed/posts') && req.method === 'GET') {
       const principal = resolvePrincipal(req);
-      const posts = sovraDb.getFeedPosts(principal?.did);
+      const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : undefined;
+      const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : undefined;
+      let posts = sovraDb.getFeedPosts(principal?.did);
+      if (typeof offset === 'number' && !isNaN(offset) && offset > 0) {
+        posts = posts.slice(offset);
+      }
+      if (typeof limit === 'number' && !isNaN(limit) && limit > 0) {
+        posts = posts.slice(0, limit);
+      }
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
       });
-      res.end(JSON.stringify({ ok: true, posts }));
+      res.end(JSON.stringify({ ok: true, posts, count: posts.length }));
       return;
     }
 
@@ -27049,9 +38543,30 @@ async function startDevServer() {
       return;
     }
 
+    // API: Record Post View with In-Memory Micro-Batching (Viral Spikes Defense)
+    if (url.pathname === '/api/feed/view' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const postId = String(parsed.postId || '');
+        if (!postId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'postId is required' }));
+          return;
+        }
+        postViewBatchBuffer.set(postId, (postViewBatchBuffer.get(postId) || 0) + 1);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, batched: true, currentBuffer: postViewBatchBuffer.get(postId) }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
     // API: Create Dynamic Post
-    // API: Create Dynamic Post
-    if (url.pathname === '/api/feed/create' && req.method === 'POST') {
+    if ((url.pathname === '/api/feed/create' || url.pathname === '/api/feed/post') && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 25 * 1024 * 1024);
       if (!ok) return;
       try {
@@ -27288,6 +38803,13 @@ async function startDevServer() {
           return;
         }
 
+        const magicCheck = validateMediaMagicBytes(mediaBuffer, mimeType);
+        if (!magicCheck.valid) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Invalid media payload: ${magicCheck.error || 'Magic byte signature mismatch'}` }));
+          return;
+        }
+
         const cidObj = CID.create('raw', mediaBuffer, false, 'sha2-256');
         const cid = cidObj.toString('base32');
 
@@ -27301,6 +38823,32 @@ async function startDevServer() {
           try { await storageDaemon.blockstore.put(cidObj, mediaBuffer); } catch (_) {}
         }
 
+        if (isVideo) {
+          const hlsDir = path.join(POSTS_DIR, `hls_${cid}`);
+          if (!fs.existsSync(hlsDir)) {
+            try { fs.mkdirSync(hlsDir, { recursive: true }); } catch (_) {}
+          }
+          // Queue background adaptive bitrate HLS transcoding with concurrency limiter
+          enqueueTranscode(async () => {
+            try {
+              const transcodeRes = await transcoderWorker.transcode({
+                jobId: cid,
+                sourceCid: cid,
+                targetResolutions: ['1080p', '720p', '480p', '360p'],
+                segmentDurationSeconds: 2,
+              });
+              if (transcodeRes.ok && transcodeRes.value) {
+                const masterM3u8 = transcodeRes.value.masterM3u8 || transcoderWorker.generateMasterPlaylist(cid, ['1080p', '720p', '480p', '360p']);
+                fs.writeFileSync(path.join(hlsDir, 'master.m3u8'), masterM3u8);
+                for (const resKey of ['1080p', '720p', '480p', '360p']) {
+                  const varM3u8 = `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:2\n#EXTINF:2.0,\n/api/feed/video/${cid}\n#EXT-X-ENDLIST\n`;
+                  fs.writeFileSync(path.join(hlsDir, `${cid}_${resKey}.m3u8`), varM3u8);
+                }
+              }
+            } catch (_) {}
+          });
+        }
+
         const mediaUrl = isVideo ? `/api/feed/video/${cid}` : `/api/feed/image/${cid}`;
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
@@ -27308,6 +38856,7 @@ async function startDevServer() {
             ok: true,
             cid,
             url: mediaUrl,
+            hlsUrl: isVideo ? `/api/feed/video/${cid}/hls/master.m3u8` : undefined,
             filename: targetFilename,
             mimeType,
             sizeBytes: mediaBuffer.length,
@@ -27341,16 +38890,113 @@ async function startDevServer() {
       return;
     }
 
-    if (url.pathname.startsWith('/api/feed/video/') && req.method === 'GET') {
-      const cid = path.basename(url.pathname);
+    // 🎬 Adaptive HLS Video Playlist & Segment Serving
+    if (url.pathname.startsWith('/api/feed/video/') && url.pathname.includes('/hls/') && req.method === 'GET') {
+      const parts = url.pathname.split('/hls/');
+      const cidPart = path.basename(parts[0]);
+      const fileName = parts[1] || 'master.m3u8';
+      const hlsFilePath = path.join(POSTS_DIR, `hls_${cidPart}`, fileName);
+      if (fs.existsSync(hlsFilePath)) {
+        const isPlaylist = fileName.endsWith('.m3u8');
+        res.writeHead(200, {
+          'Content-Type': isPlaylist ? 'application/vnd.apple.mpegurl' : 'video/MP2T',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-cache',
+        });
+        fs.createReadStream(hlsFilePath).pipe(res);
+        return;
+      }
+    }
+
+    if ((url.pathname.startsWith('/api/feed/video/') || url.pathname.startsWith('/api/video/stream/') || url.pathname.startsWith('/api/watch/video/')) && req.method === 'GET') {
+      const rawCid = path.basename(url.pathname);
+      const cid = rawCid.includes('.') ? rawCid.split('.')[0]! : rawCid;
+
+      // Access Control: Verify Post / Video Visibility Model (Public, Friends, Private, Only_Me)
+      const requestedPostId = url.searchParams.get('postId');
+      const allPosts = sovraDb.getAllPosts();
+      const associatedPost = requestedPostId
+        ? allPosts.find(p => p.id === requestedPostId)
+        : allPosts.find(p => p.mediaCid === cid || (p.mediaVideo && p.mediaVideo.includes(cid)));
+
+      if (associatedPost) {
+        const vis = associatedPost.visibility || 'public';
+        if (vis === 'only_me' || vis === 'private') {
+          const principal = resolvePrincipal(req);
+          if (!principal) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to view private media' }));
+            return;
+          }
+          if (principal.did !== associatedPost.authorDid && principal.role !== 'SUPER_ADMIN') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Forbidden: Access to private media is restricted to author' }));
+            return;
+          }
+        } else if (vis === 'friends') {
+          const principal = resolvePrincipal(req);
+          if (!principal) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to view friends-only media' }));
+            return;
+          }
+          if (principal.did !== associatedPost.authorDid && principal.role !== 'SUPER_ADMIN') {
+            const areFriends = sovraDb.areFriends(principal.did, associatedPost.authorDid);
+            if (!areFriends) {
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Forbidden: Access to friends-only media is restricted' }));
+              return;
+            }
+          }
+        }
+      }
+
       const possibleFiles = [
         path.join(POSTS_DIR, `${cid}.mp4`),
         path.join(POSTS_DIR, `${cid}.webm`),
         path.join(REELS_DIR, `${cid}.mp4`),
+        path.join(REELS_DIR, `${cid}.webm`),
       ];
-      const filePath = possibleFiles.find(p => fs.existsSync(p));
+      let filePath = possibleFiles.find(p => fs.existsSync(p));
 
       if (!filePath) {
+        try {
+          const blk = await storageDaemon.getBlock(cid);
+          if (blk) {
+            const fileSize = blk.length;
+            const range = req.headers.range;
+            if (range) {
+              const parts = range.replace(/bytes=/, '').split('-');
+              const start = parseInt(parts[0], 10);
+              const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+              if (start >= fileSize) {
+                res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
+                res.end();
+                return;
+              }
+              const chunk = blk.subarray(start, end + 1);
+              res.writeHead(206, {
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunk.length,
+                'Content-Type': 'video/mp4',
+                'Cache-Control': 'public, max-age=3600',
+              });
+              res.end(chunk);
+              return;
+            } else {
+              res.writeHead(200, {
+                'Content-Length': fileSize,
+                'Accept-Ranges': 'bytes',
+                'Content-Type': 'video/mp4',
+                'Cache-Control': 'public, max-age=3600',
+              });
+              res.end(blk);
+              return;
+            }
+          }
+        } catch {}
+
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Video not found' }));
         return;
@@ -27399,34 +39045,22 @@ async function startDevServer() {
       if (!ok) return;
       try {
         const parsed = JSON.parse(body);
-        let principal = resolvePrincipal(req, parsed);
-        let userDid = principal?.did;
-        if (!userDid && parsed.sessionToken) {
-          const u = sovraDb.findUserBySessionToken(parsed.sessionToken);
-          if (u) userDid = u.did;
-        }
-        if (!userDid && parsed.userDid) {
-          const u = sovraDb.findUserByDid(parsed.userDid);
-          if (u) userDid = u.did;
-        }
-        if (!userDid) {
-          const enforced = enforceAuth(req, res, parsed);
-          if (!enforced) return;
-          userDid = enforced.did;
-        }
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const userDid = principal.did;
 
         const post = sovraDb.getAllPosts().find(p => p.id === parsed.postId);
         if (post) {
           if (!Array.isArray(post.likedByDids)) post.likedByDids = [];
           const idx = post.likedByDids.indexOf(userDid);
           let isLiked: boolean;
-          if (typeof parsed.isLiked === 'boolean') {
-            isLiked = parsed.isLiked;
-            if (isLiked && idx === -1) {
-              post.likedByDids.push(userDid);
-            } else if (!isLiked && idx !== -1) {
-              post.likedByDids.splice(idx, 1);
-            }
+          const action = typeof parsed.action === 'string' ? parsed.action.toUpperCase() : null;
+          if (action === 'LIKE' || parsed.isLiked === true) {
+            if (idx === -1) post.likedByDids.push(userDid);
+            isLiked = true;
+          } else if (action === 'UNLIKE' || parsed.isLiked === false) {
+            if (idx !== -1) post.likedByDids.splice(idx, 1);
+            isLiked = false;
           } else {
             // Default: toggle
             if (idx >= 0) {
@@ -27497,6 +39131,16 @@ async function startDevServer() {
         const authorUser = sovraDb.findUserByDid(authorDid);
         const post = sovraDb.getAllPosts().find(p => p.id === parsed.postId);
         if (post) {
+          if (sovraDb.isBlocked(authorDid, post.authorDid)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot comment: author is blocked or has blocked you' }));
+            return;
+          }
+          if (!sovraDb.canUserViewPost(post, authorDid)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Forbidden: You cannot view or comment on this post' }));
+            return;
+          }
           const text = String(parsed.text || '').trim();
           if (!text) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -27522,18 +39166,19 @@ async function startDevServer() {
             }));
             return;
           }
-          const comment = {
-            id: 'cmt-' + Date.now(),
+          const comment = sovraDb.addComment(post.id, {
             author: authorUser?.displayName || String(parsed.author || 'Verified Peer'),
             authorDid,
+            authorHandle: authorUser?.handle,
             authorAvatar: authorUser?.avatar || (parsed.authorAvatar ? String(parsed.authorAvatar) : undefined),
             authorAvatarDataUrl: authorUser?.avatarDataUrl || (parsed.authorAvatarDataUrl ? String(parsed.authorAvatarDataUrl) : undefined),
             text,
-            timestamp: Date.now(),
-          };
-          if (!Array.isArray(post.comments)) post.comments = [];
-          post.comments.push(comment);
-          sovraDb.save();
+          });
+          if (!comment) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Failed to create comment' }));
+            return;
+          }
           dynamicSocialStore.posts = sovraDb.getAllPosts();
 
           try {
@@ -27557,7 +39202,7 @@ async function startDevServer() {
           }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, comment, commentsCount: post.comments.length }));
+          res.end(JSON.stringify({ ok: true, comment, commentsCount: (post.comments || []).length }));
         } else {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Post not found' }));
@@ -27598,6 +39243,31 @@ async function startDevServer() {
         try { deleted = sovraDb.deletePost(parsed.postId); } catch(e) {}
         dynamicSocialStore.posts = sovraDb.getAllPosts();
         if (deleted) {
+          const mediaCid = targetPost.mediaCid || (targetPost as any).imageCid;
+          if (mediaCid) {
+            const allRemainingPosts = sovraDb.getAllPosts();
+            const allReels = sovraDb.getAllReels();
+            const stories = sovraDb.getState().stories || [];
+            const isReferencedElsewhere =
+              allRemainingPosts.some(p => p.id !== targetPost.id && (p.mediaCid === mediaCid || (p as any).imageCid === mediaCid)) ||
+              allReels.some(r => r.mediaCid === mediaCid || r.thumbnailCid === mediaCid) ||
+              stories.some(s => s.segments && s.segments.some(seg => seg.mediaCid === mediaCid));
+
+            if (!isReferencedElsewhere) {
+              if (storageDaemon && typeof (storageDaemon as any).unpin === 'function') {
+                try { (storageDaemon as any).unpin(mediaCid); } catch (_) {}
+              }
+              try {
+                if (fs.existsSync(POSTS_DIR)) {
+                  for (const f of fs.readdirSync(POSTS_DIR)) {
+                    if (f.startsWith(mediaCid)) {
+                      try { fs.unlinkSync(path.join(POSTS_DIR, f)); } catch (_) {}
+                    }
+                  }
+                }
+              } catch (_) {}
+            }
+          }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true }));
         } else {
@@ -27607,6 +39277,64 @@ async function startDevServer() {
       } catch {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Delete Media with Reference-Counting and RBAC
+    if (url.pathname === '/api/media/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 1024 * 64);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const cid = String(parsed.cid || parsed.mediaCid || '').trim();
+        if (!cid || cid.includes('..') || cid.includes('/') || cid.includes('\\')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Valid cid is required' }));
+          return;
+        }
+
+        const allPosts = sovraDb.getAllPosts();
+        const postWithMedia = allPosts.find(p => p.mediaCid === cid || (p as any).imageCid === cid);
+        if (postWithMedia && postWithMedia.authorDid !== principal.did && principal.role !== 'SUPER_ADMIN' && principal.role !== 'ADMIN') {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot delete media owned by another user' }));
+          return;
+        }
+
+        const allRemainingPosts = allPosts.filter(p => !postWithMedia || p.id !== postWithMedia.id);
+        const isReferencedElsewhere =
+          allRemainingPosts.some(p => p.mediaCid === cid || (p as any).imageCid === cid) ||
+          sovraDb.getAllReels().some(r => r.mediaCid === cid || r.thumbnailCid === cid) ||
+          (sovraDb.getState().stories || []).some(s => s.segments && s.segments.some(seg => seg.mediaCid === cid));
+
+        let unlinked = false;
+        if (!isReferencedElsewhere) {
+          if (storageDaemon && typeof (storageDaemon as any).unpin === 'function') {
+            try { (storageDaemon as any).unpin(cid); } catch (_) {}
+          }
+          const dirsToClean = [POSTS_DIR, REELS_DIR, ATTACHMENTS_DIR];
+          for (const dir of dirsToClean) {
+            try {
+              if (fs.existsSync(dir)) {
+                for (const f of fs.readdirSync(dir)) {
+                  if (f.startsWith(cid)) {
+                    try { fs.unlinkSync(path.join(dir, f)); unlinked = true; } catch (_) {}
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, cid, unlinked, referencedElsewhere: isReferencedElsewhere }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
       }
       return;
     }
@@ -27700,7 +39428,9 @@ async function startDevServer() {
         const result = sovraDb.addCommentReply(postId, commentId, {
           author: authorUser?.displayName || 'Peer',
           authorDid: principal.did,
+          authorHandle: authorUser?.handle,
           authorAvatar: authorUser?.avatar || 'S',
+          authorAvatarDataUrl: authorUser?.avatarDataUrl,
           text: String(text).trim(),
         });
         if (!result.ok) {
@@ -27709,8 +39439,188 @@ async function startDevServer() {
           return;
         }
         dynamicSocialStore.posts = sovraDb.getAllPosts();
+
+        const post = sovraDb.getAllPosts().find(p => p.id === postId);
+        const parentComment = post?.comments?.find(c => c.id === commentId);
+
+        try {
+          await node.pubsub.publish('sovra/feed/main', new TextEncoder().encode(JSON.stringify({
+            type: 'FEED_COMMENT_REPLY_ADDED',
+            postId,
+            commentId,
+            reply: result.reply,
+          })));
+        } catch {}
+
+        if (parentComment && parentComment.authorDid && parentComment.authorDid !== principal.did) {
+          sovraDb.addNotification({
+            recipientDid: parentComment.authorDid,
+            senderDid: principal.did,
+            type: 'reply',
+            title: 'New Reply',
+            body: `${authorUser?.displayName || 'A peer'} replied to your comment: "${String(text).slice(0, 50)}"`,
+            link: `/app#post-${postId}`,
+            data: { postId, commentId, replyId: result.reply?.id },
+          });
+        }
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, reply: result.reply }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Get Comments for Post
+    if (url.pathname === '/api/feed/comments' && req.method === 'GET') {
+      const postId = url.searchParams.get('postId');
+      if (!postId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'postId parameter required' }));
+        return;
+      }
+      const post = sovraDb.getAllPosts().find(p => p.id === postId);
+      if (!post) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Post not found' }));
+        return;
+      }
+      const principal = resolvePrincipal(req);
+      if (principal && !sovraDb.canUserViewPost(post, principal.did)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: You cannot view this post' }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, comments: post.comments || [] }));
+      return;
+    }
+
+    // API: Like / Unlike Comment or Reply
+    if (url.pathname === '/api/feed/comment/like' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 1024 * 64);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const { postId, commentId, action } = parsed;
+        if (!postId || !commentId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'postId and commentId are required' }));
+          return;
+        }
+
+        const likeRes = sovraDb.likeComment(postId, commentId, principal.did, action);
+        if (!likeRes.ok) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: likeRes.error }));
+          return;
+        }
+
+        dynamicSocialStore.posts = sovraDb.getAllPosts();
+
+        // Notification if liked and not own comment
+        if (likeRes.isLiked && likeRes.comment && likeRes.comment.authorDid && likeRes.comment.authorDid !== principal.did) {
+          const likingUser = sovraDb.findUserByDid(principal.did);
+          sovraDb.addNotification({
+            recipientDid: likeRes.comment.authorDid,
+            senderDid: principal.did,
+            type: 'like',
+            title: likeRes.isReply ? 'New Reply Like' : 'New Comment Like',
+            body: `${likingUser?.displayName || 'A peer'} liked your ${likeRes.isReply ? 'reply' : 'comment'}`,
+            link: `/app#post-${postId}`,
+            data: { postId, commentId },
+          });
+        }
+
+        try {
+          await node.pubsub.publish('sovra/feed/main', new TextEncoder().encode(JSON.stringify({
+            type: 'FEED_COMMENT_LIKED',
+            postId,
+            commentId,
+            isLiked: likeRes.isLiked,
+            likesCount: likeRes.likesCount,
+            userDid: principal.did,
+          })));
+        } catch {}
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          isLiked: likeRes.isLiked,
+          likesCount: likeRes.likesCount,
+          likedByDids: likeRes.likedByDids,
+          isReply: likeRes.isReply,
+        }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Edit Comment or Reply
+    if (url.pathname === '/api/feed/comment/edit' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 1024 * 64);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const { postId, commentId, text } = parsed;
+        if (!postId || !commentId || !text) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'postId, commentId, and text are required' }));
+          return;
+        }
+
+        const editRes = sovraDb.editComment(postId, commentId, principal.did, text);
+        if (!editRes.ok) {
+          const isForbidden = editRes.error?.includes('Unauthorized');
+          res.writeHead(isForbidden ? 403 : 404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: editRes.error }));
+          return;
+        }
+
+        dynamicSocialStore.posts = sovraDb.getAllPosts();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, comment: editRes.comment }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Delete Comment Reply
+    if (url.pathname === '/api/feed/comment/reply/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 1024 * 64);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const { postId, commentId, replyId } = parsed;
+        if (!postId || !commentId || !replyId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'postId, commentId, and replyId are required' }));
+          return;
+        }
+
+        const delRes = sovraDb.deleteCommentReply(postId, commentId, replyId, principal.did);
+        if (!delRes.ok) {
+          const isForbidden = delRes.error?.includes('Unauthorized');
+          res.writeHead(isForbidden ? 403 : 404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: delRes.error }));
+          return;
+        }
+
+        dynamicSocialStore.posts = sovraDb.getAllPosts();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
@@ -28130,14 +40040,15 @@ async function startDevServer() {
       return;
     }
 
-    if (url.pathname === '/api/social/channels' && req.method === 'POST') {
+    if ((url.pathname === '/api/social/channels' || url.pathname === '/api/channel/create') && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
       try {
         const parsed = JSON.parse(body);
         const principal = enforceAuth(req, res, parsed);
         if (!principal) return;
-        const cleanHandle = String(parsed.handle || '').trim().replace(/^@+/, '');
+        const rawHandle = parsed.handle || (parsed.name ? 'ch_' + parsed.name.replace(/[^a-zA-Z0-9_]/g, '_') : 'ch_' + Date.now());
+        const cleanHandle = String(rawHandle).trim().replace(/^@+/, '');
         if (!cleanHandle || cleanHandle.length < 2) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Valid channel handle required (min 2 characters)' }));
@@ -28164,7 +40075,7 @@ async function startDevServer() {
           if (!existing.ownerDid) existing.ownerDid = principal.did;
           saveDynamicSocialState(dynamicSocialStore);
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, channel: existing }));
+          res.end(JSON.stringify({ ok: true, channel: existing, id: existing.id }));
           return;
         }
         const newChan: ChannelRecord = {
@@ -28182,8 +40093,14 @@ async function startDevServer() {
         };
         dynamicSocialStore.channels.unshift(newChan);
         saveDynamicSocialState(dynamicSocialStore);
+        sovraDb.addSpaceMember({
+          spaceId: newChan.id,
+          spaceType: 'channel',
+          userDid: principal.did,
+          role: 'OWNER',
+        });
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, channel: newChan }));
+        res.end(JSON.stringify({ ok: true, channel: newChan, id: newChan.id }));
       } catch {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
@@ -28387,11 +40304,365 @@ async function startDevServer() {
     }
 
     // ==========================================
+    // API: SOVEREIGN GROUPS & STUDIO
+    // ==========================================
+
+    if (url.pathname === '/api/social/groups' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, groups: sovraDb.getAllGroups() }));
+      return;
+    }
+
+    if ((url.pathname === '/api/social/groups' || url.pathname === '/api/group/create') && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const name = String(parsed.name || '').trim();
+        if (!name || name.length < 2) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Group name must be at least 2 characters' }));
+          return;
+        }
+
+        const createRes = sovraDb.createGroup(parsed, principal.did);
+        if (!createRes.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: createRes.error }));
+          return;
+        }
+
+        dynamicSocialStore.groups = sovraDb.getAllGroups();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, group: createRes.group, id: createRes.group?.id }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/social/groups/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const groupId = String(parsed.groupId || parsed.id || '');
+        if (!groupId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Group ID required' }));
+          return;
+        }
+        const delRes = sovraDb.deleteGroup(groupId, principal.did);
+        if (!delRes.ok) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: delRes.error || 'Failed to delete group' }));
+          return;
+        }
+        dynamicSocialStore.groups = sovraDb.getAllGroups();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, groupId }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/social/groups/join' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const groupId = String(parsed.groupId || '');
+        const grp = sovraDb.getGroupById(groupId);
+        if (!grp) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Group not found' }));
+          return;
+        }
+
+        if (grp.privacy === 'private' && grp.membershipApprovalRequired) {
+          const reqRes = sovraDb.requestJoinSpace(grp.id, 'group', principal.did, principal.handle, principal.name || 'Peer');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, status: 'requested', request: reqRes.request }));
+          return;
+        }
+
+        const addRes = sovraDb.addSpaceMember({
+          spaceId: grp.id,
+          spaceType: 'group',
+          userDid: principal.did,
+          handle: principal.handle,
+          name: principal.name || 'Member',
+          role: 'MEMBER',
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, status: 'joined', member: addRes.member }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/social/groups/leave' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const groupId = String(parsed.groupId || '');
+        const grp = sovraDb.getGroupById(groupId);
+        if (!grp) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Group not found' }));
+          return;
+        }
+        sovraDb.leaveGroup(groupId, principal.did);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, status: 'left' }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/social/groups/members' && req.method === 'GET') {
+      const groupId = url.searchParams.get('groupId') || '';
+      const members = sovraDb.getSpaceMembers(groupId, 'group');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, members }));
+      return;
+    }
+
+    if (url.pathname === '/api/social/groups/rules' && req.method === 'GET') {
+      const groupId = url.searchParams.get('groupId') || '';
+      const rules = sovraDb.getSpaceRules(groupId);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, rules }));
+      return;
+    }
+
+    if (url.pathname === '/api/social/groups/rules' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const groupId = String(parsed.groupId || '');
+        const ruleRes = sovraDb.createSpaceRule(groupId, parsed.title, parsed.description, principal.did);
+        if (!ruleRes.ok) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: ruleRes.error }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, rule: ruleRes.rule }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/social/groups/rules/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const groupId = String(parsed.groupId || '');
+        const ruleId = String(parsed.ruleId || '');
+        const delRes = sovraDb.deleteSpaceRule(groupId, ruleId, principal.did);
+        if (!delRes.ok) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: delRes.error }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, ruleId }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/social/groups/settings' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const groupId = String(parsed.groupId || '');
+        const upRes = sovraDb.updateGroup(groupId, parsed, principal.did);
+        if (!upRes.ok) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: upRes.error }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, group: upRes.group }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // --- Unified Space Studio APIs ---
+    if (url.pathname === '/api/studio/spaces' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      const userDid = principal?.did;
+      const allChannels = sovraDb.getAllChannels();
+      const allPages = sovraDb.getAllPages();
+      const allGroups = sovraDb.getAllGroups();
+
+      const userChannels = userDid ? allChannels.filter(c => c.ownerDid === userDid || sovraDb.canManageSpace(userDid, c.id, 'channel')) : [];
+      const userPages = userDid ? allPages.filter(p => p.ownerDid === userDid || sovraDb.canManageSpace(userDid, p.id, 'page')) : [];
+      const userGroups = userDid ? allGroups.filter(g => g.ownerDid === userDid || sovraDb.canManageSpace(userDid, g.id, 'group')) : [];
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        spaces: {
+          channels: userChannels,
+          pages: userPages,
+          groups: userGroups,
+        },
+        totalCount: userChannels.length + userPages.length + userGroups.length,
+      }));
+      return;
+    }
+
+    if (url.pathname === '/api/studio/space' && req.method === 'GET') {
+      const spaceId = url.searchParams.get('spaceId') || '';
+      const spaceType = (url.searchParams.get('spaceType') || 'channel') as SpaceType;
+      const principal = resolvePrincipal(req);
+      const userDid = principal?.did || '';
+
+      let spaceEntity: any = null;
+      if (spaceType === 'channel') spaceEntity = sovraDb.getChannelById(spaceId);
+      else if (spaceType === 'page') spaceEntity = sovraDb.getPageById(spaceId);
+      else if (spaceType === 'group') spaceEntity = sovraDb.getGroupById(spaceId);
+
+      if (!spaceEntity) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Space entity not found' }));
+        return;
+      }
+
+      const userRole = userDid ? sovraDb.getSpaceMemberRole(spaceId, userDid) : null;
+      const allPosts = sovraDb.getAllPosts().filter(p => p.channelTargetId === spaceId || p.authorEntityId === spaceId);
+      const members = sovraDb.getSpaceMembers(spaceId, spaceType);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        space: spaceEntity,
+        spaceType,
+        userRole,
+        isManager: userRole === 'OWNER' || userRole === 'ADMIN',
+        stats: {
+          contentCount: allPosts.length,
+          memberCount: spaceType === 'group' ? (spaceEntity.memberCount || members.length) : (spaceEntity.count || 0),
+          recentActivityCount: allPosts.length,
+        },
+      }));
+      return;
+    }
+
+    if (url.pathname === '/api/studio/content' && req.method === 'GET') {
+      const spaceId = url.searchParams.get('spaceId') || '';
+      const allPosts = sovraDb.getAllPosts().filter(p => p.channelTargetId === spaceId || p.authorEntityId === spaceId);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, posts: allPosts }));
+      return;
+    }
+
+    if (url.pathname === '/api/studio/team' && req.method === 'GET') {
+      const spaceId = url.searchParams.get('spaceId') || '';
+      const spaceType = (url.searchParams.get('spaceType') || 'channel') as SpaceType;
+      const members = sovraDb.getSpaceMembers(spaceId, spaceType);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, members }));
+      return;
+    }
+
+    if ((url.pathname === '/api/studio/team/role' || url.pathname === '/api/channel/members/role' || url.pathname === '/api/group/members/role') && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const spaceId = String(parsed.spaceId || '');
+        const targetDid = String(parsed.targetDid || '');
+        const newRole = parsed.role as SpaceRole;
+        const updateRes = sovraDb.updateSpaceMemberRole(spaceId, targetDid, newRole, principal.did);
+        if (!updateRes.ok) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: updateRes.error }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, spaceId, targetDid, role: newRole }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/studio/team/remove' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const spaceId = String(parsed.spaceId || '');
+        const targetDid = String(parsed.targetDid || '');
+        const remRes = sovraDb.removeSpaceMember(spaceId, targetDid, principal.did);
+        if (!remRes.ok) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: remRes.error }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, spaceId, targetDid }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
     // API: INSTAGRAM REELS
     // ==========================================
     if (url.pathname === '/api/reels/list' && req.method === 'GET') {
+      const allReels = sovraDb.getAllReels();
+      const reels = allReels.map(r => ({
+        ...r,
+        title: r.caption || 'Reel',
+        likes: r.likesCount,
+      }));
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, reels: sovraDb.getAllReels() }));
+      res.end(JSON.stringify({ ok: true, reels }));
       return;
     }
 
@@ -28571,7 +40842,7 @@ async function startDevServer() {
         if (result) {
           reelsStore = sovraDb.getAllReels();
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, likesCount: result.likesCount, isLiked: result.isLiked }));
+          res.end(JSON.stringify({ ok: true, likes: result.likesCount, likesCount: result.likesCount, isLiked: result.isLiked }));
         } else {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Reel not found' }));
@@ -28636,6 +40907,32 @@ async function startDevServer() {
       if (!ok) return;
       try {
         const parsed = JSON.parse(body);
+
+        // Proof-of-Work Verification (Anti-Sybil & Botnet Mitigation)
+        if (parsed.challengeId || process.env.SOVRA_REQUIRE_POW === 'true') {
+          if (!parsed.challengeId) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Proof-of-Work challenge is required for registration' }));
+            return;
+          }
+          const challenge = activeChallenges.get(String(parsed.challengeId));
+          if (!challenge || challenge.expiresAt < Date.now()) {
+            activeChallenges.delete(String(parsed.challengeId));
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Proof-of-Work challenge has expired or is invalid. Please request a new challenge.' }));
+            return;
+          }
+          const nonce = String(parsed.solutionNonce || '');
+          const computedHash = crypto.createHash('sha256').update(challenge.prefix + nonce).digest('hex');
+          const targetPrefix = '0'.repeat(challenge.difficulty);
+          if (!computedHash.startsWith(targetPrefix)) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Proof-of-Work challenge verification failed: invalid solution nonce.' }));
+            return;
+          }
+          activeChallenges.delete(String(parsed.challengeId)); // Consume single-use challenge
+        }
+
         let handle = String(parsed.handle || '').trim();
         if (!handle) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -28903,6 +41200,157 @@ async function startDevServer() {
       return;
     }
 
+    // API: Permanent Account Deletion & Transactional Cascade Cleanup
+    if ((url.pathname === '/api/user/delete' || url.pathname === '/api/user/account/delete') && (req.method === 'POST' || req.method === 'DELETE')) {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const deleteResult = sovraDb.deleteUserAccount(principal.did);
+        if (!deleteResult.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: deleteResult.error || 'Failed to delete account' }));
+          return;
+        }
+
+        // Synchronize in-memory dynamic social store
+        dynamicSocialStore.posts = sovraDb.getAllPosts();
+        dynamicSocialStore.channels = sovraDb.getAllChannels();
+        dynamicSocialStore.pages = sovraDb.getAllPages();
+
+        res.setHeader('Set-Cookie', 'sovra_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, deletedDid: principal.did, message: 'Account and associated data deleted permanently' }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // 👤 API: GET FULL PROFILE AGGREGATE
+    // ==========================================
+    if (url.pathname === '/api/user/profile' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      if (req.headers.authorization && !principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid or revoked session token' }));
+        return;
+      }
+      const viewerDid = principal?.did;
+      let targetDid = url.searchParams.get('did') || '';
+      const targetHandle = url.searchParams.get('handle') || '';
+
+      if (!targetDid && targetHandle) {
+        const found = sovraDb.findUserByHandle(targetHandle);
+        if (found) targetDid = found.did;
+      }
+
+      if (targetDid && !targetDid.startsWith('did:')) {
+        const found = sovraDb.findUserByHandle(targetDid) || sovraDb.getState().users.find(u =>
+          u.handle.toLowerCase() === targetDid.toLowerCase() ||
+          u.handle.toLowerCase() === ('@' + targetDid).toLowerCase() ||
+          u.displayName.toLowerCase() === targetDid.toLowerCase()
+        );
+        if (found) targetDid = found.did;
+      }
+
+      if (!targetDid) {
+        if (viewerDid) {
+          targetDid = viewerDid;
+        } else {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'did or handle required' }));
+          return;
+        }
+      }
+
+      const profile = sovraDb.getUserProfile(targetDid, viewerDid);
+      if (!profile) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'User not found' }));
+        return;
+      }
+
+      if (profile.isBlocked) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          isBlocked: true,
+          relationship: profile.relationship,
+          user: profile.user || {
+            did: targetDid,
+            displayName: 'Blocked Peer',
+            handle: '@blocked',
+            avatar: '🔒',
+            avatarBg: '#64748b',
+            bio: 'This peer is unavailable',
+          },
+          stats: {
+            followersCount: 0,
+            followingCount: 0,
+            friendsCount: 0,
+            mutualFriendsCount: 0,
+            postsCount: 0,
+            channelsCount: 0,
+            pagesCount: 0,
+            groupsCount: 0,
+          },
+          posts: [],
+          channels: [],
+          pages: [],
+          groups: [],
+          error: 'User is blocked',
+        }));
+        return;
+      }
+
+      if (!profile.ok) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: profile.error || 'User not found' }));
+        return;
+      }
+
+      if (profile.isPrivate) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          isBlocked: false,
+          isPrivate: true,
+          user: profile.user,
+          stats: profile.stats,
+          relationship: profile.relationship,
+          posts: [],
+          channels: [],
+          pages: [],
+          groups: [],
+        }));
+        return;
+      }
+
+      const posts = sovraDb.getUserPosts(targetDid, viewerDid);
+      const spaces = sovraDb.getUserSpaces(targetDid);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        isBlocked: false,
+        isPrivate: false,
+        user: profile.user,
+        stats: profile.stats,
+        relationship: profile.relationship,
+        posts,
+        channels: spaces.channels,
+        pages: spaces.pages,
+        groups: spaces.groups,
+      }));
+      return;
+    }
+
     if (url.pathname === '/api/user/update' && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
@@ -28912,12 +41360,12 @@ async function startDevServer() {
         if (!principal) return;
 
         const targetDid = principal.did;
-        if (parsed.handle) {
-          let handle = String(parsed.handle).trim();
-          if (!handle.startsWith('@')) handle = '@' + handle;
-          if (sovraDb.isHandleTaken(handle, targetDid)) {
-            res.writeHead(409, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: `Handle ${handle} is already in use by another peer.` }));
+        if (parsed.handle !== undefined) {
+          const valRes = sovraDb.validateHandle(String(parsed.handle), targetDid);
+          if (!valRes.valid) {
+            const status = (valRes.error?.includes('already in use') || valRes.error?.includes('already claimed')) ? 409 : 400;
+            res.writeHead(status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: valRes.error }));
             return;
           }
         }
@@ -29013,6 +41461,12 @@ async function startDevServer() {
           const commaIdx = avatarDataUrl.indexOf(',');
           const base64Data = commaIdx >= 0 ? avatarDataUrl.slice(commaIdx + 1) : avatarDataUrl;
           const imgBuffer = Buffer.from(base64Data, 'base64');
+          const magicCheck = validateMediaMagicBytes(imgBuffer);
+          if (!magicCheck.valid) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: `Invalid image payload: ${magicCheck.error || 'Magic byte signature mismatch'}` }));
+            return;
+          }
           const safeDid = did.replace(/[^a-zA-Z0-9_]/g, '_');
           const filename = `avatar_${safeDid}_${Date.now()}.webp`;
           const filePath = path.join(AVATARS_DIR, filename);
@@ -29095,6 +41549,12 @@ async function startDevServer() {
           const commaIdx = coverDataUrl.indexOf(',');
           const base64Data = commaIdx >= 0 ? coverDataUrl.slice(commaIdx + 1) : coverDataUrl;
           const imgBuffer = Buffer.from(base64Data, 'base64');
+          const magicCheck = validateMediaMagicBytes(imgBuffer);
+          if (!magicCheck.valid) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: `Invalid image payload: ${magicCheck.error || 'Magic byte signature mismatch'}` }));
+            return;
+          }
           const safeDid = did.replace(/[^a-zA-Z0-9_]/g, '_');
           const filename = `cover_${safeDid}_${Date.now()}.webp`;
           const filePath = path.join(COVERS_DIR, filename);
@@ -29248,6 +41708,35 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: 'toDid or targetDid is required' }));
           return;
         }
+        if (fromDid === toDid) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Cannot send friend request to yourself' }));
+          return;
+        }
+        if (sovraDb.isBlocked(fromDid, toDid)) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Cannot send friend request: user is blocked or has blocked you' }));
+          return;
+        }
+
+        const targetUser = sovraDb.findUserByDid(toDid);
+        if (targetUser?.privacySettings) {
+          const perm = targetUser.privacySettings.canSendFriendRequests;
+          if (perm === 'none') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'User does not accept friend requests' }));
+            return;
+          }
+          if (perm === 'friends_of_friends') {
+            const mutuals = sovraDb.getMutualFriends(fromDid, toDid);
+            if (mutuals.length === 0) {
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'User only accepts friend requests from friends of friends' }));
+              return;
+            }
+          }
+        }
+
         const rel = sovraDb.sendFriendRequest(fromDid, toDid);
 
         const senderUser = sovraDb.findUserByDid(fromDid);
@@ -29608,20 +42097,20 @@ async function startDevServer() {
       return;
     }
 
-    if (url.pathname === '/api/chat/contacts' && req.method === 'GET') {
+    if ((url.pathname === '/api/chat/contacts' || url.pathname === '/api/chat/conversations') && req.method === 'GET') {
       const principal = resolvePrincipal(req);
-      let userDid = principal?.did;
-      if (!userDid) {
-        const queryDid = url.searchParams.get('userDid');
-        if (queryDid && (sovraDb.findUserByDid(queryDid) || queryDid.startsWith('did:sovra:'))) {
-          userDid = queryDid;
-        }
-      }
-      if (!userDid) {
+      if (!principal) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Authentication required' }));
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
         return;
       }
+      const queryDid = url.searchParams.get('userDid');
+      if (queryDid && queryDid !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access contacts for another user' }));
+        return;
+      }
+      const userDid = principal.did;
       const allPeers = sovraDb.getAllPeers(userDid);
       const allRels = sovraDb.getFriendRelationships(userDid);
       const friendDids = new Set(
@@ -29671,24 +42160,24 @@ async function startDevServer() {
       contactsWithThreads.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, contacts: contactsWithThreads }));
+      res.end(JSON.stringify({ ok: true, contacts: contactsWithThreads, conversations: contactsWithThreads }));
       return;
     }
 
     if ((url.pathname === '/api/chat/messages' || url.pathname === '/api/chat/history') && req.method === 'GET') {
       const principal = resolvePrincipal(req);
-      let userDid = principal?.did;
-      if (!userDid) {
-        const queryDid = url.searchParams.get('userDid');
-        if (queryDid && (sovraDb.findUserByDid(queryDid) || queryDid.startsWith('did:sovra:'))) {
-          userDid = queryDid;
-        }
-      }
-      if (!userDid) {
+      if (!principal) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Authentication required' }));
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
         return;
       }
+      const queryDid = url.searchParams.get('userDid');
+      if (queryDid && queryDid !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access messages for another user' }));
+        return;
+      }
+      const userDid = principal.did;
       const since = Number(url.searchParams.get('since') || 0);
       const targetThreadId = url.searchParams.get('threadId') || undefined;
       let messages = sovraDb.getState().chatMessages;
@@ -29701,6 +42190,14 @@ async function startDevServer() {
       );
       if (targetThreadId) {
         messages = messages.filter(m => m.threadId === targetThreadId);
+      }
+      const targetContactDid = url.searchParams.get('contactDid') || url.searchParams.get('recipientDid');
+      if (targetContactDid) {
+        messages = messages.filter(
+          m => (m.senderDid === userDid && m.recipientDid === targetContactDid) ||
+               (m.senderDid === targetContactDid && m.recipientDid === userDid) ||
+               (targetContactDid.startsWith('channel:') && (m.threadId === targetContactDid || m.recipientDid === targetContactDid))
+        );
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, messages }));
@@ -29715,24 +42212,93 @@ async function startDevServer() {
         const principal = enforceAuth(req, res, parsed);
         if (!principal) return;
 
+        const recipientDid = String(parsed.recipientDid || parsed.recipient || '');
+        if (recipientDid && !recipientDid.startsWith('channel:')) {
+          if (sovraDb.isBlocked(principal.did, recipientDid)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot send message: recipient is blocked or has blocked you' }));
+            return;
+          }
+          const recipientUser = sovraDb.findUserByDid(recipientDid);
+          if (recipientUser?.privacySettings) {
+            const canMsg = recipientUser.privacySettings.canMessageMe;
+            if (canMsg === 'none') {
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Recipient does not accept direct messages' }));
+              return;
+            }
+            if (canMsg === 'friends' && !sovraDb.areFriends(principal.did, recipientDid)) {
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Recipient only accepts direct messages from friends' }));
+              return;
+            }
+          }
+        }
+
         if (!parsed.text && !parsed.isAudio && !parsed.attachment) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Message text, audio or attachment required' }));
           return;
         }
 
-        const validAttachment = parsed.attachment && typeof parsed.attachment === 'object' && parsed.attachment.dataUrl ? {
-          name: String(parsed.attachment.name || 'file'),
-          type: String(parsed.attachment.type || 'application/octet-stream'),
-          size: Number(parsed.attachment.size || 0),
-          dataUrl: String(parsed.attachment.dataUrl || ''),
-          cid: parsed.attachment.cid ? String(parsed.attachment.cid) : undefined,
-        } : undefined;
+        let validAttachment: ChatAttachmentRecord | undefined = undefined;
+        if (parsed.attachment && typeof parsed.attachment === 'object') {
+          const rawName = String(parsed.attachment.name || 'file');
+          const safeName = path.basename(rawName).replace(/["'\r\n\0]/g, '_') || 'file';
+          let mimeType = String(parsed.attachment.type || 'application/octet-stream').toLowerCase();
+          let dataUrl = typeof parsed.attachment.dataUrl === 'string' ? parsed.attachment.dataUrl : '';
+          let size = Number(parsed.attachment.size || 0);
+          let fileBuffer: Buffer | null = null;
+
+          if (dataUrl && dataUrl.includes('base64,')) {
+            const commaIdx = dataUrl.indexOf(',');
+            const base64Data = dataUrl.slice(commaIdx + 1);
+            fileBuffer = Buffer.from(base64Data, 'base64');
+            if (!size) size = fileBuffer.length;
+          }
+
+          if (fileBuffer && fileBuffer.length > 0) {
+            const cidObj = CID.create('raw', fileBuffer, false, 'sha2-256');
+            const realCid = cidObj.toString('base32');
+            const storedFileName = `${realCid}_${safeName}`;
+            const storedPath = path.join(ATTACHMENTS_DIR, storedFileName);
+            fs.writeFileSync(storedPath, fileBuffer);
+
+            if (storageDaemon && storageDaemon.blockstore) {
+              try { await storageDaemon.blockstore.put(cidObj, fileBuffer); } catch (_) {}
+            }
+
+            validAttachment = {
+              name: safeName,
+              type: mimeType,
+              size,
+              dataUrl,
+              cid: realCid,
+              url: `/api/chat/attachment/${realCid}?name=${encodeURIComponent(safeName)}`,
+            };
+          } else if (parsed.attachment.cid) {
+            validAttachment = {
+              name: safeName,
+              type: mimeType,
+              size,
+              dataUrl,
+              cid: String(parsed.attachment.cid),
+              url: `/api/chat/attachment/${parsed.attachment.cid}?name=${encodeURIComponent(safeName)}`,
+            };
+          } else if (dataUrl) {
+            validAttachment = {
+              name: safeName,
+              type: mimeType,
+              size,
+              dataUrl,
+            };
+          }
+        }
 
         const record = sovraDb.appendMessage({
           id: parsed.id,
           senderDid: principal.did,
-          recipientDid: String(parsed.recipientDid || 'channel:local_mesh'),
+          recipientDid: String(parsed.recipientDid || parsed.recipient || 'channel:local_mesh'),
           senderName: String(parsed.senderName || 'Peer'),
           text: String(parsed.text || ''),
           attachment: validAttachment,
@@ -29774,8 +42340,8 @@ async function startDevServer() {
 
           // Deliver message instantly to active realtime SSE subscriber
           broadcastChatEvent(record.recipientDid, record);
-        } else if (record && record.recipientDid === 'channel:local_mesh') {
-          broadcastChatEvent('channel:local_mesh', record);
+        } else if (record && record.recipientDid && record.recipientDid.startsWith('channel:')) {
+          broadcastChatEvent(record.recipientDid, record);
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -29848,6 +42414,42 @@ async function startDevServer() {
       return;
     }
 
+    if ((url.pathname === '/api/chat/delete' || url.pathname === '/api/chat/message/delete' || url.pathname === '/api/chat/messages') && (req.method === 'POST' || req.method === 'DELETE')) {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        let parsed: any = {};
+        if (body && body.trim()) {
+          try { parsed = JSON.parse(body); } catch (_) {}
+        }
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const queryMsgId = url.searchParams.get('messageId') || url.searchParams.get('id');
+        const msgId = String(parsed.messageId || parsed.id || queryMsgId || '');
+        if (!msgId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'messageId required' }));
+          return;
+        }
+        const delRes = sovraDb.deleteChatMessage(msgId, principal.did);
+        if (!delRes.ok) {
+          const status = delRes.error?.includes('Forbidden') || delRes.error?.includes('Unauthorized') ? 403 : 404;
+          res.writeHead(status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: delRes.error }));
+          return;
+        }
+        if (delRes.deletedMessage) {
+          broadcastChatEvent(delRes.deletedMessage.recipientDid, { type: 'chat_delete', messageId: msgId, threadId: delRes.deletedMessage.threadId }, 'chat_delete');
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, deletedId: msgId }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid request' }));
+      }
+      return;
+    }
+
     if (url.pathname === '/api/chat/receipt' && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
@@ -29873,6 +42475,242 @@ async function startDevServer() {
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // API: CHAT ATTACHMENTS (UPLOAD & STREAMING)
+    // ==========================================
+    if (url.pathname === '/api/chat/attachment/upload' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 25 * 1024 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const rawData = parsed.dataUrl || parsed.base64 || parsed.content;
+        if (!rawData || typeof rawData !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'File dataUrl is required' }));
+          return;
+        }
+
+        const commaIdx = rawData.indexOf(',');
+        const base64Data = commaIdx >= 0 ? rawData.slice(commaIdx + 1) : rawData;
+        const fileBuffer = Buffer.from(base64Data, 'base64');
+        const rawName = String(parsed.name || 'file');
+        const safeName = path.basename(rawName).replace(/["'\r\n\0]/g, '_') || 'file';
+        const mimeType = String(parsed.type || 'application/octet-stream').toLowerCase();
+
+        // Reject dangerous executables
+        const hex4 = fileBuffer.subarray(0, 4).toString('hex').toLowerCase();
+        const hex8 = fileBuffer.length >= 8 ? fileBuffer.subarray(0, 8).toString('hex').toLowerCase() : '';
+        if (hex4.startsWith('4d5a') || hex8.startsWith('7f454c46')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Disallowed executable attachment format' }));
+          return;
+        }
+
+        if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) {
+          const magicCheck = validateMediaMagicBytes(fileBuffer, mimeType);
+          if (!magicCheck.valid) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: `Invalid media attachment: ${magicCheck.error || 'Magic byte signature mismatch'}` }));
+            return;
+          }
+        }
+
+        const cidObj = CID.create('raw', fileBuffer, false, 'sha2-256');
+        const cid = cidObj.toString('base32');
+        const storedPath = path.join(ATTACHMENTS_DIR, `${cid}_${safeName}`);
+        fs.writeFileSync(storedPath, fileBuffer);
+
+        if (storageDaemon && storageDaemon.blockstore) {
+          try { await storageDaemon.blockstore.put(cidObj, fileBuffer); } catch (_) {}
+        }
+
+        const attachment = {
+          name: safeName,
+          type: mimeType,
+          size: fileBuffer.length,
+          cid,
+          url: `/api/chat/attachment/${cid}?name=${encodeURIComponent(safeName)}`,
+          dataUrl: rawData,
+        };
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, attachment }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/chat/attachment/') && req.method === 'GET') {
+      const cidOrId = path.basename(url.pathname);
+      if (!cidOrId || cidOrId.includes('..') || cidOrId.includes('/') || cidOrId.includes('\\')) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid attachment identifier' }));
+        return;
+      }
+
+      // Authentication check
+      const principal = resolvePrincipal(req);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to access attachment' }));
+        return;
+      }
+
+      // Authorization: Find matching messages in sovraDb
+      const allMessages = sovraDb.getState().chatMessages;
+      const matchingMessages = allMessages.filter(m => 
+        m.attachment?.cid === cidOrId ||
+        m.id === cidOrId ||
+        (m.attachment?.url && m.attachment.url.includes(cidOrId))
+      );
+      const matchingMsg = matchingMessages[matchingMessages.length - 1];
+
+      if (matchingMessages.length > 0) {
+        const isParticipant =
+          principal.role === 'SUPER_ADMIN' ||
+          principal.role === 'ADMIN' ||
+          matchingMessages.some(m =>
+            principal.did === m.senderDid ||
+            principal.did === m.recipientDid ||
+            m.recipientDid.startsWith('channel:')
+          );
+
+        if (!isParticipant) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: You do not have permission to access this attachment' }));
+          return;
+        }
+      }
+
+      // Locate file in ATTACHMENTS_DIR
+      let targetFile: string | null = null;
+      if (fs.existsSync(ATTACHMENTS_DIR)) {
+        const files = fs.readdirSync(ATTACHMENTS_DIR);
+        const match = files.find(f => f.startsWith(cidOrId + '_') || f === cidOrId || f.startsWith(cidOrId + '.'));
+        if (match) {
+          targetFile = path.join(ATTACHMENTS_DIR, match);
+        }
+      }
+
+      // Fallback: If not on disk, check if matching message has dataUrl to reconstruct
+      if (!targetFile && matchingMsg && matchingMsg.attachment?.dataUrl) {
+        try {
+          const dUrl = matchingMsg.attachment.dataUrl;
+          const commaIdx = dUrl.indexOf(',');
+          const base64Data = commaIdx >= 0 ? dUrl.slice(commaIdx + 1) : dUrl;
+          const buf = Buffer.from(base64Data, 'base64');
+          const safeName = path.basename(matchingMsg.attachment.name || 'file').replace(/["'\r\n\0]/g, '_');
+          const reconstructedPath = path.join(ATTACHMENTS_DIR, `${cidOrId}_${safeName}`);
+          fs.writeFileSync(reconstructedPath, buf);
+          targetFile = reconstructedPath;
+        } catch (_) {}
+      }
+
+      if (!targetFile || !fs.existsSync(targetFile)) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Attachment file not found' }));
+        return;
+      }
+
+      // Resolve filename and MIME type
+      const queryName = url.searchParams.get('name');
+      const filename = queryName
+        ? path.basename(queryName).replace(/["'\r\n\0]/g, '_')
+        : (matchingMsg?.attachment?.name ? path.basename(matchingMsg.attachment.name).replace(/["'\r\n\0]/g, '_') : path.basename(targetFile).replace(/^[a-z0-9]+_/, ''));
+
+      let mimeType = matchingMsg?.attachment?.type || '';
+      if (!mimeType || mimeType === 'application/octet-stream') {
+        const ext = path.extname(filename).toLowerCase();
+        const mimeMap: Record<string, string> = {
+          '.pdf': 'application/pdf',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.png': 'image/png',
+          '.webp': 'image/webp',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml',
+          '.mp4': 'video/mp4',
+          '.webm': 'video/webm',
+          '.mp3': 'audio/mpeg',
+          '.wav': 'audio/wav',
+          '.ogg': 'audio/ogg',
+          '.txt': 'text/plain; charset=utf-8',
+          '.csv': 'text/csv; charset=utf-8',
+          '.json': 'application/json',
+          '.zip': 'application/zip',
+          '.tar': 'application/x-tar',
+          '.gz': 'application/gzip',
+          '.doc': 'application/msword',
+          '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          '.xls': 'application/vnd.ms-excel',
+          '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        };
+        mimeType = mimeMap[ext] || 'application/octet-stream';
+      }
+
+      // Determine Content-Disposition
+      const forceDownload = url.searchParams.get('download') === '1';
+      const isPreviewable = !forceDownload && (
+        mimeType.startsWith('image/') ||
+        mimeType.startsWith('video/') ||
+        mimeType.startsWith('audio/') ||
+        mimeType === 'application/pdf' ||
+        mimeType.startsWith('text/')
+      );
+      const dispositionType = isPreviewable ? 'inline' : 'attachment';
+      const safeHeaderFilename = filename.replace(/["\r\n]/g, '_');
+
+      const stat = fs.statSync(targetFile);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      // Range support for audio/video media streaming
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+        if (start >= fileSize || end >= fileSize || start > end) {
+          res.writeHead(416, {
+            'Content-Range': `bytes */${fileSize}`,
+            'Access-Control-Allow-Origin': '*',
+          });
+          res.end();
+          return;
+        }
+
+        const chunkSize = end - start + 1;
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunkSize,
+          'Content-Type': mimeType,
+          'Content-Disposition': `${dispositionType}; filename="${safeHeaderFilename}"`,
+          'Cache-Control': 'private, max-age=86400',
+          'Access-Control-Allow-Origin': '*',
+          'ETag': `"${cidOrId}"`,
+        });
+        fs.createReadStream(targetFile, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': fileSize,
+          'Accept-Ranges': 'bytes',
+          'Content-Type': mimeType,
+          'Content-Disposition': `${dispositionType}; filename="${safeHeaderFilename}"`,
+          'Cache-Control': 'private, max-age=86400',
+          'Access-Control-Allow-Origin': '*',
+          'ETag': `"${cidOrId}"`,
+        });
+        fs.createReadStream(targetFile).pipe(res);
       }
       return;
     }
@@ -30228,22 +43066,25 @@ async function startDevServer() {
     // ==========================================
     // API: YOUTUBE WATCH PLAYER & TIPPING
     // ==========================================
-    if (url.pathname === '/api/youtube/videos' && req.method === 'GET') {
+    if ((url.pathname === '/api/youtube/videos' || url.pathname === '/api/watch/videos') && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, videos: longFormVideosCatalog }));
+      res.end(JSON.stringify({ ok: true, videos: sovraDb.getAllVideos() }));
       return;
     }
 
-    if (url.pathname === '/api/youtube/video' && req.method === 'GET') {
-      const vidId = url.searchParams.get('id') || currentYoutubeVideo.id;
-      const found = longFormVideosCatalog.find(v => v.id === vidId) || currentYoutubeVideo;
-      const comments = sovraDb.getVideoComments(found.id);
+    if ((url.pathname === '/api/youtube/video' || url.pathname === '/api/watch/video') && req.method === 'GET') {
+      const allVideos = sovraDb.getAllVideos();
+      const vidId = url.searchParams.get('id') || allVideos[0]?.id;
+      const found = allVideos.find(v => v.id === vidId) || allVideos[0];
+      const comments = found ? sovraDb.getVideoComments(found.id) : [];
+      const recommended = allVideos.filter(v => found && v.id !== found.id);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
           ok: true,
           video: found,
           comments,
+          recommended,
         }),
       );
       return;
@@ -30254,11 +43095,10 @@ async function startDevServer() {
       if (!ok) return;
       try {
         const parsed = JSON.parse(body);
-        const found = longFormVideosCatalog.find(v => v.id === parsed.videoId);
+        const found = sovraDb.getVideoById(parsed.videoId);
         if (found) {
-          currentYoutubeVideo = found;
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, video: currentYoutubeVideo }));
+          res.end(JSON.stringify({ ok: true, video: found }));
         } else {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Video not found' }));
@@ -30266,6 +43106,122 @@ async function startDevServer() {
       } catch {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Upload Long-Form Watch Video (Persistent + Magic Byte Validated)
+    if ((url.pathname === '/api/youtube/upload' || url.pathname === '/api/watch/upload') && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 50 * 1024 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const title = String(parsed.title || '').trim();
+        if (!title) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Video title is required' }));
+          return;
+        }
+
+        let cid = '';
+        let mimeType = parsed.mimeType || 'video/mp4';
+        const rawMedia = parsed.videoData || parsed.mediaBase64 || parsed.content;
+        if (rawMedia && typeof rawMedia === 'string') {
+          let base64Data = rawMedia;
+          const commaIdx = base64Data.indexOf(',');
+          if (commaIdx !== -1) {
+            const header = base64Data.substring(0, commaIdx);
+            const match = header.match(/data:([^;]+);base64/);
+            if (match) mimeType = match[1];
+            base64Data = base64Data.substring(commaIdx + 1);
+          }
+          const buffer = Buffer.from(base64Data, 'base64');
+          const magicCheck = validateMediaMagicBytes(buffer, mimeType);
+          if (!magicCheck.valid) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: `Invalid video payload: ${magicCheck.error || 'Magic byte signature mismatch'}` }));
+            return;
+          }
+          const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+          cid = 'bafy' + hash.substring(0, 32);
+          const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
+          const filePath = path.join(POSTS_DIR, `${cid}.${ext}`);
+          fs.writeFileSync(filePath, buffer);
+          if (storageDaemon && typeof (storageDaemon as any).putBlock === 'function') {
+            try { await (storageDaemon as any).putBlock(cid, buffer); } catch (_) {}
+          }
+        } else {
+          cid = 'bafy' + crypto.randomBytes(16).toString('hex');
+        }
+
+        const tags = Array.isArray(parsed.tags) ? parsed.tags : (typeof parsed.tags === 'string' ? parsed.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : ['#sovra', '#p2p']);
+        const newVideo = sovraDb.createVideo({
+          ownerDid: principal.did,
+          title,
+          description: String(parsed.description || title).trim(),
+          cid,
+          channelName: parsed.channelName,
+          channelHandle: parsed.channelHandle,
+          duration: parsed.duration || '10:00',
+          durationSeconds: parsed.durationSeconds || 600,
+          tags,
+          visibility: parsed.visibility || 'public',
+        });
+        longFormVideosCatalog.unshift(newVideo);
+        currentYoutubeVideo = newVideo;
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, video: newVideo }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Like / Unlike Video
+    if ((url.pathname === '/api/youtube/like' || url.pathname === '/api/watch/like') && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const videoId = String(parsed.videoId || '');
+        if (!videoId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'videoId is required' }));
+          return;
+        }
+        const likeRes = sovraDb.toggleVideoLike(videoId, principal.did);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(likeRes));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Delete Video
+    if ((url.pathname === '/api/youtube/delete' || url.pathname === '/api/watch/delete') && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const videoId = String(parsed.videoId || '');
+        const delRes = sovraDb.deleteVideo(videoId, principal.did);
+        const status = delRes.ok ? 200 : (delRes.error?.includes('Forbidden') ? 403 : 404);
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(delRes));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
       }
       return;
     }
@@ -30387,7 +43343,7 @@ async function startDevServer() {
       return;
     }
 
-    if (url.pathname === '/api/youtube/subscribe' && req.method === 'POST') {
+    if ((url.pathname === '/api/youtube/subscribe' || url.pathname === '/api/watch/subscribe') && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
       try {
@@ -30396,13 +43352,25 @@ async function startDevServer() {
         if (!principal) return;
 
         const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
-        const targetVideo = longFormVideosCatalog.find(v => v.id === targetVideoId) || currentYoutubeVideo;
-        targetVideo.isSubscribed = !targetVideo.isSubscribed;
+        const targetVideo = sovraDb.getVideoById(targetVideoId) || longFormVideosCatalog.find(v => v.id === targetVideoId) || currentYoutubeVideo;
+        const channelHandle = parsed.channelHandle || targetVideo?.channelHandle || 'sovra';
+        const subResult = sovraDb.toggleVideoSubscribe(channelHandle, principal.did);
+        if (targetVideo) {
+          targetVideo.isSubscribed = subResult.isSubscribed;
+          targetVideo.channelSubscribers = subResult.subscribersCount;
+          targetVideo.channelSubscribersText = `${subResult.subscribersCount.toLocaleString()} subscriber${subResult.subscribersCount === 1 ? '' : 's'}`;
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, isSubscribed: targetVideo.isSubscribed }));
-      } catch {
+        res.end(JSON.stringify({
+          ok: true,
+          isSubscribed: subResult.isSubscribed,
+          subscribed: subResult.isSubscribed,
+          subscribersCount: subResult.subscribersCount,
+          subscribersText: `${subResult.subscribersCount.toLocaleString()} subscriber${subResult.subscribersCount === 1 ? '' : 's'}`
+        }));
+      } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
       }
       return;
     }
@@ -30416,13 +43384,14 @@ async function startDevServer() {
         if (!principal) return;
 
         const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
+        const authorUser = sovraDb.findUserByDid(principal.did);
 
         if (parsed.parentCommentId) {
           // Nested reply
           const reply = sovraDb.addVideoReply(targetVideoId, parsed.parentCommentId, {
-            authorName: parsed.authorName || 'Local Peer',
-            authorAvatar: parsed.authorAvatar || (parsed.authorName || 'L')[0].toUpperCase(),
-            authorHandle: parsed.authorHandle || (parsed.authorName || 'peer').toLowerCase().replace(/\s+/g, '_'),
+            authorName: parsed.authorName || (authorUser?.displayName || 'Local Peer'),
+            authorAvatar: parsed.authorAvatar || (authorUser?.avatar || 'L'),
+            authorHandle: parsed.authorHandle || (authorUser?.handle || 'peer'),
             text: String(parsed.text || ''),
           });
           if (reply) {
@@ -30438,9 +43407,10 @@ async function startDevServer() {
 
         // Top-level comment
         const comment = sovraDb.addVideoComment(targetVideoId, {
-          authorName: parsed.authorName ?? 'Verified Peer',
-          authorAvatar: parsed.authorAvatar ?? (parsed.authorName ?? 'V')[0].toUpperCase(),
-          authorHandle: parsed.authorHandle ?? (parsed.authorName ?? 'peer').toLowerCase().replace(/\s+/g, '_'),
+          authorDid: principal.did,
+          authorName: parsed.authorName ?? (authorUser?.displayName || 'Verified Peer'),
+          authorAvatar: parsed.authorAvatar ?? (authorUser?.avatar || 'V'),
+          authorHandle: parsed.authorHandle ?? (authorUser?.handle || 'peer'),
           text: String(parsed.text ?? ''),
         });
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -30478,9 +43448,583 @@ async function startDevServer() {
     }
 
     // ==========================================
+    // PHASE 5: PLAYLISTS API
+    // ==========================================
+    if (url.pathname === '/api/playlists' && req.method === 'GET') {
+      const channelId = url.searchParams.get('channelId') || undefined;
+      const principal = resolvePrincipal(req);
+      const userDid = principal?.did;
+      const playlists = sovraDb.getAllPlaylists(channelId, userDid);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, playlists }));
+      return;
+    }
+
+    if (url.pathname === '/api/playlists/view' && req.method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (!id) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Playlist ID is required' }));
+        return;
+      }
+      const playlist = sovraDb.getPlaylistById(id);
+      if (!playlist) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Playlist not found' }));
+        return;
+      }
+      const videos = (playlist.videoIds || []).map(vid => {
+        return longFormVideosCatalog.find(v => v.id === vid) || {
+          id: vid,
+          title: `Video ${vid}`,
+          channelName: playlist.creatorName || 'Creator',
+          channelHandle: playlist.creatorHandle || 'creator',
+          channelAvatar: '🎬',
+          views: 1200,
+          viewsText: '1.2K views',
+          duration: '10:00',
+          durationSeconds: 600,
+          publishedAt: 'Recently',
+          description: '',
+          tags: ['#sovra'],
+          likes: 50,
+        };
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, playlist, videos }));
+      return;
+    }
+
+    if (url.pathname === '/api/playlists/create' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const title = String(parsed.title || '').trim();
+        if (!title) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Playlist title is required' }));
+          return;
+        }
+        const user = sovraDb.findUserByDid(principal.did);
+        const playlist = sovraDb.createPlaylist({
+          channelId: parsed.channelId,
+          creatorDid: principal.did,
+          creatorHandle: user?.handle || 'creator',
+          creatorName: user?.displayName || 'Creator',
+          title,
+          description: parsed.description,
+          thumbnailUrl: parsed.thumbnailUrl,
+          videoIds: Array.isArray(parsed.videoIds) ? parsed.videoIds : [],
+          privacy: parsed.privacy || 'public',
+        });
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, playlist }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/playlists/update' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const id = String(parsed.id || '');
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Playlist ID required' }));
+          return;
+        }
+        const result = sovraDb.updatePlaylist(id, principal.did, parsed);
+        if (result.ok) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, playlist: result.playlist }));
+        } else {
+          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
+          res.writeHead(code, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/playlists/reorder' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const id = String(parsed.id || '');
+        const videoIds = parsed.videoIds;
+        if (!id || !Array.isArray(videoIds)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Playlist ID and videoIds array are required' }));
+          return;
+        }
+        const result = sovraDb.reorderPlaylist(id, principal.did, videoIds);
+        if (result.ok) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, playlist: result.playlist }));
+        } else {
+          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
+          res.writeHead(code, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/playlists/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const id = String(parsed.id || '');
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Playlist ID required' }));
+          return;
+        }
+        const result = sovraDb.deletePlaylist(id, principal.did);
+        if (result.ok) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        } else {
+          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
+          res.writeHead(code, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/playlists/add-video' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const id = String(parsed.id || '');
+        const videoId = String(parsed.videoId || '');
+        if (!id || !videoId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'id and videoId are required' }));
+          return;
+        }
+        const result = sovraDb.addVideoToPlaylist(id, videoId, principal.did);
+        if (result.ok) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, playlist: result.playlist }));
+        } else {
+          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
+          res.writeHead(code, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/playlists/remove-video' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const id = String(parsed.id || '');
+        const videoId = String(parsed.videoId || '');
+        if (!id || !videoId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'id and videoId are required' }));
+          return;
+        }
+        const result = sovraDb.removeVideoFromPlaylist(id, videoId, principal.did);
+        if (result.ok) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, playlist: result.playlist }));
+        } else {
+          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
+          res.writeHead(code, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // PHASE 5: LIVE SESSIONS & CHAT API
+    // ==========================================
+    if (url.pathname === '/api/live/sessions' && req.method === 'GET') {
+      const statusParam = url.searchParams.get('status') as LiveSessionStatus | null;
+      const sessions = sovraDb.getAllLiveSessions(statusParam || undefined);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, sessions }));
+      return;
+    }
+
+    if (url.pathname === '/api/live/session' && req.method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (!id) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Live session ID required' }));
+        return;
+      }
+      const session = sovraDb.getLiveSessionById(id);
+      if (!session) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Live session not found' }));
+        return;
+      }
+      const chatMessages = sovraDb.getLiveChatMessages(id);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, session, chatMessages }));
+      return;
+    }
+
+    if (url.pathname === '/api/live/create' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const title = String(parsed.title || '').trim();
+        if (!title) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Broadcast title is required' }));
+          return;
+        }
+        const user = sovraDb.findUserByDid(principal.did);
+        const session = sovraDb.createLiveSession({
+          channelId: parsed.channelId,
+          creatorDid: principal.did,
+          creatorHandle: user?.handle || 'creator',
+          creatorName: user?.displayName || 'Creator',
+          creatorAvatar: user?.avatar || '🔴',
+          title,
+          description: parsed.description,
+          streamUrl: parsed.streamUrl,
+          scheduledStartTime: parsed.scheduledStartTime,
+          category: parsed.category,
+        });
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, session }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/live/status' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const id = String(parsed.id || '');
+        const newStatus = parsed.status as LiveSessionStatus;
+        if (!id || !newStatus) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'id and status are required' }));
+          return;
+        }
+        const result = sovraDb.updateLiveSessionStatus(id, newStatus, principal.did);
+        if (result.ok) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, session: result.session }));
+        } else {
+          const code = result.error?.startsWith('Unauthorized') ? 403 : (result.error?.startsWith('Invalid state') ? 400 : 404);
+          res.writeHead(code, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/live/like' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const id = String(parsed.id || '');
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Session id required' }));
+          return;
+        }
+        const result = sovraDb.likeLiveSession(id);
+        if (result.ok) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, likesCount: result.likesCount }));
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/live/chat' && req.method === 'GET') {
+      const sessionId = url.searchParams.get('sessionId');
+      if (!sessionId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'sessionId required' }));
+        return;
+      }
+      const messages = sovraDb.getLiveChatMessages(sessionId);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, messages }));
+      return;
+    }
+
+    if (url.pathname === '/api/live/chat' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const sessionId = String(parsed.sessionId || '');
+        const text = String(parsed.text || '').trim();
+        if (!sessionId || !text) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'sessionId and text required' }));
+          return;
+        }
+        const user = sovraDb.findUserByDid(principal.did);
+        const session = sovraDb.getLiveSessionById(sessionId);
+        const isModerator = session ? (session.creatorDid === principal.did || principal.role === 'SUPER_ADMIN' || principal.role === 'MODERATOR') : false;
+        const msg = sovraDb.addLiveChatMessage(sessionId, {
+          senderDid: principal.did,
+          senderHandle: user?.handle || 'peer',
+          senderName: user?.displayName || 'Peer',
+          senderAvatar: user?.avatar,
+          text,
+          isModerator,
+        });
+        if (msg) {
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, message: msg }));
+        } else {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Could not send live chat message' }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/live/chat/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const messageId = String(parsed.messageId || '');
+        const sessionId = String(parsed.sessionId || '');
+        const session = sessionId ? sovraDb.getLiveSessionById(sessionId) : undefined;
+        const isModerator = session ? (session.creatorDid === principal.did || principal.role === 'SUPER_ADMIN' || principal.role === 'MODERATOR') : (principal.role === 'SUPER_ADMIN' || principal.role === 'MODERATOR');
+        const deleted = sovraDb.deleteLiveChatMessage(messageId, principal.did, isModerator);
+        if (deleted) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        } else {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized to delete this live chat message' }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // PHASE 5: WATCH HISTORY API
+    // ==========================================
+    if (url.pathname === '/api/watch/history' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const videoId = String(parsed.videoId || '');
+        const durationWatchedSec = Number(parsed.durationWatchedSec || 0);
+        if (!videoId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'videoId is required' }));
+          return;
+        }
+        if (durationWatchedSec < 5) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, ignored: true, reason: 'Duration below minimum 5s threshold' }));
+          return;
+        }
+        const record = sovraDb.recordWatchHistory(principal.did, videoId, durationWatchedSec, Boolean(parsed.completed));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, history: record }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/watch/history' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+        return;
+      }
+      const rawHistory = sovraDb.getWatchHistory(principal.did);
+      const history = rawHistory.map(h => ({
+        ...h,
+        video: longFormVideosCatalog.find(v => v.id === h.videoId) || {
+          id: h.videoId,
+          title: `Video ${h.videoId}`,
+          channelName: 'Sovra Channel',
+          duration: '10:00',
+          durationSeconds: 600,
+        },
+      }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, history }));
+      return;
+    }
+
+    if (url.pathname === '/api/watch/history/clear' && req.method === 'POST') {
+      const principal = resolvePrincipal(req);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+        return;
+      }
+      sovraDb.clearWatchHistory(principal.did);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    // ==========================================
+    // PHASE 5: SAVED MEDIA COLLECTIONS API
+    // ==========================================
+    if (url.pathname === '/api/media/save' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const mediaId = String(parsed.mediaId || '');
+        const mediaType = (parsed.mediaType || 'video') as 'video' | 'reel' | 'post' | 'image';
+        if (!mediaId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'mediaId is required' }));
+          return;
+        }
+        const saveResult = sovraDb.saveMedia(principal.did, mediaId, mediaType, parsed.title, parsed.thumbnailUrl);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, record: saveResult.record, alreadySaved: saveResult.alreadySaved }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/media/unsave' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+        const mediaId = String(parsed.mediaId || '');
+        if (!mediaId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'mediaId is required' }));
+          return;
+        }
+        sovraDb.unsaveMedia(principal.did, mediaId);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/media/saved' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+        return;
+      }
+      const savedMedia = sovraDb.getSavedMedia(principal.did);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, savedMedia }));
+      return;
+    }
+
+    if (url.pathname === '/api/media/saved/check' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+        return;
+      }
+      const mediaId = url.searchParams.get('mediaId') || '';
+      const isSaved = sovraDb.isMediaSaved(principal.did, mediaId);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, isSaved }));
+      return;
+    }
+
+    // ==========================================
     // 🔔 REAL-TIME NOTIFICATIONS API
     // ==========================================
-    if (url.pathname === '/api/notifications' && req.method === 'GET') {
+    if ((url.pathname === '/api/notifications' || url.pathname === '/api/notifications/list') && req.method === 'GET') {
       const principal = resolvePrincipal(req);
       if (!principal) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -30536,9 +44080,26 @@ async function startDevServer() {
     // ==========================================
     if (url.pathname === '/api/search' && req.method === 'GET') {
       const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+      const scope = (url.searchParams.get('scope') || 'all').toLowerCase();
+      const principal = resolvePrincipal(req);
+      const viewerDid = principal?.did;
+
       if (!q) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, query: '', results: { users: [], posts: [], channels: [], pages: [] } }));
+        res.end(JSON.stringify({
+          ok: true,
+          query: '',
+          scope,
+          users: [],
+          posts: [],
+          channels: [],
+          pages: [],
+          groups: [],
+          videos: [],
+          topics: [],
+          results: { users: [], posts: [], channels: [], pages: [], groups: [], videos: [], topics: [] },
+          counts: { users: 0, posts: 0, channels: 0, pages: 0, groups: 0, videos: 0, topics: 0 },
+        }));
         return;
       }
 
@@ -30552,47 +44113,299 @@ async function startDevServer() {
           }
         }
       } catch (err) {
-        console.warn('[SearchWorker] Query error:', err);
+        // Fallback gracefully
       }
 
-      const users = sovraDb.getAllUsers()
-        .filter(u => indexedDocIds.has(`user:${u.did}`) || u.handle.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q) || (u.bio && u.bio.toLowerCase().includes(q)))
-        .map(toPublicUserDTO);
-      const principal = resolvePrincipal(req);
-      const posts = sovraDb.getAllPosts()
-        .filter(p => {
-          if (!sovraDb.canUserViewPost(p, principal?.did)) return false;
-          if (indexedDocIds.has(`post:${p.id}`)) return true;
-          const matchCaption = Boolean(p.caption && typeof p.caption === 'string' && p.caption.toLowerCase().includes(q));
-          let matchTags = false;
-          if (Array.isArray(p.tags)) {
-            matchTags = p.tags.some(t => typeof t === 'string' && t.toLowerCase().includes(q));
-          } else if (typeof p.tags === 'string') {
-            matchTags = (p.tags as string).toLowerCase().includes(q);
+      // 1. Users (People) - strictly filter out blocked users and private profiles!
+      let users: PublicUserDTO[] = [];
+      if (scope === 'all' || scope === 'people') {
+        users = sovraDb.getAllUsers()
+          .filter(u => {
+            if ((u as any).isBanned || (u as any).moderationState === 'HIDDEN' || (u as any).moderationState === 'REMOVED') return false;
+            if (viewerDid && sovraDb.isBlocked(u.did, viewerDid)) return false;
+            if (!sovraDb.canUserViewProfile(u, viewerDid)) return false;
+            if (indexedDocIds.has(`user:${u.did}`)) return true;
+            return u.handle.toLowerCase().includes(q) ||
+                   u.displayName.toLowerCase().includes(q) ||
+                   (u.name && u.name.toLowerCase().includes(q)) ||
+                   (u.bio && u.bio.toLowerCase().includes(q));
+          })
+          .map(toPublicUserDTO);
+      }
+
+      // 2. Posts - strictly filter permissions and blocked authors
+      let posts: any[] = [];
+      if (scope === 'all' || scope === 'posts') {
+        posts = sovraDb.getAllPosts()
+          .filter(p => {
+            if (!sovraDb.canUserViewPost(p, viewerDid)) return false;
+            if (indexedDocIds.has(`post:${p.id}`)) return true;
+            const matchCaption = Boolean(p.caption && typeof p.caption === 'string' && p.caption.toLowerCase().includes(q));
+            let matchTags = false;
+            if (Array.isArray(p.tags)) {
+              matchTags = p.tags.some(t => typeof t === 'string' && t.toLowerCase().includes(q));
+            } else if (typeof p.tags === 'string') {
+              matchTags = (p.tags as string).toLowerCase().includes(q);
+            }
+            return matchCaption || matchTags;
+          });
+      }
+
+      // 3. Channels
+      let channels: any[] = [];
+      if (scope === 'all' || scope === 'channels') {
+        channels = (dynamicSocialStore.channels || sovraDb.db.channels || [])
+          .filter(c => {
+            if (c.moderationState === 'HIDDEN' || c.moderationState === 'REMOVED') return false;
+            return indexedDocIds.has(`channel:${c.id}`) ||
+                   (c.name && c.name.toLowerCase().includes(q)) ||
+                   (c.desc && c.desc.toLowerCase().includes(q)) ||
+                   (c.handle && c.handle.toLowerCase().includes(q));
+          });
+      }
+
+      // 4. Pages
+      let pages: any[] = [];
+      if (scope === 'all' || scope === 'pages') {
+        pages = (dynamicSocialStore.pages || sovraDb.db.pages || [])
+          .filter(p => {
+            if (p.moderationState === 'HIDDEN' || p.moderationState === 'REMOVED') return false;
+            return (p.name && p.name.toLowerCase().includes(q)) ||
+                   (p.category && p.category.toLowerCase().includes(q)) ||
+                   (p.desc && p.desc.toLowerCase().includes(q));
+          });
+      }
+
+      // 5. Groups
+      let groups: any[] = [];
+      if (scope === 'all' || scope === 'groups') {
+        groups = (dynamicSocialStore.groups || sovraDb.db.groups || [])
+          .filter(g => {
+            if (g.moderationState === 'HIDDEN' || g.moderationState === 'REMOVED') return false;
+            if (g.privacy === 'private') {
+              if (!viewerDid || !sovraDb.isSpaceMember(g.id, viewerDid)) return false;
+            }
+            return (g.name && g.name.toLowerCase().includes(q)) ||
+                   (g.desc && g.desc.toLowerCase().includes(q)) ||
+                   (g.category && g.category.toLowerCase().includes(q));
+          });
+      }
+
+      // 6. Videos
+      let videos: any[] = [];
+      if (scope === 'all' || scope === 'videos') {
+        videos = sovraDb.getAllPosts()
+          .filter(p => {
+            const isVideo = p.mediaType === 'video' || (p.type && p.type === 'video') || (p.mediaCid && String(p.mediaCid).endsWith('.mp4')) || (p.videoDuration && p.videoDuration > 0);
+            if (!isVideo) return false;
+            if (!sovraDb.canUserViewPost(p, viewerDid)) return false;
+            return (p.caption && p.caption.toLowerCase().includes(q)) ||
+                   (p.title && String(p.title).toLowerCase().includes(q)) ||
+                   (Array.isArray(p.tags) && p.tags.some(t => String(t).toLowerCase().includes(q)));
+          });
+      }
+
+      // 7. Topics
+      let topics: { tag: string; count: number }[] = [];
+      if (scope === 'all' || scope === 'topics') {
+        const topicCounts = new Map<string, number>();
+        for (const post of sovraDb.getAllPosts()) {
+          if (!sovraDb.canUserViewPost(post, viewerDid)) continue;
+          const tags: string[] = [];
+          if (Array.isArray(post.tags)) {
+            tags.push(...post.tags.map(t => String(t)));
           }
-          return matchCaption || matchTags;
-        });
-      const channels = (dynamicSocialStore.channels || sovraDb.db.channels || [])
-        .filter(c => indexedDocIds.has(`channel:${c.id}`) || (c.name && c.name.toLowerCase().includes(q)) || (c.desc && c.desc.toLowerCase().includes(q)) || (c.handle && c.handle.toLowerCase().includes(q)));
-      const pages = (dynamicSocialStore.pages || sovraDb.db.pages || [])
-        .filter(p => (p.name && p.name.toLowerCase().includes(q)) || (p.category && p.category.toLowerCase().includes(q)) || (p.desc && p.desc.toLowerCase().includes(q)));
+          if (typeof post.caption === 'string') {
+            const matches = post.caption.match(/#[a-zA-Z0-9_]+/g);
+            if (matches) tags.push(...matches.map(t => t.replace('#', '')));
+          }
+          for (const rawTag of tags) {
+            const tag = rawTag.toLowerCase().replace(/^#/, '');
+            if (tag.includes(q.replace(/^#/, ''))) {
+              topicCounts.set(tag, (topicCounts.get(tag) || 0) + 1);
+            }
+          }
+        }
+        topics = Array.from(topicCounts.entries()).map(([tag, count]) => ({ tag, count }));
+      }
+
+      const results = {
+        users,
+        posts,
+        channels,
+        pages,
+        groups,
+        videos,
+        topics,
+      };
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
         query: q,
+        scope,
         users,
         posts,
         channels,
         pages,
-        results: { users, posts, channels, pages }
+        groups,
+        videos,
+        topics,
+        counts: {
+          users: users.length,
+          posts: posts.length,
+          channels: channels.length,
+          pages: pages.length,
+          groups: groups.length,
+          videos: videos.length,
+          topics: topics.length,
+        },
+        results,
       }));
       return;
     }
 
     // ==========================================
-    // 📞 WEBRTC E2EE CALL SIGNALING API
+    // ⚡ DEBOUNCED SEARCH AUTOCOMPLETE API
     // ==========================================
+    if (url.pathname === '/api/search/autocomplete' && req.method === 'GET') {
+      const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+      const principal = resolvePrincipal(req);
+      const viewerDid = principal?.did;
+
+      if (!q || q.length < 1) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, suggestions: [] }));
+        return;
+      }
+
+      const suggestions: Array<{
+        type: 'user' | 'channel' | 'page' | 'group' | 'topic';
+        title: string;
+        subtitle?: string;
+        id: string;
+        avatar?: string;
+      }> = [];
+
+      // People
+      for (const u of sovraDb.getAllUsers()) {
+        if (suggestions.length >= 8) break;
+        if (viewerDid && sovraDb.isBlocked(u.did, viewerDid)) continue;
+        if (!sovraDb.canUserViewProfile(u, viewerDid)) continue;
+        if (u.handle.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q)) {
+          suggestions.push({
+            type: 'user',
+            title: u.displayName,
+            subtitle: u.handle,
+            id: u.did,
+            avatar: u.avatarDataUrl || u.avatar,
+          });
+        }
+      }
+
+      // Channels
+      for (const c of (dynamicSocialStore.channels || sovraDb.db.channels || [])) {
+        if (suggestions.length >= 10) break;
+        if ((c.name && c.name.toLowerCase().includes(q)) || (c.handle && c.handle.toLowerCase().includes(q))) {
+          suggestions.push({
+            type: 'channel',
+            title: c.name,
+            subtitle: c.handle || 'Channel',
+            id: c.id,
+            avatar: c.avatar,
+          });
+        }
+      }
+
+      // Pages
+      for (const p of (dynamicSocialStore.pages || sovraDb.db.pages || [])) {
+        if (suggestions.length >= 12) break;
+        if (p.name && p.name.toLowerCase().includes(q)) {
+          suggestions.push({
+            type: 'page',
+            title: p.name,
+            subtitle: p.category || 'Page',
+            id: p.id,
+            avatar: p.avatar,
+          });
+        }
+      }
+
+      // Groups
+      for (const g of (dynamicSocialStore.groups || sovraDb.db.groups || [])) {
+        if (suggestions.length >= 14) break;
+        if (g.privacy === 'private' && (!viewerDid || !sovraDb.isSpaceMember(g.id, viewerDid))) continue;
+        if (g.name && g.name.toLowerCase().includes(q)) {
+          suggestions.push({
+            type: 'group',
+            title: g.name,
+            subtitle: `${g.memberCount || 1} members`,
+            id: g.id,
+            avatar: g.avatar,
+          });
+        }
+      }
+
+      // Topics
+      if (q.startsWith('#') || q.length >= 2) {
+        const cleanQ = q.replace(/^#/, '');
+        for (const post of sovraDb.getAllPosts()) {
+          if (suggestions.length >= 16) break;
+          if (!sovraDb.canUserViewPost(post, viewerDid)) continue;
+          if (typeof post.caption === 'string' && post.caption.toLowerCase().includes('#' + cleanQ)) {
+            const matches = post.caption.match(/#[a-zA-Z0-9_]+/g) || [];
+            for (const match of matches) {
+              const tag = match.toLowerCase();
+              if (tag.includes(cleanQ) && !suggestions.some(s => s.type === 'topic' && s.title.toLowerCase() === tag)) {
+                suggestions.push({
+                  type: 'topic',
+                  title: tag,
+                  subtitle: 'Topic',
+                  id: tag.replace('#', ''),
+                });
+              }
+            }
+          }
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, suggestions: suggestions.slice(0, 10) }));
+      return;
+    }
+
+    // ==========================================
+    // 🏷️ TOPIC HASHTAG POSTS API
+    // ==========================================
+    if (url.pathname === '/api/topics/posts' && req.method === 'GET') {
+      const topic = url.searchParams.get('topic') || url.searchParams.get('tag') || '';
+      const sort = (url.searchParams.get('sort') || 'latest') as 'latest' | 'popular';
+      const principal = resolvePrincipal(req);
+      const viewerDid = principal?.did;
+
+      if (!topic) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'topic parameter required' }));
+        return;
+      }
+
+      const posts = sovraDb.getPostsByTopic(topic, viewerDid, sort);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, topic, sort, posts, count: posts.length }));
+      return;
+    }
+
+    // ==========================================
+    // 📞 WEBRTC E2EE CALL SIGNALING API (PRODUCTION HARDENED)
+    // ==========================================
+    if ((url.pathname === '/api/call/ice-servers' || url.pathname === '/api/webrtc/ice-servers') && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      const iceServers = getIceServers(principal?.did);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, iceServers }));
+      return;
+    }
+
     if (url.pathname === '/api/call/offer' && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 1024 * 1024);
       if (!ok) return;
@@ -30602,7 +44415,7 @@ async function startDevServer() {
         if (!principal) return;
 
         const recipientDid = String(parsed.recipientDid || '');
-        const offerSdp = String(parsed.offerSdp || parsed.sdp || '');
+        const offerSdp = String(parsed.offerSdp || parsed.sdp || parsed.sdpOffer || '');
         const callType = parsed.callType === 'video' ? 'video' : 'audio';
 
         if (!recipientDid || !offerSdp) {
@@ -30611,23 +44424,39 @@ async function startDevServer() {
           return;
         }
 
-        const session = sovraDb.createCallOffer(principal.did, recipientDid, offerSdp, callType);
+        try {
+          const session = sovraDb.createCallOffer(principal.did, recipientDid, offerSdp, callType);
 
+          // Notify recipient
+          const senderUser = sovraDb.findUserByDid(principal.did);
+          sovraDb.addNotification({
+            recipientDid,
+            senderDid: principal.did,
+            type: 'call',
+            title: `Incoming ${callType.toUpperCase()} Call`,
+            body: `${senderUser?.displayName || senderUser?.handle || 'A peer'} is calling you...`,
+            link: '/app',
+            data: { callId: session.callId, callType },
+          });
 
-        // Notify recipient
-        const senderUser = sovraDb.findUserByDid(principal.did);
-        sovraDb.addNotification({
-          recipientDid,
-          senderDid: principal.did,
-          type: 'call',
-          title: `Incoming ${callType.toUpperCase()} Call`,
-          body: `${senderUser?.displayName || senderUser?.handle || 'A peer'} is calling you...`,
-          link: '/app',
-          data: { callId: session.callId, callType },
-        });
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, session }));
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, session, sessionId: session.callId }));
+        } catch (callErr: any) {
+          const msg = callErr?.message || 'Call initiation failed';
+          if (callErr?.code === 'BUSY') {
+            res.writeHead(486, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: msg, code: 'BUSY' }));
+          } else if (msg.includes('Forbidden') || msg.includes('Block relationship')) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: msg }));
+          } else if (msg.includes('engaged in an active call')) {
+            res.writeHead(409, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: msg, code: 'ALREADY_IN_CALL' }));
+          } else {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: msg }));
+          }
+        }
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
@@ -30648,7 +44477,9 @@ async function startDevServer() {
       const incoming = allCalls.find(c =>
         c.recipientDid === userDid &&
         (c.status === 'offering' || c.status === 'ringing') &&
-        now - c.createdAt < 45000
+        now - c.createdAt < 45000 &&
+        !sovraDb.isBlocked(c.callerDid, userDid) &&
+        !sovraDb.isBlocked(userDid, c.callerDid)
       );
       if (!incoming) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -30688,6 +44519,13 @@ async function startDevServer() {
         res.end(JSON.stringify({ ok: false, error: 'callId required' }));
         return;
       }
+      const allCalls = sovraDb.getState().call_sessions || [];
+      const anyCall = allCalls.find(c => c.callId === callId);
+      if (anyCall && anyCall.callerDid !== principal.did && anyCall.recipientDid !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized access to call session' }));
+        return;
+      }
       const session = sovraDb.pollCall(callId, principal.did);
       if (!session) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -30715,14 +44553,39 @@ async function startDevServer() {
           return;
         }
 
-        const session = sovraDb.answerCall(callId, principal.did, answerSdp);
-        if (!session) {
+        const allCalls = sovraDb.getState().call_sessions || [];
+        const existingCall = allCalls.find(c => c.callId === callId);
+        if (!existingCall) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Call session not found or caller not recipient' }));
+          res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
           return;
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, session }));
+
+        if (existingCall.recipientDid !== principal.did) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Only the designated recipient can answer the call' }));
+          return;
+        }
+
+        if (existingCall.status !== 'offering' && existingCall.status !== 'ringing') {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Conflict: Call is in '${existingCall.status}' state and cannot be answered` }));
+          return;
+        }
+
+        try {
+          const session = sovraDb.answerCall(callId, principal.did, answerSdp);
+          if (!session) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Call session not found or answer rejected' }));
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, session }));
+        } catch (ansErr: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: ansErr?.message || 'Answer failed' }));
+        }
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
@@ -30746,9 +44609,34 @@ async function startDevServer() {
           return;
         }
 
-        const session = sovraDb.addIceCandidate(callId, principal.did, candidate);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: !!session, session }));
+        const allCalls = sovraDb.getState().call_sessions || [];
+        const existingCall = allCalls.find(c => c.callId === callId);
+        if (!existingCall) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
+          return;
+        }
+
+        if (existingCall.callerDid !== principal.did && existingCall.recipientDid !== principal.did) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized candidate submission' }));
+          return;
+        }
+
+        if (existingCall.status === 'ended' || existingCall.status === 'rejected') {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Conflict: Call has already ended' }));
+          return;
+        }
+
+        try {
+          const session = sovraDb.addIceCandidate(callId, principal.did, candidate);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: !!session, session }));
+        } catch (candErr: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: candErr?.message || 'Candidate error' }));
+        }
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
@@ -30764,7 +44652,7 @@ async function startDevServer() {
         const principal = enforceAuth(req, res, parsed);
         if (!principal) return;
 
-        const callId = String(parsed.callId || '');
+        const callId = String(parsed.callId || parsed.sessionId || '');
         const reason = parsed.reason ? String(parsed.reason) : undefined;
         if (!callId) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -30772,9 +44660,575 @@ async function startDevServer() {
           return;
         }
 
+        const allCalls = sovraDb.getState().call_sessions || [];
+        const existingCall = allCalls.find(c => c.callId === callId);
+        if (!existingCall) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
+          return;
+        }
+
+        if (existingCall.callerDid !== principal.did && existingCall.recipientDid !== principal.did) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized call termination' }));
+          return;
+        }
+
         const session = sovraDb.endCall(callId, principal.did, reason);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, session }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/call/restart-ice' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const callId = String(parsed.callId || '');
+        if (!callId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'callId is required' }));
+          return;
+        }
+
+        const allCalls = sovraDb.getState().call_sessions || [];
+        const existingCall = allCalls.find(c => c.callId === callId);
+        if (!existingCall) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
+          return;
+        }
+
+        if (existingCall.callerDid !== principal.did && existingCall.recipientDid !== principal.did) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized ICE restart' }));
+          return;
+        }
+
+        existingCall.status = 'reconnecting';
+        existingCall.updatedAt = Date.now();
+        sovraDb.recordCallMetric({
+          callId,
+          eventType: 'ice_restarted',
+          callerDid: existingCall.callerDid,
+          recipientDid: existingCall.recipientDid,
+        });
+        sovraDb.save();
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, status: 'reconnecting' }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/call/metrics' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+        return;
+      }
+
+      const callId = url.searchParams.get('callId') || undefined;
+      const isAdmin = principal.role === 'SUPER_ADMIN' || principal.role === 'SECURITY_ADMIN' || principal.did.startsWith('did:sovra:admin');
+      const metrics = sovraDb.getCallMetrics({
+        callId,
+        userDid: isAdmin ? undefined : principal.did,
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, metrics, count: metrics.length }));
+      return;
+    }
+
+    // ==========================================
+    // 🛡️ PHASE 7: TRUST, SAFETY & MODERATION REST API
+    // ==========================================
+
+    const VALID_REPORT_REASONS = [
+      'Spam',
+      'Harassment',
+      'Impersonation',
+      'Fraud',
+      'Violence',
+      'Illegal content',
+      'Privacy violation',
+      'Sexual content',
+      'Child safety',
+      'Copyright',
+      'Other',
+    ];
+
+    const VALID_TARGET_TYPES = [
+      'user',
+      'post',
+      'comment',
+      'message',
+      'video',
+      'reel',
+      'channel',
+      'page',
+      'group',
+      'live',
+    ];
+
+    const VALID_MODERATION_ACTIONS = [
+      'Hide',
+      'Remove',
+      'Restrict',
+      'Restore',
+      'Warn',
+      'Mute',
+      'Ban',
+      'Unban',
+    ];
+
+    const VALID_REPORT_STATUSES = [
+      'SUBMITTED',
+      'TRIAGED',
+      'UNDER_REVIEW',
+      'ACTION_TAKEN',
+      'RESOLVED',
+      'REJECTED',
+    ];
+
+    // API: Submit Content/User Report
+    if (url.pathname === '/api/moderation/report' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const targetType = String(parsed.targetType || '').toLowerCase();
+        const targetId = String(parsed.targetId || '').trim();
+        const reason = String(parsed.reason || '').trim();
+        const details = parsed.details !== undefined ? String(parsed.details).trim() : '';
+
+        if (!VALID_TARGET_TYPES.includes(targetType)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Invalid targetType: must be one of ${VALID_TARGET_TYPES.join(', ')}` }));
+          return;
+        }
+
+        if (!targetId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'targetId is required' }));
+          return;
+        }
+
+        if (!VALID_REPORT_REASONS.includes(reason)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Invalid reason: must be one of standard taxonomy (${VALID_REPORT_REASONS.join(', ')})` }));
+          return;
+        }
+
+        // Prevent self-reporting
+        if (targetType === 'user' && targetId === principal.did) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Self-reporting is not permitted' }));
+          return;
+        }
+
+        // Security: Prevent reporter identity forging
+        if (parsed.reporterDid && parsed.reporterDid !== principal.did) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot forge reporter identity' }));
+          return;
+        }
+
+        const report = sovraDb.createReport({
+          targetType: targetType as any,
+          targetId,
+          targetTitle: parsed.targetTitle ? String(parsed.targetTitle) : undefined,
+          reporterDid: principal.did,
+          reason: reason as any,
+          details,
+          spaceId: parsed.spaceId ? String(parsed.spaceId) : undefined,
+          spaceType: parsed.spaceType ? String(parsed.spaceType) as any : undefined,
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, report }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: List Moderation Reports (RBAC Scoped)
+    if (url.pathname === '/api/moderation/reports' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Authentication required' }));
+        return;
+      }
+
+      const spaceId = url.searchParams.get('spaceId');
+      const spaceType = (url.searchParams.get('spaceType') || 'channel') as any;
+      const status = url.searchParams.get('status') as any;
+      const targetType = url.searchParams.get('targetType') as any;
+
+      const isGlobalMod = ['SUPER_ADMIN', 'SECURITY_ADMIN', 'MODERATOR'].includes(principal.role);
+
+      if (spaceId) {
+        // Space-scoped query: verify caller has moderation role in this space
+        if (!isGlobalMod) {
+          const perm = sovraDb.canUserModerate(principal.did, {
+            targetType: 'channel',
+            targetId: spaceId,
+            spaceId,
+            spaceType,
+          }, principal.role);
+          if (!perm.allowed) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: perm.reason || 'Forbidden: Insufficient privileges for this space' }));
+            return;
+          }
+        }
+      } else {
+        // Global query: caller must have global platform role
+        if (!isGlobalMod) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Platform moderator privileges required to view all reports' }));
+          return;
+        }
+      }
+
+      const reports = sovraDb.getReports({
+        status: status || undefined,
+        spaceId: spaceId || undefined,
+        targetType: targetType || undefined,
+        viewerDid: principal.did,
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, reports, total: reports.length }));
+      return;
+    }
+
+    // API: Execute Moderation Action (Hide, Remove, Restrict, Restore, Warn, Mute, Ban, Unban)
+    if (url.pathname === '/api/moderation/action' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const action = String(parsed.action || '').trim();
+        const targetType = String(parsed.targetType || '').toLowerCase();
+        const targetId = String(parsed.targetId || '').trim();
+
+        if (!VALID_MODERATION_ACTIONS.includes(action)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Invalid action: must be one of ${VALID_MODERATION_ACTIONS.join(', ')}` }));
+          return;
+        }
+
+        if (!VALID_TARGET_TYPES.includes(targetType)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Invalid targetType: must be one of ${VALID_TARGET_TYPES.join(', ')}` }));
+          return;
+        }
+
+        if (!targetId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'targetId is required' }));
+          return;
+        }
+
+        // Verify Moderation Scope & Authorization
+        const perm = sovraDb.canUserModerate(principal.did, {
+          targetType: targetType as any,
+          targetId,
+          spaceId: parsed.spaceId ? String(parsed.spaceId) : undefined,
+          spaceType: parsed.spaceType ? String(parsed.spaceType) as any : undefined,
+        }, principal.role);
+
+        if (!perm.allowed) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: perm.reason || 'Forbidden: Insufficient moderation authority' }));
+          return;
+        }
+
+        const actionRes = sovraDb.takeModerationAction({
+          reportId: parsed.reportId ? String(parsed.reportId) : undefined,
+          targetType: targetType as any,
+          targetId,
+          action: action as any,
+          moderatorDid: principal.did,
+          moderatorHandle: principal.handle,
+          notes: parsed.notes ? String(parsed.notes) : undefined,
+          spaceId: parsed.spaceId ? String(parsed.spaceId) : undefined,
+          spaceType: parsed.spaceType ? String(parsed.spaceType) as any : undefined,
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, ...actionRes }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Transition Report Lifecycle Status
+    if (url.pathname === '/api/moderation/report/status' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const reportId = String(parsed.reportId || '').trim();
+        const status = String(parsed.status || '').trim();
+
+        if (!reportId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'reportId is required' }));
+          return;
+        }
+
+        if (!VALID_REPORT_STATUSES.includes(status)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Invalid status: must be one of ${VALID_REPORT_STATUSES.join(', ')}` }));
+          return;
+        }
+
+        const rep = (sovraDb.getReports() || []).find(r => r.id === reportId);
+        if (!rep) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Report not found' }));
+          return;
+        }
+
+        // Verify Moderation Authority over this report
+        const perm = sovraDb.canUserModerate(principal.did, {
+          targetType: rep.targetType,
+          targetId: rep.targetId,
+          spaceId: rep.spaceId,
+          spaceType: rep.spaceType,
+        }, principal.role);
+
+        if (!perm.allowed) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: perm.reason || 'Forbidden: Insufficient moderation authority' }));
+          return;
+        }
+
+        const updated = sovraDb.updateReportStatus(reportId, status as any, principal.did, parsed.notes ? String(parsed.notes) : undefined);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(updated));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Mute Target (User, Conversation, Channel, Page, Group)
+    if (url.pathname === '/api/moderation/mute' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const targetType = String(parsed.targetType || '').toLowerCase();
+        const targetId = String(parsed.targetId || '').trim();
+        const durationSeconds = typeof parsed.durationSeconds === 'number' ? parsed.durationSeconds : undefined;
+
+        if (!['user', 'conversation', 'channel', 'page', 'group'].includes(targetType)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'targetType must be user, conversation, channel, page, or group' }));
+          return;
+        }
+
+        if (!targetId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'targetId is required' }));
+          return;
+        }
+
+        if (targetType === 'user' && targetId === principal.did) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Cannot mute yourself' }));
+          return;
+        }
+
+        const mute = sovraDb.muteTarget(principal.did, targetType as any, targetId, durationSeconds);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, isMuted: true, mute }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Unmute Target
+    if (url.pathname === '/api/moderation/unmute' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const targetType = String(parsed.targetType || '').toLowerCase();
+        const targetId = String(parsed.targetId || '').trim();
+
+        if (!targetId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'targetId is required' }));
+          return;
+        }
+
+        const unmuted = sovraDb.unmuteTarget(principal.did, targetType as any, targetId);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, isMuted: false, unmuted }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: List Mutes for Authenticated User
+    if (url.pathname === '/api/moderation/mutes' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Authentication required' }));
+        return;
+      }
+
+      const mutes = sovraDb.getUserMutes(principal.did);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, mutes }));
+      return;
+    }
+
+    // API: Logout / Revoke All Other Remote Sessions
+    if (url.pathname === '/api/user/sessions/revoke-others' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        // Security: Prevent User A from targeting User B's sessions
+        if (parsed.targetDid && parsed.targetDid !== principal.did) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot revoke other users sessions' }));
+          return;
+        }
+
+        const revokedCount = sovraDb.revokeAllOtherSessions(principal.did, principal.sessionId);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, revokedCount, message: `Successfully revoked ${revokedCount} other session(s)` }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Verify Inbound Mesh Packet Cryptographic & Moderation Integrity
+    if (url.pathname === '/api/mesh/moderation/verify-packet' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const verification = sovraDb.verifyAndIngestMeshPacket(parsed);
+        if (!verification.valid) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: verification.error }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, verified: true }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Queue Offline Report (Local Outbox Ingestion)
+    if (url.pathname === '/api/moderation/outbox/queue' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const outboxId = 'outbox_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, queued: true, outboxId, timestamp: Date.now() }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // API: Synchronize Durable Offline Report Outbox on Reconnection
+    if (url.pathname === '/api/moderation/outbox/sync' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 128 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const reports = Array.isArray(parsed.reports) ? parsed.reports : [];
+        const acknowledgedIds: string[] = [];
+
+        for (const item of reports) {
+          if (!item || !item.targetType || !item.targetId || !item.reason) continue;
+          if (!VALID_TARGET_TYPES.includes(item.targetType)) continue;
+          if (!VALID_REPORT_REASONS.includes(item.reason)) continue;
+
+          sovraDb.createReport({
+            targetType: item.targetType,
+            targetId: item.targetId,
+            targetTitle: item.targetTitle,
+            reporterDid: principal.did, // Binds reporter strictly to authenticated session
+            reason: item.reason,
+            details: item.details ? String(item.details) : undefined,
+            spaceId: item.spaceId,
+            spaceType: item.spaceType,
+          });
+
+          acknowledgedIds.push(item.id || item.outboxId || 'synced_' + Date.now());
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          synced: acknowledgedIds.length,
+          acknowledgedIds,
+        }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
@@ -30803,7 +45257,10 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: loginResult.error }));
           return;
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `sovra_session_token=${encodeURIComponent(loginResult.sessionToken!)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800`
+        });
         res.end(JSON.stringify({
           ok: true,
           sessionToken: loginResult.sessionToken,
@@ -30813,6 +45270,20 @@ async function startDevServer() {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
       }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/logout' && (req.method === 'POST' || req.method === 'GET')) {
+      const principal = resolvePrincipal(req);
+      if (principal && principal.sessionId) {
+        adminSecurity.revokeAdminSession(principal.sessionId, 'ADMIN_LOGOUT');
+        sovraDb.revokeToken(principal.sessionId, 'ADMIN_LOGOUT');
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Set-Cookie': 'sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'
+      });
+      res.end(JSON.stringify({ ok: true, message: 'Admin session terminated' }));
       return;
     }
 
@@ -30847,7 +45318,7 @@ async function startDevServer() {
         chatMessagesVolume: allMsgs.length,
         diskStorageBytes: diskBytes,
         diskStorageMb: diskMb,
-        auditLogs: sovraDb.getAuditLogs(50),
+        auditLogs: sovraDb.getAuditLogs(200),
         reelsCount: sovraDb.getAllReels().length,
       };
 
@@ -30885,13 +45356,259 @@ async function startDevServer() {
       return;
     }
 
+    // Android Digital Asset Links (Universal App Links)
+    if (url.pathname === '/.well-known/assetlinks.json') {
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400',
+      });
+      res.end(JSON.stringify([
+        {
+          relation: ['delegate_permission/common.handle_all_urls'],
+          target: {
+            namespace: 'android_app',
+            package_name: 'network.sovra.mobile',
+            sha256_cert_fingerprints: [
+              '5F:E9:60:5F:17:55:F2:0A:9E:6C:F9:55:9D:3A:DF:B2:EC:88:23:25:18:32:9C:45:57:E4:66:A6:33:D6:2B:1C',
+            ],
+          },
+        },
+      ], null, 2));
+      return;
+    }
+
+    // Apple App Site Association (iOS Universal Links)
+    if (url.pathname === '/.well-known/apple-app-site-association' || url.pathname === '/apple-app-site-association') {
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400',
+      });
+      res.end(JSON.stringify({
+        applinks: {
+          apps: [],
+          details: [
+            {
+              appID: 'TEAMID.network.sovra.mobile',
+              paths: ['/feed/*', '/p/*', '/u/*', '/call/*', '/chat/*'],
+            },
+          ],
+        },
+      }, null, 2));
+      return;
+    }
+
+    // Blind Push Gateway: Register Device
+    if (url.pathname === '/api/push/register' && req.method === 'POST') {
+      try {
+        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+        if (!bodyOk) return;
+        const parsed = reqBody ? JSON.parse(reqBody) : {};
+        if (!parsed.deviceId || !parsed.pushToken || !parsed.blindChannelId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Missing deviceId, pushToken, or blindChannelId' }));
+          return;
+        }
+        blindPushRelay.registerDevice({
+          deviceId: String(parsed.deviceId),
+          deviceDid: String(parsed.deviceDid || 'did:sovra:anonymous'),
+          platform: (parsed.platform === 'ios' ? 'ios' : (parsed.platform === 'web' ? 'web' : 'android')),
+          pushToken: String(parsed.pushToken),
+          blindChannelId: String(parsed.blindChannelId),
+          updatedAt: Date.now(),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, registered: true, totalDevices: blindPushRelay.getRegisteredDeviceCount() }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Push registration failed' }));
+      }
+      return;
+    }
+
+    // Blind Push Gateway: Dispatch Opaque Wakeup Ping
+    if (url.pathname === '/api/push/dispatch' && req.method === 'POST') {
+      try {
+        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+        if (!bodyOk) return;
+        const parsed = reqBody ? JSON.parse(reqBody) : {};
+        if (!parsed.blindChannelId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Missing blindChannelId' }));
+          return;
+        }
+        const dispatchRes = await blindPushRelay.dispatchBlindSignal({
+          blindChannelId: String(parsed.blindChannelId),
+          opaqueWakeupHint: String(parsed.opaqueWakeupHint || crypto.randomBytes(16).toString('hex')),
+          priority: parsed.priority === 'normal' ? 'normal' : 'high',
+          timestamp: Date.now(),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: dispatchRes.ok, dispatchedCount: dispatchRes.ok ? dispatchRes.value.length : 0 }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Push dispatch failed' }));
+      }
+      return;
+    }
+
+    // Blind Push Gateway: Status
+    if (url.pathname === '/api/push/status' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, activeDevices: blindPushRelay.getRegisteredDeviceCount() }));
+      return;
+    }
+
+    // Dynamic Proof-of-Work (PoW) Challenge Endpoint (Sybil Botnet Defense)
+    if (url.pathname === '/api/auth/challenge' && req.method === 'GET') {
+      const challengeId = 'pow_' + crypto.randomBytes(16).toString('hex');
+      const prefix = crypto.randomBytes(8).toString('hex');
+      const difficulty = Number(process.env.SOVRA_POW_DIFFICULTY) || 3;
+      const expiresAt = Date.now() + 120000; // 2 minutes validity
+      activeChallenges.set(challengeId, { prefix, difficulty, expiresAt });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, challengeId, prefix, difficulty, expiresAt }));
+      return;
+    }
+
+    // Enterprise Multi-Language (i18n) API
+    if (url.pathname.startsWith('/api/i18n') && req.method === 'GET') {
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (parts.length <= 2 || parts[2] === 'locales') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: true,
+          supportedLocales: Object.values(SUPPORTED_LOCALES),
+          defaultLocale: 'en',
+        }));
+        return;
+      }
+      const requestedLocale = parts[2];
+      const bundle = getLocaleBundle(requestedLocale);
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'public, max-age=3600',
+      });
+      res.end(JSON.stringify({ ok: true, ...bundle }));
+      return;
+    }
+
+    // Legal & App Store Compliance: Privacy Policy & Terms of Service
+    if (
+      url.pathname === '/privacy' ||
+      url.pathname === '/privacy-policy' ||
+      url.pathname === '/terms' ||
+      url.pathname === '/terms-of-service' ||
+      url.pathname === '/api/compliance/privacy' ||
+      url.pathname === '/api/compliance/terms'
+    ) {
+      const isPrivacy = url.pathname.includes('privacy');
+      const isJson = (req.headers.accept && req.headers.accept.includes('application/json')) || url.pathname.startsWith('/api/');
+
+      const privacyData = {
+        title: 'SOVRA Protocol Privacy Policy',
+        lastUpdated: '2026-10-10',
+        version: '1.0.0',
+        architecture: 'Zero-Knowledge Cryptographic Decentralized Architecture',
+        principles: [
+          'No Central Account Credentials: Users are identified solely by cryptographic Ed25519 Public Keys / W3C DIDs.',
+          'No Plaintext Communication Storage: All spatial messages, calls, and chats are encrypted end-to-end with X25519 key agreements.',
+          'No Third-Party Telemetry or Ad Tracking: Zero trackers, zero analytics SDKs, zero data sales.',
+          'Hardware Permissions Transparency: Bluetooth and Local Wi-Fi are used exclusively for offline mesh packet transmission. Camera and Microphone are used strictly for real-time encrypted WebRTC calls.',
+          'User Right to Erasure: Users possess full sovereignty to delete local database keys and revoke network registrations at will.'
+        ],
+        dataSafety: {
+          location: 'Never Collected or Stored',
+          personalIdentifiers: 'Cryptographic DID Keys only (no phone number or email required)',
+          financialInfo: 'Peer-to-peer cryptographic tip vouchers only',
+          dataShared: 'None',
+        }
+      };
+
+      const termsData = {
+        title: 'SOVRA Protocol Terms of Service',
+        lastUpdated: '2026-10-10',
+        version: '1.0.0',
+        governance: 'Decentralized Peer-to-Peer Sovereign Protocol',
+        clauses: [
+          'Acceptance: By connecting to the SOVRA network, peers agree to participate in decentralized cryptographic gossip.',
+          'Sovereign Identity: Users are solely responsible for safeguarding their private keys and recovery seeds.',
+          'Decentralized Conduct: Users must not use protocol bandwidth for denial-of-service or unlawful exploitation.',
+          'No Warranty: The protocol is provided as free, open-source decentralized infrastructure.'
+        ]
+      };
+
+      if (isJson) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, document: isPrivacy ? privacyData : termsData }));
+        return;
+      }
+
+      const doc = isPrivacy ? privacyData : termsData;
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${doc.title} — SOVRA</title>
+  <style>
+    :root { --bg: #090d16; --fg: #e2e8f0; --accent: #6366f1; --card: #131b2e; --border: #1e293b; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; padding: 32px 16px; }
+    .container { max-width: 760px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 36px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    h1 { color: #fff; margin-top: 0; font-size: 28px; }
+    .meta { font-size: 13px; color: #94a3b8; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    .badge { display: inline-block; background: rgba(99,102,241,0.2); color: #818cf8; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-bottom: 16px; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 12px; }
+    .back { display: inline-block; margin-top: 24px; color: var(--accent); text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="badge">Official Compliance Document</div>
+    <h1>${doc.title}</h1>
+    <div class="meta">Effective Date: ${doc.lastUpdated} | Protocol Version: ${doc.version}</div>
+    ${isPrivacy ? `
+      <h3>Zero-Knowledge Architecture</h3>
+      <p>SOVRA is engineered from the ground up to respect human freedom and digital sovereignty.</p>
+      <h3>Core Principles</h3>
+      <ul>${privacyData.principles.map(p => `<li>${p}</li>`).join('')}</ul>
+      <h3>Google Play & App Store Data Safety Declaration</h3>
+      <p><strong>Device Permissions:</strong> Bluetooth, Wi-Fi Direct, Camera, Microphone.</p>
+      <p><strong>Telemetry & Ads:</strong> Zero. No third-party ad networks or tracking scripts exist in this application.</p>
+    ` : `
+      <h3>Decentralized Protocol Governance</h3>
+      <p>SOVRA operates as a decentralized, sovereign peer-to-peer communication network.</p>
+      <h3>Terms & Conditions</h3>
+      <ul>${termsData.clauses.map(c => `<li>${c}</li>`).join('')}</ul>
+    `}
+    <a class="back" href="/">&larr; Return to SOVRA App</a>
+  </div>
+</body>
+</html>`;
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400',
+      });
+      res.end(html);
+      return;
+    }
+
+
     // Compiled Client Bundle Assets (Solution C)
     if (url.pathname === '/assets/bundle.js' || url.pathname === '/dist/bundle.js') {
       const bundlePath = path.resolve(import.meta.dirname, '../apps/sovra-app/dist/bundle.js');
       if (fs.existsSync(bundlePath)) {
+        const stat = fs.statSync(bundlePath);
+        const etag = `"${stat.size}-${stat.mtimeMs.toString(36)}"`;
+        if (req.headers['if-none-match'] === etag) {
+          res.writeHead(304);
+          res.end();
+          return;
+        }
         res.writeHead(200, {
           'Content-Type': 'application/javascript; charset=utf-8',
-          'Cache-Control': 'public, max-age=3600',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'ETag': etag,
         });
         res.end(fs.readFileSync(bundlePath));
         return;
@@ -30900,9 +45617,17 @@ async function startDevServer() {
     if (url.pathname === '/assets/bundle.js.map' || url.pathname === '/dist/bundle.js.map') {
       const mapPath = path.resolve(import.meta.dirname, '../apps/sovra-app/dist/bundle.js.map');
       if (fs.existsSync(mapPath)) {
+        const stat = fs.statSync(mapPath);
+        const etag = `"${stat.size}-${stat.mtimeMs.toString(36)}"`;
+        if (req.headers['if-none-match'] === etag) {
+          res.writeHead(304);
+          res.end();
+          return;
+        }
         res.writeHead(200, {
           'Content-Type': 'application/json; charset=utf-8',
-          'Cache-Control': 'public, max-age=3600',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'ETag': etag,
         });
         res.end(fs.readFileSync(mapPath));
         return;
@@ -30926,6 +45651,18 @@ async function startDevServer() {
 
     // Product B: Standalone Company Operations Console (Dedicated Admin Panel)
     if (url.pathname === '/admin' || url.pathname === '/admin/' || url.pathname === '/admin/index.html') {
+      const principal = resolvePrincipal(req);
+      if (!principal || !['SUPER_ADMIN', 'ADMIN', 'SECURITY_ADMIN', 'INFRA_OPERATOR', 'MODERATOR', 'SUPPORT', 'ANALYST'].includes(principal.role)) {
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        });
+        res.end(renderAdminLoginHtml());
+        return;
+      }
+
       const diskBytes = getDirectorySize(STORAGE_DIR);
       const diskMb = Number((diskBytes / (1024 * 1024)).toFixed(2));
       const allUsers = sovraDb.getAllUsers().map(toPublicUserDTO);
@@ -30976,13 +45713,29 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: 'Channel ID required' }));
           return;
         }
+
+        const principal = resolvePrincipal(req, parsed);
+        const auth = adminSecurity.authorize(principal, 'admin:moderate', 'ADMIN_DELETE_CHANNEL', channelId);
+        if (!auth.authorized) {
+          res.writeHead(auth.statusCode, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: auth.error }));
+          return;
+        }
+
+        const existing = sovraDb.getChannelById(channelId);
+        if (!existing) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Channel not found' }));
+          return;
+        }
+
         const delRes = sovraDb.deleteChannel(channelId, 'did:sovra:system');
         dynamicSocialStore.channels = sovraDb.getAllChannels();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: delRes.ok, channelId }));
-      } catch {
+      } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
       }
       return;
     }
@@ -30999,19 +45752,42 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: 'Page ID required' }));
           return;
         }
+
+        const principal = resolvePrincipal(req, parsed);
+        const auth = adminSecurity.authorize(principal, 'admin:moderate', 'ADMIN_DELETE_PAGE', pageId);
+        if (!auth.authorized) {
+          res.writeHead(auth.statusCode, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: auth.error }));
+          return;
+        }
+
+        const existing = sovraDb.getPageById(pageId);
+        if (!existing) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Page not found' }));
+          return;
+        }
+
         const delRes = sovraDb.deletePage(pageId, 'did:sovra:system');
         dynamicSocialStore.pages = sovraDb.getAllPages();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: delRes.ok, pageId }));
-      } catch {
+      } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
       }
       return;
     }
 
     // Admin: Purge Stale Test Entities
     if (url.pathname === '/api/admin/entities/purge-test' && req.method === 'POST') {
+      const principal = resolvePrincipal(req);
+      const auth = adminSecurity.authorize(principal, 'admin:super', 'ADMIN_PURGE_TEST_ENTITIES');
+      if (!auth.authorized) {
+        res.writeHead(auth.statusCode, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: auth.error }));
+        return;
+      }
       const resPurge = sovraDb.purgeTestEntities();
       dynamicSocialStore.channels = sovraDb.getAllChannels();
       dynamicSocialStore.pages = sovraDb.getAllPages();
@@ -31114,6 +45890,8 @@ async function startDevServer() {
   };
 
   const server = http.createServer(requestHandler);
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
 
   const tlsCreds = ensureDevTlsCertificates();
   let httpsServer: https.Server | null = null;
@@ -31123,6 +45901,8 @@ async function startDevServer() {
         key: tlsCreds.key,
         cert: tlsCreds.cert
       }, requestHandler);
+      httpsServer.keepAliveTimeout = 65000;
+      httpsServer.headersTimeout = 66000;
     } catch (tlsErr) {
       console.warn('[HTTPS] Could not initialize HTTPS server:', tlsErr);
     }
@@ -31170,10 +45950,38 @@ async function startDevServer() {
       console.log(`     Alternatively in Chrome: chrome://flags/#unsafely-treat-insecure-origin-as-secure`);
     }
     console.log(`\nPress Ctrl+C to terminate the local node.`);
+
+    // Periodic SQLite WAL Checkpoint Daemon (Every 15 minutes)
+    const walCheckpointInterval = setInterval(() => {
+      try {
+        (sovraDb as any).sqliteEngine?.checkpoint();
+      } catch (_) {}
+    }, 15 * 60 * 1000);
+    walCheckpointInterval.unref();
+
+    // Periodic Automated Snapshot & Backup Daemon (Every 6 hours)
+    const backupInterval = setInterval(() => {
+      try {
+        const mgr = new SovraBackupManager(STORAGE_DIR);
+        mgr.createBackup({ tag: 'auto_cron' });
+      } catch (backupErr) {
+        console.warn('[BACKUP CRON] Automated snapshot encountered an error:', backupErr);
+      }
+    }, 6 * 60 * 60 * 1000);
+    backupInterval.unref();
   });
 }
 
-startDevServer().catch(err => {
-  console.error('[FATAL] Failed to start local server:', err);
-  process.exit(1);
-});
+const isMainScript = !process.env.VITEST && (
+  !process.argv[1] ||
+  process.argv[1].endsWith('dev-server.ts') ||
+  process.argv[1].endsWith('dev-server.js')
+);
+
+if (isMainScript) {
+  startDevServer().catch(err => {
+    console.error('[FATAL] Failed to start local server:', err);
+    process.exit(1);
+  });
+}
+

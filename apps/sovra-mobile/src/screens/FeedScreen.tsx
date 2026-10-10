@@ -529,6 +529,156 @@ export function FeedScreen(): React.JSX.Element {
         ))}
       </section>
 
+      {/* Inline Progressive Post Composer (Zero-Popup Industry Standard) */}
+      {isCreateOpen ? (
+        <div
+          style={{
+            margin: '12px 16px',
+            backgroundColor: '#111827',
+            borderRadius: 14,
+            padding: 16,
+            border: '1px solid rgba(56, 189, 248, 0.4)',
+            boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '1.2rem' }}>⚡</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#38bdf8' }}>Broadcast Sovereign Post</span>
+            </div>
+            <button
+              onClick={() => {
+                setIsCreateOpen(false);
+                setCreateError(null);
+              }}
+              disabled={isSubmitting}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: 16,
+                cursor: 'pointer',
+                padding: 4,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {createError && (
+            <div
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: 8,
+                fontSize: 12,
+                color: '#f87171',
+                marginBottom: 12,
+              }}
+            >
+              {createError}
+            </div>
+          )}
+
+          <textarea
+            value={newCaption}
+            onChange={e => setNewCaption(e.target.value)}
+            placeholder="What's happening on the P2P mesh network? Broadcast to nearby peers..."
+            disabled={isSubmitting}
+            rows={3}
+            style={{
+              width: '100%',
+              backgroundColor: '#1f2937',
+              border: '1px solid #374151',
+              borderRadius: 10,
+              color: '#fff',
+              padding: 12,
+              fontSize: 13,
+              resize: 'none',
+              outline: 'none',
+              boxSizing: 'border-box',
+              marginBottom: 12,
+            }}
+          />
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
+            <button
+              onClick={() => {
+                setIsCreateOpen(false);
+                setCreateError(null);
+              }}
+              disabled={isSubmitting}
+              style={{
+                padding: '8px 14px',
+                backgroundColor: '#374151',
+                color: '#cbd5e1',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreatePost}
+              disabled={isSubmitting || !newCaption.trim()}
+              style={{
+                padding: '8px 18px',
+                backgroundColor: isSubmitting || !newCaption.trim() ? '#475569' : '#00a884',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: isSubmitting || !newCaption.trim() ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {isSubmitting ? 'Relaying...' : '🚀 Broadcast Post'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onClick={() => setIsCreateOpen(true)}
+          style={{
+            margin: '12px 16px',
+            padding: '12px 16px',
+            backgroundColor: '#111827',
+            borderRadius: 12,
+            border: '1px dashed rgba(255,255,255,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            cursor: 'pointer',
+          }}
+        >
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              backgroundColor: '#00a884',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+            }}
+          >
+            ⚡
+          </div>
+          <div style={{ color: '#94a3b8', fontSize: 13, flex: 1 }}>
+            What's on your sovereign mind? Broadcast to mesh...
+          </div>
+          <span style={{ color: '#38bdf8', fontSize: 16 }}>✎</span>
+        </div>
+      )}
+
       {/* Feed Posts */}
       <section aria-label="Feed Stream" style={{ flex: 1, paddingBottom: 64 }}>
         {/* Loading Skeleton */}
@@ -717,135 +867,6 @@ export function FeedScreen(): React.JSX.Element {
             </article>
           ))}
       </section>
-
-      {/* Create Post Modal */}
-      {isCreateOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16,
-          }}
-        >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: 420,
-              backgroundColor: '#111827',
-              borderRadius: 16,
-              padding: 20,
-              border: '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Create Sovereign Post</h3>
-              <button
-                onClick={() => {
-                  setIsCreateOpen(false);
-                  setCreateError(null);
-                }}
-                disabled={isSubmitting}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#94a3b8',
-                  fontSize: 18,
-                  cursor: 'pointer',
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {createError && (
-              <div
-                style={{
-                  padding: '8px 12px',
-                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  color: '#f87171',
-                  marginBottom: 12,
-                }}
-              >
-                {createError}
-              </div>
-            )}
-
-            <textarea
-              value={newCaption}
-              onChange={e => setNewCaption(e.target.value)}
-              placeholder="What's happening on the P2P mesh network?"
-              disabled={isSubmitting}
-              rows={4}
-              style={{
-                width: '100%',
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
-                borderRadius: 10,
-                color: '#fff',
-                padding: 12,
-                fontSize: 13,
-                resize: 'none',
-                outline: 'none',
-                boxSizing: 'border-box',
-                marginBottom: 16,
-              }}
-            />
-
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => {
-                  setIsCreateOpen(false);
-                  setCreateError(null);
-                }}
-                disabled={isSubmitting}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#374151',
-                  color: '#cbd5e1',
-                  border: 'none',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreatePost}
-                disabled={isSubmitting || !newCaption.trim()}
-                style={{
-                  padding: '8px 20px',
-                  backgroundColor: isSubmitting || !newCaption.trim() ? '#475569' : '#3b82f6',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: isSubmitting || !newCaption.trim() ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                {isSubmitting ? 'Broadcasting...' : 'Broadcast Post ⚡'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

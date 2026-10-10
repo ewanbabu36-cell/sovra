@@ -6,10 +6,11 @@
  * Operates in WAL mode (Write-Ahead Logging) with B-tree indexes, foreign keys, and atomic commits.
  */
 
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, StatementSync } from 'node:sqlite';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { SqliteMigrationRunner } from './database-migrations.ts';
 import type {
   UserRecord,
   PublicUserDTO,
@@ -30,6 +31,8 @@ export class SqliteSocialDatabaseEngine {
   private db: DatabaseSync;
   private readonly dbPath: string;
   private readonly storageDir: string;
+  private stmtCache = new Map<string, StatementSync>();
+  private migrationRunner: SqliteMigrationRunner;
 
   constructor(storageDir?: string) {
     this.storageDir = storageDir || process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev';
@@ -37,6 +40,21 @@ export class SqliteSocialDatabaseEngine {
     this.dbPath = path.join(this.storageDir, 'sovra-social.sqlite');
     this.db = new DatabaseSync(this.dbPath);
     this.initSchema();
+    this.migrationRunner = new SqliteMigrationRunner(this.db);
+    this.migrationRunner.applyPending();
+  }
+
+  public getMigrationRunner(): SqliteMigrationRunner {
+    return this.migrationRunner;
+  }
+
+  public prepareCached(sql: string): StatementSync {
+    let stmt = this.stmtCache.get(sql);
+    if (!stmt) {
+      stmt = this.db.prepare(sql);
+      this.stmtCache.set(sql, stmt);
+    }
+    return stmt;
   }
 
   public checkpoint(): void {
@@ -46,12 +64,15 @@ export class SqliteSocialDatabaseEngine {
   }
 
   private initSchema(): void {
-    // Configure high-performance WAL mode and safety pragmas
+    // Configure high-performance WAL mode, memory mapping and safety pragmas
     this.db.exec(`
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = NORMAL;
       PRAGMA foreign_keys = ON;
       PRAGMA busy_timeout = 5000;
+      PRAGMA temp_store = MEMORY;
+      PRAGMA mmap_size = 268435456;
+      PRAGMA cache_size = -64000;
 
       -- 1. USERS
       CREATE TABLE IF NOT EXISTS users (
@@ -88,6 +109,7 @@ export class SqliteSocialDatabaseEngine {
         user_agent TEXT NOT NULL,
         created_at INTEGER NOT NULL,
         last_active_at INTEGER NOT NULL,
+        expires_at INTEGER DEFAULT 0,
         is_revoked INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (user_did) REFERENCES users(did) ON DELETE CASCADE
       );
@@ -135,6 +157,7 @@ export class SqliteSocialDatabaseEngine {
         saved_by_dids_json TEXT NOT NULL DEFAULT '[]',
         liked_by_dids_json TEXT NOT NULL DEFAULT '[]',
         reactions_json TEXT NOT NULL DEFAULT '{}',
+        views_count INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
@@ -236,7 +259,18 @@ export class SqliteSocialDatabaseEngine {
         timestamp INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_logs(timestamp DESC);
+
+      -- 11. PERSISTENT TOKEN REVOCATION REGISTRY
+      CREATE TABLE IF NOT EXISTS revoked_tokens (
+        token TEXT PRIMARY KEY,
+        revoked_at INTEGER NOT NULL,
+        reason TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_revoked_tokens ON revoked_tokens(token);
     `);
+    try {
+      this.db.exec('ALTER TABLE posts ADD COLUMN views_count INTEGER NOT NULL DEFAULT 0;');
+    } catch (_) {}
   }
 
   /**
@@ -356,6 +390,18 @@ export class SqliteSocialDatabaseEngine {
                 c.text || '', (c as any).parentId || null, (c as any).likesCount ?? (c as any).likes ?? 0,
                 JSON.stringify((c as any).likedByDids || []), (c as any).createdAt || (c as any).timestamp || Date.now()
               );
+              if (Array.isArray((c as any).replies)) {
+                for (const r of (c as any).replies) {
+                  const rAuthor = (r as any).author || (r as any).authorName || 'Peer';
+                  const rHandle = (r as any).authorHandle || (r as any).handle || '';
+                  commentStmt.run(
+                    r.id, p.id, (r as any).authorDid || p.authorDid, rHandle, rAuthor,
+                    (r as any).authorAvatar || 'S', (r as any).authorAvatarBg || '#6366f1',
+                    r.text || '', c.id, (r as any).likesCount ?? (r as any).likes ?? 0,
+                    JSON.stringify((r as any).likedByDids || []), (r as any).createdAt || (r as any).timestamp || Date.now()
+                  );
+                }
+              }
             }
           }
         }
@@ -474,14 +520,14 @@ export class SqliteSocialDatabaseEngine {
   }
 
   public findUserByDid(did: string): UserRecord | undefined {
-    const row = this.db.prepare('SELECT * FROM users WHERE did = ?').get(did) as any;
+    const row = this.prepareCached('SELECT * FROM users WHERE did = ?').get(did) as any;
     if (!row) return undefined;
     return this.mapUserRow(row);
   }
 
   public findUserByHandle(handle: string): UserRecord | undefined {
     const clean = handle.startsWith('@') ? handle.toLowerCase() : '@' + handle.toLowerCase();
-    const row = this.db.prepare('SELECT * FROM users WHERE lower(handle) = ?').get(clean) as any;
+    const row = this.prepareCached('SELECT * FROM users WHERE lower(handle) = ?').get(clean) as any;
     if (!row) return undefined;
     return this.mapUserRow(row);
   }
@@ -491,12 +537,22 @@ export class SqliteSocialDatabaseEngine {
     if (this.isSessionRevoked(token)) return undefined;
 
     // Check user_sessions
-    const sessRow = this.db.prepare('SELECT user_did FROM user_sessions WHERE token = ? AND is_revoked = 0').get(token) as any;
-    if (sessRow) {
-      return this.findUserByDid(sessRow.user_did);
+    try {
+      const sessRow = this.prepareCached('SELECT user_did, expires_at FROM user_sessions WHERE token = ? AND is_revoked = 0').get(token) as any;
+      if (sessRow) {
+        if (sessRow.expires_at && Number(sessRow.expires_at) > 0 && Number(sessRow.expires_at) < Date.now()) {
+          return undefined;
+        }
+        return this.findUserByDid(sessRow.user_did);
+      }
+    } catch {
+      const sessRow = this.prepareCached('SELECT user_did FROM user_sessions WHERE token = ? AND is_revoked = 0').get(token) as any;
+      if (sessRow) {
+        return this.findUserByDid(sessRow.user_did);
+      }
     }
     // Fallback to primary session_token
-    const userRow = this.db.prepare('SELECT * FROM users WHERE session_token = ?').get(token) as any;
+    const userRow = this.prepareCached('SELECT * FROM users WHERE session_token = ?').get(token) as any;
     if (userRow) return this.mapUserRow(userRow);
     return undefined;
   }
@@ -514,9 +570,13 @@ export class SqliteSocialDatabaseEngine {
     deviceType?: 'Desktop' | 'Mobile' | 'Tablet';
     ipAddress?: string;
     userAgent?: string;
+    ttlMs?: number;
+    expiresAt?: number;
   }): UserSessionRecord {
     const now = Date.now();
     const sessionId = 'ses_' + now + '_' + crypto.randomBytes(6).toString('hex');
+    const defaultTtlMs = 7 * 24 * 60 * 60 * 1000;
+    const expiresAt = session.expiresAt || (session.ttlMs ? now + session.ttlMs : now + defaultTtlMs);
     const rec: UserSessionRecord = {
       sessionId,
       userDid: session.userDid,
@@ -527,17 +587,18 @@ export class SqliteSocialDatabaseEngine {
       userAgent: session.userAgent || 'Sovra Client/1.0',
       createdAt: now,
       lastActiveAt: now,
+      expiresAt,
       isRevoked: false,
     };
 
     this.db.prepare(`
       INSERT INTO user_sessions (
         session_id, user_did, token, device_name, device_type,
-        ip_address, user_agent, created_at, last_active_at, is_revoked
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ip_address, user_agent, created_at, last_active_at, expires_at, is_revoked
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       rec.sessionId, rec.userDid, rec.token, rec.deviceName, rec.deviceType,
-      rec.ipAddress, rec.userAgent, rec.createdAt, rec.lastActiveAt, 0
+      rec.ipAddress, rec.userAgent, rec.createdAt, rec.lastActiveAt, rec.expiresAt, 0
     );
 
     return rec;
@@ -555,26 +616,90 @@ export class SqliteSocialDatabaseEngine {
       userAgent: r.user_agent,
       createdAt: r.created_at,
       lastActiveAt: r.last_active_at,
+      expiresAt: Number(r.expires_at || 0),
       isRevoked: Boolean(r.is_revoked),
     }));
   }
 
   public revokeSession(sessionId: string, userDid?: string): boolean {
-    let stmt;
-    if (userDid) {
-      stmt = this.db.prepare('UPDATE user_sessions SET is_revoked = 1 WHERE session_id = ? AND user_did = ?');
-      const res = stmt.run(sessionId, userDid);
-      return res.changes > 0;
-    } else {
-      stmt = this.db.prepare('UPDATE user_sessions SET is_revoked = 1 WHERE session_id = ? OR token = ?');
-      const res = stmt.run(sessionId, sessionId);
-      return res.changes > 0;
+    try {
+      const sess = this.prepareCached('SELECT token, session_id FROM user_sessions WHERE session_id = ? OR token = ?').get(sessionId, sessionId) as any;
+      const token = sess?.token || sessionId;
+      try {
+        this.prepareCached('INSERT OR REPLACE INTO revoked_tokens (token, revoked_at, reason) VALUES (?, ?, ?)').run(
+          token, Date.now(), 'Revocation'
+        );
+      } catch (_) {}
+
+      let stmt;
+      if (userDid) {
+        stmt = this.db.prepare('UPDATE user_sessions SET is_revoked = 1 WHERE (session_id = ? OR token = ?) AND user_did = ?');
+        const res = stmt.run(sessionId, sessionId, userDid);
+        return res.changes > 0;
+      } else {
+        stmt = this.db.prepare('UPDATE user_sessions SET is_revoked = 1 WHERE session_id = ? OR token = ?');
+        const res = stmt.run(sessionId, sessionId);
+        return res.changes > 0;
+      }
+    } catch {
+      return false;
     }
   }
 
   public isSessionRevoked(token: string): boolean {
-    const row = this.db.prepare('SELECT is_revoked FROM user_sessions WHERE token = ?').get(token) as any;
-    return row ? Boolean(row.is_revoked) : false;
+    if (!token) return true;
+    try {
+      const rev = this.prepareCached('SELECT 1 FROM revoked_tokens WHERE token = ?').get(token);
+      if (rev) return true;
+      const row = this.prepareCached('SELECT is_revoked, expires_at FROM user_sessions WHERE token = ?').get(token) as any;
+      if (!row) return false;
+      if (row.is_revoked) return true;
+      if (row.expires_at && Number(row.expires_at) > 0 && Number(row.expires_at) < Date.now()) return true;
+      return false;
+    } catch {
+      const row = this.prepareCached('SELECT is_revoked FROM user_sessions WHERE token = ?').get(token) as any;
+      return row ? Boolean(row.is_revoked) : false;
+    }
+  }
+
+  public deleteChatMessage(messageId: string, requesterDid: string): { ok: boolean; error?: string } {
+    try {
+      const msg = this.prepareCached('SELECT sender_did, recipient_did FROM chat_messages WHERE id = ?').get(messageId) as any;
+      if (!msg) return { ok: false, error: 'Message not found' };
+      if (msg.sender_did !== requesterDid && !msg.recipient_did.startsWith('channel:')) {
+        return { ok: false, error: 'Forbidden: Cannot delete message sent by another peer' };
+      }
+      this.prepareCached('DELETE FROM chat_messages WHERE id = ?').run(messageId);
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Failed to delete message' };
+    }
+  }
+
+  public deleteUserAccount(userDid: string): { ok: boolean; error?: string } {
+    if (!userDid) return { ok: false, error: 'User DID required' };
+    const user = this.findUserByDid(userDid);
+    if (!user) return { ok: false, error: 'User not found' };
+
+    const deleteTx = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM users WHERE did = ?').run(userDid);
+      this.db.prepare('DELETE FROM user_sessions WHERE user_did = ?').run(userDid);
+      this.db.prepare('DELETE FROM follows WHERE follower_did = ? OR target_did = ?').run(userDid, userDid);
+      this.db.prepare('DELETE FROM posts WHERE author_did = ?').run(userDid);
+      this.db.prepare('DELETE FROM comments WHERE author_did = ?').run(userDid);
+      this.db.prepare('DELETE FROM likes WHERE user_did = ?').run(userDid);
+      this.db.prepare('DELETE FROM chat_messages WHERE sender_did = ? OR recipient_did = ?').run(userDid, userDid);
+      this.db.prepare('DELETE FROM notifications WHERE recipient_did = ? OR sender_did = ?').run(userDid, userDid);
+      this.db.prepare('DELETE FROM channels WHERE owner_did = ?').run(userDid);
+      this.db.prepare('DELETE FROM pages WHERE owner_did = ?').run(userDid);
+    });
+
+    try {
+      deleteTx();
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Database error during account deletion' };
+    }
   }
 
   // --- ASYMMETRIC FOLLOW GRAPH ---
@@ -711,10 +836,16 @@ export class SqliteSocialDatabaseEngine {
   }
 
   public findPostById(id: string): FeedPostRecord | undefined {
-    const row = this.db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
+    const row = this.prepareCached('SELECT * FROM posts WHERE id = ?').get(id) as any;
     if (!row) return undefined;
-    const commentRows = this.db.prepare('SELECT * FROM comments WHERE post_id = ? ORDER BY created_at ASC').all(id) as any[];
+    const commentRows = this.prepareCached('SELECT * FROM comments WHERE post_id = ? ORDER BY created_at ASC').all(id) as any[];
     return this.mapPostRow(row, commentRows);
+  }
+
+  public incrementPostViews(id: string, delta = 1): void {
+    try {
+      this.prepareCached('UPDATE posts SET views_count = COALESCE(views_count, 0) + ? WHERE id = ?').run(delta, id);
+    } catch (_) {}
   }
 
   private mapPostRow(r: any, comments: any[]): FeedPostRecord {
@@ -751,15 +882,34 @@ export class SqliteSocialDatabaseEngine {
       tags,
       likesCount: r.likes_count,
       timestamp: r.created_at,
-      comments: comments.map(c => ({
-        id: c.id,
-        author: c.author_name,
-        authorDid: c.author_did,
-        authorAvatar: c.author_avatar,
-        text: c.text,
-        timestamp: c.created_at,
-        likesCount: c.likes_count,
-      })),
+      comments: (() => {
+        const topComments = comments.filter(c => !c.parent_id);
+        const replyComments = comments.filter(c => Boolean(c.parent_id));
+        return topComments.map(c => ({
+          id: c.id,
+          author: c.author_name,
+          authorDid: c.author_did,
+          authorHandle: c.author_handle,
+          authorAvatar: c.author_avatar,
+          text: c.text,
+          timestamp: c.created_at,
+          likesCount: c.likes_count,
+          likedByDids: JSON.parse(c.liked_by_dids_json || '[]'),
+          replies: replyComments.filter(rc => rc.parent_id === c.id).map(rc => ({
+            id: rc.id,
+            commentId: c.id,
+            parentId: c.id,
+            author: rc.author_name,
+            authorDid: rc.author_did,
+            authorHandle: rc.author_handle,
+            authorAvatar: rc.author_avatar,
+            text: rc.text,
+            timestamp: rc.created_at,
+            likesCount: rc.likes_count,
+            likedByDids: JSON.parse(rc.liked_by_dids_json || '[]'),
+          })),
+        }));
+      })(),
       likedByDids: JSON.parse(r.liked_by_dids_json || '[]'),
       visibility: r.visibility,
       sharesCount: r.shares_count,
@@ -879,7 +1029,10 @@ export class SqliteSocialDatabaseEngine {
   }
 
   public close(): void {
-    this.db.close();
+    this.stmtCache.clear();
+    try {
+      this.db.close();
+    } catch (_) {}
   }
 }
 

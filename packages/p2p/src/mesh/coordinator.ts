@@ -49,6 +49,7 @@ export class MeshTransportManager {
   private isDutyCycleScanning = true;
 
   private statusChangeHandlers: Array<(status: MeshNetworkStatus) => void> = [];
+  private peerDiscoveredHandlers: Array<(peer: MeshDiscoveredPeer) => void> = [];
 
   constructor(config: MeshTransportManagerConfig) {
     this.router = config.router;
@@ -176,7 +177,13 @@ export class MeshTransportManager {
         this.pendingConnections.delete(peer.peerAddress);
       });
     }
-
+ 
+    for (const h of this.peerDiscoveredHandlers) {
+      try {
+        h(peer);
+      } catch {}
+    }
+ 
     this.notifyStatusChange();
   }
 
@@ -333,6 +340,19 @@ export class MeshTransportManager {
       this.setBatteryProfile(controls.batteryProfile);
     }
     this.notifyStatusChange();
+  }
+
+  public getDiscoveredPeers(): MeshDiscoveredPeer[] {
+    return Array.from(this.nearbyDiscoveredPeers.values()).sort(
+      (a, b) => (b.rssi ?? -127) - (a.rssi ?? -127),
+    );
+  }
+
+  public onPeerDiscovered(handler: (peer: MeshDiscoveredPeer) => void): () => void {
+    this.peerDiscoveredHandlers.push(handler);
+    return () => {
+      this.peerDiscoveredHandlers = this.peerDiscoveredHandlers.filter(h => h !== handler);
+    };
   }
 
   public onStatusChange(handler: (status: MeshNetworkStatus) => void): () => void {

@@ -81,7 +81,25 @@ describe('Sovra Observability, Health Probes & Telemetry Suite', () => {
   });
 
   it('GET /api/admin/alerts exposes telemetry alerts array', async () => {
-    const res = await fetch(`${BASE_URL}/api/admin/alerts`);
+    const loginRes = await fetch(`${BASE_URL}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        did: 'did:sovra:admin_operator',
+        adminKey: process.env.ADMIN_SECRET_KEY || 'sovra-test-admin-secret-key-32-chars-ok!',
+        role: 'SUPER_ADMIN',
+      }),
+    });
+    let token = '';
+    if (loginRes.status === 200) {
+      const loginData = await loginRes.json();
+      token = loginData.sessionToken;
+    }
+
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE_URL}/api/admin/alerts`, { headers });
     expect(res.status).toBe(200);
 
     const data = await res.json();

@@ -74,7 +74,7 @@ RCT_EXPORT_METHOD(isBluetoothEnabled:(RCTPromiseResolveBlock)resolve rejecter:(R
 
 RCT_EXPORT_METHOD(hasPermissions:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
     NSString *status = [[SovraBleBridge sharedInstance] getAuthorizationStatus];
-    resolve(@([status isEqualToString:@"authorized"]));
+    resolve(@([status isEqualToString:@"authorized"] || [status isEqualToString:@"allowed"]));
 }
 
 RCT_EXPORT_METHOD(startAdvertising:(NSString *)serviceUuid data:(NSString *)base64Data resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {

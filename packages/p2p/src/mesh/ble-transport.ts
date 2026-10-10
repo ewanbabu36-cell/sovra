@@ -338,10 +338,18 @@ export class BluetoothLETransport implements SovraTransport {
         flags = parsed.f ?? 0;
       } catch {}
 
+      let distanceMeters: number | undefined;
+      if (dev.rssi !== undefined) {
+        const measuredPower = -59;
+        const n = 2.2;
+        distanceMeters = Math.round(Math.pow(10, (measuredPower - dev.rssi) / (10 * n)) * 10) / 10;
+      }
+
       handler({
         peerAddress: dev.address,
         transportType: 'ble',
         rssi: dev.rssi,
+        distanceMeters,
         ephemeralToken: token,
         protocolVersion: version,
         capabilityFlags: flags,

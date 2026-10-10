@@ -1,0 +1,17 @@
+# ============================================================
+#   SOVRA LITESTREAM CONTINUOUS DISASTER RECOVERY REPLICATION
+#   Continuous real-time sub-second WAL replication to S3/R2
+# ============================================================
+
+dbs:
+  - path: /app/.sovra-storage-prod/sovra-social.sqlite
+    replicas:
+      - type: s3
+        bucket: "${LITESTREAM_BUCKET:-sovra-production-backups}"
+        path: "databases/sovra-social"
+        endpoint: "${LITESTREAM_ENDPOINT:-https://s3.us-east-1.amazonaws.com}"
+        access-key-id: "${LITESTREAM_ACCESS_KEY_ID:-}"
+        secret-access-key: "${LITESTREAM_SECRET_ACCESS_KEY:-}"
+        region: "${LITESTREAM_REGION:-us-east-1}"
+        sync-interval: "${LITESTREAM_SYNC_INTERVAL:-1s}"
+        retention: "${LITESTREAM_RETENTION:-168h}" # 7 days continuous point-in-time recovery

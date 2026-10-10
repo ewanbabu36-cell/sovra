@@ -12,7 +12,7 @@ import { BottomTabNavigator } from './src/navigation/BottomTabNavigator.js';
 
 export default function App(): React.JSX.Element {
   return (
-    <main
+    <div
       style={{
         margin: 0,
         padding: 0,
@@ -26,6 +26,6 @@ export default function App(): React.JSX.Element {
       }}
     >
       <BottomTabNavigator />
-    </main>
+    </div>
   );
 }

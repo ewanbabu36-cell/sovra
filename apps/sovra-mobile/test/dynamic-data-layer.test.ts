@@ -110,7 +110,7 @@ describe('Sovra Mobile Dynamic Data Layer & API Service', () => {
   });
 
   it('fetches real E2EE chat messages and dispatches message without timeouts', async () => {
-    const initialMsgs = await fetchChatMessages('did:key:z6MksAliceP2P');
+    const initialMsgs = await fetchChatMessages();
     expect(Array.isArray(initialMsgs)).toBe(true);
 
     const sendRes = await sendChatMessage({

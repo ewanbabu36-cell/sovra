@@ -22,8 +22,8 @@ export interface MobileReelItem {
   bgGradient: string;
   manifestCid: string;
   segment0Cid: string;
-  videoUrl?: string;
-  isLiked?: boolean;
+  videoUrl?: string | undefined;
+  isLiked?: boolean | undefined;
 }
 
 export interface MobileStoryItem {
@@ -44,6 +44,7 @@ export interface MobileChatMessage {
   timestamp: number;
   isOutgoing: boolean;
   tickState: 'sending' | 'sent' | 'delivered' | 'read';
-  isAudioNote?: boolean;
-  isBitChat?: boolean;
+  isAudioNote?: boolean | undefined;
+  isBitChat?: boolean | undefined;
+  hopCount?: number | undefined;
 }

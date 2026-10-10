@@ -106,6 +106,18 @@ export interface CachedMessage {
   syncStatus: 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
 }
 
+export interface ConversationSummary {
+  threadId: string;
+  peerDid: string;
+  peerName: string;
+  lastMessageText: string;
+  lastMessageTimestamp: number;
+  unreadCount: number;
+  status: CachedMessage['status'];
+  isBitChat?: boolean | undefined;
+  isChannel?: boolean | undefined;
+}
+
 export interface CachedUser {
   did: string;
   handle: string;
@@ -507,6 +519,88 @@ export class SovraLocalDatabase {
           (threadOrPeerDid.startsWith('channel:') && m.recipientDid === threadOrPeerDid),
       )
       .sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  public getConversationsList(myDid?: string): ConversationSummary[] {
+    const threadMap = new Map<string, CachedMessage[]>();
+
+    for (const msg of Object.values(this.state.messages)) {
+      let tId = msg.threadId;
+      if (!tId) {
+        if (msg.recipientDid.startsWith('channel:')) {
+          tId = msg.recipientDid;
+        } else if (msg.senderDid === myDid) {
+          tId = msg.recipientDid;
+        } else {
+          tId = msg.senderDid;
+        }
+      }
+      if (!threadMap.has(tId)) {
+        threadMap.set(tId, []);
+      }
+      threadMap.get(tId)!.push(msg);
+    }
+
+    const summaries: ConversationSummary[] = [];
+
+    for (const [threadId, msgs] of threadMap.entries()) {
+      if (msgs.length === 0) continue;
+      msgs.sort((a, b) => b.timestamp - a.timestamp);
+      const latest = msgs[0];
+      if (!latest) continue;
+      const isChannel = threadId.startsWith('channel:');
+
+      let peerName = latest.senderName;
+      let peerDid = threadId;
+
+      if (isChannel) {
+        peerName = threadId === 'channel:local_mesh' ? '#local-mesh' : (threadId === 'channel:emergency_sos' ? '#emergency-sos' : threadId);
+        peerDid = threadId;
+      } else if (latest.senderDid === myDid) {
+        peerDid = latest.recipientDid;
+        peerName = peerDid.includes('Alice') ? 'Alice' : peerDid.substring(0, 16);
+      } else {
+        peerDid = latest.senderDid;
+        peerName = latest.senderName || peerDid.substring(0, 16);
+      }
+
+      const unreadCount = msgs.filter(m => m.senderDid !== myDid && m.status !== 'read').length;
+
+      summaries.push({
+        threadId,
+        peerDid,
+        peerName,
+        lastMessageText: latest.text,
+        lastMessageTimestamp: latest.timestamp,
+        unreadCount,
+        status: latest.status,
+        isBitChat: latest.isBitChat,
+        isChannel,
+      });
+    }
+
+    // Default broadcast channels if not yet in state
+    const defaultChannels = [
+      { id: 'channel:local_mesh', name: '#local-mesh', desc: 'Hyperlocal Public Beacon (50m)' },
+      { id: 'channel:emergency_sos', name: '#emergency-sos', desc: 'Zero-Internet SOS Broadcast Swarm' },
+    ];
+    for (const dc of defaultChannels) {
+      if (!summaries.find(s => s.threadId === dc.id)) {
+        summaries.push({
+          threadId: dc.id,
+          peerDid: dc.id,
+          peerName: dc.name,
+          lastMessageText: dc.desc,
+          lastMessageTimestamp: 0,
+          unreadCount: 0,
+          status: 'delivered',
+          isBitChat: true,
+          isChannel: true,
+        });
+      }
+    }
+
+    return summaries.sort((a, b) => b.lastMessageTimestamp - a.lastMessageTimestamp);
   }
 
   public async updateMessageStatus(

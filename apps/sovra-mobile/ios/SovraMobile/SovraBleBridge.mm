@@ -58,13 +58,13 @@ static NSString * const kSovraNotifyCharUUID    = @"00005358-0000-1000-8000-0080
     if (@available(iOS 13.1, *)) {
         CBManagerAuthorization auth = CBManager.authorization;
         switch (auth) {
-            case CBManagerAuthorizationAllowedAlways: return @"allowed";
+            case CBManagerAuthorizationAllowedAlways: return @"authorized";
             case CBManagerAuthorizationDenied: return @"denied";
             case CBManagerAuthorizationRestricted: return @"restricted";
             case CBManagerAuthorizationNotDetermined: return @"not_determined";
         }
     }
-    return @"allowed";
+    return @"authorized";
 }
 
 - (NSString *)getBluetoothState {

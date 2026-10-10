@@ -1861,3 +1861,191 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
 </body>
 </html>`;
 }
+
+export function renderAdminLoginHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOVRA Operations Console — Sign In</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #090d16;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    .login-card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    }
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #818cf8;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 0.5rem;
+    }
+    p.subtitle {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-bottom: 1.75rem;
+      line-height: 1.4;
+    }
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #cbd5e1;
+      margin-bottom: 0.5rem;
+    }
+    input[type="password"], input[type="text"] {
+      width: 100%;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: #f8fafc;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    input[type="password"]:focus, input[type="text"]:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+    .btn-submit {
+      width: 100%;
+      background: #4f46e5;
+      color: white;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      margin-top: 0.5rem;
+    }
+    .btn-submit:hover {
+      background: #4338ca;
+    }
+    .error-msg {
+      display: none;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+    .security-notice {
+      margin-top: 1.75rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid #1f2937;
+      font-size: 0.75rem;
+      color: #64748b;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo-badge">🛡️ SOVRA OPS ZERO-TRUST</div>
+    <h1>Operations Console</h1>
+    <p class="subtitle">Administrative authentication is strictly enforced. Please enter your administrator credentials to proceed.</p>
+
+    <div id="errorAlert" class="error-msg"></div>
+
+    <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
+      <div class="form-group">
+        <label for="adminKeyInput">Admin Secret Key</label>
+        <input type="password" id="adminKeyInput" placeholder="Enter ADMIN_SECRET_KEY" required autocomplete="current-password" autofocus />
+      </div>
+
+      <div class="form-group">
+        <label for="adminRoleSelect">Administrative Role</label>
+        <select id="adminRoleSelect" style="width: 100%; background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 0.75rem 1rem; color: #f8fafc; font-size: 0.95rem;">
+          <option value="SUPER_ADMIN">SUPER_ADMIN (Full Console Operations)</option>
+          <option value="ADMIN">ADMIN (Infrastructure & Metrics)</option>
+          <option value="MODERATOR">MODERATOR (Content & Channels)</option>
+          <option value="SECURITY_ADMIN">SECURITY_ADMIN (Audits & Keys)</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">Authenticate Session</button>
+    </form>
+
+    <div class="security-notice">
+      SEC-RBAC-01: All access attempts are cryptographically verified, rate-limited, and logged. Anonymous privilege escalation is strictly prevented.
+    </div>
+  </div>
+
+  <script>
+    async function handleAdminLogin(e) {
+      e.preventDefault();
+      const errBox = document.getElementById('errorAlert');
+      const submitBtn = document.getElementById('submitBtn');
+      const adminKey = document.getElementById('adminKeyInput').value.trim();
+      const role = document.getElementById('adminRoleSelect').value;
+
+      errBox.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Verifying...';
+
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminKey, role })
+        });
+        const data = await res.json();
+        if (data.ok && data.sessionToken) {
+          localStorage.setItem('sovra_admin_token', data.sessionToken);
+          document.cookie = 'sovra_session_token=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; Max-Age=604800';
+          window.location.reload();
+        } else {
+          errBox.textContent = data.error || 'Authentication failed. Please verify credentials.';
+          errBox.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.innerText = 'Authenticate Session';
+        }
+      } catch (err) {
+        errBox.textContent = 'Connection error: ' + err.message;
+        errBox.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Authenticate Session';
+      }
+    }
+  </script>
+</body>
+</html>`;
+}
+

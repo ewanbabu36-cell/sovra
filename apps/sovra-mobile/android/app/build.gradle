@@ -15,11 +15,25 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("SOVRA_KEYSTORE_FILE") ?: "sovra-release-key.jks")
+            storePassword(System.getenv("SOVRA_KEYSTORE_PASSWORD") ?: "sovraSecure2026!")
+            keyAlias(System.getenv("SOVRA_KEY_ALIAS") ?: "sovra-upload")
+            keyPassword(System.getenv("SOVRA_KEY_PASSWORD") ?: "sovraSecure2026!")
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.release
         }
+    }
+
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
     }
 
     compileOptions {

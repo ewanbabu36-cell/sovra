@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Sovra</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+    body, html { width: 100%; height: 100%; background-color: #090d16; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; }
+    #appRoot { display: flex; flex-direction: column; width: 100%; height: 100%; max-width: 480px; margin: 0 auto; position: relative; background-color: #090d16; }
+    #screenContainer { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; padding-bottom: 70px; }
+    
+    /* Bottom Navigation Bar */
+    #bottomNavBar { position: absolute; bottom: 0; left: 0; right: 0; height: 62px; background-color: #0f172a; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-around; z-index: 100; backdrop-filter: blur(12px); }
+    .nav-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; background: none; border: none; color: #94a3b8; font-size: 11px; cursor: pointer; flex: 1; height: 100%; transition: color 0.15s; }
+    .nav-btn.active { color: #38bdf8; font-weight: 700; }
+    .nav-icon { font-size: 20px; margin-bottom: 2px; }
+
+    /* Top HUD Header */
+    /* Top Header & Navigation */
+    #topHeader { padding: 10px 14px; background-color: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; z-index: 90; height: 56px; cursor: pointer; transition: background 0.3s; }
+    .brand-logo-btn { width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, #0284c7, #6366f1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 16px; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; flex-shrink: 0; }
+    .brand-logo-btn:active { transform: scale(0.92); }
+    .brand-title { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; user-select: none; }
+    .mesh-badge { font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 12px; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); display: flex; align-items: center; gap: 4px; }
+    
+    /* Dual Mode Switcher Button */
+    .mode-switch-btn { padding: 5px 10px; border-radius: 14px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #cbd5e1; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; }
+    .mode-switch-btn.advance-active { background: rgba(0, 240, 255, 0.15); color: #00f0ff; border-color: #00f0ff; box-shadow: 0 0 10px rgba(0, 240, 255, 0.35); text-shadow: 0 0 4px #00f0ff; }
+    .mode-switch-btn:active { transform: scale(0.94); }
+
+    /* Direct Profile Avatar in Header */
+    .header-profile-btn { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a855f7); border: 1.5px solid rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: transform 0.15s; flex-shrink: 0; }
+    .header-profile-btn:active { transform: scale(0.92); }
+
+    /* Side-Docked Navigation Menu Drawer (Zero Popup) */
+    #mainMenuBackdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.65); z-index: 140; backdrop-filter: blur(4px); transition: opacity 0.25s; opacity: 0; display: none; }
+    #mainMenuDrawer { position: absolute; top: 0; bottom: 0; left: 0; width: 280px; max-width: 85%; background: #0c1322; border-right: 1px solid rgba(255,255,255,0.1); z-index: 150; transform: translateX(-100%); transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; box-shadow: 4px 0 24px rgba(0,0,0,0.6); }
+    .drawer-item { display: flex; align-items: center; gap: 12px; padding: 12px 18px; color: #e2e8f0; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; text-decoration: none; }
+    .drawer-item:hover, .drawer-item:active { background: rgba(255,255,255,0.06); color: #38bdf8; }
+
+    /* Radar Visualizer Animation */
+    @keyframes radarPulse { 0% { transform: scale(0.8); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 0.3; } 100% { transform: scale(0.8); opacity: 0.8; } }
+    .radar-circle { width: 84px; height: 84px; border-radius: 50%; border: 2px solid #38bdf8; display: flex; align-items: center; justify-content: center; animation: radarPulse 3s infinite ease-in-out; background: rgba(56, 189, 248, 0.05); }
+
+    /* Message Bubbles */
+    .msg-bubble { max-width: 82%; padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; line-height: 1.4; word-break: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+    .msg-out { align-self: flex-end; background-color: #005c4b; color: #fff; }
+    .msg-in { align-self: flex-start; background-color: #202c33; color: #e9edef; }
+
+    /* Action Buttons & Cards */
+    .card { background: #182229; border-radius: 12px; padding: 14px; border: 1px solid rgba(255,255,255,0.06); }
+    .btn-action { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s; }
+    .btn-action:hover { background: rgba(255,255,255,0.12); color: #fff; }
+    .btn-primary { background: #00a884; border: none; color: #fff; border-radius: 6px; padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .btn-primary:active { opacity: 0.8; }
+    .tag-pill { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 600; }
+
+    /* ======================================================== */
+    /* ADVANCE MODE CYBERPUNK HUD (Sci-Fi Ref Images 1, 2, 3, 4, 5) */
+    /* ======================================================== */
+    .mode-advance #topHeader { background: rgba(6, 14, 26, 0.95); border-bottom: 1px solid rgba(0, 240, 255, 0.4); box-shadow: 0 2px 16px rgba(0, 240, 255, 0.15); }
+    .mode-advance .brand-title { background: linear-gradient(135deg, #00f0ff, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 12px rgba(0, 240, 255, 0.6); }
+    .mode-advance #bottomNavBar { background: rgba(6, 14, 26, 0.95); border-top: 1px solid rgba(0, 240, 255, 0.35); box-shadow: 0 -2px 16px rgba(0, 240, 255, 0.15); }
+    .mode-advance .nav-btn.active { color: #00f0ff; text-shadow: 0 0 8px rgba(0, 240, 255, 0.7); }
+
+    /* Ref Image 5: Circuit Traced Translucent Glass Card */
+    .circuit-glass-card {
+      position: relative;
+      background: rgba(10, 20, 36, 0.84);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 240, 255, 0.05);
+      overflow: hidden;
+    }
+    .circuit-glass-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; width: 22px; height: 22px;
+      border-top: 2px solid #00f0ff;
+      border-left: 2px solid #00f0ff;
+      pointer-events: none;
+    }
+    .circuit-glass-card::after {
+      content: "";
+      position: absolute;
+      bottom: 0; right: 0; width: 22px; height: 22px;
+      border-bottom: 2px solid #00f0ff;
+      border-right: 2px solid #00f0ff;
+      pointer-events: none;
+    }
+    .circuit-corner-tr {
+      position: absolute;
+      top: 0; right: 0; width: 16px; height: 16px;
+      border-top: 2px solid #00f0ff;
+      border-right: 2px solid #00f0ff;
+      pointer-events: none;
+    }
+    .circuit-corner-bl {
+      position: absolute;
+      bottom: 0; left: 0; width: 16px; height: 16px;
+      border-bottom: 2px solid #00f0ff;
+      border-left: 2px solid #00f0ff;
+      pointer-events: none;
+    }
+
+    /* Ref Image 2: Circular Telemetry Meters */
+    .telemetry-row { display: flex; justify-content: space-around; align-items: center; margin: 12px 0; }
+    .meter-circle { position: relative; width: 62px; height: 62px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .meter-svg { transform: rotate(-90deg); width: 62px; height: 62px; }
+    .meter-bg { stroke: rgba(255,255,255,0.08); fill: none; stroke-width: 5; }
+    .meter-progress { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+    .meter-text { position: absolute; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 0 6px #00f0ff; }
+    .meter-label { font-size: 8px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
+
+    /* Ref Image 1: Tactical Mesh War Table */
+    .tactical-table {
+      background: radial-gradient(circle at center, rgba(0, 240, 255, 0.12) 0%, rgba(6, 14, 26, 0.95) 75%);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      border-radius: 14px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+    }
+    .tactical-grid {
+      position: absolute; inset: 0;
+      background-size: 20px 20px;
+      background-image: 
+        linear-gradient(to right, rgba(0, 240, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 240, 255, 0.08) 1px, transparent 1px);
+      pointer-events: none;
+    }
+
+    /* Ref Image 3: Cosmic Orbital Radar Rings */
+    .orbital-container {
+      position: relative;
+      width: 220px; height: 220px;
+      margin: 10px auto;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .orbital-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px dashed rgba(0, 240, 255, 0.35);
+      animation: orbitSpin 30s linear infinite;
+    }
+    .orbital-ring.r1 { width: 110px; height: 110px; border-color: rgba(0, 240, 255, 0.4); }
+    .orbital-ring.r2 { width: 165px; height: 165px; border-color: rgba(56, 189, 248, 0.3); animation-duration: 45s; animation-direction: reverse; }
+    .orbital-ring.r3 { width: 220px; height: 220px; border-color: rgba(129, 140, 248, 0.25); animation-duration: 60s; }
+    @keyframes orbitSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .orbital-core {
+      width: 54px; height: 54px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #00f0ff 0%, #0369a1 70%, #082f49 100%);
+      box-shadow: 0 0 20px #00f0ff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; z-index: 2;
+    }
+    .orbital-satellite {
+      position: absolute;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: rgba(10, 20, 36, 0.9);
+      border: 1px solid #00f0ff;
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="appRoot">
+    <!-- Off-Canvas Main Menu Drawer (Zero Popup) -->
+    <div id="mainMenuBackdrop" onclick="toggleMainMenu(false)"></div>
+    <aside id="mainMenuDrawer">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px;">⚡</div>
+          <span style="font-weight: 800; font-size: 16px; letter-spacing: -0.5px;">SOVRA MENU</span>
+        </div>
+        <button onclick="toggleMainMenu(false)" style="background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px 8px;">✕</button>
+      </div>
+
+      <!-- User Identity Quick View in Drawer -->
+      <div style="padding: 14px 16px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="openProfileDirectly(); toggleMainMenu(false);">
+        <div id="drawerAvatar" style="width: 42px; height: 42px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>
+        <div style="flex: 1; min-width: 0;">
+          <div id="drawerName" style="font-size: 14px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Sovereign Peer</div>
+          <div id="drawerHandle" style="font-size: 11px; color: #38bdf8;">@sovereign_peer</div>
+        </div>
+        <span style="font-size: 12px; color: #94a3b8;">→</span>
+      </div>
+
+      <!-- Navigation Drawer Links -->
+      <div style="flex: 1; overflow-y: auto;">
+        <div class="drawer-item" onclick="switchTab('feed'); toggleMainMenu(false);">
+          <span>📷</span> <span>Feed (Home)</span>
+        </div>
+        <div class="drawer-item" onclick="switchTab('reels'); toggleMainMenu(false);">
+          <span>🎬</span> <span>Reels & Shorts</span>
+        </div>
+        <div class="drawer-item" onclick="switchTab('watch'); toggleMainMenu(false);">
+          <span>📺</span> <span>Watch Video Catalog</span>
+        </div>
+        <div class="drawer-item" onclick="switchTab('chats'); setChatTab('chats'); toggleMainMenu(false);">
+          <span>💬</span> <span>Chats (WhatsApp Mode)</span>
+        </div>
+        <div class="drawer-item" onclick="switchTab('chats'); setChatTab('radar'); toggleMainMenu(false);">
+          <span>📶</span> <span>Nearby BLE Radar</span>
+        </div>
+        <div class="drawer-item" onclick="switchTab('me'); toggleMainMenu(false);">
+          <span>👤</span> <span>My Profile & Settings</span>
+        </div>
+        <div class="drawer-item" onclick="toggleUiMode(); toggleMainMenu(false);">
+          <span>⚡</span> <span id="drawerModeLabel">Switch to Advance HUD</span>
+        </div>
+      </div>
+
+      <!-- Drawer Footer -->
+      <div style="padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 11px; color: #64748b;">
+        Sovra Sovereign Mobile v2.0<br>100% Zero-Cloud P2P Mesh
+      </div>
+    </aside>
+
+    <!-- Top Navigation Header -->
+    <header id="topHeader" onclick="handleHeaderContainerClick(event)">
+      <!-- Left: Logo (Opens Menu) & Title (Navigates to Home) -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button id="mainLogoBtn" class="brand-logo-btn" onclick="toggleMainMenu(true); event.stopPropagation();" title="Open Menu">
+          ⚡
+        </button>
+        <div class="brand-title" onclick="handleHeaderTitleClick(event)" style="cursor: pointer;" title="Reset to Home Feed">
+          SOVRA
+        </div>
+      </div>
+
+      <!-- Right: Mode Switcher & Direct Profile Button -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button id="modeSwitchBtn" class="mode-switch-btn" onclick="toggleUiMode(event)" title="Toggle Simple / Advance HUD Mode">
+          ✨ SIMPLE
+        </button>
+        <div id="headerProfileAvatar" class="header-profile-btn" onclick="openProfileDirectly(event)" title="Open Profile">
+          👤
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Screens Container -->
+    <main id="screenContainer"></main>
+
+    <!-- 5-Tab Navigation -->
+    <nav id="bottomNavBar">
+      <button class="nav-btn" onclick="switchTab('feed')" id="nav-feed">
+        <span class="nav-icon">📷</span>
+        <span>Feed</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('reels')" id="nav-reels">
+        <span class="nav-icon">🎬</span>
+        <span>Reels</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('watch')" id="nav-watch">
+        <span class="nav-icon">📺</span>
+        <span>Watch</span>
+      </button>
+      <button class="nav-btn active" onclick="switchTab('chats')" id="nav-chats">
+        <span class="nav-icon">💬</span>
+        <span>Chats</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('me')" id="nav-me">
+        <span class="nav-icon">👤</span>
+        <span>Me</span>
+      </button>
+    </nav>
+  </div>
+
+  <script>
+    // Global Navigation State
+    let activeTab = 'chats';
+    let chatSubTab = 'chats';
+    let activeRecipient = null;
+    let discoveredPeers = [];
+    let isComposerExpanded = false;
+    let activeOpenCommentsPostId = null;
+    let activeWatchVideoId = null;
+    let isProfileEditing = false;
+    let selectedWatchCategory = 'All';
+
+    // Dual UI Mode: 'simple' (Consumer Social) vs 'advance' (Sci-Fi Cyber HUD)
+    let currentUiMode = localStorage.getItem('sovra_ui_mode_v1') || 'simple';
+
+    function setUiMode(mode) {
+      currentUiMode = mode;
+      try { localStorage.setItem('sovra_ui_mode_v1', mode); } catch (e) {}
+      updateUiModeVisuals();
+    }
+
+    function toggleUiMode(e) {
+      if (e) e.stopPropagation();
+      const next = currentUiMode === 'simple' ? 'advance' : 'simple';
+      setUiMode(next);
+      if (activeTab === 'feed') renderFeedScreen();
+      else if (activeTab === 'reels') renderReelsScreen();
+      else if (activeTab === 'watch') renderWatchScreen();
+      else if (activeTab === 'chats') renderChatsScreen();
+      else if (activeTab === 'me') renderMeScreen();
+    }
+
+    function updateUiModeVisuals() {
+      const root = document.getElementById('appRoot');
+      const btn = document.getElementById('modeSwitchBtn');
+      const drawerLabel = document.getElementById('drawerModeLabel');
+      const drawerAvatar = document.getElementById('drawerAvatar');
+      const drawerName = document.getElementById('drawerName');
+      const drawerHandle = document.getElementById('drawerHandle');
+      const headerAvatar = document.getElementById('headerProfileAvatar');
+
+      if (userProfile) {
+        if (drawerAvatar) drawerAvatar.innerText = userProfile.avatar || '👤';
+        if (drawerName) drawerName.innerText = userProfile.name || 'Sovereign Peer';
+        if (drawerHandle) drawerHandle.innerText = userProfile.handle || '@sovereign';
+        if (headerAvatar) headerAvatar.innerText = userProfile.avatar || '👤';
+      }
+
+      if (currentUiMode === 'advance') {
+        if (root) root.classList.add('mode-advance');
+        if (btn) {
+          btn.innerText = '⚡ ADVANCE HUD';
+          btn.classList.add('advance-active');
+        }
+        if (drawerLabel) drawerLabel.innerText = 'Switch to Simple Mode (Social)';
+      } else {
+        if (root) root.classList.remove('mode-advance');
+        if (btn) {
+          btn.innerText = '✨ SIMPLE';
+          btn.classList.remove('advance-active');
+        }
+        if (drawerLabel) drawerLabel.innerText = 'Switch to Advance HUD (Cyber)';
+      }
+    }
+
+    function toggleMainMenu(show) {
+      const drawer = document.getElementById('mainMenuDrawer');
+      const backdrop = document.getElementById('mainMenuBackdrop');
+      if (!drawer || !backdrop) return;
+      const isVisible = (show !== undefined) ? show : (drawer.style.transform !== 'translateX(0px)');
+      if (isVisible) {
+        updateUiModeVisuals();
+        backdrop.style.display = 'block';
+        setTimeout(() => {
+          drawer.style.transform = 'translateX(0px)';
+          backdrop.style.opacity = '1';
+        }, 10);
+      } else {
+        drawer.style.transform = 'translateX(-100%)';
+        backdrop.style.opacity = '0';
+        setTimeout(() => {
+          backdrop.style.display = 'none';
+        }, 250);
+      }
+    }
+
+    function handleHeaderTitleClick(e) {
+      if (e) e.stopPropagation();
+      switchTab('feed');
+      const c = document.getElementById('screenContainer');
+      if (c) c.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function handleHeaderContainerClick(e) {
+      if (e.target.id === 'topHeader' || e.target.classList.contains('brand-title')) {
+        handleHeaderTitleClick(e);
+      }
+    }
+
+    function openProfileDirectly(e) {
+      if (e) e.stopPropagation();
+      switchTab('me');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // ==========================================
+    // 1. DATA PERSISTENCE & MODELS (100% DYNAMIC)
+    // ==========================================
+
+    function loadSavedFeedPosts() {
+      try {
+        const s = localStorage.getItem('sovra_feed_posts_v2');
+        if (s) return JSON.parse(s);
+      } catch (e) {}
+      return [];
+    }
+
+    function saveFeedPosts() {
+      try { localStorage.setItem('sovra_feed_posts_v2', JSON.stringify(feedPosts)); } catch (e) {}
+    }
+
+    function loadSavedReels() {
+      try {
+        const s = localStorage.getItem('sovra_reels_v2');
+        if (s) return JSON.parse(s);
+      } catch (e) {}
+      return [];
+    }
+
+    function saveReels() {
+      try { localStorage.setItem('sovra_reels_v2', JSON.stringify(reelsVideos)); } catch (e) {}
+    }
+
+    function loadSavedWatchVideos() {
+      try {
+        const s = localStorage.getItem('sovra_watch_v2');
+        if (s) return JSON.parse(s);
+      } catch (e) {}
+      return [];
+    }
+
+    function loadSavedMessages() {
+      try {
+        const stored = localStorage.getItem('sovra_chat_messages_v1');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {}
+      return [];
+    }
+
+    function saveMessages() {
+      try { localStorage.setItem('sovra_chat_messages_v1', JSON.stringify(chatMessages)); } catch (e) {}
+    }
+
+    function loadUserProfile() {
+      try {
+        const s = localStorage.getItem('sovra_user_profile_v2');
+        if (s) return JSON.parse(s);
+      } catch (e) {}
+      const defaultName = localStorage.getItem('sovra_node_name') || 'Sovereign Peer';
+      return {
+        name: defaultName,
+        handle: '@' + defaultName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+        bio: 'Decentralized Sovereign Mesh Node • Zero-Cloud Identity',
+        avatar: '👤',
+        did: 'did:key:z6Mks' + Math.random().toString(36).substring(2, 10).toUpperCase(),
+        joined: 'October 2026'
+      };
+    }
+
+    function saveUserProfile(profile) {
+      try {
+        localStorage.setItem('sovra_user_profile_v2', JSON.stringify(profile));
+        localStorage.setItem('sovra_node_name', profile.name);
+      } catch (e) {}
+    }
+
+    let feedPosts = loadSavedFeedPosts();
+    let reelsVideos = loadSavedReels();
+    let watchVideos = loadSavedWatchVideos();
+    let chatMessages = loadSavedMessages();
+    let userProfile = loadUserProfile();
+
+    // ==========================================
+    // 2. NATIVE BLE BRIDGE INITIALIZATION
+    // ==========================================
+
+    function initBleNative() {
+      if (window.SovraBleNative) {
+        try {
+          const enabled = window.SovraBleNative.isBluetoothEnabled();
+          const hasPerm = window.SovraBleNative.hasPermissions();
+          if (enabled && hasPerm) {
+            window.SovraBleNative.startScanning('00005356-0000-1000-8000-00805f9b34fb');
+            const unameB64 = btoa(unescape(encodeURIComponent(userProfile.name || 'Sovra Node')));
+            window.SovraBleNative.startAdvertising('00005356-0000-1000-8000-00805f9b34fb', unameB64);
+            updateMeshBadge('BLE Mesh (' + discoveredPeers.length + ' Peers)', true);
+          } else if (!enabled) {
+            updateMeshBadge('Bluetooth is OFF', false);
+          } else {
+            updateMeshBadge('Grant BLE Permissions', false);
+          }
+        } catch (e) {
+          console.warn('[BLE] Bridge warning:', e);
+        }
+      }
+    }
+
+    function rescanRadar() {
+      if (window.SovraBleNative) {
+        try {
+          window.SovraBleNative.stopScanning();
+          setTimeout(() => {
+            window.SovraBleNative.startScanning('00005356-0000-1000-8000-00805f9b34fb');
+            const unameB64 = btoa(unescape(encodeURIComponent(userProfile.name || 'Sovra Node')));
+            window.SovraBleNative.startAdvertising('00005356-0000-1000-8000-00805f9b34fb', unameB64);
+          }, 300);
+        } catch (e) {}
+      }
+      updateMeshBadge('Scanning BLE spectrum...', true);
+      if (activeTab === 'chats' && !activeRecipient) renderChatsScreen();
+    }
+
+    // Listen to native Android BLE events
+    window.addEventListener('onDeviceDiscovered', function(e) {
+      if (!e.detail) return;
+      const dev = e.detail;
+      const rssi = dev.rssi || -50;
+      const dist = Math.round(Math.pow(10, (-59 - rssi) / 22) * 10) / 10;
+      const peerName = dev.name || ('Peer ' + (dev.address ? dev.address.substring(0, 8) : ''));
+      
+      const existingIdx = discoveredPeers.findIndex(p => p.address === dev.address);
+      if (existingIdx >= 0) {
+        discoveredPeers[existingIdx].rssi = rssi;
+        discoveredPeers[existingIdx].distance = dist;
+        // Update name if we received a resolved user profile name
+        if (dev.name && dev.name !== discoveredPeers[existingIdx].name) {
+          discoveredPeers[existingIdx].name = dev.name;
+        }
+      } else {
+        discoveredPeers.push({
+          address: dev.address,
+          name: peerName,
+          rssi: rssi,
+          distance: dist
+        });
+      }
+      updateMeshBadge('BLE Mesh (' + discoveredPeers.length + ' Peers)', true);
+      // ONLY re-render radar if user is actively on radar subtab and NOT inside a chat thread
+      if (activeTab === 'chats' && chatSubTab === 'radar' && !activeRecipient) {
+        renderChatsScreen();
+      }
+      if (activeTab === 'feed' && !isComposerExpanded && activeOpenCommentsPostId === null) {
+        renderFeedScreen();
+      }
+    });
+
+    window.addEventListener('onIncomingDataReceived', function(e) {
+      if (!e.detail || !e.detail.data) return;
+      try {
+        const decodedStr = decodeURIComponent(escape(atob(e.detail.data)));
+        const parsed = JSON.parse(decodedStr);
+        if (parsed && parsed.text) {
+          if (parsed.id && chatMessages.some(m => m.id === parsed.id)) return;
+
+          const senderName = parsed.senderName || 'Peer ' + (e.detail.gattId ? e.detail.gattId.substring(0, 8) : '');
+
+          // Match or register peer in discoveredPeers by MAC or senderName
+          let peer = discoveredPeers.find(p => 
+            (e.detail.gattId && p.address === e.detail.gattId) ||
+            (parsed.senderName && p.name && p.name.toLowerCase() === parsed.senderName.toLowerCase())
+          );
+
+          if (!peer && e.detail.gattId) {
+            peer = {
+              address: e.detail.gattId,
+              name: senderName,
+              rssi: -50,
+              distance: 1.0
+            };
+            discoveredPeers.push(peer);
+            updateMeshBadge('BLE Mesh (' + discoveredPeers.length + ' Peers)', true);
+          } else if (peer && parsed.senderName && peer.name.startsWith('Peer ')) {
+            peer.name = parsed.senderName;
+          }
+
+          const peerAddress = peer ? peer.address : (e.detail.gattId || 'peer:direct');
+          const threadId = parsed.channel || peerAddress;
+
+          const newMsg = {
+            id: parsed.id || ('m-' + Date.now()),
+            threadId: threadId,
+            senderName: senderName,
+            text: parsed.text,
+            isOut: false,
+            time: parsed.timestamp || Date.now(),
+            tick: 'delivered',
+            isBitChat: true
+          };
+          chatMessages.push(newMsg);
+          saveMessages();
+
+          // Check if user is currently inside this active thread
+          const isThreadOpen = activeRecipient && (
+            activeRecipient.did === threadId ||
+            activeRecipient.did === e.detail.gattId ||
+            (peer && activeRecipient.did === peer.address) ||
+            (activeRecipient.name && parsed.senderName && activeRecipient.name.toLowerCase() === parsed.senderName.toLowerCase())
+          );
+
+          if (isThreadOpen) {
+            // Keep activeRecipient reachable address synchronized with the actual connected peer
+            if (e.detail.gattId && activeRecipient.did !== e.detail.gattId) {
+              activeRecipient.did = e.detail.gattId;
+            }
+            const box = document.getElementById('threadMessagesBox');
+            if (box) {
+              if (box.children.length === 1 && box.children[0].tagName === 'DIV' && box.children[0].style.margin === 'auto') {
+                box.innerHTML = '';
+              }
+              const bubble = document.createElement('div');
+              bubble.className = 'msg-bubble msg-in';
+              bubble.innerHTML = `
+                <div>${escapeHtml(newMsg.text)}</div>
+                <div style="display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 9px; color: #8696a0; margin-top: 2px;">
+                  <span>${new Date(newMsg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              `;
+              box.appendChild(bubble);
+              box.scrollTop = box.scrollHeight;
+            }
+          } else if (activeTab === 'chats' && !activeRecipient) {
+            renderChatsScreen();
+          }
+        }
+      } catch (err) {
+        console.warn('[BLE Receive Error]', err);
+      }
+    });
+
+    function updateMeshBadge(text, isBle) {
+      const dot = document.getElementById('meshStatusDot');
+      const label = document.getElementById('meshStatusText');
+      if (label) label.innerText = text;
+      if (dot) dot.style.color = isBle ? '#38bdf8' : '#4ade80';
+    }
+
+    // ==========================================
+    // 3. TAB NAVIGATION SWITCHER
+    // ==========================================
+
+    function switchTab(tab) {
+      activeTab = tab;
+      if (tab !== 'chats') {
+        activeRecipient = null;
+      }
+      const nav = document.getElementById('bottomNavBar');
+      const container = document.getElementById('screenContainer');
+      if (nav) nav.style.display = 'flex';
+      if (container) container.style.paddingBottom = '70px';
+
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      const activeNav = document.getElementById('nav-' + tab);
+      if (activeNav) activeNav.classList.add('active');
+
+      if (!container) return;
+
+      if (tab === 'feed') renderFeedScreen();
+      else if (tab === 'reels') renderReelsScreen();
+      else if (tab === 'watch') renderWatchScreen();
+      else if (tab === 'chats') renderChatsScreen();
+      else if (tab === 'me') renderMeScreen();
+    }
+
+    // ==========================================
+    // 4. FEED SCREEN (ZERO POPUP, 100% DYNAMIC)
+    // ==========================================
+
+    function renderFeedScreen() {
+      const c = document.getElementById('screenContainer');
+      const isAdvance = (currentUiMode === 'advance');
+
+      // Stories bar: styled according to mode
+      const peerStories = discoveredPeers.map(p => {
+        const ringBg = isAdvance 
+          ? 'linear-gradient(135deg, #00f0ff, #38bdf8)' 
+          : 'linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)';
+        return `
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; cursor: pointer;" onclick="openPeerByAddress('${p.address}')">
+            <div style="width: 54px; height: 54px; border-radius: 50%; background: ${ringBg}; padding: 2.5px; display: flex; align-items: center; justify-content: center; box-shadow: ${isAdvance ? '0 0 10px rgba(0,240,255,0.4)' : 'none'};">
+              <div style="width: 100%; height: 100%; border-radius: 50%; background: #0f172a; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 2px solid #090d16;">
+                ${p.name && p.name.trim().length > 0 ? escapeHtml(p.name.trim()[0].toUpperCase()) : '📡'}
+              </div>
+            </div>
+            <span style="font-size: 10px; color: ${isAdvance ? '#00f0ff' : '#94a3b8'}; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">${escapeHtml(p.name)}</span>
+          </div>
+        `;
+      }).join('');
+
+      // Advance Mode: Holographic Node Telemetry HUD (Ref Image 2)
+      const telemetryHudHtml = isAdvance ? `
+        <div class="circuit-glass-card" style="margin-bottom: 14px;">
+          <div class="circuit-corner-tr"></div>
+          <div class="circuit-corner-bl"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 14px; animation: radarPulse 2s infinite ease;">💠</span>
+              <span style="font-size: 12px; font-weight: 800; color: #00f0ff; letter-spacing: 0.5px;">SOVRA // NODE TELEMETRY HUD</span>
+            </div>
+            <span style="font-size: 9px; padding: 2px 8px; border-radius: 4px; background: rgba(0, 240, 255, 0.15); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); font-weight: 700;">ONLINE 3.2GHz</span>
+          </div>
+
+          <!-- 4 Circular SVG Gauges (Ref Image 2) -->
+          <div class="telemetry-row">
+            <div class="meter-circle">
+              <svg class="meter-svg" viewBox="0 0 62 62"><circle class="meter-bg" cx="31" cy="31" r="26"></circle><circle class="meter-progress" cx="31" cy="31" r="26" stroke="#00f0ff" stroke-dasharray="163.36" stroke-dashoffset="117"></circle></svg>
+              <div class="meter-text">28%</div>
+              <div class="meter-label">CPU</div>
+            </div>
+            <div class="meter-circle">
+              <svg class="meter-svg" viewBox="0 0 62 62"><circle class="meter-bg" cx="31" cy="31" r="26"></circle><circle class="meter-progress" cx="31" cy="31" r="26" stroke="#38bdf8" stroke-dasharray="163.36" stroke-dashoffset="57"></circle></svg>
+              <div class="meter-text">65%</div>
+              <div class="meter-label">RELAY</div>
+            </div>
+            <div class="meter-circle">
+              <svg class="meter-svg" viewBox="0 0 62 62"><circle class="meter-bg" cx="31" cy="31" r="26"></circle><circle class="meter-progress" cx="31" cy="31" r="26" stroke="#818cf8" stroke-dasharray="163.36" stroke-dashoffset="94"></circle></svg>
+              <div class="meter-text">42%</div>
+              <div class="meter-label">SQLITE</div>
+            </div>
+            <div class="meter-circle">
+              <svg class="meter-svg" viewBox="0 0 62 62"><circle class="meter-bg" cx="31" cy="31" r="26"></circle><circle class="meter-progress" cx="31" cy="31" r="26" stroke="#34d399" stroke-dasharray="163.36" stroke-dashoffset="20"></circle></svg>
+              <div class="meter-text">88%</div>
+              <div class="meter-label">CIPHER</div>
+            </div>
+          </div>
+
+          <!-- Real-time Packet Log Stream (Ref Image 2) -->
+          <div style="background: rgba(0,0,0,0.55); border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 6px; padding: 6px 10px; font-family: monospace; font-size: 10px; color: #a5f3fc; line-height: 1.4; margin-top: 6px;">
+            <div style="color: #34d399;">[13:20:10] Noise_XX Key Rotation Monotonic Pass</div>
+            <div style="color: #38bdf8;">[13:20:14] Manufacturer 0x5356 Beacon Broadcasted</div>
+          </div>
+
+          <!-- Cyber Command Pills -->
+          <div style="display: flex; gap: 6px; margin-top: 10px; overflow-x: auto; padding-bottom: 2px;">
+            <button class="btn-action" onclick="rescanRadar()" style="border-color: rgba(0, 240, 255, 0.4); color: #00f0ff;">⚡ Force Sync</button>
+            <button class="btn-action" onclick="switchTab('chats'); setChatTab('radar');" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">📶 Tactical Grid</button>
+            <button class="btn-action" onclick="toggleComposer(true)" style="border-color: rgba(52, 211, 153, 0.4); color: #34d399;">✍️ Broadcast</button>
+          </div>
+        </div>
+      ` : '';
+
+      // Inline Composer HTML (Zero Popup!)
+      const composerCardClass = isAdvance ? 'circuit-glass-card' : 'card';
+      const composerHtml = isComposerExpanded ? `
+        <div class="${composerCardClass}" style="margin-bottom: 14px; border: 1px solid ${isAdvance ? '#00f0ff' : 'rgba(56, 189, 248, 0.4)'}; animation: fadeIn 0.2s;">
+          ${isAdvance ? '<div class="circuit-corner-tr"></div><div class="circuit-corner-bl"></div>' : ''}
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 13px; font-weight: 700; color: ${isAdvance ? '#00f0ff' : '#38bdf8'};">${isAdvance ? '⚡ QUANTUM MESH BROADCAST' : 'Publish Sovereign Post'}</span>
+            <button onclick="toggleComposer(false)" style="background: none; border: none; color: #94a3b8; font-size: 16px; cursor: pointer;">✕</button>
+          </div>
+          <textarea id="composerTextInput" placeholder="${isAdvance ? 'Enter payload for DAG chunk broadcast over 2.4GHz mesh...' : 'What\'s happening on your mesh? Broadcast to all nearby nodes...'}" style="width: 100%; background: ${isAdvance ? 'rgba(0,0,0,0.6)' : '#0f172a'}; border: 1px solid ${isAdvance ? 'rgba(0,240,255,0.3)' : 'rgba(255,255,255,0.1)'}; border-radius: 8px; padding: 10px; color: #fff; font-size: 13px; min-height: 80px; outline: none; resize: none;"></textarea>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <div style="display: flex; gap: 6px;">
+              <select id="composerTagSelect" style="background: ${isAdvance ? 'rgba(0,0,0,0.6)' : '#0f172a'}; color: ${isAdvance ? '#00f0ff' : '#38bdf8'}; border: 1px solid ${isAdvance ? 'rgba(0,240,255,0.3)' : 'rgba(255,255,255,0.1)'}; border-radius: 6px; padding: 4px 8px; font-size: 11px; outline: none;">
+                <option value="#mesh">#mesh</option>
+                <option value="#tech">#tech</option>
+                <option value="#crypto">#crypto</option>
+                <option value="#sos">#sos</option>
+                <option value="#general">#general</option>
+              </select>
+            </div>
+            <button class="btn-primary" onclick="publishNewPost()" style="background: ${isAdvance ? 'linear-gradient(135deg, #0284c7, #00f0ff)' : '#00a884'}; color: ${isAdvance ? '#020617' : '#fff'}; font-weight: 800;">
+              ${isAdvance ? '⚡ Relayed Hop' : '🚀 Broadcast Post'}
+            </button>
+          </div>
+        </div>
+      ` : `
+        <div class="${composerCardClass}" onclick="toggleComposer(true)" style="margin-bottom: 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; border: 1px dashed ${isAdvance ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.15)'};">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: ${isAdvance ? 'rgba(0,240,255,0.2)' : '#00a884'}; border: 1px solid ${isAdvance ? '#00f0ff' : 'transparent'}; display: flex; align-items: center; justify-content: center; font-size: 16px;">${userProfile.avatar}</div>
+          <div style="color: ${isAdvance ? '#7dd3fc' : '#8696a0'}; font-size: 13px; flex: 1;">${isAdvance ? 'Enter sovereign block update ⚡' : 'What\'s on your sovereign mind? ⚡'}</div>
+          <span style="font-size: 18px; color: ${isAdvance ? '#00f0ff' : '#38bdf8'};">✎</span>
+        </div>
+      `;
+
+      // Posts list HTML
+      const postsHtml = feedPosts.map(p => {
+        const isCommentsOpen = activeOpenCommentsPostId === p.id;
+        const commentsListHtml = p.comments.map(c => `
+          <div style="background: ${isAdvance ? 'rgba(0,0,0,0.4)' : '#0f172a'}; border: 1px solid ${isAdvance ? 'rgba(0,240,255,0.15)' : 'transparent'}; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: 12px;">
+            <div style="font-weight: 700; color: ${isAdvance ? '#00f0ff' : '#38bdf8'}; font-size: 11px; margin-bottom: 2px;">${c.author}</div>
+            <div style="color: #e2e8f0;">${c.text}</div>
+          </div>
+        `).join('');
+
+        const inlineCommentsDrawer = isCommentsOpen ? `
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); animation: fadeIn 0.2s;">
+            <div style="font-size: 12px; font-weight: 700; color: ${isAdvance ? '#00f0ff' : '#94a3b8'}; margin-bottom: 8px;">Comments (${p.comments.length})</div>
+            ${commentsListHtml.length > 0 ? commentsListHtml : '<div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">No comments yet. Be the first to reply!</div>'}
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <input type="text" id="commentInput-${p.id}" placeholder="Write an inline reply..." style="flex: 1; background: ${isAdvance ? 'rgba(0,0,0,0.5)' : '#0f172a'}; border: 1px solid ${isAdvance ? 'rgba(0,240,255,0.3)' : 'rgba(255,255,255,0.1)'}; border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 12px; outline: none;" onkeydown="if(event.key==='Enter') addComment('${p.id}')">
+              <button class="btn-action" onclick="addComment('${p.id}')" style="background: ${isAdvance ? '#0284c7' : '#00a884'}; color: #fff; border: none;">Reply</button>
+            </div>
+          </div>
+        ` : '';
+
+        const cardContainerClass = isAdvance ? 'circuit-glass-card' : 'card';
+        return `
+          <div class="${cardContainerClass}" style="margin-bottom: 14px;">
+            ${isAdvance ? '<div class="circuit-corner-tr"></div><div class="circuit-corner-bl"></div>' : ''}
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 38px; height: 38px; border-radius: 50%; background: ${p.avatarBg}; display: flex; align-items: center; justify-content: center; font-size: 16px; border: ${isAdvance ? '1px solid #00f0ff' : 'none'};">${p.avatar}</div>
+                <div>
+                  <div style="font-size: 13px; font-weight: 700; color: #fff;">${p.author}</div>
+                  <div style="font-size: 10px; color: #94a3b8;">${p.handle} • ${p.timeAgo}</div>
+                </div>
+              </div>
+              <span class="tag-pill" style="${isAdvance ? 'border: 1px solid #00f0ff; color: #00f0ff; background: rgba(0,240,255,0.1);' : ''}">${p.tag}</span>
+            </div>
+            <div style="font-size: 13px; line-height: 1.5; color: #e9edef;">${p.content}</div>
+            
+            <!-- Actions bar -->
+            <div style="display: flex; gap: 10px; margin-top: 12px;">
+              <button class="btn-action" onclick="toggleLikePost('${p.id}')" style="color: ${p.isLiked ? '#ef4444' : '#94a3b8'};">
+                <span>${p.isLiked ? '❤️' : '🤍'}</span>
+                <span>${p.likes}</span>
+              </button>
+              <button class="btn-action" onclick="toggleComments('${p.id}')">
+                <span>💬</span>
+                <span>${p.comments.length} Comments</span>
+              </button>
+              <button class="btn-action" onclick="sharePost('${p.id}')">
+                <span>🚀</span>
+                <span>Relay</span>
+              </button>
+            </div>
+
+            <!-- Zero-Popup Inline Comments -->
+            ${inlineCommentsDrawer}
+          </div>
+        `;
+      }).join('');
+
+      const emptyFeedHtml = `
+        <div class="${isAdvance ? 'circuit-glass-card' : 'card'}" style="text-align: center; padding: 36px 16px; color: #8696a0;">
+          <div style="font-size: 32px; margin-bottom: 8px;">🌐</div>
+          <div style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px;">Sovereign Feed Ready</div>
+          <div style="font-size: 12px; line-height: 1.4; color: #94a3b8; max-width: 280px; margin: 0 auto 14px;">No posts published yet. Broadcast your first update to nearby BLE nodes or wait for peer DAG packets!</div>
+          <button class="btn-primary" onclick="toggleComposer(true)">✎ Compose Post</button>
+        </div>
+      `;
+
+      c.innerHTML = `
+        <div style="padding: 12px 16px;">
+          <!-- Advance Telemetry HUD -->
+          ${telemetryHudHtml}
+
+          <!-- Stories Bar -->
+          <div style="display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; cursor: pointer;" onclick="toggleComposer(true)">
+              <div style="width: 54px; height: 54px; border-radius: 50%; background: #1e293b; border: 2px dashed ${isAdvance ? '#00f0ff' : '#38bdf8'}; display: flex; align-items: center; justify-content: center; font-size: 20px; color: ${isAdvance ? '#00f0ff' : '#38bdf8'};">+</div>
+              <span style="font-size: 10px; color: ${isAdvance ? '#00f0ff' : '#38bdf8'}; font-weight: 700;">Story</span>
+            </div>
+            ${peerStories.length > 0 ? peerStories : `
+              <div style="display: flex; align-items: center; color: #64748b; font-size: 11px; padding: 0 10px;">
+                Bring another Sovra node nearby to view live stories over BLE
+              </div>
+            `}
+          </div>
+
+          <!-- Inline Post Composer -->
+          ${composerHtml}
+
+          <!-- Dynamic Feed Posts List -->
+          <div>${postsHtml.length > 0 ? postsHtml : emptyFeedHtml}</div>
+        </div>
+      `;
+    }
+
+    function toggleComposer(open) {
+      isComposerExpanded = open;
+      renderFeedScreen();
+    }
+
+    function publishNewPost() {
+      const input = document.getElementById('composerTextInput');
+      const tagSelect = document.getElementById('composerTagSelect');
+      if (!input || !input.value.trim()) return;
+
+      const newPost = {
+        id: 'post-' + Date.now(),
+        author: userProfile.name,
+        handle: userProfile.handle,
+        avatar: userProfile.avatar,
+        avatarBg: '#00a884',
+        timeAgo: 'Just now',
+        content: input.value.trim(),
+        tag: tagSelect ? tagSelect.value : '#mesh',
+        likes: 0,
+        isLiked: false,
+        comments: []
+      };
+
+      feedPosts.unshift(newPost);
+      saveFeedPosts();
+      isComposerExpanded = false;
+      renderFeedScreen();
+
+      // Transmit new post event over Bluetooth mesh radio
+      if (window.SovraBleNative) {
+        try {
+          const payload = {
+            id: newPost.id,
+            channel: 'channel:local_mesh',
+            senderName: userProfile.name,
+            text: '📢 [Feed Post] ' + newPost.content,
+            timestamp: Date.now()
+          };
+          window.SovraBleNative.broadcastData(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+        } catch (e) {}
+      }
+    }
+
+    function toggleLikePost(postId) {
+      const p = feedPosts.find(x => x.id === postId);
+      if (!p) return;
+      p.isLiked = !p.isLiked;
+      p.likes += p.isLiked ? 1 : -1;
+      saveFeedPosts();
+      renderFeedScreen();
+    }
+
+    function toggleComments(postId) {
+      activeOpenCommentsPostId = activeOpenCommentsPostId === postId ? null : postId;
+      renderFeedScreen();
+    }
+
+    function addComment(postId) {
+      const input = document.getElementById('commentInput-' + postId);
+      if (!input || !input.value.trim()) return;
+      const p = feedPosts.find(x => x.id === postId);
+      if (!p) return;
+      p.comments.push({ author: userProfile.name, text: input.value.trim() });
+      saveFeedPosts();
+      renderFeedScreen();
+    }
+
+    function sharePost(postId) {
+      const p = feedPosts.find(x => x.id === postId);
+      if (!p) return;
+      updateMeshBadge('Relayed ' + p.id + ' over Mesh', true);
+    }
+
+    // ==========================================
+    // 5. REELS SCREEN (ZERO POPUP, 100% DYNAMIC)
+    // ==========================================
+
+    let activeReelIndex = 0;
+    let isReelCommentsOpen = false;
+
+    function renderReelsScreen() {
+      const c = document.getElementById('screenContainer');
+      if (reelsVideos.length === 0) {
+        c.innerHTML = `
+          <div style="padding: 16px; height: 100%; display: flex; align-items: center; justify-content: center;">
+            <div class="card" style="text-align: center; padding: 40px 20px; max-width: 320px;">
+              <div style="font-size: 36px; margin-bottom: 12px;">🎬</div>
+              <div style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px;">No Local Reels Cached</div>
+              <div style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">Reels stream dynamically from nearby peer DAG stores over Wi-Fi Direct and BLE. Connect to nearby nodes to receive short videos.</div>
+              <button class="btn-primary" onclick="switchTab('chats')">📡 Scan Nearby Nodes</button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+      const reel = reelsVideos[activeReelIndex] || reelsVideos[0];
+
+      const commentsHtml = isReelCommentsOpen ? `
+        <div style="background: rgba(15, 23, 42, 0.95); border-radius: 12px; padding: 12px; margin-top: 10px; border: 1px solid rgba(255,255,255,0.1); animation: fadeIn 0.2s;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 12px; font-weight: 700; color: #38bdf8;">Reel Comments (${reel.comments.length})</span>
+            <button onclick="toggleReelComments()" style="background: none; border: none; color: #94a3b8; font-size: 14px; cursor: pointer;">✕</button>
+          </div>
+          <div style="max-height: 120px; overflow-y: auto; margin-bottom: 8px;">
+            ${reel.comments.map(c => `
+              <div style="background: #182229; border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; font-size: 11px;">
+                <strong style="color: #38bdf8;">${c.author}:</strong> ${c.text}
+              </div>
+            `).join('')}
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="reelCommentInput" placeholder="Add comment..." style="flex: 1; background: #182229; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 8px; color: #fff; font-size: 11px; outline: none;" onkeydown="if(event.key==='Enter') addReelComment()">
+            <button onclick="addReelComment()" class="btn-action" style="background: #00a884; color: #fff; border: none;">Send</button>
+          </div>
+        </div>
+      ` : '';
+
+      c.innerHTML = `
+        <div style="padding: 12px 16px; height: 100%; display: flex; flex-direction: column;">
+          <!-- Reel Card -->
+          <div style="flex: 1; border-radius: 16px; background: ${reel.gradient}; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; border: 1px solid rgba(255,255,255,0.1); min-height: 380px;">
+            
+            <!-- Top Badges -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="tag-pill" style="background: rgba(0,0,0,0.5); color: #38bdf8;">🎬 P2P Reel ${activeReelIndex + 1}/${reelsVideos.length}</span>
+              <span style="font-size: 11px; color: #4ade80; background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 10px;">⚡ UnixFS Stream</span>
+            </div>
+
+            <!-- Animated Canvas Preview Placeholder -->
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0.15; font-size: 90px;">
+              ▶
+            </div>
+
+            <!-- Bottom Content & Action Rail -->
+            <div style="z-index: 10;">
+              <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+                <!-- Creator & Title Info -->
+                <div style="max-width: 75%;">
+                  <div style="font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 4px;">${reel.creator}</div>
+                  <div style="font-size: 12px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px;">${reel.title}</div>
+                  <div style="font-size: 11px; color: #94a3b8;">${reel.description}</div>
+                </div>
+
+                <!-- Vertical Action Rail -->
+                <div style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
+                  <button onclick="toggleReelLike()" style="background: rgba(0,0,0,0.4); border: none; border-radius: 50%; width: 42px; height: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: ${reel.isLiked ? '#ef4444' : '#fff'}; cursor: pointer;">
+                    <span style="font-size: 18px;">${reel.isLiked ? '❤️' : '🤍'}</span>
+                    <span style="font-size: 9px; font-weight: 700;">${reel.likes}</span>
+                  </button>
+                  <button onclick="toggleReelComments()" style="background: rgba(0,0,0,0.4); border: none; border-radius: 50%; width: 42px; height: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; cursor: pointer;">
+                    <span style="font-size: 18px;">💬</span>
+                    <span style="font-size: 9px; font-weight: 700;">${reel.comments.length}</span>
+                  </button>
+                  <button onclick="tipReelCreator()" style="background: rgba(0,0,0,0.4); border: none; border-radius: 50%; width: 42px; height: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #f59e0b; cursor: pointer;">
+                    <span style="font-size: 18px;">⚡</span>
+                    <span style="font-size: 9px; font-weight: 700;">${reel.tips}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Zero-Popup Inline Comments Drawer -->
+              ${commentsHtml}
+            </div>
+          </div>
+
+          <!-- Next / Prev Controls -->
+          <div style="display: flex; gap: 10px; margin-top: 12px;">
+            <button onclick="cycleReel(-1)" class="btn-action" style="flex: 1; justify-content: center;">◀ Previous Reel</button>
+            <button onclick="cycleReel(1)" class="btn-action" style="flex: 1; justify-content: center; background: rgba(56, 189, 248, 0.2); color: #38bdf8;">Next Reel ▶</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function cycleReel(dir) {
+      if (reelsVideos.length === 0) return;
+      activeReelIndex = (activeReelIndex + dir + reelsVideos.length) % reelsVideos.length;
+      isReelCommentsOpen = false;
+      renderReelsScreen();
+    }
+
+    function toggleReelLike() {
+      const reel = reelsVideos[activeReelIndex];
+      if (!reel) return;
+      reel.isLiked = !reel.isLiked;
+      reel.likes += reel.isLiked ? 1 : -1;
+      saveReels();
+      renderReelsScreen();
+    }
+
+    function tipReelCreator() {
+      const reel = reelsVideos[activeReelIndex];
+      if (!reel) return;
+      reel.tips += 5;
+      saveReels();
+      updateMeshBadge('Tipped +5 SOVR to ' + reel.creator, true);
+      renderReelsScreen();
+    }
+
+    function toggleReelComments() {
+      isReelCommentsOpen = !isReelCommentsOpen;
+      renderReelsScreen();
+    }
+
+    function addReelComment() {
+      const input = document.getElementById('reelCommentInput');
+      if (!input || !input.value.trim()) return;
+      const reel = reelsVideos[activeReelIndex];
+      if (!reel) return;
+      reel.comments.push({ author: userProfile.name, text: input.value.trim() });
+      saveReels();
+      renderReelsScreen();
+    }
+
+    // ==========================================
+    // 6. WATCH SCREEN (ZERO POPUP, 100% DYNAMIC)
+    // ==========================================
+
+    function renderWatchScreen() {
+      const c = document.getElementById('screenContainer');
+      const categories = ['All', 'Mesh Radio', 'P2P Architecture', 'Security'];
+
+      const categoryPillsHtml = categories.map(cat => `
+        <button onclick="setWatchCategory('${cat}')" style="background: ${selectedWatchCategory === cat ? '#38bdf8' : '#182229'}; color: ${selectedWatchCategory === cat ? '#0f172a' : '#94a3b8'}; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 4px 12px; font-size: 11px; font-weight: 700; cursor: pointer; flex-shrink: 0;">
+          ${cat}
+        </button>
+      `).join('');
+
+      const filteredVideos = selectedWatchCategory === 'All' 
+        ? watchVideos 
+        : watchVideos.filter(v => v.category === selectedWatchCategory);
+
+      if (filteredVideos.length === 0) {
+        c.innerHTML = `
+          <div style="padding: 12px 16px;">
+            <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+              ${categoryPillsHtml}
+            </div>
+            <div class="card" style="text-align: center; padding: 40px 16px; margin-top: 20px;">
+              <div style="font-size: 36px; margin-bottom: 10px;">📺</div>
+              <div style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px;">No Video Broadcasts Found</div>
+              <div style="font-size: 12px; color: #94a3b8; line-height: 1.4;">Videos stream peer-to-peer from local community seeders. No centralized video servers are used.</div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const videosListHtml = filteredVideos.map(v => {
+        const isPlaying = activeWatchVideoId === v.id;
+        return `
+          <div class="card" style="margin-bottom: 14px; overflow: hidden; padding: 0;">
+            <!-- Thumbnail / Video Player -->
+            <div style="height: 180px; background: ${v.gradient}; position: relative; display: flex; flex-direction: column; justify-content: space-between; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="tag-pill" style="background: rgba(0,0,0,0.6);">${v.category}</span>
+                <span style="font-size: 10px; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px; font-weight: 700;">${v.duration}</span>
+              </div>
+              
+              <!-- Center Play Button -->
+              <div style="align-self: center; cursor: pointer;" onclick="togglePlayVideo('${v.id}')">
+                <div style="width: 52px; height: 52px; border-radius: 50%; background: ${isPlaying ? '#00a884' : 'rgba(0,0,0,0.6)'}; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                  ${isPlaying ? '⏸' : '▶'}
+                </div>
+              </div>
+
+              <div style="font-size: 10px; color: ${isPlaying ? '#4ade80' : '#94a3b8'}; font-weight: 700;">
+                ${isPlaying ? '● Live HLS Stream Playing Inline' : 'Tap to stream over P2P'}
+              </div>
+            </div>
+
+            <!-- Video Details -->
+            <div style="padding: 12px 14px;">
+              <div style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px;">${v.title}</div>
+              <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px;">${v.channel} • ${v.views}</div>
+              <div style="font-size: 12px; color: #cbd5e1; line-height: 1.4;">${v.description}</div>
+              
+              <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <button class="btn-action" onclick="tipVideoChannel('${v.channel}')">⚡ Tip Channel</button>
+                <button class="btn-action" onclick="togglePlayVideo('${v.id}')">${isPlaying ? 'Stop' : 'Watch Inline'}</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      c.innerHTML = `
+        <div style="padding: 12px 16px;">
+          <!-- Category Pills -->
+          <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            ${categoryPillsHtml}
+          </div>
+
+          <!-- Video Cards -->
+          <div>${videosListHtml}</div>
+        </div>
+      `;
+    }
+
+    function setWatchCategory(cat) {
+      selectedWatchCategory = cat;
+      renderWatchScreen();
+    }
+
+    function togglePlayVideo(id) {
+      activeWatchVideoId = activeWatchVideoId === id ? null : id;
+      renderWatchScreen();
+    }
+
+    function tipVideoChannel(channelName) {
+      updateMeshBadge('Tipped +10 SOVR to ' + channelName, true);
+    }
+
+    // ==========================================
+    // 7. CHATS SCREEN (ZERO POPUP, 100% DYNAMIC)
+    // ==========================================
+
+    function renderChatsScreen() {
+      const c = document.getElementById('screenContainer');
+      const nav = document.getElementById('bottomNavBar');
+      if (activeRecipient) {
+        if (nav) nav.style.display = 'none';
+        if (c) c.style.paddingBottom = '0px';
+        renderThreadView(c);
+      } else {
+        if (nav) nav.style.display = 'flex';
+        if (c) c.style.paddingBottom = '70px';
+        renderConversationsHub(c);
+      }
+    }
+
+    function renderConversationsHub(c) {
+      const uniqueThreads = new Set(chatMessages.map(m => m.threadId || 'did:key:z6MksAliceP2P'));
+      c.innerHTML = `
+        <div style="display: flex; flex-direction: column; height: 100%;">
+          <!-- Subtab bar -->
+          <div style="display: flex; background-color: #182229; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <button onclick="setChatTab('chats')" style="flex: 1; padding: 10px 0; background: transparent; border: none; border-bottom: ${chatSubTab === 'chats' ? '2px solid #00a884' : 'none'}; color: ${chatSubTab === 'chats' ? '#00a884' : '#8696a0'}; font-weight: 700; font-size: 12px; cursor: pointer;">
+              Chats (${uniqueThreads.size})
+            </button>
+            <button onclick="setChatTab('radar')" style="flex: 1; padding: 10px 0; background: transparent; border: none; border-bottom: ${chatSubTab === 'radar' ? '2px solid #38bdf8' : 'none'}; color: ${chatSubTab === 'radar' ? '#38bdf8' : '#8696a0'}; font-weight: 700; font-size: 12px; cursor: pointer;">
+              Radar (${discoveredPeers.length})
+            </button>
+            <button onclick="setChatTab('channels')" style="flex: 1; padding: 10px 0; background: transparent; border: none; border-bottom: ${chatSubTab === 'channels' ? '2px solid #f59e0b' : 'none'}; color: ${chatSubTab === 'channels' ? '#f59e0b' : '#8696a0'}; font-weight: 700; font-size: 12px; cursor: pointer;">
+              Channels (2)
+            </button>
+          </div>
+
+          <!-- Body based on subtab -->
+          <div style="flex: 1; overflow-y: auto; padding: 12px 14px;">
+            ${chatSubTab === 'chats' ? renderChatsListHtml() : ''}
+            ${chatSubTab === 'radar' ? renderRadarHtml() : ''}
+            ${chatSubTab === 'channels' ? renderChannelsHtml() : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function setChatTab(tab) {
+      chatSubTab = tab;
+      renderChatsScreen();
+    }
+
+    function openPeerByAddress(address) {
+      const p = discoveredPeers.find(x => x.address === address);
+      const name = p ? p.name : ('Peer ' + address.substring(0, 8));
+      if (activeTab !== 'chats') {
+        activeTab = 'chats';
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        const activeNav = document.getElementById('nav-chats');
+        if (activeNav) activeNav.classList.add('active');
+      }
+      openThread(address, name, false, false);
+    }
+
+    function openChatById(tid) {
+      if (tid === 'channel:local_mesh') {
+        openThread('channel:local_mesh', '#local-mesh', true, false);
+      } else if (tid === 'channel:emergency_sos') {
+        openThread('channel:emergency_sos', '#emergency-sos', true, true);
+      } else if (tid === 'did:key:z6MksAliceP2P') {
+        openThread('did:key:z6MksAliceP2P', 'Alice (P2P Architect)', false, false);
+      } else {
+        const peer = discoveredPeers.find(p => p.address === tid);
+        const lastMsg = chatMessages.slice().reverse().find(m => m.threadId === tid);
+        const name = peer ? peer.name : (lastMsg && lastMsg.senderName && lastMsg.senderName !== 'You' ? lastMsg.senderName : ('Peer ' + tid.substring(0, 8)));
+        openThread(tid, name, false, false);
+      }
+    }
+
+    function renderChatsListHtml() {
+      const threadMap = {};
+      chatMessages.forEach(m => {
+        const tid = m.threadId || 'did:key:z6MksAliceP2P';
+        if (!threadMap[tid] || m.time > threadMap[tid].time) {
+          threadMap[tid] = m;
+        }
+      });
+
+      const threadIds = Object.keys(threadMap);
+      if (threadIds.length === 0) {
+        return `<div style="padding: 24px 16px; text-align: center; color: #8696a0; font-size: 13px;">No conversations yet. Open <strong>Radar</strong> or <strong>Channels</strong> to start chatting over Bluetooth!</div>`;
+      }
+
+      return threadIds.map(tid => {
+        const lastMsg = threadMap[tid];
+        let name = 'Peer ' + tid.substring(0, 8);
+        let avatarBg = '#3b82f6';
+        let avatarIcon = '💬';
+
+        if (tid === 'did:key:z6MksAliceP2P') {
+          name = 'Alice (P2P Architect)';
+          avatarBg = '#3b82f6';
+          avatarIcon = 'A';
+        } else if (tid === 'channel:local_mesh') {
+          name = '#local-mesh (50m Swarm)';
+          avatarBg = '#0284c7';
+          avatarIcon = '📶';
+        } else if (tid === 'channel:emergency_sos') {
+          name = '#emergency-sos';
+          avatarBg = '#dc2626';
+          avatarIcon = '🚨';
+        } else {
+          const matchedPeer = discoveredPeers.find(p => p.address === tid);
+          if (matchedPeer) {
+            name = matchedPeer.name;
+          } else if (lastMsg.senderName && lastMsg.senderName !== 'You') {
+            name = lastMsg.senderName;
+          }
+          avatarBg = '#10b981';
+          avatarIcon = '👤';
+        }
+
+        const timeStr = new Date(lastMsg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        return `
+          <div onclick="openChatById('${tid}')" style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); cursor: pointer;">
+            <div style="width: 44px; height: 44px; border-radius: 50%; background: ${avatarBg}; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px;">${avatarIcon}</div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="font-size: 14px; font-weight: 700; color: #fff;">${escapeHtml(name)}</span>
+                <span style="font-size: 10px; color: #8696a0;">${timeStr}</span>
+              </div>
+              <div style="font-size: 12px; color: #8696a0; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${lastMsg.isOut ? 'You: ' : ''}${escapeHtml(lastMsg.text)}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderRadarHtml() {
+      const isAdvance = (currentUiMode === 'advance');
+
+      if (isAdvance) {
+        // ========================================================
+        // ADVANCE MODE: 3D TACTICAL MESH WAR TABLE (Ref Image 1) + COSMIC ORBITAL RADAR (Ref Image 3)
+        // ========================================================
+        const peersTacticalCards = discoveredPeers.length === 0 ? `
+          <div style="background: rgba(0,0,0,0.4); border: 1px dashed rgba(0,240,255,0.3); border-radius: 8px; padding: 14px; text-align: center; color: #7dd3fc; font-size: 11px;">
+            Scanning 2.4GHz RF spectrum for peer beacons... Bring nearby nodes within range to lock coordinates.
+          </div>
+        ` : discoveredPeers.map((p, idx) => `
+          <div class="circuit-glass-card" style="padding: 12px; margin-bottom: 8px; border-color: rgba(0, 240, 255, 0.4);">
+            <div class="circuit-corner-tr"></div>
+            <div class="circuit-corner-bl"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 10px; font-weight: 800; color: #00f0ff; background: rgba(0,240,255,0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(0,240,255,0.3);">NODE #${idx + 1}</span>
+                <span style="font-size: 13px; font-weight: 800; color: #fff;">${escapeHtml(p.name)}</span>
+              </div>
+              <span style="font-size: 10px; color: #34d399; font-weight: 700;">RSSI: ${p.rssi} dBm</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 10px; color: #7dd3fc;">
+                Dist: ~${p.distance}m • Coord: [${(40.7128 + idx * 0.003).toFixed(4)}, ${(-74.006 + idx * 0.003).toFixed(4)}] • Direct Link
+              </div>
+              <button onclick="openPeerByAddress('${p.address}')" style="background: linear-gradient(135deg, #0284c7, #00f0ff); color: #020617; border: none; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 800; cursor: pointer;">
+                INITIALIZE CHAT
+              </button>
+            </div>
+          </div>
+        `).join('');
+
+        return `
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <!-- Ref Image 1: 3D Tactical Mesh War Table -->
+            <div class="tactical-table">
+              <div class="tactical-grid"></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 2; margin-bottom: 8px;">
+                <div style="font-size: 11px; font-weight: 800; color: #00f0ff; letter-spacing: 0.5px;">TACTICAL MESH WAR-ROOM // SECTOR NY-07</div>
+                <span style="font-size: 9px; padding: 2px 6px; background: rgba(0,240,255,0.15); color: #00f0ff; border-radius: 4px; border: 1px solid rgba(0,240,255,0.3); font-weight: 700;">LIVE 2.4GHz</span>
+              </div>
+              
+              <!-- Ref Image 3: Cosmic Orbital Radar Rings -->
+              <div class="orbital-container">
+                <div class="orbital-ring r1"></div>
+                <div class="orbital-ring r2"></div>
+                <div class="orbital-ring r3"></div>
+                
+                <!-- Center Core (Ref Image 3) -->
+                <div class="orbital-core">
+                  <span>⚡</span>
+                </div>
+
+                <!-- Satellite Orbit Nodes (Ref Image 3) -->
+                <div class="orbital-satellite" style="top: 10px; left: 94px;" title="Notifications">🔔</div>
+                <div class="orbital-satellite" style="top: 94px; right: 10px;" title="Memory LocalDb">🧠</div>
+                <div class="orbital-satellite" style="bottom: 10px; left: 94px;" title="Backup Vault">☁️</div>
+                <div class="orbital-satellite" style="top: 94px; left: 10px;" title="Voice Notes">🎙️</div>
+                <div class="orbital-satellite" style="top: 36px; right: 36px;" title="Mesh Browser">🌐</div>
+                <div class="orbital-satellite" style="bottom: 36px; left: 36px;" title="P2P Skills">⚙️</div>
+              </div>
+
+              <div style="text-align: center; position: relative; z-index: 2; margin-top: 6px;">
+                <div style="font-size: 12px; font-weight: 800; color: #fff; text-shadow: 0 0 8px #00f0ff;">${discoveredPeers.length} Sovereign Node(s) Active In Physical Range</div>
+                <button onclick="rescanRadar()" style="margin-top: 8px; background: rgba(0,240,255,0.15); color: #00f0ff; border: 1px solid #00f0ff; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 800; cursor: pointer; text-shadow: 0 0 4px #00f0ff;">
+                  🔄 FORCE TACTICAL RESCAN
+                </button>
+              </div>
+            </div>
+
+            <div style="font-size: 12px; font-weight: 800; color: #00f0ff; letter-spacing: 0.5px;">IDENTIFIED MESH PEERS (${discoveredPeers.length})</div>
+            ${peersTacticalCards}
+          </div>
+        `;
+      }
+
+      // ========================================================
+      // SIMPLE MODE: Clean Familiar Radar (Consumer Grade)
+      // ========================================================
+      let peersHtml = '';
+      if (discoveredPeers.length === 0) {
+        peersHtml = `
+          <div style="background: #182229; border-radius: 10px; padding: 16px; text-align: center; color: #8696a0; font-size: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+            Scanning nearby devices... Bring another Sovra user within Bluetooth range to discover.
+          </div>
+        `;
+      } else {
+        peersHtml = discoveredPeers.map(p => `
+          <div style="background: #182229; border-radius: 10px; padding: 12px; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding-right: 8px;">
+              <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #fff; flex-shrink: 0;">
+                ${p.name && p.name.trim().length > 0 ? escapeHtml(p.name.trim()[0].toUpperCase()) : '👤'}
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 14px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(p.name)}</div>
+                <div style="font-size: 11px; color: #38bdf8; margin-top: 2px;">
+                  Nearby • Direct Link
+                </div>
+              </div>
+            </div>
+            <button onclick="openPeerByAddress('${p.address}')" style="background: #00a884; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0;">
+              Chat
+            </button>
+          </div>
+        `).join('');
+      }
+
+      return `
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Radar graphic -->
+          <div style="background: #182229; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; border: 1px solid rgba(56, 189, 248, 0.2);">
+            <div class="radar-circle">
+              <span style="font-size: 24px;">📶</span>
+            </div>
+            <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-top: 8px;">Nearby Radar Active</div>
+            <div style="font-size: 11px; color: #8696a0; margin-top: 2px;">${discoveredPeers.length} Peer(s) detected nearby</div>
+            <button onclick="rescanRadar()" style="margin-top: 10px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid #38bdf8; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer;">
+              🔄 Rescan Radar
+            </button>
+          </div>
+          <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Nearby Friends (${discoveredPeers.length})</div>
+          ${peersHtml}
+        </div>
+      `;
+    }
+
+    function renderChannelsHtml() {
+      return `
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div onclick="openChatById('channel:local_mesh')" style="background: #182229; border-radius: 10px; padding: 14px; border: 1px solid rgba(2, 132, 199, 0.3); cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <span style="font-size: 18px;">📶</span>
+              <span style="font-size: 15px; font-weight: 700; color: #38bdf8;">#local-mesh</span>
+              <span style="font-size: 9px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 1px 6px; border-radius: 4px; font-weight: 700;">50m Swarm</span>
+            </div>
+            <div style="font-size: 12px; color: #94a3b8;">Hyperlocal public broadcast beacon for all nearby nodes. Zero internet required.</div>
+          </div>
+
+          <div onclick="openChatById('channel:emergency_sos')" style="background: #182229; border-radius: 10px; padding: 14px; border: 1px solid rgba(220, 38, 38, 0.4); cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <span style="font-size: 18px;">🚨</span>
+              <span style="font-size: 15px; font-weight: 700; color: #ef4444;">#emergency-sos</span>
+              <span style="font-size: 9px; background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 1px 6px; border-radius: 4px; font-weight: 700;">Priority Swarm</span>
+            </div>
+            <div style="font-size: 12px; color: #94a3b8;">Emergency distress beacon. Relayed across all available hops without pairing.</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function openThread(did, name, isChannel, isEmergency) {
+      chatSubTab = 'chats'; // Ensure subtab is not 'radar'
+      activeRecipient = {
+        did: did,
+        name: name || 'Peer',
+        isChannel: !!isChannel,
+        isEmergency: !!isEmergency
+      };
+      renderChatsScreen();
+    }
+
+    function renderThreadView(c) {
+      const threadMsgs = chatMessages.filter(m => m.threadId === activeRecipient.did || (!m.threadId && activeRecipient.did === 'did:key:z6MksAliceP2P'));
+      
+      const msgsHtml = threadMsgs.map(m => `
+        <div class="msg-bubble ${m.isOut ? 'msg-out' : 'msg-in'}">
+          <div>${escapeHtml(m.text)}</div>
+          <div style="display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 9px; color: #8696a0; margin-top: 2px;">
+            <span>${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <span>${m.isOut ? (m.tick === 'read' ? '✓✓' : m.tick === 'delivered' ? '✓✓' : '✓') : ''}</span>
+          </div>
+        </div>
+      `).join('');
+
+      const avatarInitial = (activeRecipient.name && activeRecipient.name.trim().length > 0)
+        ? activeRecipient.name.trim()[0].toUpperCase()
+        : 'P';
+
+      c.innerHTML = `
+        <div style="display: flex; flex-direction: column; height: 100%; position: absolute; inset: 0; background: #090d16; z-index: 50;">
+          <!-- Thread Header -->
+          <div style="padding: 10px 14px; background: #182229; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;">
+            <button onclick="closeThread()" style="background: none; border: none; color: #38bdf8; font-size: 22px; cursor: pointer; padding: 4px 8px 4px 0; line-height: 1;">←</button>
+            <div style="width: 38px; height: 38px; border-radius: 50%; background: ${activeRecipient.isEmergency ? '#dc2626' : activeRecipient.isChannel ? '#0284c7' : '#3b82f6'}; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; flex-shrink: 0;">
+              ${activeRecipient.isEmergency ? '🚨' : activeRecipient.isChannel ? '📶' : avatarInitial}
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff;">${escapeHtml(activeRecipient.name)}</div>
+              <div style="font-size: 10px; color: ${activeRecipient.isEmergency ? '#ef4444' : '#34d399'};">
+                ${activeRecipient.isEmergency ? '🚨 Emergency SOS Swarm' : activeRecipient.isChannel ? '📶 Hyperlocal 50m Broadcast' : '● E2EE Double Ratchet Active'}
+              </div>
+            </div>
+          </div>
+
+          <!-- Messages list -->
+          <div id="threadMessagesBox" style="flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;">
+            ${msgsHtml.length > 0 ? msgsHtml : '<div style="margin: auto; text-align: center; color: #64748b; font-size: 12px; padding: 20px;">Start your sovereign encrypted conversation.<br>Messages are routed directly over Bluetooth Low Energy radio.</div>'}
+          </div>
+
+          <!-- Input bar -->
+          <div style="padding: 10px 14px; background: #182229; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;">
+            <input type="text" id="chatInput" placeholder="Message" style="flex: 1; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 10px 16px; color: #fff; font-size: 13px; outline: none;" onkeydown="if(event.key==='Enter') sendCurrentMessage()">
+            <button onclick="sendCurrentMessage()" style="width: 40px; height: 40px; border-radius: 50%; background: #00a884; border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">➤</button>
+          </div>
+        </div>
+      `;
+
+      const box = document.getElementById('threadMessagesBox');
+      if (box) box.scrollTop = box.scrollHeight;
+    }
+
+    function closeThread() {
+      activeRecipient = null;
+      renderChatsScreen();
+    }
+
+    function sendCurrentMessage() {
+      const input = document.getElementById('chatInput');
+      if (!input || !input.value.trim() || !activeRecipient) return;
+      const text = input.value.trim();
+      input.value = '';
+
+      const newMsg = {
+        id: 'm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        threadId: activeRecipient.did,
+        senderName: 'You',
+        text: text,
+        isOut: true,
+        time: Date.now(),
+        tick: 'sent',
+        isBitChat: true
+      };
+
+      chatMessages.push(newMsg);
+      saveMessages();
+
+      const box = document.getElementById('threadMessagesBox');
+      if (box) {
+        if (box.children.length === 1 && box.children[0].tagName === 'DIV' && box.children[0].style.margin === 'auto') {
+          box.innerHTML = '';
+        }
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble msg-out';
+        bubble.innerHTML = `
+          <div>${escapeHtml(newMsg.text)}</div>
+          <div style="display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 9px; color: #8696a0; margin-top: 2px;">
+            <span>${new Date(newMsg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <span>✓</span>
+          </div>
+        `;
+        box.appendChild(bubble);
+        box.scrollTop = box.scrollHeight;
+      }
+
+      input.focus();
+
+      // Transmit over Bluetooth LE Radio
+      if (window.SovraBleNative) {
+        try {
+          const payload = {
+            id: newMsg.id,
+            channel: activeRecipient.isChannel ? activeRecipient.did : undefined,
+            recipientAddress: !activeRecipient.isChannel ? activeRecipient.did : undefined,
+            senderName: userProfile.name,
+            text: text,
+            timestamp: Date.now()
+          };
+          const payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+
+          if (activeRecipient.isChannel) {
+            window.SovraBleNative.broadcastData(payloadB64);
+          } else {
+            window.SovraBleNative.sendData(activeRecipient.did, payloadB64);
+          }
+        } catch (e) {
+          console.error('[BLE Send Error]', e);
+        }
+      }
+    }
+
+    // ==========================================
+    // 8. ME SCREEN (ZERO POPUP, 100% DYNAMIC)
+    // ==========================================
+
+    let isDiagnosticsExpanded = false;
+
+    function renderMeScreen() {
+      const c = document.getElementById('screenContainer');
+
+      const editFormHtml = isProfileEditing ? `
+        <div class="card" style="margin-bottom: 16px; border: 1px solid #38bdf8; animation: fadeIn 0.2s;">
+          <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 10px;">Edit Sovereign Profile</div>
+          <div style="margin-bottom: 8px;">
+            <label style="font-size: 10px; color: #94a3b8; display: block; margin-bottom: 2px;">Display Name</label>
+            <input type="text" id="editProfileNameInput" value="${userProfile.name}" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 12px; outline: none;">
+          </div>
+          <div style="margin-bottom: 8px;">
+            <label style="font-size: 10px; color: #94a3b8; display: block; margin-bottom: 2px;">Bio</label>
+            <input type="text" id="editProfileBioInput" value="${userProfile.bio}" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 12px; outline: none;">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="font-size: 10px; color: #94a3b8; display: block; margin-bottom: 2px;">Avatar Emoji</label>
+            <select id="editProfileAvatarSelect" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 12px; outline: none;">
+              <option value="👤" ${userProfile.avatar === '👤' ? 'selected' : ''}>👤 User</option>
+              <option value="⚡" ${userProfile.avatar === '⚡' ? 'selected' : ''}>⚡ Lightning Node</option>
+              <option value="📡" ${userProfile.avatar === '📡' ? 'selected' : ''}>📡 Mesh Radio</option>
+              <option value="🔒" ${userProfile.avatar === '🔒' ? 'selected' : ''}>🔒 Cipher Shield</option>
+              <option value="🚀" ${userProfile.avatar === '🚀' ? 'selected' : ''}>🚀 Sovereign Rocket</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-primary" onclick="saveEditedProfile()">Save Changes</button>
+            <button class="btn-action" onclick="toggleEditProfile(false)">Cancel</button>
+          </div>
+        </div>
+      ` : '';
+
+      const diagnosticsHtml = isDiagnosticsExpanded ? `
+        <div class="card" style="margin-top: 12px; animation: fadeIn 0.2s;">
+          <div style="font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">Node Diagnostics & Cryptographic Vault</div>
+          <div style="font-size: 11px; color: #94a3b8; line-height: 1.6;">
+            <div>🔑 <strong>DID Key:</strong> ${userProfile.did}</div>
+            <div>🔒 <strong>AEAD Suite:</strong> ChaCha20-Poly1305 (256-bit)</div>
+            <div>📡 <strong>BLE Scanner:</strong> SCAN_MODE_LOW_LATENCY</div>
+            <div>📶 <strong>Wi-Fi Direct:</strong> P2P Group Owner Capable</div>
+            <div>💾 <strong>Local Storage Used:</strong> ${(JSON.stringify(localStorage).length / 1024).toFixed(1)} KB</div>
+          </div>
+          <button onclick="clearLocalCache()" class="btn-action" style="margin-top: 10px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: #ef4444;">
+            🗑 Clear Local App Cache
+          </button>
+        </div>
+      ` : '';
+
+      c.innerHTML = `
+        <div style="padding: 16px;">
+          <!-- Profile Header Card -->
+          <div class="card" style="margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; font-size: 24px;">${userProfile.avatar}</div>
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">${userProfile.name}</div>
+                  <div style="font-size: 11px; color: #38bdf8;">${userProfile.handle}</div>
+                </div>
+              </div>
+              <button class="btn-action" onclick="toggleEditProfile(true)">✏️ Edit</button>
+            </div>
+            <div style="font-size: 12px; color: #cbd5e1; line-height: 1.4; margin-bottom: 10px;">${userProfile.bio}</div>
+            <div style="font-size: 10px; color: #64748b;">Member since ${userProfile.joined}</div>
+          </div>
+
+          <!-- Zero-Popup Inline Profile Editor -->
+          ${editFormHtml}
+
+          <!-- Dynamic Metrics Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+            <div class="card" style="text-align: center; padding: 10px;">
+              <div style="font-size: 16px; font-weight: 700; color: #38bdf8;">${feedPosts.length}</div>
+              <div style="font-size: 10px; color: #94a3b8;">Posts</div>
+            </div>
+            <div class="card" style="text-align: center; padding: 10px;">
+              <div style="font-size: 16px; font-weight: 700; color: #4ade80;">${discoveredPeers.length}</div>
+              <div style="font-size: 10px; color: #94a3b8;">Mesh Peers</div>
+            </div>
+            <div class="card" style="text-align: center; padding: 10px;">
+              <div style="font-size: 16px; font-weight: 700; color: #f59e0b;">${chatMessages.length}</div>
+              <div style="font-size: 10px; color: #94a3b8;">Messages</div>
+            </div>
+          </div>
+
+          <!-- Mesh Radio Status Overview -->
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 13px; font-weight: 700;">Zero-Cloud Node Status</span>
+              <span style="font-size: 10px; color: #4ade80; font-weight: 700;">● Active</span>
+            </div>
+            <div style="font-size: 11px; color: #94a3b8; line-height: 1.6;">
+              <div>📶 <strong>Mesh Transport:</strong> 2.4GHz BLE Ad-Hoc</div>
+              <div>🔒 <strong>Encryption:</strong> E2EE Double Ratchet (Active)</div>
+              <div>⚡ <strong>Mesh Relay:</strong> Store-and-Forward Active</div>
+            </div>
+            <button class="btn-action" onclick="toggleDiagnostics()" style="margin-top: 10px; width: 100%; justify-content: center;">
+              ${isDiagnosticsExpanded ? 'Hide Node Diagnostics ▲' : 'Show Node Diagnostics ▼'}
+            </button>
+          </div>
+
+          <!-- Zero-Popup Inline Diagnostics Drawer -->
+          ${diagnosticsHtml}
+        </div>
+      `;
+    }
+
+    function toggleEditProfile(open) {
+      isProfileEditing = open !== undefined ? open : !isProfileEditing;
+      renderMeScreen();
+    }
+
+    function saveEditedProfile() {
+      const nameInput = document.getElementById('editProfileNameInput');
+      const bioInput = document.getElementById('editProfileBioInput');
+      const avatarSelect = document.getElementById('editProfileAvatarSelect');
+      if (nameInput && nameInput.value.trim()) {
+        userProfile.name = nameInput.value.trim();
+        userProfile.handle = '@' + userProfile.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      }
+      if (bioInput) userProfile.bio = bioInput.value.trim();
+      if (avatarSelect) userProfile.avatar = avatarSelect.value;
+      saveUserProfile(userProfile);
+      // Immediately re-advertise over BLE with updated username
+      if (window.SovraBleNative) {
+        try {
+          const unameB64 = btoa(unescape(encodeURIComponent(userProfile.name || 'Sovra Node')));
+          window.SovraBleNative.startAdvertising('00005356-0000-1000-8000-00805f9b34fb', unameB64);
+        } catch (e) {}
+      }
+      isProfileEditing = false;
+      renderMeScreen();
+      updateMeshBadge('Profile Updated', true);
+    }
+
+    function toggleDiagnostics() {
+      isDiagnosticsExpanded = !isDiagnosticsExpanded;
+      renderMeScreen();
+    }
+
+    function clearLocalCache() {
+      localStorage.clear();
+      feedPosts = loadSavedFeedPosts();
+      reelsVideos = loadSavedReels();
+      watchVideos = loadSavedWatchVideos();
+      chatMessages = loadSavedMessages();
+      userProfile = loadUserProfile();
+      updateMeshBadge('Cache Wiped Clean', true);
+      renderMeScreen();
+    }
+
+    // ==========================================
+    // 9. APP LIFECYCLE BOOT
+    // ==========================================
+
+    window.addEventListener('DOMContentLoaded', function() {
+      updateUiModeVisuals();
+      switchTab('chats');
+      initBleNative();
+      setInterval(initBleNative, 4000);
+    });
+  </script>
+</body>
+</html>

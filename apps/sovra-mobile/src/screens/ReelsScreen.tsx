@@ -486,39 +486,31 @@ export function ReelsScreen(): React.JSX.Element {
           </div>
         ))}
 
-      {/* Comments Drawer Modal */}
+      {/* Inline Comments Sub-surface (Zero-Popup Industry Standard) */}
       {commentsOpen && (
         <div
-          role="dialog"
-          aria-modal="true"
           style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            backdropFilter: 'blur(10px)',
-            zIndex: 100,
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            maxHeight: '60%',
+            backgroundColor: 'rgba(17, 24, 39, 0.96)',
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'flex-end',
+            padding: 16,
+            borderTop: '1px solid rgba(255,255,255,0.15)',
+            zIndex: 10,
+            boxShadow: '0 -10px 25px rgba(0, 0, 0, 0.6)',
           }}
         >
-          <div
-            style={{
-              backgroundColor: '#111827',
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              maxHeight: '65%',
-              display: 'flex',
-              flexDirection: 'column',
-              padding: 16,
-              borderTop: '1px solid rgba(255,255,255,0.1)',
-            }}
-          >
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>
-                Comments ({activeReelComments.length})
-              </h4>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#38bdf8' }}>
+              Comments ({activeReelComments.length})
+            </h4>
               <button
                 onClick={() => setCommentsOpen(false)}
                 style={{
@@ -603,8 +595,7 @@ export function ReelsScreen(): React.JSX.Element {
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
+        )}
+      </div>
+    );
+  }

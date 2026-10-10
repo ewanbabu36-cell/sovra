@@ -61,4 +61,13 @@ tmp/
 .sovra-tls/
 .tmp-*
 .test-drill-*
+.sovra-backups/
+.test-bench-sqlite-*
+.test-final-restore-*
+*.apk
+*.aab
+*.jks
+local.properties
+.gradle/
+
 

@@ -49,6 +49,7 @@ class SovraBleModule(private val context: Context) {
     // Active GATT Connections: gattId -> ActiveConnection
     data class ActiveConnection(
         val gattId: String,
+        val address: String = "",
         val gatt: BluetoothGatt,
         var mtu: Int = 23,
         var writeCharacteristic: BluetoothGattCharacteristic? = null,
@@ -117,12 +118,20 @@ class SovraBleModule(private val context: Context) {
         }, filter)
     }
 
+    // Track devices connected to our GATT Server
+    private val serverConnectedDevices = ConcurrentHashMap<String, BluetoothDevice>()
+
     // ==========================================
     // 2. BLE ADVERTISING (PERIPHERAL ROLE)
     // ==========================================
 
     @Synchronized
-    fun startAdvertising(serviceUuidStr: String, advertisementData: ByteArray, callback: (Boolean, String?) -> Unit) {
+    fun startAdvertising(
+        serviceUuidStr: String,
+        advertisementData: ByteArray,
+        username: String? = null,
+        callback: (Boolean, String?) -> Unit
+    ) {
         if (!hasPermissions()) {
             callback(false, "Bluetooth permissions not granted")
             return
@@ -142,6 +151,17 @@ class SovraBleModule(private val context: Context) {
         // Initialize GATT Server to handle incoming mesh connections
         setupGattServer()
 
+        // 1. Try to set the Bluetooth Adapter local device name to user's Sovra username
+        val cleanUsername = username?.trim()
+        if (!cleanUsername.isNullOrEmpty()) {
+            try {
+                adapter.name = cleanUsername
+                Log.i(TAG, "BluetoothAdapter name set to '$cleanUsername'")
+            } catch (e: Exception) {
+                Log.w(TAG, "Unable to set adapter name: ${e.message}")
+            }
+        }
+
         val serviceUuid = try {
             UUID.fromString(serviceUuidStr)
         } catch (e: Exception) {
@@ -155,18 +175,33 @@ class SovraBleModule(private val context: Context) {
             .setTimeout(0)
             .build()
 
-        val data = AdvertiseData.Builder()
+        val dataBuilder = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
             .addServiceUuid(ParcelUuid(serviceUuid))
-            .addServiceData(ParcelUuid(serviceUuid), advertisementData)
-            .build()
+
+        val scanResponseBuilder = AdvertiseData.Builder()
+            .setIncludeDeviceName(true)
+
+        // 2. Add username to Manufacturer Specific Data (0x5356 = 'S','V' for Sovra)
+        val nameBytes = (cleanUsername ?: "").toByteArray(Charsets.UTF_8)
+        val mfgPayload = if (nameBytes.isNotEmpty()) {
+            if (nameBytes.size > 22) nameBytes.copyOf(22) else nameBytes
+        } else if (advertisementData.isNotEmpty()) {
+            if (advertisementData.size > 22) advertisementData.copyOf(22) else advertisementData
+        } else {
+            null
+        }
+
+        if (mfgPayload != null && mfgPayload.isNotEmpty()) {
+            scanResponseBuilder.addManufacturerData(0x5356, mfgPayload)
+        }
 
         stopAdvertising()
 
         val advCb = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-                Log.i(TAG, "BLE Peripheral Advertising started successfully on $serviceUuid")
+                Log.i(TAG, "BLE Peripheral Advertising started successfully on $serviceUuid (name='$cleanUsername')")
                 activeAdvertiser = advertiser
                 callback(true, null)
             }
@@ -178,7 +213,17 @@ class SovraBleModule(private val context: Context) {
         }
 
         this.advertiseCallback = advCb
-        advertiser.startAdvertising(settings, data, advCb)
+        try {
+            advertiser.startAdvertising(settings, dataBuilder.build(), scanResponseBuilder.build(), advCb)
+        } catch (e: Exception) {
+            Log.e(TAG, "startAdvertising exception: ${e.message}")
+            callback(false, e.message)
+        }
+    }
+
+    // Overload for backward compatibility
+    fun startAdvertising(serviceUuidStr: String, advertisementData: ByteArray, callback: (Boolean, String?) -> Unit) {
+        startAdvertising(serviceUuidStr, advertisementData, null, callback)
     }
 
     @Synchronized
@@ -248,9 +293,25 @@ class SovraBleModule(private val context: Context) {
 
                 val scanRecord = result.scanRecord
                 val serviceData = scanRecord?.getServiceData(ParcelUuid(serviceUuid)) ?: ByteArray(0)
-                val deviceName = scanRecord?.deviceName ?: device.name
+                
+                // Extract custom username from 0x5356 Manufacturer Data if present
+                val mfgData = scanRecord?.getManufacturerSpecificData(0x5356)
+                val customName = if (mfgData != null && mfgData.isNotEmpty()) {
+                    try {
+                        String(mfgData, Charsets.UTF_8).trim()
+                    } catch (e: Exception) {
+                        null
+                    }
+                } else null
 
-                onDeviceDiscovered?.invoke(address, rssi, serviceData, deviceName)
+                val resolvedName = if (!customName.isNullOrBlank()) {
+                    customName
+                } else {
+                    val rawName = scanRecord?.deviceName ?: device.name
+                    if (!rawName.isNullOrBlank()) rawName else ("Peer " + address.take(8))
+                }
+
+                onDeviceDiscovered?.invoke(address, rssi, serviceData, resolvedName)
             }
 
             override fun onScanFailed(errorCode: Int) {
@@ -319,20 +380,28 @@ class SovraBleModule(private val context: Context) {
 
         val gattCallback = object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-                Log.i(TAG, "GATT onConnectionStateChange: status=$status newState=$newState")
+                Log.i(TAG, "GATT Client onConnectionStateChange: status=$status newState=$newState")
                 if (status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
                     val conn = activeConnections[gattId]
                     if (conn != null) {
                         conn.isConnected = true
-                        // Discover GATT Services
-                        gatt.discoverServices()
+                        // Step 1: Request 512 MTU first for high-throughput mesh packets
+                        val mtuOk = try {
+                            gatt.requestMtu(DEFAULT_MAX_MTU)
+                        } catch (e: Exception) {
+                            false
+                        }
+                        if (!mtuOk) {
+                            Log.w(TAG, "GATT requestMtu returned false; fallback directly to discoverServices")
+                            gatt.discoverServices()
+                        }
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     val conn = activeConnections.remove(gattId)
                     conn?.isConnected = false
                     conn?.onDisconnected?.invoke()
                     onPeerDisconnected?.invoke(gattId)
-                    gatt.close()
+                    try { gatt.close() } catch (e: Exception) {}
                     if (!completed) {
                         completed = true
                         mainHandler.removeCallbacks(timeoutRunnable)
@@ -341,7 +410,18 @@ class SovraBleModule(private val context: Context) {
                 }
             }
 
+            override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+                Log.i(TAG, "GATT Client onMtuChanged: negotiated MTU=$mtu status=$status")
+                val conn = activeConnections[gattId]
+                if (conn != null) {
+                    conn.mtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else 23
+                }
+                // Step 2: Discover GATT Services AFTER MTU negotiation is acknowledged
+                gatt.discoverServices()
+            }
+
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                Log.i(TAG, "GATT Client onServicesDiscovered: status=$status")
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     val service = gatt.getService(SOVRA_SERVICE_UUID)
                     if (service != null) {
@@ -353,18 +433,26 @@ class SovraBleModule(private val context: Context) {
                             conn.writeCharacteristic = writeChar
                             conn.notifyCharacteristic = notifyChar
 
-                            // Enable local notifications for incoming data
+                            // Step 3: Enable local notifications for incoming data
                             if (notifyChar != null) {
                                 gatt.setCharacteristicNotification(notifyChar, true)
                                 val desc = notifyChar.getDescriptor(CLIENT_CONFIG_DESCRIPTOR_UUID)
                                 if (desc != null) {
                                     desc.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                                    gatt.writeDescriptor(desc)
+                                    val descWritten = gatt.writeDescriptor(desc)
+                                    if (descWritten) {
+                                        // Success callback will be triggered in onDescriptorWrite
+                                        return
+                                    }
                                 }
                             }
 
-                            // Request high MTU (512 bytes)
-                            gatt.requestMtu(DEFAULT_MAX_MTU)
+                            // If descriptor write not needed or already done, complete connection now
+                            if (!completed) {
+                                completed = true
+                                mainHandler.removeCallbacks(timeoutRunnable)
+                                callback(true, gattId, conn.mtu, null)
+                            }
                         }
                     } else {
                         if (!completed) {
@@ -373,15 +461,18 @@ class SovraBleModule(private val context: Context) {
                             callback(false, null, 0, "Sovra GATT Service not found on peer")
                         }
                     }
+                } else {
+                    if (!completed) {
+                        completed = true
+                        mainHandler.removeCallbacks(timeoutRunnable)
+                        callback(false, null, 0, "GATT service discovery failed with status $status")
+                    }
                 }
             }
 
-            override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-                Log.i(TAG, "GATT onMtuChanged: negotiated MTU=$mtu status=$status")
+            override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+                Log.i(TAG, "GATT Client onDescriptorWrite: status=$status")
                 val conn = activeConnections[gattId]
-                if (conn != null) {
-                    conn.mtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else 23
-                }
                 if (!completed) {
                     completed = true
                     mainHandler.removeCallbacks(timeoutRunnable)
@@ -394,6 +485,7 @@ class SovraBleModule(private val context: Context) {
                 characteristic: BluetoothGattCharacteristic,
                 status: Int
             ) {
+                Log.i(TAG, "GATT Client onCharacteristicWrite: status=$status")
                 val conn = activeConnections[gattId]
                 val cb = conn?.pendingWriteCallback
                 conn?.pendingWriteCallback = null
@@ -407,6 +499,7 @@ class SovraBleModule(private val context: Context) {
             ) {
                 if (characteristic.uuid == SOVRA_NOTIFY_CHAR_UUID) {
                     val data = characteristic.value ?: return
+                    Log.i(TAG, "GATT Client received notify data len=${data.size}")
                     onIncomingDataReceived?.invoke(gattId, data)
                 }
             }
@@ -420,6 +513,7 @@ class SovraBleModule(private val context: Context) {
 
         activeConnections[gattId] = ActiveConnection(
             gattId = gattId,
+            address = address,
             gatt = gatt,
             isConnected = false
         )
@@ -446,21 +540,22 @@ class SovraBleModule(private val context: Context) {
             return
         }
 
-        if (conn.pendingWriteCallback != null) {
-            callback(false, "GATT write in progress; backpressure applied")
-            return
+        val cbWrapper: (Boolean) -> Unit = { ok ->
+            conn.pendingWriteCallback = null
+            callback(ok, if (ok) null else "GATT write returned non-zero status")
         }
+        conn.pendingWriteCallback = cbWrapper
+
+        // 3.5s Watchdog timer to ensure pendingWriteCallback is never locked permanently
+        mainHandler.postDelayed({
+            if (conn.pendingWriteCallback === cbWrapper) {
+                conn.pendingWriteCallback = null
+                callback(false, "GATT write timed out")
+            }
+        }, 3500)
 
         writeChar.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         writeChar.value = data
-
-        conn.pendingWriteCallback = { ok ->
-            if (ok) {
-                callback(true, null)
-            } else {
-                callback(false, "GATT onCharacteristicWrite returned status non-zero")
-            }
-        }
 
         val initiated = conn.gatt.writeCharacteristic(writeChar)
         if (!initiated) {
@@ -483,6 +578,65 @@ class SovraBleModule(private val context: Context) {
         }
     }
 
+    fun sendDataToAddress(address: String, data: ByteArray, callback: ((Boolean, String?) -> Unit)? = null) {
+        // 1. If we already have an active client connection to this address, write directly
+        val existingClient = activeConnections.values.find {
+            it.address.equals(address, ignoreCase = true) && it.isConnected && it.writeCharacteristic != null
+        }
+        if (existingClient != null) {
+            writeCharacteristic(existingClient.gattId, data) { ok, err ->
+                callback?.invoke(ok, err)
+            }
+            return
+        }
+
+        // 2. If this peer is connected to our GATT Server, send via GATT Notification
+        val serverClient = serverConnectedDevices.values.find {
+            it.address.equals(address, ignoreCase = true)
+        }
+        if (serverClient != null && gattServer != null) {
+            val service = gattServer?.getService(SOVRA_SERVICE_UUID)
+            val notifyChar = service?.getCharacteristic(SOVRA_NOTIFY_CHAR_UUID)
+            if (notifyChar != null) {
+                notifyChar.value = data
+                val notified = gattServer?.notifyCharacteristicChanged(serverClient, notifyChar, false) ?: false
+                if (notified) {
+                    Log.i(TAG, "Sent data via GATT Server notification to ${serverClient.address}")
+                    callback?.invoke(true, null)
+                    return
+                }
+            }
+        }
+
+        // 3. Otherwise, connect as client and write
+        connectGatt(address) { ok, gattId, _, err ->
+            if (ok && gattId != null) {
+                mainHandler.postDelayed({
+                    writeCharacteristic(gattId, data) { wOk, wErr ->
+                        callback?.invoke(wOk, wErr)
+                    }
+                }, 100)
+            } else {
+                callback?.invoke(false, err ?: "Failed to connect to peer")
+            }
+        }
+    }
+
+    fun broadcastDataToDiscoveredPeers(data: ByteArray, callback: ((Int) -> Unit)? = null) {
+        val allAddresses = (discoveredDevices.keys().toList() + serverConnectedDevices.keys().toList()).distinct()
+        if (allAddresses.isEmpty()) {
+            callback?.invoke(0)
+            return
+        }
+        var count = 0
+        allAddresses.forEach { addr ->
+            sendDataToAddress(addr, data) { ok, _ ->
+                if (ok) count++
+            }
+        }
+        callback?.invoke(allAddresses.size)
+    }
+
     // ==========================================
     // 6. GATT SERVER (HOSTING SOVRA SERVICE)
     // ==========================================
@@ -494,7 +648,32 @@ class SovraBleModule(private val context: Context) {
 
         val serverCallback = object : BluetoothGattServerCallback() {
             override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
-                Log.i(TAG, "GATT Server peer state change: ${device.address} newState=$newState")
+                Log.i(TAG, "GATT Server peer state change: ${device.address} newState=$newState status=$status")
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    serverConnectedDevices[device.address] = device
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    serverConnectedDevices.remove(device.address)
+                }
+            }
+
+            override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
+                Log.i(TAG, "GATT Server onMtuChanged: device=${device.address} mtu=$mtu")
+            }
+
+            override fun onDescriptorWriteRequest(
+                device: BluetoothDevice,
+                requestId: Int,
+                descriptor: BluetoothGattDescriptor,
+                preparedWrite: Boolean,
+                responseNeeded: Boolean,
+                offset: Int,
+                value: ByteArray?
+            ) {
+                Log.i(TAG, "GATT Server onDescriptorWriteRequest from ${device.address}")
+                descriptor.value = value
+                if (responseNeeded) {
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                }
             }
 
             override fun onCharacteristicWriteRequest(
@@ -506,14 +685,19 @@ class SovraBleModule(private val context: Context) {
                 offset: Int,
                 value: ByteArray?
             ) {
+                Log.i(TAG, "GATT Server onCharacteristicWriteRequest from ${device.address}, len=${value?.size}")
                 if (characteristic.uuid == SOVRA_WRITE_CHAR_UUID && value != null) {
-                    onIncomingDataReceived?.invoke("server-${device.address}", value)
+                    onIncomingDataReceived?.invoke(device.address, value)
                     if (responseNeeded) {
                         gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
                     }
                 } else if (responseNeeded) {
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null)
                 }
+            }
+
+            override fun onNotificationSent(device: BluetoothDevice, status: Int) {
+                Log.i(TAG, "GATT Server onNotificationSent to ${device.address} status=$status")
             }
         }
 

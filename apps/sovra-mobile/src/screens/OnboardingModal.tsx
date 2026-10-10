@@ -96,18 +96,13 @@ export function OnboardingModal({
     <div
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(5, 7, 13, 0.95)',
-        backdropFilter: 'blur(20px)',
+        inset: 0,
+        backgroundColor: '#090d16',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
+        overflowY: 'auto',
+        padding: 0,
         color: '#f8fafc',
         fontFamily: 'system-ui, -apple-system, sans-serif',
       }}
@@ -115,14 +110,34 @@ export function OnboardingModal({
       <div
         style={{
           width: '100%',
-          maxWidth: 420,
+          maxWidth: 480,
+          margin: '0 auto',
+          minHeight: '100vh',
           backgroundColor: '#0f172a',
-          borderRadius: 24,
-          padding: 28,
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+          padding: 24,
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
+        {/* Top Header with Back Arrow */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 14 }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#38bdf8',
+              fontSize: 22,
+              cursor: 'pointer',
+              padding: 4,
+              lineHeight: 1,
+            }}
+          >
+            ←
+          </button>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>Create Sovereign Account</div>
+        </div>
+
         {/* Step Indicator */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 24 }}>
           {[1, 2, 3].map((s) => (

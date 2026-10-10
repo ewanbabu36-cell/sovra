@@ -23,11 +23,13 @@ import { SqliteSocialDatabaseEngine } from './database-sqlite.ts';
 // ==========================================
 
 export interface UserPrivacySettings {
-  profileVisibility: 'public' | 'friends' | 'only_me';
+  profileVisibility: 'public' | 'friends' | 'only_me' | 'private';
   canMessageMe: 'public' | 'friends' | 'none';
   canSendFriendRequests: 'public' | 'friends_of_friends' | 'none';
   showOnlineStatus: boolean;
   showFollowers: boolean;
+  postVisibility?: 'public' | 'friends' | 'only_me';
+  blockedDids?: string[];
 }
 
 export interface UserRecord {
@@ -123,8 +125,9 @@ export interface ChatAttachmentRecord {
   name: string;
   type: string;
   size: number;
-  dataUrl: string;
+  dataUrl?: string;
   cid?: string;
+  url?: string;
 }
 
 export interface ChatMessageRecord {
@@ -151,23 +154,42 @@ export interface ChatMessageRecord {
   isBitChat?: boolean;
   hopCount?: number;
   route?: string[];
+  moderationState?: ModerationState;
+  moderationReason?: string;
 }
 
 export interface PostCommentRecord {
   id: string;
   author: string;
   authorDid: string;
+  authorHandle?: string;
   authorAvatar?: string;
+  authorAvatarDataUrl?: string;
   text: string;
   timestamp: number;
+  updatedAt?: number;
+  likesCount?: number;
+  likedByDids?: string[];
+  parentId?: string;
+  moderationState?: ModerationState;
+  moderationReason?: string;
   replies?: Array<{
     id: string;
+    commentId?: string;
+    parentId?: string;
     author: string;
     authorDid: string;
+    authorHandle?: string;
     authorAvatar?: string;
+    authorAvatarDataUrl?: string;
     text: string;
     timestamp: number;
+    updatedAt?: number;
     likes?: number;
+    likesCount?: number;
+    likedByDids?: string[];
+    moderationState?: ModerationState;
+    moderationReason?: string;
   }>;
 }
 
@@ -374,6 +396,9 @@ export interface FeedPostRecord {
   hiddenByDids?: string[];
   reportsCount?: number;
   reportedByDids?: string[];
+  moderationState?: ModerationState;
+  moderationReason?: string;
+  moderationUpdatedAt?: number;
 
   // Extensible Type Metadata
   pollData?: PollData;
@@ -414,6 +439,8 @@ export interface ChannelRecord {
   isSubbed: boolean;
   ownerDid?: string;
   createdAt: number;
+  moderationState?: ModerationState;
+  moderationReason?: string;
 }
 
 export interface PageRecord {
@@ -430,6 +457,68 @@ export interface PageRecord {
   isFollowing: boolean;
   ownerDid?: string;
   createdAt: number;
+  moderationState?: ModerationState;
+  moderationReason?: string;
+}
+
+export type SpaceRole = 'OWNER' | 'ADMIN' | 'EDITOR' | 'MODERATOR' | 'MEMBER';
+export type SpaceType = 'channel' | 'page' | 'group';
+
+export interface GroupRecord {
+  id: string;
+  handle: string;
+  name: string;
+  category: string;
+  description: string;
+  privacy: 'public' | 'private' | 'secret';
+  avatar: string;
+  bg: string;
+  memberCount: number;
+  postApprovalRequired: boolean;
+  membershipApprovalRequired: boolean;
+  ownerDid?: string;
+  createdAt: number;
+  updatedAt?: number;
+  moderationState?: ModerationState;
+  moderationReason?: string;
+}
+
+export interface SpaceMemberRecord {
+  id: string;
+  spaceId: string;
+  spaceType: SpaceType;
+  userDid: string;
+  handle: string;
+  name: string;
+  avatar?: string;
+  role: SpaceRole;
+  joinedAt: number;
+  invitedByDid?: string;
+  isMuted?: boolean;
+  isBanned?: boolean;
+}
+
+export interface SpaceRuleRecord {
+  id: string;
+  spaceId: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  createdAt: number;
+}
+
+export interface SpaceJoinRequestRecord {
+  id: string;
+  spaceId: string;
+  spaceType: SpaceType;
+  userDid: string;
+  handle: string;
+  name: string;
+  avatar?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: number;
+  reviewedAt?: number;
+  reviewedByDid?: string;
 }
 
 export interface ReelRecord {
@@ -454,6 +543,8 @@ export interface ReelRecord {
   videoMimeType?: string;
   likedByDids: string[];
   createdAt: number;
+  moderationState?: ModerationState;
+  moderationReason?: string;
 }
 
 export interface ReelCommentRecord {
@@ -467,6 +558,8 @@ export interface ReelCommentRecord {
   timestamp: number;
   timeAgo: string;
   likes: number;
+  moderationState?: ModerationState;
+  moderationReason?: string;
 }
 
 export interface YoutubeReplyRecord {
@@ -480,6 +573,53 @@ export interface YoutubeReplyRecord {
   timestamp: number;
   likes: number;
   isCreator?: boolean;
+  moderationState?: ModerationState;
+  moderationReason?: string;
+}
+
+export interface VideoChapter {
+  timeSeconds: number;
+  timecode: string;
+  title: string;
+}
+
+export interface VideoVariant {
+  resolution: string;
+  bitrate: string;
+  framerate: string;
+  bandwidthBps: number;
+}
+
+export interface YoutubeVideoRecord {
+  id: string;
+  ownerDid?: string;
+  title: string;
+  channelName: string;
+  channelHandle: string;
+  channelAvatar: string;
+  channelAvatarBg: string;
+  channelSubscribers: number;
+  channelSubscribersText: string;
+  isSubscribed?: boolean;
+  views: number;
+  viewsText: string;
+  likes: number;
+  dislikes: number;
+  cid: string;
+  thumbnailCid?: string;
+  duration: string;
+  durationSeconds: number;
+  publishedAt: string;
+  description: string;
+  tags: string[];
+  ambientColor?: string;
+  gradient?: string;
+  chapters?: VideoChapter[];
+  variants?: VideoVariant[];
+  visibility?: string;
+  status?: string;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface YoutubeCommentRecord {
@@ -498,6 +638,8 @@ export interface YoutubeCommentRecord {
   isSuperThanks?: boolean;
   superThanksAmount?: string;
   replies: YoutubeReplyRecord[];
+  moderationState?: ModerationState;
+  moderationReason?: string;
 }
 
 export interface TipVoucherRecord {
@@ -516,14 +658,107 @@ export interface TipVoucherRecord {
   signatureHex?: string;
 }
 
+export type AuditLogType =
+  | 'USER_REGISTERED'
+  | 'PROFILE_UPDATED'
+  | 'POST_CREATED'
+  | 'POST_DELETED'
+  | 'CHAT_SENT'
+  | 'FRIEND_REQUEST'
+  | 'FRIEND_ACCEPTED'
+  | 'TIP_VOUCHER'
+  | 'REEL_UPLOADED'
+  | 'COMMENT_POSTED'
+  | 'REPORT_SUBMITTED'
+  | 'REPORT_STATUS_CHANGED'
+  | 'MODERATION_ACTION'
+  | 'CONTENT_HIDDEN'
+  | 'CONTENT_REMOVED'
+  | 'CONTENT_RESTRICTED'
+  | 'CONTENT_RESTORED'
+  | 'USER_MUTED'
+  | 'USER_UNMUTED'
+  | 'USER_WARNED'
+  | 'USER_BANNED'
+  | 'USER_UNBANNED'
+  | 'SESSION_REVOKED'
+  | 'PRIVACY_UPDATED';
+
 export interface AuditLogRecord {
   id: string;
-  type: 'USER_REGISTERED' | 'PROFILE_UPDATED' | 'POST_CREATED' | 'POST_DELETED' | 'CHAT_SENT' | 'FRIEND_REQUEST' | 'FRIEND_ACCEPTED' | 'TIP_VOUCHER' | 'REEL_UPLOADED' | 'COMMENT_POSTED';
+  type: AuditLogType | string;
   action?: string;
   actorDid: string;
   actorHandle: string;
+  targetDid?: string;
+  resourceType?: string;
+  resourceId?: string;
+  result?: string;
   details: string;
   timestamp: number;
+  context?: {
+    ip?: string;
+    userAgent?: string;
+  };
+}
+
+export type ModerationState = 'VISIBLE' | 'HIDDEN' | 'REMOVED' | 'REPORTED' | 'UNDER_REVIEW' | 'RESTRICTED';
+
+export type ReportTargetType =
+  | 'user'
+  | 'post'
+  | 'comment'
+  | 'message'
+  | 'video'
+  | 'reel'
+  | 'channel'
+  | 'page'
+  | 'group'
+  | 'live';
+
+export type ReportReason =
+  | 'Spam'
+  | 'Harassment'
+  | 'Impersonation'
+  | 'Fraud'
+  | 'Violence'
+  | 'Illegal content'
+  | 'Privacy violation'
+  | 'Sexual content'
+  | 'Child safety'
+  | 'Copyright'
+  | 'Other';
+
+export type ReportStatus = 'SUBMITTED' | 'TRIAGED' | 'UNDER_REVIEW' | 'ACTION_TAKEN' | 'RESOLVED' | 'REJECTED';
+
+export type ModerationActionType = 'Hide' | 'Remove' | 'Restrict' | 'Restore' | 'Warn' | 'Mute' | 'Ban' | 'Unban';
+
+export interface ReportRecord {
+  id: string;
+  targetType: ReportTargetType;
+  targetId: string;
+  targetTitle?: string;
+  reporterDid: string;
+  reason: ReportReason;
+  details?: string;
+  spaceId?: string;
+  spaceType?: 'channel' | 'page' | 'group';
+  status: ReportStatus;
+  moderationNotes?: string;
+  actionTaken?: ModerationActionType;
+  resolvedByDid?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MuteRecord {
+  id: string;
+  userDid: string;
+  targetType: 'user' | 'conversation' | 'channel' | 'page' | 'group';
+  targetId: string;
+  durationSeconds?: number;
+  mutedUntil?: number;
+  createdAt: number;
 }
 
 export interface StorySegmentRecord {
@@ -577,11 +812,22 @@ export interface CallSessionRecord {
   sdpOffer?: string;
   sdpAnswer?: string;
   iceCandidates: { candidate: string; senderDid: string }[];
-  status: 'offering' | 'answered' | 'connected' | 'ended' | 'rejected';
+  status: 'offering' | 'ringing' | 'answered' | 'connected' | 'reconnecting' | 'failed' | 'ended' | 'rejected';
   durationSec?: number;
   reason?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface CallMetricRecord {
+  id: string;
+  callId: string;
+  eventType: 'call_started' | 'call_accepted' | 'call_rejected' | 'call_connected' | 'call_failed' | 'call_ended' | 'ice_failed' | 'ice_restarted' | 'turn_used';
+  callerDid: string;
+  recipientDid: string;
+  timestamp: number;
+  reason?: string;
+  candidateType?: 'host' | 'srflx' | 'prflx' | 'relay';
 }
 
 export interface FollowRecord {
@@ -601,7 +847,79 @@ export interface UserSessionRecord {
   userAgent: string;
   createdAt: number;
   lastActiveAt: number;
+  expiresAt: number;
   isRevoked: boolean;
+}
+
+export interface PlaylistRecord {
+  id: string;
+  channelId?: string;
+  creatorDid: string;
+  creatorHandle?: string;
+  creatorName?: string;
+  title: string;
+  description: string;
+  thumbnailUrl?: string;
+  videoIds: string[];
+  privacy: 'public' | 'unlisted' | 'private';
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type LiveSessionStatus = 'SCHEDULED' | 'STARTING' | 'LIVE' | 'ENDING' | 'ENDED' | 'REPLAY';
+
+export interface LiveChatMessageRecord {
+  id: string;
+  sessionId: string;
+  senderDid: string;
+  senderHandle: string;
+  senderName: string;
+  senderAvatar?: string;
+  text: string;
+  timestamp: number;
+  isModerator?: boolean;
+}
+
+export interface LiveSessionRecord {
+  id: string;
+  channelId?: string;
+  creatorDid: string;
+  creatorHandle: string;
+  creatorName: string;
+  creatorAvatar: string;
+  title: string;
+  description: string;
+  streamUrl: string;
+  playbackUrl?: string;
+  thumbnailUrl?: string;
+  status: LiveSessionStatus;
+  scheduledStartTime?: number;
+  actualStartTime?: number;
+  endedAt?: number;
+  viewerCount: number;
+  likesCount: number;
+  category?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WatchHistoryRecord {
+  id: string;
+  userDid: string;
+  videoId: string;
+  durationWatchedSec: number;
+  completed: boolean;
+  lastWatchedAt: number;
+}
+
+export interface SavedMediaRecord {
+  id: string;
+  userDid: string;
+  mediaId: string;
+  mediaType: 'video' | 'reel' | 'post' | 'image';
+  title?: string;
+  thumbnailUrl?: string;
+  savedAt: number;
 }
 
 export interface DatabaseSchema {
@@ -612,6 +930,10 @@ export interface DatabaseSchema {
   posts: FeedPostRecord[];
   channels: ChannelRecord[];
   pages: PageRecord[];
+  groups: GroupRecord[];
+  space_members: SpaceMemberRecord[];
+  space_rules: SpaceRuleRecord[];
+  space_join_requests: SpaceJoinRequestRecord[];
   friend_relationships: FriendRelationshipRecord[];
   follows: FollowRecord[];
   user_sessions: UserSessionRecord[];
@@ -623,6 +945,18 @@ export interface DatabaseSchema {
   stories: StoryRecord[];
   notifications: NotificationRecord[];
   call_sessions: CallSessionRecord[];
+  playlists: PlaylistRecord[];
+  live_sessions: LiveSessionRecord[];
+  live_chat_messages: LiveChatMessageRecord[];
+  watch_history: WatchHistoryRecord[];
+  saved_media: SavedMediaRecord[];
+  reports: ReportRecord[];
+  mutes: MuteRecord[];
+  call_metrics: CallMetricRecord[];
+  revoked_tokens?: Array<{ token: string; revokedAt: number; reason?: string }>;
+  videos: YoutubeVideoRecord[];
+  video_likes: Array<{ videoId: string; userDid: string; timestamp: number }>;
+  channel_subscriptions: Array<{ channelHandle: string; userDid: string; timestamp: number }>;
 }
 
 // ==========================================
@@ -712,6 +1046,14 @@ export class SovraDatabaseEngine {
         { id: 'pg-meshlabs', handle: '@mesh_labs', name: 'Mesh Labs AI', category: 'brand', bio: 'Local edge LLMs and private search models', count: 12400, cta: 'Visit Website', ctaType: 'website', avatar: '⚡', bg: '#4f46e5', isFollowing: true, ownerDid: 'did:sovra:system', createdAt: Date.now() - 9000000 },
         { id: 'pg-bakery', handle: '@artisan_bakery', name: 'Sovereign Sourdough', category: 'business', bio: 'Fresh organic loaves delivered directly via P2P orders', count: 1850, cta: 'Send Message', ctaType: 'message', avatar: '🥖', bg: '#d97706', isFollowing: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 7000000 },
       ],
+      groups: [
+        { id: 'grp-mesh-devs', handle: '@mesh_core', name: 'Mesh Protocol Builders', category: 'technology', description: 'Core engineers developing GossipSub and BLE mesh routers', privacy: 'public', avatar: '💻', bg: '#0284c7', memberCount: 142, postApprovalRequired: false, membershipApprovalRequired: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 10000000 },
+        { id: 'grp-sovereign-ai', handle: '@edge_intelligence', name: 'Local Edge AI Circle', category: 'ai', description: 'Running quantization models and private LLMs on local hardware', privacy: 'public', avatar: '🧠', bg: '#8b5cf6', memberCount: 89, postApprovalRequired: false, membershipApprovalRequired: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 8000000 },
+        { id: 'grp-privacy-hub', handle: '@privacy_mesh', name: 'Zero-Knowledge Privacy Guild', category: 'privacy', description: 'Discussions on cryptographic attestations and onion routing', privacy: 'public', avatar: '🛡️', bg: '#10b981', memberCount: 65, postApprovalRequired: false, membershipApprovalRequired: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 5000000 },
+      ],
+      space_members: [],
+      space_rules: [],
+      space_join_requests: [],
       friend_relationships: [],
       follows: [],
       user_sessions: [],
@@ -723,6 +1065,18 @@ export class SovraDatabaseEngine {
       stories: this.getSeedStories(),
       notifications: [],
       call_sessions: [],
+      playlists: this.getSeedPlaylists(),
+      live_sessions: this.getSeedLiveSessions(),
+      live_chat_messages: this.getSeedLiveChatMessages(),
+      watch_history: [],
+      saved_media: [],
+      reports: [],
+      mutes: [],
+      call_metrics: [],
+      revoked_tokens: [],
+      videos: this.getSeedVideos(),
+      video_likes: [],
+      channel_subscriptions: [],
     };
   }
 
@@ -837,6 +1191,32 @@ export class SovraDatabaseEngine {
             }
             return deduped;
           })(),
+          groups: (() => {
+            const list = Array.isArray(parsed.groups) ? parsed.groups : (this.db.groups || []);
+            const seenIds = new Set<string>();
+            const deduped: GroupRecord[] = [];
+            for (const grp of list) {
+              if (!grp || !grp.id) continue;
+              if (seenIds.has(grp.id)) continue;
+              seenIds.add(grp.id);
+              deduped.push(grp);
+            }
+            const seedGroups: GroupRecord[] = [
+              { id: 'grp-mesh-devs', handle: '@mesh_core', name: 'Mesh Protocol Builders', category: 'technology', description: 'Core engineers developing GossipSub and BLE mesh routers', privacy: 'public', avatar: '💻', bg: '#0284c7', memberCount: 142, postApprovalRequired: false, membershipApprovalRequired: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 10000000 },
+              { id: 'grp-sovereign-ai', handle: '@edge_intelligence', name: 'Local Edge AI Circle', category: 'ai', description: 'Running quantization models and private LLMs on local hardware', privacy: 'public', avatar: '🧠', bg: '#8b5cf6', memberCount: 89, postApprovalRequired: false, membershipApprovalRequired: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 8000000 },
+              { id: 'grp-privacy-hub', handle: '@privacy_mesh', name: 'Zero-Knowledge Privacy Guild', category: 'privacy', description: 'Discussions on cryptographic attestations and onion routing', privacy: 'public', avatar: '🛡️', bg: '#10b981', memberCount: 65, postApprovalRequired: false, membershipApprovalRequired: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 5000000 },
+            ];
+            for (const sg of seedGroups) {
+              if (!seenIds.has(sg.id)) {
+                seenIds.add(sg.id);
+                deduped.push(sg);
+              }
+            }
+            return deduped;
+          })(),
+          space_members: Array.isArray(parsed.space_members) ? parsed.space_members : [],
+          space_rules: Array.isArray(parsed.space_rules) ? parsed.space_rules : [],
+          space_join_requests: Array.isArray(parsed.space_join_requests) ? parsed.space_join_requests : [],
           friend_relationships: Array.isArray(parsed.friend_relationships) ? parsed.friend_relationships : [],
           follows: Array.isArray(parsed.follows) ? parsed.follows : [],
           user_sessions: Array.isArray(parsed.user_sessions) ? parsed.user_sessions : [],
@@ -848,6 +1228,15 @@ export class SovraDatabaseEngine {
           stories: Array.isArray(parsed.stories) && parsed.stories.length > 0 ? parsed.stories : this.getSeedStories(),
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           call_sessions: Array.isArray(parsed.call_sessions) ? parsed.call_sessions : [],
+          playlists: Array.isArray(parsed.playlists) && parsed.playlists.length > 0 ? parsed.playlists : this.getSeedPlaylists(),
+          live_sessions: Array.isArray(parsed.live_sessions) && parsed.live_sessions.length > 0 ? parsed.live_sessions : this.getSeedLiveSessions(),
+          live_chat_messages: Array.isArray(parsed.live_chat_messages) ? parsed.live_chat_messages : this.getSeedLiveChatMessages(),
+          watch_history: Array.isArray(parsed.watch_history) ? parsed.watch_history : [],
+          saved_media: Array.isArray(parsed.saved_media) ? parsed.saved_media : [],
+          reports: Array.isArray(parsed.reports) ? parsed.reports : [],
+          mutes: Array.isArray(parsed.mutes) ? parsed.mutes : [],
+          call_metrics: Array.isArray(parsed.call_metrics) ? parsed.call_metrics : [],
+          revoked_tokens: Array.isArray(parsed.revoked_tokens) ? parsed.revoked_tokens : [],
         };
       } else {
         this.save();
@@ -867,6 +1256,14 @@ export class SovraDatabaseEngine {
     if (!Array.isArray(this.db.contacts_and_peers)) this.db.contacts_and_peers = [];
     if (!Array.isArray(this.db.chatMessages)) this.db.chatMessages = [];
     if (!Array.isArray(this.db.users)) this.db.users = [];
+    if (!Array.isArray(this.db.reports)) this.db.reports = [];
+    if (!Array.isArray(this.db.mutes)) this.db.mutes = [];
+    if (!Array.isArray(this.db.revoked_tokens)) this.db.revoked_tokens = [];
+    if (!Array.isArray(this.db.videos) || this.db.videos.length === 0) {
+      this.db.videos = this.getSeedVideos();
+    }
+    if (!Array.isArray(this.db.video_likes)) this.db.video_likes = [];
+    if (!Array.isArray(this.db.channel_subscriptions)) this.db.channel_subscriptions = [];
 
     // Ensure every user has a unique, cryptographically random BIP-39 recovery phrase
     let usersNeedSave = false;
@@ -883,26 +1280,13 @@ export class SovraDatabaseEngine {
       this.save();
     }
 
-    // Helper to identify automated test artifacts
-    const isTestArtifact = (handle?: string, name?: string, did?: string, createdAt?: number) => {
-      // If created in the last 60 seconds, keep it (active in-progress automated test)
-      if (createdAt && (Date.now() - createdAt < 60000)) return false;
-      const h = (handle || '').toLowerCase().trim();
-      const n = (name || '').toLowerCase().trim();
-      const d = (did || '').toLowerCase().trim();
-      if (h === '@laptop_host') return false;
-      if (h === '@merajsharif' || h === '@ewan' || h === '@farhat' || h === '@meraj' || h === '@rahul_phone') return false;
-      return /(alice|bob|charlie|bb_|muw|_mu|\d{6,}|attacker|victim|gate_|drill|dev_\w{3,}|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_e2e|persona_author|test|meshcore|aimesh|mut_ch|guild_|alice_tech)/i.test(h + ' ' + n + ' ' + d);
-    };
-
-    // Filter out test drill artifacts & deduplicate users
+    // Deduplicate users (keeping latest record) without destructive regex filtering
     const uniqueUsers: UserRecord[] = [];
     const seenUserHandles = new Set<string>();
     const seenUserDids = new Set<string>();
     for (let i = this.db.users.length - 1; i >= 0; i--) {
       const u = this.db.users[i];
-      if (isTestArtifact(u.handle, u.displayName || u.name, u.did, u.createdAt)) continue;
-      if (u.handle === '@peer' || u.did === 'did:key:peer') continue;
+      if (!u || !u.did) continue;
       const cleanH = (u.handle || '').toLowerCase().trim();
       if (!seenUserHandles.has(cleanH) && !seenUserDids.has(u.did)) {
         seenUserHandles.add(cleanH);
@@ -912,16 +1296,14 @@ export class SovraDatabaseEngine {
     }
     this.db.users = uniqueUsers;
 
-    // Filter contacts & peers: remove test artifacts and legacy mock placeholders (did:key:peer, @alice_sovereign, @bob_mesh, @carol_sounds, @rahul_sharma)
-    const legacyMockDids = new Set(['did:key:peer', 'did:sovra:alice_ble', 'did:sovra:bob_ble', 'did:sovra:carol_sounds', 'did:sovra:rahul_sharma']);
+    // Deduplicate contacts & peers (keeping latest record)
     const uniquePeers: ContactPeerRecord[] = [];
     const seenPeerHandles = new Set<string>();
     const seenPeerDids = new Set<string>();
 
     for (let i = this.db.contacts_and_peers.length - 1; i >= 0; i--) {
       const p = this.db.contacts_and_peers[i];
-      if (legacyMockDids.has(p.did)) continue;
-      if (isTestArtifact(p.handle, p.name, p.did, p.lastSeenTimestamp)) continue;
+      if (!p || !p.did) continue;
       const h = (p.handle || p.name || p.did).toLowerCase().trim();
       if (!seenPeerHandles.has(h) && !seenPeerDids.has(p.did)) {
         seenPeerHandles.add(h);
@@ -931,59 +1313,34 @@ export class SovraDatabaseEngine {
     }
     this.db.contacts_and_peers = uniquePeers;
 
-    // Clean friend relationships referencing non-existent or deleted test users
-    const validUserDids = new Set(this.db.users.map(u => u.did));
-    if (Array.isArray(this.db.friend_relationships)) {
-      this.db.friend_relationships = this.db.friend_relationships.filter(r => {
-        if (legacyMockDids.has(r.fromDid) || legacyMockDids.has(r.toDid)) return false;
-        if (isTestArtifact(undefined, undefined, r.fromDid) || isTestArtifact(undefined, undefined, r.toDid)) return false;
-        const isRecent = Boolean(r.createdAt && (Date.now() - r.createdAt < 60000));
-        if (!isRecent && (!validUserDids.has(r.fromDid) || !validUserDids.has(r.toDid))) return false;
-        return true;
-      });
-    }
-
-    // Filter repetitive test messages & orphaned test chat messages
-    const now = Date.now();
-    this.db.chatMessages = this.db.chatMessages.filter(m => {
-      if (m.recipientDid.startsWith('channel:') || m.threadId?.startsWith('channel:')) return true;
-      if (m.text === 'Dynamic P2P ratchet test message' || m.text.includes('ratchet test message')) {
-        return false;
-      }
-      const isStale = (now - (m.timestamp || 0)) > 60000;
-      if (isStale) {
-        if (!validUserDids.has(m.senderDid) && !validUserDids.has(m.recipientDid)) {
-          return false;
+    // Deduplicate channels (keeping latest record)
+    if (Array.isArray(this.db.channels)) {
+      const uniqueChannels: ChannelRecord[] = [];
+      const seenChannelIds = new Set<string>();
+      for (let i = this.db.channels.length - 1; i >= 0; i--) {
+        const c = this.db.channels[i];
+        if (!c || !c.id) continue;
+        if (!seenChannelIds.has(c.id)) {
+          seenChannelIds.add(c.id);
+          uniqueChannels.unshift(c);
         }
       }
-      return true;
-    });
-
-    // Clean orphaned test channels & test pages
-    const seedChannelIds = new Set(['ch-alpha', 'ch-gaming', 'ch-news', 'ch-music']);
-    if (Array.isArray(this.db.channels)) {
-      this.db.channels = this.db.channels.filter(c => {
-        if (!c || !c.id) return false;
-        if (seedChannelIds.has(c.id)) return true;
-        // If created in the last 60 seconds, keep it (active in-progress automated test)
-        if (c.createdAt && (now - c.createdAt < 60000)) return true;
-        if (isTestArtifact(c.handle, c.name, c.ownerDid, c.createdAt)) return false;
-        if (c.ownerDid && !validUserDids.has(c.ownerDid) && c.ownerDid !== 'did:sovra:system') return false;
-        return true;
-      });
+      this.db.channels = uniqueChannels;
     }
 
-    const seedPageIds = new Set(['pg-metropolis', 'pg-meshlabs', 'pg-bakery']);
+    // Deduplicate pages (keeping latest record)
     if (Array.isArray(this.db.pages)) {
-      this.db.pages = this.db.pages.filter(p => {
-        if (!p || !p.id) return false;
-        if (seedPageIds.has(p.id)) return true;
-        // If created in the last 60 seconds, keep it (active in-progress automated test)
-        if (p.createdAt && (now - p.createdAt < 60000)) return true;
-        if (isTestArtifact(p.handle, p.name, p.ownerDid, p.createdAt)) return false;
-        if (p.ownerDid && !validUserDids.has(p.ownerDid) && p.ownerDid !== 'did:sovra:system') return false;
-        return true;
-      });
+      const uniquePages: PageRecord[] = [];
+      const seenPageIds = new Set<string>();
+      for (let i = this.db.pages.length - 1; i >= 0; i--) {
+        const p = this.db.pages[i];
+        if (!p || !p.id) continue;
+        if (!seenPageIds.has(p.id)) {
+          seenPageIds.add(p.id);
+          uniquePages.unshift(p);
+        }
+      }
+      this.db.pages = uniquePages;
     }
 
     this.save();
@@ -1107,10 +1464,22 @@ export class SovraDatabaseEngine {
     if (this.isSessionRevoked(token)) return undefined;
     const activeSession = (this.db.user_sessions || []).find(s => s.token === token && !s.isRevoked);
     if (activeSession) {
+      if (activeSession.expiresAt && activeSession.expiresAt < Date.now()) {
+        return undefined;
+      }
+      activeSession.lastActiveAt = Date.now();
       const user = this.db.users.find(u => u.did === activeSession.userDid);
       if (user) return user;
     }
-    return this.db.users.find(u => u.sessionToken === token);
+    const legacyUser = this.db.users.find(u => u.sessionToken === token);
+    if (legacyUser) {
+      const matchSession = (this.db.user_sessions || []).find(s => s.token === token);
+      if (matchSession && (matchSession.isRevoked || (matchSession.expiresAt && matchSession.expiresAt < Date.now()))) {
+        return undefined;
+      }
+      return legacyUser;
+    }
+    return undefined;
   }
 
   public revokeAllSessions(): number {
@@ -1356,21 +1725,11 @@ export class SovraDatabaseEngine {
     this.load();
     if (!Array.isArray(this.db.contacts_and_peers)) this.db.contacts_and_peers = [];
     const legacyMockDids = new Set(['did:key:peer', 'did:sovra:alice_ble', 'did:sovra:bob_ble', 'did:sovra:carol_sounds']);
-    const isTestArtifact = (handle?: string, name?: string, did?: string, createdAt?: number) => {
-      if (createdAt && (Date.now() - createdAt < 60000)) return false;
-      const h = (handle || '').toLowerCase().trim();
-      const n = (name || '').toLowerCase().trim();
-      const d = (did || '').toLowerCase().trim();
-      if (h === '@laptop_host') return false;
-      if (h === '@merajsharif' || h === '@ewan' || h === '@farhat' || h === '@meraj' || h === '@rahul_phone') return false;
-      return /(alice|bob|charlie|bb_|muw|_mu|\d{6,}|attacker|victim|gate_|drill|dev_\w{3,}|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_e2e|persona_author|test)/i.test(h + ' ' + n + ' ' + d);
-    };
 
     const existingDids = new Set(this.db.contacts_and_peers.map(p => p.did));
     let added = false;
     for (const u of (this.db.users || [])) {
       if (legacyMockDids.has(u.did)) continue;
-      if (isTestArtifact(u.handle, u.displayName || u.name, u.did, u.createdAt)) continue;
       if (!existingDids.has(u.did)) {
         this.db.contacts_and_peers.push({
           did: u.did,
@@ -1394,7 +1753,7 @@ export class SovraDatabaseEngine {
     }
     if (added) this.save();
 
-    const peers = this.db.contacts_and_peers.filter(p => !legacyMockDids.has(p.did) && !isTestArtifact(p.handle, p.name, p.did, p.lastSeenTimestamp));
+    const peers = this.db.contacts_and_peers.filter(p => !legacyMockDids.has(p.did));
     if (!excludeDid) return [...peers];
     return peers.filter(p => p.did !== excludeDid);
   }
@@ -1464,6 +1823,35 @@ export class SovraDatabaseEngine {
     );
     this.save();
     return record;
+  }
+
+  public deleteChatMessage(messageId: string, requesterDid: string): { ok: boolean; deletedMessage?: ChatMessageRecord; error?: string } {
+    this.load();
+    if (!this.db.chatMessages) this.db.chatMessages = [];
+    const idx = this.db.chatMessages.findIndex(m => m.id === messageId);
+    if (idx === -1) {
+      return { ok: false, error: 'Message not found' };
+    }
+    const msg = this.db.chatMessages[idx];
+    const isSender = msg.senderDid === requesterDid;
+    const isChannelOwner = msg.recipientDid.startsWith('channel:') && (() => {
+      const chId = msg.recipientDid.replace('channel:', '');
+      const ch = this.getChannelById(chId);
+      if (ch && ch.ownerDid === requesterDid) return true;
+      const mem = this.getSpaceMember(chId, requesterDid);
+      return !!(mem && (mem.role === 'OWNER' || mem.role === 'ADMIN' || mem.role === 'MODERATOR'));
+    })();
+
+    if (!isSender && !isChannelOwner) {
+      return { ok: false, error: 'Forbidden: Cannot delete message sent by another peer' };
+    }
+
+    const [deleted] = this.db.chatMessages.splice(idx, 1);
+    this.save();
+    try {
+      this.sqliteEngine?.deleteChatMessage(messageId, requesterDid);
+    } catch (_) {}
+    return { ok: true, deletedMessage: deleted };
   }
 
   public getMessagesForUser(userDid: string, since = 0): ChatMessageRecord[] {
@@ -1546,14 +1934,6 @@ export class SovraDatabaseEngine {
     }
 
     const conversations: any[] = [];
-    const isTestArtifact = (handle?: string, name?: string, did?: string, createdAt?: number) => {
-      if (createdAt && (Date.now() - createdAt < 60000)) return false;
-      const h = (handle || '').toLowerCase().trim();
-      const n = (name || '').toLowerCase().trim();
-      const d = (did || '').toLowerCase().trim();
-      if (h === '@laptop_host' || h === '@merajsharif' || h === '@ewan' || h === '@farhat' || h === '@meraj' || h === '@rahul_phone') return false;
-      return /(alice|bob|charlie|bb_|muw|_mu|\d{6,}|attacker|victim|gate_|drill|dev_\w{3,}|probe|snoop|tipper_|phone_dev|laptop_dev|hacked|anonymous|_e2e|persona_author|test)/i.test(h + ' ' + n + ' ' + d);
-    };
 
     for (const [partnerDid, msgs] of threadMap.entries()) {
       msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
@@ -1565,8 +1945,6 @@ export class SovraDatabaseEngine {
 
       const handle = u?.handle || p?.handle || '';
       const name = u?.displayName || u?.name || p?.name || lastMsg.senderName || 'Peer';
-
-      if (isTestArtifact(handle, name, partnerDid, lastMsg.timestamp)) continue;
 
       const isFriend = this.areFriends(userDid, partnerDid);
       const unreadCount = msgs.filter(m => m.senderDid === partnerDid && (m.recipientDid === userDid || m.recipientDid === 'self') && m.status !== 'read').length;
@@ -1708,6 +2086,8 @@ export class SovraDatabaseEngine {
   }
 
   public canUserViewPost(post: FeedPostRecord, viewerDid?: string): boolean {
+    if (post.moderationState === 'HIDDEN' || post.moderationState === 'REMOVED') return false;
+    if (viewerDid && this.isBlocked(post.authorDid, viewerDid)) return false;
     const visibility = post.visibility || 'public';
     if (visibility === 'public') return true;
     if (!viewerDid) return false;
@@ -1726,11 +2106,49 @@ export class SovraDatabaseEngine {
 
   public getFeedPosts(viewerDid?: string): FeedPostRecord[] {
     this.load();
+    if (!viewerDid) {
+      return this.db.posts.filter(p => {
+        if (p.moderationState === 'HIDDEN' || p.moderationState === 'REMOVED') return false;
+        return (p.visibility || 'public') === 'public';
+      });
+    }
+
+    // High performance O(1) set-based visibility and privacy checks
+    const userMap = new Map<string, UserRecord>();
+    for (const u of this.db.users) {
+      userMap.set(u.did, u);
+    }
+    const viewerUser = userMap.get(viewerDid);
+    const viewerBlockedDids = new Set<string>(viewerUser?.privacySettings?.blockedDids || []);
+
+    const acceptedFriends = new Set<string>();
+    if (Array.isArray(this.db.friend_relationships)) {
+      for (const r of this.db.friend_relationships) {
+        if (r.status === 'accepted') {
+          if (r.fromDid === viewerDid) acceptedFriends.add(r.toDid);
+          else if (r.toDid === viewerDid) acceptedFriends.add(r.fromDid);
+        }
+      }
+    }
+
     return this.db.posts.filter(p => {
-      if (viewerDid && Array.isArray(p.hiddenByDids) && p.hiddenByDids.includes(viewerDid)) {
+      if (p.moderationState === 'HIDDEN' || p.moderationState === 'REMOVED') return false;
+      if (Array.isArray(p.hiddenByDids) && p.hiddenByDids.includes(viewerDid)) return false;
+      if (viewerBlockedDids.has(p.authorDid)) return false;
+
+      const authorUser = userMap.get(p.authorDid);
+      if (authorUser?.privacySettings?.blockedDids && authorUser.privacySettings.blockedDids.includes(viewerDid)) {
         return false;
       }
-      return this.canUserViewPost(p, viewerDid);
+
+      const visibility = p.visibility || 'public';
+      if (visibility === 'public') return true;
+      if (p.authorDid === viewerDid) return true;
+      if (visibility === 'only_me') return false;
+      if (visibility === 'friends') {
+        return acceptedFriends.has(p.authorDid);
+      }
+      return true;
     });
   }
 
@@ -2090,6 +2508,415 @@ export class SovraDatabaseEngine {
     return { ok: true };
   }
 
+  // ==========================================
+  // COLLECTION: GROUPS & UNIFIED SPACES RBAC
+  // ==========================================
+
+  public getAllGroups(): GroupRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.groups)) this.db.groups = [];
+    const seenIds = new Set<string>();
+    const seenHandles = new Set<string>();
+    const result: GroupRecord[] = [];
+    for (const g of this.db.groups) {
+      if (!g || !g.id) continue;
+      const handle = (g.handle || '').trim().toLowerCase();
+      if (!handle || handle === '@') continue;
+      if (seenIds.has(g.id) || seenHandles.has(handle)) continue;
+      seenIds.add(g.id);
+      seenHandles.add(handle);
+      result.push(g);
+    }
+    return result;
+  }
+
+  public getGroupById(id: string): GroupRecord | undefined {
+    this.load();
+    return this.getAllGroups().find(g => g.id === id || (g.handle && g.handle.toLowerCase() === id.toLowerCase()));
+  }
+
+  public createGroup(data: Partial<GroupRecord>, creatorDid: string): { ok: boolean; group?: GroupRecord; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.groups)) this.db.groups = [];
+    const name = String(data.name || '').trim();
+    if (!name || name.length < 2) return { ok: false, error: 'Group name must be at least 2 characters' };
+    let handle = String(data.handle || '').trim().toLowerCase().replace(/^@+/, '');
+    if (!handle) handle = name.toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 20);
+    handle = '@' + handle;
+
+    if (this.db.groups.some(g => g.handle && g.handle.toLowerCase() === handle)) {
+      handle = handle + '_' + Math.floor(Math.random() * 1000);
+    }
+
+    const newGroup: GroupRecord = {
+      id: 'grp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      handle,
+      name,
+      category: String(data.category || 'general'),
+      description: String(data.description || 'Sovereign peer group'),
+      privacy: (data.privacy === 'private' || data.privacy === 'secret') ? data.privacy : 'public',
+      avatar: String(data.avatar || '👥'),
+      bg: String(data.bg || '#0284c7'),
+      memberCount: 1,
+      postApprovalRequired: Boolean(data.postApprovalRequired),
+      membershipApprovalRequired: Boolean(data.membershipApprovalRequired),
+      ownerDid: creatorDid,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    this.db.groups.unshift(newGroup);
+
+    // Automatically add creator as OWNER in space_members
+    if (!Array.isArray(this.db.space_members)) this.db.space_members = [];
+    const creatorUser = this.findUserByDid(creatorDid);
+    this.db.space_members.push({
+      id: 'sm-' + Date.now(),
+      spaceId: newGroup.id,
+      spaceType: 'group',
+      userDid: creatorDid,
+      handle: creatorUser ? creatorUser.handle : '@creator',
+      name: creatorUser ? creatorUser.name : 'Space Owner',
+      avatar: creatorUser?.avatar || '👤',
+      role: 'OWNER',
+      joinedAt: Date.now(),
+    });
+
+    this.logActivity('GROUP_CREATED' as any, creatorDid, handle, `Created sovereign group ${name}`);
+    this.save();
+    return { ok: true, group: newGroup };
+  }
+
+  public updateGroup(groupId: string, data: Partial<GroupRecord>, requesterDid: string): { ok: boolean; group?: GroupRecord; error?: string } {
+    this.load();
+    const grp = this.getGroupById(groupId);
+    if (!grp) return { ok: false, error: 'Group not found' };
+    if (!this.hasSpacePermission(requesterDid, grp.id, 'group', 'MANAGE_SETTINGS')) {
+      return { ok: false, error: 'Unauthorized to modify group settings' };
+    }
+
+    if (data.name) grp.name = String(data.name).trim();
+    if (data.description !== undefined) grp.description = String(data.description).trim();
+    if (data.category) grp.category = String(data.category).trim();
+    if (data.privacy) grp.privacy = data.privacy;
+    if (data.avatar) grp.avatar = String(data.avatar);
+    if (data.bg) grp.bg = String(data.bg);
+    if (typeof data.postApprovalRequired === 'boolean') grp.postApprovalRequired = data.postApprovalRequired;
+    if (typeof data.membershipApprovalRequired === 'boolean') grp.membershipApprovalRequired = data.membershipApprovalRequired;
+    grp.updatedAt = Date.now();
+
+    this.logActivity('GROUP_UPDATED' as any, requesterDid, grp.handle, `Updated settings for group ${grp.name}`);
+    this.save();
+    return { ok: true, group: grp };
+  }
+
+  public deleteGroup(groupId: string, requesterDid?: string): { ok: boolean; error?: string } {
+    this.load();
+    const gIdx = this.db.groups.findIndex(g => g.id === groupId || g.handle === groupId);
+    if (gIdx === -1) return { ok: false, error: 'Group not found' };
+    const grp = this.db.groups[gIdx];
+    if (requesterDid && grp.ownerDid && grp.ownerDid !== requesterDid && requesterDid !== 'did:sovra:system') {
+      return { ok: false, error: 'Unauthorized to delete this group' };
+    }
+    this.db.groups.splice(gIdx, 1);
+    if (Array.isArray(this.db.space_members)) {
+      this.db.space_members = this.db.space_members.filter(sm => sm.spaceId !== grp.id);
+    }
+    this.logActivity('GROUP_DELETED' as any, requesterDid || 'did:sovra:admin', grp.handle, `Deleted group ${grp.name}`);
+    this.save();
+    return { ok: true };
+  }
+
+  // --- Space Members RBAC ---
+  public getSpaceMembers(spaceId: string, spaceType?: SpaceType): SpaceMemberRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.space_members)) this.db.space_members = [];
+    return this.db.space_members.filter(sm => sm.spaceId === spaceId && (!spaceType || sm.spaceType === spaceType));
+  }
+
+  public getSpaceMember(spaceId: string, userDid: string): SpaceMemberRecord | null {
+    this.load();
+    if (!userDid) return null;
+    if (Array.isArray(this.db.space_members)) {
+      const mem = this.db.space_members.find(sm => sm.spaceId === spaceId && sm.userDid === userDid);
+      if (mem) return mem;
+    }
+    const role = this.getSpaceMemberRole(spaceId, userDid);
+    if (role) {
+      return {
+        id: 'owner-' + userDid,
+        spaceId,
+        spaceType: 'channel',
+        userDid,
+        handle: '@owner',
+        name: 'Space Owner',
+        role,
+        joinedAt: Date.now(),
+      };
+    }
+    return null;
+  }
+
+  public addSpaceMember(member: Partial<SpaceMemberRecord>, requesterDid?: string): { ok: boolean; member?: SpaceMemberRecord; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.space_members)) this.db.space_members = [];
+    const spaceId = String(member.spaceId || '');
+    const spaceType = (member.spaceType || 'group') as SpaceType;
+    const userDid = String(member.userDid || '');
+    if (!spaceId || !userDid) return { ok: false, error: 'spaceId and userDid required' };
+
+    if (requesterDid && !this.hasSpacePermission(requesterDid, spaceId, spaceType, 'MANAGE_MEMBERS')) {
+      return { ok: false, error: 'Unauthorized: insufficient permission to add members' };
+    }
+
+    const existing = this.db.space_members.find(sm => sm.spaceId === spaceId && sm.userDid === userDid);
+    if (existing) {
+      if (member.role) existing.role = member.role;
+      this.save();
+      return { ok: true, member: existing };
+    }
+
+    const u = this.findUserByDid(userDid);
+    const newMember: SpaceMemberRecord = {
+      id: 'sm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      spaceId,
+      spaceType,
+      userDid,
+      handle: u ? u.handle : (member.handle || '@peer'),
+      name: u ? u.name : (member.name || 'Sovereign Peer'),
+      avatar: u?.avatar || member.avatar || '👤',
+      role: member.role || 'MEMBER',
+      joinedAt: Date.now(),
+      invitedByDid: requesterDid,
+    };
+    this.db.space_members.push(newMember);
+
+    // Increment count on space
+    if (spaceType === 'group') {
+      const g = this.getGroupById(spaceId);
+      if (g) g.memberCount = this.db.space_members.filter(m => m.spaceId === spaceId).length;
+    } else if (spaceType === 'channel') {
+      const c = this.getChannelById(spaceId);
+      if (c) c.count = (c.count || 0) + 1;
+    } else if (spaceType === 'page') {
+      const p = this.getPageById(spaceId);
+      if (p) p.count = (p.count || 0) + 1;
+    }
+
+    this.save();
+    return { ok: true, member: newMember };
+  }
+
+  public updateSpaceMemberRole(spaceId: string, userDid: string, newRole: SpaceRole, requesterDid: string): { ok: boolean; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.space_members)) this.db.space_members = [];
+    const isCh = (this.db.channels || []).some(c => c.id === spaceId);
+    const isPg = (this.db.pages || []).some(p => p.id === spaceId);
+    const spaceType = isCh ? 'channel' : isPg ? 'page' : 'group';
+
+    if (!this.hasSpacePermission(requesterDid, spaceId, spaceType, 'MANAGE_TEAM')) {
+      return { ok: false, error: 'Unauthorized: insufficient permission to change roles' };
+    }
+
+    const requesterRole = this.getSpaceMemberRole(spaceId, requesterDid);
+    if (requesterRole !== 'OWNER' && (newRole === 'OWNER' || newRole === 'ADMIN')) {
+      return { ok: false, error: 'Forbidden: only space OWNER can manage ADMIN or transfer OWNER' };
+    }
+
+    let member = this.db.space_members.find(sm => sm.spaceId === spaceId && sm.userDid === userDid);
+    if (!member) {
+      const addRes = this.addSpaceMember({ spaceId, spaceType, userDid, role: newRole }, requesterDid);
+      if (!addRes.ok) return { ok: false, error: addRes.error };
+      this.logActivity('MEMBER_ROLE_CHANGED' as any, requesterDid, userDid, `Added ${userDid} with role ${newRole} in ${spaceId}`);
+      return { ok: true };
+    }
+
+    if (requesterRole !== 'OWNER' && (member.role === 'ADMIN' || member.role === 'OWNER')) {
+      return { ok: false, error: 'Forbidden: only space OWNER can manage ADMIN or transfer OWNER' };
+    }
+
+    member.role = newRole;
+    this.logActivity('MEMBER_ROLE_CHANGED' as any, requesterDid, userDid, `Changed role of ${userDid} to ${newRole} in ${spaceId}`);
+    this.save();
+    return { ok: true };
+  }
+
+  public removeSpaceMember(spaceId: string, userDid: string, requesterDid: string): { ok: boolean; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.space_members)) this.db.space_members = [];
+    const idx = this.db.space_members.findIndex(sm => sm.spaceId === spaceId && sm.userDid === userDid);
+    if (idx === -1) return { ok: false, error: 'Member not found in space' };
+    const member = this.db.space_members[idx];
+
+    // Allow user to leave space themselves, otherwise require MANAGE_MEMBERS
+    if (requesterDid !== userDid && !this.hasSpacePermission(requesterDid, spaceId, member.spaceType, 'MANAGE_MEMBERS')) {
+      return { ok: false, error: 'Unauthorized: insufficient permission to remove members' };
+    }
+
+    // Cannot remove owner unless transferring
+    if (member.role === 'OWNER' && requesterDid !== userDid) {
+      return { ok: false, error: 'Forbidden: cannot remove space OWNER' };
+    }
+
+    this.db.space_members.splice(idx, 1);
+    this.save();
+    return { ok: true };
+  }
+
+  // --- Space Rules ---
+  public getSpaceRules(spaceId: string): SpaceRuleRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.space_rules)) this.db.space_rules = [];
+    return this.db.space_rules.filter(r => r.spaceId === spaceId).sort((a, b) => a.orderIndex - b.orderIndex);
+  }
+
+  public createSpaceRule(spaceId: string, title: string, description: string, requesterDid: string): { ok: boolean; rule?: SpaceRuleRecord; error?: string } {
+    this.load();
+    if (!this.hasSpacePermission(requesterDid, spaceId, 'group', 'MANAGE_SETTINGS')) {
+      return { ok: false, error: 'Unauthorized: insufficient permission to create rules' };
+    }
+    if (!Array.isArray(this.db.space_rules)) this.db.space_rules = [];
+    const count = this.db.space_rules.filter(r => r.spaceId === spaceId).length;
+    const newRule: SpaceRuleRecord = {
+      id: 'rule-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      spaceId,
+      title: String(title || '').trim(),
+      description: String(description || '').trim(),
+      orderIndex: count + 1,
+      createdAt: Date.now(),
+    };
+    this.db.space_rules.push(newRule);
+    this.save();
+    return { ok: true, rule: newRule };
+  }
+
+  public deleteSpaceRule(spaceId: string, ruleId: string, requesterDid: string): { ok: boolean; error?: string } {
+    this.load();
+    if (!this.hasSpacePermission(requesterDid, spaceId, 'group', 'MANAGE_SETTINGS')) {
+      return { ok: false, error: 'Unauthorized: insufficient permission to delete rules' };
+    }
+    if (!Array.isArray(this.db.space_rules)) this.db.space_rules = [];
+    const idx = this.db.space_rules.findIndex(r => r.id === ruleId && r.spaceId === spaceId);
+    if (idx === -1) return { ok: false, error: 'Rule not found' };
+    this.db.space_rules.splice(idx, 1);
+    this.save();
+    return { ok: true };
+  }
+
+  // --- Space Join Requests ---
+  public getSpaceJoinRequests(spaceId: string): SpaceJoinRequestRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.space_join_requests)) this.db.space_join_requests = [];
+    return this.db.space_join_requests.filter(r => r.spaceId === spaceId && r.status === 'pending');
+  }
+
+  public requestJoinSpace(spaceId: string, spaceType: SpaceType, userDid: string, handle: string, name: string): { ok: boolean; request?: SpaceJoinRequestRecord; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.space_join_requests)) this.db.space_join_requests = [];
+    const existing = this.db.space_join_requests.find(r => r.spaceId === spaceId && r.userDid === userDid && r.status === 'pending');
+    if (existing) return { ok: true, request: existing };
+
+    const req: SpaceJoinRequestRecord = {
+      id: 'sjr-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      spaceId,
+      spaceType,
+      userDid,
+      handle,
+      name,
+      status: 'pending',
+      createdAt: Date.now(),
+    };
+    this.db.space_join_requests.push(req);
+    this.save();
+    return { ok: true, request: req };
+  }
+
+  public respondSpaceJoinRequest(spaceId: string, requestId: string, status: 'approved' | 'rejected', reviewerDid: string): { ok: boolean; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.space_join_requests)) this.db.space_join_requests = [];
+    const req = this.db.space_join_requests.find(r => r.id === requestId && r.spaceId === spaceId);
+    if (!req) return { ok: false, error: 'Join request not found' };
+
+    if (!this.hasSpacePermission(reviewerDid, spaceId, req.spaceType, 'MANAGE_MEMBERS')) {
+      return { ok: false, error: 'Unauthorized: insufficient permission to review join requests' };
+    }
+
+    req.status = status;
+    req.reviewedAt = Date.now();
+    req.reviewedByDid = reviewerDid;
+
+    if (status === 'approved') {
+      this.addSpaceMember({
+        spaceId,
+        spaceType: req.spaceType,
+        userDid: req.userDid,
+        handle: req.handle,
+        name: req.name,
+        role: 'MEMBER',
+      }, reviewerDid);
+    }
+    this.save();
+    return { ok: true };
+  }
+
+  // --- Unified Space Permission Engine ---
+  public getSpaceMemberRole(spaceId: string, userDid: string): SpaceRole | null {
+    this.load();
+    if (!userDid) return null;
+    if (userDid === 'did:sovra:system' || userDid === 'did:sovra:admin') return 'OWNER';
+
+    // Direct check on space ownerDid
+    const ch = this.getChannelById(spaceId);
+    if (ch && ch.ownerDid === userDid) return 'OWNER';
+
+    const pg = this.getPageById(spaceId);
+    if (pg && pg.ownerDid === userDid) return 'OWNER';
+
+    const grp = this.getGroupById(spaceId);
+    if (grp && grp.ownerDid === userDid) return 'OWNER';
+
+    if (Array.isArray(this.db.space_members)) {
+      const mem = this.db.space_members.find(sm => sm.spaceId === spaceId && sm.userDid === userDid);
+      if (mem) return mem.role;
+    }
+    return null;
+  }
+
+  public canManageSpace(userDid: string, spaceId: string, spaceType: SpaceType): boolean {
+    const role = this.getSpaceMemberRole(spaceId, userDid);
+    return role === 'OWNER' || role === 'ADMIN';
+  }
+
+  public hasSpacePermission(userDid: string, spaceId: string, spaceType: SpaceType, action: string): boolean {
+    if (!userDid) return false;
+    if (userDid === 'did:sovra:system' || userDid === 'did:sovra:admin') return true;
+
+    const role = this.getSpaceMemberRole(spaceId, userDid);
+    if (!role) return false;
+
+    switch (action) {
+      case 'VIEW':
+        return true;
+      case 'TRANSFER_OWNERSHIP':
+        return role === 'OWNER';
+      case 'MANAGE_SETTINGS':
+      case 'MANAGE_TEAM':
+        return role === 'OWNER' || role === 'ADMIN';
+      case 'MANAGE_MEMBERS':
+      case 'MANAGE_MODERATION':
+      case 'MANAGE_COMMENTS':
+        return role === 'OWNER' || role === 'ADMIN' || role === 'MODERATOR';
+      case 'CREATE_CONTENT':
+      case 'EDIT_CONTENT':
+      case 'DELETE_CONTENT':
+        return role === 'OWNER' || role === 'ADMIN' || role === 'EDITOR';
+      case 'VIEW_ANALYTICS':
+        return role === 'OWNER' || role === 'ADMIN' || role === 'EDITOR' || role === 'MODERATOR';
+      default:
+        return role === 'OWNER' || role === 'ADMIN';
+    }
+  }
+
   public purgeTestEntities(): { ok: boolean; purgedChannels: number; purgedPages: number } {
     this.load();
     const beforeCh = this.db.channels.length;
@@ -2101,16 +2928,16 @@ export class SovraDatabaseEngine {
     this.db.channels = this.db.channels.filter(c => {
       if (!c || !c.id) return false;
       if (seedChannelIds.has(c.id)) return true;
-      if (/(meshcore|aimesh|mut_ch|guild_|alice_tech)/i.test((c.handle || '') + ' ' + (c.name || ''))) return false;
-      if (c.ownerDid && !validUserDids.has(c.ownerDid) && c.ownerDid !== 'did:sovra:system') return false;
+      // Only purge entities explicitly marked as ephemeral test entities
+      if ((c as any).isTest === true || c.id.startsWith('test_entity_') || (c.ownerDid && c.ownerDid.startsWith('did:sovra:test_runner'))) return false;
       return true;
     });
 
     this.db.pages = this.db.pages.filter(p => {
       if (!p || !p.id) return false;
       if (seedPageIds.has(p.id)) return true;
-      if (/(meshcore|aimesh|mut_ch|guild_|alice_tech)/i.test((p.handle || '') + ' ' + (p.name || ''))) return false;
-      if (p.ownerDid && !validUserDids.has(p.ownerDid) && p.ownerDid !== 'did:sovra:system') return false;
+      // Only purge entities explicitly marked as ephemeral test entities
+      if ((p as any).isTest === true || p.id.startsWith('test_entity_') || (p.ownerDid && p.ownerDid.startsWith('did:sovra:test_runner'))) return false;
       return true;
     });
 
@@ -2145,6 +2972,310 @@ export class SovraDatabaseEngine {
     return { ok: true, user };
   }
 
+  // ==========================================
+  // PHASE 6: BLOCKING & IDENTITY PRIVACY ENGINE
+  // ==========================================
+
+  public isBlocked(didA?: string, didB?: string): boolean {
+    if (!didA || !didB || didA === didB) return false;
+    this.load();
+    const userA = this.findUserByDid(didA);
+    const userB = this.findUserByDid(didB);
+    if (userA?.privacySettings?.blockedDids?.includes(didB)) return true;
+    if (userB?.privacySettings?.blockedDids?.includes(didA)) return true;
+    return false;
+  }
+
+  public hasBlocked(blockerDid: string, targetDid: string): boolean {
+    if (!blockerDid || !targetDid || blockerDid === targetDid) return false;
+    this.load();
+    const blocker = this.findUserByDid(blockerDid);
+    return Boolean(blocker?.privacySettings?.blockedDids?.includes(targetDid));
+  }
+
+  public blockUser(blockerDid: string, targetDid: string): { ok: boolean; error?: string } {
+    if (!blockerDid || !targetDid || blockerDid === targetDid) {
+      return { ok: false, error: 'Invalid user DIDs for block operation' };
+    }
+    this.load();
+    const blocker = this.findUserByDid(blockerDid);
+    if (!blocker) return { ok: false, error: 'Blocker user not found' };
+
+    if (!blocker.privacySettings) {
+      blocker.privacySettings = {
+        profileVisibility: 'public',
+        canMessageMe: 'public',
+        canSendFriendRequests: 'public',
+        showOnlineStatus: true,
+        showFollowers: true,
+        blockedDids: [],
+      };
+    }
+    if (!Array.isArray(blocker.privacySettings.blockedDids)) {
+      blocker.privacySettings.blockedDids = [];
+    }
+    if (!blocker.privacySettings.blockedDids.includes(targetDid)) {
+      blocker.privacySettings.blockedDids.push(targetDid);
+    }
+
+    // Sever all bilateral relationships:
+    this.unfollowUser(blockerDid, targetDid);
+    this.unfollowUser(targetDid, blockerDid);
+
+    // Update friend relationship to blocked
+    const rel = (this.db.friend_relationships || []).find(
+      r => (r.fromDid === blockerDid && r.toDid === targetDid) || (r.fromDid === targetDid && r.toDid === blockerDid)
+    );
+    if (rel) {
+      rel.status = 'blocked';
+      rel.updatedAt = Date.now();
+    }
+
+    blocker.updatedAt = Date.now();
+    this.save();
+    return { ok: true };
+  }
+
+  public unblockUser(blockerDid: string, targetDid: string): { ok: boolean; error?: string } {
+    if (!blockerDid || !targetDid) return { ok: false, error: 'Invalid user DIDs' };
+    this.load();
+    const blocker = this.findUserByDid(blockerDid);
+    if (!blocker || !blocker.privacySettings || !Array.isArray(blocker.privacySettings.blockedDids)) {
+      return { ok: true };
+    }
+    const idx = blocker.privacySettings.blockedDids.indexOf(targetDid);
+    if (idx >= 0) {
+      blocker.privacySettings.blockedDids.splice(idx, 1);
+    }
+
+    const rel = (this.db.friend_relationships || []).find(
+      r => (r.fromDid === blockerDid && r.toDid === targetDid) || (r.fromDid === targetDid && r.toDid === blockerDid)
+    );
+    if (rel && rel.status === 'blocked') {
+      const rIdx = this.db.friend_relationships.indexOf(rel);
+      if (rIdx >= 0) this.db.friend_relationships.splice(rIdx, 1);
+    }
+
+    blocker.updatedAt = Date.now();
+    this.save();
+    return { ok: true };
+  }
+
+  public getBlockedUsers(userDid: string): PublicUserDTO[] {
+    this.load();
+    const user = this.findUserByDid(userDid);
+    if (!user || !user.privacySettings || !Array.isArray(user.privacySettings.blockedDids)) return [];
+    return this.db.users
+      .filter(u => user.privacySettings!.blockedDids!.includes(u.did))
+      .map(toPublicUserDTO)
+      .filter((u): u is PublicUserDTO => u !== null);
+  }
+
+  public canUserViewProfile(targetUser: UserRecord, viewerDid?: string): boolean {
+    if (!targetUser) return false;
+    if (viewerDid && this.isBlocked(targetUser.did, viewerDid)) return false;
+    if (viewerDid && targetUser.did === viewerDid) return true;
+
+    const visibility = targetUser.privacySettings?.profileVisibility || 'public';
+    if (visibility === 'public') return true;
+    if (visibility === 'only_me' || visibility === 'private') {
+      return viewerDid === targetUser.did;
+    }
+    if (visibility === 'friends') {
+      return viewerDid ? this.areFriends(targetUser.did, viewerDid) : false;
+    }
+    return true;
+  }
+
+  public getUserProfile(targetDid: string, viewerDid?: string): {
+    ok: boolean;
+    error?: string;
+    isBlocked?: boolean;
+    isPrivate?: boolean;
+    user?: PublicUserDTO;
+    stats?: {
+      followersCount: number;
+      followingCount: number;
+      friendsCount: number;
+      mutualFriendsCount: number;
+      postsCount: number;
+      channelsCount: number;
+      pagesCount: number;
+      groupsCount: number;
+    };
+    relationship?: {
+      isSelf: boolean;
+      isFollowing: boolean;
+      isFollowedBy: boolean;
+      areFriends: boolean;
+      friendshipStatus: 'none' | 'pending_sent' | 'pending_received' | 'accepted' | 'rejected' | 'blocked';
+      isBlocked: boolean;
+      hasBlockedMe: boolean;
+      canMessage: boolean;
+      canSendFriendRequest: boolean;
+    };
+  } {
+    this.load();
+    let targetUser = this.findUserByDid(targetDid);
+    if (!targetUser) {
+      targetUser = this.findUserByHandle(targetDid);
+      if (targetUser) targetDid = targetUser.did;
+    }
+    if (!targetUser) {
+      return { ok: false, error: 'User not found' };
+    }
+
+    const isSelf = viewerDid === targetDid;
+    const isBlocked = viewerDid ? this.hasBlocked(viewerDid, targetDid) : false;
+    const hasBlockedMe = viewerDid ? this.hasBlocked(targetDid, viewerDid) : false;
+
+    if (hasBlockedMe || isBlocked) {
+      return { ok: true, error: 'User is not available', isBlocked: true };
+    }
+
+    const followStats = this.getFollowStats(targetDid);
+    const friendsCount = (this.db.friend_relationships || []).filter(
+      r => r.status === 'accepted' && (r.fromDid === targetDid || r.toDid === targetDid)
+    ).length;
+    const mutualFriends = viewerDid ? this.getMutualFriends(viewerDid, targetDid) : [];
+    const postsCount = (this.db.posts || []).filter(p => p.authorDid === targetDid).length;
+    const channelsCount = (this.db.channels || []).filter(c => c.ownerDid === targetDid).length;
+    const pagesCount = (this.db.pages || []).filter(p => p.ownerDid === targetDid).length;
+    const groupsCount = (this.db.space_members || []).filter(sm => sm.userDid === targetDid && sm.spaceType === 'group').length;
+
+    let friendshipStatus: 'none' | 'pending_sent' | 'pending_received' | 'accepted' | 'rejected' | 'blocked' = 'none';
+    if (viewerDid && !isSelf) {
+      const rel = (this.db.friend_relationships || []).find(
+        r => (r.fromDid === viewerDid && r.toDid === targetDid) || (r.fromDid === targetDid && r.toDid === viewerDid)
+      );
+      if (rel) {
+        if (rel.status === 'accepted') friendshipStatus = 'accepted';
+        else if (rel.status === 'blocked') friendshipStatus = 'blocked';
+        else if (rel.status === 'pending') {
+          friendshipStatus = rel.fromDid === viewerDid ? 'pending_sent' : 'pending_received';
+        }
+      }
+    }
+
+    const canView = this.canUserViewProfile(targetUser, viewerDid);
+    const isPrivate = !canView;
+
+    const canMsgSetting = targetUser.privacySettings?.canMessageMe || 'public';
+    let canMessage = false;
+    if (isSelf) canMessage = true;
+    else if (!isBlocked && !hasBlockedMe) {
+      if (canMsgSetting === 'public') canMessage = true;
+      else if (canMsgSetting === 'friends') canMessage = friendshipStatus === 'accepted';
+    }
+
+    const canFriendSetting = targetUser.privacySettings?.canSendFriendRequests || 'public';
+    let canSendFriendRequest = false;
+    if (!isSelf && !isBlocked && !hasBlockedMe && friendshipStatus === 'none') {
+      if (canFriendSetting === 'public') canSendFriendRequest = true;
+      else if (canFriendSetting === 'friends_of_friends') canSendFriendRequest = mutualFriends.length > 0;
+    }
+
+    return {
+      ok: true,
+      isPrivate,
+      user: toPublicUserDTO(targetUser) || undefined,
+      stats: {
+        followersCount: followStats.followersCount,
+        followingCount: followStats.followingCount,
+        friendsCount,
+        mutualFriendsCount: mutualFriends.length,
+        postsCount,
+        channelsCount,
+        pagesCount,
+        groupsCount,
+      },
+      relationship: {
+        isSelf,
+        isFollowing: viewerDid ? this.isFollowing(viewerDid, targetDid) : false,
+        isFollowedBy: viewerDid ? this.isFollowing(targetDid, viewerDid) : false,
+        areFriends: friendshipStatus === 'accepted',
+        friendshipStatus,
+        isBlocked,
+        hasBlockedMe,
+        canMessage,
+        canSendFriendRequest,
+      },
+    };
+  }
+
+  public getUserPosts(targetDid: string, viewerDid?: string, limit: number = 20, offset: number = 0): FeedPostRecord[] {
+    this.load();
+    const targetUser = this.findUserByDid(targetDid);
+    if (!targetUser) return [];
+    if (!this.canUserViewProfile(targetUser, viewerDid)) return [];
+
+    return (this.db.posts || [])
+      .filter(p => p.authorDid === targetDid && this.canUserViewPost(p, viewerDid))
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(offset, offset + limit);
+  }
+
+  public getUserSpaces(targetDid: string, viewerDid?: string): { channels: ChannelRecord[]; pages: PageRecord[]; groups: GroupRecord[] } {
+    this.load();
+    const channels = (this.db.channels || []).filter(c => c.ownerDid === targetDid);
+    const pages = (this.db.pages || []).filter(p => p.ownerDid === targetDid);
+
+    const groupMemberships = (this.db.space_members || []).filter(sm => sm.userDid === targetDid && sm.spaceType === 'group');
+    const groupIds = groupMemberships.map(m => m.spaceId);
+    const groups = (this.db.groups || []).filter(g => {
+      if (!groupIds.includes(g.id)) return false;
+      if (g.privacy === 'public') return true;
+      if (!viewerDid) return false;
+      if (viewerDid === targetDid) return true;
+      // Member of private group?
+      return (this.db.space_members || []).some(sm => sm.spaceId === g.id && sm.userDid === viewerDid);
+    });
+
+    return { channels, pages, groups };
+  }
+
+  public validateHandle(handle: string, excludeDid?: string): { valid: boolean; error?: string; cleanHandle?: string } {
+    if (!handle) return { valid: false, error: 'Username/handle cannot be empty' };
+    let clean = handle.trim();
+    if (!clean.startsWith('@')) clean = '@' + clean;
+    const body = clean.slice(1);
+    if (body.length < 3) return { valid: false, error: 'Username must be at least 3 characters' };
+    if (body.length > 30) return { valid: false, error: 'Username cannot exceed 30 characters' };
+    if (!/^[a-zA-Z0-9_.]+$/.test(body)) {
+      return { valid: false, error: 'Username may only contain letters, numbers, underscores and dots' };
+    }
+    const reserved = ['sovra', 'admin', 'system', 'root', 'official', 'support', 'superadmin', 'mod', 'moderator'];
+    if (reserved.includes(body.toLowerCase())) {
+      return { valid: false, error: `Username "${clean}" is a reserved system identifier` };
+    }
+    if (this.isHandleTaken(clean, excludeDid)) {
+      return { valid: false, error: `Username "${clean}" is already in use by another peer` };
+    }
+    return { valid: true, cleanHandle: clean };
+  }
+
+  public getPostsByTopic(topic: string, viewerDid?: string, sort: 'latest' | 'popular' = 'latest'): FeedPostRecord[] {
+    this.load();
+    const clean = topic.startsWith('#') ? topic.slice(1).toLowerCase() : topic.toLowerCase();
+    const posts = this.getFeedPosts(viewerDid).filter(p => {
+      if (viewerDid && this.isBlocked(p.authorDid, viewerDid)) return false;
+      const matchInTags = Array.isArray(p.tags)
+        ? p.tags.some(t => t.toLowerCase().includes(clean))
+        : (typeof p.tags === 'string' && p.tags.toLowerCase().includes(clean));
+      const matchInCaption = Boolean(p.caption && p.caption.toLowerCase().includes('#' + clean));
+      return matchInTags || matchInCaption;
+    });
+
+    if (sort === 'popular') {
+      return posts.sort((a, b) => ((b.likesCount || 0) + (b.commentsCount || 0)) - ((a.likesCount || 0) + (a.commentsCount || 0)));
+    }
+    return posts.sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  public leaveGroup(groupId: string, userDid: string): { ok: boolean; error?: string } {
+    return this.removeSpaceMember(groupId, userDid, userDid);
+  }
+
   public toggleLike(postId: string, userDid: string): { likesCount: number; isLiked: boolean } | null {
     this.load();
     const post = this.db.posts.find(p => p.id === postId);
@@ -2166,21 +3297,27 @@ export class SovraDatabaseEngine {
     return { likesCount: post.likesCount, isLiked: post.isLiked };
   }
 
-  public addComment(postId: string, comment: { author?: string; authorName?: string; authorDid: string; text: string; authorAvatar?: string }): PostCommentRecord | null {
+  public addComment(postId: string, comment: { author?: string; authorName?: string; authorDid: string; authorHandle?: string; text: string; authorAvatar?: string; authorAvatarDataUrl?: string }): PostCommentRecord | null {
     this.load();
     const post = this.db.posts.find(p => p.id === postId);
     if (!post) return null;
 
     if (!Array.isArray(post.comments)) post.comments = [];
 
-    const authorName = comment.author || comment.authorName || 'Peer';
+    const user = this.findUserByDid(comment.authorDid);
+    const authorName = comment.author || comment.authorName || user?.displayName || 'Peer';
+    const authorHandle = comment.authorHandle || user?.handle || '@peer';
     const record: PostCommentRecord = {
-      id: 'cmt-' + Date.now(),
+      id: 'cmt-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
       author: authorName,
       authorDid: comment.authorDid,
-      authorAvatar: comment.authorAvatar || authorName.charAt(0).toUpperCase(),
+      authorHandle,
+      authorAvatar: comment.authorAvatar || user?.avatar || authorName.charAt(0).toUpperCase(),
+      authorAvatarDataUrl: comment.authorAvatarDataUrl || user?.avatarDataUrl,
       text: comment.text.trim(),
       timestamp: Date.now(),
+      likesCount: 0,
+      likedByDids: [],
       replies: [],
     };
 
@@ -2189,7 +3326,7 @@ export class SovraDatabaseEngine {
     return record;
   }
 
-  public addCommentReply(postId: string, commentId: string, reply: { author?: string; authorName?: string; authorDid: string; text: string; authorAvatar?: string }): { ok: boolean; reply?: any; error?: string } {
+  public addCommentReply(postId: string, commentId: string, reply: { author?: string; authorName?: string; authorDid: string; authorHandle?: string; text: string; authorAvatar?: string; authorAvatarDataUrl?: string }): { ok: boolean; reply?: any; error?: string } {
     this.load();
     const post = this.db.posts.find(p => p.id === postId);
     if (!post) return { ok: false, error: 'Post not found' };
@@ -2198,20 +3335,164 @@ export class SovraDatabaseEngine {
     if (!parentComment) return { ok: false, error: 'Parent comment not found' };
     if (!Array.isArray(parentComment.replies)) parentComment.replies = [];
 
-    const authorName = reply.author || reply.authorName || 'Peer';
+    const user = this.findUserByDid(reply.authorDid);
+    const authorName = reply.author || reply.authorName || user?.displayName || 'Peer';
+    const authorHandle = reply.authorHandle || user?.handle || '@peer';
     const replyRecord = {
       id: 'rpl-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
       commentId,
+      parentId: commentId,
       author: authorName,
       authorDid: reply.authorDid,
-      authorAvatar: reply.authorAvatar || authorName.charAt(0).toUpperCase(),
+      authorHandle,
+      authorAvatar: reply.authorAvatar || user?.avatar || authorName.charAt(0).toUpperCase(),
+      authorAvatarDataUrl: reply.authorAvatarDataUrl || user?.avatarDataUrl,
       text: reply.text.trim(),
       timestamp: Date.now(),
       likesCount: 0,
+      likedByDids: [] as string[],
     };
     parentComment.replies.push(replyRecord);
     this.save();
     return { ok: true, reply: replyRecord };
+  }
+
+  public likeComment(
+    postId: string,
+    commentId: string,
+    userDid: string,
+    action?: 'LIKE' | 'UNLIKE'
+  ): { ok: boolean; isLiked?: boolean; likesCount?: number; likedByDids?: string[]; isReply?: boolean; parentCommentId?: string; comment?: any; error?: string } {
+    this.load();
+    const post = this.db.posts.find(p => p.id === postId);
+    if (!post) return { ok: false, error: 'Post not found' };
+    if (!Array.isArray(post.comments)) post.comments = [];
+
+    // 1. Check top-level comments
+    const comment = post.comments.find(c => c.id === commentId);
+    if (comment) {
+      if (!Array.isArray(comment.likedByDids)) comment.likedByDids = [];
+      const idx = comment.likedByDids.indexOf(userDid);
+      let isLiked = false;
+      const act = action ? action.toUpperCase() : null;
+      if (act === 'LIKE') {
+        if (idx === -1) comment.likedByDids.push(userDid);
+        isLiked = true;
+      } else if (act === 'UNLIKE') {
+        if (idx !== -1) comment.likedByDids.splice(idx, 1);
+        isLiked = false;
+      } else {
+        if (idx >= 0) {
+          comment.likedByDids.splice(idx, 1);
+          isLiked = false;
+        } else {
+          comment.likedByDids.push(userDid);
+          isLiked = true;
+        }
+      }
+      comment.likesCount = comment.likedByDids.length;
+      this.save();
+      return { ok: true, isLiked, likesCount: comment.likesCount, likedByDids: comment.likedByDids, isReply: false, comment };
+    }
+
+    // 2. Check nested replies
+    for (const parent of post.comments) {
+      if (Array.isArray(parent.replies)) {
+        const reply = parent.replies.find(r => r.id === commentId);
+        if (reply) {
+          if (!Array.isArray(reply.likedByDids)) reply.likedByDids = [];
+          const idx = reply.likedByDids.indexOf(userDid);
+          let isLiked = false;
+          const act = action ? action.toUpperCase() : null;
+          if (act === 'LIKE') {
+            if (idx === -1) reply.likedByDids.push(userDid);
+            isLiked = true;
+          } else if (act === 'UNLIKE') {
+            if (idx !== -1) reply.likedByDids.splice(idx, 1);
+            isLiked = false;
+          } else {
+            if (idx >= 0) {
+              reply.likedByDids.splice(idx, 1);
+              isLiked = false;
+            } else {
+              reply.likedByDids.push(userDid);
+              isLiked = true;
+            }
+          }
+          reply.likesCount = reply.likedByDids.length;
+          this.save();
+          return { ok: true, isLiked, likesCount: reply.likesCount, likedByDids: reply.likedByDids, isReply: true, parentCommentId: parent.id, comment: reply };
+        }
+      }
+    }
+
+    return { ok: false, error: 'Comment not found' };
+  }
+
+  public editComment(
+    postId: string,
+    commentId: string,
+    requesterDid: string,
+    newText: string
+  ): { ok: boolean; comment?: any; error?: string } {
+    this.load();
+    const post = this.db.posts.find(p => p.id === postId);
+    if (!post) return { ok: false, error: 'Post not found' };
+    if (!Array.isArray(post.comments)) post.comments = [];
+
+    const comment = post.comments.find(c => c.id === commentId);
+    if (comment) {
+      if (comment.authorDid !== requesterDid) {
+        return { ok: false, error: 'Unauthorized: Cannot edit another user\'s comment' };
+      }
+      comment.text = newText.trim();
+      (comment as any).updatedAt = Date.now();
+      this.save();
+      return { ok: true, comment };
+    }
+
+    for (const parent of post.comments) {
+      if (Array.isArray(parent.replies)) {
+        const reply = parent.replies.find(r => r.id === commentId);
+        if (reply) {
+          if (reply.authorDid !== requesterDid) {
+            return { ok: false, error: 'Unauthorized: Cannot edit another user\'s reply' };
+          }
+          reply.text = newText.trim();
+          (reply as any).updatedAt = Date.now();
+          this.save();
+          return { ok: true, comment: reply };
+        }
+      }
+    }
+
+    return { ok: false, error: 'Comment not found' };
+  }
+
+  public deleteCommentReply(
+    postId: string,
+    commentId: string,
+    replyId: string,
+    requesterDid: string
+  ): { ok: boolean; error?: string } {
+    this.load();
+    const post = this.db.posts.find(p => p.id === postId);
+    if (!post) return { ok: false, error: 'Post not found' };
+    if (!Array.isArray(post.comments)) post.comments = [];
+    const parent = post.comments.find(c => c.id === commentId);
+    if (!parent || !Array.isArray(parent.replies)) return { ok: false, error: 'Parent comment not found' };
+
+    const rIdx = parent.replies.findIndex(r => r.id === replyId);
+    if (rIdx === -1) return { ok: false, error: 'Reply not found' };
+    const reply = parent.replies[rIdx];
+
+    if (reply.authorDid !== requesterDid && parent.authorDid !== requesterDid && post.authorDid !== requesterDid) {
+      return { ok: false, error: 'Unauthorized: Cannot delete another user\'s reply' };
+    }
+
+    parent.replies.splice(rIdx, 1);
+    this.save();
+    return { ok: true };
   }
 
   public deletePost(postId: string): boolean {
@@ -2416,20 +3697,28 @@ export class SovraDatabaseEngine {
     return (this.db.follows || []).some(f => f.followerDid === followerDid && f.targetDid === targetDid);
   }
 
-  public getFollowers(targetDid: string): UserRecord[] {
+  public getFollowers(targetDid: string, limit?: number, offset: number = 0): UserRecord[] {
     this.load();
     const followerDids = (this.db.follows || [])
       .filter(f => f.targetDid === targetDid)
       .map(f => f.followerDid);
-    return this.db.users.filter(u => followerDids.includes(u.did));
+    const users = this.db.users.filter(u => followerDids.includes(u.did));
+    if (limit !== undefined) {
+      return users.slice(offset, offset + limit);
+    }
+    return users;
   }
 
-  public getFollowing(followerDid: string): UserRecord[] {
+  public getFollowing(followerDid: string, limit?: number, offset: number = 0): UserRecord[] {
     this.load();
     const targetDids = (this.db.follows || [])
       .filter(f => f.followerDid === followerDid)
       .map(f => f.targetDid);
-    return this.db.users.filter(u => targetDids.includes(u.did));
+    const users = this.db.users.filter(u => targetDids.includes(u.did));
+    if (limit !== undefined) {
+      return users.slice(offset, offset + limit);
+    }
+    return users;
   }
 
   public getFollowStats(did: string): { followersCount: number; followingCount: number } {
@@ -2450,10 +3739,14 @@ export class SovraDatabaseEngine {
     deviceType?: 'Desktop' | 'Mobile' | 'Tablet';
     ipAddress?: string;
     userAgent?: string;
+    ttlMs?: number;
+    expiresAt?: number;
   }): UserSessionRecord {
     this.load();
     if (!this.db.user_sessions) this.db.user_sessions = [];
     const now = Date.now();
+    const defaultTtlMs = 7 * 24 * 60 * 60 * 1000; // 7 days absolute session lifetime
+    const expiresAt = session.expiresAt || (session.ttlMs ? now + session.ttlMs : now + defaultTtlMs);
     const sessionRecord: UserSessionRecord = {
       sessionId: 'ses_' + now + '_' + crypto.randomBytes(6).toString('hex'),
       userDid: session.userDid,
@@ -2464,10 +3757,14 @@ export class SovraDatabaseEngine {
       userAgent: session.userAgent || 'Sovra Native Client/1.0',
       createdAt: now,
       lastActiveAt: now,
+      expiresAt,
       isRevoked: false,
     };
     this.db.user_sessions.push(sessionRecord);
     this.save();
+    try {
+      this.sqliteEngine?.createSession(sessionRecord);
+    } catch (_) {}
     return sessionRecord;
   }
 
@@ -2476,21 +3773,162 @@ export class SovraDatabaseEngine {
     return (this.db.user_sessions || []).filter(s => s.userDid === userDid);
   }
 
-  public revokeSession(sessionId: string, userDid: string): boolean {
+  public revokeToken(token: string, reason?: string): boolean {
     this.load();
-    const session = (this.db.user_sessions || []).find(s => s.sessionId === sessionId && s.userDid === userDid);
+    if (!token) return false;
+    if (!this.db.revoked_tokens) this.db.revoked_tokens = [];
+    let modified = false;
+
+    if (!this.db.revoked_tokens.some(r => r.token === token)) {
+      this.db.revoked_tokens.push({
+        token,
+        revokedAt: Date.now(),
+        reason: reason || 'Explicit token revocation',
+      });
+      modified = true;
+    }
+
+    const session = (this.db.user_sessions || []).find(s => s.token === token || s.sessionId === token);
+    if (session) {
+      session.isRevoked = true;
+      session.lastActiveAt = Date.now();
+      modified = true;
+    }
+
+    const user = this.db.users.find(u => u.sessionToken === token || (session && u.did === session.userDid));
+    if (user && user.sessionToken === token) {
+      user.sessionToken = undefined;
+      user.updatedAt = Date.now();
+      modified = true;
+    }
+
+    if (modified) {
+      this.save();
+      try {
+        this.sqliteEngine?.revokeSession(token);
+      } catch (_) {}
+      return true;
+    }
+    return false;
+  }
+
+  public revokeSession(sessionId: string, userDid?: string): boolean {
+    this.load();
+    if (!this.db.revoked_tokens) this.db.revoked_tokens = [];
+    const session = (this.db.user_sessions || []).find(
+      s => (s.sessionId === sessionId || s.token === sessionId) && (!userDid || s.userDid === userDid)
+    );
     if (!session) return false;
     session.isRevoked = true;
     session.lastActiveAt = Date.now();
-    this.logActivity('USER_REGISTERED', userDid, userDid.slice(-8), `Revoked remote hardware session ${session.deviceName}`);
+
+    if (session.token && !this.db.revoked_tokens.some(r => r.token === session.token)) {
+      this.db.revoked_tokens.push({
+        token: session.token,
+        revokedAt: Date.now(),
+        reason: 'Session revoked by user/admin',
+      });
+    }
+
+    const targetDid = userDid || session.userDid;
+    const user = this.db.users.find(u => u.did === targetDid);
+    if (user && user.sessionToken === session.token) {
+      user.sessionToken = undefined;
+      user.updatedAt = Date.now();
+    }
+
+    this.logActivity('USER_REGISTERED', targetDid, targetDid.slice(-8), `Revoked remote hardware session ${session.deviceName}`);
     this.save();
+    try {
+      this.sqliteEngine?.revokeSession(sessionId, userDid);
+    } catch (_) {}
     return true;
   }
 
   public isSessionRevoked(token: string): boolean {
     this.load();
+    if (!token) return true;
+    if (Array.isArray(this.db.revoked_tokens) && this.db.revoked_tokens.some(r => r.token === token)) {
+      return true;
+    }
     const session = (this.db.user_sessions || []).find(s => s.token === token);
-    return session ? session.isRevoked : false;
+    if (session) {
+      if (session.isRevoked) return true;
+      if (session.expiresAt && session.expiresAt < Date.now()) return true;
+    }
+    return false;
+  }
+
+  public deleteUserAccount(userDid: string): { ok: boolean; error?: string } {
+    this.load();
+    const user = this.findUserByDid(userDid);
+    if (!user) {
+      return { ok: false, error: 'User not found' };
+    }
+
+    // 1. Remove from users
+    this.db.users = this.db.users.filter(u => u.did !== userDid);
+
+    // 2. Revoke and remove all sessions
+    if (Array.isArray(this.db.user_sessions)) {
+      this.db.user_sessions = this.db.user_sessions.filter(s => s.userDid !== userDid);
+    }
+
+    // 3. Remove from contacts and peers
+    this.db.contacts_and_peers = this.db.contacts_and_peers.filter(p => p.did !== userDid);
+
+    // 4. Remove friendships
+    if (Array.isArray(this.db.friend_relationships)) {
+      this.db.friend_relationships = this.db.friend_relationships.filter(
+        r => r.fromDid !== userDid && r.toDid !== userDid
+      );
+    }
+
+    // 5. Remove follows
+    if (Array.isArray(this.db.follows)) {
+      this.db.follows = this.db.follows.filter(
+        f => f.followerDid !== userDid && f.followingDid !== userDid
+      );
+    }
+
+    // 6. Remove user's posts
+    this.db.posts = this.db.posts.filter(p => p.authorDid !== userDid);
+
+    // 7. Clean user's likes and comments on remaining posts
+    for (const post of this.db.posts) {
+      if (Array.isArray(post.likedByDids) && post.likedByDids.includes(userDid)) {
+        post.likedByDids = post.likedByDids.filter(d => d !== userDid);
+        post.likesCount = post.likedByDids.length;
+      }
+      if (Array.isArray(post.comments)) {
+        post.comments = post.comments.filter(c => c.authorDid !== userDid);
+        post.commentsCount = post.comments.length;
+      }
+    }
+
+    // 8. Clean chat messages
+    this.db.chatMessages = this.db.chatMessages.filter(
+      m => m.senderDid !== userDid && m.recipientDid !== userDid
+    );
+
+    // 9. Clean notifications
+    if (Array.isArray(this.db.notifications)) {
+      this.db.notifications = this.db.notifications.filter(
+        n => n.recipientDid !== userDid && n.senderDid !== userDid
+      );
+    }
+
+    // 10. Clean user channels and pages ownership
+    if (Array.isArray(this.db.channels)) {
+      this.db.channels = this.db.channels.filter(c => c.ownerDid !== userDid);
+    }
+    if (Array.isArray(this.db.pages)) {
+      this.db.pages = this.db.pages.filter(p => p.ownerDid !== userDid);
+    }
+
+    this.logActivity('USER_DELETED', userDid, user.handle, `Permanently deleted user account ${user.handle} (${userDid})`);
+    this.save();
+    return { ok: true };
   }
 
   // ==========================================
@@ -2612,8 +4050,275 @@ export class SovraDatabaseEngine {
   }
 
   // ==========================================
-  // COLLECTION 7: VIDEO COMMENTS & REPLIES (WATCH STUDIO)
+  // COLLECTION 7: VIDEOS, COMMENTS & REPLIES (WATCH STUDIO)
   // ==========================================
+
+  public getAllVideos(userDid?: string): YoutubeVideoRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.videos) || this.db.videos.length === 0) {
+      this.db.videos = this.getSeedVideos();
+      this.save();
+    }
+    if (userDid) {
+      return this.db.videos.map(v => ({
+        ...v,
+        isSubscribed: this.isVideoSubscribed(v.channelHandle, userDid),
+        isLiked: this.isVideoLiked(v.id, userDid),
+      }));
+    }
+    return [...this.db.videos];
+  }
+
+  public getVideoById(id: string, userDid?: string): YoutubeVideoRecord | null {
+    this.load();
+    const vids = this.getAllVideos(userDid);
+    return vids.find(v => v.id === id) || null;
+  }
+
+  public createVideo(params: {
+    ownerDid: string;
+    title: string;
+    description: string;
+    cid: string;
+    thumbnailCid?: string;
+    channelName?: string;
+    channelHandle?: string;
+    channelAvatar?: string;
+    channelAvatarBg?: string;
+    duration?: string;
+    durationSeconds?: number;
+    tags?: string[];
+    visibility?: string;
+  }): YoutubeVideoRecord {
+    this.load();
+    if (!Array.isArray(this.db.videos)) this.db.videos = this.getSeedVideos();
+    const id = 'vid_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const u = this.findUserByDid(params.ownerDid);
+    const newVideo: YoutubeVideoRecord = {
+      id,
+      ownerDid: params.ownerDid,
+      title: params.title.trim(),
+      description: params.description.trim(),
+      cid: params.cid,
+      thumbnailCid: params.thumbnailCid,
+      channelName: params.channelName || (u?.displayName) || 'Verified Creator',
+      channelHandle: params.channelHandle || (u?.handle?.replace('@', '')) || 'creator',
+      channelAvatar: params.channelAvatar || (u?.displayName ? u.displayName[0].toUpperCase() : 'V'),
+      channelAvatarBg: params.channelAvatarBg || '#6366f1',
+      channelSubscribers: 1,
+      channelSubscribersText: '1 subscriber',
+      isSubscribed: false,
+      views: 0,
+      viewsText: '0 views',
+      likes: 0,
+      dislikes: 0,
+      duration: params.duration || '0:30',
+      durationSeconds: params.durationSeconds || 30,
+      publishedAt: 'Just now',
+      tags: Array.isArray(params.tags) ? params.tags : ['#sovra', '#p2p', '#watch'],
+      ambientColor: 'rgba(99, 102, 241, 0.45)',
+      gradient: 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)',
+      chapters: [{ timeSeconds: 0, timecode: '00:00', title: 'Start' }],
+      variants: [{ resolution: '1080p', bitrate: '8 Mbps', framerate: '30fps', bandwidthBps: 8_000_000 }],
+      visibility: params.visibility || 'public',
+      status: 'ready',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    this.db.videos.unshift(newVideo);
+    this.save();
+    return newVideo;
+  }
+
+  public deleteVideo(videoId: string, requesterDid: string): { ok: boolean; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.videos)) return { ok: false, error: 'Video not found' };
+    const idx = this.db.videos.findIndex(v => v.id === videoId);
+    if (idx === -1) return { ok: false, error: 'Video not found' };
+    const vid = this.db.videos[idx];
+    if (vid.ownerDid && vid.ownerDid !== requesterDid && requesterDid !== 'did:sovra:system') {
+      return { ok: false, error: 'Forbidden: Cannot delete video created by another user' };
+    }
+    this.db.videos.splice(idx, 1);
+    this.save();
+    return { ok: true };
+  }
+
+  public toggleVideoLike(videoId: string, userDid: string): { ok: boolean; isLiked: boolean; likesCount: number } {
+    this.load();
+    if (!Array.isArray(this.db.videos)) this.db.videos = this.getSeedVideos();
+    if (!Array.isArray(this.db.video_likes)) this.db.video_likes = [];
+    const vid = this.db.videos.find(v => v.id === videoId);
+    if (!vid) return { ok: false, isLiked: false, likesCount: 0 };
+    const existingIdx = this.db.video_likes.findIndex(vl => vl.videoId === videoId && vl.userDid === userDid);
+    let isLiked = false;
+    if (existingIdx >= 0) {
+      this.db.video_likes.splice(existingIdx, 1);
+      vid.likes = Math.max(0, (vid.likes || 1) - 1);
+      isLiked = false;
+    } else {
+      this.db.video_likes.push({ videoId, userDid, timestamp: Date.now() });
+      vid.likes = (vid.likes || 0) + 1;
+      isLiked = true;
+    }
+    this.save();
+    return { ok: true, isLiked, likesCount: vid.likes };
+  }
+
+  public toggleVideoSubscribe(channelHandle: string, userDid: string): { ok: boolean; isSubscribed: boolean; subscribersCount: number } {
+    this.load();
+    if (!Array.isArray(this.db.videos)) this.db.videos = this.getSeedVideos();
+    if (!Array.isArray(this.db.channel_subscriptions)) this.db.channel_subscriptions = [];
+    const cleanHandle = channelHandle.toLowerCase().replace('@', '');
+    const existingIdx = this.db.channel_subscriptions.findIndex(s => s.channelHandle.toLowerCase().replace('@', '') === cleanHandle && s.userDid === userDid);
+    let isSubscribed = false;
+    if (existingIdx >= 0) {
+      this.db.channel_subscriptions.splice(existingIdx, 1);
+      isSubscribed = false;
+    } else {
+      this.db.channel_subscriptions.push({ channelHandle: cleanHandle, userDid, timestamp: Date.now() });
+      isSubscribed = true;
+    }
+    const delta = isSubscribed ? 1 : -1;
+    let finalCount = 0;
+    for (const v of this.db.videos) {
+      if ((v.channelHandle || '').toLowerCase().replace('@', '') === cleanHandle) {
+        v.channelSubscribers = Math.max(0, (v.channelSubscribers || 0) + delta);
+        v.channelSubscribersText = v.channelSubscribers >= 1000 ? `${(v.channelSubscribers / 1000).toFixed(1)}K subscribers` : `${v.channelSubscribers} subscriber${v.channelSubscribers === 1 ? '' : 's'}`;
+        v.isSubscribed = isSubscribed;
+        finalCount = v.channelSubscribers;
+      }
+    }
+    if (finalCount === 0) {
+      finalCount = this.db.channel_subscriptions.filter(s => s.channelHandle.toLowerCase().replace('@', '') === cleanHandle).length;
+    }
+    this.save();
+    return { ok: true, isSubscribed, subscribersCount: finalCount };
+  }
+
+  public isVideoSubscribed(channelHandle: string, userDid: string): boolean {
+    this.load();
+    if (!Array.isArray(this.db.channel_subscriptions)) return false;
+    const cleanHandle = channelHandle.toLowerCase().replace('@', '');
+    return this.db.channel_subscriptions.some(s => s.channelHandle.toLowerCase().replace('@', '') === cleanHandle && s.userDid === userDid);
+  }
+
+  public isVideoLiked(videoId: string, userDid: string): boolean {
+    this.load();
+    if (!Array.isArray(this.db.video_likes)) return false;
+    return this.db.video_likes.some(vl => vl.videoId === videoId && vl.userDid === userDid);
+  }
+
+  private getSeedVideos(): YoutubeVideoRecord[] {
+    return [
+      {
+        id: 'yt-video-1',
+        title: 'Decentralized 4K Master Video & BitSwap Swarm Distribution | Sovra Architecture Deep Dive',
+        channelName: 'Sovra Protocol Lab',
+        channelHandle: 'sovralab',
+        channelAvatar: 'S',
+        channelAvatarBg: '#6366f1',
+        channelSubscribers: 142800,
+        channelSubscribersText: '142.8K subscribers',
+        isSubscribed: false,
+        views: 284512,
+        viewsText: '284K views',
+        likes: 18420,
+        dislikes: 12,
+        cid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+        duration: '14:20',
+        durationSeconds: 860,
+        publishedAt: 'Premiered 2 hours ago',
+        description: 'Decentralized 4K master video streaming over RFC 8216 HLS and BitSwap swarm.',
+        tags: ['#P2P', '#RFC8216', '#BitSwap', '#4KUHD', '#Sovra'],
+        ambientColor: 'rgba(99, 102, 241, 0.45)',
+        gradient: 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)',
+        chapters: [
+          { timeSeconds: 0, timecode: '00:00', title: 'Introduction to Sovereign P2P Streaming' },
+          { timeSeconds: 135, timecode: '02:15', title: 'RFC 8216 Master & Variant Playlists' },
+        ],
+        variants: [
+          { resolution: '4K (2160p60)', bitrate: '25 Mbps', framerate: '60fps', bandwidthBps: 25_000_000 },
+          { resolution: '1080p60', bitrate: '8 Mbps', framerate: '60fps', bandwidthBps: 8_000_000 },
+        ],
+      },
+      {
+        id: 'yt-video-2',
+        title: 'Zero-Server Cellular CGNAT Traversal: ICE 4-Tier & Birthday Paradox Port Prediction',
+        channelName: 'Telecom Engineering Guild',
+        channelHandle: 'telecom_guild',
+        channelAvatar: 'T',
+        channelAvatarBg: '#10b981',
+        channelSubscribers: 98400,
+        channelSubscribersText: '98.4K subscribers',
+        isSubscribed: false,
+        views: 192430,
+        viewsText: '192K views',
+        likes: 12890,
+        dislikes: 8,
+        cid: 'bafybeicgnattraversal4tierportpredictionbirthdayparadox88',
+        duration: '18:45',
+        durationSeconds: 1125,
+        publishedAt: 'Yesterday',
+        description: 'ICE 4-tier traversal and Birthday Paradox port prediction over cellular CGNAT.',
+        tags: ['#Telecom', '#NATTraversal', '#STUN', '#5GQUIC', '#Networking'],
+        ambientColor: 'rgba(16, 185, 129, 0.45)',
+        gradient: 'radial-gradient(circle at center, #064e3b 0%, #022c22 100%)',
+        chapters: [{ timeSeconds: 0, timecode: '00:00', title: 'Cellular NAT Reality' }],
+        variants: [{ resolution: '1080p60', bitrate: '8 Mbps', framerate: '60fps', bandwidthBps: 8_000_000 }],
+      },
+      {
+        id: 'yt-video-3',
+        title: 'Double Ratchet E2EE Cryptography & Signal Protocol in Web & Mobile',
+        channelName: 'Alice Cryptography Lab',
+        channelHandle: 'alice_crypto',
+        channelAvatar: 'A',
+        channelAvatarBg: '#ec4899',
+        channelSubscribers: 215100,
+        channelSubscribersText: '215.1K subscribers',
+        isSubscribed: true,
+        views: 310890,
+        viewsText: '310K views',
+        likes: 24700,
+        dislikes: 15,
+        cid: 'bafybeidoubleratchetchacha20poly1305signalkdfkeys44',
+        duration: '22:10',
+        durationSeconds: 1330,
+        publishedAt: '3 days ago',
+        description: 'Complete breakdown of Signal-grade HKDF ratchet chains and Double Ratchet protocol.',
+        tags: ['#Cryptography', '#DoubleRatchet', '#Signal', '#E2EE', '#Privacy'],
+        ambientColor: 'rgba(236, 72, 153, 0.45)',
+        gradient: 'radial-gradient(circle at center, #831843 0%, #4a044e 100%)',
+        chapters: [{ timeSeconds: 0, timecode: '00:00', title: 'Cryptographic Forward Secrecy' }],
+        variants: [{ resolution: '1080p60', bitrate: '8 Mbps', framerate: '60fps', bandwidthBps: 8_000_000 }],
+      },
+      {
+        id: 'yt-video-4',
+        title: 'Dynamic 95/5 Creator Split & Off-Chain Hardware Vouchers: The Death of the 45% Middleman Tax',
+        channelName: 'Creator Economics Studio',
+        channelHandle: 'creator_studio',
+        channelAvatar: 'C',
+        channelAvatarBg: '#f59e0b',
+        channelSubscribers: 76500,
+        channelSubscribersText: '76.5K subscribers',
+        isSubscribed: false,
+        views: 145200,
+        viewsText: '145K views',
+        likes: 11240,
+        dislikes: 6,
+        cid: 'bafybeicreatoreconomics95splitvouchersoffchainmerkle12',
+        duration: '12:05',
+        durationSeconds: 725,
+        publishedAt: '5 days ago',
+        description: 'State channel micropayment vouchers with Ed25519 signatures delivering 95% straight to creator.',
+        tags: ['#CreatorEconomy', '#Monetization', '#MicroPayments', '#Decentralization'],
+        ambientColor: 'rgba(245, 158, 11, 0.45)',
+        gradient: 'radial-gradient(circle at center, #78350f 0%, #451a03 100%)',
+        chapters: [{ timeSeconds: 0, timecode: '00:00', title: 'Middleman Tax Analysis' }],
+        variants: [{ resolution: '1080p60', bitrate: '8 Mbps', framerate: '60fps', bandwidthBps: 8_000_000 }],
+      },
+    ];
+  }
 
   public getVideoComments(videoId: string): YoutubeCommentRecord[] {
     this.load();
@@ -3114,11 +4819,27 @@ export class SovraDatabaseEngine {
   // COLLECTION 9: REAL-TIME AUDIT LOGS
   // ==========================================
 
+  private sanitizeAuditDetails(details: string): string {
+    if (!details) return '';
+    return details
+      .replace(/stk_[a-zA-Z0-9_-]{16,}/gi, 'stk_[REDACTED_SESSION_TOKEN]')
+      .replace(/seed\s*phrase:[^;\n]+/gi, 'seed phrase: [REDACTED_SEED_PHRASE]')
+      .replace(/private\s*key:[^;\n]+/gi, 'private key: [REDACTED_PRIVATE_KEY]')
+      .replace(/password:[^;\n]+/gi, 'password: [REDACTED_PASSWORD]')
+      .replace(/[0-9a-fA-F]{64}/g, (match) => match.slice(0, 8) + '...[REDACTED_HASH_KEY]');
+  }
+
   public logActivity(
     type: AuditLogRecord['type'],
     actorDid: string,
     actorHandle: string,
     details: string,
+    targetDid?: string,
+    resourceType?: string,
+    resourceId?: string,
+    result?: string,
+    context?: { ip?: string; userAgent?: string },
+    action?: string,
   ): AuditLogRecord {
     this.load();
     if (!Array.isArray(this.db.audit_logs)) this.db.audit_logs = [];
@@ -3126,11 +4847,16 @@ export class SovraDatabaseEngine {
     const record: AuditLogRecord = {
       id: 'aud_' + Date.now() + '_' + crypto.randomBytes(6).toString('hex'),
       type,
-      action: type,
+      action: action || type,
       actorDid,
-      actorHandle: actorHandle.startsWith('@') ? actorHandle : '@' + actorHandle,
-      details,
+      actorHandle: actorHandle ? (actorHandle.startsWith('@') ? actorHandle : '@' + actorHandle) : '@peer',
+      targetDid,
+      resourceType,
+      resourceId,
+      result: result || 'SUCCESS',
+      details: this.sanitizeAuditDetails(details),
       timestamp: Date.now(),
+      context,
     };
 
     this.db.audit_logs.unshift(record);
@@ -3139,6 +4865,33 @@ export class SovraDatabaseEngine {
     }
     this.save();
     return record;
+  }
+
+  public logAudit(options: {
+    type: AuditLogRecord['type'];
+    action?: string;
+    actorDid: string;
+    actorHandle?: string;
+    targetDid?: string;
+    resourceType?: string;
+    resourceId?: string;
+    result?: string;
+    details: string;
+    context?: { ip?: string; userAgent?: string };
+  }): AuditLogRecord {
+    const handle = options.actorHandle || this.findUserByDid(options.actorDid)?.handle || '@peer';
+    return this.logActivity(
+      options.type,
+      options.actorDid,
+      handle,
+      options.details,
+      options.targetDid,
+      options.resourceType,
+      options.resourceId,
+      options.result,
+      options.context,
+      options.action
+    );
   }
 
   public getAuditLogs(limit = 100): AuditLogRecord[] {
@@ -3285,16 +5038,12 @@ export class SovraDatabaseEngine {
     for (const s of active) {
       const handleKey = (s.creatorHandle || '').toLowerCase().replace(/^@/, '').trim();
       if (!handleKey) continue;
-      // If handle or name starts with alice, consolidate under canonical 'alice_creator'
-      let canonicalKey = handleKey;
-      if (handleKey.startsWith('alice') || (s.creatorName && s.creatorName.toLowerCase().startsWith('alice'))) {
-        canonicalKey = 'alice_creator';
-      }
+      let canonicalKey = s.creatorDid || handleKey;
       if (!creatorMap.has(canonicalKey)) {
         creatorMap.set(canonicalKey, {
           ...s,
-          creatorHandle: canonicalKey,
-          creatorName: canonicalKey === 'alice_creator' ? 'Alice' : (s.creatorName || s.creatorHandle),
+          creatorHandle: s.creatorHandle || handleKey,
+          creatorName: s.creatorName || s.creatorHandle || handleKey,
           segments: Array.isArray(s.segments) ? [...s.segments] : [],
           seenByDids: Array.isArray(s.seenByDids) ? [...s.seenByDids] : [],
         });
@@ -3642,25 +5391,7 @@ export class SovraDatabaseEngine {
   }
 
   public logoutUser(token: string): boolean {
-    this.load();
-    if (!token) return false;
-    let modified = false;
-    const session = (this.db.user_sessions || []).find(s => s.token === token || s.sessionId === token);
-    if (session) {
-      session.isRevoked = true;
-      modified = true;
-    }
-    const user = this.db.users.find(u => u.sessionToken === token || (session && u.did === session.userDid));
-    if (user && user.sessionToken === token) {
-      user.sessionToken = undefined;
-      user.updatedAt = Date.now();
-      modified = true;
-    }
-    if (modified) {
-      this.save();
-      return true;
-    }
-    return false;
+    return this.revokeToken(token, 'User logout');
   }
 
   // ==========================================
@@ -3903,6 +5634,53 @@ export class SovraDatabaseEngine {
   // WEBRTC CALL SIGNALING ENGINE
   // ==========================================
 
+  public recordCallMetric(metric: Omit<CallMetricRecord, 'id' | 'timestamp'> & { timestamp?: number }): CallMetricRecord {
+    this.load();
+    if (!Array.isArray(this.db.call_metrics)) this.db.call_metrics = [];
+    const record: CallMetricRecord = {
+      id: 'cm_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex'),
+      callId: metric.callId,
+      eventType: metric.eventType,
+      callerDid: metric.callerDid,
+      recipientDid: metric.recipientDid,
+      timestamp: metric.timestamp || Date.now(),
+      reason: metric.reason,
+      candidateType: metric.candidateType,
+    };
+    this.db.call_metrics.push(record);
+    if (this.db.call_metrics.length > 1000) {
+      this.db.call_metrics = this.db.call_metrics.slice(-1000);
+    }
+    this.save();
+    return record;
+  }
+
+  public getCallMetrics(filter?: { callId?: string; userDid?: string; limit?: number }): CallMetricRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.call_metrics)) return [];
+    let list = this.db.call_metrics;
+    if (filter?.callId) {
+      list = list.filter(m => m.callId === filter.callId);
+    }
+    if (filter?.userDid) {
+      list = list.filter(m => m.callerDid === filter.userDid || m.recipientDid === filter.userDid);
+    }
+    const limit = filter?.limit || 100;
+    return list.slice(-limit);
+  }
+
+  public getActiveCallForUser(userDid: string): CallSessionRecord | undefined {
+    this.load();
+    if (!Array.isArray(this.db.call_sessions)) return undefined;
+    const now = Date.now();
+    return this.db.call_sessions.find(c => {
+      if (c.callerDid !== userDid && c.recipientDid !== userDid) return false;
+      if (c.status === 'ended' || c.status === 'rejected' || c.status === 'failed') return false;
+      if ((c.status === 'offering' || c.status === 'ringing') && (now - c.createdAt > 45000)) return false;
+      return true;
+    });
+  }
+
   public createCallOffer(
     paramsOrCallerDid: string | { callId?: string; callerDid: string; callerName?: string; callerAvatar?: string; recipientDid: string; sdpOffer: string; callType?: string },
     recipientDid?: string,
@@ -3914,23 +5692,67 @@ export class SovraDatabaseEngine {
     const params = typeof paramsOrCallerDid === 'string'
       ? { callerDid: paramsOrCallerDid, recipientDid: recipientDid || '', sdpOffer: sdpOffer || '', callType: _callType }
       : paramsOrCallerDid;
+
+    if (!params.callerDid || !params.recipientDid) {
+      throw new Error('Both callerDid and recipientDid are required for WebRTC call offer');
+    }
+    if (params.callerDid === params.recipientDid) {
+      throw new Error('Cannot initiate a call to yourself');
+    }
+
+    // Bidirectional block enforcement
+    if (this.isBlocked(params.callerDid, params.recipientDid) || this.isBlocked(params.recipientDid, params.callerDid)) {
+      throw new Error('Forbidden: Block relationship active');
+    }
+
+    // SDP validation
+    const rawOffer = String(params.sdpOffer || '');
+    if (!rawOffer || rawOffer.length > 65536) {
+      throw new Error('Invalid SDP offer: Payload exceeds allowable size limit (64KB) or is empty');
+    }
+    if (!rawOffer.startsWith('v=0') && !rawOffer.includes('m=')) {
+      throw new Error('Malformed SDP offer: Missing valid SDP structure');
+    }
+    const sdp = rawOffer.endsWith('\r\n') ? rawOffer : (rawOffer.endsWith('\n') ? rawOffer.slice(0, -1) + '\r\n' : rawOffer + '\r\n');
+
+    // Single active call per user check
+    const callerActive = this.getActiveCallForUser(params.callerDid);
+    if (callerActive && callerActive.callId !== params.callId) {
+      throw new Error('Caller is already engaged in an active call');
+    }
+    const calleeActive = this.getActiveCallForUser(params.recipientDid);
+    if (calleeActive && calleeActive.callId !== params.callId) {
+      const busyErr = new Error('User is currently busy on another call');
+      (busyErr as any).code = 'BUSY';
+      throw busyErr;
+    }
+
     const callId = params.callId || ('call-' + Date.now() + '-' + crypto.randomBytes(4).toString('hex'));
     const now = Date.now();
     const callerUser = this.findUserByDid(params.callerDid);
     const call: CallSessionRecord = {
       callId,
       callerDid: params.callerDid,
-      callerName: (params as any).callerName || callerUser?.displayName || 'Peer',
+      callerName: (params as any).callerName || callerUser?.displayName || callerUser?.name || 'Peer',
       callerAvatar: (params as any).callerAvatar || callerUser?.avatar || '📞',
       recipientDid: params.recipientDid,
       callType: (params.callType === 'video' ? 'video' : 'audio'),
-      sdpOffer: params.sdpOffer,
+      sdpOffer: sdp,
       iceCandidates: [],
       status: 'offering',
       createdAt: now,
       updatedAt: now,
     };
     this.db.call_sessions.unshift(call);
+
+    // Record observability metric
+    this.recordCallMetric({
+      callId,
+      eventType: 'call_started',
+      callerDid: params.callerDid,
+      recipientDid: params.recipientDid,
+    });
+
     this.save();
     return call;
   }
@@ -3944,14 +5766,45 @@ export class SovraDatabaseEngine {
     if (!Array.isArray(this.db.call_sessions)) return null;
     const cid = typeof callIdOrParams === 'string' ? callIdOrParams : callIdOrParams.callId;
     const rdid = typeof callIdOrParams === 'string' ? recipientDid : callIdOrParams.recipientDid;
-    const sdp = typeof callIdOrParams === 'string' ? sdpAnswer : callIdOrParams.sdpAnswer;
+    const sdpRaw = typeof callIdOrParams === 'string' ? sdpAnswer : callIdOrParams.sdpAnswer;
 
     const call = this.db.call_sessions.find(c => c.callId === cid);
     if (!call) return null;
-    if (rdid && call.recipientDid !== rdid && call.callerDid !== rdid) return null;
+
+    // Strict recipient authorization
+    if (rdid && call.recipientDid !== rdid) {
+      throw new Error('Forbidden: Only the designated recipient can answer this call');
+    }
+
+    if (call.status === 'ended' || call.status === 'rejected') {
+      throw new Error('Call has already been terminated');
+    }
+    if (call.status === 'answered' || call.status === 'connected') {
+      throw new Error('Call has already been answered');
+    }
+
+    // SDP Answer validation
+    const rawAnswer = String(sdpRaw || '');
+    if (!rawAnswer || rawAnswer.length > 65536) {
+      throw new Error('Invalid SDP answer: Payload exceeds allowable size limit (64KB) or is empty');
+    }
+    if (!rawAnswer.startsWith('v=0') && !rawAnswer.includes('m=')) {
+      throw new Error('Malformed SDP answer: Missing valid SDP structure');
+    }
+    const sdp = rawAnswer.endsWith('\r\n') ? rawAnswer : (rawAnswer.endsWith('\n') ? rawAnswer.slice(0, -1) + '\r\n' : rawAnswer + '\r\n');
+
     call.sdpAnswer = sdp;
     call.status = 'answered';
     call.updatedAt = Date.now();
+
+    // Record observability metric
+    this.recordCallMetric({
+      callId: call.callId,
+      eventType: 'call_accepted',
+      callerDid: call.callerDid,
+      recipientDid: call.recipientDid,
+    });
+
     this.save();
     return call;
   }
@@ -3961,11 +5814,50 @@ export class SovraDatabaseEngine {
     if (!Array.isArray(this.db.call_sessions)) return null;
     const call = this.db.call_sessions.find(c => c.callId === callId);
     if (!call) return null;
-    if (call.callerDid !== senderDid && call.recipientDid !== senderDid) return null;
+
+    // Caller/recipient leg authorization
+    if (call.callerDid !== senderDid && call.recipientDid !== senderDid) {
+      throw new Error('Forbidden: Unauthorized ICE candidate submission');
+    }
+
+    // Drop late candidates after call termination
+    if (call.status === 'ended' || call.status === 'rejected' || call.status === 'failed') {
+      return null;
+    }
+
     if (!Array.isArray(call.iceCandidates)) call.iceCandidates = [];
-    call.iceCandidates.push({ candidate: typeof candidate === 'string' ? candidate : JSON.stringify(candidate), senderDid });
-    call.updatedAt = Date.now();
-    this.save();
+
+    const candStr = typeof candidate === 'string' ? candidate : JSON.stringify(candidate);
+    if (candStr.length > 4096) {
+      throw new Error('Invalid ICE candidate: Payload exceeds 4KB limit');
+    }
+
+    // Candidate count limit: max 100 candidates per peer
+    const peerCandidateCount = call.iceCandidates.filter(c => c.senderDid === senderDid).length;
+    if (peerCandidateCount >= 100) {
+      return call; // Gracefully cap without corrupting session
+    }
+
+    // Deduplication check
+    const isDuplicate = call.iceCandidates.some(c => c.senderDid === senderDid && c.candidate === candStr);
+    if (!isDuplicate) {
+      call.iceCandidates.push({ candidate: candStr, senderDid });
+      call.updatedAt = Date.now();
+
+      // Track TURN usage if candidate is relay type
+      if (candStr.includes('typ relay') || (typeof candidate === 'object' && candidate?.type === 'relay')) {
+        this.recordCallMetric({
+          callId: call.callId,
+          eventType: 'turn_used',
+          callerDid: call.callerDid,
+          recipientDid: call.recipientDid,
+          candidateType: 'relay',
+        });
+      }
+
+      this.save();
+    }
+
     return call;
   }
 
@@ -3974,12 +5866,30 @@ export class SovraDatabaseEngine {
     if (!Array.isArray(this.db.call_sessions)) return null;
     const call = this.db.call_sessions.find(c => c.callId === callId);
     if (!call) return null;
-    if (call.callerDid !== requesterDid && call.recipientDid !== requesterDid) return null;
-    call.status = 'ended';
+
+    if (requesterDid && call.callerDid !== requesterDid && call.recipientDid !== requesterDid) {
+      throw new Error('Forbidden: Unauthorized call termination');
+    }
+
+    if (call.status === 'ended' || call.status === 'rejected') {
+      return call; // Idempotent
+    }
+
+    const isDeclined = reason === 'declined' || reason === 'rejected';
+    call.status = isDeclined ? 'rejected' : 'ended';
     call.reason = reason || 'user_hung_up';
     const durationSec = Math.max(0, Math.floor((Date.now() - (call.updatedAt || call.createdAt)) / 1000));
     call.durationSec = durationSec;
     call.updatedAt = Date.now();
+
+    // Record observability metric
+    this.recordCallMetric({
+      callId: call.callId,
+      eventType: isDeclined ? 'call_rejected' : 'call_ended',
+      callerDid: call.callerDid,
+      recipientDid: call.recipientDid,
+      reason: call.reason,
+    });
 
     // Log call event to direct messages thread
     if (!Array.isArray(this.db.chatMessages)) this.db.chatMessages = [];
@@ -4019,7 +5929,1123 @@ export class SovraDatabaseEngine {
       ((c.recipientDid === callIdOrUserDid || c.callerDid === callIdOrUserDid) && (c.status === 'offering' || c.status === 'answered'))
     );
   }
+
+  // ==========================================
+  // PHASE 5 SEED METHODS (PLAYLISTS & LIVE SESSIONS)
+  // ==========================================
+
+  private getSeedPlaylists(): PlaylistRecord[] {
+    return [
+      {
+        id: 'pl-mesh-core',
+        channelId: 'ch-alpha',
+        creatorDid: 'did:sovra:system',
+        creatorHandle: 'sovra_alpha',
+        creatorName: 'Sovra Alpha Radar',
+        title: 'Decentralized Protocol Fundamentals',
+        description: 'Curated master series on RFC 8216 HLS, GossipSub P2P routing, and BitSwap swarm streaming.',
+        thumbnailUrl: '/assets/icon.svg',
+        videoIds: ['yt-video-1', 'yt-video-2'],
+        privacy: 'public',
+        createdAt: Date.now() - 86400000,
+        updatedAt: Date.now() - 43200000,
+      },
+      {
+        id: 'pl-creator-econ',
+        channelId: 'ch-alpha',
+        creatorDid: 'did:sovra:system',
+        creatorHandle: 'sovra_alpha',
+        creatorName: 'Sovra Alpha Radar',
+        title: 'Sovereign Creator Monetization',
+        description: 'Zero-middleman economics, 95/5 hardware vouchers, and micro-settlement deep dives.',
+        thumbnailUrl: '/assets/icon.svg',
+        videoIds: ['yt-video-4', 'yt-video-3'],
+        privacy: 'public',
+        createdAt: Date.now() - 172800000,
+        updatedAt: Date.now() - 86400000,
+      },
+    ];
+  }
+
+  private getSeedLiveSessions(): LiveSessionRecord[] {
+    return [
+      {
+        id: 'live-sovra-keynote',
+        channelId: 'ch-alpha',
+        creatorDid: 'did:sovra:system',
+        creatorHandle: 'sovra_alpha',
+        creatorName: 'Sovra Alpha Radar',
+        creatorAvatar: '📢',
+        title: 'Live P2P Mesh Swarm & Decentralized Media Showcase',
+        description: 'Live interactive stream broadcasting global network telemetry and real-time BitSwap chunk transfers across 120 sovereign validator nodes.',
+        streamUrl: '/api/feed/video/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+        playbackUrl: '/api/feed/video/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+        status: 'LIVE',
+        scheduledStartTime: Date.now() - 3600000,
+        actualStartTime: Date.now() - 3500000,
+        viewerCount: 842,
+        likesCount: 429,
+        category: 'tech',
+        createdAt: Date.now() - 3600000,
+        updatedAt: Date.now(),
+      },
+      {
+        id: 'live-web3-arcade',
+        channelId: 'ch-gaming',
+        creatorDid: 'did:sovra:system',
+        creatorHandle: 'web3_gaming',
+        creatorName: 'Web3 Arcade Live',
+        creatorAvatar: '🎮',
+        title: 'Sovereign Esports Cup: Quarter Finals Tournament',
+        description: 'Quarter finals match live with low-latency WebRTC broadcast and decentralized live chat.',
+        streamUrl: '/api/reels/video/bafybeihkoviema7g3gxyt6la7vd5ho32wuq5z2m4r6z5g3k7r4o6z5m4r6',
+        playbackUrl: '/api/reels/video/bafybeihkoviema7g3gxyt6la7vd5ho32wuq5z2m4r6z5g3k7r4o6z5m4r6',
+        status: 'SCHEDULED',
+        scheduledStartTime: Date.now() + 7200000,
+        viewerCount: 0,
+        likesCount: 156,
+        category: 'gaming',
+        createdAt: Date.now() - 7200000,
+        updatedAt: Date.now() - 7200000,
+      },
+    ];
+  }
+
+  private getSeedLiveChatMessages(): LiveChatMessageRecord[] {
+    return [
+      {
+        id: 'lmsg-1',
+        sessionId: 'live-sovra-keynote',
+        senderDid: 'did:sovra:alice_ble',
+        senderHandle: 'alice_ble',
+        senderName: 'Alice Sovereign',
+        senderAvatar: 'A',
+        text: 'Sub-200ms latency verified across North America nodes! 🚀',
+        timestamp: Date.now() - 120000,
+        isModerator: true,
+      },
+      {
+        id: 'lmsg-2',
+        sessionId: 'live-sovra-keynote',
+        senderDid: 'did:sovra:bob_ble',
+        senderHandle: 'bob_ble',
+        senderName: 'Bob Mesh Node',
+        senderAvatar: 'B',
+        text: 'Bandwidth seeders earning SOV vouchers in real time. Amazing architecture! ⚡',
+        timestamp: Date.now() - 60000,
+        isModerator: false,
+      },
+    ];
+  }
+
+  // ==========================================
+  // COLLECTION: PLAYLISTS
+  // ==========================================
+
+  public getAllPlaylists(channelId?: string, userDid?: string): PlaylistRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.playlists)) {
+      this.db.playlists = this.getSeedPlaylists();
+      this.save();
+    }
+    let list = this.db.playlists;
+    if (channelId) {
+      list = list.filter(p => p.channelId === channelId);
+    }
+    if (userDid) {
+      list = list.filter(p => p.creatorDid === userDid || p.privacy === 'public');
+    }
+    return [...list];
+  }
+
+  public getPlaylistById(id: string): PlaylistRecord | undefined {
+    this.load();
+    if (!Array.isArray(this.db.playlists)) return undefined;
+    return this.db.playlists.find(p => p.id === id);
+  }
+
+  public createPlaylist(params: {
+    channelId?: string;
+    creatorDid: string;
+    creatorHandle?: string;
+    creatorName?: string;
+    title: string;
+    description?: string;
+    thumbnailUrl?: string;
+    videoIds?: string[];
+    privacy?: 'public' | 'unlisted' | 'private';
+  }): PlaylistRecord {
+    this.load();
+    if (!Array.isArray(this.db.playlists)) this.db.playlists = [];
+    const id = 'pl-' + Date.now() + '-' + crypto.randomBytes(4).toString('hex');
+    const now = Date.now();
+    const newPlaylist: PlaylistRecord = {
+      id,
+      channelId: params.channelId,
+      creatorDid: params.creatorDid,
+      creatorHandle: params.creatorHandle || 'creator',
+      creatorName: params.creatorName || 'Creator',
+      title: params.title.trim(),
+      description: (params.description || '').trim(),
+      thumbnailUrl: params.thumbnailUrl || '/assets/icon.svg',
+      videoIds: Array.isArray(params.videoIds) ? params.videoIds : [],
+      privacy: params.privacy || 'public',
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.db.playlists.unshift(newPlaylist);
+    this.logActivity('PROFILE_UPDATED', params.creatorDid, params.creatorHandle || 'creator', `Created playlist "${newPlaylist.title}"`);
+    this.save();
+    return newPlaylist;
+  }
+
+  public updatePlaylist(
+    id: string,
+    requesterDid: string,
+    updates: Partial<Pick<PlaylistRecord, 'title' | 'description' | 'thumbnailUrl' | 'privacy' | 'videoIds'>>
+  ): { ok: boolean; playlist?: PlaylistRecord; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.playlists)) return { ok: false, error: 'Playlists not initialized' };
+    const playlist = this.db.playlists.find(p => p.id === id);
+    if (!playlist) return { ok: false, error: 'Playlist not found' };
+
+    // RBAC: Check ownership or channel role
+    const isOwner = playlist.creatorDid === requesterDid || playlist.creatorDid === 'did:sovra:system';
+    let isChannelAdmin = false;
+    if (playlist.channelId) {
+      const channel = this.getChannelById(playlist.channelId);
+      if (channel && channel.ownerDid === requesterDid) isChannelAdmin = true;
+      const mem = this.getSpaceMember(playlist.channelId, requesterDid);
+      if (mem && (mem.role === 'OWNER' || mem.role === 'ADMIN' || mem.role === 'EDITOR')) isChannelAdmin = true;
+    }
+
+    if (!isOwner && !isChannelAdmin) {
+      return { ok: false, error: 'Unauthorized: Only playlist creator or channel administrator can modify playlist' };
+    }
+
+    if (updates.title !== undefined) playlist.title = updates.title.trim();
+    if (updates.description !== undefined) playlist.description = updates.description.trim();
+    if (updates.thumbnailUrl !== undefined) playlist.thumbnailUrl = updates.thumbnailUrl;
+    if (updates.privacy !== undefined) playlist.privacy = updates.privacy;
+    if (Array.isArray(updates.videoIds)) playlist.videoIds = updates.videoIds;
+    playlist.updatedAt = Date.now();
+    this.save();
+    return { ok: true, playlist };
+  }
+
+  public deletePlaylist(id: string, requesterDid: string): { ok: boolean; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.playlists)) return { ok: false, error: 'Playlists not initialized' };
+    const idx = this.db.playlists.findIndex(p => p.id === id);
+    if (idx === -1) return { ok: false, error: 'Playlist not found' };
+
+    const playlist = this.db.playlists[idx]!;
+    const isOwner = playlist.creatorDid === requesterDid || playlist.creatorDid === 'did:sovra:system';
+    let isChannelAdmin = false;
+    if (playlist.channelId) {
+      const channel = this.getChannelById(playlist.channelId);
+      if (channel && channel.ownerDid === requesterDid) isChannelAdmin = true;
+      const mem = this.getSpaceMember(playlist.channelId, requesterDid);
+      if (mem && (mem.role === 'OWNER' || mem.role === 'ADMIN')) isChannelAdmin = true;
+    }
+
+    if (!isOwner && !isChannelAdmin) {
+      return { ok: false, error: 'Unauthorized: Only playlist creator or channel administrator can delete playlist' };
+    }
+
+    this.db.playlists.splice(idx, 1);
+    this.save();
+    return { ok: true };
+  }
+
+  public reorderPlaylist(id: string, requesterDid: string, videoIds: string[]): { ok: boolean; playlist?: PlaylistRecord; error?: string } {
+    return this.updatePlaylist(id, requesterDid, { videoIds });
+  }
+
+  public addVideoToPlaylist(id: string, videoId: string, requesterDid: string): { ok: boolean; playlist?: PlaylistRecord; error?: string } {
+    this.load();
+    const playlist = this.getPlaylistById(id);
+    if (!playlist) return { ok: false, error: 'Playlist not found' };
+    if (!Array.isArray(playlist.videoIds)) playlist.videoIds = [];
+    if (!playlist.videoIds.includes(videoId)) {
+      playlist.videoIds.push(videoId);
+    }
+    return this.updatePlaylist(id, requesterDid, { videoIds: playlist.videoIds });
+  }
+
+  public removeVideoFromPlaylist(id: string, videoId: string, requesterDid: string): { ok: boolean; playlist?: PlaylistRecord; error?: string } {
+    this.load();
+    const playlist = this.getPlaylistById(id);
+    if (!playlist) return { ok: false, error: 'Playlist not found' };
+    if (!Array.isArray(playlist.videoIds)) playlist.videoIds = [];
+    const newIds = playlist.videoIds.filter(v => v !== videoId);
+    return this.updatePlaylist(id, requesterDid, { videoIds: newIds });
+  }
+
+  // ==========================================
+  // COLLECTION: LIVE SESSIONS & REALTIME LIVE CHAT
+  // ==========================================
+
+  public getAllLiveSessions(status?: LiveSessionStatus): LiveSessionRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) {
+      this.db.live_sessions = this.getSeedLiveSessions();
+      this.save();
+    }
+    if (status) {
+      return this.db.live_sessions.filter(s => s.status === status);
+    }
+    return [...this.db.live_sessions];
+  }
+
+  public getLiveSessionById(id: string): LiveSessionRecord | undefined {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) return undefined;
+    return this.db.live_sessions.find(s => s.id === id);
+  }
+
+  public createLiveSession(params: {
+    channelId?: string;
+    creatorDid: string;
+    creatorHandle: string;
+    creatorName: string;
+    creatorAvatar?: string;
+    title: string;
+    description?: string;
+    streamUrl?: string;
+    playbackUrl?: string;
+    scheduledStartTime?: number;
+    category?: string;
+  }): LiveSessionRecord {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) this.db.live_sessions = [];
+    const id = 'live-' + Date.now() + '-' + crypto.randomBytes(4).toString('hex');
+    const now = Date.now();
+    const session: LiveSessionRecord = {
+      id,
+      channelId: params.channelId,
+      creatorDid: params.creatorDid,
+      creatorHandle: params.creatorHandle.replace('@', ''),
+      creatorName: params.creatorName,
+      creatorAvatar: params.creatorAvatar || '🔴',
+      title: params.title.trim(),
+      description: (params.description || '').trim(),
+      streamUrl: params.streamUrl || `/api/live/stream/${id}`,
+      playbackUrl: params.playbackUrl,
+      thumbnailUrl: '/assets/icon.svg',
+      status: 'SCHEDULED',
+      scheduledStartTime: params.scheduledStartTime || now,
+      viewerCount: 0,
+      likesCount: 0,
+      category: params.category || 'tech',
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.db.live_sessions.unshift(session);
+    this.logActivity('POST_CREATED', params.creatorDid, params.creatorHandle, `Scheduled live broadcast: "${session.title}"`);
+    this.save();
+    return session;
+  }
+
+  public updateLiveSessionStatus(
+    id: string,
+    newStatus: LiveSessionStatus,
+    requesterDid: string
+  ): { ok: boolean; session?: LiveSessionRecord; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) return { ok: false, error: 'Live sessions not initialized' };
+    const session = this.db.live_sessions.find(s => s.id === id);
+    if (!session) return { ok: false, error: 'Live session not found' };
+
+    // RBAC: Verify creator or channel admin
+    const isOwner = session.creatorDid === requesterDid || session.creatorDid === 'did:sovra:system';
+    let isChannelAdmin = false;
+    if (session.channelId) {
+      const channel = this.getChannelById(session.channelId);
+      if (channel && channel.ownerDid === requesterDid) isChannelAdmin = true;
+      const mem = this.getSpaceMember(session.channelId, requesterDid);
+      if (mem && (mem.role === 'OWNER' || mem.role === 'ADMIN' || mem.role === 'MODERATOR')) isChannelAdmin = true;
+    }
+
+    if (!isOwner && !isChannelAdmin) {
+      return { ok: false, error: 'Unauthorized: Only stream host or channel moderator can change live stream status' };
+    }
+
+    // State machine transitions:
+    // SCHEDULED -> STARTING -> LIVE -> ENDING -> ENDED -> REPLAY
+    const validTransitions: Record<LiveSessionStatus, LiveSessionStatus[]> = {
+      SCHEDULED: ['STARTING', 'LIVE', 'ENDED'],
+      STARTING: ['LIVE', 'ENDED'],
+      LIVE: ['ENDING', 'ENDED'],
+      ENDING: ['ENDED', 'REPLAY'],
+      ENDED: ['REPLAY', 'SCHEDULED'],
+      REPLAY: ['ENDED'],
+    };
+
+    if (session.status !== newStatus && !validTransitions[session.status]?.includes(newStatus)) {
+      return { ok: false, error: `Invalid state transition: Cannot transition from ${session.status} to ${newStatus}` };
+    }
+
+    session.status = newStatus;
+    const now = Date.now();
+    if (newStatus === 'LIVE' && !session.actualStartTime) {
+      session.actualStartTime = now;
+      session.viewerCount = Math.max(session.viewerCount, 1);
+    }
+    if (newStatus === 'ENDED') {
+      session.endedAt = now;
+      if (!session.playbackUrl) {
+        session.playbackUrl = session.streamUrl;
+      }
+    }
+    session.updatedAt = now;
+    this.save();
+    return { ok: true, session };
+  }
+
+  public likeLiveSession(id: string): { ok: boolean; likesCount: number; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) return { ok: false, likesCount: 0, error: 'Live sessions not initialized' };
+    const session = this.db.live_sessions.find(s => s.id === id);
+    if (!session) return { ok: false, likesCount: 0, error: 'Live session not found' };
+    session.likesCount = (session.likesCount || 0) + 1;
+    this.save();
+    return { ok: true, likesCount: session.likesCount };
+  }
+
+  public getLiveChatMessages(sessionId: string): LiveChatMessageRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.live_chat_messages)) {
+      this.db.live_chat_messages = this.getSeedLiveChatMessages();
+      this.save();
+    }
+    return this.db.live_chat_messages.filter(m => m.sessionId === sessionId);
+  }
+
+  public addLiveChatMessage(
+    sessionId: string,
+    message: {
+      senderDid: string;
+      senderHandle: string;
+      senderName: string;
+      senderAvatar?: string;
+      text: string;
+      isModerator?: boolean;
+    }
+  ): LiveChatMessageRecord | null {
+    this.load();
+    if (!Array.isArray(this.db.live_chat_messages)) this.db.live_chat_messages = [];
+    const text = (message.text || '').trim();
+    if (!text) return null;
+
+    const id = 'lmsg-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex');
+    const record: LiveChatMessageRecord = {
+      id,
+      sessionId,
+      senderDid: message.senderDid,
+      senderHandle: message.senderHandle.replace('@', ''),
+      senderName: message.senderName,
+      senderAvatar: message.senderAvatar,
+      text,
+      timestamp: Date.now(),
+      isModerator: Boolean(message.isModerator),
+    };
+    this.db.live_chat_messages.push(record);
+    this.save();
+    return record;
+  }
+
+  public deleteLiveChatMessage(messageId: string, requesterDid: string, isModerator?: boolean): boolean {
+    this.load();
+    if (!Array.isArray(this.db.live_chat_messages)) return false;
+    const idx = this.db.live_chat_messages.findIndex(m => m.id === messageId);
+    if (idx === -1) return false;
+    const msg = this.db.live_chat_messages[idx]!;
+    if (msg.senderDid !== requesterDid && !isModerator) return false;
+    this.db.live_chat_messages.splice(idx, 1);
+    this.save();
+    return true;
+  }
+
+  // ==========================================
+  // COLLECTION: WATCH HISTORY & SAVED COLLECTIONS
+  // ==========================================
+
+  public recordWatchHistory(
+    userDid: string,
+    videoId: string,
+    durationWatchedSec: number,
+    completed: boolean = false
+  ): WatchHistoryRecord {
+    this.load();
+    if (!Array.isArray(this.db.watch_history)) this.db.watch_history = [];
+    const now = Date.now();
+    const existing = this.db.watch_history.find(h => h.userDid === userDid && h.videoId === videoId);
+    if (existing) {
+      existing.durationWatchedSec = Math.max(existing.durationWatchedSec, durationWatchedSec);
+      existing.completed = existing.completed || completed;
+      existing.lastWatchedAt = now;
+      this.save();
+      return existing;
+    }
+    const record: WatchHistoryRecord = {
+      id: 'wh-' + now + '-' + crypto.randomBytes(3).toString('hex'),
+      userDid,
+      videoId,
+      durationWatchedSec,
+      completed,
+      lastWatchedAt: now,
+    };
+    this.db.watch_history.unshift(record);
+    this.save();
+    return record;
+  }
+
+  public getWatchHistory(userDid: string): WatchHistoryRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.watch_history)) return [];
+    return this.db.watch_history
+      .filter(h => h.userDid === userDid)
+      .sort((a, b) => b.lastWatchedAt - a.lastWatchedAt);
+  }
+
+  public clearWatchHistory(userDid: string): boolean {
+    this.load();
+    if (!Array.isArray(this.db.watch_history)) return false;
+    this.db.watch_history = this.db.watch_history.filter(h => h.userDid !== userDid);
+    this.save();
+    return true;
+  }
+
+  public saveMedia(
+    userDid: string,
+    mediaId: string,
+    mediaType: 'video' | 'reel' | 'post' | 'image',
+    title?: string,
+    thumbnailUrl?: string
+  ): { ok: boolean; record: SavedMediaRecord; alreadySaved: boolean } {
+    this.load();
+    if (!Array.isArray(this.db.saved_media)) this.db.saved_media = [];
+    const existing = this.db.saved_media.find(s => s.userDid === userDid && s.mediaId === mediaId);
+    if (existing) {
+      return { ok: true, record: existing, alreadySaved: true };
+    }
+    const record: SavedMediaRecord = {
+      id: 'sm-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
+      userDid,
+      mediaId,
+      mediaType,
+      title: title || 'Saved Media',
+      thumbnailUrl: thumbnailUrl || '/assets/icon.svg',
+      savedAt: Date.now(),
+    };
+    this.db.saved_media.unshift(record);
+    this.save();
+    return { ok: true, record, alreadySaved: false };
+  }
+
+  public unsaveMedia(userDid: string, mediaId: string): boolean {
+    this.load();
+    if (!Array.isArray(this.db.saved_media)) return false;
+    const idx = this.db.saved_media.findIndex(s => s.userDid === userDid && s.mediaId === mediaId);
+    if (idx === -1) return false;
+    this.db.saved_media.splice(idx, 1);
+    this.save();
+    return true;
+  }
+
+  public getSavedMedia(userDid: string): SavedMediaRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.saved_media)) return [];
+    return this.db.saved_media
+      .filter(s => s.userDid === userDid)
+      .sort((a, b) => b.savedAt - a.savedAt);
+  }
+
+  public isMediaSaved(userDid: string, mediaId: string): boolean {
+    this.load();
+    if (!Array.isArray(this.db.saved_media)) return false;
+    return this.db.saved_media.some(s => s.userDid === userDid && s.mediaId === mediaId);
+  }
+
+  // ==========================================
+  // PHASE 7: TRUST + SAFETY + MODERATION + PRIVACY
+  // ==========================================
+
+  public canUserModerate(
+    actorDid: string,
+    resource: {
+      targetType: ReportTargetType;
+      targetId: string;
+      spaceId?: string;
+      spaceType?: 'channel' | 'page' | 'group';
+    },
+    explicitRole?: string
+  ): { allowed: boolean; role?: string; reason?: string } {
+    if (!actorDid) return { allowed: false, reason: 'Authentication required' };
+
+    // System and Admin DIDs have super-user privileges
+    if (actorDid === 'did:sovra:system' || actorDid === 'did:sovra:admin' || actorDid.startsWith('did:sovra:admin')) {
+      return { allowed: true, role: 'SUPER_ADMIN' };
+    }
+
+    const actor = this.findUserByDid(actorDid);
+    const platformRole = explicitRole || (actor as any)?.role || (actor as any)?.platformRole || 'USER';
+
+    // Global platform roles have platform-wide moderation authority
+    if (['SUPER_ADMIN', 'SECURITY_ADMIN', 'MODERATOR'].includes(platformRole)) {
+      return { allowed: true, role: platformRole };
+    }
+
+    // Space-scoped moderation authority
+    if (resource.spaceId) {
+      const spaceType = resource.spaceType || 'channel';
+      const spaceRole = this.getSpaceMemberRole(resource.spaceId, actorDid);
+
+      // Check if user is space owner directly
+      let isOwner = false;
+      if (spaceType === 'channel') {
+        const ch = (this.db.channels || []).find(c => c.id === resource.spaceId);
+        if (ch && ch.ownerDid === actorDid) isOwner = true;
+      } else if (spaceType === 'page') {
+        const pg = (this.db.pages || []).find(p => p.id === resource.spaceId);
+        if (pg && pg.ownerDid === actorDid) isOwner = true;
+      } else if (spaceType === 'group') {
+        const grp = (this.db.groups || []).find(g => g.id === resource.spaceId);
+        if (grp && grp.ownerDid === actorDid) isOwner = true;
+      }
+
+      if (isOwner) {
+        return { allowed: true, role: 'OWNER' };
+      }
+
+      if (spaceRole === 'OWNER' || spaceRole === 'ADMIN' || spaceRole === 'MODERATOR') {
+        return { allowed: true, role: spaceRole };
+      }
+
+      if (spaceRole === 'EDITOR') {
+        return { allowed: false, role: 'EDITOR', reason: 'Forbidden: Editors do not possess moderation privileges' };
+      }
+
+      if (spaceRole === 'MEMBER') {
+        return { allowed: false, role: 'MEMBER', reason: 'Forbidden: Regular members do not possess moderation privileges' };
+      }
+
+      return { allowed: false, reason: 'Forbidden: You are not authorized to moderate this space' };
+    }
+
+    // If resource is global (no spaceId) and actor is not a platform moderator:
+    return { allowed: false, reason: 'Forbidden: Platform moderator role required for global resources' };
+  }
+
+  public createReport(data: {
+    targetType: ReportTargetType;
+    targetId: string;
+    targetTitle?: string;
+    reporterDid: string;
+    reason: ReportReason;
+    details?: string;
+    spaceId?: string;
+    spaceType?: 'channel' | 'page' | 'group';
+  }): ReportRecord {
+    this.load();
+    if (!Array.isArray(this.db.reports)) this.db.reports = [];
+
+    const id = 'rep_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const record: ReportRecord = {
+      id,
+      targetType: data.targetType,
+      targetId: data.targetId,
+      targetTitle: data.targetTitle || `${data.targetType}:${data.targetId}`,
+      reporterDid: data.reporterDid,
+      reason: data.reason,
+      details: data.details || '',
+      spaceId: data.spaceId,
+      spaceType: data.spaceType,
+      status: 'SUBMITTED',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    this.db.reports.unshift(record);
+
+    // Update target's content moderation state to REPORTED if currently VISIBLE
+    const currentState = this.getContentModerationState(data.targetType, data.targetId);
+    if (!currentState || currentState === 'VISIBLE') {
+      this.setContentModerationState(data.targetType, data.targetId, 'REPORTED', data.reporterDid, `Reported for ${data.reason}`);
+    }
+
+    // Audit the submission
+    this.logAudit({
+      type: 'REPORT_SUBMITTED',
+      action: 'SUBMIT_REPORT',
+      actorDid: data.reporterDid,
+      resourceType: data.targetType,
+      resourceId: data.targetId,
+      details: `Reported ${data.targetType} "${data.targetId}" for "${data.reason}"`,
+    });
+
+    this.save();
+    return record;
+  }
+
+  public getReports(filter?: {
+    status?: ReportStatus;
+    spaceId?: string;
+    targetType?: ReportTargetType;
+    viewerDid?: string;
+  }): ReportRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.reports)) return [];
+
+    let list = [...this.db.reports];
+    if (filter?.status) {
+      list = list.filter(r => r.status === filter.status);
+    }
+    if (filter?.spaceId) {
+      list = list.filter(r => r.spaceId === filter.spaceId);
+    }
+    if (filter?.targetType) {
+      list = list.filter(r => r.targetType === filter.targetType);
+    }
+    return list;
+  }
+
+  public updateReportStatus(
+    reportId: string,
+    status: ReportStatus,
+    moderatorDid: string,
+    notes?: string
+  ): { ok: boolean; report?: ReportRecord; error?: string } {
+    this.load();
+    const report = (this.db.reports || []).find(r => r.id === reportId);
+    if (!report) return { ok: false, error: 'Report not found' };
+
+    report.status = status;
+    report.updatedAt = Date.now();
+    if (notes) report.moderationNotes = notes;
+    if (status === 'RESOLVED' || status === 'REJECTED') {
+      report.resolvedByDid = moderatorDid;
+    }
+
+    this.logAudit({
+      type: 'REPORT_STATUS_CHANGED',
+      action: 'UPDATE_REPORT_STATUS',
+      actorDid: moderatorDid,
+      resourceType: report.targetType,
+      resourceId: report.targetId,
+      details: `Transitioned report ${reportId} to status ${status}`,
+    });
+
+    this.save();
+    return { ok: true, report };
+  }
+
+  public setContentModerationState(
+    targetType: ReportTargetType,
+    targetId: string,
+    state: ModerationState,
+    moderatorDid: string,
+    reason?: string
+  ): boolean {
+    this.load();
+    let updated = false;
+
+    if (targetType === 'post') {
+      const p = (this.db.posts || []).find(post => post.id === targetId);
+      if (p) {
+        p.moderationState = state;
+        p.moderationReason = reason;
+        p.moderationUpdatedAt = Date.now();
+        updated = true;
+      }
+    } else if (targetType === 'comment') {
+      for (const p of this.db.posts || []) {
+        const c = (p.comments || []).find(cm => cm.id === targetId);
+        if (c) {
+          c.moderationState = state;
+          c.moderationReason = reason;
+          updated = true;
+          break;
+        }
+      }
+      if (!updated && this.db.video_comments) {
+        for (const vid of Object.keys(this.db.video_comments)) {
+          const c = (this.db.video_comments[vid] || []).find(cm => cm.id === targetId);
+          if (c) {
+            c.moderationState = state;
+            c.moderationReason = reason;
+            updated = true;
+            break;
+          }
+        }
+      }
+    } else if (targetType === 'message') {
+      const msg = (this.db.chatMessages || []).find(m => m.id === targetId);
+      if (msg) {
+        msg.moderationState = state;
+        msg.moderationReason = reason;
+        updated = true;
+      }
+    } else if (targetType === 'channel') {
+      const ch = (this.db.channels || []).find(c => c.id === targetId);
+      if (ch) {
+        ch.moderationState = state;
+        ch.moderationReason = reason;
+        updated = true;
+      }
+    } else if (targetType === 'page') {
+      const pg = (this.db.pages || []).find(p => p.id === targetId);
+      if (pg) {
+        pg.moderationState = state;
+        pg.moderationReason = reason;
+        updated = true;
+      }
+    } else if (targetType === 'group') {
+      const grp = (this.db.groups || []).find(g => g.id === targetId);
+      if (grp) {
+        grp.moderationState = state;
+        grp.moderationReason = reason;
+        updated = true;
+      }
+    } else if (targetType === 'reel') {
+      const r = (this.db.reels || []).find(rl => rl.id === targetId);
+      if (r) {
+        r.moderationState = state;
+        r.moderationReason = reason;
+        updated = true;
+      }
+    } else if (targetType === 'user') {
+      const u = (this.db.users || []).find(usr => usr.did === targetId);
+      if (u) {
+        (u as any).moderationState = state;
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      this.save();
+    }
+    return updated;
+  }
+
+  public getContentModerationState(targetType: ReportTargetType, targetId: string): ModerationState {
+    this.load();
+    if (targetType === 'post') {
+      const p = (this.db.posts || []).find(post => post.id === targetId);
+      return p?.moderationState || 'VISIBLE';
+    } else if (targetType === 'comment') {
+      for (const p of this.db.posts || []) {
+        const c = (p.comments || []).find(cm => cm.id === targetId);
+        if (c) return c.moderationState || 'VISIBLE';
+      }
+      if (this.db.video_comments) {
+        for (const vid of Object.keys(this.db.video_comments)) {
+          const c = (this.db.video_comments[vid] || []).find(cm => cm.id === targetId);
+          if (c) return c.moderationState || 'VISIBLE';
+        }
+      }
+      return 'VISIBLE';
+    } else if (targetType === 'message') {
+      const msg = (this.db.chatMessages || []).find(m => m.id === targetId);
+      return msg?.moderationState || 'VISIBLE';
+    } else if (targetType === 'channel') {
+      const ch = (this.db.channels || []).find(c => c.id === targetId);
+      return ch?.moderationState || 'VISIBLE';
+    } else if (targetType === 'page') {
+      const pg = (this.db.pages || []).find(p => p.id === targetId);
+      return pg?.moderationState || 'VISIBLE';
+    } else if (targetType === 'group') {
+      const grp = (this.db.groups || []).find(g => g.id === targetId);
+      return grp?.moderationState || 'VISIBLE';
+    } else if (targetType === 'reel') {
+      const r = (this.db.reels || []).find(rl => rl.id === targetId);
+      return r?.moderationState || 'VISIBLE';
+    } else if (targetType === 'user') {
+      const u = (this.db.users || []).find(usr => usr.did === targetId);
+      return (u as any)?.moderationState || 'VISIBLE';
+    }
+    return 'VISIBLE';
+  }
+
+  public takeModerationAction(data: {
+    reportId?: string;
+    targetType: ReportTargetType;
+    targetId: string;
+    action: ModerationActionType;
+    moderatorDid: string;
+    moderatorHandle?: string;
+    notes?: string;
+    spaceId?: string;
+    spaceType?: 'channel' | 'page' | 'group';
+  }): { ok: boolean; action: ModerationActionType; targetId: string; moderationState?: ModerationState; error?: string } {
+    this.load();
+
+    let targetState: ModerationState = 'VISIBLE';
+    switch (data.action) {
+      case 'Hide':
+        targetState = 'HIDDEN';
+        this.setContentModerationState(data.targetType, data.targetId, 'HIDDEN', data.moderatorDid, data.notes);
+        break;
+      case 'Remove':
+        targetState = 'REMOVED';
+        this.setContentModerationState(data.targetType, data.targetId, 'REMOVED', data.moderatorDid, data.notes);
+        break;
+      case 'Restrict':
+        targetState = 'RESTRICTED';
+        this.setContentModerationState(data.targetType, data.targetId, 'RESTRICTED', data.moderatorDid, data.notes);
+        break;
+      case 'Restore':
+        targetState = 'VISIBLE';
+        this.setContentModerationState(data.targetType, data.targetId, 'VISIBLE', data.moderatorDid, data.notes);
+        break;
+      case 'Warn':
+        targetState = this.getContentModerationState(data.targetType, data.targetId);
+        if (data.targetType === 'user') {
+          this.addNotification({
+            recipientDid: data.targetId,
+            senderDid: data.moderatorDid,
+            senderHandle: data.moderatorHandle || '@moderator',
+            senderName: 'Safety Operations',
+            senderAvatar: '🛡️',
+            type: 'system',
+            title: 'Community Warning',
+            body: data.notes || 'Your account has received an official policy warning.',
+          });
+        }
+        break;
+      case 'Mute':
+        targetState = this.getContentModerationState(data.targetType, data.targetId);
+        if (data.targetType === 'user') {
+          if (data.spaceId) {
+            const member = (this.db.space_members || []).find(sm => sm.spaceId === data.spaceId && sm.userDid === data.targetId);
+            if (member) member.isMuted = true;
+          }
+          this.muteTarget(data.moderatorDid, 'user', data.targetId);
+        }
+        break;
+      case 'Ban':
+        targetState = 'RESTRICTED';
+        if (data.targetType === 'user') {
+          if (data.spaceId) {
+            const member = (this.db.space_members || []).find(sm => sm.spaceId === data.spaceId && sm.userDid === data.targetId);
+            if (member) member.isBanned = true;
+          } else {
+            const u = (this.db.users || []).find(usr => usr.did === data.targetId);
+            if (u) (u as any).isBanned = true;
+          }
+        }
+        break;
+      case 'Unban':
+        targetState = 'VISIBLE';
+        if (data.targetType === 'user') {
+          if (data.spaceId) {
+            const member = (this.db.space_members || []).find(sm => sm.spaceId === data.spaceId && sm.userDid === data.targetId);
+            if (member) member.isBanned = false;
+          } else {
+            const u = (this.db.users || []).find(usr => usr.did === data.targetId);
+            if (u) (u as any).isBanned = false;
+          }
+        }
+        break;
+    }
+
+    // If reportId was provided, update report status
+    if (data.reportId) {
+      const rep = (this.db.reports || []).find(r => r.id === data.reportId);
+      if (rep) {
+        rep.status = 'ACTION_TAKEN';
+        rep.actionTaken = data.action;
+        rep.moderationNotes = data.notes;
+        rep.resolvedByDid = data.moderatorDid;
+        rep.updatedAt = Date.now();
+      }
+    }
+
+    // Audit log the moderation action
+    this.logAudit({
+      type: 'MODERATION_ACTION',
+      action: data.action,
+      actorDid: data.moderatorDid,
+      actorHandle: data.moderatorHandle,
+      targetDid: data.targetType === 'user' ? data.targetId : undefined,
+      resourceType: data.targetType,
+      resourceId: data.targetId,
+      result: 'SUCCESS',
+      details: `Executed ${data.action} on ${data.targetType} "${data.targetId}"${data.notes ? `: ${data.notes}` : ''}`,
+    });
+
+    this.save();
+    return { ok: true, action: data.action, targetId: data.targetId, moderationState: targetState };
+  }
+
+  public muteTarget(
+    userDid: string,
+    targetType: 'user' | 'conversation' | 'channel' | 'page' | 'group',
+    targetId: string,
+    durationSeconds?: number
+  ): MuteRecord {
+    this.load();
+    if (!Array.isArray(this.db.mutes)) this.db.mutes = [];
+
+    // Remove existing mute for same user & target if present
+    this.db.mutes = this.db.mutes.filter(m => !(m.userDid === userDid && m.targetType === targetType && m.targetId === targetId));
+
+    const id = 'mut_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const mutedUntil = durationSeconds ? Date.now() + (durationSeconds * 1000) : undefined;
+    const record: MuteRecord = {
+      id,
+      userDid,
+      targetType,
+      targetId,
+      durationSeconds,
+      mutedUntil,
+      createdAt: Date.now(),
+    };
+
+    this.db.mutes.unshift(record);
+    this.logAudit({
+      type: 'USER_MUTED',
+      action: 'MUTE',
+      actorDid: userDid,
+      resourceType: targetType,
+      resourceId: targetId,
+      details: `Muted ${targetType} "${targetId}"${durationSeconds ? ` for ${durationSeconds}s` : ' indefinitely'}`,
+    });
+
+    this.save();
+    return record;
+  }
+
+  public unmuteTarget(
+    userDid: string,
+    targetType: 'user' | 'conversation' | 'channel' | 'page' | 'group',
+    targetId: string
+  ): boolean {
+    this.load();
+    if (!Array.isArray(this.db.mutes)) return false;
+
+    const beforeLen = this.db.mutes.length;
+    this.db.mutes = this.db.mutes.filter(m => !(m.userDid === userDid && m.targetType === targetType && m.targetId === targetId));
+    const removed = this.db.mutes.length < beforeLen;
+
+    if (removed) {
+      this.logAudit({
+        type: 'USER_UNMUTED',
+        action: 'UNMUTE',
+        actorDid: userDid,
+        resourceType: targetType,
+        resourceId: targetId,
+        details: `Unmuted ${targetType} "${targetId}"`,
+      });
+      this.save();
+    }
+    return removed;
+  }
+
+  public isMuted(
+    userDid: string,
+    targetType: 'user' | 'conversation' | 'channel' | 'page' | 'group',
+    targetId: string
+  ): boolean {
+    this.load();
+    if (!Array.isArray(this.db.mutes)) return false;
+
+    const mute = this.db.mutes.find(m => m.userDid === userDid && m.targetType === targetType && m.targetId === targetId);
+    if (!mute) return false;
+
+    // Check expiration if duration was set
+    if (mute.mutedUntil && Date.now() > mute.mutedUntil) {
+      return false;
+    }
+    return true;
+  }
+
+  public getUserMutes(userDid: string): MuteRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.mutes)) return [];
+    const now = Date.now();
+    return this.db.mutes.filter(m => m.userDid === userDid && (!m.mutedUntil || m.mutedUntil > now));
+  }
+
+  public revokeAllOtherSessions(userDid: string, currentToken?: string): number {
+    this.load();
+    if (!Array.isArray(this.db.user_sessions)) return 0;
+
+    let revokedCount = 0;
+    for (const session of this.db.user_sessions) {
+      if (session.userDid === userDid && !session.isRevoked) {
+        if (!currentToken || session.token !== currentToken) {
+          session.isRevoked = true;
+          session.lastActiveAt = Date.now();
+          revokedCount++;
+        }
+      }
+    }
+
+    if (revokedCount > 0) {
+      this.logAudit({
+        type: 'SESSION_REVOKED',
+        action: 'REVOKE_ALL_OTHER_SESSIONS',
+        actorDid: userDid,
+        details: `Revoked ${revokedCount} remote hardware session(s) for user ${userDid}`,
+      });
+      this.save();
+    }
+    return revokedCount;
+  }
+
+  public verifyAndIngestMeshPacket(packet: {
+    id: string;
+    sourceDid: string;
+    payload: any;
+    timestamp: number;
+    ttlMs?: number;
+    signatureHex?: string;
+    type: string;
+    recipientDid?: string;
+  }): { valid: boolean; error?: string } {
+    if (!packet || !packet.id || !packet.sourceDid) {
+      return { valid: false, error: 'Malformed packet: id and sourceDid are required' };
+    }
+
+    // 1. Verify packet TTL
+    if (packet.ttlMs && typeof packet.ttlMs === 'number') {
+      const age = Date.now() - packet.timestamp;
+      if (age > packet.ttlMs) {
+        return { valid: false, error: 'Packet expired: TTL exceeded' };
+      }
+    }
+
+    // 2. Reject unreasonable future timestamp (skew > 60s)
+    if (packet.timestamp > Date.now() + 60000) {
+      return { valid: false, error: 'Packet invalid: Clock skew exceeds threshold' };
+    }
+
+    // 3. Check author status: banned globally or blocked by recipient
+    this.load();
+    const author = (this.db.users || []).find(u => u.did === packet.sourceDid);
+    if (author && (author as any).isBanned) {
+      return { valid: false, error: 'Packet rejected: Source DID is suspended/banned on SOVRA network' };
+    }
+
+    if (packet.recipientDid && this.isBlocked(packet.sourceDid, packet.recipientDid)) {
+      return { valid: false, error: 'Packet rejected: Source DID is blocked by recipient' };
+    }
+
+    // 4. Check if underlying content has been marked HIDDEN or REMOVED by moderation
+    const contentId = packet.payload?.contentId || packet.payload?.postId || packet.id;
+    const contentType = (packet.payload?.contentType || packet.type || 'post') as ReportTargetType;
+    const modState = this.getContentModerationState(contentType, contentId);
+    if (modState === 'HIDDEN' || modState === 'REMOVED') {
+      return { valid: false, error: `Packet rejected: Content has been ${modState.toLowerCase()} by moderation` };
+    }
+
+    return { valid: true };
+  }
 }
 
 // Singleton database instance exported for application-wide use
 export const sovraDb = new SovraDatabaseEngine();
+export { SovraDatabaseEngine as DatabaseEngine };
+export default sovraDb;

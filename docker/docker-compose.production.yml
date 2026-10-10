@@ -19,6 +19,10 @@ services:
       - SOVRA_P2P_PORT=4001
       - SOVRA_HTTP_PORT=3001
       - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY:-sovra-production-admin-secret-key-32chars!}
+      - SOVRA_TURN_SERVERS=${SOVRA_TURN_SERVERS:-stun:stun.l.google.com:19302}
+      - SOVRA_TURN_USERNAME=${SOVRA_TURN_USERNAME:-}
+      - SOVRA_TURN_CREDENTIAL=${SOVRA_TURN_CREDENTIAL:-}
+      - SOVRA_TURN_SECRET=${SOVRA_TURN_SECRET:-}
     volumes:
       - sovra-prod-storage:/app/.sovra-storage-prod
     ports:
@@ -57,6 +61,56 @@ services:
       driver: "json-file"
       options:
         max-size: "50m"
+        max-file: "3"
+
+  coturn:
+    image: coturn/coturn:4.6.2-alpine
+    container_name: sovra-coturn-relay
+    restart: always
+    environment:
+      - SOVRA_TURN_SECRET=${SOVRA_TURN_SECRET:-sovra-dev-turn-secret-change-in-prod-replace-with-env!}
+    command: ["-c", "/etc/coturn/turnserver.conf", "--static-auth-secret=${SOVRA_TURN_SECRET:-sovra-dev-turn-secret-change-in-prod-replace-with-env!}"]
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/udp"
+      - "5349:5349/tcp"
+      - "49152-49200:49152-49200/udp"
+    networks:
+      - sovra-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  litestream-replicator:
+    image: litestream/litestream:0.3.13
+    container_name: sovra-litestream-replicator
+    restart: unless-stopped
+    environment:
+      - LITESTREAM_BUCKET=${LITESTREAM_BUCKET:-sovra-production-backups}
+      - LITESTREAM_ENDPOINT=${LITESTREAM_ENDPOINT:-https://s3.us-east-1.amazonaws.com}
+      - LITESTREAM_ACCESS_KEY_ID=${LITESTREAM_ACCESS_KEY_ID:-}
+      - LITESTREAM_SECRET_ACCESS_KEY=${LITESTREAM_SECRET_ACCESS_KEY:-}
+      - LITESTREAM_REGION=${LITESTREAM_REGION:-us-east-1}
+      - LITESTREAM_SYNC_INTERVAL=${LITESTREAM_SYNC_INTERVAL:-1s}
+      - LITESTREAM_RETENTION=${LITESTREAM_RETENTION:-168h}
+    volumes:
+      - ./litestream.yml:/etc/litestream.yml:ro
+      - sovra-prod-storage:/app/.sovra-storage-prod
+    command: ["replicate", "-config", "/etc/litestream.yml"]
+    depends_on:
+      sovra-node:
+        condition: service_healthy
+    networks:
+      - sovra-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
         max-file: "3"
 
 networks:

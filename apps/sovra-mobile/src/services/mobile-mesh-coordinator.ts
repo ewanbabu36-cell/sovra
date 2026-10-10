@@ -18,6 +18,7 @@ import {
   type MeshNetworkStatus,
   type MeshDiagnostics,
   type MeshUserControls,
+  type MeshDiscoveredPeer,
 } from '@sovra/p2p';
 import { bytesToHex } from '@sovra/crypto';
 import { NativeMobileBleAdapter } from './native-ble-bridge.js';
@@ -42,6 +43,8 @@ export class MobileMeshCoordinator {
 
   private isStarted = false;
   private listeners: Array<(state: MobileMeshRuntimeState) => void> = [];
+  private peerListeners: Array<(peers: MeshDiscoveredPeer[]) => void> = [];
+  private messageListeners: Array<(message: CachedMessage) => void> = [];
 
   private constructor() {
     // 1. Resolve or generate persistent local Ed25519 identity for mesh routing
@@ -122,26 +125,65 @@ export class MobileMeshCoordinator {
             syncStatus: 'SYNCED',
           };
           await localDb.saveMessage(cachedMsg);
+          for (const ml of this.messageListeners) {
+            try {
+              ml(cachedMsg);
+            } catch {}
+          }
         } else if (envelope.envelopeType === 'SIGNED_EVENT') {
-          const cachedPost: CachedPost = {
-            id: envelope.envelopeId,
-            authorDid: envelope.originDid,
-            authorName: data.authorName || envelope.originDid.substring(0, 12),
-            authorHandle: data.authorHandle || '@peer',
-            caption: data.caption || '',
-            mediaCid: data.mediaCid,
-            timestamp: envelope.timestamp,
-            likesCount: 0,
-            likedByDids: [],
-            isLiked: false,
-            commentsCount: 0,
-            syncStatus: 'SYNCED',
-          };
-          await localDb.savePost(cachedPost);
+          if (data.channel) {
+            const cleanId = data.channel.replace('#', '').replace(/-/g, '_').replace(/^channel:/, '');
+            const channelId = `channel:${cleanId}`;
+            const cachedMsg: CachedMessage = {
+              id: envelope.envelopeId,
+              threadId: channelId,
+              senderDid: envelope.originDid,
+              recipientDid: channelId,
+              senderName: data.senderName || envelope.originDid.substring(0, 12),
+              text: data.text || data.caption || '',
+              timestamp: envelope.timestamp,
+              status: 'delivered',
+              isBitChat: true,
+              hopCount: envelope.hopCount,
+              syncStatus: 'SYNCED',
+            };
+            await localDb.saveMessage(cachedMsg);
+            for (const ml of this.messageListeners) {
+              try {
+                ml(cachedMsg);
+              } catch {}
+            }
+          } else {
+            const cachedPost: CachedPost = {
+              id: envelope.envelopeId,
+              authorDid: envelope.originDid,
+              authorName: data.authorName || envelope.originDid.substring(0, 12),
+              authorHandle: data.authorHandle || '@peer',
+              caption: data.caption || '',
+              mediaCid: data.mediaCid,
+              timestamp: envelope.timestamp,
+              likesCount: 0,
+              likedByDids: [],
+              isLiked: false,
+              commentsCount: 0,
+              syncStatus: 'SYNCED',
+            };
+            await localDb.savePost(cachedPost);
+          }
         }
       } catch (err) {
         console.warn('[MobileMeshCoordinator] Error processing incoming envelope payload:', err);
       }
+    });
+
+    this.transportManager.onPeerDiscovered(() => {
+      const peers = this.getDiscoveredPeers();
+      for (const pl of this.peerListeners) {
+        try {
+          pl(peers);
+        } catch {}
+      }
+      this.notifyListeners();
     });
 
     this.transportManager.onStatusChange(() => {
@@ -263,6 +305,59 @@ export class MobileMeshCoordinator {
     };
   }
 
+  public async sendChannelBroadcast(
+    channelId: string,
+    text: string,
+    senderName: string,
+  ): Promise<{ success: boolean; envelopeId: string }> {
+    const cleanId = channelId.replace('#', '').replace(/-/g, '_').replace(/^channel:/, '');
+    const formattedChannel = `channel:${cleanId}`;
+    const payloadBytes = new TextEncoder().encode(
+      JSON.stringify({ channel: formattedChannel, text, senderName }),
+    );
+    const envelope = await this.router.sendEnvelope({
+      envelopeType: 'SIGNED_EVENT',
+      targetDid: '*', // Broadcast to entire mesh swarm
+      payloadBytes,
+      priority: channelId.includes('sos') || channelId.includes('emergency') ? 3 : 1,
+    });
+
+    await localDb.saveMessage({
+      id: envelope.envelopeId,
+      threadId: formattedChannel,
+      senderDid: this.localDid,
+      recipientDid: formattedChannel,
+      senderName,
+      text,
+      timestamp: Date.now(),
+      status: 'sent',
+      isBitChat: true,
+      hopCount: 0,
+      syncStatus: 'PENDING',
+    });
+
+    return { success: true, envelopeId: envelope.envelopeId };
+  }
+
+  public getDiscoveredPeers(): MeshDiscoveredPeer[] {
+    return this.transportManager.getDiscoveredPeers();
+  }
+
+  public onPeersChange(handler: (peers: MeshDiscoveredPeer[]) => void): () => void {
+    this.peerListeners.push(handler);
+    handler(this.getDiscoveredPeers());
+    return () => {
+      this.peerListeners = this.peerListeners.filter(h => h !== handler);
+    };
+  }
+
+  public onIncomingMessage(handler: (message: CachedMessage) => void): () => void {
+    this.messageListeners.push(handler);
+    return () => {
+      this.messageListeners = this.messageListeners.filter(h => h !== handler);
+    };
+  }
+
   private notifyListeners(): void {
     const state = this.getRuntimeState();
     for (const listener of this.listeners) {
@@ -274,3 +369,5 @@ export class MobileMeshCoordinator {
 }
 
 export const mobileMesh = MobileMeshCoordinator.getInstance();
+// Automatically start BLE transport in background on app load
+mobileMesh.start().catch(() => {});
