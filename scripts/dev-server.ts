@@ -15137,20 +15137,41 @@ function renderHtml(
       </div>
     </div>
 
-  <!-- 🎥 6B. UPLOAD LONG VIDEO MODAL (Watch Platform) -->
+  <!-- 🎥 6B. UPLOAD VIDEO & SHORTS MODAL (Watch & Reels Platform) -->
   <div id="videoUploadModal" class="omni-modal-overlay" style="display: none;">
-    <div class="omni-modal-card" style="max-width: 500px;">
+    <div class="omni-modal-card" style="max-width: 520px;">
       <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
         <div style="font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 6px;">
-          <span>🎥</span> <span>Upload Video to Sovereign Watch</span>
+          <span>🎥</span> <span>Upload Video &amp; Shorts to Sovra</span>
         </div>
         <button onclick="closeVideoUploadModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
       </div>
-      <div style="padding: 1.25rem;">
-        <label class="social-modal-label">Video Title</label>
+      <div style="padding: 1.25rem; max-height: calc(85vh - 70px); overflow-y: auto;">
+        
+        <!-- Video Destination Switcher (Auto-detected or Manual) -->
+        <label class="social-modal-label">Destination &amp; Feed Format</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0.85rem;" id="videoFormatSelectorGroup">
+          <div id="targetFormatWatchTile" onclick="selectVideoUploadTargetFormat('watch')" style="cursor: pointer; padding: 10px; border-radius: 10px; border: 1px solid rgba(225, 29, 72, 0.5); background: rgba(225, 29, 72, 0.12); display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.2rem;">🎬</span>
+            <div>
+              <div style="font-weight: 700; font-size: 0.82rem; color: #fff;">16:9 Long-Form</div>
+              <div style="font-size: 0.68rem; color: #fda4af;">Watch Player Feed</div>
+            </div>
+          </div>
+          <div id="targetFormatShortTile" onclick="selectVideoUploadTargetFormat('short')" style="cursor: pointer; padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.03); display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.2rem;">📱</span>
+            <div>
+              <div style="font-weight: 700; font-size: 0.82rem; color: #fff;">9:16 Shorts / Reel</div>
+              <div style="font-size: 0.68rem; color: #94a3b8;">60fps Vertical Stage</div>
+            </div>
+          </div>
+        </div>
+        <input type="hidden" id="videoUploadTargetFormat" value="watch">
+
+        <label class="social-modal-label">Video Title / Caption</label>
         <input type="text" id="videoUploadTitleInput" class="social-modal-input" placeholder="e.g. Decentralized Media &amp; P2P BitSwap Deep Dive" value="Decentralized Media &amp; P2P BitSwap Deep Dive">
 
-        <label class="social-modal-label">Channel Author</label>
+        <label class="social-modal-label">Channel / Creator</label>
         <select id="videoUploadChannelSelect" class="social-modal-input">
           <option value="personal">👤 Personal Profile</option>
         </select>
@@ -15158,24 +15179,47 @@ function renderHtml(
         <label class="social-modal-label">Tags (comma separated)</label>
         <input type="text" id="videoUploadTagsInput" class="social-modal-input" placeholder="e.g. #P2P, #BitSwap, #Decentralized" value="#P2P, #BitSwap, #Decentralized">
 
-        <label class="social-modal-label">Resolution / Bitrate</label>
-        <select id="videoUploadQualitySelect" class="social-modal-input">
-          <option value="1080p60">1080p 60FPS (High-Bitrate HLS)</option>
-          <option value="4k">4K UHD (Master Profile)</option>
-          <option value="720p">720p (Bandwidth Efficient)</option>
-        </select>
-
-        <label class="social-modal-label">Video File / P2P CID</label>
-        <div style="border: 2px dashed rgba(255,255,255,0.15); border-radius: 12px; padding: 1.25rem; text-align: center; cursor: pointer; background: rgba(0,0,0,0.25);" onclick="document.getElementById('videoUploadFileInput').click()">
+        <!-- File Picker & Live Frame / Thumbnail Preview -->
+        <label class="social-modal-label">Video File &amp; Merkle CID Ingest</label>
+        <div style="border: 2px dashed rgba(255,255,255,0.15); border-radius: 12px; padding: 1rem; text-align: center; cursor: pointer; background: rgba(0,0,0,0.25);" onclick="document.getElementById('videoUploadFileInput').click()">
           <input type="file" id="videoUploadFileInput" accept="video/*" style="display: none;" onchange="handleVideoFileSelected(event)" />
           <div style="font-size: 1.8rem; margin-bottom: 0.25rem;">🎬</div>
           <div style="font-size: 0.84rem; color: #f8fafc; font-weight: 600;" id="videoUploadFilePrompt">Choose video file (MP4, MKV, WebM)</div>
-          <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Automatic RFC 8216 HLS chunking &amp; BitSwap P2P seed announce</div>
+          <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;" id="videoUploadFormatBadge">Automatic aspect-ratio detection &amp; frame capture</div>
+          <img id="videoUploadThumbPreview" style="display: none; max-height: 120px; border-radius: 8px; object-fit: cover; margin: 8px auto 0; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(0,0,0,0.4);" alt="Thumbnail Preview" />
         </div>
 
-        <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+        <!-- Sovereign Monetization & Access Controls -->
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 0.75rem 0.85rem; margin-top: 0.85rem; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.82rem; color: #fbbf24; display: flex; align-items: center; gap: 4px;">
+                <span>⚡</span> <span>P2P Micro-Tipping (Super Thanks)</span>
+              </div>
+              <div style="font-size: 0.7rem; color: #94a3b8;">95% Creator Split • 0% Platform Middleman Cut</div>
+            </div>
+            <label class="switch" style="transform: scale(0.85);">
+              <input type="checkbox" id="videoUploadTippingToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.05);">
+            <div>
+              <div style="font-weight: 700; font-size: 0.82rem; color: #f1f5f9;">Content Visibility</div>
+              <div style="font-size: 0.7rem; color: #94a3b8;">Global Kademlia DHT announce vs Encrypted pass</div>
+            </div>
+            <select id="videoUploadVisibilitySelect" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.75rem; border-radius: 6px; padding: 3px 6px;">
+              <option value="public">🌐 Public (Mesh)</option>
+              <option value="unlisted">🔗 Unlisted</option>
+              <option value="members">🔒 Members Only</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.15rem;">
           <button onclick="closeVideoUploadModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
-          <button onclick="submitVideoUpload()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem; background: #e11d48; border-color: #f43f5e;">Publish Video 🚀</button>
+          <button onclick="submitVideoUpload()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem; background: #e11d48; border-color: #f43f5e;" id="btnSubmitVideoUpload">Publish Content 🚀</button>
         </div>
       </div>
     </div>
@@ -38881,7 +38925,7 @@ function renderHtml(
       });
     }
 
-    // --- Long-Form Video Upload Handlers (YouTube / Watch Platform) ---
+    // --- Multi-Format Video & Shorts Upload Handlers (Watch & Reels Platform) ---
     function openVideoUploadModal() {
       const m = document.getElementById('videoUploadModal');
       if (m) {
@@ -38898,30 +38942,159 @@ function renderHtml(
         }
       }
     }
+
     function closeVideoUploadModal() {
       const m = document.getElementById('videoUploadModal');
       if (m) m.style.display = 'none';
+      selectedVideoUploadFile = null;
+      window._selectedVideoThumbnail = null;
+      window._selectedVideoDuration = null;
+      const thumbEl = document.getElementById('videoUploadThumbPreview');
+      if (thumbEl) {
+        thumbEl.style.display = 'none';
+        thumbEl.src = '';
+      }
+      const promptEl = document.getElementById('videoUploadFilePrompt');
+      if (promptEl) promptEl.innerText = 'Choose video file (MP4, MKV, WebM)';
+      const badgeEl = document.getElementById('videoUploadFormatBadge');
+      if (badgeEl) {
+        badgeEl.innerHTML = 'Automatic aspect-ratio detection &amp; frame capture';
+        badgeEl.style.color = '#94a3b8';
+      }
     }
+
+    function selectVideoUploadTargetFormat(fmt) {
+      const input = document.getElementById('videoUploadTargetFormat');
+      if (input) input.value = fmt;
+      const watchTile = document.getElementById('targetFormatWatchTile');
+      const shortTile = document.getElementById('targetFormatShortTile');
+      const submitBtn = document.getElementById('btnSubmitVideoUpload');
+
+      if (fmt === 'short') {
+        if (shortTile) {
+          shortTile.style.borderColor = 'rgba(56, 189, 248, 0.6)';
+          shortTile.style.background = 'rgba(56, 189, 248, 0.14)';
+        }
+        if (watchTile) {
+          watchTile.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          watchTile.style.background = 'rgba(255, 255, 255, 0.03)';
+        }
+        if (submitBtn) submitBtn.innerText = 'Publish Short to Reels Feed 🚀';
+      } else {
+        if (watchTile) {
+          watchTile.style.borderColor = 'rgba(225, 29, 72, 0.6)';
+          watchTile.style.background = 'rgba(225, 29, 72, 0.14)';
+        }
+        if (shortTile) {
+          shortTile.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          shortTile.style.background = 'rgba(255, 255, 255, 0.03)';
+        }
+        if (submitBtn) submitBtn.innerText = 'Publish to Sovereign Watch 🚀';
+      }
+    }
+
     let selectedVideoUploadFile = null;
     function handleVideoFileSelected(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
       selectedVideoUploadFile = file;
+
       const prompt = document.getElementById('videoUploadFilePrompt');
       if (prompt) prompt.innerText = '✓ Selected: ' + file.name + ' (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB)';
+
+      // Auto-inspect aspect ratio and capture live thumbnail frame via HTML5 video element
+      try {
+        const tempVideo = document.createElement('video');
+        tempVideo.preload = 'metadata';
+        tempVideo.muted = true;
+        tempVideo.playsInline = true;
+        const objectUrl = URL.createObjectURL(file);
+        tempVideo.src = objectUrl;
+
+        tempVideo.onloadedmetadata = function() {
+          const w = tempVideo.videoWidth || 0;
+          const h = tempVideo.videoHeight || 0;
+          const dur = tempVideo.duration || 0;
+          window._selectedVideoDuration = Math.round(dur);
+
+          // 9:16 vertical detection or short duration check
+          const isVertical = (h > w) || (dur > 0 && dur <= 90 && h >= w);
+          const badge = document.getElementById('videoUploadFormatBadge');
+          if (badge) {
+            if (isVertical) {
+              badge.innerHTML = '📱 <b>9:16 Vertical Short Detected</b> (' + w + 'x' + h + ', ' + Math.round(dur) + 's) &bull; Auto-routed to Reels Feed';
+              badge.style.color = '#38bdf8';
+            } else {
+              badge.innerHTML = '🎬 <b>16:9 Landscape Video Detected</b> (' + w + 'x' + h + ', ' + Math.round(dur) + 's) &bull; Auto-routed to Watch Feed';
+              badge.style.color = '#fda4af';
+            }
+          }
+          selectVideoUploadTargetFormat(isVertical ? 'short' : 'watch');
+
+          // Seek to 1s to capture frame preview
+          tempVideo.currentTime = Math.min(1.0, dur > 1 ? 1.0 : (dur > 0 ? dur / 2 : 0.1));
+        };
+
+        tempVideo.onseeked = function() {
+          try {
+            const canvas = document.createElement('canvas');
+            const targetW = Math.min(tempVideo.videoWidth || 480, 480);
+            canvas.width = targetW;
+            canvas.height = Math.round(targetW * ((tempVideo.videoHeight || 270) / (tempVideo.videoWidth || 480)));
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+              const thumbData = canvas.toDataURL('image/jpeg', 0.85);
+              window._selectedVideoThumbnail = thumbData;
+              const thumbImg = document.getElementById('videoUploadThumbPreview');
+              if (thumbImg) {
+                thumbImg.src = thumbData;
+                thumbImg.style.display = 'block';
+              }
+            }
+          } catch (e) {
+            console.warn('[Upload] Frame capture fallback:', e);
+          } finally {
+            URL.revokeObjectURL(objectUrl);
+          }
+        };
+      } catch (err) {
+        console.warn('[Upload] Video inspection error:', err);
+      }
     }
+
     async function submitVideoUpload() {
       const title = document.getElementById('videoUploadTitleInput').value.trim();
       const tagsStr = document.getElementById('videoUploadTagsInput').value.trim();
+      const targetFmt = document.getElementById('videoUploadTargetFormat') ? document.getElementById('videoUploadTargetFormat').value : 'watch';
+      const tippingEl = document.getElementById('videoUploadTippingToggle');
+      const isTippingEnabled = tippingEl ? tippingEl.checked : true;
+      const visEl = document.getElementById('videoUploadVisibilitySelect');
+      const visibility = visEl ? visEl.value : 'public';
+
       if (!title) {
-        alert('Please enter a video title.');
+        alert('Please enter a video title or caption.');
         return;
       }
       const tags = tagsStr.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
-      const publishBtn = document.querySelector('#videoUploadModal .action-pill-primary');
+      const publishBtn = document.getElementById('btnSubmitVideoUpload') || document.querySelector('#videoUploadModal .action-pill-primary');
       if (publishBtn) {
         publishBtn.disabled = true;
-        publishBtn.innerText = 'Publishing... ⏳';
+        publishBtn.innerText = 'Publishing to P2P Mesh... ⏳';
+      }
+
+      // Resolve author name & handle
+      const chanSelect = document.getElementById('videoUploadChannelSelect');
+      const chanVal = chanSelect ? chanSelect.value : 'personal';
+      let authorName = (myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Sovereign Creator';
+      let authorHandle = (myProfile && myProfile.handle) ? myProfile.handle : '@creator';
+
+      if (chanVal !== 'personal' && typeof allChannelsData !== 'undefined') {
+        const matched = allChannelsData.find(function(c) { return c.id === chanVal; });
+        if (matched) {
+          authorName = matched.name;
+          authorHandle = matched.handle;
+        }
       }
 
       let videoData = null;
@@ -38940,47 +39113,82 @@ function renderHtml(
         }
       }
 
-      const payload = {
-        title: title,
-        tags: tags.length ? tags : ['#Sovereign', '#P2P'],
-        channelName: (myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Sovereign Creator',
-        channelHandle: (myProfile && myProfile.handle) ? myProfile.handle : '@creator',
-        videoData: videoData,
-        mimeType: mimeType
-      };
-
       try {
-        const res = await fetch('/api/youtube/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        if (result.ok && result.video) {
-          const newVideo = result.video;
-          if (typeof ytVideosCatalog !== 'undefined') {
-            ytVideosCatalog.unshift(newVideo);
-            activeYtVideoIndex = 0;
-            if (typeof renderYtCurrentVideo === 'function') {
-              renderYtCurrentVideo();
+        if (targetFmt === 'short') {
+          // Route 1: 9:16 Vertical Short / Reel Ingestion
+          const payload = {
+            caption: title,
+            tags: tags.length ? tags : ['#Shorts', '#Sovra', '#P2P'],
+            creatorHandle: authorHandle,
+            creatorName: authorName,
+            videoData: videoData,
+            thumbnailData: window._selectedVideoThumbnail,
+            mimeType: mimeType,
+            isShort: true
+          };
+
+          const res = await fetch('/api/reels/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (result.ok && result.reel) {
+            const newReel = result.reel;
+            if (typeof reelsStore !== 'undefined') {
+              reelsStore.unshift(newReel);
+              const counterEl = document.getElementById('reelCounterDisplay');
+              if (counterEl) counterEl.innerText = '1 / ' + reelsStore.length;
             }
+            closeVideoUploadModal();
+            showAccountToast('🎉 Short "' + title + '" published to 60fps Sovereign Reels feed!');
+          } else {
+            alert('Short publication failed: ' + (result.error || 'Unknown error'));
           }
-          if (typeof longFormVideosCatalog !== 'undefined') {
-            longFormVideosCatalog.unshift(newVideo);
-          }
-          const titleEl = document.getElementById('ytVideoTitle');
-          if (titleEl) titleEl.innerText = newVideo.title;
-          const cidEl = document.getElementById('ytCidDisplay');
-          if (cidEl) cidEl.innerText = 'CID: ' + newVideo.cid;
-          const chanEl = document.getElementById('ytChannelName');
-          if (chanEl) chanEl.innerText = newVideo.channelName;
-          selectedVideoUploadFile = null;
-          const promptEl = document.getElementById('videoUploadFilePrompt');
-          if (promptEl) promptEl.innerText = 'Choose video file (MP4, MKV, WebM)';
-          closeVideoUploadModal();
-          showAccountToast('🎉 Video "' + title + '" published to Sovereign Watch over P2P!');
         } else {
-          alert('Video upload failed: ' + (result.error || 'Unknown error'));
+          // Route 2: 16:9 Landscape Long-Form Watch Ingestion
+          const payload = {
+            title: title,
+            tags: tags.length ? tags : ['#Sovereign', '#P2P'],
+            channelName: authorName,
+            channelHandle: authorHandle,
+            videoData: videoData,
+            thumbnailData: window._selectedVideoThumbnail,
+            durationSeconds: window._selectedVideoDuration || 600,
+            mimeType: mimeType,
+            visibility: visibility,
+            monetization: { tippingEnabled: isTippingEnabled, creatorSplitPercent: 95 }
+          };
+
+          const res = await fetch('/api/youtube/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (result.ok && result.video) {
+            const newVideo = result.video;
+            if (typeof ytVideosCatalog !== 'undefined') {
+              ytVideosCatalog.unshift(newVideo);
+              activeYtVideoIndex = 0;
+              if (typeof renderYtCurrentVideo === 'function') {
+                renderYtCurrentVideo();
+              }
+            }
+            if (typeof longFormVideosCatalog !== 'undefined') {
+              longFormVideosCatalog.unshift(newVideo);
+            }
+            const titleEl = document.getElementById('ytVideoTitle');
+            if (titleEl) titleEl.innerText = newVideo.title;
+            const cidEl = document.getElementById('ytCidDisplay');
+            if (cidEl) cidEl.innerText = 'CID: ' + newVideo.cid;
+            const chanEl = document.getElementById('ytChannelName');
+            if (chanEl) chanEl.innerText = newVideo.channelName;
+            closeVideoUploadModal();
+            showAccountToast('🎉 Video "' + title + '" published to Sovereign Watch over P2P!');
+          } else {
+            alert('Video upload failed: ' + (result.error || 'Unknown error'));
+          }
         }
       } catch (err) {
         console.error('Video upload network error:', err);
@@ -38988,7 +39196,7 @@ function renderHtml(
       } finally {
         if (publishBtn) {
           publishBtn.disabled = false;
-          publishBtn.innerText = 'Publish Video 🚀';
+          selectVideoUploadTargetFormat(targetFmt);
         }
       }
     }
@@ -44946,8 +45154,9 @@ async function startDevServer() {
         let videoPath: string | undefined;
         let mimeType = parsed.mimeType || 'video/mp4';
 
-        if (parsed.videoData) {
-          let base64Data = String(parsed.videoData);
+        const rawVideo = parsed.videoData || parsed.mediaBase64 || parsed.content;
+        if (rawVideo) {
+          let base64Data = String(rawVideo);
           const commaIdx = base64Data.indexOf(',');
           if (commaIdx !== -1) {
             const header = base64Data.substring(0, commaIdx);
@@ -47448,6 +47657,22 @@ async function startDevServer() {
         });
         longFormVideosCatalog.unshift(newVideo);
         currentYoutubeVideo = newVideo;
+
+        if (parsed.isShort) {
+          try {
+            sovraDb.createReel({
+              creatorDid: principal.did,
+              creatorHandle: String(parsed.channelHandle || 'you_peer').replace('@', ''),
+              creatorName: String(parsed.channelName || 'You (Sovereign)'),
+              caption: title,
+              tags,
+              cid,
+              videoUrl: `/api/reels/video/${cid}`,
+              videoMimeType: mimeType,
+            });
+            reelsStore = sovraDb.getAllReels();
+          } catch (_) {}
+        }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, video: newVideo }));
