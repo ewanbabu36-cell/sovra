@@ -147,6 +147,10 @@ export interface ChatMessageRecord {
   readAt?: number;
   status: 'sent' | 'delivered' | 'read';
   signatureHex: string;
+  isE2EE?: boolean;
+  ciphertextHex?: string;
+  ivHex?: string;
+  tagHex?: string;
   disappearingDurationSec?: number;
   expiresAt?: number;
   isDisappeared?: boolean;
@@ -1800,6 +1804,10 @@ export class SovraDatabaseEngine {
       sentAt: msg.sentAt || now,
       status: msg.status || 'sent',
       signatureHex: msg.signatureHex || '',
+      isE2EE: Boolean(msg.isE2EE),
+      ciphertextHex: msg.ciphertextHex || '',
+      ivHex: msg.ivHex || '',
+      tagHex: msg.tagHex || '',
       disappearingDurationSec: msg.disappearingDurationSec || 0,
       expiresAt: msg.expiresAt,
       isDisappeared: false,
@@ -1814,12 +1822,12 @@ export class SovraDatabaseEngine {
     }
 
     this.db.chatMessages.push(record);
-    const summaryLabel = record.isAudio ? 'voice note' : (record.attachment ? 'attachment' : 'message');
+    const summaryLabel = record.isE2EE ? 'encrypted message (AES-GCM-256)' : (record.isAudio ? 'voice note' : (record.attachment ? 'attachment' : 'message'));
     this.logActivity(
       'CHAT_SENT',
       record.senderDid,
       record.senderName,
-      `Sent ${summaryLabel} (${(record.text || record.attachment?.name || '').substring(0, 32)}...) in thread ${record.threadId}`,
+      `Sent ${summaryLabel} in thread ${record.threadId}`,
     );
     this.save();
     return record;
