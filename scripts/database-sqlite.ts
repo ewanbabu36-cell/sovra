@@ -267,6 +267,66 @@ export class SqliteSocialDatabaseEngine {
         reason TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_revoked_tokens ON revoked_tokens(token);
+
+      -- 12. COMMUNITY JURY CASES & 24H MODERATION
+      CREATE TABLE IF NOT EXISTS jury_cases (
+        id TEXT PRIMARY KEY,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        target_url TEXT NOT NULL,
+        author_did TEXT NOT NULL,
+        author_handle TEXT NOT NULL,
+        author_defense_note TEXT,
+        author_defense_timestamp INTEGER,
+        violation_category TEXT NOT NULL,
+        violation_subcategory TEXT,
+        evidence_text TEXT NOT NULL,
+        evidence_urls_json TEXT NOT NULL DEFAULT '[]',
+        is_emergency INTEGER NOT NULL DEFAULT 0,
+        emergency_reason TEXT,
+        status TEXT NOT NULL DEFAULT 'OPEN_VOTING',
+        verdict TEXT,
+        verdict_reason TEXT,
+        voting_deadline INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        reporters_json TEXT NOT NULL DEFAULT '[]',
+        jurors_json TEXT NOT NULL DEFAULT '[]',
+        votes_json TEXT NOT NULL DEFAULT '[]',
+        vote_stats_json TEXT NOT NULL,
+        enforcement_action TEXT,
+        enforced_at INTEGER,
+        restored_at INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_jury_cases_status ON jury_cases(status);
+      CREATE INDEX IF NOT EXISTS idx_jury_cases_target ON jury_cases(target_type, target_id);
+      CREATE INDEX IF NOT EXISTS idx_jury_cases_author ON jury_cases(author_did);
+      CREATE INDEX IF NOT EXISTS idx_jury_cases_deadline ON jury_cases(voting_deadline);
+
+      -- 13. JURY APPEALS
+      CREATE TABLE IF NOT EXISTS jury_appeals (
+        id TEXT PRIMARY KEY,
+        case_id TEXT NOT NULL,
+        appellant_did TEXT NOT NULL,
+        appellant_role TEXT NOT NULL,
+        appeal_reason TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        review_decision TEXT,
+        reviewer_did TEXT,
+        resolution_note TEXT,
+        created_at INTEGER NOT NULL,
+        resolved_at INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_jury_appeals_case ON jury_appeals(case_id);
+      CREATE INDEX IF NOT EXISTS idx_jury_appeals_status ON jury_appeals(status);
+
+      -- 14. JURY MODERATION POLICIES
+      CREATE TABLE IF NOT EXISTS jury_policies (
+        id TEXT PRIMARY KEY,
+        config_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        updated_by TEXT NOT NULL
+      );
     `);
     try {
       this.db.exec('ALTER TABLE posts ADD COLUMN views_count INTEGER NOT NULL DEFAULT 0;');

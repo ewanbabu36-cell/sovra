@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
+import vm from 'node:vm';
 import { validateEnvironment } from './env-validator.ts';
 import { ensureDevTlsCertificates } from './tls-helper.ts';
 import { SovraBackupManager } from './sovra-backup-restore.ts';
@@ -10072,7 +10073,7 @@ function renderHtml(
           <span class="rail-icon">👤</span>
           <span class="rail-label">Profile</span>
         </button>
-        <button class="rail-nav-item" id="tab-admin" data-action="switch-tab" data-tab="admin" onclick="switchTab('admin')">
+        <button class="rail-nav-item" id="tab-admin" data-action="switch-tab" data-tab="admin" onclick="switchTab('admin')" style="display: none;">
           <span class="rail-icon">⚙️</span>
           <span class="rail-label">Ops Console</span>
         </button>
@@ -10105,41 +10106,52 @@ function renderHtml(
         <button type="button" onclick="toggleDevMainMenu(false)" style="background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px 8px;">✕</button>
       </div>
 
+      <!-- Consumer Profile Card -->
       <div style="padding: 14px 18px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="switchTab('me'); toggleDevMainMenu(false);">
-        <div style="width: 42px; height: 42px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>
+        <div id="drawerAvatarIcon" style="width: 42px; height: 42px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>
         <div style="flex: 1; min-width: 0;">
-          <div style="font-size: 14px; font-weight: 700; color: #fff;">Sovereign Profile</div>
-          <div style="font-size: 11px; color: #38bdf8;">@sovereign_node</div>
+          <div id="drawerProfileName" style="font-size: 14px; font-weight: 700; color: #fff;">My Profile</div>
+          <div id="drawerProfileHandle" style="font-size: 11px; color: #38bdf8;">@you</div>
         </div>
         <span style="font-size: 12px; color: #94a3b8;">→</span>
       </div>
 
       <div style="flex: 1; overflow-y: auto;">
+        <!-- Essential Consumer Features -->
         <div class="dev-drawer-item" onclick="switchTab('feed'); toggleDevMainMenu(false);">
           <span>📷</span> <span>Feed (Home)</span>
         </div>
         <div class="dev-drawer-item" onclick="switchTab('friends'); toggleDevMainMenu(false);">
-          <span>👥</span> <span>Friends & Mesh Radar</span>
+          <span>👥</span> <span>Friends &amp; Connections</span>
         </div>
         <div class="dev-drawer-item" onclick="switchTab('reels'); toggleDevMainMenu(false);">
-          <span>🎬</span> <span>Reels & Shorts</span>
+          <span>🎬</span> <span>Reels &amp; Shorts</span>
         </div>
         <div class="dev-drawer-item" onclick="switchTab('youtube'); toggleDevMainMenu(false);">
-          <span>📺</span> <span>Watch Video Catalog</span>
+          <span>📺</span> <span>Watch Videos</span>
         </div>
         <div class="dev-drawer-item" onclick="switchTab('chat'); toggleDevMainMenu(false);">
-          <span>💬</span> <span>Chats (WhatsApp Mode)</span>
+          <span>💬</span> <span>Messages &amp; Chats</span>
         </div>
-        <div class="dev-drawer-item" onclick="toggleDevServerUiMode(); toggleDevMainMenu(false);">
-          <span>⚡</span> <span id="devDrawerModeLabel">Toggle Advance HUD Mode</span>
+        <div class="dev-drawer-item" onclick="openSafetyCenterModal(); toggleDevMainMenu(false);">
+          <span>🛡️</span> <span>Privacy &amp; Safety Center</span>
         </div>
-        <div class="dev-drawer-item" onclick="switchTab('admin'); toggleDevMainMenu(false);">
-          <span>⚙️</span> <span>Operations Console</span>
+
+        <!-- Admin / Node Operator Section (Hidden for normal users) -->
+        <div id="drawerAdminSection" style="display: none; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 8px;">
+          <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 18px 6px;">Operator Controls</div>
+          <div class="dev-drawer-item" onclick="toggleDevServerUiMode(); toggleDevMainMenu(false);">
+            <span>⚡</span> <span id="devDrawerModeLabel">Toggle HUD Mode</span>
+          </div>
+          <div class="dev-drawer-item" onclick="switchTab('admin'); toggleDevMainMenu(false);">
+            <span>⚙️</span> <span>Operations Console</span>
+          </div>
         </div>
       </div>
 
-      <div style="padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 11px; color: #64748b;">
-        Sovra Decentralized Mesh Node<br>Zero Central Server Dependency
+      <div style="padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center;">
+        <span>Sovra Sovereign Platform</span>
+        <span id="drawerRoleIndicator" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;">Citizen</span>
       </div>
     </aside>
 
@@ -12432,31 +12444,11 @@ function renderHtml(
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #c084fc;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span>🔄 Switch Profile / Page</span>
                   </div>
-                  <div class="overflow-menu-item" role="menuitem" tabindex="0" onclick="openSovereignIdCardModal(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 10h4"/><path d="M14 14h4"/></svg>
-                    <span>Sovereign Identity Details</span>
-                  </div>
                   <div class="overflow-menu-item" id="profileSettingsMenuItem" role="menuitem" tabindex="0" onclick="openSpatialSettingsSurface(this); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #94a3b8;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     <span>Account &amp; Security Settings</span>
                   </div>
-                  <div class="overflow-menu-item" id="profileMfaBtn" role="menuitem" tabindex="0" onclick="openSovereignMfaModal(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="11" r="3"/><path d="M12 14v2"/></svg>
-                    <span>🛡️ Authenticator 2FA &amp; PIN</span>
-                  </div>
-                  <div class="overflow-menu-item" role="menuitem" tabindex="0" onclick="openConnectedDevicesView(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a78bfa;"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
-                    <span>Connected Devices &amp; Sessions</span>
-                  </div>
-                  <div class="overflow-menu-item" id="copyProfileDidBtn" role="menuitem" tabindex="0" onclick="copyProfileDid(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #60a5fa;"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                    <span>Copy Sovereign DID</span>
-                  </div>
                   <div class="overflow-menu-divider"></div>
-                  <div class="overflow-menu-item" id="pwaMeInstallBtn" role="menuitem" tabindex="0" onclick="triggerPwaInstall(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #34d399;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                    <span id="pwaMeInstallLabel">Install Web App (PWA)</span>
-                  </div>
                   <div class="overflow-menu-item item-danger" role="menuitem" tabindex="0" onclick="quickLockSession(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f87171;"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     <span>Quick Lock Session</span>
@@ -12476,18 +12468,18 @@ function renderHtml(
               <span id="meProfileName">—</span>
               <button id="meVerifiedBadgeBtn" onclick="openSovereignIdCardModal()" class="authoritative-verified-badge" aria-label="Cryptographically Verified Sovereign DID — Click to inspect identity proof" title="Cryptographically Verified Sovereign DID — Click to inspect identity proof">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-                <span id="meEd25519Badge">Ed25519 Verified</span>
+                <span id="meEd25519Badge">Verified</span>
                 <span id="meVerifiedCheckmark" style="color: #38bdf8; font-weight: 700; margin-left: 1px;">✓</span>
               </button>
               <span id="meRoleBadge" style="display: none;">Sovereign Peer</span>
             </div>
-            <div class="profile-handle" id="meProfileHandle">— &bull; libp2p Peer: <code id="mePeerIdShort">—</code></div>
+            <div class="profile-handle" id="meProfileHandle">— &bull; Sovereign Citizen</div>
             
             <div class="profile-did-badge" id="meProfileDidChip" role="button" tabindex="0" onclick="copyProfileDid()" onkeydown="if(event.key==='Enter'||event.key===' ')copyProfileDid()" aria-label="Copy Decentralized Identifier" title="Click to copy full Decentralized Identifier">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; color: #818cf8;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
               <span class="did-chip-prefix">DID:</span>
               <span id="meProfileDid" data-full-did="${masterKey.did || ''}">${masterKey.did ? (masterKey.did.length > 20 ? (masterKey.did.slice(0, 12) + '...' + masterKey.did.slice(-4)) : masterKey.did) : 'did:key:z6Mk...EFDD'}</span>
-              <span id="copyDidIcon" class="did-chip-copy-icon" style="display: inline-flex; align-items: center; margin-left: 2px;" title="Copy to clipboard"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span>
+              <span id="copyProfileDidBtn" class="did-chip-copy-icon" style="display: inline-flex; align-items: center; margin-left: 2px;" title="Copy to clipboard"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span>
             </div>
 
             <!-- Modernized Glassmorphic Profile Bio Container -->
@@ -12495,7 +12487,7 @@ function renderHtml(
               <div class="profile-bio-header">
                 <div class="profile-bio-title">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                  <span>Node Persona &amp; Bio</span>
+                  <span>About &amp; Bio</span>
                 </div>
                 <button type="button" class="profile-bio-edit-btn" onclick="openEditProfileModal()" title="Edit bio &amp; profile information" aria-label="Edit Profile Bio">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -12504,17 +12496,15 @@ function renderHtml(
               </div>
               <div class="profile-bio-text" id="meProfileBio">—</div>
               <div class="profile-bio-badges">
-                <span class="bio-pill-badge" id="bioBeaconBadge" title="Local P2P mesh gossiping is active">
+                <span class="bio-pill-badge" id="bioBeaconBadge" title="Account active on sovereign network">
                   <span class="bio-beacon-dot"></span>
-                  <span>Mesh Active</span>
+                  <span>Active</span>
                 </span>
-                <span class="bio-pill-badge" style="color: #a5b4fc; border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.1);" title="Routing mesh packets and seeding DAG blocks">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                  <span>Relay &amp; Seeder</span>
+                <span class="bio-pill-badge" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.1);" title="Protected by end-to-end cryptographic keys">
+                  <span>🛡️ Sovereign &amp; Private</span>
                 </span>
-                <span class="bio-pill-badge" style="color: #34d399; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);" title="BitSwap protocol channel ready for high-bandwidth chunk exchange">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span>BitSwap Ready</span>
+                <span class="bio-pill-badge" style="color: #a5b4fc; border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.1);" title="Creator and media publishing enabled">
+                  <span>🎬 Creator</span>
                 </span>
               </div>
             </div>
@@ -12530,24 +12520,24 @@ function renderHtml(
             <div class="profile-stats-row">
               <div class="profile-stat-box stat-box-posts" onclick="viewMyFeedPosts()" title="Click to view published posts" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyFeedPosts()" aria-label="View Feed Posts">
                 <div class="stat-top-row">
-                  <span class="stat-category-title">Feed Posts</span>
+                  <span class="stat-category-title">Posts</span>
                   <span class="stat-icon-wrap" style="color: #818cf8;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   </span>
                 </div>
                 <div class="stat-number" id="meFeedPostsCount">—</div>
-                <div class="stat-subtext">Published updates</div>
+                <div class="stat-subtext">Published</div>
               </div>
 
               <div class="profile-stat-box stat-box-friends" onclick="viewMyProfileFriends()" title="Click to view friends" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyProfileFriends()" aria-label="View Friends">
                 <div class="stat-top-row">
-                  <span class="stat-category-title" id="meFriendsStatTitle">Mutual Friends</span>
+                  <span class="stat-category-title" id="meFriendsStatTitle">Friends</span>
                   <span class="stat-icon-wrap" style="color: #38bdf8;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   </span>
                 </div>
                 <div class="stat-number" id="meFriendsCount" style="color: #38bdf8;">—</div>
-                <div class="stat-subtext">Bilateral trust</div>
+                <div class="stat-subtext">Connected</div>
               </div>
 
               <div class="profile-stat-box stat-box-followers" onclick="openSocialConnectionsModal('followers')" title="Click to view followers" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openSocialConnectionsModal('followers')" aria-label="View Followers">
@@ -12558,7 +12548,7 @@ function renderHtml(
                   </span>
                 </div>
                 <div class="stat-number" id="meFollowersCount">—</div>
-                <div class="stat-subtext">Mesh subscribers</div>
+                <div class="stat-subtext">Followers</div>
               </div>
 
               <div class="profile-stat-box stat-box-following" onclick="openSocialConnectionsModal('following')" title="Click to view following" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openSocialConnectionsModal('following')" aria-label="View Following">
@@ -12569,7 +12559,7 @@ function renderHtml(
                   </span>
                 </div>
                 <div class="stat-number" id="meFollowingCount">—</div>
-                <div class="stat-subtext">Subscribed peers</div>
+                <div class="stat-subtext">Following</div>
               </div>
             </div>
           </div>
@@ -12582,20 +12572,20 @@ function renderHtml(
           <div class="sovereign-hub-ribbon" onclick="toggleSovereignHubExpanded()">
             <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
               <span style="font-size: 1rem;">🛡️</span>
-              <span style="font-weight: 800; font-size: 0.88rem; color: #f8fafc; letter-spacing: -0.01em;">Sovereign Node &amp; Security</span>
+              <span style="font-weight: 800; font-size: 0.88rem; color: #f8fafc; letter-spacing: -0.01em;">Account &amp; Creator Studio</span>
               <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.68rem; padding: 2px 7px;">
                 <span class="pulse-dot" style="width: 6px; height: 6px; background: #10b981; display: inline-block; border-radius: 50%; margin-right: 4px;"></span>
-                Online &bull; Noise_XX
+                Online &bull; Secured
               </span>
             </div>
             
             <div style="display: flex; align-items: center; gap: 8px;">
               <!-- Quick Glance Telemetry Pills -->
               <div class="sovereign-hub-glance-pills" style="display: flex; align-items: center; gap: 6px;">
-                <span class="hub-glance-pill" title="libp2p Loopback Latency" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #38bdf8; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">
+                <span class="hub-glance-pill" title="Network Connection Speed" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #38bdf8; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">
                   ⚡ &lt; 15ms
                 </span>
-                <span class="hub-glance-pill" title="Local Storage Footprint" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #34d399; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;" id="hubGlanceStorage">
+                <span class="hub-glance-pill" title="Local Storage Used" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #34d399; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;" id="hubGlanceStorage">
                   💾 20 MB
                 </span>
               </div>
@@ -12612,20 +12602,24 @@ function renderHtml(
 
           <!-- 2. Interactive Segmented Tabs (Active in Tabbed Mode) -->
           <div class="sovereign-hub-tabs-row" id="sovereignHubTabsRow">
-            <button type="button" class="sovereign-hub-tab-btn active" onclick="switchSovereignHubTab('cryptoIdentityCard', this)">
-              <span>🔑</span> <span>Identity &amp; DID</span>
+            <button type="button" class="sovereign-hub-tab-btn active" id="hubBtnIdentity" onclick="switchSovereignHubTab('cryptoIdentityCard', this)">
+              <span>🔑</span> <span>Account Security</span>
             </button>
-            <button type="button" class="sovereign-hub-tab-btn" onclick="switchSovereignHubTab('creatorModeCard', this)">
-              <span>🎬</span> <span>Creator Mode</span>
+            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnCreator" onclick="switchSovereignHubTab('creatorModeCard', this)">
+              <span>🎬</span> <span>Creator Tools</span>
             </button>
-            <button type="button" class="sovereign-hub-tab-btn" onclick="switchSovereignHubTab('nodeDiagnosticsCard', this)">
+            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnSafety" onclick="openSafetyCenterModal()">
+              <span>🛡️</span> <span>Privacy &amp; Safety</span>
+            </button>
+            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnDisplay" onclick="switchSovereignHubTab('uiDisplayModeCard', this)">
+              <span>✨</span> <span>Theme &amp; Display</span>
+            </button>
+            <!-- Node Operator Diagnostic Tabs (Hidden by default for regular citizens) -->
+            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnP2pDiagnostics" style="display: none;" onclick="switchSovereignHubTab('nodeDiagnosticsCard', this)">
               <span>⚡</span> <span>P2P Diagnostics</span>
             </button>
-            <button type="button" class="sovereign-hub-tab-btn" onclick="switchSovereignHubTab('meshTelemetryCard', this)">
+            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnMeshTelemetry" style="display: none;" onclick="switchSovereignHubTab('meshTelemetryCard', this)">
               <span>🌐</span> <span>libp2p Swarm</span>
-            </button>
-            <button type="button" class="sovereign-hub-tab-btn" onclick="switchSovereignHubTab('uiDisplayModeCard', this)">
-              <span>✨</span> <span>Interface Mode</span>
             </button>
           </div>
 
@@ -12637,48 +12631,48 @@ function renderHtml(
               <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                 <span style="display: flex; align-items: center; gap: 7px; font-weight: 700;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-                  <span>Cryptographic Identity</span>
+                  <span>Digital Sovereign ID</span>
                 </span>
-                <span class="badge" id="meCardCryptoBadge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.72rem;">Noise_XX &bull; Ed25519</span>
+                <span class="badge" id="meCardCryptoBadge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.72rem;">Secured &bull; Verified</span>
               </div>
               <div class="key-val">
-                <span class="key-label">Decentralized DID</span>
+                <span class="key-label">Sovereign ID (DID)</span>
                 <div class="key-data-copy-row">
-                  <span class="key-data" id="meCardDid" style="cursor: pointer; font-family: monospace; font-size: 0.8rem; color: #38bdf8;" onclick="copyCardItem('meCardDid', event)" title="Click to copy full DID">—</span>
-                  <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardDid', event)" title="Copy Decentralized DID" aria-label="Copy Decentralized DID">
+                  <span class="key-data" id="meCardDid" style="cursor: pointer; font-family: monospace; font-size: 0.8rem; color: #38bdf8;" onclick="copyCardItem('meCardDid', event)" title="Click to copy full ID">—</span>
+                  <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardDid', event)" title="Copy Sovereign ID" aria-label="Copy Sovereign ID">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                   </button>
                 </div>
               </div>
               <div class="key-val">
-                <span class="key-label">Peer ID (libp2p)</span>
+                <span class="key-label">Device Connection ID</span>
                 <div class="key-data-copy-row">
-                  <span class="key-data" id="meCardPeerId" style="cursor: pointer; font-family: monospace; font-size: 0.8rem; color: #a5b4fc;" onclick="copyCardItem('meCardPeerId', event)" title="Click to copy Peer ID">—</span>
-                  <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardPeerId', event)" title="Copy libp2p Peer ID" aria-label="Copy libp2p Peer ID">
+                  <span class="key-data" id="meCardPeerId" style="cursor: pointer; font-family: monospace; font-size: 0.8rem; color: #a5b4fc;" onclick="copyCardItem('meCardPeerId', event)" title="Click to copy Device ID">—</span>
+                  <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardPeerId', event)" title="Copy Device Connection ID" aria-label="Copy Device Connection ID">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                   </button>
                 </div>
               </div>
               <div class="key-val">
-                <span class="key-label">Device Key (Ed25519)</span>
+                <span class="key-label">Device Security Key</span>
                 <div class="key-data-copy-row">
-                  <span class="key-data" id="meCardDeviceKey" style="cursor: pointer; font-family: monospace; font-size: 0.8rem; color: #6ee7b7;" onclick="copyCardItem('meCardDeviceKey', event)" title="Click to copy Device Key">—</span>
-                  <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardDeviceKey', event)" title="Copy Device Key" aria-label="Copy Device Key">
+                  <span class="key-data" id="meCardDeviceKey" style="cursor: pointer; font-family: monospace; font-size: 0.8rem; color: #6ee7b7;" onclick="copyCardItem('meCardDeviceKey', event)" title="Click to copy Security Key">—</span>
+                  <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardDeviceKey', event)" title="Copy Device Security Key" aria-label="Copy Device Security Key">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                   </button>
                 </div>
               </div>
               <div class="key-val">
-                <span class="key-label">Transport Protocol</span>
-                <span class="key-data" id="meCardTransport" style="font-size: 0.82rem; color: #94a3b8;">Noise_XX + Yamux (TCP)</span>
+                <span class="key-label">Connection Security</span>
+                <span class="key-data" id="meCardTransport" style="font-size: 0.82rem; color: #94a3b8;">End-to-End Encrypted (P2P)</span>
               </div>
             </div>
             <div class="card-footer-actions">
               <button type="button" class="btn-card-action" onclick="openSovereignIdCardModal()" style="background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 10h4"/><path d="M14 14h4"/></svg>
-                <span>Inspect W3C DID &amp; QR</span>
+                <span>Show QR &amp; Card</span>
               </button>
-              <button type="button" class="btn-card-action" onclick="verifyCurrentIdentityCrypto(myProfile)" style="background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.35); color: #34d399; flex: 0.5;" title="Verify Ed25519 signature proof">
+              <button type="button" class="btn-card-action" onclick="verifyCurrentIdentityCrypto(myProfile)" style="background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.35); color: #34d399; flex: 0.5;" title="Verify security keys">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 <span>Verify</span>
               </button>
@@ -12691,15 +12685,15 @@ function renderHtml(
               <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                 <span style="display: flex; align-items: center; gap: 7px; font-weight: 700;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #c084fc;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.4-.4-.8-.4-1.3 0-.9.7-1.6 1.6-1.6h1.9c3.8 0 6.9-3.1 6.9-6.9 0-5.2-4.1-9.5-9.2-9.5z"/></svg>
-                  <span>Creator Mode</span>
+                  <span>Creator Tools</span>
                 </span>
-                <span class="badge" id="creatorStatusBadge" style="${isCreatorModeActive ? 'background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4);' : 'background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);'} font-size: 0.72rem;">${isCreatorModeActive ? '● Studio Active' : 'Consumer Mode'}</span>
+                <span class="badge" id="creatorStatusBadge" style="${isCreatorModeActive ? 'background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4);' : 'background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);'} font-size: 0.72rem;">${isCreatorModeActive ? '● Studio Active' : 'Standard Account'}</span>
               </div>
               <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.4;">
-                Enable Creator Studio &amp; BitSwap seeding tools directly in this app.
+                Enable Creator Studio tools, fan tipping, and high-speed media delivery.
               </div>
               <div class="toggle-row" style="background: rgba(255,255,255,0.03); padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.75rem;">
-                <span style="font-weight: 700; font-size: 0.88rem; color: #f1f5f9;" id="creatorStatusText">${isCreatorModeActive ? 'Studio Active' : 'Consumer Mode'}</span>
+                <span style="font-weight: 700; font-size: 0.88rem; color: #f1f5f9;" id="creatorStatusText">${isCreatorModeActive ? 'Studio Active' : 'Standard Account'}</span>
                 <label class="switch">
                   <input type="checkbox" id="creatorToggle" ${isCreatorModeActive ? 'checked' : ''} onchange="toggleCreatorMode(this.checked)">
                   <span class="slider"></span>
@@ -12707,25 +12701,25 @@ function renderHtml(
               </div>
               <div id="creatorCardTelemetryBlock">
                 <div class="key-val">
-                  <span class="key-label">BitSwap Seeding Relay</span>
-                  <span class="key-data" id="creatorSeedingTelemetry" style="color: #38bdf8; font-size: 0.8rem;">${isCreatorModeActive ? '50 MB/s P2P Relay (Active)' : 'Consumer Relay (Dynamic)'}</span>
+                  <span class="key-label">Media Delivery Network</span>
+                  <span class="key-data" id="creatorSeedingTelemetry" style="color: #38bdf8; font-size: 0.8rem;">${isCreatorModeActive ? 'High-Speed Streaming Active (50 MB/s)' : 'Standard Delivery'}</span>
                 </div>
                 <div class="key-val">
-                  <span class="key-label">Micro-Tipping Protocol</span>
-                  <span class="key-data" id="creatorTippingTelemetry" style="color: #34d399; font-size: 0.8rem;">${isCreatorModeActive ? 'SOV Settlement (95% / 5%)' : 'Viewer Mode (Tipping Allowed)'}</span>
+                  <span class="key-label">Fan Tipping &amp; Monetization</span>
+                  <span class="key-data" id="creatorTippingTelemetry" style="color: #34d399; font-size: 0.8rem;">${isCreatorModeActive ? 'Enabled &bull; Keep 95% of Earnings' : 'Viewer Mode (Tipping Allowed)'}</span>
                 </div>
               </div>
             </div>
             <div class="card-footer-actions">
               <button type="button" class="btn-card-action" onclick="openCreatorStudioQuickAction()" style="background: rgba(192, 132, 252, 0.15); border-color: rgba(192, 132, 252, 0.35); color: #d8b4fe;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/></svg>
-                <span id="creatorActionBtnText">${isCreatorModeActive ? 'Launch Creator Studio' : 'Switch to Creator Mode'}</span>
+                <span id="creatorActionBtnText">${isCreatorModeActive ? 'Launch Creator Studio' : 'Enable Creator Tools'}</span>
               </button>
             </div>
           </div>
 
-          <!-- Card 3: P2P Node Health & Diagnostics (Decoupled from Social Persona) -->
-          <div class="card profile-telemetry-card" id="nodeDiagnosticsCard">
+          <!-- Card 3: P2P Node Health & Diagnostics (Admin / Operator Only) -->
+          <div class="card profile-telemetry-card" id="nodeDiagnosticsCard" style="display: none;">
             <div>
               <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                 <span style="display: flex; align-items: center; gap: 7px; font-weight: 700;">
@@ -12781,8 +12775,8 @@ function renderHtml(
             </div>
           </div>
 
-          <!-- Card 4: libp2p Swarm & PubSub Mesh Telemetry -->
-          <div class="card profile-telemetry-card" id="meshTelemetryCard">
+          <!-- Card 4: libp2p Swarm & PubSub Mesh Telemetry (Admin / Operator Only) -->
+          <div class="card profile-telemetry-card" id="meshTelemetryCard" style="display: none;">
             <div>
               <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                 <span style="display: flex; align-items: center; gap: 7px; font-weight: 700;">
@@ -12865,11 +12859,11 @@ function renderHtml(
           <div class="wallet-header">
             <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 800; font-size: 1.1rem; color: #f8fafc;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981; flex-shrink: 0;"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-              <span>Sovereign Bandwidth &amp; Micro-Tip Wallet</span>
+              <span>My Wallet</span>
             </div>
-            <span class="badge verifiable-state-badge" id="walletVerifiableStateBadge" title="Cryptographically signed Ed25519 off-chain state channel vouchers with Merkle DAG leaf verification. Settleable on Layer-1 with zero gas fees.">
+            <span class="badge verifiable-state-badge" id="walletVerifiableStateBadge" title="Your personal sovereign balance with zero platform cuts or transfer fees.">
               <span class="pulse-dot"></span>
-              <span>Layer-1 Verifiable State</span>
+              <span>Self-Custody &bull; Zero Fees</span>
             </span>
           </div>
 
@@ -12889,85 +12883,85 @@ function renderHtml(
             <div class="wallet-metric-box">
               <div class="wallet-metric-label">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #fbbf24;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span>Seeder Bandwidth</span>
+                <span>Network Rewards</span>
               </div>
               <div class="wallet-metric-value" id="walletBandwidthEarned">—</div>
-              <div class="wallet-metric-subtext" id="walletBandwidthSubtext">Mesh blocks served</div>
+              <div class="wallet-metric-subtext" id="walletBandwidthSubtext">Community incentives</div>
             </div>
             <div class="wallet-metric-box">
               <div class="wallet-metric-label">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f472b6;"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
-                <span>Super Thanks &amp; Tips</span>
+                <span>Tips &amp; Gifts</span>
               </div>
               <div class="wallet-metric-value" id="walletTipsEarned">—</div>
-              <div class="wallet-metric-subtext" id="walletTipsSubtext">Creator Micro-Tips</div>
+              <div class="wallet-metric-subtext" id="walletTipsSubtext">Creator earnings</div>
             </div>
             <div class="wallet-metric-box">
               <div class="wallet-metric-label">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                <span>Staked Security Bond</span>
+                <span>Security Deposit</span>
               </div>
               <div class="wallet-metric-value" id="walletStakedBond">—</div>
-              <div class="wallet-metric-subtext">DHT Relay Guarantee</div>
+              <div class="wallet-metric-subtext">Refundable reserve</div>
             </div>
             <div class="wallet-metric-box">
               <div class="wallet-metric-label">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a78bfa;"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
-                <span>Relay Gas Credits</span>
+                <span>Network Credits</span>
               </div>
               <div class="wallet-metric-value" id="walletRelayGas">—</div>
-              <div class="wallet-metric-subtext">Active Mesh Routing</div>
+              <div class="wallet-metric-subtext">Active balance</div>
             </div>
           </div>
 
-          <!-- Core Financial Action Buttons: [ Withdraw Payout ], [ Public Key & Deposit ], [ Send ], [ Sync State ] -->
+          <!-- Core Financial Action Buttons: [ Cash Out ], [ Add Money ], [ Send ], [ Refresh ] -->
           <div class="wallet-action-hub">
-            <button class="wallet-action-btn wallet-btn-primary" onclick="openWithdrawModal()" title="Withdraw SOV to Layer-1 address" aria-label="Withdraw SOV to Layer-1 address">
+            <button class="wallet-action-btn wallet-btn-primary" onclick="openWithdrawModal()" title="Withdraw SOV earnings to external account" aria-label="Cash Out">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-              <span>Withdraw Payout</span>
+              <span>Cash Out</span>
             </button>
-            <button class="wallet-action-btn wallet-btn-secondary" onclick="openDepositModal()" title="View Public Key & Layer-1 Deposit / Faucet" aria-label="View Public Key & Layer-1 Deposit / Faucet">
+            <button class="wallet-action-btn wallet-btn-secondary" onclick="openDepositModal()" title="Add money or deposit SOV to wallet" aria-label="Add Money">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-              <span>Public Key &amp; Deposit</span>
+              <span>Add Money</span>
             </button>
-            <button class="wallet-action-btn wallet-btn-secondary" onclick="openSendSovModal()" title="Send SOV peer-to-peer via state channel voucher" aria-label="Send SOV peer-to-peer via state channel voucher">
+            <button class="wallet-action-btn wallet-btn-secondary" onclick="openSendSovModal()" title="Send SOV instantly to any friend or creator" aria-label="Send">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              <span>Send P2P Transfer</span>
+              <span>Send</span>
             </button>
-            <button class="wallet-action-btn wallet-btn-ghost" onclick="refreshWalletBalanceLive()" title="Sync wallet balance with sovereign mesh" aria-label="Sync wallet balance with sovereign mesh">
+            <button class="wallet-action-btn wallet-btn-ghost" onclick="refreshWalletBalanceLive()" title="Update wallet balance" aria-label="Refresh">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
-              <span>Sync State</span>
+              <span>Refresh</span>
             </button>
           </div>
 
-          <!-- Visual Vouchers & State Proofs -->
+          <!-- Visual Vouchers & Recent Activity -->
           <div class="wallet-vouchers-section" id="walletVouchersSection">
             <div class="wallet-vouchers-header">
               <div class="vouchers-title">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
-                <span>State Channel Vouchers &amp; Merkle Proofs</span>
+                <span>Recent Activity</span>
               </div>
               <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.7rem;">
-                ● SHA-256 DAG State
+                ● Instant Settlement
               </span>
             </div>
             <div id="walletVouchersContainer" class="wallet-vouchers-list">
               <div class="wallet-voucher-card">
                 <div class="voucher-meta-col">
                   <div class="voucher-root-row">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M3 12h6m6 0h6"/></svg>
-                    <span>Root: 0x7f4a8b9e…9c21</span>
-                    <span style="color: #34d399; font-weight: 700;">+475.00 SOV</span>
+                    <span style="font-size: 0.95rem;">🎁</span>
+                    <span style="font-weight: 700; color: #f8fafc;">Welcome Bonus &bull; Fan Tip</span>
+                    <span style="color: #34d399; font-weight: 800; margin-left: auto;">+475.00 SOV</span>
                   </div>
                   <div class="voucher-specs-row">
-                    <span>Block #8,421</span> &bull; 
-                    <span>Split: 95% Creator, 5% BitSwap</span> &bull; 
-                    <span>Ed25519 Signed</span>
+                    <span>Direct Deposit</span> &bull; 
+                    <span>Keep 95% Creator Share</span> &bull; 
+                    <span style="color: #38bdf8;">Verified Receipt</span>
                   </div>
                 </div>
-                <button class="voucher-verify-btn" id="btn-verify-vouch_genesis_01" onclick="verifyMerkleProofLive('vouch_genesis_01', '0x7f4a8b9e11029c21', 'genesis_payload_01')" aria-label="Verify cryptographic Merkle proof for genesis voucher">
+                <button class="voucher-verify-btn" id="btn-verify-vouch_genesis_01" onclick="verifyMerkleProofLive('vouch_genesis_01', '0x7f4a8b9e11029c21', 'genesis_payload_01')" aria-label="Verify receipt for genesis voucher">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-                  <span>Verify Proof</span>
+                  <span>Receipt</span>
                 </button>
               </div>
             </div>
@@ -12980,12 +12974,12 @@ function renderHtml(
             <div style="display: flex; align-items: center; gap: 0.6rem;">
               <span style="font-size: 1.3rem;">✨</span>
               <div>
-                <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Creator Hub &amp; Sovereign Entities</div>
-                <div style="font-size: 0.76rem; color: #94a3b8;">Create and manage decentralized broadcast channels and public pages.</div>
+                <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Channels &amp; Public Pages</div>
+                <div style="font-size: 0.76rem; color: #94a3b8;">Create broadcast channels for subscribers and public pages for your brand.</div>
               </div>
             </div>
             <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.4); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
-              Sovereign Assets
+              Publishing Hub
             </span>
           </div>
 
@@ -13000,7 +12994,7 @@ function renderHtml(
                 </div>
                 <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">Broadcast Channels</div>
                 <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin-top: 0.25rem;">
-                  One-to-many decentralized feeds for subscribers, crypto updates, and announcements.
+                  Broadcast updates, photos, and news directly to your subscribers' inbox with zero censorship.
                 </div>
               </div>
               <button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
@@ -13016,9 +13010,9 @@ function renderHtml(
                   <span style="font-size: 1.35rem;">🏢</span>
                   <span class="badge" style="background: rgba(192, 132, 252, 0.15); color: #c084fc; font-size: 0.68rem; font-weight: 700;">PAGE</span>
                 </div>
-                <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">Sovereign Pages</div>
+                <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">Public Pages</div>
                 <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin-top: 0.25rem;">
-                  Public verified profiles for organizations, projects, developer tools, and communities.
+                  Official verified profiles for your brand, company, creative project, or community.
                 </div>
               </div>
               <button type="button" class="btn btn-primary" onclick="openCreatePageModal()" style="background: rgba(192, 132, 252, 0.2); border: 1px solid rgba(192, 132, 252, 0.45); color: #c084fc; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
@@ -13334,7 +13328,7 @@ function renderHtml(
     </div>
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <span>&copy; 2026 SOVRA Network Inc.</span>
-      <a href="/admin" target="_blank" style="color: #475569; text-decoration: none; font-size: 0.68rem; transition: color 0.15s;" onmouseover="this.style.color='#94a3b8'" onmouseout="this.style.color='#475569'" title="Company Operations Console">Ops &nearr;</a>
+      <a href="/admin" id="rightRailOpsLink" target="_blank" style="display: none; color: #475569; text-decoration: none; font-size: 0.68rem; transition: color 0.15s;" onmouseover="this.style.color='#94a3b8'" onmouseout="this.style.color='#475569'" title="Company Operations Console">Ops &nearr;</a>
     </div>
   </div>
 
@@ -14758,21 +14752,83 @@ function renderHtml(
         <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.78rem; color: #bae6fd; line-height: 1.45;">
           <b>Universal Human Equality:</b> Under SOVRA, no government, corporation, or powerful elite has special immunity or unilateral takedown power. All reports initiate a <b>24-Hour Democratic Community Ballot</b> where author has an equal right of defense.
         </div>
-        <label class="social-modal-label">Reason for Report</label>
-        <select id="reportReasonInput" class="social-modal-input">
-          <option value="hate_speech">🚩 Hate Speech &amp; Communal Disharmony</option>
-          <option value="illegal">🚫 Illegal Violence &amp; Physical Threat</option>
-          <option value="terrorism">⚡ Terrorism &amp; Violent Extremism</option>
-          <option value="misinformation">⚠️ Malicious Misinformation / Deception</option>
-          <option value="harassment">🛑 Targeted Harassment &amp; Bullying</option>
+        <div id="safetyReportTargetLabel" style="font-size: 0.82rem; color: #f87171; font-weight: 700; margin-bottom: 8px;">Target: Selected Post</div>
+        <label class="social-modal-label">Reason for Report (17 Standardized Categories)</label>
+        <select id="reportReasonInput" class="social-modal-input" style="font-size: 0.82rem;">
+          <option value="HATE_SPEECH_DEHUMANIZATION">🚩 1. Hate Speech &amp; Targeted Dehumanization</option>
+          <option value="IMMINENT_VIOLENCE_INCITEMENT">⚡ 2. Credible Threats &amp; Incitement to Imminent Violence</option>
+          <option value="TERRORISM_EXTREMISM">💣 3. Terrorist Recruitment &amp; Violent Extremism</option>
+          <option value="CHILD_EXPLOITATION_CSAM">🛑 4. Child Sexual Abuse &amp; Exploitation (Immediate Quarantine)</option>
+          <option value="MINOR_GROOMING_EXPLOITATION">🚸 5. Minor Grooming &amp; Exploitation</option>
+          <option value="NCII_SEXUAL_EXPLOITATION">🔞 6. Non-Consensual Intimate Imagery (NCII)</option>
+          <option value="ADULT_SEXUAL_CONTENT">⚠️ 7. Adult Sexual Content &amp; Unlabeled Nudity</option>
+          <option value="HARASSMENT_STALKING">🚫 8. Harassment, Stalking &amp; Coordinated Abuse</option>
+          <option value="MISINFORMATION_DECEPTION">📰 9. Misinformation &amp; Manipulated Media</option>
+          <option value="FRAUD_SCAMS_PHISHING">🎣 10. Fraud, Phishing &amp; Malicious Impersonation</option>
+          <option value="DOXXING_PRIVATE_INFO">👁️ 11. Doxxing &amp; Exposure of Sensitive Info</option>
+          <option value="TRAFFICKING_COERCION">⛓️ 12. Human Trafficking &amp; Coercion</option>
+          <option value="DANGEROUS_INSTRUCTIONS">☣️ 13. Dangerous Instructions for Serious Harm</option>
+          <option value="SPAM_COORDINATED_MANIPULATION">🤖 14. Spam, Bots &amp; Coordinated Inauthentic Behavior</option>
+          <option value="SUICIDE_SELF_HARM">❤️‍🩹 15. Encouragement of Suicide or Self-Harm</option>
+          <option value="COPYRIGHT_INFRINGEMENT">©️ 16. Copyright Infringement &amp; IP Violation</option>
+          <option value="OTHER_SERIOUS_VIOLATION">⚖️ 17. Other Serious Platform Violation</option>
         </select>
 
-        <label class="social-modal-label">Additional Context / Evidence</label>
-        <textarea id="reportDetailsInput" class="social-modal-input" style="min-height: 60px; resize: vertical;" placeholder="Provide evidence or context for the peer jurors..."></textarea>
+        <label class="social-modal-label">Evidence, Context &amp; Intent Explanation</label>
+        <textarea id="reportDetailsInput" class="social-modal-input" style="min-height: 70px; resize: vertical;" placeholder="Provide factual context, intent explanation, and evidence links for peer jurors..."></textarea>
 
         <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
           <button onclick="closeSafetyReportModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
-          <button onclick="submitSafetyReport()" class="action-pill-btn action-pill-danger" style="flex: 1.2; padding: 0.75rem; justify-content: center; font-size: 0.85rem;">Initiate 24h Jury Ballot ⚖️</button>
+          <button onclick="submitSafetyReport()" class="action-pill-btn action-pill-danger" style="flex: 1.4; padding: 0.75rem; justify-content: center; font-size: 0.85rem;">Initiate 24h Jury Ballot ⚖️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🛡️ 11. SOVRA CITIZEN PRIVACY & SAFETY CENTER MODAL -->
+  <div id="safetyCenterModal" class="omni-modal-overlay" style="display: none;">
+    <div class="omni-modal-card" style="max-width: 500px; width: 94%;">
+      <div style="padding: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 800; font-size: 1rem; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+          <span>🛡️</span> <span>Privacy &amp; Sovereign Safety Center</span>
+        </div>
+        <button onclick="closeSafetyCenterModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.25rem; max-height: 75vh; overflow-y: auto;">
+        <!-- Core Universal Rights Pillar -->
+        <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;">
+          <div style="font-weight: 700; color: #a5b4fc; font-size: 0.85rem; margin-bottom: 4px;">⚖️ Universal Sovereign Equality</div>
+          <div style="font-size: 0.78rem; color: #cbd5e1; line-height: 1.45;">
+            Under SOVRA, no government, corporation, or elite has special immunity or unilateral censorship power. Every human being has equal rights, privacy, and due process.
+          </div>
+        </div>
+
+        <!-- 24h Community Jury Court Access -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;">
+          <div style="font-weight: 700; color: #f87171; font-size: 0.85rem; margin-bottom: 4px;">🗳️ 24h Democratic Community Jury</div>
+          <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin-bottom: 10px;">
+            Content moderation is decided by decentralized community jurors, requiring a 66.67% supermajority to take down harmful posts.
+          </div>
+          <button onclick="closeSafetyCenterModal(); openLatestJuryBallotOrList();" class="action-pill-btn action-pill-danger" style="width: 100%; justify-content: center; font-size: 0.8rem; padding: 8px 12px;">
+            Review Active Community Ballots ⚖️
+          </button>
+        </div>
+
+        <!-- Cryptographic Sovereign Data & Privacy -->
+        <div style="background: rgba(34, 197, 94, 0.05); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
+          <div style="font-weight: 700; color: #4ade80; font-size: 0.85rem; margin-bottom: 4px;">🔐 Zero-Knowledge Privacy &amp; Encryption</div>
+          <div style="font-size: 0.78rem; color: #cbd5e1; line-height: 1.4;">
+            Your chats and identity are secured with Ed25519 &amp; Noise_XX cryptography. No central authority can snoop on your private communications.
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button onclick="closeSafetyCenterModal(); triggerSafetyReportModal();" class="action-pill-btn action-pill-secondary" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 8px 12px;">
+            🚩 File Safety Report
+          </button>
+          <button onclick="closeSafetyCenterModal();" class="action-pill-btn action-pill-primary" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 8px 12px;">
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -14792,7 +14848,7 @@ function renderHtml(
         <div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(129, 140, 248, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 1.4rem;">🏛️</span>
           <div style="font-size: 0.76rem; color: #c7d2fe; line-height: 1.4;">
-            <b>Universal Sovereignty:</b> Equal due process for all human beings. 66% supermajority required to delete. Government actions have no special immunity.
+            <b>Universal Sovereignty:</b> Equal due process for all human beings. 66.67% supermajority required to delete. Government actions have no special immunity.
           </div>
         </div>
 
@@ -14840,26 +14896,33 @@ function renderHtml(
           <div style="width: 100%; height: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 5px; overflow: hidden; display: flex;">
             <div id="juryBarViolation" style="height: 100%; width: 0%; background: linear-gradient(90deg, #ef4444, #dc2626); transition: width 0.3s;"></div>
             <div id="juryBarSafe" style="height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, #16a34a); transition: width 0.3s;"></div>
+            <div id="juryBarInsufficient" style="height: 100%; width: 0%; background: linear-gradient(90deg, #64748b, #475569); transition: width 0.3s;"></div>
           </div>
           <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px; text-align: right;">
-            Supermajority required to auto-delete: <b>66%</b>
+            Supermajority required to auto-delete: <b>66.67%</b>
           </div>
         </div>
 
-        <!-- Cast Your Sovereign Vote -->
+        <!-- Cast Your Sovereign Vote: 3 Standard Substantive Choices -->
         <div style="font-size: 0.8rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Cast Your Sovereign Peer Vote:</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
-          <button onclick="castBallotVote('hate_speech')" class="action-pill-btn action-pill-danger" style="padding: 8px; font-size: 0.76rem; justify-content: center; text-align: center;">
-            🚩 Hate Speech
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 12px;">
+          <button onclick="castBallotVote('VIOLATION_PROVEN')" class="action-pill-btn action-pill-danger" style="padding: 8px 4px; font-size: 0.72rem; justify-content: center; text-align: center;">
+            🚩 Violation Proven
           </button>
-          <button onclick="castBallotVote('illegal')" class="action-pill-btn action-pill-danger" style="padding: 8px; font-size: 0.76rem; justify-content: center; text-align: center;">
-            🚫 Illegal / Violence
+          <button onclick="castBallotVote('VIOLATION_NOT_PROVEN')" class="action-pill-btn action-pill-primary" style="padding: 8px 4px; font-size: 0.72rem; justify-content: center; text-align: center; background: #16a34a;">
+            🛡️ Not Proven
           </button>
-          <button onclick="castBallotVote('misinformation')" class="action-pill-btn action-pill-secondary" style="padding: 8px; font-size: 0.76rem; justify-content: center; text-align: center; color: #fbbf24;">
-            ⚠️ Misinformation
+          <button onclick="castBallotVote('INSUFFICIENT_EVIDENCE')" class="action-pill-btn action-pill-secondary" style="padding: 8px 4px; font-size: 0.72rem; justify-content: center; text-align: center; color: #94a3b8;">
+            ⚖️ Insufficient Info
           </button>
-          <button onclick="castBallotVote('safe_defense')" class="action-pill-btn action-pill-primary" style="padding: 8px; font-size: 0.76rem; justify-content: center; text-align: center; background: #16a34a;">
-            🛡️ Safe / Self-Defense
+        </div>
+
+        <!-- Appeals Section for Closed Cases -->
+        <div id="juryAppealSection" style="margin-top: 8px; margin-bottom: 12px; display: none;">
+          <label class="social-modal-label">Submit Appeal / Independent Re-examination</label>
+          <textarea id="juryAppealReasonInput" class="social-modal-input" style="min-height: 48px; font-size: 0.78rem;" placeholder="State why this verdict violates evidence or policy..."></textarea>
+          <button onclick="submitAppealFromModal()" class="action-pill-btn action-pill-warning" style="margin-top: 6px; padding: 6px 12px; font-size: 0.75rem; width: 100%; justify-content: center;">
+            ⚖️ Submit Official Case Appeal
           </button>
         </div>
 
@@ -16484,76 +16547,157 @@ function renderHtml(
     // "Universal Human Equality: No state or corporation is above human beings"
     // ==========================================================================
     window.SovraAutonomousJury = (function() {
-      async function createReport(postId, reason, details) {
+      async function createReport(arg1, arg2, arg3, arg4) {
         try {
           const myDid = window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:peer';
-          const resp = await fetch('/api/jury/report', {
+          let payload;
+          if (arg4 !== undefined) {
+            payload = {
+              targetType: arg1,
+              targetId: arg2,
+              violationCategory: arg3,
+              evidenceText: arg4,
+              reporterDid: myDid
+            };
+          } else {
+            payload = {
+              targetType: 'post',
+              targetId: arg1,
+              postId: arg1,
+              violationCategory: arg2,
+              reason: arg2,
+              evidenceText: arg3,
+              details: arg3,
+              reporterDid: myDid
+            };
+          }
+          const resp = await fetch('/api/moderation/reports', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ postId, reason, details, reporterDid: myDid })
+            body: JSON.stringify(payload)
           });
           return await resp.json();
         } catch (e) {
           console.error('[SovraAutonomousJury] Report creation error:', e);
-          return { ok: false, error: e };
+          return { ok: false, error: String(e) };
         }
       }
 
-      async function submitDefense(ballotId, defenseNote) {
+      async function fetchCases(params) {
         try {
-          const resp = await fetch('/api/jury/defense', {
+          const q = params ? new URLSearchParams(params).toString() : '';
+          const url = '/api/moderation/cases' + (q ? '?' + q : '');
+          const resp = await fetch(url);
+          return await resp.json();
+        } catch (e) {
+          return { ok: false, cases: [], ballots: [] };
+        }
+      }
+
+      async function fetchCaseById(caseId) {
+        try {
+          const resp = await fetch('/api/moderation/cases/' + encodeURIComponent(caseId));
+          return await resp.json();
+        } catch (e) {
+          return { ok: false, error: String(e) };
+        }
+      }
+
+      async function submitDefense(caseId, defenseNote) {
+        try {
+          const resp = await fetch('/api/moderation/cases/' + encodeURIComponent(caseId) + '/defense', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ballotId, defenseNote })
+            body: JSON.stringify({ caseId: caseId, ballotId: caseId, defenseNote: defenseNote })
           });
           return await resp.json();
         } catch (e) {
           console.error('[SovraAutonomousJury] Defense submission error:', e);
-          return { ok: false, error: e };
+          return { ok: false, error: String(e) };
         }
       }
 
-      async function castVote(ballotId, vote) {
+      async function castVote(caseId, vote, rationale) {
         try {
-          const myDid = window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:voter_' + Math.random().toString(36).substring(2, 8);
-          const resp = await fetch('/api/jury/vote', {
+          const myDid = window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : ('did:sovra:voter_' + Math.random().toString(36).substring(2, 8));
+          const resp = await fetch('/api/moderation/cases/' + encodeURIComponent(caseId) + '/vote', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ballotId, vote, voterDid: myDid })
+            body: JSON.stringify({ caseId: caseId, ballotId: caseId, choice: vote, vote: vote, voterDid: myDid, rationale: rationale })
           });
           return await resp.json();
         } catch (e) {
           console.error('[SovraAutonomousJury] Vote casting error:', e);
-          return { ok: false, error: e };
+          return { ok: false, error: String(e) };
+        }
+      }
+
+      async function finalizeCase(caseId, force) {
+        try {
+          const resp = await fetch('/api/moderation/cases/' + encodeURIComponent(caseId) + '/finalize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ caseId: caseId, force: Boolean(force) })
+          });
+          return await resp.json();
+        } catch (e) {
+          return { ok: false, error: String(e) };
+        }
+      }
+
+      async function submitAppeal(caseId, appealReason) {
+        try {
+          const resp = await fetch('/api/moderation/cases/' + encodeURIComponent(caseId) + '/appeal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ caseId: caseId, appealReason: appealReason })
+          });
+          return await resp.json();
+        } catch (e) {
+          return { ok: false, error: String(e) };
+        }
+      }
+
+      async function resolveAppeal(caseId, appealId, decision, resolutionNote) {
+        try {
+          const resp = await fetch('/api/moderation/cases/' + encodeURIComponent(caseId) + '/appeal/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ caseId: caseId, appealId: appealId, decision: decision, resolutionNote: resolutionNote })
+          });
+          return await resp.json();
+        } catch (e) {
+          return { ok: false, error: String(e) };
+        }
+      }
+
+      async function fetchTransparencyMetrics() {
+        try {
+          const resp = await fetch('/api/moderation/transparency');
+          return await resp.json();
+        } catch (e) {
+          return { ok: false, error: String(e) };
         }
       }
 
       async function fetchBallots(includeAll) {
-        try {
-          const resp = await fetch('/api/jury/ballots' + (includeAll ? '?all=true' : ''));
-          return await resp.json();
-        } catch (e) {
-          return { ok: false, ballots: [] };
-        }
+        return fetchCases(includeAll ? { all: 'true' } : undefined);
       }
 
       async function resolveBallot(ballotId) {
-        try {
-          const resp = await fetch('/api/jury/resolve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ballotId })
-          });
-          return await resp.json();
-        } catch (e) {
-          return { ok: false, error: e };
-        }
+        return finalizeCase(ballotId, true);
       }
 
       return {
         createReport: createReport,
+        fetchCases: fetchCases,
+        fetchCaseById: fetchCaseById,
         submitDefense: submitDefense,
         castVote: castVote,
+        finalizeCase: finalizeCase,
+        submitAppeal: submitAppeal,
+        resolveAppeal: resolveAppeal,
+        fetchTransparencyMetrics: fetchTransparencyMetrics,
         fetchBallots: fetchBallots,
         resolveBallot: resolveBallot
       };
@@ -22730,6 +22874,31 @@ function renderHtml(
         if (websiteRow) websiteRow.style.display = 'none';
         const badge = document.getElementById('meEd25519Badge');
         if (badge) badge.innerText = 'Guest';
+
+        const drawerName = document.getElementById('drawerProfileName');
+        if (drawerName) drawerName.innerText = 'Guest (Logged Out)';
+        const drawerHandle = document.getElementById('drawerProfileHandle');
+        if (drawerHandle) drawerHandle.innerText = '@guest';
+        const railAdminTab = document.getElementById('tab-admin');
+        if (railAdminTab) railAdminTab.style.display = 'none';
+        const drawerAdminSec = document.getElementById('drawerAdminSection');
+        if (drawerAdminSec) drawerAdminSec.style.display = 'none';
+        const hubP2p = document.getElementById('hubBtnP2pDiagnostics');
+        if (hubP2p) hubP2p.style.display = 'none';
+        const hubMesh = document.getElementById('hubBtnMeshTelemetry');
+        if (hubMesh) hubMesh.style.display = 'none';
+        const cardP2p = document.getElementById('nodeDiagnosticsCard');
+        if (cardP2p) cardP2p.style.display = 'none';
+        const cardMesh = document.getElementById('meshTelemetryCard');
+        if (cardMesh) cardMesh.style.display = 'none';
+        const rightRailOps = document.getElementById('rightRailOpsLink');
+        if (rightRailOps) rightRailOps.style.display = 'none';
+        const drawerRole = document.getElementById('drawerRoleIndicator');
+        if (drawerRole) {
+          drawerRole.innerText = 'Guest';
+          drawerRole.style.background = 'rgba(100, 116, 139, 0.2)';
+          drawerRole.style.color = '#94a3b8';
+        }
         return;
       }
       myProfile.name = myProfile.displayName || myProfile.name || 'Sovereign Node';
@@ -22759,6 +22928,60 @@ function renderHtml(
       const railHandle = document.getElementById('railUserHandle');
       if (railHandle) railHandle.innerText = myProfile.handle || '@you';
 
+      // Update SOVRA Drawer Profile Card
+      const drawerName = document.getElementById('drawerProfileName');
+      if (drawerName) drawerName.innerText = myProfile.displayName || myProfile.name || 'My Profile';
+      const drawerHandle = document.getElementById('drawerProfileHandle');
+      if (drawerHandle) drawerHandle.innerText = myProfile.handle || '@you';
+      const drawerAvatar = document.getElementById('drawerAvatarIcon');
+      if (drawerAvatar) {
+        if (myProfile.avatarDataUrl) {
+          drawerAvatar.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
+        } else {
+          const ltr = (myProfile.name ? myProfile.name.charAt(0).toUpperCase() : (myProfile.avatar || '👤'));
+          drawerAvatar.innerText = ltr;
+          if (myProfile.avatarBg) drawerAvatar.style.background = myProfile.avatarBg;
+        }
+      }
+
+      // Role-Based UI Gate: Hide Operations Console from regular users
+      const isAdminUser = Boolean(
+        myProfile.role === 'SUPER_ADMIN' ||
+        myProfile.role === 'ADMIN' ||
+        myProfile.role === 'OPERATOR' ||
+        myProfile.role === 'SECURITY_ADMIN' ||
+        myProfile.isAdmin === true ||
+        myProfile.handle === '@laptop_host'
+      );
+
+      const railAdminTab = document.getElementById('tab-admin');
+      if (railAdminTab) railAdminTab.style.display = isAdminUser ? 'flex' : 'none';
+
+      const drawerAdminSec = document.getElementById('drawerAdminSection');
+      if (drawerAdminSec) drawerAdminSec.style.display = isAdminUser ? 'block' : 'none';
+
+      const hubP2p = document.getElementById('hubBtnP2pDiagnostics');
+      if (hubP2p) hubP2p.style.display = isAdminUser ? 'inline-flex' : 'none';
+
+      const hubMesh = document.getElementById('hubBtnMeshTelemetry');
+      if (hubMesh) hubMesh.style.display = isAdminUser ? 'inline-flex' : 'none';
+
+      const cardP2p = document.getElementById('nodeDiagnosticsCard');
+      if (cardP2p && !isAdminUser) cardP2p.style.display = 'none';
+
+      const cardMesh = document.getElementById('meshTelemetryCard');
+      if (cardMesh && !isAdminUser) cardMesh.style.display = 'none';
+
+      const rightRailOps = document.getElementById('rightRailOpsLink');
+      if (rightRailOps) rightRailOps.style.display = isAdminUser ? 'inline' : 'none';
+
+      const drawerRole = document.getElementById('drawerRoleIndicator');
+      if (drawerRole) {
+        drawerRole.innerText = isAdminUser ? 'Node Operator' : 'Citizen';
+        drawerRole.style.background = isAdminUser ? 'rgba(239, 68, 68, 0.15)' : 'rgba(99, 102, 241, 0.15)';
+        drawerRole.style.color = isAdminUser ? '#f87171' : '#818cf8';
+      }
+
       const handleEl = document.getElementById('currentUserHandleText');
       if (handleEl) handleEl.innerText = myProfile.handle || '@you';
 
@@ -22782,7 +23005,11 @@ function renderHtml(
       const profileHandle = document.getElementById('meProfileHandle');
       const peerIdStr = window.sovraPeerId || '${binding.peerId}';
       if (profileHandle) {
-        profileHandle.innerHTML = (myProfile.handle || '@you') + ' &bull; libp2p Peer: <code id="mePeerIdShort">' + peerIdStr.substring(0, 12) + '...</code>';
+        if (isAdminUser) {
+          profileHandle.innerHTML = (myProfile.handle || '@you') + ' &bull; <span style="color: #f87171; font-weight: 700;">Node Operator</span> &bull; <code id="mePeerIdShort">' + peerIdStr.substring(0, 12) + '...</code>';
+        } else {
+          profileHandle.innerHTML = (myProfile.handle || '@you') + ' &bull; <span style="color: #38bdf8; font-weight: 600;">Sovereign Citizen</span>';
+        }
       }
 
       const peerShort = document.getElementById('mePeerIdShort');
@@ -25561,6 +25788,23 @@ function renderHtml(
     // Tab switching for all modes + admin console + friends discovery
     function switchTab(tab) {
       if (tab === 'chats') tab = 'chat';
+      if (tab === 'admin') {
+        const p = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
+        const isAdminUser = Boolean(p && (
+          p.role === 'SUPER_ADMIN' ||
+          p.role === 'ADMIN' ||
+          p.role === 'OPERATOR' ||
+          p.role === 'SECURITY_ADMIN' ||
+          p.isAdmin === true ||
+          p.handle === '@laptop_host'
+        ));
+        if (!isAdminUser) {
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('🔒 Operations Console is reserved for Node Operators and Admins.');
+          }
+          return;
+        }
+      }
       const views = {
         feed: document.getElementById('feed-view'),
         friends: document.getElementById('friends-view'),
@@ -26149,22 +26393,21 @@ function renderHtml(
             '<div class="profile-bio-header">' +
               '<div class="profile-bio-title">' +
                 '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>' +
-                '<span>Node Persona &amp; Bio</span>' +
+                '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>' +
+                '<span>About &amp; Bio</span>' +
               '</div>' +
             '</div>' +
             '<div class="profile-bio-text">' + bioText + '</div>' +
             '<div class="profile-bio-badges">' +
-              '<span class="bio-pill-badge" title="Local P2P mesh gossiping is active">' +
+              '<span class="bio-pill-badge" title="Active on network">' +
                 '<span class="bio-beacon-dot"></span>' +
-                '<span>Mesh Active</span>' +
+                '<span>Active</span>' +
               '</span>' +
-              '<span class="bio-pill-badge" style="color: #a5b4fc; border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.1);" title="Routing mesh packets and seeding DAG blocks">' +
-                '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>' +
-                '<span>Relay &amp; Seeder</span>' +
+              '<span class="bio-pill-badge" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.1);" title="Sovereign identity">' +
+                '<span>🛡️ Sovereign</span>' +
               '</span>' +
-              '<span class="bio-pill-badge" style="color: #34d399; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);" title="BitSwap ready">' +
-                '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
-                '<span>BitSwap Ready</span>' +
+              '<span class="bio-pill-badge" style="color: #a5b4fc; border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.1);" title="Community Peer">' +
+                '<span>✨ Peer</span>' +
               '</span>' +
             '</div>' +
           '</div>' +
@@ -26172,11 +26415,11 @@ function renderHtml(
           '<div class="profile-stats-row" style="margin-top: 14px;">' +
             '<div class="profile-stat-box stat-box-posts">' +
               '<div class="stat-top-row">' +
-                '<span class="stat-category-title">Feed Posts</span>' +
+                '<span class="stat-category-title">Posts</span>' +
                 '<span class="stat-icon-wrap" style="color: #818cf8;">📄</span>' +
               '</div>' +
               '<div class="stat-number" id="peerStatPosts">' + (stats.postsCount || posts.length) + '</div>' +
-              '<div class="stat-subtext">Published updates</div>' +
+              '<div class="stat-subtext">Published</div>' +
             '</div>' +
 
             '<div class="profile-stat-box stat-box-friends">' +
@@ -26185,7 +26428,7 @@ function renderHtml(
                 '<span class="stat-icon-wrap" style="color: #38bdf8;">🤝</span>' +
               '</div>' +
               '<div class="stat-number" id="peerStatFriends" style="color: #38bdf8;">' + (stats.friendsCount || stats.mutualFriendsCount || 0) + '</div>' +
-              '<div class="stat-subtext">Bilateral trust</div>' +
+              '<div class="stat-subtext">Connected</div>' +
             '</div>' +
 
             '<div class="profile-stat-box stat-box-followers">' +
@@ -26194,7 +26437,7 @@ function renderHtml(
                 '<span class="stat-icon-wrap" style="color: #10b981;">👥</span>' +
               '</div>' +
               '<div class="stat-number" id="peerStatFollowers" style="color: #10b981;">' + (stats.followersCount || 0) + '</div>' +
-              '<div class="stat-subtext">Mesh subscribers</div>' +
+              '<div class="stat-subtext">Followers</div>' +
             '</div>' +
 
             '<div class="profile-stat-box stat-box-following">' +
@@ -26203,7 +26446,7 @@ function renderHtml(
                 '<span class="stat-icon-wrap" style="color: #c084fc;">📡</span>' +
               '</div>' +
               '<div class="stat-number" id="peerStatFollowing" style="color: #c084fc;">' + (stats.followingCount || 0) + '</div>' +
-              '<div class="stat-subtext">Subscriptions</div>' +
+              '<div class="stat-subtext">Following</div>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -28586,11 +28829,15 @@ function renderHtml(
 
       if (tab === 'posts') {
         const myPosts = feedPostsData.filter(function(p) { return p.authorDid === myDid; });
-        const displayPosts = myPosts.length > 0 ? myPosts : feedPostsData;
-        if (displayPosts.length === 0) {
-          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">No posts published yet. Share your first update on the mesh!</div>';
+        if (myPosts.length === 0) {
+          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">' +
+            '<div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); display: flex; align-items: center; justify-content: center; font-size: 1.75rem; border: 1px solid rgba(56, 189, 248, 0.2);">📸</div>' +
+            '<div style="font-weight: 800; font-size: 1.1rem; color: #f8fafc;">Share Photos &amp; Updates</div>' +
+            '<div style="font-size: 0.85rem; max-width: 320px; line-height: 1.4; color: #94a3b8;">When you share photos, videos, and thoughts, they will appear on your profile.</div>' +
+            '<button type="button" onclick="triggerBottomCreateAction()" style="margin-top: 0.5rem; background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; font-weight: 700; border: none; padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.3);">+ Share Your First Post</button>' +
+          '</div>';
         } else {
-          html = displayPosts.map(function(p) {
+          html = myPosts.map(function(p) {
             var mediaContent = p.mediaImage ?
               '<img src="' + p.mediaImage + '" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;" />' :
               (p.mediaVideo ? '<div style="font-size: 2.2rem; pointer-events: none;">🎬</div>' :
@@ -28608,11 +28855,15 @@ function renderHtml(
         }
       } else if (tab === 'reels') {
         const myReels = reelsData.filter(function(r) { return r.creatorDid === myDid; });
-        const displayReels = myReels.length > 0 ? myReels : reelsData;
-        if (displayReels.length === 0) {
-          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">No video reels created yet. Record or upload your first reel!</div>';
+        if (myReels.length === 0) {
+          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">' +
+            '<div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(168, 85, 247, 0.1); display: flex; align-items: center; justify-content: center; font-size: 1.75rem; border: 1px solid rgba(168, 85, 247, 0.2);">🎬</div>' +
+            '<div style="font-weight: 800; font-size: 1.1rem; color: #f8fafc;">Capture &amp; Share Reels</div>' +
+            '<div style="font-size: 0.85rem; max-width: 320px; line-height: 1.4; color: #94a3b8;">Create short immersive video reels to express yourself and reach new audiences.</div>' +
+            '<button type="button" onclick="openReelUploadModal()" style="margin-top: 0.5rem; background: linear-gradient(135deg, #9333ea, #4f46e5); color: #fff; font-weight: 700; border: none; padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 12px rgba(147,51,234,0.3);">+ Create a Reel</button>' +
+          '</div>';
         } else {
-          html = displayReels.map(function(r, idx) {
+          html = myReels.map(function(r, idx) {
             return '<div class="media-grid-item" style="background: ' + r.bgGradient + ';" onclick="switchTab(&quot;reels&quot;); currentReelIndex = ' + idx + '; renderCurrentReel();">' +
               '<div style="font-size: 2.2rem; pointer-events: none;">🎬</div>' +
               '<div class="media-hover-overlay">' +
@@ -28625,7 +28876,12 @@ function renderHtml(
       } else if (tab === 'articles') {
         const myArticles = feedPostsData.filter(function(p) { return p.authorDid === myDid && p.postType === 'article'; });
         if (myArticles.length === 0) {
-          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">No long-form articles published yet. Tap "+ Post" → "Long Post" to write!</div>';
+          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">' +
+            '<div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(99, 102, 241, 0.1); display: flex; align-items: center; justify-content: center; font-size: 1.75rem; border: 1px solid rgba(99, 102, 241, 0.2);">📖</div>' +
+            '<div style="font-weight: 800; font-size: 1.1rem; color: #f8fafc;">Write Long-Form Articles</div>' +
+            '<div style="font-size: 0.85rem; max-width: 320px; line-height: 1.4; color: #94a3b8;">Publish in-depth articles, essays, and stories with rich markdown formatting.</div>' +
+            '<button type="button" onclick="triggerBottomCreateAction()" style="margin-top: 0.5rem; background: linear-gradient(135deg, #4f46e5, #6366f1); color: #fff; font-weight: 700; border: none; padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">+ Write an Article</button>' +
+          '</div>';
         } else {
           html = myArticles.map(function(p) {
             return '<div class="media-grid-item" style="background: linear-gradient(135deg, #1e1b4b, #312e81); padding: 1rem; display: flex; flex-direction: column; justify-content: center; text-align: center;" onclick="switchTab(&quot;feed&quot;); var c = document.getElementById(&quot;card-' + p.id + '&quot;); if(c) c.scrollIntoView({ behavior: &quot;smooth&quot; });">' +
@@ -28641,7 +28897,12 @@ function renderHtml(
       } else if (tab === 'media') {
         const myMedia = feedPostsData.filter(function(p) { return p.authorDid === myDid && (p.mediaImage || p.mediaVideo || p.postType === 'photo' || p.postType === 'video'); });
         if (myMedia.length === 0) {
-          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">No photos or videos uploaded yet. Share media from your camera or local disk!</div>';
+          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">' +
+            '<div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(16, 185, 129, 0.1); display: flex; align-items: center; justify-content: center; font-size: 1.75rem; border: 1px solid rgba(16, 185, 129, 0.2);">🖼️</div>' +
+            '<div style="font-weight: 800; font-size: 1.1rem; color: #f8fafc;">Photos &amp; Videos</div>' +
+            '<div style="font-size: 0.85rem; max-width: 320px; line-height: 1.4; color: #94a3b8;">Your photos and video clips will appear together in this gallery.</div>' +
+            '<button type="button" onclick="triggerBottomCreateAction()" style="margin-top: 0.5rem; background: linear-gradient(135deg, #059669, #10b981); color: #fff; font-weight: 700; border: none; padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.3);">+ Upload Media</button>' +
+          '</div>';
         } else {
           html = myMedia.map(function(p) {
             var content = p.mediaImage ?
@@ -28659,7 +28920,12 @@ function renderHtml(
       } else if (tab === 'saved') {
         const mySaved = feedPostsData.filter(function(p) { return (p.savedByDids || []).includes(myDid); });
         if (mySaved.length === 0) {
-          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 2.5rem 1rem; color: #64748b; font-size: 0.85rem;">No saved posts yet. Tap 🔖 Save on any feed post to bookmark it privately!</div>';
+          html = '<div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">' +
+            '<div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(245, 158, 11, 0.1); display: flex; align-items: center; justify-content: center; font-size: 1.75rem; border: 1px solid rgba(245, 158, 11, 0.2);">🔖</div>' +
+            '<div style="font-weight: 800; font-size: 1.1rem; color: #f8fafc;">No Saved Posts Yet</div>' +
+            '<div style="font-size: 0.85rem; max-width: 320px; line-height: 1.4; color: #94a3b8;">Save photos and videos that you want to see again. Only you can see what you have saved.</div>' +
+            '<button type="button" onclick="switchTab(&quot;feed&quot;)" style="margin-top: 0.5rem; background: linear-gradient(135deg, #d97706, #f59e0b); color: #fff; font-weight: 700; border: none; padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 12px rgba(245,158,11,0.3);">Explore Feed</button>' +
+          '</div>';
         } else {
           html = mySaved.map(function(p) {
             var mediaContent = p.mediaImage ?
@@ -28909,6 +29175,26 @@ function renderHtml(
 
     // --- Sovereign Control Hub (Smart Segmented Tabs & Collapse) ---
     function switchSovereignHubTab(cardId, btnEl) {
+      const isAdminUser = Boolean(
+        typeof myProfile !== 'undefined' && (
+          myProfile.role === 'SUPER_ADMIN' ||
+          myProfile.role === 'ADMIN' ||
+          myProfile.role === 'OPERATOR' ||
+          myProfile.role === 'SECURITY_ADMIN' ||
+          myProfile.isAdmin === true ||
+          myProfile.handle === '@laptop_host'
+        )
+      );
+
+      // Gate operator diagnostic cards
+      if (!isAdminUser && (cardId === 'nodeDiagnosticsCard' || cardId === 'meshTelemetryCard')) {
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('🔒 P2P Node Diagnostics are reserved for Node Operators.');
+        }
+        cardId = 'cryptoIdentityCard';
+        btnEl = document.getElementById('hubBtnIdentity');
+      }
+
       const grid = document.getElementById('profileSettingsGrid');
       if (grid) {
         grid.classList.remove('grid-mode');
@@ -28919,9 +29205,15 @@ function renderHtml(
         if (viewBtnIcon) viewBtnIcon.innerText = '⊞';
       }
       const cards = document.querySelectorAll('#profileSettingsGrid .profile-telemetry-card');
-      cards.forEach(function(c) { c.classList.remove('tab-active'); });
+      cards.forEach(function(c) {
+        c.classList.remove('tab-active');
+        c.style.display = 'none';
+      });
       const target = document.getElementById(cardId);
-      if (target) target.classList.add('tab-active');
+      if (target) {
+        target.classList.add('tab-active');
+        target.style.display = 'block';
+      }
 
       const tabBtns = document.querySelectorAll('.sovereign-hub-tab-btn');
       tabBtns.forEach(function(b) { b.classList.remove('active'); });
@@ -28944,6 +29236,17 @@ function renderHtml(
       const viewBtnIcon = document.getElementById('hubViewModeIcon');
       const tabsRow = document.getElementById('sovereignHubTabsRow');
 
+      const isAdminUser = Boolean(
+        typeof myProfile !== 'undefined' && (
+          myProfile.role === 'SUPER_ADMIN' ||
+          myProfile.role === 'ADMIN' ||
+          myProfile.role === 'OPERATOR' ||
+          myProfile.role === 'SECURITY_ADMIN' ||
+          myProfile.isAdmin === true ||
+          myProfile.handle === '@laptop_host'
+        )
+      );
+
       if (isGrid) {
         grid.classList.remove('grid-mode');
         grid.classList.add('tabbed-mode');
@@ -28959,7 +29262,15 @@ function renderHtml(
         if (viewBtnText) viewBtnText.innerText = 'Tabs';
         if (viewBtnIcon) viewBtnIcon.innerText = '⊟';
         const cards = document.querySelectorAll('#profileSettingsGrid .profile-telemetry-card');
-        cards.forEach(function(c) { c.classList.add('tab-active'); });
+        cards.forEach(function(c) {
+          if (!isAdminUser && (c.id === 'nodeDiagnosticsCard' || c.id === 'meshTelemetryCard')) {
+            c.classList.remove('tab-active');
+            c.style.display = 'none';
+          } else {
+            c.classList.add('tab-active');
+            c.style.display = 'block';
+          }
+        });
       }
     }
 
@@ -29525,19 +29836,19 @@ function renderHtml(
         html += '<div class="wallet-voucher-card">' +
           '<div class="voucher-meta-col">' +
             '<div class="voucher-root-row">' +
-              '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M3 12h6m6 0h6"/></svg>' +
-              '<span>Root: ' + rootHash.slice(0, 10) + '…' + rootHash.slice(-4) + '</span>' +
-              '<span style="color: #34d399; font-weight: 700;">+' + creatorAmt + ' SOV</span>' +
+              '<span style="font-size: 0.95rem;">🎁</span> ' +
+              '<span style="font-weight: 700; color: #f8fafc;">Tip from Fan</span>' +
+              '<span style="color: #34d399; font-weight: 800; margin-left: auto;">+' + creatorAmt + ' SOV</span>' +
             '</div>' +
             '<div class="voucher-specs-row">' +
-              '<span>Block #' + blockHeight + '</span> &bull; ' +
-              '<span>Split: 95% Creator, 5% BitSwap</span> &bull; ' +
-              '<span>' + dateStr + '</span>' +
+              '<span>' + dateStr + '</span> &bull; ' +
+              '<span>Instant Settlement (95% Net)</span> &bull; ' +
+              '<span style="color: #38bdf8;">Verified Receipt</span>' +
             '</div>' +
           '</div>' +
-          '<button class="voucher-verify-btn" id="btn-verify-' + vId + '" aria-label="Verify cryptographic Merkle proof for voucher ' + vId + '" onclick="verifyMerkleProofLive(&quot;' + vId + '&quot;, &quot;' + rootHash + '&quot;, &quot;' + rawPayload + '&quot;)">' +
+          '<button class="voucher-verify-btn" id="btn-verify-' + vId + '" aria-label="View receipt for voucher ' + vId + '" onclick="verifyMerkleProofLive(&quot;' + vId + '&quot;, &quot;' + rootHash + '&quot;, &quot;' + rawPayload + '&quot;)">' +
             '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>' +
-            '<span>Verify Proof</span>' +
+            '<span>Receipt</span>' +
           '</button>' +
         '</div>';
       }
@@ -35481,29 +35792,29 @@ function renderHtml(
         if (studioSec) studioSec.style.display = isAct ? 'block' : 'none';
 
         const statusText = document.getElementById('creatorStatusText');
-        if (statusText) statusText.innerText = isAct ? 'Studio Active' : 'Consumer Mode';
+        if (statusText) statusText.innerText = isAct ? 'Studio Active' : 'Standard Account';
 
         const badgeEl = document.getElementById('creatorStatusBadge');
         if (badgeEl) {
-          badgeEl.innerText = isAct ? '● Studio Active' : 'Consumer Mode';
+          badgeEl.innerText = isAct ? '● Studio Active' : 'Standard Account';
           badgeEl.style.background = isAct ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.15)';
           badgeEl.style.color = isAct ? '#34d399' : '#fbbf24';
           badgeEl.style.borderColor = isAct ? 'rgba(52, 211, 153, 0.4)' : 'rgba(245, 158, 11, 0.3)';
         }
 
         const seedingEl = document.getElementById('creatorSeedingTelemetry');
-        if (seedingEl) seedingEl.innerText = isAct ? '50 MB/s P2P Relay (Active)' : 'Consumer Relay (Dynamic)';
+        if (seedingEl) seedingEl.innerText = isAct ? 'High-Speed Streaming Active (50 MB/s)' : 'Standard Delivery';
 
         const tippingEl = document.getElementById('creatorTippingTelemetry');
-        if (tippingEl) tippingEl.innerText = isAct ? 'SOV Settlement (95% / 5%)' : 'Viewer Mode (Tipping Allowed)';
+        if (tippingEl) tippingEl.innerText = isAct ? 'Enabled • Keep 95% of Earnings' : 'Viewer Mode (Tipping Allowed)';
 
         const actionBtn = document.getElementById('creatorActionBtnText');
-        if (actionBtn) actionBtn.innerText = isAct ? 'Launch Creator Studio' : 'Switch to Creator Mode';
+        if (actionBtn) actionBtn.innerText = isAct ? 'Launch Creator Studio' : 'Enable Creator Tools';
 
         const toggleInput = document.getElementById('creatorToggle');
         if (toggleInput) toggleInput.checked = isAct;
 
-        showAccountToast(isAct ? '✨ Creator Studio & Seeding Relay Activated' : '👁 Switched to Consumer Mode');
+        showAccountToast(isAct ? '✨ Creator Studio Tools Activated' : 'Switched to Standard Account');
       } catch (err) {
         console.error('toggleCreatorMode error', err);
       }
@@ -36862,6 +37173,13 @@ function renderHtml(
       }
     });
 
+    // Auto-dismiss any modal overlay if backdrop is clicked
+    document.addEventListener('click', function(e) {
+      if (e.target && e.target.classList && e.target.classList.contains('omni-modal-overlay')) {
+        e.target.style.display = 'none';
+      }
+    });
+
     // Instagram-Grade Double-Tap Heart Burst
     document.addEventListener('dblclick', function(e) {
       const postCard = e.target.closest('.insta-post-card');
@@ -37598,17 +37916,16 @@ function renderHtml(
       });
 
       let html = '<div style="font-size: 0.82rem; font-weight: 700; color: #cbd5e1; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">' +
-        '<span>📋 Your Managed Entities (' + (channels.length + pages.length) + ')</span>' +
-        '<span style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Personal Sovereign Scope</span>' +
+        '<span>📋 Your Channels &amp; Pages (' + (channels.length + pages.length) + ')</span>' +
+        '<span style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Broadcast &amp; Brands</span>' +
         '</div>';
 
       if (channels.length === 0 && pages.length === 0) {
-        const userHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : '@creator';
         html += '<div style="background: rgba(15, 23, 42, 0.55); border: 1px dashed rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 1.5rem 1rem; text-align: center; margin-top: 0.4rem;">' +
           '<div style="font-size: 1.8rem; margin-bottom: 0.4rem;">✨</div>' +
-          '<div style="font-weight: 700; color: #f8fafc; font-size: 0.92rem; margin-bottom: 0.25rem;">No Personal Entities Created Yet</div>' +
+          '<div style="font-weight: 700; color: #f8fafc; font-size: 0.92rem; margin-bottom: 0.25rem;">No Channels or Pages Yet</div>' +
           '<div style="color: #94a3b8; font-size: 0.78rem; line-height: 1.45; max-width: 440px; margin: 0 auto 1rem;">' +
-            'You are operating under your personal cryptographic identity (' + userHandle + '). Network channels and test feeds are isolated in the Admin Ops Console.' +
+            'Create a broadcast channel to send announcements to your fans, or create a public page for your brand, business, or community.' +
           '</div>' +
           '<div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">' +
             '<button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 600; cursor: pointer;">+ Create Channel</button>' +
@@ -38235,21 +38552,58 @@ function renderHtml(
       showAccountToast('✍️ Quote post published');
     }
 
-    // --- Safety & Dispute Report ---
-    function triggerSafetyReportModal() {
-      closePostOptionsModal();
-      const m = document.getElementById('safetyReportModal');
-      if (m) m.style.display = 'flex';
-    }
-    // --- Safety & Dispute Report (24h Autonomous Jury Engine) ---
+    // --- Safety & Dispute Report (24h Autonomous Community Jury Engine) ---
     let activeJuryBallot = null;
     let juryTimerInterval = null;
+    let activeReportTarget = { type: 'post', id: '', title: '' };
 
-    function triggerSafetyReportModal() {
+    function openSafetyCenterModal() {
+      const m = document.getElementById('safetyCenterModal');
+      if (m) m.style.display = 'flex';
+    }
+    function closeSafetyCenterModal() {
+      const m = document.getElementById('safetyCenterModal');
+      if (m) m.style.display = 'none';
+    }
+    async function openLatestJuryBallotOrList() {
+      try {
+        if (!window.SovraAutonomousJury) {
+          showAccountToast('⚖️ Community Jury enclave initializing...');
+          return;
+        }
+        const res = await window.SovraAutonomousJury.fetchCases({ status: 'OPEN_VOTING' });
+        const list = res && (res.cases || res.ballots) ? (res.cases || res.ballots) : [];
+        if (list.length > 0) {
+          openJuryBallotModal(list[0].id);
+        } else {
+          showAccountToast('⚖️ All community ballots resolved. No active disputes!');
+        }
+      } catch (e) {
+        showAccountToast('⚖️ Community Jury is peaceful.');
+      }
+    }
+
+    function triggerSafetyReportModal(targetType, targetId, targetTitle) {
       closePostOptionsModal();
+      if (targetType) {
+        activeReportTarget = { type: targetType, id: targetId, title: targetTitle || '' };
+      } else if (activeTargetPost && activeTargetPost.id) {
+        activeReportTarget = { type: 'post', id: activeTargetPost.id, title: activeTargetPost.caption || '' };
+      }
+
+      const labelEl = document.getElementById('safetyReportTargetLabel');
+      if (labelEl) {
+        labelEl.innerText = 'Target: ' + (activeReportTarget.type === 'profile' ? 'User Profile ' : 'Post ') + (activeReportTarget.id || '');
+      }
       const m = document.getElementById('safetyReportModal');
       if (m) m.style.display = 'flex';
     }
+
+    function triggerProfileReportModal(userDid, handle) {
+      const did = userDid || (window.SovraState && window.SovraState.viewingProfileDid) || 'did:sovra:peer';
+      triggerSafetyReportModal('profile', did, handle || did);
+    }
+
     function closeSafetyReportModal() {
       const m = document.getElementById('safetyReportModal');
       if (m) m.style.display = 'none';
@@ -38258,23 +38612,31 @@ function renderHtml(
     async function submitSafetyReport() {
       const reasonEl = document.getElementById('reportReasonInput');
       const detailsEl = document.getElementById('reportDetailsInput');
-      const reason = reasonEl ? reasonEl.value : 'hate_speech';
+      const reason = reasonEl ? reasonEl.value : 'HATE_SPEECH_DEHUMANIZATION';
       const details = detailsEl ? detailsEl.value.trim() : '';
-      const targetPostId = activeTargetPost.id;
+      const targetType = activeReportTarget.type || 'post';
+      const targetId = activeReportTarget.id;
       closeSafetyReportModal();
 
-      if (!targetPostId) {
-        showAccountToast('⚠️ Please select a valid post to report.');
+      if (!targetId) {
+        showAccountToast('⚠️ Please select a valid target to report.');
         return;
       }
 
       showAccountToast('⚖️ Initiating 24-Hour Equal Rights Community Ballot...');
 
       try {
-        const res = await window.SovraAutonomousJury.createReport(targetPostId, reason, details);
-        if (res && res.ok && res.ballot) {
-          renderJuryBannerOnCard(targetPostId, res.ballot);
-          showAccountToast('⚖️ 24h Democratic Review Active! Community ballot opened.');
+        const res = await window.SovraAutonomousJury.createReport(targetType, targetId, reason, details);
+        if (res && res.ok && (res.case || res.ballot)) {
+          const c = res.case || res.ballot;
+          if (targetType === 'post') {
+            renderJuryBannerOnCard(targetId, c);
+          }
+          if (res.emergency) {
+            showAccountToast('🛑 Emergency safety trigger: Content quarantined immediately.');
+          } else {
+            showAccountToast('⚖️ 24h Democratic Review Active! Community ballot opened.');
+          }
         } else {
           showAccountToast('⚠️ ' + (res?.error || 'Failed to submit report ticket.'));
         }
@@ -38301,7 +38663,7 @@ function renderHtml(
             'Flagged for review. Community decides deletion via 24h democratic ballot.' +
           '</div>' +
         '</div>' +
-        '<button onclick="openJuryBallotModal(\'' + ballot.id + '\')" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">' +
+        '<button data-ballot-id="' + ballot.id + '" onclick="openJuryBallotModal(this.getAttribute(&quot;data-ballot-id&quot;))" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">' +
           'Vote in Jury 🗳️' +
         '</button>';
 
@@ -38318,9 +38680,8 @@ function renderHtml(
       if (!m) return;
 
       try {
-        const res = await window.SovraAutonomousJury.fetchBallots(true);
-        const ballots = res && res.ballots ? res.ballots : [];
-        const ballot = ballots.find(function(b) { return b.id === ballotId; });
+        const res = await window.SovraAutonomousJury.fetchCaseById(ballotId);
+        const ballot = res && (res.case || res.ballot) ? (res.case || res.ballot) : null;
         if (!ballot) {
           showAccountToast('⚠️ Ballot expired or not found.');
           return;
@@ -38331,9 +38692,10 @@ function renderHtml(
         m.style.display = 'flex';
 
         if (juryTimerInterval) clearInterval(juryTimerInterval);
+        const deadline = ballot.votingDeadline || ballot.expiresAt || (Date.now() + 86400000);
         juryTimerInterval = setInterval(function() {
           if (!activeJuryBallot) return;
-          const remainingMs = Math.max(0, activeJuryBallot.expiresAt - Date.now());
+          const remainingMs = Math.max(0, deadline - Date.now());
           const hours = Math.floor(remainingMs / (1000 * 60 * 60));
           const mins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
           const secs = Math.floor((remainingMs % (1000 * 60)) / 1000);
@@ -38341,7 +38703,7 @@ function renderHtml(
           if (timeEl) {
             timeEl.innerText = hours + 'h ' + mins + 'm ' + secs + 's Remaining';
           }
-          if (remainingMs <= 0) {
+          if (remainingMs <= 0 && activeJuryBallot.status === 'OPEN_VOTING') {
             clearInterval(juryTimerInterval);
             executeJuryResolutionFromModal();
           }
@@ -38364,57 +38726,65 @@ function renderHtml(
       if (targetHandleEl) targetHandleEl.innerText = '@' + (ballot.authorHandle || 'author');
 
       const reasonBadgeEl = document.getElementById('juryReasonBadge');
-      if (reasonBadgeEl) reasonBadgeEl.innerText = (ballot.reason || 'Flagged').replace(/_/g, ' ');
+      if (reasonBadgeEl) reasonBadgeEl.innerText = (ballot.violationCategory || ballot.reason || 'Flagged').replace(/_/g, ' ');
 
       const captionEl = document.getElementById('juryTargetCaption');
-      if (captionEl) captionEl.innerText = '"' + (ballot.postCaption || 'No caption text') + '"';
+      if (captionEl) captionEl.innerText = '"' + (ballot.evidenceText || ballot.postCaption || 'Evidence summary') + '"';
 
       const detailsEl = document.getElementById('juryDetailsText');
-      if (detailsEl) detailsEl.innerText = 'Accusation: ' + (ballot.details || 'Community dispute initiated');
+      if (detailsEl) detailsEl.innerText = 'Status: ' + (ballot.status || 'OPEN_VOTING') + (ballot.verdict ? ' (' + ballot.verdict + ')' : '');
 
       const defenseEl = document.getElementById('juryAuthorDefenseContent');
       if (defenseEl) {
         defenseEl.innerText = ballot.authorDefenseNote
           ? '"' + ballot.authorDefenseNote + '"'
-          : 'No defense statement filed yet. (Author can submit explanation below)';
+          : 'No defense statement filed yet. (Author has equal right of context & defense below)';
       }
 
       const myDid = window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:peer';
       const defenseFormEl = document.getElementById('juryDefenseFormSection');
       if (defenseFormEl) {
-        defenseFormEl.style.display = (ballot.authorDid === myDid || !ballot.authorDefenseNote) ? 'block' : 'none';
+        defenseFormEl.style.display = (ballot.status === 'OPEN_VOTING' && (ballot.authorDid === myDid || !ballot.authorDefenseNote)) ? 'block' : 'none';
       }
 
-      const vHate = ballot.votes.hate_speech || 0;
-      const vIllegal = ballot.votes.illegal || 0;
-      const vMisinfo = ballot.votes.misinformation || 0;
-      const vTerrorism = ballot.votes.terrorism || 0;
-      const vSafe = ballot.votes.safe_defense || 0;
+      // Votes and consensus metrics
+      const stats = ballot.voteStats || {};
+      const vProven = stats.violationProvenVotes || 0;
+      const vNotProven = stats.violationNotProvenVotes || 0;
+      const vInsufficient = stats.insufficientEvidenceVotes || 0;
+      const total = stats.totalValidVotes || (vProven + vNotProven + vInsufficient);
 
-      const violationVotes = vHate + vIllegal + vMisinfo + vTerrorism;
-      const totalVotes = violationVotes + vSafe;
-      const violationPct = totalVotes > 0 ? Math.round((violationVotes / totalVotes) * 100) : 0;
-      const safePct = totalVotes > 0 ? (100 - violationPct) : 0;
+      const provenPct = total > 0 ? Math.round((vProven / total) * 100) : 0;
+      const notProvenPct = total > 0 ? Math.round((vNotProven / total) * 100) : 0;
+      const insufficientPct = total > 0 ? (100 - provenPct - notProvenPct) : 0;
 
       const consensusLabelEl = document.getElementById('juryConsensusLabel');
       if (consensusLabelEl) {
-        consensusLabelEl.innerText = violationPct + '% Violation (Quorum: ' + totalVotes + ' Votes)';
+        consensusLabelEl.innerText = provenPct + '% Proven (' + vProven + '/' + total + ' Votes, Quorum: ' + (ballot.minQuorum || 21) + ')';
       }
 
       const barViolationEl = document.getElementById('juryBarViolation');
-      if (barViolationEl) barViolationEl.style.width = violationPct + '%';
+      if (barViolationEl) barViolationEl.style.width = provenPct + '%';
 
       const barSafeEl = document.getElementById('juryBarSafe');
-      if (barSafeEl) barSafeEl.style.width = safePct + '%';
+      if (barSafeEl) barSafeEl.style.width = notProvenPct + '%';
+
+      const barInsuffEl = document.getElementById('juryBarInsufficient');
+      if (barInsuffEl) barInsuffEl.style.width = insufficientPct + '%';
+
+      const appealSectionEl = document.getElementById('juryAppealSection');
+      if (appealSectionEl) {
+        appealSectionEl.style.display = (ballot.status === 'CLOSED' || ballot.verdict) ? 'block' : 'none';
+      }
     }
 
     async function castBallotVote(option) {
       if (!activeJuryBallot) return;
       try {
         const res = await window.SovraAutonomousJury.castVote(activeJuryBallot.id, option);
-        if (res && res.ok && res.ballot) {
-          activeJuryBallot = res.ballot;
-          updateBallotModalUI(res.ballot);
+        if (res && res.ok && (res.case || res.ballot)) {
+          activeJuryBallot = res.case || res.ballot;
+          updateBallotModalUI(activeJuryBallot);
           showAccountToast('🗳️ Sovereign vote registered on community jury!');
         } else {
           showAccountToast('⚠️ ' + (res?.error || 'Failed to record vote.'));
@@ -38434,9 +38804,9 @@ function renderHtml(
       }
       try {
         const res = await window.SovraAutonomousJury.submitDefense(activeJuryBallot.id, note);
-        if (res && res.ok && res.ballot) {
-          activeJuryBallot = res.ballot;
-          updateBallotModalUI(res.ballot);
+        if (res && res.ok && (res.case || res.ballot)) {
+          activeJuryBallot = res.case || res.ballot;
+          updateBallotModalUI(activeJuryBallot);
           if (inputEl) inputEl.value = '';
           showAccountToast('🛡️ Defense statement registered & visible to all jurors!');
         }
@@ -38445,20 +38815,43 @@ function renderHtml(
       }
     }
 
+    async function submitAppealFromModal() {
+      if (!activeJuryBallot) return;
+      const inputEl = document.getElementById('juryAppealReasonInput');
+      const reason = inputEl ? inputEl.value.trim() : '';
+      if (!reason) {
+        showAccountToast('⚠️ Please explain the reason for the appeal.');
+        return;
+      }
+      try {
+        const res = await window.SovraAutonomousJury.submitAppeal(activeJuryBallot.id, reason);
+        if (res && res.ok) {
+          showAccountToast('⚖️ Appeal registered! Forwarded to independent review.');
+          if (inputEl) inputEl.value = '';
+          closeJuryBallotModal();
+        } else {
+          showAccountToast('⚠️ ' + (res?.error || 'Failed to submit appeal.'));
+        }
+      } catch (e) {
+        console.error('[SubmitAppeal] Error:', e);
+      }
+    }
+
     async function executeJuryResolutionFromModal() {
       if (!activeJuryBallot) return;
-      const ballotId = activeJuryBallot.id;
-      const postId = activeJuryBallot.postId;
+      const caseId = activeJuryBallot.id;
+      const targetId = activeJuryBallot.targetId || activeJuryBallot.postId;
       showAccountToast('⚖️ Computing democratic consensus & executing verdict...');
 
       try {
-        const res = await window.SovraAutonomousJury.resolveBallot(ballotId);
-        if (res && res.ok && res.ballot) {
-          const verdict = res.ballot.verdict;
+        const res = await window.SovraAutonomousJury.finalizeCase(caseId, true);
+        if (res && res.ok && (res.case || res.ballot)) {
+          const c = res.case || res.ballot;
+          const verdict = c.verdict;
           closeJuryBallotModal();
 
-          if (verdict && verdict.action === 'DELETED') {
-            const card = document.getElementById('card-' + postId);
+          if (verdict === 'REMOVE_VIOLATION' || verdict === 'QUARANTINE_EMERGENCY' || (verdict && verdict.action === 'DELETED')) {
+            const card = document.getElementById('card-' + targetId);
             if (card) {
               card.style.opacity = '0';
               card.style.transform = 'scale(0.92)';
@@ -38466,13 +38859,13 @@ function renderHtml(
               setTimeout(function() { card.remove(); }, 420);
             }
             if (typeof feedPostsData !== 'undefined') {
-              feedPostsData = feedPostsData.filter(function(p) { return p.id !== postId; });
+              feedPostsData = feedPostsData.filter(function(p) { return p.id !== targetId; });
             }
-            showAccountToast('⚖️ Democratic Verdict: 66%+ Consensus Reached. Post permanently auto-deleted!');
+            showAccountToast('⚖️ Democratic Verdict: 66.67%+ Consensus Reached. Content auto-deleted!');
           } else {
-            const banner = document.getElementById('jury-banner-' + postId);
+            const banner = document.getElementById('jury-banner-' + targetId);
             if (banner) banner.remove();
-            showAccountToast('🛡️ Democratic Verdict: Consensus not reached. Post preserved as legitimate expression / self-defense!');
+            showAccountToast('🛡️ Democratic Verdict: Violation not proven. Content preserved under equal rights!');
           }
         }
       } catch (e) {
@@ -39038,6 +39431,19 @@ async function startDevServer() {
   }
 
   const autonomousJuryEngine = new SovraAutonomousJuryEngine();
+
+  // Background Durable Worker: Process Due Community Jury Cases & Auto-Enforce Verdicts
+  const juryBackgroundWorker = setInterval(() => {
+    try {
+      const processed = sovraDb.processDueCases();
+      if (processed.finalizedCount > 0) {
+        console.log(`[JuryWorker] Automatically finalized ${processed.finalizedCount} due cases at deadline.`);
+      }
+    } catch (err) {
+      console.error('[JuryWorker] Error processing due cases:', err);
+    }
+  }, 5000);
+  juryBackgroundWorker.unref();
 
   // High-Frequency In-Memory Micro-Batching Buffer for Post/Reel Views (Viral Spikes Defense)
   const postViewBatchBuffer = new Map<string, number>();
@@ -47752,128 +48158,392 @@ async function startDevServer() {
     }
 
     // =========================================================================
-    // ⚖️ SOVRA AUTONOMOUS COMMUNITY JURY API ENDPOINTS
-    // "Equal Rights For Every Human Being: 24h Democratic Review & Auto-Takedown"
+    // ⚖️ EVIDENCE-BASED COMMUNITY JURY & 24-HOUR AUTOMATIC MODERATION ENGINE
+    // "Equal Justice System: Universal Rights For Every Human Being"
     // =========================================================================
 
-    // 1. Report Post to Community Jury
-    if (url.pathname === '/api/jury/report' && req.method === 'POST') {
+    // 1. Submit or Consolidate Jury Report
+    if ((url.pathname === '/api/moderation/reports' || url.pathname === '/api/moderation/jury/report' || url.pathname === '/api/jury/report') && req.method === 'POST') {
+      const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
+      if (!bodyOk) return;
       try {
-        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
-        if (!bodyOk) return;
-        const parsed = reqBody ? JSON.parse(reqBody) : {};
-        const postId = String(parsed.postId || '');
-        const targetPost = sovraDb.getAllPosts().find(p => p.id === postId);
-        if (!targetPost) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Target post not found' }));
+        const parsed = body ? JSON.parse(body) : {};
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const targetType = (parsed.targetType === 'profile' || parsed.targetType === 'user') ? 'profile' : 'post';
+        const targetId = String(parsed.targetId || parsed.postId || parsed.userDid || '').trim();
+        if (!targetId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'targetId (or postId) is required' }));
           return;
         }
 
-        const reporterDid = String(parsed.reporterDid || resolvePrincipal(req)?.did || 'did:sovra:peer');
-        const reason = parsed.reason || 'hate_speech';
-        const details = String(parsed.details || '');
+        // Map reason/category
+        let categoryInput = String(parsed.violationCategory || parsed.reason || 'HATE_SPEECH_DEHUMANIZATION').toUpperCase();
+        if (categoryInput === 'HATE_SPEECH') categoryInput = 'HATE_SPEECH_DEHUMANIZATION';
+        else if (categoryInput === 'ILLEGAL') categoryInput = 'IMMINENT_VIOLENCE_INCITEMENT';
+        else if (categoryInput === 'TERRORISM') categoryInput = 'TERRORISM_EXTREMISM';
+        else if (categoryInput === 'MISINFORMATION') categoryInput = 'MISINFORMATION_DECEPTION';
+        else if (categoryInput === 'HARASSMENT') categoryInput = 'HARASSMENT_STALKING';
+        else if (categoryInput === 'CSAM') categoryInput = 'CHILD_EXPLOITATION_CSAM';
+        else if (categoryInput === 'NCII') categoryInput = 'NCII_SEXUAL_EXPLOITATION';
+        else if (categoryInput === 'DOXXING') categoryInput = 'DOXXING_PRIVATE_INFO';
 
-        const ballot = autonomousJuryEngine.createBallot({
-          postId: targetPost.id,
-          postCid: targetPost.mediaCid || (targetPost as any).imageCid || '',
-          postCaption: targetPost.caption || '',
-          authorDid: targetPost.authorDid,
-          authorHandle: targetPost.authorName || 'peer',
-          reporterDid,
-          reason,
-          details,
+        const violationSubcategory = parsed.violationSubcategory ? String(parsed.violationSubcategory) : undefined;
+        const evidenceText = String(parsed.evidenceText || parsed.details || '').trim();
+        const evidenceUrls = Array.isArray(parsed.evidenceUrls) ? parsed.evidenceUrls.map(String) : [];
+        const reporterPrivacy = parsed.reporterPrivacy || 'ANONYMOUS_TO_PUBLIC';
+
+        const result = sovraDb.createOrConsolidateJuryReport({
+          targetType: targetType as any,
+          targetId,
+          violationCategory: categoryInput as any,
+          violationSubcategory,
+          evidenceText,
+          evidenceUrls,
+          reporterDid: principal.did,
+          reporterPrivacy,
         });
 
-        (targetPost as any).isUnderJuryReview = true;
-        (targetPost as any).juryBallotId = ballot.id;
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, ballot }));
-      } catch (err: any) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Report failed' }));
-      }
-      return;
-    }
-
-    // 2. Author's Equal Right of Defense Note
-    if (url.pathname === '/api/jury/defense' && req.method === 'POST') {
-      try {
-        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
-        if (!bodyOk) return;
-        const parsed = reqBody ? JSON.parse(reqBody) : {};
-        const ballotId = String(parsed.ballotId || '');
-        const defenseNote = String(parsed.defenseNote || '');
-        const ballot = autonomousJuryEngine.submitDefense(ballotId, defenseNote);
-        if (!ballot) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Ballot not found' }));
+        if (!result.ok) {
+          const statusCode = result.error?.includes('not found') ? 404 : (result.error?.includes('Duplicate') ? 429 : 400);
+          res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
           return;
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, ballot }));
+
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          case: result.case,
+          caseId: result.case?.id,
+          ballot: result.case,
+          consolidated: result.consolidated,
+          emergency: result.emergency,
+          message: result.consolidated ? 'Report consolidated with existing case' : 'New jury case created'
+        }));
       } catch (err: any) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message }));
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON body' }));
       }
       return;
     }
 
-    // 3. Cast Sovereign Peer Vote
-    if (url.pathname === '/api/jury/vote' && req.method === 'POST') {
-      try {
-        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
-        if (!bodyOk) return;
-        const parsed = reqBody ? JSON.parse(reqBody) : {};
-        const ballotId = String(parsed.ballotId || '');
-        const vote = String(parsed.vote || '');
-        const voterDid = String(parsed.voterDid || resolvePrincipal(req)?.did || 'did:sovra:voter_' + crypto.randomBytes(4).toString('hex'));
-        const ballot = autonomousJuryEngine.castVote(ballotId, vote, voterDid);
-        if (!ballot) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Vote rejected or ballot inactive' }));
-          return;
-        }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, ballot }));
-      } catch (err: any) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message }));
-      }
-      return;
-    }
+    // 2. Query Jury Cases / Ballots
+    if ((url.pathname === '/api/moderation/cases' || url.pathname === '/api/moderation/jury/cases' || url.pathname === '/api/jury/ballots') && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      const status = url.searchParams.get('status') as any;
+      const targetType = url.searchParams.get('targetType') as any;
+      const authorDid = url.searchParams.get('authorDid') || undefined;
+      const violationCategory = url.searchParams.get('violationCategory') as any;
+      const jurorEligibleOnly = url.searchParams.get('jurorEligibleOnly') === 'true';
 
-    // 4. Query Ballots & Verdicts
-    if (url.pathname === '/api/jury/ballots' && req.method === 'GET') {
-      autonomousJuryEngine.checkAndResolveExpired();
-      const includeAll = url.searchParams.get('all') === 'true';
-      const ballots = includeAll ? autonomousJuryEngine.getAllBallots() : autonomousJuryEngine.getActiveBallots();
+      const cases = sovraDb.getJuryCases({
+        status: status || undefined,
+        targetType: targetType || undefined,
+        authorDid,
+        violationCategory: violationCategory || undefined,
+        jurorEligibleOnly,
+        forJurorDid: jurorEligibleOnly && principal ? principal.did : undefined,
+      });
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, ballots }));
+      res.end(JSON.stringify({ ok: true, cases, ballots: cases }));
       return;
     }
 
-    // 5. Democratic Resolution & Auto-Execution (Fast-Forward / 24h Trigger)
-    if (url.pathname === '/api/jury/resolve' && req.method === 'POST') {
-      try {
-        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+    // 3. Transparency Metrics
+    if ((url.pathname === '/api/moderation/transparency' || url.pathname === '/api/moderation/jury/transparency') && req.method === 'GET') {
+      const metrics = sovraDb.getTransparencyMetrics();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, metrics }));
+      return;
+    }
+
+    // 4. Policy Configuration Settings
+    if (url.pathname === '/api/moderation/policies') {
+      if (req.method === 'GET') {
+        const policies = sovraDb.getModerationPolicyConfig();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, policies }));
+        return;
+      }
+      if (req.method === 'POST') {
+        const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
         if (!bodyOk) return;
-        const parsed = reqBody ? JSON.parse(reqBody) : {};
-        const ballotId = String(parsed.ballotId || '');
-        const ballot = autonomousJuryEngine.resolveBallot(ballotId, true);
-        if (!ballot) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Ballot not found' }));
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          const principal = enforceAuth(req, res, parsed);
+          if (!principal) return;
+
+          if (!['SUPER_ADMIN', 'SECURITY_ADMIN'].includes(principal.role)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Forbidden: Admin authorization required to update policies' }));
+            return;
+          }
+
+          const updated = sovraDb.updateModerationPolicyConfig(parsed.policies || parsed, principal.did);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, policies: updated }));
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err?.message || 'Policy update failed' }));
+        }
+        return;
+      }
+    }
+
+    // 5. Legacy Endpoints with Body-level Ballot ID (/api/jury/defense, /api/jury/vote, /api/jury/resolve)
+    if (url.pathname === '/api/jury/defense' && req.method === 'POST') {
+      const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
+      if (!bodyOk) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const caseId = String(parsed.ballotId || parsed.caseId || '');
+        const defenseNote = String(parsed.defenseNote || parsed.defense || '').trim();
+        const result = sovraDb.submitAuthorDefense(caseId, principal.did, defenseNote);
+        if (!result.ok) {
+          const statusCode = result.error?.includes('author') ? 403 : (result.error?.includes('not found') ? 404 : 400);
+          res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
           return;
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, ballot }));
+        res.end(JSON.stringify({ ok: true, case: result.case, ballot: result.case }));
       } catch (err: any) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message }));
       }
       return;
+    }
+
+    if (url.pathname === '/api/jury/vote' && req.method === 'POST') {
+      const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
+      if (!bodyOk) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const principal = enforceAuth(req, res, parsed);
+        if (!principal) return;
+
+        const caseId = String(parsed.ballotId || parsed.caseId || '');
+        let choice = String(parsed.vote || parsed.choice || '').trim().toUpperCase();
+        if (choice === 'SAFE_DEFENSE' || choice === 'SAFE' || choice === 'NOT_PROVEN') choice = 'VIOLATION_NOT_PROVEN';
+        else if (['HATE_SPEECH', 'ILLEGAL', 'TERRORISM', 'MISINFORMATION', 'PROVEN'].includes(choice)) choice = 'VIOLATION_PROVEN';
+        else if (choice === 'INSUFFICIENT' || choice === 'NEED_MORE_INFO') choice = 'INSUFFICIENT_EVIDENCE';
+
+        const result = sovraDb.castJuryVote(caseId, principal.did, choice as any, parsed.rationale);
+        if (!result.ok) {
+          const statusCode = result.error?.includes('Conflict of interest') ? 403 : (result.error?.includes('already voted') ? 409 : (result.error?.includes('not found') ? 404 : 400));
+          res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, case: result.case, ballot: result.case }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/jury/resolve' && req.method === 'POST') {
+      const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
+      if (!bodyOk) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const caseId = String(parsed.ballotId || parsed.caseId || '');
+        const result = sovraDb.finalizeJuryCase(caseId, true);
+        if (!result.ok) {
+          const statusCode = result.error?.includes('not found') ? 404 : 400;
+          res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, case: result.case, ballot: result.case }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message }));
+      }
+      return;
+    }
+
+    // 6. Parametric Case Endpoints (/api/moderation/cases/:id/...)
+    const juryParamMatch = url.pathname.match(/^\/api\/(?:moderation\/)?(?:jury\/)?cases\/([^/]+)(?:\/(defense|vote|finalize|appeal(?:\/resolve)?))?$/);
+    if (juryParamMatch) {
+      const caseId = decodeURIComponent(juryParamMatch[1]);
+      const subAction = juryParamMatch[2];
+
+      // GET case details
+      if (!subAction && req.method === 'GET') {
+        const principal = resolvePrincipal(req);
+        const juryCase = sovraDb.getJuryCaseById(caseId, principal?.did);
+        if (!juryCase) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Case not found' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, case: juryCase, ballot: juryCase }));
+        return;
+      }
+
+      // POST author defense
+      if (subAction === 'defense' && req.method === 'POST') {
+        const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
+        if (!bodyOk) return;
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          const principal = enforceAuth(req, res, parsed);
+          if (!principal) return;
+
+          const defenseNote = String(parsed.defenseNote || parsed.defense || '').trim();
+          if (!defenseNote) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'defenseNote is required' }));
+            return;
+          }
+
+          const result = sovraDb.submitAuthorDefense(caseId, principal.did, defenseNote);
+          if (!result.ok) {
+            const statusCode = result.error?.includes('author') ? 403 : (result.error?.includes('not found') ? 404 : 400);
+            res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: result.error }));
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, case: result.case, ballot: result.case }));
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err?.message }));
+        }
+        return;
+      }
+
+      // POST cast jury vote
+      if (subAction === 'vote' && req.method === 'POST') {
+        const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
+        if (!bodyOk) return;
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          const principal = enforceAuth(req, res, parsed);
+          if (!principal) return;
+
+          let choice = String(parsed.choice || parsed.vote || '').trim().toUpperCase();
+          if (choice === 'SAFE_DEFENSE' || choice === 'SAFE' || choice === 'NOT_PROVEN') choice = 'VIOLATION_NOT_PROVEN';
+          else if (['HATE_SPEECH', 'ILLEGAL', 'TERRORISM', 'MISINFORMATION', 'PROVEN'].includes(choice)) choice = 'VIOLATION_PROVEN';
+          else if (choice === 'INSUFFICIENT' || choice === 'NEED_MORE_INFO') choice = 'INSUFFICIENT_EVIDENCE';
+
+          const result = sovraDb.castJuryVote(caseId, principal.did, choice as any, parsed.rationale);
+          if (!result.ok) {
+            const statusCode = result.error?.includes('Conflict of interest') ? 403 : (result.error?.includes('already voted') ? 409 : (result.error?.includes('not found') ? 404 : 400));
+            res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: result.error }));
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, case: result.case, ballot: result.case }));
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err?.message }));
+        }
+        return;
+      }
+
+      // POST finalize case
+      if (subAction === 'finalize' && req.method === 'POST') {
+        const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
+        if (!bodyOk) return;
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          const force = Boolean(parsed.force);
+          const result = sovraDb.finalizeJuryCase(caseId, force);
+          if (!result.ok) {
+            const statusCode = result.error?.includes('not found') ? 404 : 400;
+            res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: result.error }));
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, case: result.case, ballot: result.case }));
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err?.message }));
+        }
+        return;
+      }
+
+      // POST appeal
+      if (subAction === 'appeal' && req.method === 'POST') {
+        const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
+        if (!bodyOk) return;
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          const principal = enforceAuth(req, res, parsed);
+          if (!principal) return;
+
+          const appealReason = String(parsed.appealReason || parsed.reason || '').trim();
+          if (!appealReason) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'appealReason is required' }));
+            return;
+          }
+
+          const result = sovraDb.submitJuryAppeal(caseId, principal.did, appealReason);
+          if (!result.ok) {
+            const statusCode = result.error?.includes('Only the author') ? 403 : (result.error?.includes('not found') ? 404 : 400);
+            res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: result.error }));
+            return;
+          }
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, appeal: result.appeal, case: result.case }));
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err?.message }));
+        }
+        return;
+      }
+
+      // POST resolve appeal
+      if (subAction === 'appeal/resolve' && req.method === 'POST') {
+        const { body, ok: bodyOk } = await readBoundedBody(req, res, 64 * 1024);
+        if (!bodyOk) return;
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          const principal = enforceAuth(req, res, parsed);
+          if (!principal) return;
+
+          if (!['SUPER_ADMIN', 'SECURITY_ADMIN', 'MODERATOR'].includes(principal.role)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Forbidden: Independent moderator role required to resolve appeals' }));
+            return;
+          }
+
+          const appealId = String(parsed.appealId || '');
+          const decision = String(parsed.decision || 'DENIED').toUpperCase() as 'GRANTED' | 'DENIED';
+          const resolutionNote = String(parsed.resolutionNote || '');
+
+          const result = sovraDb.resolveJuryAppeal(caseId, appealId, principal.did, decision, resolutionNote);
+          if (!result.ok) {
+            const statusCode = result.error?.includes('Original juror') ? 403 : (result.error?.includes('not found') ? 404 : 400);
+            res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: result.error }));
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, appeal: result.appeal, case: result.case }));
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err?.message }));
+        }
+        return;
+      }
     }
 
     // Dynamic Proof-of-Work (PoW) Challenge Endpoint (Sybil Botnet Defense)
@@ -48326,6 +48996,30 @@ async function startDevServer() {
     }
   }
 
+  // Automated Integrity Gate: Verify that NO client-side <script> tag contains a SyntaxError or unescaped string
+  try {
+    const renderedHtml = renderHtml(binding, masterKey, tcpPort, 0, storageDaemon, socialGraph, localFeed);
+    const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+    let match;
+    let scriptIdx = 0;
+    while ((match = scriptRegex.exec(renderedHtml)) !== null) {
+      scriptIdx++;
+      const code = match[1];
+      if (!code.trim()) continue;
+      new vm.Script(code, { filename: `served_script_${scriptIdx}.js` });
+    }
+    console.log(`[Integrity Gate] Verified ${scriptIdx} client script blocks: 0 syntax errors. UI freeze prevention ACTIVE.`);
+  } catch (err: any) {
+    console.error('\n' + '='.repeat(70));
+    console.error(`🚨 [FATAL INTEGRITY CHECK ERROR] Client <script> failed syntax validation:`);
+    console.error(`   Message: ${err.message}`);
+    console.error(`   The client UI will FREEZE if served!`);
+    console.error('='.repeat(70) + '\n');
+    if (!process.env.VITEST) {
+      process.exit(1);
+    }
+  }
+
   server.listen(HTTP_PORT, '0.0.0.0', () => {
     console.log('[2/2] HTTP Server Bound!');
     const interfaces = os.networkInterfaces();
@@ -48340,6 +49034,9 @@ async function startDevServer() {
     }
 
     if (httpsServer) {
+      httpsServer.on('error', (err: any) => {
+        console.warn(`[HTTPS] Warning: Could not bind HTTPS port ${HTTPS_PORT} (${err.code}). HTTP server remains active.`);
+      });
       httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
         console.log(`[HTTPS] Secure Dev Server Bound on https://0.0.0.0:${HTTPS_PORT}`);
       });

@@ -37,22 +37,17 @@ describe('Bottom Navigation & Friend Search Suite', () => {
     expect(content).toContain('renderFriendsDiscoveryView');
   });
 
-  it('proves bottom navigation bar matches top navigation and features 8 synchronized slots', () => {
+  it('proves bottom navigation bar matches streamlined 5-tab mobile dock', () => {
     expect(content).toContain('id="bnav-feed"');
-    expect(content).toContain('id="bnav-friends"');
-    expect(content).toContain('class="bottom-nav-create"');
     expect(content).toContain('id="bnav-reels"');
+    expect(content).toContain('class="bottom-nav-create"');
     expect(content).toContain('id="bnav-youtube"');
-    expect(content).toContain('id="bnav-chat"');
     expect(content).toContain('id="bnav-me"');
-    expect(content).toContain('id="bnav-admin"');
   });
 
   it('proves switchTab seamlessly coordinates views, top tabs, and bottom dock items', () => {
     expect(content).toContain('friends: document.getElementById(\'friends-view\')');
     expect(content).toContain('friends: document.getElementById(\'tab-friends\')');
-    expect(content).toContain('friends: document.getElementById(\'bnav-friends\')');
-    expect(content).toContain('admin: document.getElementById(\'bnav-admin\')');
   });
 
   it('proves friend requests, bilateral handshake confirm, message, and block actions are wired', () => {

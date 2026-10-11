@@ -755,6 +755,142 @@ export interface ReportRecord {
   updatedAt: number;
 }
 
+export type JuryCaseState =
+  | 'OPEN'
+  | 'TRIAGE'
+  | 'VOTING'
+  | 'PENDING_REVIEW'
+  | 'VIOLATION_PROVEN'
+  | 'VIOLATION_NOT_PROVEN'
+  | 'INSUFFICIENT_EVIDENCE'
+  | 'ACTION_APPLIED'
+  | 'APPEALED'
+  | 'APPEAL_RESOLVED'
+  | 'CLOSED';
+
+export type JuryVoteChoice =
+  | 'VIOLATION_PROVEN'
+  | 'VIOLATION_NOT_PROVEN'
+  | 'INSUFFICIENT_EVIDENCE';
+
+export type ExtendedViolationCategory =
+  | 'hate_speech'
+  | 'credible_threats'
+  | 'terrorism_extremism'
+  | 'csam_exploitation'
+  | 'minor_grooming'
+  | 'ncii_exploitation'
+  | 'adult_sexual_content'
+  | 'harassment_stalking'
+  | 'misinformation_deception'
+  | 'fraud_scams'
+  | 'doxxing_privacy'
+  | 'trafficking_coercion'
+  | 'dangerous_instructions'
+  | 'spam_manipulation'
+  | 'suicide_self_harm'
+  | 'copyright_violation'
+  | 'other_serious';
+
+export interface ModerationPolicyConfig {
+  votingDurationMs: number;
+  targetJurySize: number;
+  minQuorum: number;
+  removalThresholdRatio: number;
+  emergencyCategories: ExtendedViolationCategory[];
+  updatedAt: number;
+  updatedByDid?: string;
+}
+
+export interface JuryAppealRecord {
+  id: string;
+  caseId: string;
+  appellantDid: string;
+  role: 'author' | 'reporter';
+  rationale: string;
+  additionalEvidence?: string;
+  status: 'PENDING' | 'GRANTED' | 'DENIED';
+  reviewedByDid?: string;
+  resolutionNote?: string;
+  submittedAt: number;
+  resolvedAt?: number;
+}
+
+export interface JuryCaseRecord {
+  id: string;
+  targetType: 'post' | 'profile' | 'comment';
+  targetId: string;
+  targetAuthorDid: string;
+  targetCanonicalUrl: string;
+  targetPreviewText?: string;
+  targetMediaCid?: string;
+  reportsCount: number;
+  reportIds: string[];
+  categories: ExtendedViolationCategory[];
+  subcategory?: string;
+  evidenceUrls: string[];
+  evidenceContext?: string;
+  state: JuryCaseState;
+  priority: 'EMERGENCY' | 'STANDARD';
+  emergencyAction?: {
+    applied: boolean;
+    action: string;
+    timestamp: number;
+    specialistDid?: string;
+    reason: string;
+  };
+  authorDefenseNote?: string;
+  authorDefenseSubmittedAt?: number;
+  assignedJurorDids: string[];
+  votingOpensAt: number;
+  votingDeadline: number;
+  votes: {
+    violationProven: number;
+    violationNotProven: number;
+    insufficientEvidence: number;
+  };
+  voters: Record<string, { choice: JuryVoteChoice; timestamp: number; reasoning?: string }>;
+  verdict?: {
+    decision: 'REMOVE' | 'PRESERVE' | 'INSUFFICIENT_QUORUM' | 'EMERGENCY_RESTRICT';
+    violationPercent: number;
+    totalSubstantiveVotes: number;
+    totalVotes: number;
+    quorumReached: boolean;
+    finalizedAt: number;
+    reason: string;
+  };
+  enforcement?: {
+    applied: boolean;
+    action: 'REMOVED' | 'PRESERVED' | 'RESTRICTED' | 'RESTORED';
+    timestamp: number;
+    idempotentToken: string;
+  };
+  appeals: JuryAppealRecord[];
+  auditTrail: Array<{
+    action: string;
+    actorDid: string;
+    details: string;
+    timestamp: number;
+    previousState?: JuryCaseState;
+    newState?: JuryCaseState;
+  }>;
+  createdAt: number;
+  updatedAt: number;
+  // Convenience alias fields for client & UI interoperability
+  authorDid?: string;
+  authorHandle?: string;
+  violationCategory?: ExtendedViolationCategory | string;
+  evidenceText?: string;
+  status?: string;
+  minQuorum?: number;
+  voteStats?: {
+    violationProvenVotes: number;
+    violationNotProvenVotes: number;
+    insufficientEvidenceVotes: number;
+    totalValidVotes: number;
+  };
+}
+
 export interface MuteRecord {
   id: string;
   userDid: string;
@@ -961,6 +1097,8 @@ export interface DatabaseSchema {
   videos: YoutubeVideoRecord[];
   video_likes: Array<{ videoId: string; userDid: string; timestamp: number }>;
   channel_subscriptions: Array<{ channelHandle: string; userDid: string; timestamp: number }>;
+  jury_cases?: JuryCaseRecord[];
+  jury_policies?: ModerationPolicyConfig;
 }
 
 // ==========================================
@@ -977,6 +1115,7 @@ export class SovraDatabaseEngine {
   private storageDir: string;
   private dbFilePath: string;
   private dbBackupPath: string;
+  private lastBackupAt?: number;
   private sqliteEngine?: SqliteSocialDatabaseEngine;
 
   constructor(customStorageDir?: string) {
@@ -1081,6 +1220,8 @@ export class SovraDatabaseEngine {
       videos: this.getSeedVideos(),
       video_likes: [],
       channel_subscriptions: [],
+      jury_cases: [],
+      jury_policies: this.getDefaultJuryPolicies(),
     };
   }
 
@@ -1241,6 +1382,8 @@ export class SovraDatabaseEngine {
           mutes: Array.isArray(parsed.mutes) ? parsed.mutes : [],
           call_metrics: Array.isArray(parsed.call_metrics) ? parsed.call_metrics : [],
           revoked_tokens: Array.isArray(parsed.revoked_tokens) ? parsed.revoked_tokens : [],
+          jury_cases: Array.isArray(parsed.jury_cases) ? parsed.jury_cases : [],
+          jury_policies: parsed.jury_policies || this.getDefaultJuryPolicies(),
         };
       } else {
         this.save();
@@ -1413,12 +1556,15 @@ export class SovraDatabaseEngine {
         fs.mkdirSync(this.storageDir, { recursive: true });
       }
       this.db.schemaVersion = 1;
-      const data = JSON.stringify(this.db, null, 2);
+      const isTestEnv = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
+      const data = isTestEnv ? JSON.stringify(this.db) : JSON.stringify(this.db, null, 2);
 
-      // Create rolling backup if valid primary file exists
-      if (fs.existsSync(this.dbFilePath)) {
+      // Create rolling backup at most once every 5 seconds to prevent I/O thrashing
+      const now = Date.now();
+      if (!isTestEnv && fs.existsSync(this.dbFilePath) && (!this.lastBackupAt || now - this.lastBackupAt > 5000)) {
         try {
           fs.copyFileSync(this.dbFilePath, this.dbBackupPath);
+          this.lastBackupAt = now;
         } catch (_) {}
       }
 
@@ -7050,6 +7196,982 @@ export class SovraDatabaseEngine {
     }
 
     return { valid: true };
+  }
+
+  // =========================================================================
+  // ⚖️ COMMUNITY JURY & 24-HOUR AUTOMATED MODERATION ENGINE
+  // =========================================================================
+
+  public getDefaultJuryPolicies(): ModerationPolicyConfig {
+    return {
+      votingDurationMs: 24 * 60 * 60 * 1000, // 86400000 ms (24 hours)
+      targetJurySize: 21,
+      minQuorum: 21,
+      removalThresholdRatio: 0.6667, // 2/3 supermajority
+      emergencyCategories: [
+        'csam_exploitation',
+        'minor_grooming',
+        'ncii_exploitation',
+        'suicide_self_harm',
+        'trafficking_coercion',
+      ],
+      updatedAt: Date.now(),
+    };
+  }
+
+  public getModerationPolicyConfig(): ModerationPolicyConfig {
+    this.load();
+    if (!this.db.jury_policies) {
+      this.db.jury_policies = this.getDefaultJuryPolicies();
+    }
+    return this.db.jury_policies;
+  }
+
+  public updateModerationPolicyConfig(
+    updates: Partial<ModerationPolicyConfig>,
+    updatedByDid: string
+  ): { ok: boolean; policy?: ModerationPolicyConfig; error?: string } {
+    this.load();
+    const current = this.getModerationPolicyConfig();
+
+    if (updates.votingDurationMs !== undefined) {
+      if (typeof updates.votingDurationMs !== 'number' || updates.votingDurationMs < 1000) {
+        return { ok: false, error: 'Voting duration must be at least 1000 milliseconds' };
+      }
+    }
+    if (updates.minQuorum !== undefined) {
+      if (typeof updates.minQuorum !== 'number' || updates.minQuorum < 1) {
+        return { ok: false, error: 'Minimum quorum must be at least 1' };
+      }
+    }
+    if (updates.removalThresholdRatio !== undefined) {
+      if (
+        typeof updates.removalThresholdRatio !== 'number' ||
+        updates.removalThresholdRatio < 0.5 ||
+        updates.removalThresholdRatio > 1.0
+      ) {
+        return { ok: false, error: 'Removal threshold ratio must be between 0.50 (50%) and 1.00 (100%)' };
+      }
+    }
+    if (updates.targetJurySize !== undefined) {
+      if (typeof updates.targetJurySize !== 'number' || updates.targetJurySize < 1) {
+        return { ok: false, error: 'Target jury size must be at least 1' };
+      }
+    }
+
+    const updatedPolicy: ModerationPolicyConfig = {
+      ...current,
+      ...updates,
+      updatedAt: Date.now(),
+      updatedByDid,
+    };
+
+    this.db.jury_policies = updatedPolicy;
+    this.logAudit({
+      type: 'MODERATION_POLICY_UPDATED',
+      action: 'UPDATE_POLICY_CONFIG',
+      actorDid: updatedByDid,
+      details: `Updated jury moderation policy: quorum=${updatedPolicy.minQuorum}, threshold=${updatedPolicy.removalThresholdRatio}, duration=${updatedPolicy.votingDurationMs}ms`,
+    });
+    this.save();
+    return { ok: true, policy: updatedPolicy };
+  }
+
+  public normalizeViolationCategory(input?: string): ExtendedViolationCategory {
+    if (!input) return 'other_serious';
+    const clean = String(input).trim().toLowerCase();
+    const map: Record<string, ExtendedViolationCategory> = {
+      'hate_speech': 'hate_speech',
+      'hate_speech_dehumanization': 'hate_speech',
+      'hatespeech': 'hate_speech',
+      'credible_threats': 'credible_threats',
+      'imminent_violence_incitement': 'credible_threats',
+      'imminent_violence': 'credible_threats',
+      'violence': 'credible_threats',
+      'threats': 'credible_threats',
+      'illegal': 'credible_threats',
+      'terrorism_extremism': 'terrorism_extremism',
+      'terrorism': 'terrorism_extremism',
+      'extremism': 'terrorism_extremism',
+      'csam_exploitation': 'csam_exploitation',
+      'child_exploitation_csam': 'csam_exploitation',
+      'csam': 'csam_exploitation',
+      'child_safety': 'csam_exploitation',
+      'minor_grooming': 'minor_grooming',
+      'minor_grooming_predation': 'minor_grooming',
+      'grooming': 'minor_grooming',
+      'ncii_exploitation': 'ncii_exploitation',
+      'ncii_sexual_exploitation': 'ncii_exploitation',
+      'ncii': 'ncii_exploitation',
+      'adult_sexual_content': 'adult_sexual_content',
+      'nonconsensual_sexual_content': 'adult_sexual_content',
+      'sexual_content': 'adult_sexual_content',
+      'harassment_stalking': 'harassment_stalking',
+      'harassment': 'harassment_stalking',
+      'stalking': 'harassment_stalking',
+      'misinformation_deception': 'misinformation_deception',
+      'coordinated_disinformation': 'misinformation_deception',
+      'misinformation': 'misinformation_deception',
+      'fraud_scams': 'fraud_scams',
+      'financial_fraud_scam': 'fraud_scams',
+      'fraud': 'fraud_scams',
+      'scam': 'fraud_scams',
+      'doxxing_privacy': 'doxxing_privacy',
+      'doxxing_private_info': 'doxxing_privacy',
+      'doxxing': 'doxxing_privacy',
+      'privacy': 'doxxing_privacy',
+      'trafficking_coercion': 'trafficking_coercion',
+      'human_trafficking_coercion': 'trafficking_coercion',
+      'trafficking': 'trafficking_coercion',
+      'dangerous_instructions': 'dangerous_instructions',
+      'dangerous_weapons_cbrn': 'dangerous_instructions',
+      'weapons': 'dangerous_instructions',
+      'spam_manipulation': 'spam_manipulation',
+      'spam_inauthentic_activity': 'spam_manipulation',
+      'spam': 'spam_manipulation',
+      'suicide_self_harm': 'suicide_self_harm',
+      'self_harm': 'suicide_self_harm',
+      'suicide': 'suicide_self_harm',
+      'copyright_violation': 'copyright_violation',
+      'intellectual_property_infringe': 'copyright_violation',
+      'copyright': 'copyright_violation',
+      'other_serious': 'other_serious',
+      'other_severe_harm': 'other_serious',
+      'other': 'other_serious',
+    };
+    return map[clean] || 'other_serious';
+  }
+
+  public decorateCaseRecord(c: JuryCaseRecord): JuryCaseRecord {
+    const policy = this.getModerationPolicyConfig();
+    const substantive = (c.votes?.violationProven || 0) + (c.votes?.violationNotProven || 0);
+    const total = substantive + (c.votes?.insufficientEvidence || 0);
+    const user = (this.db.users || []).find(u => u.did === c.targetAuthorDid);
+
+    c.authorDid = c.targetAuthorDid;
+    c.authorHandle = user?.handle ? user.handle.replace(/^@/, '') : (c.targetAuthorDid ? c.targetAuthorDid.slice(-8) : 'author');
+    c.violationCategory = c.categories?.[0] || 'other_serious';
+    c.evidenceText = c.evidenceContext || c.targetPreviewText || '';
+    c.status = (c.state === 'VOTING' || c.state === 'TRIAGE' || c.state === 'OPEN') ? 'OPEN_VOTING' : 'CLOSED';
+    c.minQuorum = policy.minQuorum || 21;
+    c.voteStats = {
+      violationProvenVotes: c.votes?.violationProven || 0,
+      violationNotProvenVotes: c.votes?.violationNotProven || 0,
+      insufficientEvidenceVotes: c.votes?.insufficientEvidence || 0,
+      totalValidVotes: total,
+    };
+    return c;
+  }
+
+  public createOrConsolidateJuryReport(data: {
+    targetType: 'post' | 'profile' | 'comment';
+    targetId: string;
+    reporterDid: string;
+    category?: ExtendedViolationCategory;
+    violationCategory?: ExtendedViolationCategory | string;
+    subcategory?: string;
+    violationSubcategory?: string;
+    description?: string;
+    evidenceText?: string;
+    evidenceUrls?: string[];
+    evidenceContext?: string;
+    reporterPrivacy?: string;
+    isEmergency?: boolean;
+  }): {
+    ok: boolean;
+    case?: JuryCaseRecord;
+    report?: ReportRecord;
+    isConsolidated?: boolean;
+    consolidated?: boolean;
+    emergency?: boolean;
+    error?: string;
+  } {
+    this.load();
+    if (!Array.isArray(this.db.jury_cases)) this.db.jury_cases = [];
+    if (!Array.isArray(this.db.reports)) this.db.reports = [];
+
+    let targetAuthorDid = '';
+    let targetCanonicalUrl = '';
+    let targetPreviewText = '';
+    let targetMediaCid = '';
+
+    if (data.targetType === 'post') {
+      const p = (this.db.posts || []).find(post => post.id === data.targetId);
+      if (!p) return { ok: false, error: 'Target post not found' };
+      targetAuthorDid = p.authorDid;
+      targetCanonicalUrl = `https://sovra.mesh/post/${p.id}`;
+      targetPreviewText = p.caption || '';
+      targetMediaCid = p.mediaCid || (p as any).imageCid || '';
+    } else if (data.targetType === 'profile') {
+      const u = (this.db.users || []).find(usr => usr.did === data.targetId || usr.handle === data.targetId);
+      if (!u) return { ok: false, error: 'Target user profile not found' };
+      targetAuthorDid = u.did;
+      targetCanonicalUrl = `https://sovra.mesh/profile/${u.did}`;
+      targetPreviewText = `${u.displayName || u.name} (${u.handle})`;
+    } else {
+      return { ok: false, error: `Unsupported target type: ${data.targetType}` };
+    }
+
+    if (data.reporterDid === targetAuthorDid) {
+      return { ok: false, error: 'Cannot submit a violation report against your own account or content' };
+    }
+
+    const catInput = (data.category || data.violationCategory || 'other_serious') as string;
+    const normalizedCategory = this.normalizeViolationCategory(catInput);
+    const subcategory = data.subcategory || data.violationSubcategory;
+    const descriptionText = String(data.description || data.evidenceText || '').trim();
+
+    const reportId = 'rep_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const reportRecord: ReportRecord = {
+      id: reportId,
+      targetType: data.targetType as ReportTargetType,
+      targetId: data.targetId,
+      targetTitle: targetPreviewText || `${data.targetType}:${data.targetId}`,
+      reporterDid: data.reporterDid,
+      reason: (normalizedCategory as any) || 'Other',
+      details: descriptionText,
+      status: 'SUBMITTED',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    this.db.reports.unshift(reportRecord);
+
+    const policy = this.getModerationPolicyConfig();
+    const isEmergency = Boolean(
+      data.isEmergency ||
+      policy.emergencyCategories.includes(normalizedCategory) ||
+      normalizedCategory === 'csam_exploitation' ||
+      normalizedCategory === 'minor_grooming' ||
+      normalizedCategory === 'ncii_exploitation' ||
+      normalizedCategory === 'suicide_self_harm' ||
+      normalizedCategory === 'credible_threats' ||
+      normalizedCategory === 'terrorism_extremism'
+    );
+
+    const existingCase = this.db.jury_cases.find(
+      c => c.targetType === data.targetType && c.targetId === data.targetId && (c.state === 'OPEN' || c.state === 'VOTING' || c.state === 'TRIAGE')
+    );
+
+    if (existingCase) {
+      existingCase.reportsCount++;
+      if (!existingCase.reportIds.includes(reportId)) existingCase.reportIds.push(reportId);
+      if (!existingCase.categories.includes(normalizedCategory)) existingCase.categories.push(normalizedCategory);
+      if (data.evidenceUrls && Array.isArray(data.evidenceUrls)) {
+        existingCase.evidenceUrls = Array.from(new Set([...existingCase.evidenceUrls, ...data.evidenceUrls]));
+      }
+      existingCase.updatedAt = Date.now();
+      existingCase.auditTrail.push({
+        action: 'REPORT_CONSOLIDATED',
+        actorDid: data.reporterDid,
+        details: `Consolidated report ${reportId} for category ${normalizedCategory}`,
+        timestamp: Date.now(),
+      });
+
+      this.logAudit({
+        type: 'REPORT_CONSOLIDATED',
+        action: 'CONSOLIDATE_REPORT',
+        actorDid: data.reporterDid,
+        resourceType: data.targetType,
+        resourceId: data.targetId,
+        details: `Consolidated report into active jury case ${existingCase.id}`,
+      });
+
+      this.save();
+      const decorated = this.decorateCaseRecord(existingCase);
+      return { ok: true, case: decorated, report: reportRecord, isConsolidated: true, consolidated: true, emergency: isEmergency };
+    }
+
+    const caseId = 'case_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const now = Date.now();
+
+    const eligiblePool = (this.db.users || [])
+      .filter(u => u.did !== targetAuthorDid && u.did !== data.reporterDid && !(u as any).isBanned)
+      .map(u => u.did);
+    const shuffled = [...eligiblePool].sort(() => 0.5 - Math.random());
+    const assignedJurors = shuffled.slice(0, policy.targetJurySize);
+
+    const newCase: JuryCaseRecord = {
+      id: caseId,
+      targetType: data.targetType,
+      targetId: data.targetId,
+      targetAuthorDid,
+      targetCanonicalUrl,
+      targetPreviewText,
+      targetMediaCid,
+      reportsCount: 1,
+      reportIds: [reportId],
+      categories: [normalizedCategory],
+      subcategory,
+      evidenceUrls: data.evidenceUrls || [],
+      evidenceContext: descriptionText || data.evidenceContext || '',
+      state: isEmergency ? 'TRIAGE' : 'VOTING',
+      priority: isEmergency ? 'EMERGENCY' : 'STANDARD',
+      votingOpensAt: now,
+      votingDeadline: now + policy.votingDurationMs,
+      votes: {
+        violationProven: 0,
+        violationNotProven: 0,
+        insufficientEvidence: 0,
+      },
+      voters: {},
+      assignedJurorDids: assignedJurors,
+      appeals: [],
+      auditTrail: [
+        {
+          action: 'CASE_OPENED',
+          actorDid: data.reporterDid,
+          details: `Opened ${isEmergency ? 'EMERGENCY' : 'STANDARD'} jury case for ${normalizedCategory}`,
+          timestamp: now,
+          newState: isEmergency ? 'TRIAGE' : 'VOTING',
+        },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (isEmergency) {
+      newCase.emergencyAction = {
+        applied: true,
+        action: 'TEMPORARY_QUARANTINE',
+        timestamp: now,
+        reason: `Immediate safety routing for high-risk category: ${normalizedCategory}`,
+      };
+      this.setContentModerationState(data.targetType as ReportTargetType, data.targetId, 'RESTRICTED', data.reporterDid, `Emergency safety quarantine: ${normalizedCategory}`);
+    } else {
+      this.setContentModerationState(data.targetType as ReportTargetType, data.targetId, 'UNDER_REVIEW', data.reporterDid, `Community jury review: ${normalizedCategory}`);
+    }
+
+    this.db.jury_cases.unshift(newCase);
+
+    this.addNotification({
+      recipientDid: targetAuthorDid,
+      senderDid: 'did:sovra:system:jury',
+      senderHandle: '@sovra_jury',
+      senderName: 'Equal Community Jury',
+      senderAvatar: '⚖️',
+      type: 'system',
+      title: isEmergency ? 'Safety Alert: Content Quarantined' : 'Notice: Content Under Community Review',
+      body: `Your ${data.targetType} is under review for ${normalizedCategory}. You have the equal right to submit a context/defense statement.`,
+      targetId: caseId,
+    });
+
+    this.logAudit({
+      type: 'JURY_CASE_OPENED',
+      action: 'OPEN_CASE',
+      actorDid: data.reporterDid,
+      resourceType: data.targetType,
+      resourceId: data.targetId,
+      details: `Created jury case ${caseId} (${newCase.priority}) with 24h deadline`,
+    });
+
+    this.save();
+    const decorated = this.decorateCaseRecord(newCase);
+    return { ok: true, case: decorated, report: reportRecord, isConsolidated: false, consolidated: false, emergency: isEmergency };
+  }
+
+  public getJuryCases(filter?: {
+    state?: JuryCaseState;
+    status?: string;
+    targetType?: string;
+    priority?: string;
+    authorDid?: string;
+    violationCategory?: string;
+    category?: string;
+    viewerDid?: string;
+    forJurorDid?: string;
+    jurorEligibleOnly?: boolean;
+  }): JuryCaseRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.jury_cases)) return [];
+
+    let list = [...this.db.jury_cases];
+
+    const stateFilter = filter?.state || (filter?.status === 'OPEN_VOTING' ? 'VOTING' : undefined);
+    if (stateFilter) {
+      list = list.filter(c => c.state === stateFilter || (filter?.status === 'OPEN_VOTING' && (c.state === 'VOTING' || c.state === 'TRIAGE' || c.state === 'OPEN')));
+    }
+    if (filter?.targetType) {
+      list = list.filter(c => c.targetType === filter.targetType);
+    }
+    if (filter?.priority) {
+      list = list.filter(c => c.priority === filter.priority);
+    }
+    if (filter?.authorDid) {
+      list = list.filter(c => c.targetAuthorDid === filter.authorDid);
+    }
+    const catFilter = filter?.violationCategory || filter?.category;
+    if (catFilter) {
+      const normCat = this.normalizeViolationCategory(catFilter);
+      list = list.filter(c => c.categories.includes(normCat));
+    }
+
+    const viewer = filter?.forJurorDid || filter?.viewerDid;
+    if (filter?.jurorEligibleOnly && viewer) {
+      list = list.filter(c => {
+        if (c.targetAuthorDid === viewer) return false;
+        const isRep = (this.db.reports || []).some(r => c.reportIds.includes(r.id) && r.reporterDid === viewer);
+        if (isRep) return false;
+        if (c.priority === 'EMERGENCY' && c.categories.includes('csam_exploitation')) return false;
+        return c.state === 'VOTING';
+      });
+    }
+
+    return list.map(c => {
+      const anonymizedVoters: Record<string, any> = {};
+      for (const [vDid, vInfo] of Object.entries(c.voters)) {
+        anonymizedVoters[vDid === viewer ? vDid : 'juror_' + crypto.createHash('sha256').update(vDid + c.id).digest('hex').slice(0, 8)] = {
+          choice: vInfo.choice,
+          timestamp: vInfo.timestamp,
+        };
+      }
+      return this.decorateCaseRecord({
+        ...c,
+        voters: anonymizedVoters,
+      });
+    });
+  }
+
+  public getJuryCaseById(caseId: string, viewerDid?: string): JuryCaseRecord | null {
+    this.load();
+    const c = (this.db.jury_cases || []).find(item => item.id === caseId);
+    if (!c) return null;
+
+    const anonymizedVoters: Record<string, any> = {};
+    for (const [vDid, vInfo] of Object.entries(c.voters)) {
+      anonymizedVoters[vDid === viewerDid ? vDid : 'juror_' + crypto.createHash('sha256').update(vDid + c.id).digest('hex').slice(0, 8)] = {
+        choice: vInfo.choice,
+        timestamp: vInfo.timestamp,
+      };
+    }
+
+    return this.decorateCaseRecord({
+      ...c,
+      voters: anonymizedVoters,
+    });
+  }
+
+  public submitAuthorDefense(
+    caseId: string,
+    authorDid: string,
+    defenseNote: string
+  ): { ok: boolean; case?: JuryCaseRecord; error?: string } {
+    this.load();
+    const c = (this.db.jury_cases || []).find(item => item.id === caseId);
+    if (!c) return { ok: false, error: 'Case not found' };
+
+    if (c.targetAuthorDid !== authorDid) {
+      return { ok: false, error: 'Forbidden: Only the content author can submit a defense statement' };
+    }
+
+    if (c.state === 'ACTION_APPLIED' || c.state === 'CLOSED') {
+      return { ok: false, error: 'Cannot submit defense on a closed case' };
+    }
+
+    c.authorDefenseNote = String(defenseNote || '').trim();
+    c.authorDefenseSubmittedAt = Date.now();
+    c.updatedAt = Date.now();
+    c.auditTrail.push({
+      action: 'AUTHOR_DEFENSE_SUBMITTED',
+      actorDid: authorDid,
+      details: 'Author submitted context and defense statement',
+      timestamp: Date.now(),
+    });
+
+    this.save();
+    return { ok: true, case: this.decorateCaseRecord(c) };
+  }
+
+  public castJuryVote(
+    dataOrCaseId: { caseId: string; voterDid: string; choice: JuryVoteChoice; reasoning?: string } | string,
+    voterDidArg?: string,
+    choiceArg?: JuryVoteChoice | string,
+    reasoningArg?: string
+  ): { ok: boolean; case?: JuryCaseRecord; error?: string } {
+    this.load();
+
+    let caseId = '';
+    let voterDid = '';
+    let rawChoice: any = '';
+    let reasoning = '';
+
+    if (typeof dataOrCaseId === 'string') {
+      caseId = dataOrCaseId;
+      voterDid = voterDidArg || '';
+      rawChoice = choiceArg || '';
+      reasoning = reasoningArg || '';
+    } else if (dataOrCaseId && typeof dataOrCaseId === 'object') {
+      caseId = dataOrCaseId.caseId;
+      voterDid = dataOrCaseId.voterDid;
+      rawChoice = dataOrCaseId.choice;
+      reasoning = dataOrCaseId.reasoning || '';
+    }
+
+    const c = (this.db.jury_cases || []).find(item => item.id === caseId);
+    if (!c) return { ok: false, error: 'Case not found' };
+
+    if (c.state !== 'VOTING' && c.state !== 'OPEN' && c.state !== 'TRIAGE') {
+      return { ok: false, error: `Voting is closed for this case (current state: ${c.state})` };
+    }
+
+    if (Date.now() >= c.votingDeadline) {
+      return { ok: false, error: 'Voting deadline has expired' };
+    }
+
+    if (voterDid === c.targetAuthorDid) {
+      return { ok: false, error: 'Conflict of Interest: Author cannot vote on their own case' };
+    }
+
+    const isReporter = (this.db.reports || []).some(
+      r => c.reportIds.includes(r.id) && r.reporterDid === voterDid
+    );
+    if (isReporter) {
+      return { ok: false, error: 'Conflict of Interest: Direct reporter cannot act as juror on this case' };
+    }
+
+    if (c.voters[voterDid]) {
+      return { ok: false, error: 'Duplicate Vote: Voter has already cast a vote on this case' };
+    }
+
+    let choice: JuryVoteChoice = 'INSUFFICIENT_EVIDENCE';
+    const choiceStr = String(rawChoice || '').trim().toUpperCase();
+    if (['VIOLATION_PROVEN', 'PROVEN', 'HATE_SPEECH', 'ILLEGAL', 'TERRORISM', 'MISINFORMATION', 'TRUE'].includes(choiceStr)) {
+      choice = 'VIOLATION_PROVEN';
+    } else if (['VIOLATION_NOT_PROVEN', 'NOT_PROVEN', 'SAFE_DEFENSE', 'SAFE', 'FALSE', 'DEFENSE'].includes(choiceStr)) {
+      choice = 'VIOLATION_NOT_PROVEN';
+    } else if (['INSUFFICIENT_EVIDENCE', 'INSUFFICIENT', 'NEED_MORE_INFO', 'ABSTAIN'].includes(choiceStr)) {
+      choice = 'INSUFFICIENT_EVIDENCE';
+    } else {
+      return { ok: false, error: `Invalid choice: ${rawChoice}` };
+    }
+
+    c.voters[voterDid] = {
+      choice,
+      timestamp: Date.now(),
+      reasoning,
+    };
+
+    if (choice === 'VIOLATION_PROVEN') c.votes.violationProven++;
+    else if (choice === 'VIOLATION_NOT_PROVEN') c.votes.violationNotProven++;
+    else if (choice === 'INSUFFICIENT_EVIDENCE') c.votes.insufficientEvidence++;
+
+    c.updatedAt = Date.now();
+    c.auditTrail.push({
+      action: 'VOTE_CAST',
+      actorDid: voterDid,
+      details: `Juror cast vote: ${choice}`,
+      timestamp: Date.now(),
+    });
+
+    this.save();
+    return { ok: true, case: this.decorateCaseRecord(c) };
+  }
+
+  public finalizeJuryCase(
+    caseId: string,
+    options?: { force?: boolean; finalizedByDid?: string } | boolean
+  ): { ok: boolean; case?: JuryCaseRecord; error?: string } {
+    this.load();
+    const c = (this.db.jury_cases || []).find(item => item.id === caseId);
+    if (!c) return { ok: false, error: 'Case not found' };
+
+    if (c.enforcement?.applied && (c.state === 'ACTION_APPLIED' || c.state === 'CLOSED')) {
+      return { ok: true, case: this.decorateCaseRecord(c) };
+    }
+
+    const force = typeof options === 'boolean' ? options : Boolean(options?.force);
+    const finalizedBy = (typeof options === 'object' && options?.finalizedByDid) ? options.finalizedByDid : 'did:sovra:system:jury_worker';
+
+    const now = Date.now();
+    if (!force && now < c.votingDeadline) {
+      return { ok: false, error: 'Voting window is still open. 24h deadline not yet reached.' };
+    }
+
+    const policy = this.getModerationPolicyConfig();
+    const vProven = c.votes.violationProven || 0;
+    const vNotProven = c.votes.violationNotProven || 0;
+    const vInsufficient = c.votes.insufficientEvidence || 0;
+    const substantiveVotes = vProven + vNotProven;
+    const totalVotes = substantiveVotes + vInsufficient;
+    const minQuorum = policy.minQuorum || 21;
+    const quorumReached = totalVotes >= minQuorum;
+
+    let decision: 'REMOVE' | 'PRESERVE' | 'INSUFFICIENT_QUORUM' = 'PRESERVE';
+    let violationPercent = 0;
+    let verdictReason = '';
+    let targetAction: 'REMOVED' | 'PRESERVED' = 'PRESERVED';
+
+    if (!quorumReached) {
+      c.state = 'INSUFFICIENT_EVIDENCE';
+      decision = 'INSUFFICIENT_QUORUM';
+      targetAction = 'PRESERVED';
+      verdictReason = `Quorum of ${minQuorum} was not reached (${totalVotes} votes cast). Preserving content without guilt finding.`;
+    } else {
+      violationPercent = substantiveVotes > 0 ? Math.round((vProven / substantiveVotes) * 100) : 0;
+      const ratio = substantiveVotes > 0 ? (vProven / substantiveVotes) : 0;
+
+      if (ratio >= policy.removalThresholdRatio) {
+        c.state = 'VIOLATION_PROVEN';
+        decision = 'REMOVE';
+        targetAction = 'REMOVED';
+        verdictReason = `Community supermajority threshold reached: ${violationPercent}% violation votes (threshold ${Math.round(policy.removalThresholdRatio * 100)}%). Content removed.`;
+      } else {
+        c.state = 'VIOLATION_NOT_PROVEN';
+        decision = 'PRESERVE';
+        targetAction = 'PRESERVED';
+        verdictReason = `Violation not proven: ${violationPercent}% violation votes fell below required threshold. Content preserved.`;
+      }
+    }
+
+    c.verdict = {
+      decision,
+      violationPercent,
+      totalSubstantiveVotes: substantiveVotes,
+      totalVotes,
+      quorumReached,
+      finalizedAt: now,
+      reason: verdictReason,
+    };
+
+    c.enforcement = {
+      applied: true,
+      action: targetAction,
+      timestamp: now,
+      idempotentToken: 'enf_' + crypto.randomBytes(8).toString('hex'),
+    };
+
+    if (targetAction === 'REMOVED') {
+      if (c.targetType === 'post') {
+        this.setContentModerationState('post', c.targetId, 'REMOVED', 'did:sovra:system:jury', verdictReason);
+      } else if (c.targetType === 'profile') {
+        this.setContentModerationState('user', c.targetId, 'RESTRICTED', 'did:sovra:system:jury', verdictReason);
+      }
+    } else {
+      if (c.targetType === 'post') {
+        this.setContentModerationState('post', c.targetId, 'VISIBLE', 'did:sovra:system:jury', verdictReason);
+      } else if (c.targetType === 'profile') {
+        this.setContentModerationState('user', c.targetId, 'VISIBLE', 'did:sovra:system:jury', verdictReason);
+      }
+    }
+
+    c.state = 'ACTION_APPLIED';
+    c.updatedAt = now;
+    c.auditTrail.push({
+      action: 'CASE_FINALIZED',
+      actorDid: finalizedBy,
+      details: `Finalized case: verdict=${decision}, action=${targetAction}, violationPercent=${violationPercent}%`,
+      timestamp: now,
+      newState: 'ACTION_APPLIED',
+    });
+
+    this.addNotification({
+      recipientDid: c.targetAuthorDid,
+      senderDid: 'did:sovra:system:jury',
+      senderHandle: '@sovra_jury',
+      senderName: 'Community Jury',
+      senderAvatar: '⚖️',
+      type: 'system',
+      title: targetAction === 'REMOVED' ? 'Jury Verdict: Content Removed' : 'Jury Verdict: Content Preserved',
+      body: `${verdictReason} You may appeal this decision within 14 days.`,
+      targetId: c.id,
+    });
+
+    this.logAudit({
+      type: 'JURY_CASE_FINALIZED',
+      action: 'FINALIZE_CASE',
+      actorDid: finalizedBy,
+      resourceType: c.targetType,
+      resourceId: c.targetId,
+      details: `Verdict: ${decision}, Action: ${targetAction}, Quorum: ${quorumReached}, Violation%: ${violationPercent}`,
+    });
+
+    this.save();
+    return { ok: true, case: this.decorateCaseRecord(c) };
+  }
+
+  public submitJuryAppeal(
+    caseId: string,
+    appellantDid: string,
+    data: { rationale?: string; appealReason?: string; additionalEvidence?: string } | string
+  ): { ok: boolean; case?: JuryCaseRecord; appeal?: JuryAppealRecord; error?: string } {
+    this.load();
+    const c = (this.db.jury_cases || []).find(item => item.id === caseId);
+    if (!c) return { ok: false, error: 'Case not found' };
+
+    if (!c.enforcement?.applied && c.state !== 'ACTION_APPLIED' && c.state !== 'CLOSED') {
+      return { ok: false, error: 'Appeals can only be submitted on finalized cases' };
+    }
+
+    const isAuthor = appellantDid === c.targetAuthorDid;
+    const isReporter = (this.db.reports || []).some(r => c.reportIds.includes(r.id) && r.reporterDid === appellantDid);
+    if (!isAuthor && !isReporter) {
+      return { ok: false, error: 'Forbidden: Only the affected author or the reporter can appeal this case' };
+    }
+
+    if (!Array.isArray(c.appeals)) c.appeals = [];
+    if (c.appeals.length >= 2) {
+      return { ok: false, error: 'Maximum appeal limit (2) reached for this case' };
+    }
+
+    const rationaleText = typeof data === 'string'
+      ? data
+      : String(data?.rationale || data?.appealReason || '').trim();
+    const additionalEvidence = typeof data === 'object' ? data?.additionalEvidence : undefined;
+
+    if (!rationaleText) {
+      return { ok: false, error: 'Appeal rationale is required' };
+    }
+
+    const appealId = 'appeal_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const appealRecord: JuryAppealRecord = {
+      id: appealId,
+      caseId: c.id,
+      appellantDid,
+      role: isAuthor ? 'author' : 'reporter',
+      rationale: rationaleText,
+      additionalEvidence,
+      status: 'PENDING',
+      submittedAt: Date.now(),
+    };
+
+    c.appeals.push(appealRecord);
+    c.state = 'APPEALED';
+    c.updatedAt = Date.now();
+    c.auditTrail.push({
+      action: 'APPEAL_SUBMITTED',
+      actorDid: appellantDid,
+      details: `Appeal submitted by ${appealRecord.role}: "${appealRecord.rationale.slice(0, 80)}"`,
+      timestamp: Date.now(),
+      newState: 'APPEALED',
+    });
+
+    this.logAudit({
+      type: 'JURY_APPEAL_SUBMITTED',
+      action: 'SUBMIT_APPEAL',
+      actorDid: appellantDid,
+      resourceType: c.targetType,
+      resourceId: c.targetId,
+      details: `Appeal ${appealId} submitted on case ${caseId}`,
+    });
+
+    this.save();
+    return { ok: true, case: this.decorateCaseRecord(c), appeal: appealRecord };
+  }
+
+  public resolveJuryAppeal(
+    arg1: string,
+    arg2: string,
+    arg3?: string,
+    arg4?: 'GRANTED' | 'DENIED' | string,
+    arg5?: string
+  ): { ok: boolean; case?: JuryCaseRecord; appeal?: JuryAppealRecord; error?: string } {
+    this.load();
+
+    let caseId = '';
+    let appealId = '';
+    let reviewerDid = '';
+    let decision: 'GRANTED' | 'DENIED' = 'DENIED';
+    let resolutionNote = '';
+
+    if (arg5 !== undefined || (arg4 !== 'GRANTED' && arg4 !== 'DENIED' && (arg3 === 'GRANTED' || arg3 === 'DENIED'))) {
+      if (arg3 === 'GRANTED' || arg3 === 'DENIED') {
+        // 4 args: (appealId, reviewerDid, decision, resolutionNote)
+        appealId = arg1;
+        reviewerDid = arg2;
+        decision = arg3 as any;
+        resolutionNote = arg4 || '';
+      } else {
+        // 5 args: (caseId, appealId, reviewerDid, decision, resolutionNote)
+        caseId = arg1;
+        appealId = arg2;
+        reviewerDid = arg3 || '';
+        decision = (arg4 as any) === 'GRANTED' ? 'GRANTED' : 'DENIED';
+        resolutionNote = arg5 || '';
+      }
+    } else if (arg4 === 'GRANTED' || arg4 === 'DENIED') {
+      const cByCase = (this.db.jury_cases || []).find(item => item.id === arg1);
+      if (cByCase && (cByCase.appeals || []).some(a => a.id === arg2)) {
+        caseId = arg1;
+        appealId = arg2;
+        reviewerDid = arg3 || '';
+        decision = arg4;
+        resolutionNote = arg5 || '';
+      } else {
+        appealId = arg1;
+        reviewerDid = arg2;
+        decision = arg4;
+        resolutionNote = (arg3 as any) || '';
+      }
+    } else {
+      appealId = arg1;
+      reviewerDid = arg2;
+      decision = 'DENIED';
+    }
+
+    let c = caseId ? (this.db.jury_cases || []).find(item => item.id === caseId) : null;
+    if (!c) {
+      c = (this.db.jury_cases || []).find(item => (item.appeals || []).some(a => a.id === appealId)) || null;
+    }
+    if (!c) return { ok: false, error: 'Case not found for appeal' };
+
+    const appeal = (c.appeals || []).find(a => a.id === appealId);
+    if (!appeal) return { ok: false, error: 'Appeal not found' };
+
+    if (appeal.status !== 'PENDING') {
+      return { ok: false, error: `Appeal is already ${appeal.status}` };
+    }
+
+    // Sovereign Equal Protection: Original juror CANNOT act as appeal reviewer
+    if (c.voters && c.voters[reviewerDid]) {
+      return { ok: false, error: 'Conflict of Interest: Original juror cannot evaluate this appeal' };
+    }
+
+    const now = Date.now();
+    appeal.status = decision;
+    appeal.reviewedByDid = reviewerDid;
+    appeal.resolutionNote = resolutionNote || `Appeal ${decision.toLowerCase()} by independent review`;
+    appeal.resolvedAt = now;
+
+    if (decision === 'GRANTED') {
+      const prevAction = c.enforcement?.action;
+      if (prevAction === 'REMOVED') {
+        this.setContentModerationState(c.targetType as ReportTargetType, c.targetId, 'VISIBLE', reviewerDid, `Restored via appeal ${appealId}: ${appeal.resolutionNote}`);
+        c.enforcement = {
+          applied: true,
+          action: 'RESTORED',
+          timestamp: now,
+          idempotentToken: 'enf_rst_' + crypto.randomBytes(8).toString('hex'),
+        };
+      } else {
+        this.setContentModerationState(c.targetType as ReportTargetType, c.targetId, 'REMOVED', reviewerDid, `Reversed via appeal ${appealId}: ${appeal.resolutionNote}`);
+        c.enforcement = {
+          applied: true,
+          action: 'REMOVED',
+          timestamp: now,
+          idempotentToken: 'enf_rev_' + crypto.randomBytes(8).toString('hex'),
+        };
+      }
+
+      this.addNotification({
+        recipientDid: c.targetAuthorDid,
+        senderDid: 'did:sovra:system:jury',
+        senderHandle: '@sovra_jury',
+        senderName: 'Community Appeals Panel',
+        senderAvatar: '⚖️',
+        type: 'system',
+        title: 'Appeal Granted: Decision Reversed',
+        body: `Your appeal on case ${c.id} was granted. ${appeal.resolutionNote}`,
+        targetId: c.id,
+      });
+    } else {
+      this.addNotification({
+        recipientDid: appeal.appellantDid,
+        senderDid: 'did:sovra:system:jury',
+        senderHandle: '@sovra_jury',
+        senderName: 'Community Appeals Panel',
+        senderAvatar: '⚖️',
+        type: 'system',
+        title: 'Appeal Denied',
+        body: `Your appeal on case ${c.id} was denied. ${appeal.resolutionNote}`,
+        targetId: c.id,
+      });
+    }
+
+    c.state = 'APPEAL_RESOLVED';
+    c.updatedAt = now;
+    c.auditTrail.push({
+      action: 'APPEAL_RESOLVED',
+      actorDid: reviewerDid,
+      details: `Appeal ${appealId} ${decision}: ${appeal.resolutionNote}`,
+      timestamp: now,
+      newState: 'APPEAL_RESOLVED',
+    });
+
+    this.logAudit({
+      type: 'JURY_APPEAL_RESOLVED',
+      action: 'RESOLVE_APPEAL',
+      actorDid: reviewerDid,
+      resourceType: c.targetType,
+      resourceId: c.targetId,
+      details: `Appeal ${appealId} ${decision} on case ${c.id}. Reversal: ${decision === 'GRANTED'}`,
+    });
+
+    this.save();
+    return { ok: true, case: this.decorateCaseRecord(c), appeal };
+  }
+
+  public getTransparencyMetrics(): {
+    totalCases: number;
+    activeCases: number;
+    violationProvenCount: number;
+    violationNotProvenCount: number;
+    insufficientQuorumCount: number;
+    emergencyCasesCount: number;
+    appealsTotal: number;
+    appealsGranted: number;
+    reversalRatePct: number;
+    categoryBreakdown: Record<string, number>;
+  } {
+    this.load();
+    const cases = this.db.jury_cases || [];
+    let violationProven = 0;
+    let violationNotProven = 0;
+    let insufficientQuorum = 0;
+    let emergencyCount = 0;
+    let appealsTotal = 0;
+    let appealsGranted = 0;
+    const catMap: Record<string, number> = {};
+
+    for (const c of cases) {
+      if (c.priority === 'EMERGENCY') emergencyCount++;
+      for (const cat of c.categories) {
+        catMap[cat] = (catMap[cat] || 0) + 1;
+      }
+      if (c.verdict) {
+        if (c.verdict.decision === 'REMOVE') violationProven++;
+        else if (c.verdict.decision === 'PRESERVE') violationNotProven++;
+        else if (c.verdict.decision === 'INSUFFICIENT_QUORUM') insufficientQuorum++;
+      }
+      if (Array.isArray(c.appeals)) {
+        appealsTotal += c.appeals.length;
+        appealsGranted += c.appeals.filter(a => a.status === 'GRANTED').length;
+      }
+    }
+
+    const reversalRate = appealsTotal > 0 ? Math.round((appealsGranted / appealsTotal) * 100) : 0;
+    const active = cases.filter(c => c.state === 'VOTING' || c.state === 'TRIAGE').length;
+
+    return {
+      totalCases: cases.length,
+      activeCases: active,
+      violationProvenCount: violationProven,
+      violationNotProvenCount: violationNotProven,
+      insufficientQuorumCount: insufficientQuorum,
+      emergencyCasesCount: emergencyCount,
+      appealsTotal,
+      appealsGranted,
+      reversalRatePct: reversalRate,
+      categoryBreakdown: catMap,
+    };
+  }
+
+  public processDueCases(): { finalizedCount: number; totalDue: number; valueOf(): number } {
+    this.load();
+    const now = Date.now();
+    const dueCases = (this.db.jury_cases || []).filter(
+      c => (c.state === 'VOTING' || c.state === 'TRIAGE' || c.state === 'OPEN') && now >= c.votingDeadline && !c.enforcement?.applied
+    );
+    let count = 0;
+    for (const c of dueCases) {
+      const res = this.finalizeJuryCase(c.id, { force: true, finalizedByDid: 'did:sovra:system:auto_epoch_worker' });
+      if (res.ok) count++;
+    }
+    return {
+      finalizedCount: count,
+      totalDue: dueCases.length,
+      valueOf() {
+        return count;
+      },
+    };
   }
 }
 
