@@ -14745,34 +14745,132 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- 🚨 9. SAFETY & DISPUTE REPORT MODAL -->
+  <!-- 🚨 9. SAFETY & DISPUTE REPORT MODAL (EQUAL RIGHTS COMMUNITY JURY) -->
   <div id="safetyReportModal" class="omni-modal-overlay" style="display: none;">
-    <div class="omni-modal-card" style="max-width: 440px;">
+    <div class="omni-modal-card" style="max-width: 460px;">
       <div style="padding: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
         <div style="font-weight: 800; font-size: 1rem; color: #f87171; display: flex; align-items: center; gap: 6px;">
-          <span>🚨</span> <span>Report to Mesh Dispute Jury</span>
+          <span>⚖️</span> <span>Equal Rights Community Jury (24h Review)</span>
         </div>
         <button onclick="closeSafetyReportModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">✕</button>
       </div>
       <div style="padding: 1.25rem;">
-        <p style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.45; margin: 0 0 1rem 0;">
-          Sovra uses decentralized community juror consensus rather than corporate censors. An immutable cryptographic ticket will be generated.
-        </p>
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.78rem; color: #bae6fd; line-height: 1.45;">
+          <b>Universal Human Equality:</b> Under SOVRA, no government, corporation, or powerful elite has special immunity or unilateral takedown power. All reports initiate a <b>24-Hour Democratic Community Ballot</b> where author has an equal right of defense.
+        </div>
         <label class="social-modal-label">Reason for Report</label>
         <select id="reportReasonInput" class="social-modal-input">
-          <option value="spam">🚩 Spam or Deceptive Content</option>
-          <option value="harassment">⚡ Harassment or Abuse</option>
-          <option value="impersonation">🎭 Fake Identity or Impersonation</option>
-          <option value="copyright">📦 Copyright / Stolen Content CID</option>
-          <option value="illegal">⚠️ Dangerous or Illegal Content</option>
+          <option value="hate_speech">🚩 Hate Speech &amp; Communal Disharmony</option>
+          <option value="illegal">🚫 Illegal Violence &amp; Physical Threat</option>
+          <option value="terrorism">⚡ Terrorism &amp; Violent Extremism</option>
+          <option value="misinformation">⚠️ Malicious Misinformation / Deception</option>
+          <option value="harassment">🛑 Targeted Harassment &amp; Bullying</option>
         </select>
 
-        <label class="social-modal-label">Additional Details (Optional)</label>
-        <textarea id="reportDetailsInput" class="social-modal-input" style="min-height: 60px; resize: vertical;" placeholder="Provide context for the Mesh Jurors..."></textarea>
+        <label class="social-modal-label">Additional Context / Evidence</label>
+        <textarea id="reportDetailsInput" class="social-modal-input" style="min-height: 60px; resize: vertical;" placeholder="Provide evidence or context for the peer jurors..."></textarea>
 
         <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
           <button onclick="closeSafetyReportModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
-          <button onclick="submitSafetyReport()" class="action-pill-btn action-pill-danger" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.85rem;">Submit Ticket 🚨</button>
+          <button onclick="submitSafetyReport()" class="action-pill-btn action-pill-danger" style="flex: 1.2; padding: 0.75rem; justify-content: center; font-size: 0.85rem;">Initiate 24h Jury Ballot ⚖️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚖️ 10. SOVRA AUTONOMOUS COMMUNITY JURY BALLOT & VERDICT MODAL -->
+  <div id="juryBallotModal" class="omni-modal-overlay" style="display: none;">
+    <div class="omni-modal-card" style="max-width: 500px; width: 94%;">
+      <div style="padding: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 800; font-size: 1rem; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+          <span>⚖️</span> <span>Democratic Community Jury Ballot</span>
+        </div>
+        <button onclick="closeJuryBallotModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.25rem; max-height: 75vh; overflow-y: auto;">
+        <!-- Equal Rights Principle Badge -->
+        <div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(129, 140, 248, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.4rem;">🏛️</span>
+          <div style="font-size: 0.76rem; color: #c7d2fe; line-height: 1.4;">
+            <b>Universal Sovereignty:</b> Equal due process for all human beings. 66% supermajority required to delete. Government actions have no special immunity.
+          </div>
+        </div>
+
+        <!-- 24h Countdown Clock -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;">
+          <span style="font-size: 0.78rem; color: #94a3b8; font-weight: 600;">⏳ 24h Epoch Timer</span>
+          <span id="juryTimerCountdown" style="font-size: 0.82rem; color: #f59e0b; font-weight: 800; font-family: monospace;">23h 59m 50s Remaining</span>
+        </div>
+
+        <!-- Post & Accusation Summary -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px;">
+            <span>Target: <b id="juryTargetHandle" style="color: #fff;">@author</b></span>
+            <span id="juryReasonBadge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase;">FLAGGED</span>
+          </div>
+          <div id="juryTargetCaption" style="font-size: 0.85rem; color: #e2e8f0; font-style: italic; margin-top: 4px; line-height: 1.4;">
+            "Post caption..."
+          </div>
+          <div id="juryDetailsText" style="font-size: 0.74rem; color: #94a3b8; margin-top: 6px;">
+            Accusation: ...
+          </div>
+        </div>
+
+        <!-- Author's Defense Statement (Crucial for Equal Rights) -->
+        <div style="background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+          <div style="font-size: 0.78rem; font-weight: 700; color: #4ade80; display: flex; align-items: center; gap: 6px;">
+            <span>🛡️</span> <span>Author's Right of Defense (Context &amp; Free Speech):</span>
+          </div>
+          <div id="juryAuthorDefenseContent" style="font-size: 0.82rem; color: #dcfce7; margin-top: 6px; line-height: 1.45; font-style: italic;">
+            No defense statement filed yet.
+          </div>
+          <!-- Defense Submission Input for Author -->
+          <div id="juryDefenseFormSection" style="margin-top: 8px; display: none;">
+            <textarea id="juryDefenseInput" class="social-modal-input" style="min-height: 50px; font-size: 0.78rem;" placeholder="Submit your context, self-defense statement, or evidence..."></textarea>
+            <button onclick="submitAuthorDefenseFromModal()" class="action-pill-btn action-pill-primary" style="margin-top: 6px; padding: 6px 12px; font-size: 0.75rem; width: 100%; justify-content: center;">Submit My Defense Note 🛡️</button>
+          </div>
+        </div>
+
+        <!-- Live Democratic Voting Bar -->
+        <div style="margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #cbd5e1; margin-bottom: 4px; font-weight: 600;">
+            <span>Community Consensus</span>
+            <span id="juryConsensusLabel">0% Violation (Quorum: 0 Votes)</span>
+          </div>
+          <div style="width: 100%; height: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 5px; overflow: hidden; display: flex;">
+            <div id="juryBarViolation" style="height: 100%; width: 0%; background: linear-gradient(90deg, #ef4444, #dc2626); transition: width 0.3s;"></div>
+            <div id="juryBarSafe" style="height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, #16a34a); transition: width 0.3s;"></div>
+          </div>
+          <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px; text-align: right;">
+            Supermajority required to auto-delete: <b>66%</b>
+          </div>
+        </div>
+
+        <!-- Cast Your Sovereign Vote -->
+        <div style="font-size: 0.8rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Cast Your Sovereign Peer Vote:</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+          <button onclick="castBallotVote('hate_speech')" class="action-pill-btn action-pill-danger" style="padding: 8px; font-size: 0.76rem; justify-content: center; text-align: center;">
+            🚩 Hate Speech
+          </button>
+          <button onclick="castBallotVote('illegal')" class="action-pill-btn action-pill-danger" style="padding: 8px; font-size: 0.76rem; justify-content: center; text-align: center;">
+            🚫 Illegal / Violence
+          </button>
+          <button onclick="castBallotVote('misinformation')" class="action-pill-btn action-pill-secondary" style="padding: 8px; font-size: 0.76rem; justify-content: center; text-align: center; color: #fbbf24;">
+            ⚠️ Misinformation
+          </button>
+          <button onclick="castBallotVote('safe_defense')" class="action-pill-btn action-pill-primary" style="padding: 8px; font-size: 0.76rem; justify-content: center; text-align: center; background: #16a34a;">
+            🛡️ Safe / Self-Defense
+          </button>
+        </div>
+
+        <!-- Fast-Forward Resolution (Testing & Verification Trigger) -->
+        <div style="padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 8px;">
+          <button onclick="executeJuryResolutionFromModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 7px; justify-content: center; font-size: 0.75rem; color: #38bdf8; border-color: rgba(56,189,248,0.3);">
+            ⚡ Fast-Forward 24h &amp; Execute Judgment
+          </button>
+          <button onclick="closeJuryBallotModal()" class="action-pill-btn action-pill-secondary" style="padding: 7px 14px; font-size: 0.75rem;">
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -16378,6 +16476,86 @@ function renderHtml(
         deriveBlindChannelId: deriveBlindChannelId,
         dispatchBlindWakeup: dispatchBlindWakeup,
         getDeviceId: getOrCreateDeviceId
+      };
+    })();
+
+    // ==========================================================================
+    // ⚖️ PILLAR 8: SOVRA AUTONOMOUS COMMUNITY JURY & DEMOCRATIC COURT (CLIENT ENCLAVE)
+    // "Universal Human Equality: No state or corporation is above human beings"
+    // ==========================================================================
+    window.SovraAutonomousJury = (function() {
+      async function createReport(postId, reason, details) {
+        try {
+          const myDid = window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:peer';
+          const resp = await fetch('/api/jury/report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId, reason, details, reporterDid: myDid })
+          });
+          return await resp.json();
+        } catch (e) {
+          console.error('[SovraAutonomousJury] Report creation error:', e);
+          return { ok: false, error: e };
+        }
+      }
+
+      async function submitDefense(ballotId, defenseNote) {
+        try {
+          const resp = await fetch('/api/jury/defense', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ballotId, defenseNote })
+          });
+          return await resp.json();
+        } catch (e) {
+          console.error('[SovraAutonomousJury] Defense submission error:', e);
+          return { ok: false, error: e };
+        }
+      }
+
+      async function castVote(ballotId, vote) {
+        try {
+          const myDid = window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:voter_' + Math.random().toString(36).substring(2, 8);
+          const resp = await fetch('/api/jury/vote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ballotId, vote, voterDid: myDid })
+          });
+          return await resp.json();
+        } catch (e) {
+          console.error('[SovraAutonomousJury] Vote casting error:', e);
+          return { ok: false, error: e };
+        }
+      }
+
+      async function fetchBallots(includeAll) {
+        try {
+          const resp = await fetch('/api/jury/ballots' + (includeAll ? '?all=true' : ''));
+          return await resp.json();
+        } catch (e) {
+          return { ok: false, ballots: [] };
+        }
+      }
+
+      async function resolveBallot(ballotId) {
+        try {
+          const resp = await fetch('/api/jury/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ballotId })
+          });
+          return await resp.json();
+        } catch (e) {
+          return { ok: false, error: e };
+        }
+      }
+
+      return {
+        createReport: createReport,
+        submitDefense: submitDefense,
+        castVote: castVote,
+        fetchBallots: fetchBallots,
+        resolveBallot: resolveBallot
       };
     })();
 
@@ -38063,14 +38241,243 @@ function renderHtml(
       const m = document.getElementById('safetyReportModal');
       if (m) m.style.display = 'flex';
     }
+    // --- Safety & Dispute Report (24h Autonomous Jury Engine) ---
+    let activeJuryBallot = null;
+    let juryTimerInterval = null;
+
+    function triggerSafetyReportModal() {
+      closePostOptionsModal();
+      const m = document.getElementById('safetyReportModal');
+      if (m) m.style.display = 'flex';
+    }
     function closeSafetyReportModal() {
       const m = document.getElementById('safetyReportModal');
       if (m) m.style.display = 'none';
     }
-    function submitSafetyReport() {
-      const reason = document.getElementById('reportReasonInput').value;
+
+    async function submitSafetyReport() {
+      const reasonEl = document.getElementById('reportReasonInput');
+      const detailsEl = document.getElementById('reportDetailsInput');
+      const reason = reasonEl ? reasonEl.value : 'hate_speech';
+      const details = detailsEl ? detailsEl.value.trim() : '';
+      const targetPostId = activeTargetPost.id;
       closeSafetyReportModal();
-      showAccountToast('✅ Report submitted. Thank you for keeping the community safe.');
+
+      if (!targetPostId) {
+        showAccountToast('⚠️ Please select a valid post to report.');
+        return;
+      }
+
+      showAccountToast('⚖️ Initiating 24-Hour Equal Rights Community Ballot...');
+
+      try {
+        const res = await window.SovraAutonomousJury.createReport(targetPostId, reason, details);
+        if (res && res.ok && res.ballot) {
+          renderJuryBannerOnCard(targetPostId, res.ballot);
+          showAccountToast('⚖️ 24h Democratic Review Active! Community ballot opened.');
+        } else {
+          showAccountToast('⚠️ ' + (res?.error || 'Failed to submit report ticket.'));
+        }
+      } catch (err) {
+        console.error('[SafetyReport] Error:', err);
+        showAccountToast('⚠️ Error submitting report to mesh.');
+      }
+    }
+
+    function renderJuryBannerOnCard(postId, ballot) {
+      const card = document.getElementById('card-' + postId);
+      if (!card || card.querySelector('.sovra-jury-card-banner')) return;
+
+      const banner = document.createElement('div');
+      banner.className = 'sovra-jury-card-banner';
+      banner.id = 'jury-banner-' + postId;
+      banner.style.cssText = 'background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; padding: 10px 14px; margin: 0 1rem 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;';
+      banner.innerHTML = 
+        '<div style="flex: 1;">' +
+          '<div style="font-weight: 700; color: #f87171; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">' +
+            '<span>⚖️</span> <span>Under 24h Equal Community Review</span>' +
+          '</div>' +
+          '<div style="font-size: 0.74rem; color: #cbd5e1; margin-top: 2px;">' +
+            'Flagged for review. Community decides deletion via 24h democratic ballot.' +
+          '</div>' +
+        '</div>' +
+        '<button onclick="openJuryBallotModal(\'' + ballot.id + '\')" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">' +
+          'Vote in Jury 🗳️' +
+        '</button>';
+
+      const header = card.querySelector('.insta-post-header');
+      if (header && header.nextSibling) {
+        card.insertBefore(banner, header.nextSibling);
+      } else {
+        card.prepend(banner);
+      }
+    }
+
+    async function openJuryBallotModal(ballotId) {
+      const m = document.getElementById('juryBallotModal');
+      if (!m) return;
+
+      try {
+        const res = await window.SovraAutonomousJury.fetchBallots(true);
+        const ballots = res && res.ballots ? res.ballots : [];
+        const ballot = ballots.find(function(b) { return b.id === ballotId; });
+        if (!ballot) {
+          showAccountToast('⚠️ Ballot expired or not found.');
+          return;
+        }
+
+        activeJuryBallot = ballot;
+        updateBallotModalUI(ballot);
+        m.style.display = 'flex';
+
+        if (juryTimerInterval) clearInterval(juryTimerInterval);
+        juryTimerInterval = setInterval(function() {
+          if (!activeJuryBallot) return;
+          const remainingMs = Math.max(0, activeJuryBallot.expiresAt - Date.now());
+          const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+          const mins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+          const secs = Math.floor((remainingMs % (1000 * 60)) / 1000);
+          const timeEl = document.getElementById('juryTimerCountdown');
+          if (timeEl) {
+            timeEl.innerText = hours + 'h ' + mins + 'm ' + secs + 's Remaining';
+          }
+          if (remainingMs <= 0) {
+            clearInterval(juryTimerInterval);
+            executeJuryResolutionFromModal();
+          }
+        }, 1000);
+      } catch (e) {
+        console.error('[JuryModal] Open error:', e);
+      }
+    }
+
+    function closeJuryBallotModal() {
+      const m = document.getElementById('juryBallotModal');
+      if (m) m.style.display = 'none';
+      if (juryTimerInterval) clearInterval(juryTimerInterval);
+      activeJuryBallot = null;
+    }
+
+    function updateBallotModalUI(ballot) {
+      if (!ballot) return;
+      const targetHandleEl = document.getElementById('juryTargetHandle');
+      if (targetHandleEl) targetHandleEl.innerText = '@' + (ballot.authorHandle || 'author');
+
+      const reasonBadgeEl = document.getElementById('juryReasonBadge');
+      if (reasonBadgeEl) reasonBadgeEl.innerText = (ballot.reason || 'Flagged').replace(/_/g, ' ');
+
+      const captionEl = document.getElementById('juryTargetCaption');
+      if (captionEl) captionEl.innerText = '"' + (ballot.postCaption || 'No caption text') + '"';
+
+      const detailsEl = document.getElementById('juryDetailsText');
+      if (detailsEl) detailsEl.innerText = 'Accusation: ' + (ballot.details || 'Community dispute initiated');
+
+      const defenseEl = document.getElementById('juryAuthorDefenseContent');
+      if (defenseEl) {
+        defenseEl.innerText = ballot.authorDefenseNote
+          ? '"' + ballot.authorDefenseNote + '"'
+          : 'No defense statement filed yet. (Author can submit explanation below)';
+      }
+
+      const myDid = window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:peer';
+      const defenseFormEl = document.getElementById('juryDefenseFormSection');
+      if (defenseFormEl) {
+        defenseFormEl.style.display = (ballot.authorDid === myDid || !ballot.authorDefenseNote) ? 'block' : 'none';
+      }
+
+      const vHate = ballot.votes.hate_speech || 0;
+      const vIllegal = ballot.votes.illegal || 0;
+      const vMisinfo = ballot.votes.misinformation || 0;
+      const vTerrorism = ballot.votes.terrorism || 0;
+      const vSafe = ballot.votes.safe_defense || 0;
+
+      const violationVotes = vHate + vIllegal + vMisinfo + vTerrorism;
+      const totalVotes = violationVotes + vSafe;
+      const violationPct = totalVotes > 0 ? Math.round((violationVotes / totalVotes) * 100) : 0;
+      const safePct = totalVotes > 0 ? (100 - violationPct) : 0;
+
+      const consensusLabelEl = document.getElementById('juryConsensusLabel');
+      if (consensusLabelEl) {
+        consensusLabelEl.innerText = violationPct + '% Violation (Quorum: ' + totalVotes + ' Votes)';
+      }
+
+      const barViolationEl = document.getElementById('juryBarViolation');
+      if (barViolationEl) barViolationEl.style.width = violationPct + '%';
+
+      const barSafeEl = document.getElementById('juryBarSafe');
+      if (barSafeEl) barSafeEl.style.width = safePct + '%';
+    }
+
+    async function castBallotVote(option) {
+      if (!activeJuryBallot) return;
+      try {
+        const res = await window.SovraAutonomousJury.castVote(activeJuryBallot.id, option);
+        if (res && res.ok && res.ballot) {
+          activeJuryBallot = res.ballot;
+          updateBallotModalUI(res.ballot);
+          showAccountToast('🗳️ Sovereign vote registered on community jury!');
+        } else {
+          showAccountToast('⚠️ ' + (res?.error || 'Failed to record vote.'));
+        }
+      } catch (e) {
+        console.error('[CastVote] Error:', e);
+      }
+    }
+
+    async function submitAuthorDefenseFromModal() {
+      if (!activeJuryBallot) return;
+      const inputEl = document.getElementById('juryDefenseInput');
+      const note = inputEl ? inputEl.value.trim() : '';
+      if (!note) {
+        showAccountToast('⚠️ Please write your defense context.');
+        return;
+      }
+      try {
+        const res = await window.SovraAutonomousJury.submitDefense(activeJuryBallot.id, note);
+        if (res && res.ok && res.ballot) {
+          activeJuryBallot = res.ballot;
+          updateBallotModalUI(res.ballot);
+          if (inputEl) inputEl.value = '';
+          showAccountToast('🛡️ Defense statement registered & visible to all jurors!');
+        }
+      } catch (e) {
+        console.error('[SubmitDefense] Error:', e);
+      }
+    }
+
+    async function executeJuryResolutionFromModal() {
+      if (!activeJuryBallot) return;
+      const ballotId = activeJuryBallot.id;
+      const postId = activeJuryBallot.postId;
+      showAccountToast('⚖️ Computing democratic consensus & executing verdict...');
+
+      try {
+        const res = await window.SovraAutonomousJury.resolveBallot(ballotId);
+        if (res && res.ok && res.ballot) {
+          const verdict = res.ballot.verdict;
+          closeJuryBallotModal();
+
+          if (verdict && verdict.action === 'DELETED') {
+            const card = document.getElementById('card-' + postId);
+            if (card) {
+              card.style.opacity = '0';
+              card.style.transform = 'scale(0.92)';
+              card.style.transition = 'all 0.4s ease';
+              setTimeout(function() { card.remove(); }, 420);
+            }
+            if (typeof feedPostsData !== 'undefined') {
+              feedPostsData = feedPostsData.filter(function(p) { return p.id !== postId; });
+            }
+            showAccountToast('⚖️ Democratic Verdict: 66%+ Consensus Reached. Post permanently auto-deleted!');
+          } else {
+            const banner = document.getElementById('jury-banner-' + postId);
+            if (banner) banner.remove();
+            showAccountToast('🛡️ Democratic Verdict: Consensus not reached. Post preserved as legitimate expression / self-defense!');
+          }
+        }
+      } catch (e) {
+        console.error('[ResolveJury] Error:', e);
+      }
     }
 
     // ==========================================
@@ -38436,6 +38843,201 @@ async function startDevServer() {
   const financeRateLimiter = new TokenBucketRateLimiter(isBenchmarkMode ? 10000 : 30, isBenchmarkMode ? 5000 : 5);
   const storageRateLimiter = new TokenBucketRateLimiter(isBenchmarkMode ? 10000 : 10, isBenchmarkMode ? 5000 : 1);
   const blindPushRelay = new BlindPushRelayServer();
+
+  // =========================================================================
+  // ⚖️ SOVRA AUTONOMOUS COMMUNITY JURY & DEMOCRATIC TAKEDOWN ENGINE
+  // "Universal Human Equality: No state or corporation is above human beings"
+  // =========================================================================
+  interface JuryBallotRecord {
+    id: string;
+    postId: string;
+    postCid: string;
+    postCaption: string;
+    authorDid: string;
+    authorHandle: string;
+    reporterDid: string;
+    reason: 'hate_speech' | 'illegal' | 'misinformation' | 'terrorism' | 'harassment';
+    details: string;
+    authorDefenseNote?: string;
+    createdAt: number;
+    expiresAt: number; // 24 hours
+    votes: {
+      hate_speech: number;
+      illegal: number;
+      misinformation: number;
+      terrorism: number;
+      safe_defense: number;
+    };
+    voters: Record<string, string>; // voterDid -> voteChoice
+    status: 'active' | 'deleted_by_verdict' | 'dismissed_as_safe';
+    verdict?: {
+      action: 'DELETED' | 'PRESERVED';
+      violationPercent: number;
+      totalVotes: number;
+      resolvedAt: number;
+      reason: string;
+    };
+  }
+
+  class SovraAutonomousJuryEngine {
+    private ballots = new Map<string, JuryBallotRecord>();
+
+    constructor() {
+      const resolverTimer = setInterval(() => {
+        this.checkAndResolveExpired();
+      }, 10000);
+      resolverTimer.unref();
+    }
+
+    public createBallot(data: {
+      postId: string;
+      postCid?: string;
+      postCaption?: string;
+      authorDid?: string;
+      authorHandle?: string;
+      reporterDid?: string;
+      reason: 'hate_speech' | 'illegal' | 'misinformation' | 'terrorism' | 'harassment';
+      details: string;
+    }): JuryBallotRecord {
+      for (const b of this.ballots.values()) {
+        if (b.postId === data.postId && b.status === 'active') {
+          return b;
+        }
+      }
+
+      const id = 'ballot_' + crypto.randomBytes(8).toString('hex');
+      const now = Date.now();
+      const ballot: JuryBallotRecord = {
+        id,
+        postId: data.postId,
+        postCid: data.postCid || '',
+        postCaption: data.postCaption || '',
+        authorDid: data.authorDid || 'did:sovra:peer',
+        authorHandle: data.authorHandle || 'peer',
+        reporterDid: data.reporterDid || 'did:sovra:peer',
+        reason: data.reason,
+        details: data.details || '',
+        createdAt: now,
+        expiresAt: now + (24 * 60 * 60 * 1000), // 24 Hours
+        votes: {
+          hate_speech: 0,
+          illegal: 0,
+          misinformation: 0,
+          terrorism: 0,
+          safe_defense: 0
+        },
+        voters: {},
+        status: 'active'
+      };
+
+      this.ballots.set(id, ballot);
+      return ballot;
+    }
+
+    public submitDefense(ballotId: string, defenseNote: string): JuryBallotRecord | null {
+      const ballot = this.ballots.get(ballotId);
+      if (!ballot) return null;
+      ballot.authorDefenseNote = String(defenseNote || '').trim();
+      return ballot;
+    }
+
+    public castVote(ballotId: string, vote: string, voterDid: string): JuryBallotRecord | null {
+      const ballot = this.ballots.get(ballotId);
+      if (!ballot || ballot.status !== 'active') return null;
+
+      const validOptions = ['hate_speech', 'illegal', 'misinformation', 'terrorism', 'safe_defense'];
+      if (!validOptions.includes(vote)) return null;
+
+      const vDid = voterDid || 'did:sovra:voter_' + crypto.randomBytes(4).toString('hex');
+      const prevVote = ballot.voters[vDid];
+      if (prevVote && (ballot.votes as any)[prevVote] !== undefined) {
+        (ballot.votes as any)[prevVote] = Math.max(0, (ballot.votes as any)[prevVote] - 1);
+      }
+
+      ballot.voters[vDid] = vote;
+      (ballot.votes as any)[vote] = ((ballot.votes as any)[vote] || 0) + 1;
+      return ballot;
+    }
+
+    public resolveBallot(ballotId: string, force = false): JuryBallotRecord | null {
+      const ballot = this.ballots.get(ballotId);
+      if (!ballot) return null;
+      if (ballot.status !== 'active' && !force) return ballot;
+
+      const vHate = ballot.votes.hate_speech || 0;
+      const vIllegal = ballot.votes.illegal || 0;
+      const vMisinfo = ballot.votes.misinformation || 0;
+      const vTerrorism = ballot.votes.terrorism || 0;
+      const vSafe = ballot.votes.safe_defense || 0;
+
+      const violationVotes = vHate + vIllegal + vMisinfo + vTerrorism;
+      const totalVotes = violationVotes + vSafe;
+      const violationPercent = totalVotes > 0 ? (violationVotes / totalVotes) * 100 : 0;
+
+      // Supermajority requirement (66%)
+      if (totalVotes > 0 && violationPercent >= 66) {
+        ballot.status = 'deleted_by_verdict';
+        ballot.verdict = {
+          action: 'DELETED',
+          violationPercent: Math.round(violationPercent),
+          totalVotes,
+          resolvedAt: Date.now(),
+          reason: `Equal Democratic Consensus: ${Math.round(violationPercent)}% supermajority voted violation. Post permanently auto-deleted from network.`
+        };
+
+        try {
+          sovraDb.deletePost(ballot.postId);
+          dynamicSocialStore.posts = sovraDb.getAllPosts();
+        } catch (_) {}
+
+        if (ballot.postCid && storageDaemon) {
+          try { (storageDaemon as any).unpin(ballot.postCid); } catch (_) {}
+        }
+      } else {
+        ballot.status = 'dismissed_as_safe';
+        ballot.verdict = {
+          action: 'PRESERVED',
+          violationPercent: Math.round(violationPercent),
+          totalVotes,
+          resolvedAt: Date.now(),
+          reason: `Democratic Consensus NOT reached (${Math.round(violationPercent)}% violation). Post protected as legitimate expression or self-defense.`
+        };
+
+        try {
+          const post = sovraDb.getAllPosts().find(p => p.id === ballot.postId);
+          if (post) {
+            delete (post as any).isUnderJuryReview;
+            delete (post as any).juryBallotId;
+          }
+        } catch (_) {}
+      }
+
+      return ballot;
+    }
+
+    public checkAndResolveExpired() {
+      const now = Date.now();
+      for (const b of this.ballots.values()) {
+        if (b.status === 'active' && now >= b.expiresAt) {
+          this.resolveBallot(b.id);
+        }
+      }
+    }
+
+    public getBallot(id: string): JuryBallotRecord | null {
+      return this.ballots.get(id) || null;
+    }
+
+    public getActiveBallots(): JuryBallotRecord[] {
+      return Array.from(this.ballots.values()).filter(b => b.status === 'active');
+    }
+
+    public getAllBallots(): JuryBallotRecord[] {
+      return Array.from(this.ballots.values());
+    }
+  }
+
+  const autonomousJuryEngine = new SovraAutonomousJuryEngine();
 
   // High-Frequency In-Memory Micro-Batching Buffer for Post/Reel Views (Viral Spikes Defense)
   const postViewBatchBuffer = new Map<string, number>();
@@ -47146,6 +47748,131 @@ async function startDevServer() {
     if (url.pathname === '/api/push/status' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, activeDevices: blindPushRelay.getRegisteredDeviceCount() }));
+      return;
+    }
+
+    // =========================================================================
+    // ⚖️ SOVRA AUTONOMOUS COMMUNITY JURY API ENDPOINTS
+    // "Equal Rights For Every Human Being: 24h Democratic Review & Auto-Takedown"
+    // =========================================================================
+
+    // 1. Report Post to Community Jury
+    if (url.pathname === '/api/jury/report' && req.method === 'POST') {
+      try {
+        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+        if (!bodyOk) return;
+        const parsed = reqBody ? JSON.parse(reqBody) : {};
+        const postId = String(parsed.postId || '');
+        const targetPost = sovraDb.getAllPosts().find(p => p.id === postId);
+        if (!targetPost) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Target post not found' }));
+          return;
+        }
+
+        const reporterDid = String(parsed.reporterDid || resolvePrincipal(req)?.did || 'did:sovra:peer');
+        const reason = parsed.reason || 'hate_speech';
+        const details = String(parsed.details || '');
+
+        const ballot = autonomousJuryEngine.createBallot({
+          postId: targetPost.id,
+          postCid: targetPost.mediaCid || (targetPost as any).imageCid || '',
+          postCaption: targetPost.caption || '',
+          authorDid: targetPost.authorDid,
+          authorHandle: targetPost.authorName || 'peer',
+          reporterDid,
+          reason,
+          details,
+        });
+
+        (targetPost as any).isUnderJuryReview = true;
+        (targetPost as any).juryBallotId = ballot.id;
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, ballot }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Report failed' }));
+      }
+      return;
+    }
+
+    // 2. Author's Equal Right of Defense Note
+    if (url.pathname === '/api/jury/defense' && req.method === 'POST') {
+      try {
+        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+        if (!bodyOk) return;
+        const parsed = reqBody ? JSON.parse(reqBody) : {};
+        const ballotId = String(parsed.ballotId || '');
+        const defenseNote = String(parsed.defenseNote || '');
+        const ballot = autonomousJuryEngine.submitDefense(ballotId, defenseNote);
+        if (!ballot) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Ballot not found' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, ballot }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message }));
+      }
+      return;
+    }
+
+    // 3. Cast Sovereign Peer Vote
+    if (url.pathname === '/api/jury/vote' && req.method === 'POST') {
+      try {
+        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+        if (!bodyOk) return;
+        const parsed = reqBody ? JSON.parse(reqBody) : {};
+        const ballotId = String(parsed.ballotId || '');
+        const vote = String(parsed.vote || '');
+        const voterDid = String(parsed.voterDid || resolvePrincipal(req)?.did || 'did:sovra:voter_' + crypto.randomBytes(4).toString('hex'));
+        const ballot = autonomousJuryEngine.castVote(ballotId, vote, voterDid);
+        if (!ballot) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Vote rejected or ballot inactive' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, ballot }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message }));
+      }
+      return;
+    }
+
+    // 4. Query Ballots & Verdicts
+    if (url.pathname === '/api/jury/ballots' && req.method === 'GET') {
+      autonomousJuryEngine.checkAndResolveExpired();
+      const includeAll = url.searchParams.get('all') === 'true';
+      const ballots = includeAll ? autonomousJuryEngine.getAllBallots() : autonomousJuryEngine.getActiveBallots();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, ballots }));
+      return;
+    }
+
+    // 5. Democratic Resolution & Auto-Execution (Fast-Forward / 24h Trigger)
+    if (url.pathname === '/api/jury/resolve' && req.method === 'POST') {
+      try {
+        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+        if (!bodyOk) return;
+        const parsed = reqBody ? JSON.parse(reqBody) : {};
+        const ballotId = String(parsed.ballotId || '');
+        const ballot = autonomousJuryEngine.resolveBallot(ballotId, true);
+        if (!ballot) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Ballot not found' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, ballot }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message }));
+      }
       return;
     }
 
