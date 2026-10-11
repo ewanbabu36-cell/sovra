@@ -10211,6 +10211,23 @@ function renderHtml(
           <span>🛡️</span> <span>Privacy &amp; Safety Center</span>
         </div>
 
+        <!-- Creator & Spaces Section -->
+        <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 6px 14px; padding-top: 6px;">
+          <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 4px 6px;">Creator &amp; Spaces</div>
+          <div class="dev-drawer-item" onclick="openVideoUploadModal(); toggleDevMainMenu(false);">
+            <span>🎥</span> <span style="color: #f43f5e; font-weight: 600;">Upload Video / Short</span>
+          </div>
+          <div class="dev-drawer-item" onclick="openCreateChannelModal(); toggleDevMainMenu(false);">
+            <span>📢</span> <span style="color: #38bdf8; font-weight: 600;">Create Channel</span>
+          </div>
+          <div class="dev-drawer-item" onclick="openCreatePageModal(); toggleDevMainMenu(false);">
+            <span>🏢</span> <span style="color: #c084fc; font-weight: 600;">Create Page</span>
+          </div>
+          <div class="dev-drawer-item" onclick="switchTab('me'); setTimeout(function(){ if(typeof renderCreatorHubEntities==='function')renderCreatorHubEntities(); var el=document.getElementById('creatorHubEntitiesContainer'); if(el)el.scrollIntoView({behavior:'smooth'}); }, 150); toggleDevMainMenu(false);">
+            <span>📋</span> <span>Manage My Channels &amp; Pages</span>
+          </div>
+        </div>
+
         <!-- Admin / Node Operator Section (Hidden for normal users) -->
         <div id="drawerAdminSection" style="display: none; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 8px;">
           <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 18px 6px;">Operator Controls</div>
@@ -10572,8 +10589,12 @@ function renderHtml(
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
                     <span class="media-btn-label">Reel</span>
                   </button>
+                  <button type="button" class="composer-media-btn" id="composerAddStudioBtn" title="Upload Video / Short to Channel or Sovereign Studio" onclick="openVideoUploadModal();">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ef4444;"><polygon points="23 7 16 12 23 17 23 7"/><rect width="14" height="14" x="1" y="5" rx="2" ry="2"/></svg>
+                    <span class="media-btn-label">Studio</span>
+                  </button>
                   <div class="composer-more-menu-container">
-                    <button type="button" class="composer-media-btn" id="composerMoreMenuBtn" title="More attachments (Poll, Survey, Q&A, Article, Mood, Card)" onclick="toggleComposerMoreMenu(event)">
+                    <button type="button" class="composer-media-btn" id="composerMoreMenuBtn" title="More attachments (Poll, Survey, Q&A, Article, Mood, Card, Studio & Spaces)" onclick="toggleComposerMoreMenu(event)">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       <span class="media-btn-label">More</span>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 1px;"><polyline points="6 9 12 15 18 9"/></svg>
@@ -10602,6 +10623,24 @@ function renderHtml(
                       <button type="button" class="composer-more-item" onclick="selectSmartAttachment('canvas')">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #6366f1;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.4-.4-.8-.4-1.3 0-.9.7-1.6 1.6-1.6h1.9c3.8 0 6.9-3.1 6.9-6.9 0-5.2-4.1-9.5-9.2-9.5z"/></svg>
                         <span>Card</span>
+                      </button>
+                      <div style="height: 1px; background: rgba(255, 255, 255, 0.1); margin: 5px 0;"></div>
+                      <div style="padding: 3px 8px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;">Studio & Spaces</div>
+                      <button type="button" class="composer-more-item" onclick="closeComposerMoreMenu(); openVideoUploadModal();">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ef4444;"><polygon points="23 7 16 12 23 17 23 7"/><rect width="14" height="14" x="1" y="5" rx="2" ry="2"/></svg>
+                        <span>Upload Video / Short</span>
+                      </button>
+                      <button type="button" class="composer-more-item" onclick="closeComposerMoreMenu(); openCreateChannelModal();">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                        <span>Create Channel</span>
+                      </button>
+                      <button type="button" class="composer-more-item" onclick="closeComposerMoreMenu(); openCreatePageModal();">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #c084fc;"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="22.01"/><line x1="15" y1="22" x2="15" y2="22.01"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/></svg>
+                        <span>Create Page</span>
+                      </button>
+                      <button type="button" class="composer-more-item" onclick="closeComposerMoreMenu(); switchTab('me'); setTimeout(function(){ var el = document.getElementById('creatorHubEntitiesContainer'); if(el) el.scrollIntoView({behavior:'smooth'}); }, 350);">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span>Manage Spaces</span>
                       </button>
                     </div>
                   </div>
