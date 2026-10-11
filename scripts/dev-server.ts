@@ -1305,6 +1305,43 @@ async function bootstrapLocalNode() {
     });
   }
 
+  // Seed initial sovereign publishing entities for host identity
+  const hostDid = masterKey.did;
+  if (!sovraDb.db.channels.some(c => c.ownerDid === hostDid)) {
+    sovraDb.db.channels.unshift({
+      id: 'ch-host-primary',
+      handle: '@sovra_network',
+      name: 'SOVRA Sovereign Network',
+      category: 'tech',
+      desc: 'Official Decentralized Broadcast & Mesh Dispatches — 1-to-many instant transmission.',
+      count: 14250,
+      avatar: '📢',
+      bg: '#0284c7',
+      isSubbed: true,
+      ownerDid: hostDid,
+      createdAt: Date.now() - 5000000,
+    });
+  }
+  if (!sovraDb.db.pages.some(p => p.ownerDid === hostDid)) {
+    sovraDb.db.pages.unshift({
+      id: 'pg-host-primary',
+      handle: '@sovra_lab',
+      name: 'SOVRA Ecosystem Lab',
+      category: 'brand',
+      bio: 'Official sovereign brand identity, public dApps catalog, and verified protocol showcase.',
+      count: 8920,
+      cta: 'Explore dApps',
+      ctaType: 'website',
+      avatar: '⚡',
+      bg: '#4f46e5',
+      isFollowing: true,
+      ownerDid: hostDid,
+      createdAt: Date.now() - 4000000,
+    });
+  }
+  dynamicSocialStore.channels = sovraDb.getAllChannels();
+  dynamicSocialStore.pages = sovraDb.getAllPages();
+
   return {
     masterKey,
     deviceKey,
@@ -13012,62 +13049,101 @@ function renderHtml(
           </div>
         </div>
 
-        <!-- Creator Hub & Sovereign Entities (Broadcast Channels & Sovereign Pages) -->
-        <div class="card" id="profileCreatorHubCard" style="padding: 1.25rem; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.35); background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
-              <span style="font-size: 1.3rem;">✨</span>
+        <!-- Creator Hub & Sovereign Entities (Broadcast Channels & Sovereign Pages 2.0) -->
+        <div class="card" id="profileCreatorHubCard" style="padding: 1.25rem; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.4); background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(11, 15, 25, 0.95) 100%); backdrop-filter: blur(16px); box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);">
+          <!-- Top Header Row -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.65rem;">
+              <span style="font-size: 1.4rem; filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5));">✨</span>
               <div>
-                <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Channels &amp; Public Pages</div>
-                <div style="font-size: 0.76rem; color: #94a3b8;">Create broadcast channels for subscribers and public pages for your brand.</div>
+                <div style="font-weight: 800; font-size: 1.1rem; color: #fff; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px;">
+                  <span>Channels &amp; Public Pages</span>
+                  <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 6px;">2.0 ADVANCED</span>
+                </div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Telegram-grade broadcast dispatches for subscribers &amp; cryptographic public brand storefronts.</div>
               </div>
             </div>
-            <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.4); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
-              Publishing Hub
-            </span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="badge" style="background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.35); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
+                ● P2P GOSSIP ACTIVE
+              </span>
+              <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.4); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
+                Publishing Hub
+              </span>
+            </div>
           </div>
 
-          <!-- 2-Column Action Cards for Channel & Page Creation -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 0.75rem;">
+          <!-- Executive Telemetry Ribbon -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 1rem; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 10px 12px;">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 0.68rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.03em;">Audience Reach</span>
+              <span id="creatorHubAudienceRibbon" style="font-size: 1.05rem; font-weight: 800; color: #38bdf8;">23.1K+</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 0.68rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.03em;">Broadcast Engine</span>
+              <span style="font-size: 0.82rem; font-weight: 700; color: #34d399;">🎙️ Audio + Polls</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 0.68rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.03em;">Brand Showcase</span>
+              <span style="font-size: 0.82rem; font-weight: 700; color: #c084fc;">✓ Verified CTAs</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 0.68rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.03em;">Intermediary Fee</span>
+              <span style="font-size: 0.82rem; font-weight: 700; color: #f59e0b;">0% (100% Creator)</span>
+            </div>
+          </div>
+
+          <!-- 2-Column Action Cards for Channel & Page Creation / Quick Launch -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
             <!-- Broadcast Channels Action Card -->
-            <div style="background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 14px; padding: 1.1rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.85rem;">
+            <div style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.08) 0%, rgba(15, 23, 42, 0.65) 100%); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; padding: 1.1rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.85rem; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">
               <div>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
-                  <span style="font-size: 1.35rem;">📢</span>
-                  <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.68rem; font-weight: 700;">BROADCAST</span>
+                  <span style="font-size: 1.4rem;">📢</span>
+                  <span class="badge" style="background: rgba(56, 189, 248, 0.18); color: #38bdf8; font-size: 0.68rem; font-weight: 700;">BROADCAST 2.0</span>
                 </div>
-                <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">Broadcast Channels</div>
-                <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin-top: 0.25rem;">
-                  Broadcast updates, photos, and news directly to your subscribers' inbox with zero censorship.
+                <div style="font-weight: 700; color: #f8fafc; font-size: 0.98rem;">Broadcast Channels</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.45; margin-top: 0.25rem;">
+                  Broadcast voice notes, instant polls, and announcements directly to subscribers with pinned alerts &amp; emoji reactions.
                 </div>
               </div>
-              <button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>Create Channel</span>
-              </button>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="flex: 1; min-width: 120px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 700; font-size: 0.82rem; padding: 7px 12px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span>+ Create Channel</span>
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="openChannelRoom('ch-host-primary')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #f8fafc; font-weight: 600; font-size: 0.82rem; padding: 7px 12px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+                  <span>🚀 Open Room</span>
+                </button>
+              </div>
             </div>
 
             <!-- Sovereign Pages Action Card -->
-            <div style="background: rgba(192, 132, 252, 0.06); border: 1px solid rgba(192, 132, 252, 0.22); border-radius: 14px; padding: 1.1rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.85rem;">
+            <div style="background: linear-gradient(135deg, rgba(192, 132, 252, 0.08) 0%, rgba(15, 23, 42, 0.65) 100%); border: 1px solid rgba(192, 132, 252, 0.3); border-radius: 14px; padding: 1.1rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.85rem; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">
               <div>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
-                  <span style="font-size: 1.35rem;">🏢</span>
-                  <span class="badge" style="background: rgba(192, 132, 252, 0.15); color: #c084fc; font-size: 0.68rem; font-weight: 700;">PAGE</span>
+                  <span style="font-size: 1.4rem;">🏢</span>
+                  <span class="badge" style="background: rgba(192, 132, 252, 0.18); color: #c084fc; font-size: 0.68rem; font-weight: 700;">PAGE SHOWCASE</span>
                 </div>
-                <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">Public Pages</div>
-                <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin-top: 0.25rem;">
-                  Official verified profiles for your brand, company, creative project, or community.
+                <div style="font-weight: 700; color: #f8fafc; font-size: 0.98rem;">Public Brand Pages</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.45; margin-top: 0.25rem;">
+                  Cryptographic verified profiles for your brand, company, or protocol with dedicated public showcase &amp; custom CTAs.
                 </div>
               </div>
-              <button type="button" class="btn btn-primary" onclick="openCreatePageModal()" style="background: rgba(192, 132, 252, 0.2); border: 1px solid rgba(192, 132, 252, 0.45); color: #c084fc; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>Create Page</span>
-              </button>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary" onclick="openCreatePageModal()" style="flex: 1; min-width: 120px; background: rgba(192, 132, 252, 0.2); border: 1px solid rgba(192, 132, 252, 0.45); color: #c084fc; font-weight: 700; font-size: 0.82rem; padding: 7px 12px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span>+ Create Page</span>
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="openPublicPageShowcase('pg-host-primary')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #f8fafc; font-weight: 600; font-size: 0.82rem; padding: 7px 12px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+                  <span>🌐 Brand Showcase</span>
+                </button>
+              </div>
             </div>
           </div>
 
           <!-- Managed Entities Live Preview List -->
-          <div id="creatorHubEntitiesContainer" style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid rgba(255,255,255,0.08);">
+          <div id="creatorHubEntitiesContainer" style="margin-top: 1.1rem; padding-top: 0.95rem; border-top: 1px solid rgba(255,255,255,0.08);">
             <!-- Rendered dynamically via renderCreatorHubEntities() -->
           </div>
         </div>
@@ -38054,23 +38130,46 @@ function renderHtml(
       const allCh = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
       const allPg = (typeof allPagesData !== 'undefined' ? allPagesData : []);
 
-      // Filter strictly to entities created/owned by the active logged-in user
-      const channels = allCh.filter(function(c) {
+      // 1. Get entities created/owned by the active logged-in user
+      let channels = allCh.filter(function(c) {
         return currentDid && c.ownerDid && c.ownerDid === currentDid;
       });
-      const pages = allPg.filter(function(p) {
+      let pages = allPg.filter(function(p) {
         return currentDid && p.ownerDid && p.ownerDid === currentDid;
       });
+
+      // 2. Fallback: If the user hasn't explicitly created custom spaces yet, provide primary/seed spaces
+      // so the Publishing Studio, Telegram Room, and Brand Showcase are 100% visible and interactive immediately!
+      if (channels.length === 0) {
+        const primaryCh = allCh.filter(function(c) {
+          return c.id === 'ch-host-primary' || c.id === 'ch-alpha' || c.ownerDid === 'did:sovra:system';
+        });
+        channels = primaryCh.length > 0 ? primaryCh.slice(0, 2) : (allCh.length > 0 ? allCh.slice(0, 2) : []);
+      }
+      if (pages.length === 0) {
+        const primaryPg = allPg.filter(function(p) {
+          return p.id === 'pg-host-primary' || p.id === 'pg-meshlabs' || p.id === 'pg-metropolis' || p.ownerDid === 'did:sovra:system';
+        });
+        pages = primaryPg.length > 0 ? primaryPg.slice(0, 2) : (allPg.length > 0 ? allPg.slice(0, 1) : []);
+      }
 
       const totalAudience = channels.reduce(function(acc, c) { return acc + (c.count || 0); }, 0) +
                             pages.reduce(function(acc, p) { return acc + (p.count || 0); }, 0);
 
+      const ribbonAudienceEl = document.getElementById('creatorHubAudienceRibbon');
+      if (ribbonAudienceEl) {
+        ribbonAudienceEl.innerText = (totalAudience >= 1000 ? (totalAudience / 1000).toFixed(1) + 'K+' : totalAudience.toLocaleString());
+      }
+
       let html = '<div style="margin-bottom: 0.85rem;">' +
-        '<div style="font-size: 0.84rem; font-weight: 700; color: #cbd5e1; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">' +
-          '<span>📋 Your Channels &amp; Pages (' + (channels.length + pages.length) + ')</span>' +
+        '<div style="font-size: 0.84rem; font-weight: 700; color: #cbd5e1; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">' +
+          '<div style="display: flex; gap: 6px; align-items: center;">' +
+            '<span style="color: #f8fafc; font-size: 0.88rem;">📋 Active Publishing Spaces</span>' +
+            '<span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc; font-size: 0.72rem; padding: 2px 8px; border-radius: 8px;">' + (channels.length + pages.length) + ' Managed</span>' +
+          '</div>' +
           '<div style="display: flex; gap: 8px; align-items: center; font-size: 0.72rem;">' +
-            '<span style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 12px; font-weight: 600;">👥 Audience: ' + totalAudience.toLocaleString() + '</span>' +
-            '<span style="color: #38bdf8; font-weight: 600;">Broadcast &amp; Brands</span>' +
+            '<span style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 12px; font-weight: 600;">👥 Total Audience: ' + totalAudience.toLocaleString() + '</span>' +
+            '<span style="background: rgba(52, 211, 153, 0.12); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); padding: 2px 8px; border-radius: 12px; font-weight: 600;">⚡ 100% Sovereign</span>' +
           '</div>' +
         '</div>' +
         '</div>';
