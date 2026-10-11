@@ -4362,12 +4362,15 @@ function renderHtml(
         height: calc(100dvh - 116px) !important;
         padding: 0 !important;
         margin: 0 !important;
-        display: flex !important;
+        display: none !important;
         flex-direction: column !important;
         align-items: center !important;
         justify-content: flex-start !important;
         overflow: hidden !important;
         position: relative !important;
+      }
+      body.tab-active-reels #reels-view {
+        display: flex !important;
       }
       .reels-stage {
         gap: 0 !important;
@@ -4410,34 +4413,119 @@ function renderHtml(
         display: none !important;
       }
       #youtube-view {
-        width: 100%;
-        padding: 0;
-        margin: 0;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
       }
       .youtube-container {
-        grid-template-columns: 1fr !important;
-        gap: 1rem !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 0.75rem !important;
         width: 100% !important;
+        max-width: 100% !important;
         padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+      }
+      .youtube-container > div:first-child {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
       }
       .yt-ambient-wrapper {
         margin: 0 !important;
         width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
       }
       .yt-ambient-glow {
         filter: blur(35px) !important;
         opacity: 0.45 !important;
         inset: -10px !important;
       }
-      .reel-ambient-cinema-glow {
-        display: none !important;
-      }
       .yt-player-box {
         border-radius: 0 !important;
         border-left: none !important;
         border-right: none !important;
         width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
         box-shadow: none !important;
+      }
+      .yt-meta-card {
+        border-radius: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+        padding: 0.85rem 0.75rem !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+      }
+      .yt-actions-scroll {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+      .yt-channel-row {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+      }
+      .yt-channel-left {
+        min-width: 0 !important;
+        flex: 1 !important;
+        overflow: hidden !important;
+      }
+      .yt-channel-left > div {
+        min-width: 0 !important;
+        overflow: hidden !important;
+      }
+      #ytChannelName {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 160px !important;
+      }
+      #subscribersCountDisplay {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      .btn-subscribe {
+        flex-shrink: 0 !important;
+      }
+      .yt-tip-box {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        padding: 0.85rem 0.65rem !important;
+      }
+      .tip-buttons-row {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 0.4rem !important;
+      }
+      .btn-tip {
+        font-size: 0.76rem !important;
+        padding: 0.4rem 0.7rem !important;
+      }
+      #newCommentInput {
+        width: 100% !important;
+        box-sizing: border-box !important;
       }
       .yt-desktop-controls {
         display: none !important;
@@ -4453,6 +4541,12 @@ function renderHtml(
       }
       .yt-buffer-badge {
         display: none !important;
+      }
+      #ytVideoTags {
+        flex-wrap: wrap !important;
+      }
+      #ytVideoStats {
+        word-break: break-all !important;
       }
     }
     
@@ -11979,7 +12073,7 @@ function renderHtml(
                 <div class="split-seeder" title="5% Seeder Node Split"></div>
               </div>
 
-              <div style="font-size: 0.8rem; color: #cbd5e1; display: flex; justify-content: space-between;">
+              <div style="font-size: 0.8rem; color: #cbd5e1; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem;">
                 <span>Send direct micro-tokens to <b id="tipRecipientName">${longFormVideosCatalog[0]!.channelName}</b>. Zero gas fees, instant Ed25519 off-chain voucher settlement.</span>
                 <span style="font-size: 0.72rem; color: #94a3b8;">YouTube takes 45% &bull; Sovra takes 0%</span>
               </div>
@@ -24096,6 +24190,7 @@ function renderHtml(
           window.scrollTo({ top: savedY, behavior: 'instant' });
         }, 15);
       } else if (tab === 'reels') {
+        window.scrollTo({ top: 0, behavior: 'instant' });
         setTimeout(function() {
           const reelVid = document.querySelector('#reels-view video');
           if (reelVid && tabFreezeState.reels && tabFreezeState.reels.currentTime > 0) {
@@ -24106,6 +24201,7 @@ function renderHtml(
           }
         }, 60);
       } else if (tab === 'youtube') {
+        window.scrollTo({ top: 0, behavior: 'instant' });
         setTimeout(function() {
           const ytVid = document.querySelector('#youtube-view video');
           if (ytVid && tabFreezeState.youtube && tabFreezeState.youtube.currentTime > 0) {
@@ -24115,6 +24211,8 @@ function renderHtml(
             } catch(e) {}
           }
         }, 60);
+      } else {
+        window.scrollTo({ top: 0, behavior: 'instant' });
       }
 
       // Dynamic layout adjustments for wide views (Watch, Chat, Admin)
