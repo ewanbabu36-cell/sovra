@@ -14902,36 +14902,35 @@ function renderHtml(
   </div>
 
   <!-- 💳 6F. FULL PAGE SOVEREIGN WALLET MODAL / VIEW -->
-  <div id="fullPageWalletModal" class="omni-modal-overlay" style="display: none; z-index: 10060; background: rgba(8, 13, 20, 0.96); backdrop-filter: blur(20px);">
-    <div class="omni-modal-card" style="max-width: 820px; width: 96%; height: 92vh; max-height: 900px; display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; background: #0b1120; border: 1px solid rgba(16, 185, 129, 0.35); box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(16, 185, 129, 0.15);">
-      
-      <!-- Full Page Header -->
-      <div style="padding: 1.1rem 1.4rem; background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <button type="button" onclick="closeFullPageWallet()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #f8fafc; padding: 7px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-            <span>Back to Profile</span>
-          </button>
-          <div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 1.25rem;">💳</span>
-              <span style="font-weight: 800; font-size: 1.15rem; color: #fff;">Sovereign Wallet</span>
-              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 6px;">VAULT 2.0</span>
-            </div>
-            <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 2px;">Self-custodial creator earnings, P2P micro-tips, and Merkle-verified receipts.</div>
+  <div id="fullPageWalletModal" style="display: none; position: fixed; inset: 0; width: 100vw; height: 100vh; background: #080d14; z-index: 10060; overflow-y: auto; -webkit-overflow-scrolling: touch; flex-direction: column;">
+    
+    <!-- Full Page Header (Sticky Top) -->
+    <div style="position: sticky; top: 0; z-index: 100; padding: 1.1rem 1.4rem; background: rgba(11, 17, 32, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button type="button" onclick="closeFullPageWallet()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #f8fafc; padding: 7px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <span>Back to Profile</span>
+        </button>
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.25rem;">💳</span>
+            <span style="font-weight: 800; font-size: 1.15rem; color: #fff;">Sovereign Wallet</span>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 6px;">VAULT 2.0</span>
           </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="badge verifiable-state-badge" id="walletVerifiableStateBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.72rem; padding: 4px 10px; border-radius: 10px;">
-            <span class="pulse-dot"></span>
-            <span>Self-Custody &bull; Zero Fees</span>
-          </span>
-          <button type="button" onclick="closeFullPageWallet()" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 50%; color: #94a3b8; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Close">✕</button>
+          <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 2px;">Self-custodial creator earnings, P2P micro-tips, and Merkle-verified receipts.</div>
         </div>
       </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="badge verifiable-state-badge" id="walletVerifiableStateBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.72rem; padding: 4px 10px; border-radius: 10px;">
+          <span class="pulse-dot"></span>
+          <span>Self-Custody &bull; Zero Fees</span>
+        </span>
+        <button type="button" onclick="closeFullPageWallet()" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 50%; color: #94a3b8; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Close">✕</button>
+      </div>
+    </div>
 
-      <!-- Scrollable Full-Page Wallet Content -->
-      <div style="flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+    <!-- Scrollable Full-Page Wallet Main Body -->
+    <div style="width: 100%; max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 5rem 1rem; display: flex; flex-direction: column; gap: 1.25rem;">
         
         <!-- Sovereign Bandwidth & Creator Wallet Card (Full Page Standalone) -->
         <div class="sovereign-wallet-card" id="sovereignWalletCard" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 18px; padding: 1.5rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.4);">
@@ -15093,7 +15092,6 @@ function renderHtml(
         </div>
       </div>
     </div>
-  </div>
 
   <!-- 🎥 6B. UPLOAD LONG VIDEO MODAL (Watch Platform) -->
   <div id="videoUploadModal" class="omni-modal-overlay" style="display: none;">
@@ -26323,6 +26321,8 @@ function renderHtml(
         }
       }
       window._currentActiveTab = tab;
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
 
       if (tab !== 'chat') {
         document.body.classList.remove('chat-open');
@@ -27096,6 +27096,7 @@ function renderHtml(
 
       modal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
     }
 
     function triggerActiveLightboxUpdateAction() {
@@ -27172,6 +27173,7 @@ function renderHtml(
         modal.style.display = 'none';
       }
       document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
       _activeLightboxSrc = '';
       _activeLightboxContext = null;
       const updateBtn = document.getElementById('photoLightboxUpdateBtn');
@@ -29943,7 +29945,9 @@ function renderHtml(
       const modal = document.getElementById('fullPageWalletModal');
       if (!modal) return;
       modal.style.display = 'flex';
+      modal.scrollTop = 0;
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
       if (typeof refreshWalletBalanceLive === 'function') {
         refreshWalletBalanceLive();
       }
@@ -29953,8 +29957,9 @@ function renderHtml(
       const modal = document.getElementById('fullPageWalletModal');
       if (modal) {
         modal.style.display = 'none';
-        document.body.style.overflow = '';
       }
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
     }
 
     function openWithdrawModal() {
@@ -38074,6 +38079,8 @@ function renderHtml(
     document.addEventListener('click', function(e) {
       if (e.target && e.target.classList && e.target.classList.contains('omni-modal-overlay')) {
         e.target.style.display = 'none';
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
       }
     });
 
@@ -38149,6 +38156,8 @@ function renderHtml(
       if (ndd) ndd.style.display = 'none';
 
       // 2. Core Modals
+      if (typeof closeFullPageWallet === 'function') closeFullPageWallet();
+      if (typeof closePhotoLightbox === 'function') closePhotoLightbox();
       if (typeof closeSovereignIdCardModal === 'function') closeSovereignIdCardModal();
       if (typeof closeEditProfileModal === 'function') closeEditProfileModal();
       if (typeof closeAccountLifecycleModal === 'function') closeAccountLifecycleModal();
@@ -38177,6 +38186,10 @@ function renderHtml(
       document.querySelectorAll('.omni-modal-overlay, .wa-modal-overlay, .yt-modal-overlay, .story-modal-overlay, .reels-sheet-overlay').forEach(el => {
         if (el.style.display !== 'none') el.style.display = 'none';
       });
+
+      // 5. Restore window scroll
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
     }
 
     document.addEventListener('keydown', function(e) {
