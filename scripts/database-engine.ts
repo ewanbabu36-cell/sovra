@@ -648,18 +648,26 @@ export interface YoutubeCommentRecord {
 
 export interface TipVoucherRecord {
   voucherId: string;
-  videoId: string;
+  type?: string;
+  videoId?: string;
   senderDid?: string;
-  senderName: string;
+  senderName?: string;
   senderComment?: string;
-  creatorDid: string;
-  seederDid: string;
+  creatorDid?: string;
+  toDid?: string;
+  toAddress?: string;
+  recipientDid?: string;
+  seederDid?: string;
   totalAmount: string;
-  creatorAmount: string;
-  seederAmount: string;
-  platformAmount: string;
+  creatorAmount?: string;
+  seederAmount?: string;
+  platformAmount?: string;
   timestamp: number;
   signatureHex?: string;
+  status?: string;
+  txHash?: string;
+  sourceTx?: string;
+  memo?: string;
 }
 
 export type AuditLogType =
@@ -4663,15 +4671,21 @@ export class SovraDatabaseEngine {
     const seederSplit = Math.round(amount * 0.05 * 100) / 100;
 
     if (params.toDid) {
-      const recipient = this.db.users.find(u => u.did === params.toDid);
+      const cleanTo = params.toDid.replace(/^@/, '').trim().toLowerCase();
+      const recipient = this.db.users.find(u =>
+        u.did === params.toDid ||
+        (u.handle && u.handle.toLowerCase().replace(/^@/, '') === cleanTo)
+      );
       if (recipient) {
         const recBal = typeof recipient.balanceSov === 'number' ? recipient.balanceSov : 500.0;
         recipient.balanceSov = Math.round((recBal + creatorSplit) * 100) / 100;
+        params.toDid = recipient.did;
       }
     }
 
     const voucher: TipVoucherRecord = {
       voucherId: 'vouch_' + Date.now() + '_' + crypto.randomBytes(8).toString('hex'),
+      type: 'tip',
       videoId: params.videoId || 'yt-video-1',
       senderDid: sender ? sender.did : params.fromDid,
       senderName: params.senderName || (sender ? sender.displayName : 'Verified Peer'),
@@ -4684,6 +4698,7 @@ export class SovraDatabaseEngine {
       platformAmount: '0',
       timestamp: Date.now(),
       signatureHex: (params as any).signatureHex || (params as any).signature || '',
+      status: 'settled_on_l1',
     };
 
     if (!Array.isArray(this.db.tip_vouchers)) {

@@ -14132,10 +14132,15 @@ function renderHtml(
         <button onclick="closeWithdrawModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; padding: 4px;" title="Close modal" aria-label="Close modal">✕</button>
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1rem; margin-bottom: 1rem;">
+        <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1rem; margin-bottom: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
           <span style="font-size: 0.78rem; color: #94a3b8; font-weight: 600;">Available Balance</span>
-          <button type="button" onclick="setWithdrawMaxAmount()" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 0.72rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; cursor: pointer;">USE MAX</button>
+          <div style="display: flex; gap: 4px;">
+            <button type="button" onclick="setWithdrawPct(0.25)" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #cbd5e1; font-size: 0.68rem; font-weight: 700; border-radius: 6px; padding: 2px 6px; cursor: pointer;">25%</button>
+            <button type="button" onclick="setWithdrawPct(0.50)" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #cbd5e1; font-size: 0.68rem; font-weight: 700; border-radius: 6px; padding: 2px 6px; cursor: pointer;">50%</button>
+            <button type="button" onclick="setWithdrawPct(0.75)" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #cbd5e1; font-size: 0.68rem; font-weight: 700; border-radius: 6px; padding: 2px 6px; cursor: pointer;">75%</button>
+            <button type="button" onclick="setWithdrawMaxAmount()" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 0.68rem; font-weight: 700; border-radius: 6px; padding: 2px 7px; cursor: pointer;">MAX</button>
+          </div>
         </div>
         <div style="display: flex; align-items: baseline; gap: 6px;">
           <span style="font-size: 1.5rem; font-weight: 800; color: #10b981;" id="withdrawModalAvailSov">0.00 SOV</span>
@@ -14200,11 +14205,16 @@ function renderHtml(
       <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 14px; padding: 1rem; margin-bottom: 1.25rem;">
         <div style="font-size: 0.85rem; font-weight: 700; color: #34d399; margin-bottom: 4px;">P2P Mesh Testnet Faucet</div>
         <div style="font-size: 0.74rem; color: #94a3b8; line-height: 1.4; margin-bottom: 0.75rem;">
-          Simulate a Layer-1 inbound deposit to fund your sovereign node bandwidth relay credits.
+          Instant testnet deposit to fund your sovereign node bandwidth relay credits.
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px;">
+          <button type="button" onclick="claimFaucetDeposit(10)" style="padding: 7px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; border-radius: 8px; font-weight: 700; font-size: 0.75rem; cursor: pointer;">+10 SOV</button>
+          <button type="button" onclick="claimFaucetDeposit(50)" style="padding: 7px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; border-radius: 8px; font-weight: 800; font-size: 0.75rem; cursor: pointer;">+50 SOV</button>
+          <button type="button" onclick="claimFaucetDeposit(100)" style="padding: 7px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; border-radius: 8px; font-weight: 700; font-size: 0.75rem; cursor: pointer;">+100 SOV</button>
         </div>
         <button type="button" onclick="claimFaucetDeposit(50)" id="btnClaimFaucet" style="width: 100%; padding: 0.65rem; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; border-radius: 10px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          <span>Claim +50.00 SOV Testnet Deposit</span>
+          <span>Quick Claim +50.00 SOV Deposit</span>
         </button>
       </div>
 
@@ -14227,12 +14237,25 @@ function renderHtml(
       </div>
 
       <div style="margin-bottom: 1rem;">
-        <label style="display: block; font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Recipient Handle or Name</label>
-        <input type="text" id="sendModalRecipientInput" placeholder="@handle (e.g. @alice)" style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.9rem; box-sizing: border-box; outline: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Recipient Handle or DID</label>
+          <div style="display: flex; gap: 4px;">
+            <button type="button" onclick="setSendRecipient('@alice')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.68rem; border-radius: 6px; padding: 1px 6px; cursor: pointer;">@alice</button>
+            <button type="button" onclick="setSendRecipient('@bob')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.68rem; border-radius: 6px; padding: 1px 6px; cursor: pointer;">@bob</button>
+          </div>
+        </div>
+        <input type="text" id="sendModalRecipientInput" placeholder="@handle or did:key:z6Mk..." style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.9rem; box-sizing: border-box; outline: none;">
       </div>
 
       <div style="margin-bottom: 1rem;">
-        <label style="display: block; font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Transfer Amount (SOV)</label>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1;">Transfer Amount (SOV)</label>
+          <div style="display: flex; gap: 4px;">
+            <button type="button" onclick="setSendAmount(5)" style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; font-size: 0.68rem; border-radius: 6px; padding: 1px 6px; cursor: pointer;">5</button>
+            <button type="button" onclick="setSendAmount(20)" style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; font-size: 0.68rem; border-radius: 6px; padding: 1px 6px; cursor: pointer;">20</button>
+            <button type="button" onclick="setSendAmount(50)" style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; font-size: 0.68rem; border-radius: 6px; padding: 1px 6px; cursor: pointer;">50</button>
+          </div>
+        </div>
         <div style="position: relative;">
           <input type="number" id="sendModalAmountInput" step="any" placeholder="0.00" style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 1.1rem; font-weight: 700; box-sizing: border-box; outline: none;">
           <span style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; color: #94a3b8; font-weight: 700;">SOV</span>
@@ -14250,6 +14273,90 @@ function renderHtml(
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         <span>Send Instant Off-Chain Voucher</span>
       </button>
+    </div>
+  </div>
+
+  <!-- 🛡️ 4. WALLET CRYPTOGRAPHIC RECEIPT MODAL -->
+  <div id="walletReceiptModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(16px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: linear-gradient(145deg, #0f172a, #131d38); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 24px; max-width: 520px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(56, 189, 248, 0.25); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; max-height: 90vh; overflow-y: auto;">
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div style="font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; color: #38bdf8;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+          <span>Cryptographic State Channel Receipt</span>
+        </div>
+        <button onclick="closeWalletReceiptModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; padding: 4px;" title="Close modal" aria-label="Close modal">✕</button>
+      </div>
+
+      <!-- Amount Highlight Card -->
+      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 1.25rem; text-align: center; margin-bottom: 1.25rem;">
+        <div id="receiptModalDirectionBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; margin-bottom: 8px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+          <span>● INCOMING SETTLEMENT</span>
+        </div>
+        <div id="receiptModalAmountSov" style="font-size: 2.2rem; font-weight: 900; color: #10b981; letter-spacing: -0.02em;">+0.00 SOV</div>
+        <div id="receiptModalAmountFiat" style="font-size: 0.95rem; color: #94a3b8; font-weight: 600; margin-top: 2px;">≈ $0.00 USD</div>
+      </div>
+
+      <!-- Ledger Specifications Grid -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 10px; font-size: 0.82rem;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #94a3b8; font-weight: 600;">Transaction Type</span>
+          <span id="receiptModalTxType" style="font-weight: 700; color: #f8fafc;">Off-Chain Micro-Tip</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #94a3b8; font-weight: 600;">Timestamp</span>
+          <span id="receiptModalTimestamp" style="font-weight: 600; color: #cbd5e1;">—</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #94a3b8; font-weight: 600;">Settlement Protocol</span>
+          <span style="color: #38bdf8; font-weight: 700;">Zero-Fee P2P State Channel</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #94a3b8; font-weight: 600;">Network Gas Fee</span>
+          <span style="color: #34d399; font-weight: 700;">0.00 SOV (100% Free)</span>
+        </div>
+
+        <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
+
+        <div>
+          <div style="color: #94a3b8; font-weight: 600; margin-bottom: 3px;">From (Sender DID / Address)</div>
+          <div id="receiptModalFromDid" style="font-family: monospace; font-size: 0.74rem; color: #cbd5e1; word-break: break-all; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 8px;">—</div>
+        </div>
+
+        <div>
+          <div style="color: #94a3b8; font-weight: 600; margin-bottom: 3px;">To (Recipient DID / Address)</div>
+          <div id="receiptModalToDid" style="font-family: monospace; font-size: 0.74rem; color: #cbd5e1; word-break: break-all; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 8px;">—</div>
+        </div>
+
+        <div>
+          <div style="color: #94a3b8; font-weight: 600; margin-bottom: 3px;">Voucher ID / Leaf Hash</div>
+          <div id="receiptModalTxId" style="font-family: monospace; font-size: 0.74rem; color: #38bdf8; word-break: break-all; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 8px;">—</div>
+        </div>
+
+        <div>
+          <div style="color: #94a3b8; font-weight: 600; margin-bottom: 3px;">Merkle State Channel Root / Signature</div>
+          <div id="receiptModalMerkleRoot" style="font-family: monospace; font-size: 0.74rem; color: #a78bfa; word-break: break-all; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 8px;">—</div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display: flex; gap: 10px;">
+        <button type="button" onclick="copyReceiptTxId()" style="flex: 1; padding: 10px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          <span>Copy TxID</span>
+        </button>
+        <button type="button" onclick="downloadSingleReceiptJson()" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #cbd5e1; border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+          <span>Download JSON</span>
+        </button>
+        <button type="button" onclick="closeWalletReceiptModal()" style="padding: 10px 18px; background: #334155; border: none; color: #fff; border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">
+          Close
+        </button>
+      </div>
     </div>
   </div>
 
@@ -14897,19 +15004,71 @@ function renderHtml(
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
               <span>Refresh</span>
             </button>
+            <button class="wallet-action-btn wallet-btn-ghost" onclick="exportWalletStatement('csv')" title="Download CSV ledger statement" aria-label="Export" style="padding: 10px 16px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #38bdf8; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              <span>Export</span>
+            </button>
           </div>
 
           <!-- Visual Vouchers & Recent Activity -->
           <div class="wallet-vouchers-section" id="walletVouchersSection">
-            <div class="wallet-vouchers-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div class="wallet-vouchers-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
               <div class="vouchers-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #f8fafc; font-size: 0.95rem;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
-                <span>Recent Activity</span>
+                <span>Recent Activity &amp; Ledger Proofs</span>
+                <span id="walletTxTotalCountBadge" style="background: rgba(255,255,255,0.08); color: #94a3b8; font-size: 0.72rem; padding: 1px 7px; border-radius: 10px; font-weight: 600;">0</span>
               </div>
-              <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.72rem; padding: 2px 8px; border-radius: 8px;">
-                ● Instant Settlement
-              </span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.72rem; padding: 2px 8px; border-radius: 8px;">
+                  ● Instant Settlement
+                </span>
+                <button type="button" onclick="exportWalletStatement('csv')" title="Export wallet ledger statement to CSV" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #94a3b8; font-size: 0.72rem; padding: 3px 8px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: 600;">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                  <span>CSV</span>
+                </button>
+                <button type="button" onclick="exportWalletStatement('json')" title="Export wallet ledger statement to JSON" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #94a3b8; font-size: 0.72rem; padding: 3px 8px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: 600;">
+                  <span>JSON</span>
+                </button>
+              </div>
             </div>
+
+            <!-- Filter Tabs Row -->
+            <div class="wallet-filter-tabs" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; scrollbar-width: none;">
+              <button type="button" class="wallet-filter-tab active" id="wtab-all" onclick="setWalletFilter('all')" style="padding: 5px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.15); color: #34d399; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                <span>All</span>
+                <span id="wtab-count-all" style="opacity: 0.8; font-size: 0.7rem;"></span>
+              </button>
+              <button type="button" class="wallet-filter-tab" id="wtab-received" onclick="setWalletFilter('received')" style="padding: 5px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #94a3b8; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                <span>🎁 Received</span>
+                <span id="wtab-count-received" style="opacity: 0.8; font-size: 0.7rem;"></span>
+              </button>
+              <button type="button" class="wallet-filter-tab" id="wtab-sent" onclick="setWalletFilter('sent')" style="padding: 5px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #94a3b8; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                <span>✈ Sent</span>
+                <span id="wtab-count-sent" style="opacity: 0.8; font-size: 0.7rem;"></span>
+              </button>
+              <button type="button" class="wallet-filter-tab" id="wtab-withdrawal" onclick="setWalletFilter('withdrawal')" style="padding: 5px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #94a3b8; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                <span>↑ Cash Out</span>
+                <span id="wtab-count-withdrawal" style="opacity: 0.8; font-size: 0.7rem;"></span>
+              </button>
+              <button type="button" class="wallet-filter-tab" id="wtab-deposit" onclick="setWalletFilter('deposit')" style="padding: 5px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #94a3b8; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                <span>↓ Deposits</span>
+                <span id="wtab-count-deposit" style="opacity: 0.8; font-size: 0.7rem;"></span>
+              </button>
+            </div>
+
+            <!-- Search & Sort Row -->
+            <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center;">
+              <div style="position: relative; flex: 1;">
+                <input type="text" id="walletSearchInput" placeholder="Filter by handle, TxID, or memo..." oninput="handleWalletSearchInput(this.value)" style="width: 100%; padding: 7px 10px 7px 28px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; font-size: 0.78rem; box-sizing: border-box; outline: none;">
+                <span style="position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 0.78rem;">🔍</span>
+              </div>
+              <select id="walletSortSelect" onchange="handleWalletSortChange(this.value)" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #94a3b8; font-size: 0.78rem; padding: 7px 10px; outline: none; cursor: pointer;">
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="highest">Highest Amount</option>
+              </select>
+            </div>
+
             <div id="walletVouchersContainer" class="wallet-vouchers-list">
               <div class="wallet-voucher-card">
                 <div class="voucher-meta-col">
@@ -29825,12 +29984,27 @@ function renderHtml(
       openWithdrawModal();
     }
 
-    function setWithdrawMaxAmount() {
+    function setWithdrawPct(pct) {
       const input = document.getElementById('withdrawAmountInput');
-      if (input) {
-        input.value = walletBalanceSov.toFixed(2);
+      if (input && typeof walletBalanceSov === 'number') {
+        const val = Math.max(0, Math.floor(walletBalanceSov * pct * 100) / 100);
+        input.value = val.toFixed(2);
         updateWithdrawFiatCalc(input.value);
       }
+    }
+
+    function setWithdrawMaxAmount() {
+      setWithdrawPct(1.0);
+    }
+
+    function setSendAmount(amt) {
+      const input = document.getElementById('sendModalAmountInput');
+      if (input) input.value = amt.toString();
+    }
+
+    function setSendRecipient(rec) {
+      const input = document.getElementById('sendModalRecipientInput');
+      if (input) input.value = rec;
     }
 
     function updateWithdrawFiatCalc(val) {
@@ -29902,6 +30076,20 @@ function renderHtml(
           if (fiatEl) fiatEl.innerText = '≈ $' + (walletBalanceSov * 3.0).toFixed(2) + ' USD';
           closeWithdrawModal();
           showAccountToast('✓ Withdrew ' + amt.toFixed(2) + ' SOV to Layer-1 address!');
+
+          var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+            ? myProfile.did
+            : '${masterKey.did}';
+          allWalletTransactions.unshift(data.withdrawal || {
+            voucherId: 'withdraw_' + Date.now(),
+            type: 'withdrawal',
+            senderDid: myDid,
+            toAddress: addr,
+            totalAmount: amt.toString(),
+            timestamp: Date.now(),
+            status: 'settled_on_l1',
+          });
+          renderWalletVouchers(allWalletTransactions);
           updateProfileDynamicStats();
         } else {
           feedback.style.display = 'block';
@@ -29975,6 +30163,19 @@ function renderHtml(
           const fiatEl = document.getElementById('walletBalanceFiatDisplay');
           if (fiatEl) fiatEl.innerText = '≈ $' + (walletBalanceSov * 3.0).toFixed(2) + ' USD';
           showAccountToast('✓ Received +' + (amount || 50).toFixed(2) + ' SOV from Mesh Faucet!');
+
+          var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+            ? myProfile.did
+            : '${masterKey.did}';
+          allWalletTransactions.unshift(data.deposit || {
+            voucherId: 'deposit_' + Date.now(),
+            type: 'deposit',
+            recipientDid: myDid,
+            totalAmount: (amount || 50).toString(),
+            timestamp: Date.now(),
+            status: 'confirmed_on_l1',
+          });
+          renderWalletVouchers(allWalletTransactions);
           updateProfileDynamicStats();
         } else {
           showAccountToast('⚠️ Faucet failed: ' + (data.error || 'Failed'));
@@ -29984,7 +30185,7 @@ function renderHtml(
       } finally {
         if (btn) {
           btn.disabled = false;
-          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Claim +50.00 SOV Testnet Deposit</span>';
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Quick Claim +50.00 SOV Deposit</span>';
         }
       }
     }
@@ -30078,6 +30279,22 @@ function renderHtml(
           if (fiatEl) fiatEl.innerText = '≈ $' + (walletBalanceSov * 3.0).toFixed(2) + ' USD';
           closeSendSovModal();
           showAccountToast('✓ Sent ' + amt.toFixed(2) + ' SOV to ' + recipient + ' via state channel voucher!');
+
+          var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+            ? myProfile.did
+            : '${masterKey.did}';
+          allWalletTransactions.unshift({
+            voucherId: (data.voucher && data.voucher.voucherId) || ('tx_' + Date.now()),
+            type: 'sent',
+            senderDid: myDid,
+            creatorDid: recipient,
+            toDid: recipient,
+            totalAmount: amt.toString(),
+            timestamp: Date.now(),
+            senderComment: memo,
+            status: 'settled_on_l1',
+          });
+          renderWalletVouchers(allWalletTransactions);
           updateProfileDynamicStats();
         } else {
           feedback.style.display = 'block';
@@ -30137,43 +30354,402 @@ function renderHtml(
       }
     }
 
-    function renderWalletVouchers(vouchersList) {
+    var allWalletTransactions = [];
+    var activeWalletFilter = 'all';
+    var walletSearchQuery = '';
+    var walletSortOrder = 'newest';
+    var currentReceiptTx = null;
+
+    function setWalletFilter(filterType) {
+      activeWalletFilter = filterType || 'all';
+      var tabs = ['all', 'received', 'sent', 'withdrawal', 'deposit'];
+      for (var i = 0; i < tabs.length; i++) {
+        var t = tabs[i];
+        var el = document.getElementById('wtab-' + t);
+        if (el) {
+          if (t === activeWalletFilter) {
+            el.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            el.style.background = 'rgba(16, 185, 129, 0.15)';
+            el.style.color = '#34d399';
+            el.style.fontWeight = '700';
+          } else {
+            el.style.border = '1px solid rgba(255,255,255,0.1)';
+            el.style.background = 'rgba(255,255,255,0.04)';
+            el.style.color = '#94a3b8';
+            el.style.fontWeight = '600';
+          }
+        }
+      }
+      applyWalletFiltersAndRender();
+    }
+
+    function handleWalletSearchInput(val) {
+      walletSearchQuery = (val || '').trim().toLowerCase();
+      applyWalletFiltersAndRender();
+    }
+
+    function handleWalletSortChange(val) {
+      walletSortOrder = val || 'newest';
+      applyWalletFiltersAndRender();
+    }
+
+    function applyWalletFiltersAndRender() {
       var container = document.getElementById('walletVouchersContainer');
       if (!container) return;
-      if (!Array.isArray(vouchersList) || vouchersList.length === 0) {
+
+      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+        ? myProfile.did
+        : '${masterKey.did}';
+
+      var filtered = allWalletTransactions.filter(function(v) {
+        var isWithdrawal = v.type === 'withdrawal';
+        var isDeposit = v.type === 'deposit';
+        var isReward = v.type === 'reward';
+        var isSent = !isWithdrawal && !isDeposit && !isReward && (v.senderDid === myDid || v.fromDid === myDid);
+        var isReceived = !isWithdrawal && !isDeposit && !isReward && !isSent;
+
+        if (activeWalletFilter === 'received' && !(isReceived || isReward)) return false;
+        if (activeWalletFilter === 'sent' && !isSent) return false;
+        if (activeWalletFilter === 'withdrawal' && !isWithdrawal) return false;
+        if (activeWalletFilter === 'deposit' && !isDeposit) return false;
+
+        if (walletSearchQuery) {
+          var vId = (v.voucherId || v.id || '').toLowerCase();
+          var sName = (v.senderName || '').toLowerCase();
+          var sDid = (v.senderDid || v.fromDid || '').toLowerCase();
+          var rDid = (v.creatorDid || v.toDid || v.recipientDid || v.toAddress || '').toLowerCase();
+          var memo = (v.senderComment || v.message || v.memo || '').toLowerCase();
+          var amt = (v.totalAmount || v.amount || '').toString();
+          var match = vId.indexOf(walletSearchQuery) !== -1 ||
+            sName.indexOf(walletSearchQuery) !== -1 ||
+            sDid.indexOf(walletSearchQuery) !== -1 ||
+            rDid.indexOf(walletSearchQuery) !== -1 ||
+            memo.indexOf(walletSearchQuery) !== -1 ||
+            amt.indexOf(walletSearchQuery) !== -1;
+          if (!match) return false;
+        }
+
+        return true;
+      });
+
+      filtered.sort(function(a, b) {
+        var tA = Number(a.timestamp || 0);
+        var tB = Number(b.timestamp || 0);
+        var amtA = Number(a.totalAmount || a.amount || 0);
+        var amtB = Number(b.totalAmount || b.amount || 0);
+
+        if (walletSortOrder === 'oldest') return tA - tB;
+        if (walletSortOrder === 'highest') return amtB - amtA;
+        return tB - tA;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 2.25rem 1rem; color: #64748b; background: rgba(255,255,255,0.02); border-radius: 14px; border: 1px dashed rgba(255,255,255,0.08);">' +
+          '<div style="font-size: 2rem; margin-bottom: 6px;">📂</div>' +
+          '<div style="font-weight: 700; color: #cbd5e1; font-size: 0.95rem; margin-bottom: 4px;">No Transactions Found</div>' +
+          '<div style="font-size: 0.78rem; color: #64748b;">No ledger records match the selected filter or search query.</div>' +
+        '</div>';
         return;
       }
+
       var html = '';
-      for (var i = 0; i < vouchersList.length; i++) {
-        var v = vouchersList[i];
+      for (var i = 0; i < filtered.length; i++) {
+        var v = filtered[i];
         var vId = v.voucherId || v.id || ('vouch_' + i);
         var total = Number(v.totalAmount || v.amount || 50).toFixed(2);
         var creatorAmt = Number(v.creatorAmount || (Number(total) * 0.95)).toFixed(2);
         var rawPayload = vId + ':' + (v.senderDid || '') + ':' + total + ':' + (v.timestamp || Date.now());
         var rootHash = '0x' + (v.signatureHex ? v.signatureHex.slice(0, 16) : (vId.replace(/[^a-f0-9]/gi, '') + '9b12a8ef').slice(0, 16));
-        var blockHeight = 8400 + (i * 7);
-        var dateStr = v.timestamp ? new Date(v.timestamp).toLocaleTimeString() : 'Recent';
+        var dateStr = v.timestamp ? new Date(v.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recent';
 
-        html += '<div class="wallet-voucher-card">' +
-          '<div class="voucher-meta-col">' +
-            '<div class="voucher-root-row">' +
-              '<span style="font-size: 0.95rem;">🎁</span> ' +
-              '<span style="font-weight: 700; color: #f8fafc;">Tip from Fan</span>' +
-              '<span style="color: #34d399; font-weight: 800; margin-left: auto;">+' + creatorAmt + ' SOV</span>' +
+        var isWithdrawal = v.type === 'withdrawal';
+        var isDeposit = v.type === 'deposit';
+        var isReward = v.type === 'reward';
+        var isSent = !isWithdrawal && !isDeposit && !isReward && (v.senderDid === myDid || v.fromDid === myDid);
+
+        var icon = '🎁';
+        var title = 'Tip from Fan';
+        var amtDisplay = '+' + creatorAmt + ' SOV';
+        var amtColor = '#34d399';
+        var subSpecs = 'Instant Settlement (95% Net)';
+        var badgeColor = '#38bdf8';
+        var badgeText = 'Verified Receipt';
+
+        if (isWithdrawal) {
+          icon = '↑';
+          title = 'Cash Out &bull; Layer-1 Settlement';
+          amtDisplay = '-' + total + ' SOV';
+          amtColor = '#f87171';
+          subSpecs = 'Sent to ' + (v.toAddress ? (v.toAddress.slice(0, 10) + '…') : 'External L1');
+          badgeColor = '#fbbf24';
+          badgeText = 'L1 Settled';
+        } else if (isDeposit) {
+          icon = '↓';
+          title = 'Deposit &bull; Mesh Faucet';
+          amtDisplay = '+' + total + ' SOV';
+          amtColor = '#34d399';
+          subSpecs = 'Layer-1 Inbound Bridge';
+          badgeColor = '#34d399';
+          badgeText = 'Confirmed';
+        } else if (isReward) {
+          icon = '⚡';
+          title = 'Network Relay Reward';
+          amtDisplay = '+' + total + ' SOV';
+          amtColor = '#fbbf24';
+          subSpecs = 'Community Node Relay';
+          badgeColor = '#fbbf24';
+          badgeText = 'Mesh Incentive';
+        } else if (isSent) {
+          icon = '✈';
+          var toName = v.creatorDid ? (v.creatorDid.slice(0, 12) + '…') : (v.toDid || 'Peer');
+          title = 'Sent Transfer &bull; ' + toName;
+          amtDisplay = '-' + total + ' SOV';
+          amtColor = '#f87171';
+          subSpecs = v.senderComment ? ('"' + v.senderComment + '"') : 'P2P State Channel';
+          badgeColor = '#c084fc';
+          badgeText = 'P2P Voucher';
+        } else {
+          icon = '🎁';
+          title = v.senderName ? ('Tip from ' + v.senderName) : 'Tip from Fan';
+          amtDisplay = '+' + creatorAmt + ' SOV';
+          amtColor = '#34d399';
+          subSpecs = 'Instant Settlement (95% Net)';
+          badgeColor = '#38bdf8';
+          badgeText = 'Verified Receipt';
+        }
+
+        html += '<div class="wallet-voucher-card" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; gap: 10px;">' +
+          '<div class="voucher-meta-col" style="flex: 1; min-width: 0;">' +
+            '<div class="voucher-root-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">' +
+              '<span style="font-size: 1.1rem; width: 24px; text-align: center;">' + icon + '</span>' +
+              '<span style="font-weight: 700; color: #f8fafc; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + title + '</span>' +
+              '<span style="color: ' + amtColor + '; font-weight: 800; font-size: 0.95rem; margin-left: auto; flex-shrink: 0;">' + amtDisplay + '</span>' +
             '</div>' +
-            '<div class="voucher-specs-row">' +
+            '<div class="voucher-specs-row" style="display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: #64748b; flex-wrap: wrap;">' +
               '<span>' + dateStr + '</span> &bull; ' +
-              '<span>Instant Settlement (95% Net)</span> &bull; ' +
-              '<span style="color: #38bdf8;">Verified Receipt</span>' +
+              '<span style="color: #94a3b8;">' + subSpecs + '</span> &bull; ' +
+              '<span style="color: ' + badgeColor + '; font-weight: 600;">' + badgeText + '</span>' +
             '</div>' +
           '</div>' +
-          '<button class="voucher-verify-btn" id="btn-verify-' + vId + '" aria-label="View receipt for voucher ' + vId + '" onclick="verifyMerkleProofLive(&quot;' + vId + '&quot;, &quot;' + rootHash + '&quot;, &quot;' + rawPayload + '&quot;)">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>' +
-            '<span>Receipt</span>' +
-          '</button>' +
+          '<div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">' +
+            '<button class="voucher-verify-btn" id="btn-verify-' + vId + '" aria-label="View receipt for voucher ' + vId + '" onclick="openWalletReceiptModal(&quot;' + vId + '&quot;)" style="padding: 6px 10px; border-radius: 10px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">' +
+              '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>' +
+              '<span>Receipt</span>' +
+            '</button>' +
+          '</div>' +
         '</div>';
       }
+
       container.innerHTML = html;
+    }
+
+    function renderWalletVouchers(vouchersList) {
+      if (!Array.isArray(vouchersList)) return;
+      allWalletTransactions = vouchersList;
+
+      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+        ? myProfile.did
+        : '${masterKey.did}';
+
+      var total = allWalletTransactions.length;
+      var receivedCount = 0;
+      var sentCount = 0;
+      var withdrawCount = 0;
+      var depositCount = 0;
+
+      for (var i = 0; i < allWalletTransactions.length; i++) {
+        var tx = allWalletTransactions[i];
+        if (tx.type === 'withdrawal') withdrawCount++;
+        else if (tx.type === 'deposit') depositCount++;
+        else if (tx.type === 'reward') receivedCount++;
+        else if (tx.senderDid === myDid || tx.fromDid === myDid) sentCount++;
+        else receivedCount++;
+      }
+
+      var totBadge = document.getElementById('walletTxTotalCountBadge');
+      if (totBadge) totBadge.innerText = total.toString();
+      var cAll = document.getElementById('wtab-count-all');
+      if (cAll) cAll.innerText = '(' + total + ')';
+      var cRec = document.getElementById('wtab-count-received');
+      if (cRec) cRec.innerText = '(' + receivedCount + ')';
+      var cSent = document.getElementById('wtab-count-sent');
+      if (cSent) cSent.innerText = '(' + sentCount + ')';
+      var cWith = document.getElementById('wtab-count-withdrawal');
+      if (cWith) cWith.innerText = '(' + withdrawCount + ')';
+      var cDep = document.getElementById('wtab-count-deposit');
+      if (cDep) cDep.innerText = '(' + depositCount + ')';
+
+      applyWalletFiltersAndRender();
+    }
+
+    function openWalletReceiptModal(voucherId) {
+      var tx = allWalletTransactions.find(function(t) {
+        return (t.voucherId === voucherId || t.id === voucherId);
+      });
+      if (!tx) {
+        tx = {
+          voucherId: voucherId,
+          type: 'tip',
+          totalAmount: '475.00',
+          creatorAmount: '475.00',
+          timestamp: Date.now(),
+          senderDid: 'did:sovra:edge_community_foster',
+          creatorDid: (myProfile && myProfile.did) ? myProfile.did : '${masterKey.did}',
+          status: 'settled_on_l1',
+        };
+      }
+      currentReceiptTx = tx;
+
+      var modal = document.getElementById('walletReceiptModal');
+      if (!modal) return;
+
+      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+        ? myProfile.did
+        : '${masterKey.did}';
+
+      var isWithdrawal = tx.type === 'withdrawal';
+      var isDeposit = tx.type === 'deposit';
+      var isReward = tx.type === 'reward';
+      var isSent = !isWithdrawal && !isDeposit && !isReward && (tx.senderDid === myDid || tx.fromDid === myDid);
+
+      var total = Number(tx.totalAmount || tx.amount || 0).toFixed(2);
+      var fiat = (Number(total) * 3.0).toFixed(2);
+
+      var dirBadge = document.getElementById('receiptModalDirectionBadge');
+      var amtSovEl = document.getElementById('receiptModalAmountSov');
+      var amtFiatEl = document.getElementById('receiptModalAmountFiat');
+      var typeEl = document.getElementById('receiptModalTxType');
+      var timeEl = document.getElementById('receiptModalTimestamp');
+      var fromEl = document.getElementById('receiptModalFromDid');
+      var toEl = document.getElementById('receiptModalToDid');
+      var txIdEl = document.getElementById('receiptModalTxId');
+      var rootEl = document.getElementById('receiptModalMerkleRoot');
+
+      if (isWithdrawal) {
+        if (dirBadge) {
+          dirBadge.innerText = '● OUTGOING L1 WITHDRAWAL';
+          dirBadge.style.color = '#f87171';
+          dirBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+          dirBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        }
+        if (amtSovEl) { amtSovEl.innerText = '-' + total + ' SOV'; amtSovEl.style.color = '#f87171'; }
+        if (typeEl) typeEl.innerText = 'Layer-1 Cash Out Settlement';
+      } else if (isSent) {
+        if (dirBadge) {
+          dirBadge.innerText = '● OUTGOING P2P TRANSFER';
+          dirBadge.style.color = '#f87171';
+          dirBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+          dirBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        }
+        if (amtSovEl) { amtSovEl.innerText = '-' + total + ' SOV'; amtSovEl.style.color = '#f87171'; }
+        if (typeEl) typeEl.innerText = 'P2P State Channel Voucher';
+      } else if (isDeposit) {
+        if (dirBadge) {
+          dirBadge.innerText = '● INBOUND LAYER-1 DEPOSIT';
+          dirBadge.style.color = '#34d399';
+          dirBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+          dirBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        }
+        if (amtSovEl) { amtSovEl.innerText = '+' + total + ' SOV'; amtSovEl.style.color = '#10b981'; }
+        if (typeEl) typeEl.innerText = 'Mesh Faucet / L1 Inbound Bridge';
+      } else {
+        if (dirBadge) {
+          dirBadge.innerText = '● INCOMING CREATOR SETTLEMENT';
+          dirBadge.style.color = '#34d399';
+          dirBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+          dirBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        }
+        if (amtSovEl) { amtSovEl.innerText = '+' + total + ' SOV'; amtSovEl.style.color = '#10b981'; }
+        if (typeEl) typeEl.innerText = 'P2P Fan Micro-Tip (95% Net)';
+      }
+
+      if (amtFiatEl) amtFiatEl.innerText = '≈ $' + fiat + ' USD';
+      if (timeEl) timeEl.innerText = tx.timestamp ? new Date(tx.timestamp).toLocaleString() : 'Just now';
+      if (fromEl) fromEl.innerText = tx.senderDid || tx.fromDid || (isDeposit ? 'Layer-1 Inbound Bridge' : 'Verified Peer');
+      if (toEl) toEl.innerText = tx.toAddress || tx.creatorDid || tx.toDid || tx.recipientDid || myDid;
+      if (txIdEl) txIdEl.innerText = tx.voucherId || tx.txHash || voucherId;
+      if (rootEl) rootEl.innerText = tx.signatureHex ? ('0x' + tx.signatureHex.slice(0, 32) + '…') : ('0x' + (voucherId.replace(/[^a-f0-9]/gi, '') + '9b12a8ef6420182c').slice(0, 32));
+
+      modal.style.display = 'flex';
+    }
+
+    function closeWalletReceiptModal() {
+      var modal = document.getElementById('walletReceiptModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function copyReceiptTxId() {
+      if (!currentReceiptTx) return;
+      var txId = currentReceiptTx.voucherId || currentReceiptTx.txHash || 'N/A';
+      copyToClipboard(txId, function() {
+        showAccountToast('📋 Transaction ID copied to clipboard!');
+      });
+    }
+
+    function downloadSingleReceiptJson() {
+      if (!currentReceiptTx) return;
+      var dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(currentReceiptTx, null, 2));
+      var downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', 'sovra-receipt-' + (currentReceiptTx.voucherId || 'tx') + '.json');
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showAccountToast('📥 Cryptographic receipt JSON downloaded!');
+    }
+
+    function exportWalletStatement(format) {
+      if (!allWalletTransactions || allWalletTransactions.length === 0) {
+        showAccountToast('⚠️ No transactions to export.');
+        return;
+      }
+      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+        ? myProfile.did
+        : '${masterKey.did}';
+
+      if (format === 'json') {
+        var jsonContent = JSON.stringify({
+          walletDid: myDid,
+          exportedAt: new Date().toISOString(),
+          totalTransactions: allWalletTransactions.length,
+          transactions: allWalletTransactions
+        }, null, 2);
+        var dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(jsonContent);
+        var a = document.createElement('a');
+        a.setAttribute('href', dataStr);
+        a.setAttribute('download', 'sovra-wallet-statement.json');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showAccountToast('📥 Wallet statement exported (JSON)!');
+        return;
+      }
+
+      var rows = ['Transaction ID,Date,Type,Direction,Amount (SOV),Amount (USD),Counterparty,Status,Merkle Root / TxHash'];
+      for (var i = 0; i < allWalletTransactions.length; i++) {
+        var tx = allWalletTransactions[i];
+        var isOut = tx.type === 'withdrawal' || tx.senderDid === myDid || tx.fromDid === myDid;
+        var dir = isOut ? 'OUT' : 'IN';
+        var type = tx.type === 'withdrawal' ? 'Cash Out (L1)' : tx.type === 'deposit' ? 'Deposit (Faucet)' : isOut ? 'Transfer Sent' : 'Tip Received';
+        var amt = Number(tx.totalAmount || tx.amount || 0).toFixed(2);
+        var fiat = (Number(amt) * 3.0).toFixed(2);
+        var date = tx.timestamp ? new Date(tx.timestamp).toISOString() : new Date().toISOString();
+        var party = isOut ? (tx.toAddress || tx.creatorDid || tx.toDid || 'External L1') : (tx.senderDid || tx.fromDid || 'Network Relay');
+        var st = tx.status || 'settled_on_l1';
+        var hash = tx.txHash || tx.signatureHex || tx.voucherId || '';
+        rows.push('"' + (tx.voucherId || '') + '","' + date + '","' + type + '","' + dir + '","' + (isOut ? '-' : '+') + amt + '","$' + fiat + '","' + party + '","' + st + '","' + hash + '"');
+      }
+      var csv = rows.join(String.fromCharCode(10));
+
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'sovra-wallet-statement.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showAccountToast('📥 Wallet ledger statement exported (CSV)!');
     }
 
     // ==========================================
@@ -41370,13 +41946,41 @@ async function startDevServer() {
       const balanceFiat = Number((balanceSov * 3.0).toFixed(2));
 
       const allVouchers = sovraDb.getState().tip_vouchers || [];
-      const receivedVouchers = allVouchers.filter((v: any) => v.creatorDid === targetDid || v.toDid === targetDid);
-      const sentVouchers = allVouchers.filter((v: any) => v.senderDid === targetDid || v.fromDid === targetDid);
+      const receivedVouchers = allVouchers.filter((v: any) =>
+        v.creatorDid === targetDid ||
+        v.toDid === targetDid ||
+        (v.type === 'deposit' && (v.recipientDid === targetDid || v.toDid === targetDid))
+      );
+      const sentVouchers = allVouchers.filter((v: any) =>
+        v.senderDid === targetDid ||
+        v.fromDid === targetDid ||
+        (v.type === 'withdrawal' && v.senderDid === targetDid)
+      );
 
-      const tipsEarned = receivedVouchers.reduce((acc: number, v: any) => acc + Number(v.creatorAmount || v.creatorSplit || 0), 0);
-      const bandwidthEarned = receivedVouchers.reduce((acc: number, v: any) => acc + Number(v.seederAmount || v.seederSplit || 0), 0);
+      const tipsEarned = receivedVouchers
+        .filter((v: any) => !v.type || v.type === 'tip')
+        .reduce((acc: number, v: any) => acc + Number(v.creatorAmount || v.creatorSplit || 0), 0);
+      const bandwidthEarned = receivedVouchers
+        .filter((v: any) => !v.type || v.type === 'tip')
+        .reduce((acc: number, v: any) => acc + Number(v.seederAmount || v.seederSplit || 0), 0);
       const stakedBond = 50.0;
       const relayGas = 15.0;
+
+      // Deduplicate user transactions and sort chronologically (newest first)
+      const userTxMap = new Map();
+      allVouchers.forEach((v: any) => {
+        if (
+          v.creatorDid === targetDid ||
+          v.toDid === targetDid ||
+          v.senderDid === targetDid ||
+          v.fromDid === targetDid ||
+          v.recipientDid === targetDid
+        ) {
+          userTxMap.set(v.voucherId || `${v.timestamp}_${Math.random()}`, v);
+        }
+      });
+      const userTransactions = Array.from(userTxMap.values())
+        .sort((a: any, b: any) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
 
       res.writeHead(200, {
         'Content-Type': 'application/json',
@@ -41393,10 +41997,63 @@ async function startDevServer() {
         relayGas,
         sentVouchersCount: sentVouchers.length,
         receivedVouchersCount: receivedVouchers.length,
-        vouchers: (receivedVouchers.concat(sentVouchers)).length > 0
-          ? (receivedVouchers.concat(sentVouchers)).slice(-10)
-          : allVouchers.slice(-5),
+        vouchers: userTransactions.length > 0
+          ? userTransactions.slice(0, 50)
+          : allVouchers.slice(-10).reverse(),
       }));
+      return;
+    }
+
+    // API: Wallet Ledger Statement Export (CSV / JSON)
+    if (url.pathname === '/api/wallet/export' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      const queryDid = url.searchParams.get('did');
+      const format = url.searchParams.get('format') || 'csv';
+      const targetDid = queryDid || (principal ? principal.did : masterKey.did);
+
+      const allVouchers = sovraDb.getState().tip_vouchers || [];
+      const userTransactions = allVouchers.filter((v: any) =>
+        v.creatorDid === targetDid ||
+        v.toDid === targetDid ||
+        v.senderDid === targetDid ||
+        v.fromDid === targetDid ||
+        v.recipientDid === targetDid
+      ).sort((a: any, b: any) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+
+      if (format === 'json') {
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Content-Disposition': 'attachment; filename="sovra-wallet-statement.json"',
+        });
+        res.end(JSON.stringify({
+          ok: true,
+          did: targetDid,
+          exportedAt: new Date().toISOString(),
+          totalTransactions: userTransactions.length,
+          transactions: userTransactions,
+        }, null, 2));
+        return;
+      }
+
+      let csv = 'Transaction ID,Date & Time,Type,Direction,Amount (SOV),Amount (USD),Counterparty / Address,Status,TxHash / Merkle Root\n';
+      for (const tx of userTransactions) {
+        const isOut = tx.type === 'withdrawal' || tx.senderDid === targetDid || tx.fromDid === targetDid;
+        const dir = isOut ? 'OUT' : 'IN';
+        const type = tx.type === 'withdrawal' ? 'Cash Out (L1)' : tx.type === 'deposit' ? 'Deposit (Faucet)' : isOut ? 'Transfer Sent' : 'Tip Received';
+        const amt = Number(tx.totalAmount || tx.amount || 0).toFixed(2);
+        const fiat = (Number(amt) * 3.0).toFixed(2);
+        const dateStr = tx.timestamp ? new Date(tx.timestamp).toISOString() : new Date().toISOString();
+        const counterparty = isOut ? (tx.toAddress || tx.creatorDid || tx.toDid || 'External L1') : (tx.senderDid || tx.fromDid || 'Network Relay');
+        const status = tx.status || 'settled_on_l1';
+        const hash = tx.txHash || tx.signatureHex || tx.voucherId || '';
+        csv += `"${tx.voucherId}","${dateStr}","${type}","${dir}","${isOut ? '-' : '+'}${amt}","$${fiat}","${counterparty}","${status}","${hash}"\n`;
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="sovra-wallet-statement.csv"',
+      });
+      res.end(csv);
       return;
     }
 
@@ -46718,7 +47375,15 @@ async function startDevServer() {
         }
 
         const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
-        const toDid = parsed.recipientDid || parsed.creatorDid || 'did:sovra:creator_studio_broadcast';
+        let toDid = parsed.recipientDid || parsed.creatorDid || 'did:sovra:creator_studio_broadcast';
+        const cleanHandle = toDid.replace(/^@/, '').trim().toLowerCase();
+        const matchedUser = sovraDb.getAllUsers().find(u =>
+          u.did === toDid ||
+          (u.handle && u.handle.toLowerCase().replace(/^@/, '') === cleanHandle)
+        );
+        if (matchedUser) {
+          toDid = matchedUser.did;
+        }
 
         const tipResult = sovraDb.processTip({
           fromDid,
