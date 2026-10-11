@@ -26,12 +26,29 @@ export interface CallRouteContext {
 export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<boolean> {
   const { req, res, url, blindPushRelay, getIceServers, readBoundedBody, resolvePrincipal, enforceAuth } = ctx;
 
-  // 1. ICE Servers configuration
+  // 1. ICE Servers configuration with Privacy Relay Mode (IP Leakage Shielding)
   if ((url.pathname === '/api/call/ice-servers' || url.pathname === '/api/webrtc/ice-servers') && req.method === 'GET') {
     const principal = resolvePrincipal(req);
-    const iceServers = getIceServers(principal?.did);
+    const privacyParam = url.searchParams.get('privacy') || req.headers['x-sovra-privacy-mode'];
+    const privacyRelay = privacyParam === 'relay' || privacyParam === 'shielded';
+    let iceServers = getIceServers(principal?.did);
+
+    if (privacyRelay) {
+      // Filter out pure STUN servers to prevent exposing caller's local LAN & public ISP IP to untrusted peers
+      iceServers = iceServers.filter((s: any) => {
+        const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+        return urls.some((u: string) => typeof u === 'string' && (u.startsWith('turn:') || u.startsWith('turns:')));
+      });
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, iceServers }));
+    res.end(JSON.stringify({
+      ok: true,
+      iceServers,
+      iceTransportPolicy: privacyRelay ? 'relay' : 'all',
+      privacyRelay,
+      shielded: privacyRelay,
+    }));
     return true;
   }
 
@@ -47,6 +64,7 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
       const recipientDid = String(parsed.recipientDid || '');
       const offerSdp = String(parsed.offerSdp || parsed.sdp || parsed.sdpOffer || '');
       const callType = parsed.callType === 'video' ? 'video' : 'audio';
+      const privacyRelay = Boolean(parsed.privacyRelay || parsed.shieldedRelay || url.searchParams.get('privacy') === 'relay');
 
       if (!recipientDid || !offerSdp) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -56,6 +74,10 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
 
       try {
         const session = sovraDb.createCallOffer(principal.did, recipientDid, offerSdp, callType);
+        if (privacyRelay) {
+          (session as any).privacyRelay = true;
+          sovraDb.save();
+        }
 
         // Notify recipient
         const senderUser = sovraDb.findUserByDid(principal.did);
@@ -272,6 +294,24 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
         res.writeHead(409, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Conflict: Call has already ended' }));
         return true;
+      }
+
+      const isPrivacyRelay = Boolean((existingCall as any).privacyRelay || parsed.privacyRelay);
+      if (isPrivacyRelay && candidate) {
+        const candStr = typeof candidate === 'string' ? candidate : String(candidate.candidate || '');
+        // When Privacy Relay is active, strip 'typ host' (internal LAN IP) and 'typ srflx' (public ISP IP)
+        // Relay only TURN candidates to prevent geographic & network IP leaks to untrusted peers
+        if (candStr.includes('typ host') || candStr.includes('typ srflx')) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: true,
+            session: existingCall,
+            masked: true,
+            privacyRelay: true,
+            message: 'Privacy Relay active: host/srflx IP candidate masked',
+          }));
+          return true;
+        }
       }
 
       try {

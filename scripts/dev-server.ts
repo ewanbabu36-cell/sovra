@@ -41952,10 +41952,42 @@ async function startDevServer() {
     return principal;
   }
 
+  // Anti-Replay Protection: LRU Nonce Cache with Expiration & Timestamp Skew Check
+  const replayNonceCache = new Map<string, number>();
+  function checkAndRecordReplayNonce(nonce: string, timestampStr?: string | string[]): boolean {
+    const now = Date.now();
+    const ts = Number(timestampStr || now);
+    if (!isNaN(ts) && Math.abs(now - ts) > 300_000) {
+      return false; // Stale or future timestamp (> 5 min skew)
+    }
+    // Clean cache if too large
+    if (replayNonceCache.size > 10000) {
+      for (const [k, exp] of replayNonceCache) {
+        if (exp < now) replayNonceCache.delete(k);
+      }
+    }
+    if (replayNonceCache.has(nonce)) {
+      return false; // Replay attack detected!
+    }
+    replayNonceCache.set(nonce, now + 300_000);
+    return true;
+  }
+
   const requestHandler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
     const isEncrypted = Boolean((req.socket as any).encrypted);
     const hostHeader = req.headers.host || (isEncrypted ? `localhost:${HTTPS_PORT}` : `localhost:${HTTP_PORT}`);
     const url = new URL(req.url ?? '/', `${isEncrypted ? 'https' : 'http'}://${hostHeader}`);
+
+    // Anti-Replay Nonce Validation for cryptographic assertions
+    const nonceHeader = req.headers['x-sovra-nonce'];
+    if (nonceHeader && typeof nonceHeader === 'string') {
+      const isValidNonce = checkAndRecordReplayNonce(nonceHeader, req.headers['x-sovra-timestamp']);
+      if (!isValidNonce) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Anti-replay protection violation. Nonce already seen or timestamp skew exceeds 300s.' }));
+        return;
+      }
+    }
 
     // Security & Origin policy (Trusted Proxy & Principal-Aware Rate Limiting - SEC-DOS-01)
     const remoteIp = req.socket.remoteAddress || '127.0.0.1';
@@ -42036,7 +42068,14 @@ async function startDevServer() {
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
-    if (req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; connect-src 'self' ws: wss: https: http: stun: turn: turns:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
+    );
+    if (req.headers['x-forwarded-proto'] === 'https' || isEncrypted) {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     }
 
@@ -49415,6 +49454,13 @@ async function startDevServer() {
         console.log(`[HTTPS] Secure Dev Server Bound on https://0.0.0.0:${HTTPS_PORT}`);
       });
     }
+
+    // Periodic Video Cache Quota Pruning (500 MB limit, LRU eviction)
+    setInterval(() => {
+      try {
+        sovraDb.pruneVideoCache(500 * 1024 * 1024);
+      } catch (_) {}
+    }, 30 * 60 * 1000).unref();
 
     console.log(`\n============================================================`);
     console.log(`  🌐 Sovra Mesh Node is LIVE on LAN & Localhost:`);

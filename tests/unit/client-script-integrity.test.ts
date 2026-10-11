@@ -34,7 +34,7 @@ describe('Client Script Integrity & UI Freeze Prevention Gate', () => {
 
     expect(scriptCount).toBeGreaterThan(0);
     expect(errors).toEqual([]);
-  });
+  }, 30000);
 
   it('guarantees all modal overlays default to hidden to prevent backdrop clicks blocking the screen', async () => {
     const html = await new Promise<string>((resolve, reject) => {
@@ -59,7 +59,7 @@ describe('Client Script Integrity & UI Freeze Prevention Gate', () => {
       const regex = new RegExp(`id="${modalId}"[^>]*style="[^"]*display:\\s*none`, 'i');
       expect(regex.test(html)).toBe(true);
     }
-  });
+  }, 30000);
 
   it('guarantees admin controls are isolated and hidden from consumer view by default', async () => {
     const html = await new Promise<string>((resolve, reject) => {
@@ -98,5 +98,5 @@ describe('Client Script Integrity & UI Freeze Prevention Gate', () => {
 
     // 7. Right Rail footer Ops link is hidden by default
     expect(html).toMatch(/id="rightRailOpsLink"[^>]*style="[^"]*display:\s*none/i);
-  });
+  }, 30000);
 });

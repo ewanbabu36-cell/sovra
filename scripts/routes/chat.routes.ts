@@ -298,6 +298,21 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         // Deliver message instantly to active realtime SSE subscriber
         broadcastChatEvent(record.recipientDid, record);
 
+        // Auto-deposit into Zero-Knowledge Encrypted Mailbox for store-and-forward offline reliability
+        if (record.isE2EE && (record.ciphertextHex || record.text)) {
+          try {
+            sovraDb.depositMailboxMessage({
+              recipientDid: record.recipientDid,
+              senderDid: principal.did,
+              encryptedPayload: record.ciphertextHex || record.text,
+              ivHex: record.ivHex,
+              tagHex: record.tagHex,
+              priority: 'high',
+              ttlSeconds: record.disappearingDurationSec ? Math.max(300, record.disappearingDurationSec) : 7 * 24 * 3600,
+            });
+          } catch (_) {}
+        }
+
         // Blind Push Gateway: Wake mobile receiver device in background
         try {
           const recipientBlindChannel = crypto.createHash('sha256').update(record.recipientDid).digest('hex');
