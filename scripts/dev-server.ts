@@ -12505,6 +12505,10 @@ function renderHtml(
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                 <span>Edit Profile</span>
               </button>
+              <button class="profile-btn profile-btn-secondary" id="profileOpenWalletBtn" onclick="openFullPageWallet()" aria-label="Open Sovereign Wallet" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #34d399; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                <span>Wallet</span>
+              </button>
               <div class="profile-overflow-wrap">
                 <button class="profile-btn profile-btn-secondary" id="profileOverflowMenuBtn" onclick="toggleProfileOverflowMenu(event)" aria-label="More account and sovereign options" aria-haspopup="menu" aria-expanded="false" title="More Options (•••)">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
@@ -12517,6 +12521,10 @@ function renderHtml(
                   <div class="overflow-menu-item" id="profileSwitchPersonaBtn" role="menuitem" tabindex="0" onclick="openSwitchPersonaModal(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #c084fc;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span>🔄 Switch Profile / Page</span>
+                  </div>
+                  <div class="overflow-menu-item" id="profileWalletMenuItem" role="menuitem" tabindex="0" onclick="openFullPageWallet(); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                    <span>💳 My Wallet (Full Page)</span>
                   </div>
                   <div class="overflow-menu-item" id="profileSettingsMenuItem" role="menuitem" tabindex="0" onclick="openSpatialSettingsSurface(this); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #94a3b8;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -12694,6 +12702,9 @@ function renderHtml(
             </button>
             <button type="button" class="sovereign-hub-tab-btn" id="hubBtnDisplay" onclick="switchSovereignHubTab('uiDisplayModeCard', this)">
               <span>✨</span> <span>Theme &amp; Display</span>
+            </button>
+            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnWallet" onclick="switchSovereignHubTab('walletSettingsCard', this)">
+              <span>💳</span> <span>My Wallet</span>
             </button>
             <!-- Node Operator Diagnostic Tabs (Hidden by default for regular citizens) -->
             <button type="button" class="sovereign-hub-tab-btn" id="hubBtnP2pDiagnostics" style="display: none;" onclick="switchSovereignHubTab('nodeDiagnosticsCard', this)">
@@ -12932,122 +12943,45 @@ function renderHtml(
               </button>
             </div>
           </div>
-        </div>
-      </div>
 
-        <!-- Sovereign Bandwidth & Creator Wallet Card -->
-        <div class="sovereign-wallet-card" id="sovereignWalletCard">
-          <div class="wallet-header">
-            <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 800; font-size: 1.1rem; color: #f8fafc;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981; flex-shrink: 0;"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-              <span>My Wallet</span>
-            </div>
-            <span class="badge verifiable-state-badge" id="walletVerifiableStateBadge" title="Your personal sovereign balance with zero platform cuts or transfer fees.">
-              <span class="pulse-dot"></span>
-              <span>Self-Custody &bull; Zero Fees</span>
-            </span>
-          </div>
-
-          <!-- Balance Block -->
-          <div class="wallet-balance-row">
-            <div style="display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
-              <span class="wallet-balance-sov" id="walletBalanceSovDisplay">— SOV</span>
-              <span class="wallet-balance-fiat" id="walletBalanceFiatDisplay">≈ $— USD</span>
-            </div>
-            <div class="wallet-peg-pill" title="Oracle Mesh Consensus Peg: 1 SOV = $3.00 USD">
-              <span>1 SOV = $3.00 USD</span>
-            </div>
-          </div>
-
-          <!-- Sub-Metric 4-Column Grid: Standardized Equal-Width Cards -->
-          <div class="wallet-metrics-grid">
-            <div class="wallet-metric-box">
-              <div class="wallet-metric-label">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #fbbf24;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span>Network Rewards</span>
+          <!-- Card 6: Sovereign Wallet in Settings -->
+          <div class="card profile-telemetry-card" id="walletSettingsCard" style="display: none;">
+            <div>
+              <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+                <span style="display: flex; align-items: center; gap: 7px; font-weight: 700;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                  <span>Sovereign Wallet &amp; Vault</span>
+                </span>
+                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.72rem;">Self-Custody &bull; Zero Fees</span>
               </div>
-              <div class="wallet-metric-value" id="walletBandwidthEarned">—</div>
-              <div class="wallet-metric-subtext" id="walletBandwidthSubtext">Community incentives</div>
-            </div>
-            <div class="wallet-metric-box">
-              <div class="wallet-metric-label">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f472b6;"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
-                <span>Tips &amp; Gifts</span>
-              </div>
-              <div class="wallet-metric-value" id="walletTipsEarned">—</div>
-              <div class="wallet-metric-subtext" id="walletTipsSubtext">Creator earnings</div>
-            </div>
-            <div class="wallet-metric-box">
-              <div class="wallet-metric-label">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                <span>Security Deposit</span>
-              </div>
-              <div class="wallet-metric-value" id="walletStakedBond">—</div>
-              <div class="wallet-metric-subtext">Refundable reserve</div>
-            </div>
-            <div class="wallet-metric-box">
-              <div class="wallet-metric-label">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a78bfa;"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
-                <span>Network Credits</span>
-              </div>
-              <div class="wallet-metric-value" id="walletRelayGas">—</div>
-              <div class="wallet-metric-subtext">Active balance</div>
-            </div>
-          </div>
-
-          <!-- Core Financial Action Buttons: [ Cash Out ], [ Add Money ], [ Send ], [ Refresh ] -->
-          <div class="wallet-action-hub">
-            <button class="wallet-action-btn wallet-btn-primary" onclick="openWithdrawModal()" title="Withdraw SOV earnings to external account" aria-label="Cash Out">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-              <span>Cash Out</span>
-            </button>
-            <button class="wallet-action-btn wallet-btn-secondary" onclick="openDepositModal()" title="Add money or deposit SOV to wallet" aria-label="Add Money">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-              <span>Add Money</span>
-            </button>
-            <button class="wallet-action-btn wallet-btn-secondary" onclick="openSendSovModal()" title="Send SOV instantly to any friend or creator" aria-label="Send">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              <span>Send</span>
-            </button>
-            <button class="wallet-action-btn wallet-btn-ghost" onclick="refreshWalletBalanceLive()" title="Update wallet balance" aria-label="Refresh">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
-              <span>Refresh</span>
-            </button>
-          </div>
-
-          <!-- Visual Vouchers & Recent Activity -->
-          <div class="wallet-vouchers-section" id="walletVouchersSection">
-            <div class="wallet-vouchers-header">
-              <div class="vouchers-title">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
-                <span>Recent Activity</span>
-              </div>
-              <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.7rem;">
-                ● Instant Settlement
-              </span>
-            </div>
-            <div id="walletVouchersContainer" class="wallet-vouchers-list">
-              <div class="wallet-voucher-card">
-                <div class="voucher-meta-col">
-                  <div class="voucher-root-row">
-                    <span style="font-size: 0.95rem;">🎁</span>
-                    <span style="font-weight: 700; color: #f8fafc;">Welcome Bonus &bull; Fan Tip</span>
-                    <span style="color: #34d399; font-weight: 800; margin-left: auto;">+475.00 SOV</span>
-                  </div>
-                  <div class="voucher-specs-row">
-                    <span>Direct Deposit</span> &bull; 
-                    <span>Keep 95% Creator Share</span> &bull; 
-                    <span style="color: #38bdf8;">Verified Receipt</span>
+              <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 14px; margin-bottom: 0.85rem; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <div>
+                  <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 2px;">Available Balance</div>
+                  <div style="display: flex; align-items: baseline; gap: 8px;">
+                    <span style="font-size: 1.45rem; font-weight: 800; color: #10b981;" id="walletSettingsBalanceSovDisplay">500.00 SOV</span>
+                    <span style="font-size: 0.88rem; color: #94a3b8;" id="walletSettingsBalanceFiatDisplay">≈ $1500.00 USD</span>
                   </div>
                 </div>
-                <button class="voucher-verify-btn" id="btn-verify-vouch_genesis_01" onclick="verifyMerkleProofLive('vouch_genesis_01', '0x7f4a8b9e11029c21', 'genesis_payload_01')" aria-label="Verify receipt for genesis voucher">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-                  <span>Receipt</span>
-                </button>
+                <span style="font-size: 0.72rem; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 3px 8px; font-weight: 600;">1 SOV = $3.00 USD</span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.4;">
+                Self-custodial sovereign wallet with zero platform cuts, instant P2P voucher settlements, and Merkle-verified payment receipts.
+              </div>
+            </div>
+            <div class="card-footer-actions" style="display: flex; flex-direction: column; gap: 8px;">
+              <button type="button" class="btn-card-action" onclick="openFullPageWallet()" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.35) 100%); border-color: rgba(16, 185, 129, 0.5); color: #34d399; font-weight: 700; padding: 10px 14px; font-size: 0.88rem; width: 100%; justify-content: center; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                <span>🚀 Open Full Page Wallet</span>
+              </button>
+              <div style="display: flex; gap: 6px; width: 100%;">
+                <button type="button" class="btn-card-action" onclick="openWithdrawModal()" style="flex: 1; justify-content: center; background: rgba(255,255,255,0.05); font-size: 0.75rem;">Cash Out</button>
+                <button type="button" class="btn-card-action" onclick="openDepositModal()" style="flex: 1; justify-content: center; background: rgba(255,255,255,0.05); font-size: 0.75rem;">Add Money</button>
+                <button type="button" class="btn-card-action" onclick="openSendSovModal()" style="flex: 1; justify-content: center; background: rgba(255,255,255,0.05); font-size: 0.75rem;">Send SOV</button>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
         <!-- Creator Hub & Sovereign Entities (Broadcast Channels & Sovereign Pages 2.0) -->
         <div class="card" id="profileCreatorHubCard" style="padding: 1.25rem; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.4); background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(11, 15, 25, 0.95) 100%); backdrop-filter: blur(16px); box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);">
@@ -14856,6 +14790,148 @@ function renderHtml(
       <!-- Page Dispatches Stream -->
       <div id="pageShowcaseStream" style="flex: 1; overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; background: #0b1120;">
         <!-- Dynamically rendered -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 💳 6F. FULL PAGE SOVEREIGN WALLET MODAL / VIEW -->
+  <div id="fullPageWalletModal" class="omni-modal-overlay" style="display: none; z-index: 10060; background: rgba(8, 13, 20, 0.96); backdrop-filter: blur(20px);">
+    <div class="omni-modal-card" style="max-width: 820px; width: 96%; height: 92vh; max-height: 900px; display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; background: #0b1120; border: 1px solid rgba(16, 185, 129, 0.35); box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(16, 185, 129, 0.15);">
+      
+      <!-- Full Page Header -->
+      <div style="padding: 1.1rem 1.4rem; background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button type="button" onclick="closeFullPageWallet()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #f8fafc; padding: 7px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <span>Back to Profile</span>
+          </button>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.25rem;">💳</span>
+              <span style="font-weight: 800; font-size: 1.15rem; color: #fff;">Sovereign Wallet</span>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 6px;">VAULT 2.0</span>
+            </div>
+            <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 2px;">Self-custodial creator earnings, P2P micro-tips, and Merkle-verified receipts.</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge verifiable-state-badge" id="walletVerifiableStateBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.72rem; padding: 4px 10px; border-radius: 10px;">
+            <span class="pulse-dot"></span>
+            <span>Self-Custody &bull; Zero Fees</span>
+          </span>
+          <button type="button" onclick="closeFullPageWallet()" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 50%; color: #94a3b8; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Close">✕</button>
+        </div>
+      </div>
+
+      <!-- Scrollable Full-Page Wallet Content -->
+      <div style="flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+        
+        <!-- Sovereign Bandwidth & Creator Wallet Card (Full Page Standalone) -->
+        <div class="sovereign-wallet-card" id="sovereignWalletCard" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 18px; padding: 1.5rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.4);">
+          
+          <!-- Balance Block -->
+          <div class="wallet-balance-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.04em; margin-bottom: 4px;">Total Cryptographic Balance</div>
+              <div style="display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
+                <span class="wallet-balance-sov" id="walletBalanceSovDisplay" style="font-size: 2.2rem; font-weight: 800; color: #10b981; letter-spacing: -0.02em;">500.00 SOV</span>
+                <span class="wallet-balance-fiat" id="walletBalanceFiatDisplay" style="font-size: 1.15rem; color: #94a3b8; font-weight: 600;">≈ $1500.00 USD</span>
+              </div>
+            </div>
+            <div class="wallet-peg-pill" title="Oracle Mesh Consensus Peg: 1 SOV = $3.00 USD" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 12px; color: #34d399; font-size: 0.82rem; font-weight: 700;">
+              <span>1 SOV = $3.00 USD</span>
+            </div>
+          </div>
+
+          <!-- Sub-Metric 4-Column Grid -->
+          <div class="wallet-metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.25rem;">
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+              <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #fbbf24;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>Network Rewards</span>
+              </div>
+              <div class="wallet-metric-value" id="walletBandwidthEarned" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">+0.00 SOV</div>
+              <div class="wallet-metric-subtext" id="walletBandwidthSubtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Community incentives</div>
+            </div>
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+              <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f472b6;"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+                <span>Tips &amp; Gifts</span>
+              </div>
+              <div class="wallet-metric-value" id="walletTipsEarned" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">+0.00 SOV</div>
+              <div class="wallet-metric-subtext" id="walletTipsSubtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Creator earnings</div>
+            </div>
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+              <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span>Security Deposit</span>
+              </div>
+              <div class="wallet-metric-value" id="walletStakedBond" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">50.00 SOV</div>
+              <div class="wallet-metric-subtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Refundable reserve</div>
+            </div>
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+              <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a78bfa;"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+                <span>Network Credits</span>
+              </div>
+              <div class="wallet-metric-value" id="walletRelayGas" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">+15.00 SOV</div>
+              <div class="wallet-metric-subtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Active balance</div>
+            </div>
+          </div>
+
+          <!-- Core Financial Action Buttons -->
+          <div class="wallet-action-hub" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1.5rem;">
+            <button class="wallet-action-btn wallet-btn-primary" onclick="openWithdrawModal()" title="Withdraw SOV earnings to external account" aria-label="Cash Out" style="flex: 1; min-width: 130px; padding: 10px 16px; border-radius: 12px; background: #10b981; color: #080d14; font-weight: 800; font-size: 0.9rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+              <span>Cash Out</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-secondary" onclick="openDepositModal()" title="Add money or deposit SOV to wallet" aria-label="Add Money" style="flex: 1; min-width: 130px; padding: 10px 16px; border-radius: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #f8fafc; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              <span>Add Money</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-secondary" onclick="openSendSovModal()" title="Send SOV instantly to any friend or creator" aria-label="Send" style="flex: 1; min-width: 130px; padding: 10px 16px; border-radius: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #f8fafc; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <span>Send</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-ghost" onclick="refreshWalletBalanceLive()" title="Update wallet balance" aria-label="Refresh" style="padding: 10px 16px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          <!-- Visual Vouchers & Recent Activity -->
+          <div class="wallet-vouchers-section" id="walletVouchersSection">
+            <div class="wallet-vouchers-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="vouchers-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #f8fafc; font-size: 0.95rem;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+                <span>Recent Activity</span>
+              </div>
+              <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.72rem; padding: 2px 8px; border-radius: 8px;">
+                ● Instant Settlement
+              </span>
+            </div>
+            <div id="walletVouchersContainer" class="wallet-vouchers-list">
+              <div class="wallet-voucher-card">
+                <div class="voucher-meta-col">
+                  <div class="voucher-root-row">
+                    <span style="font-size: 0.95rem;">🎁</span>
+                    <span style="font-weight: 700; color: #f8fafc;">Welcome Bonus &bull; Fan Tip</span>
+                    <span style="color: #34d399; font-weight: 800; margin-left: auto;">+475.00 SOV</span>
+                  </div>
+                  <div class="voucher-specs-row">
+                    <span>Direct Deposit</span> &bull; 
+                    <span>Keep 95% Creator Share</span> &bull; 
+                    <span style="color: #38bdf8;">Verified Receipt</span>
+                  </div>
+                </div>
+                <button class="voucher-verify-btn" id="btn-verify-vouch_genesis_01" onclick="verifyMerkleProofLive('vouch_genesis_01', '0x7f4a8b9e11029c21', 'genesis_payload_01')" aria-label="Verify receipt for genesis voucher">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                  <span>Receipt</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -28875,9 +28951,13 @@ function renderHtml(
           if (!w || !w.ok) return;
           const sovEl = document.getElementById('walletBalanceSovDisplay');
           if (sovEl) sovEl.innerText = Number(w.balanceSov).toFixed(2) + ' SOV';
+          const setSovEl = document.getElementById('walletSettingsBalanceSovDisplay');
+          if (setSovEl) setSovEl.innerText = Number(w.balanceSov).toFixed(2) + ' SOV';
 
           const fiatEl = document.getElementById('walletBalanceFiatDisplay');
           if (fiatEl) fiatEl.innerText = '≈ $' + Number(w.balanceFiat).toFixed(2) + ' USD';
+          const setFiatEl = document.getElementById('walletSettingsBalanceFiatDisplay');
+          if (setFiatEl) setFiatEl.innerText = '≈ $' + Number(w.balanceFiat).toFixed(2) + ' USD';
 
           const bwEl = document.getElementById('walletBandwidthEarned');
           if (bwEl) bwEl.innerText = '+' + Number(w.bandwidthEarned).toFixed(2) + ' SOV';
@@ -29698,6 +29778,24 @@ function renderHtml(
         }
       }
       return '<svg viewBox="0 0 147 147" width="147" height="147" xmlns="http://www.w3.org/2000/svg">' + rects + '</svg>';
+    }
+
+    function openFullPageWallet() {
+      const modal = document.getElementById('fullPageWalletModal');
+      if (!modal) return;
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      if (typeof refreshWalletBalanceLive === 'function') {
+        refreshWalletBalanceLive();
+      }
+    }
+
+    function closeFullPageWallet() {
+      const modal = document.getElementById('fullPageWalletModal');
+      if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+      }
     }
 
     function openWithdrawModal() {
