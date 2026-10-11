@@ -12662,17 +12662,17 @@ function renderHtml(
             <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
               <span style="font-size: 1rem;">🛡️</span>
               <span style="font-weight: 800; font-size: 0.88rem; color: #f8fafc; letter-spacing: -0.01em;">Account &amp; Creator Studio</span>
-              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.68rem; padding: 2px 7px;">
-                <span class="pulse-dot" style="width: 6px; height: 6px; background: #10b981; display: inline-block; border-radius: 50%; margin-right: 4px;"></span>
-                Online &bull; Secured
+              <span class="badge" id="hubGlanceStatusBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.68rem; padding: 2px 7px;">
+                <span class="pulse-dot" id="hubGlancePulseDot" style="width: 6px; height: 6px; background: #10b981; display: inline-block; border-radius: 50%; margin-right: 4px;"></span>
+                <span id="hubGlanceStatusText">Online &bull; Secured</span>
               </span>
             </div>
             
             <div style="display: flex; align-items: center; gap: 8px;">
               <!-- Quick Glance Telemetry Pills -->
               <div class="sovereign-hub-glance-pills" style="display: flex; align-items: center; gap: 6px;">
-                <span class="hub-glance-pill" title="Network Connection Speed" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #38bdf8; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">
-                  ⚡ &lt; 15ms
+                <span class="hub-glance-pill" id="hubGlanceLatencyPill" title="Live Network Ping Latency" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #38bdf8; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">
+                  <span id="hubGlanceLatency">⚡ 12ms</span>
                 </span>
                 <span class="hub-glance-pill" title="Local Storage Used" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #34d399; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;" id="hubGlanceStorage">
                   💾 20 MB
@@ -12697,7 +12697,7 @@ function renderHtml(
             <button type="button" class="sovereign-hub-tab-btn" id="hubBtnCreator" onclick="switchSovereignHubTab('creatorModeCard', this)">
               <span>🎬</span> <span>Creator Tools</span>
             </button>
-            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnSafety" onclick="openSafetyCenterModal()">
+            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnSafety" onclick="switchSovereignHubTab('privacySettingsCard', this)">
               <span>🛡️</span> <span>Privacy &amp; Safety</span>
             </button>
             <button type="button" class="sovereign-hub-tab-btn" id="hubBtnDisplay" onclick="switchSovereignHubTab('uiDisplayModeCard', this)">
@@ -12794,11 +12794,11 @@ function renderHtml(
               <div id="creatorCardTelemetryBlock">
                 <div class="key-val">
                   <span class="key-label">Media Delivery Network</span>
-                  <span class="key-data" id="creatorSeedingTelemetry" style="color: #38bdf8; font-size: 0.8rem;">${isCreatorModeActive ? 'High-Speed Streaming Active (50 MB/s)' : 'Standard Delivery'}</span>
+                  <span class="key-data" id="creatorSeedingTelemetry" style="color: #38bdf8; font-size: 0.8rem;">${isCreatorModeActive ? 'BitSwap P2P Seeding Active' : 'Standard Delivery'}</span>
                 </div>
                 <div class="key-val">
                   <span class="key-label">Fan Tipping &amp; Monetization</span>
-                  <span class="key-data" id="creatorTippingTelemetry" style="color: #34d399; font-size: 0.8rem;">${isCreatorModeActive ? 'Enabled &bull; Keep 95% of Earnings' : 'Viewer Mode (Tipping Allowed)'}</span>
+                  <span class="key-data" id="creatorTippingTelemetry" style="color: #34d399; font-size: 0.8rem;">${isCreatorModeActive ? 'P2P Micro-tips (95% Creator Split)' : 'Viewer Mode (Tipping Allowed)'}</span>
                 </div>
               </div>
             </div>
@@ -12944,7 +12944,51 @@ function renderHtml(
             </div>
           </div>
 
-          <!-- Card 6: Sovereign Wallet in Settings -->
+          <!-- Card 6: Privacy & Safety Inline Controls -->
+          <div class="card profile-telemetry-card" id="privacySettingsCard" style="display: none;">
+            <div>
+              <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+                <span style="display: flex; align-items: center; gap: 7px; font-weight: 700;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #34d399;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <span>Privacy &amp; Safety Controls</span>
+                </span>
+                <span class="badge" id="privacyHubStatusBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.72rem;">● Double Ratchet E2EE</span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.4;">
+                Control who can discover your node on the mesh, initiate E2EE direct chats, and view your sovereign dispatches.
+              </div>
+              
+              <!-- Quick Toggles -->
+              <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem;">
+                <div class="toggle-row" style="background: rgba(255,255,255,0.03); padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+                  <div>
+                    <div style="font-weight: 700; font-size: 0.85rem; color: #f1f5f9;">Ghost Mode (Stealth Mesh)</div>
+                    <div style="font-size: 0.72rem; color: #94a3b8;" id="privacyGhostStatusText">Hide presence beacon from nearby BLE/Wi-Fi peers</div>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="privacyGhostToggle" onchange="toggleGhostMode(event)">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+
+                <div class="toggle-row" style="background: rgba(255,255,255,0.03); padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+                  <div>
+                    <div style="font-weight: 700; font-size: 0.85rem; color: #f1f5f9;">Direct E2EE Chat Requests</div>
+                    <div style="font-size: 0.72rem; color: #94a3b8;">Accept Double Ratchet message handshakes</div>
+                  </div>
+                  <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.72rem; padding: 2px 7px;">All Peers</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer-actions">
+              <button type="button" class="btn-card-action" onclick="openSafetyCenterModal()" style="background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8; width: 100%; justify-content: center;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span>🛡️ Advanced Safety Center &amp; Blocked List</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 7: Sovereign Wallet in Settings -->
           <div class="card profile-telemetry-card" id="walletSettingsCard" style="display: none;">
             <div>
               <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
@@ -23197,7 +23241,14 @@ function renderHtml(
       const badge = document.getElementById('meEd25519Badge');
       const checkmark = document.getElementById('meVerifiedCheckmark');
       const badgeBtn = document.getElementById('meVerifiedBadgeBtn');
+      const cardBadge = document.getElementById('meCardCryptoBadge');
       if (badge) badge.innerText = 'Testing WebCrypto Enclave...';
+      if (cardBadge) {
+        cardBadge.innerText = 'Testing Enclave...';
+        cardBadge.style.color = '#fbbf24';
+        cardBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        cardBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+      }
       if (badgeBtn) {
         badgeBtn.style.borderColor = 'rgba(245, 158, 11, 0.4)';
         badgeBtn.style.color = '#f59e0b';
@@ -23214,6 +23265,12 @@ function renderHtml(
       if (localProof && localProof.ok) {
         if (badge) {
           badge.innerText = 'Verified';
+        }
+        if (cardBadge) {
+          cardBadge.innerHTML = '✓ Enclave Verified (' + localProof.durationMs + 'ms)';
+          cardBadge.style.color = '#34d399';
+          cardBadge.style.borderColor = 'rgba(52, 211, 153, 0.4)';
+          cardBadge.style.background = 'rgba(16, 185, 129, 0.15)';
         }
         if (badgeBtn) {
           badgeBtn.title = 'Cryptographically Verified Sovereign DID — Enclave (' + localProof.durationMs + 'ms)';
@@ -23235,6 +23292,12 @@ function renderHtml(
         .then(function(res) {
           if (res && res.ok && res.verified) {
             if (badge) badge.innerText = 'Verified';
+            if (cardBadge) {
+              cardBadge.innerHTML = '✓ Node Verified';
+              cardBadge.style.color = '#38bdf8';
+              cardBadge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+              cardBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+            }
             if (badgeBtn) {
               badgeBtn.style.borderColor = 'rgba(56, 189, 248, 0.35)';
               badgeBtn.style.color = '#38bdf8';
@@ -23243,6 +23306,12 @@ function renderHtml(
             if (profile) profile.isVerified = true;
           } else {
             if (badge) badge.innerText = 'Unverified DID';
+            if (cardBadge) {
+              cardBadge.innerText = '⚠ Unverified DID';
+              cardBadge.style.color = '#ef4444';
+              cardBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+              cardBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+            }
             if (badgeBtn) {
               badgeBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
               badgeBtn.style.color = '#ef4444';
@@ -23252,6 +23321,11 @@ function renderHtml(
         })
         .catch(function(err) {
           if (badge) badge.innerText = 'Ed25519 (Offline)';
+          if (cardBadge) {
+            cardBadge.innerText = 'Ed25519 (Offline)';
+            cardBadge.style.color = '#94a3b8';
+            cardBadge.style.borderColor = 'rgba(148, 163, 184, 0.3)';
+          }
           if (badgeBtn) {
             badgeBtn.style.borderColor = 'rgba(148, 163, 184, 0.3)';
             badgeBtn.style.color = '#94a3b8';
@@ -23541,6 +23615,12 @@ function renderHtml(
         const dKey = myProfile.devicePublicKeyHex || myProfile.deviceKey || myProfile.did || '${masterKey.did}';
         cardDeviceKey.innerText = dKey;
         cardDeviceKey.dataset.fullValue = dKey;
+      }
+
+      const cardTransport = document.getElementById('meCardTransport');
+      if (cardTransport) {
+        const cipherName = (window.crypto && window.crypto.subtle) ? 'Noise_XX (ChaCha20-Poly1305) • WebCrypto Active' : 'Noise_XX P2P (Local E2EE)';
+        cardTransport.innerHTML = '<span style="color: #34d399; font-weight: 600;">● ' + cipherName + '</span>';
       }
 
       if (typeof refreshComposerAuthorSelect === 'function') {
@@ -25720,6 +25800,31 @@ function renderHtml(
         } else {
           menuIcon.innerText = '🟢';
           menuText.innerText = 'Appear Offline (Ghost Mode)';
+        }
+      }
+
+      const ghostToggle = document.getElementById('privacyGhostToggle');
+      const ghostStatusText = document.getElementById('privacyGhostStatusText');
+      const privacyBadge = document.getElementById('privacyHubStatusBadge');
+      if (ghostToggle) {
+        ghostToggle.checked = isGhost;
+      }
+      if (ghostStatusText) {
+        ghostStatusText.innerText = isGhost
+          ? 'Stealth active: Beacon suppressed, appearing offline'
+          : 'Broadcast active: Discoverable by nearby BLE/Wi-Fi peers';
+      }
+      if (privacyBadge) {
+        if (isGhost) {
+          privacyBadge.innerText = '● Stealth Mesh (Ghost Mode)';
+          privacyBadge.style.color = '#94a3b8';
+          privacyBadge.style.background = 'rgba(148, 163, 184, 0.15)';
+          privacyBadge.style.borderColor = 'rgba(148, 163, 184, 0.3)';
+        } else {
+          privacyBadge.innerText = '● Double Ratchet E2EE Active';
+          privacyBadge.style.color = '#34d399';
+          privacyBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+          privacyBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         }
       }
     }
@@ -28991,14 +29096,54 @@ function renderHtml(
       const statTitleEl = document.getElementById('meFriendsStatTitle');
       if (statTitleEl) statTitleEl.innerText = 'Friends';
 
-      // Query real node status for P2P mesh badge & peer ID
+      // Query real node status for P2P mesh badge & peer ID with live latency measurement
+      const pingStart = performance.now();
       fetch('/api/status')
         .then(function(r) { return r.json(); })
         .then(function(st) {
+          const pingEnd = performance.now();
+          const rtt = Math.max(1, Math.round(pingEnd - pingStart));
+
+          // Live Latency Pill & Telemetry
+          const latencyEl = document.getElementById('hubGlanceLatency');
+          const latencyPill = document.getElementById('hubGlanceLatencyPill');
+          if (latencyEl) latencyEl.innerText = '⚡ ' + rtt + 'ms';
+          if (latencyPill) {
+            if (rtt < 50) {
+              latencyPill.style.color = '#34d399';
+              latencyPill.style.borderColor = 'rgba(52, 211, 153, 0.3)';
+              latencyPill.title = 'Mesh RTT: ' + rtt + 'ms (Excellent Latency)';
+            } else if (rtt < 150) {
+              latencyPill.style.color = '#f59e0b';
+              latencyPill.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+              latencyPill.title = 'Mesh RTT: ' + rtt + 'ms (Good Latency)';
+            } else {
+              latencyPill.style.color = '#ef4444';
+              latencyPill.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+              latencyPill.title = 'Mesh RTT: ' + rtt + 'ms (High Latency)';
+            }
+          }
+
+          const swarmLat = document.getElementById('meSwarmLatencyDisplay');
+          if (swarmLat) swarmLat.innerText = rtt + 'ms (P2P Mesh Round-Trip)';
+
           if (!st || !st.ok) return;
+
+          // Live Status Badge in Sovereign Hub Ribbon
+          const hubStatusBadge = document.getElementById('hubGlanceStatusBadge');
+          const hubStatusText = document.getElementById('hubGlanceStatusText');
+          const hubPulseDot = document.getElementById('hubGlancePulseDot');
+          const peerCount = (st.connectedPeers || []).length;
+          if (hubStatusBadge && hubStatusText && hubPulseDot) {
+            hubStatusBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+            hubStatusBadge.style.color = '#34d399';
+            hubStatusBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            hubPulseDot.style.background = '#10b981';
+            hubStatusText.innerText = peerCount > 0 ? ('Online • ' + peerCount + ' Peers') : 'Online • Secured';
+          }
+
           const meshBadge = document.getElementById('meMeshStatusBadge');
           if (meshBadge) {
-            const peerCount = (st.connectedPeers || []).length;
             if (peerCount > 0) {
               meshBadge.innerHTML = '● Noise_XX Mesh Active (' + peerCount + ' peers)';
               meshBadge.style.color = '#34d399';
@@ -29021,6 +29166,26 @@ function renderHtml(
           }
         })
         .catch(function() {
+          const latencyEl = document.getElementById('hubGlanceLatency');
+          const latencyPill = document.getElementById('hubGlanceLatencyPill');
+          if (latencyEl) latencyEl.innerText = '⚡ Offline';
+          if (latencyPill) {
+            latencyPill.style.color = '#ef4444';
+            latencyPill.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            latencyPill.title = 'Mesh Node Unreachable';
+          }
+
+          const hubStatusBadge = document.getElementById('hubGlanceStatusBadge');
+          const hubStatusText = document.getElementById('hubGlanceStatusText');
+          const hubPulseDot = document.getElementById('hubGlancePulseDot');
+          if (hubStatusBadge && hubStatusText && hubPulseDot) {
+            hubStatusBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+            hubStatusBadge.style.color = '#ef4444';
+            hubStatusBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            hubPulseDot.style.background = '#ef4444';
+            hubStatusText.innerText = 'Node Offline';
+          }
+
           const meshBadge = document.getElementById('meMeshStatusBadge');
           if (meshBadge) {
             meshBadge.innerHTML = '○ Mesh Offline';
@@ -29083,6 +29248,24 @@ function renderHtml(
           const glanceStorage = document.getElementById('hubGlanceStorage');
           if (glanceStorage) {
             glanceStorage.innerText = '💾 ' + formattedStorage;
+          }
+
+          // Dynamic Creator Telemetry: Live pinned assets & disk footprint
+          const creatorSeeding = document.getElementById('creatorSeedingTelemetry');
+          if (creatorSeeding) {
+            const isCreatorOn = document.getElementById('creatorToggle') ? document.getElementById('creatorToggle').checked : false;
+            if (isCreatorOn) {
+              const pinned = m.pinnedCount || 0;
+              creatorSeeding.innerText = 'BitSwap Seeding Active (' + pinned + ' Pinned • ' + formattedStorage + ')';
+            } else {
+              creatorSeeding.innerText = 'Standard Delivery (' + formattedStorage + ')';
+            }
+          }
+
+          const creatorTipping = document.getElementById('creatorTippingTelemetry');
+          if (creatorTipping) {
+            const isCreatorOn = document.getElementById('creatorToggle') ? document.getElementById('creatorToggle').checked : false;
+            creatorTipping.innerText = isCreatorOn ? 'P2P Micro-tips (95% Creator Split)' : 'Viewer Mode (Tipping Allowed)';
           }
 
           const railPeers = document.getElementById('railPeerCount');
@@ -36705,10 +36888,14 @@ function renderHtml(
         }
 
         const seedingEl = document.getElementById('creatorSeedingTelemetry');
-        if (seedingEl) seedingEl.innerText = isAct ? 'High-Speed Streaming Active (50 MB/s)' : 'Standard Delivery';
+        if (seedingEl) {
+          const storageEl = document.getElementById('hubGlanceStorage');
+          const curStorage = storageEl ? storageEl.innerText.replace('💾', '').trim() : 'Active';
+          seedingEl.innerText = isAct ? 'BitSwap Seeding Active (' + curStorage + ')' : 'Standard Delivery (' + curStorage + ')';
+        }
 
         const tippingEl = document.getElementById('creatorTippingTelemetry');
-        if (tippingEl) tippingEl.innerText = isAct ? 'Enabled • Keep 95% of Earnings' : 'Viewer Mode (Tipping Allowed)';
+        if (tippingEl) tippingEl.innerText = isAct ? 'P2P Micro-tips (95% Creator Split)' : 'Viewer Mode (Tipping Allowed)';
 
         const actionBtn = document.getElementById('creatorActionBtnText');
         if (actionBtn) actionBtn.innerText = isAct ? 'Launch Creator Studio' : 'Enable Creator Tools';
