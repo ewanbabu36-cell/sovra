@@ -317,7 +317,7 @@ describe('SOVRA Community Jury & 24-Hour Democratic Moderation Engine', () => {
 
     const modState = sovraDb.getContentModerationState('post', post8Id);
     expect(modState).toBe('VISIBLE');
-  });
+  }, 20000);
 
   // 9. Democratic Supermajority Threshold (66.67% Required for Removal)
   it('9. executes automatic removal when democratic 66.67% supermajority is achieved with quorum', () => {

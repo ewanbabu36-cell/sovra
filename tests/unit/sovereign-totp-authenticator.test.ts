@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sovraDb } from '../../scripts/database-engine.ts';
+import { sovraDb } from '../../scripts/database-engine.js';
 
 describe('Sovereign RFC 6238 TOTP Authenticator & Multi-Factor Security Suite', () => {
   it('generates cryptographic Base32 secrets and calculates valid 6-digit RFC 6238 TOTP codes', () => {

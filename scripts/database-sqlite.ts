@@ -1096,3 +1096,4 @@ export class SqliteSocialDatabaseEngine {
   }
 }
 
+export { SqliteSocialDatabaseEngine as SovraSqliteEngine };

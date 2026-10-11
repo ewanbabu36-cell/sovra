@@ -373,8 +373,9 @@ export interface FeedPostRecord {
   id: string;
   authorDid: string;
   authorName: string;
-  authorAvatar: string;
-  authorAvatarBg: string;
+  authorHandle?: string;
+  authorAvatar?: string;
+  authorAvatarBg?: string;
   authorAvatarDataUrl?: string;
   audioTrack?: string;
   mediaGradient?: string;
@@ -385,7 +386,7 @@ export interface FeedPostRecord {
   isLiked?: boolean;
   isSaved?: boolean;
   caption: string;
-  tags: string;
+  tags?: string;
   timestamp: number;
   comments: PostCommentRecord[];
   mediaImage?: string;
@@ -1195,6 +1196,12 @@ export class SovraDatabaseEngine {
       tablesCount: this.sqliteEngine ? 10 : 1,
       path: this.sqliteEngine ? path.join(this.storageDir, 'sovra-social.sqlite') : this.dbFilePath,
     };
+  }
+
+  public checkpoint(): void {
+    try {
+      this.sqliteEngine?.checkpoint();
+    } catch (_) {}
   }
 
   public getStoragePaths(): { storageDir: string; dbFilePath: string; dbBackupPath: string } {
@@ -2226,12 +2233,16 @@ export class SovraDatabaseEngine {
   // COLLECTION 4: POSTS & COMMENTS
   // ==========================================
 
-  public createPost(post: Omit<FeedPostRecord, 'timestamp' | 'likesCount' | 'likedByDids' | 'comments'> & { id?: string }): FeedPostRecord {
+  public createPost(post: Omit<FeedPostRecord, 'id' | 'timestamp' | 'likesCount' | 'likedByDids' | 'comments'> & { id?: string; caption?: string }): FeedPostRecord {
     this.load();
     const now = Date.now();
     const record: FeedPostRecord = {
       ...post,
       id: post.id || ('feed-' + now),
+      authorAvatar: post.authorAvatar || 'S',
+      authorAvatarBg: post.authorAvatarBg || '#6366f1',
+      caption: post.caption || '',
+      tags: post.tags || '',
       timestamp: now,
       likesCount: 0,
       likedByDids: [],

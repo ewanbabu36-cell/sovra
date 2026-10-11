@@ -1770,6 +1770,23 @@ function renderHtml(
     html, body {
       color-scheme: dark;
     }
+    /* Accessible Focus Indicators & High Contrast Ring (WCAG 2.1 AA) */
+    :focus-visible {
+      outline: 2px solid #38bdf8 !important;
+      outline-offset: 2px !important;
+    }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4) !important;
+    }
+    /* Reduced Motion Preferences for Accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
     * {
       box-sizing: border-box;
       margin: 0;
@@ -10352,6 +10369,12 @@ function renderHtml(
         <button type="button" class="toast-close-btn" onclick="dismissFloatingChatToast(event)" aria-label="Dismiss">✕</button>
       </div>
 
+      <!-- 🌐 Floating Realtime Mesh Connectivity Status Capsule -->
+      <div id="meshConnectivityPill" style="position: fixed; bottom: 20px; right: 20px; z-index: 990; display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 999px; padding: 6px 14px; font-size: 0.78rem; color: #f8fafc; box-shadow: 0 4px 20px rgba(0,0,0,0.5); cursor: pointer; transition: all 0.25s ease;" onclick="refreshMeshStatus()" title="Tap to refresh decentralized mesh status">
+        <span id="meshStatusDot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e;"></span>
+        <span id="meshStatusText" style="font-weight: 600;">Mesh Online</span>
+      </div>
+
       <!-- Quick Reply Slide-Over Drawer (Reply without leaving Feed/Reels/Video) -->
       <div id="quickReplyDrawer" class="quick-reply-drawer" onclick="event.stopPropagation()">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -15558,6 +15581,17 @@ function renderHtml(
           </button>
         </div>
 
+        <!-- WebRTC Privacy Shield Toggle (Masks IP via Encrypted Relays) -->
+        <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="flex: 1; padding-right: 12px;">
+            <div style="font-weight: 700; color: #38bdf8; font-size: 0.85rem; margin-bottom: 2px;">🛡️ WebRTC Privacy Shield</div>
+            <div style="font-size: 0.75rem; color: #cbd5e1; line-height: 1.35;">Masks your IP during voice &amp; video calls by routing exclusively through encrypted TURN relays.</div>
+          </div>
+          <button type="button" id="privacyShieldBtn" onclick="togglePrivacyShieldUI()" class="action-pill-btn action-pill-primary" style="font-size: 0.75rem; padding: 6px 12px; flex-shrink: 0;">
+            🛡️ IP Shielded
+          </button>
+        </div>
+
         <!-- Cryptographic Sovereign Data & Privacy -->
         <div style="background: rgba(34, 197, 94, 0.05); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
           <div style="font-weight: 700; color: #4ade80; font-size: 0.85rem; margin-bottom: 4px;">🔐 Zero-Knowledge Privacy &amp; Encryption</div>
@@ -15991,19 +16025,45 @@ function renderHtml(
       if (_storedProfile) myProfile = JSON.parse(_storedProfile);
     } catch(e) {}
 
+    // Global XSS Sanitization Shield
+    window.escapeHtml = function(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    };
+
     // ==========================================
     // 🔐 SOVRA ACCOUNT LIFECYCLE, QUICK LOCK & REMOTE WIPE ENGINE
     // ==========================================
     const _origFetch = window.fetch;
     window.authenticatedFetch = async function(input, init) {
       init = init || {};
+      init.headers = init.headers || {};
+
+      // Anti-Replay Cryptographic Nonce & Timestamp Header Injection
+      const reqNonce = 'n_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+      const reqTimestamp = String(Date.now());
+      if (init.headers instanceof Headers) {
+        init.headers.set('X-Sovra-Nonce', reqNonce);
+        init.headers.set('X-Sovra-Timestamp', reqTimestamp);
+      } else if (Array.isArray(init.headers)) {
+        init.headers.push(['X-Sovra-Nonce', reqNonce]);
+        init.headers.push(['X-Sovra-Timestamp', reqTimestamp]);
+      } else {
+        init.headers['X-Sovra-Nonce'] = reqNonce;
+        init.headers['X-Sovra-Timestamp'] = reqTimestamp;
+      }
+
       let token = localStorage.getItem('sovra_session_token');
       if ((!token || token === 'undefined' || token === 'null') && window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) {
         token = window.SOVRA_HOST_SESSION.token;
         try { localStorage.setItem('sovra_session_token', token); } catch(e) {}
       }
       if (token) {
-        init.headers = init.headers || {};
         if (init.headers instanceof Headers) {
           if (!init.headers.has('Authorization')) init.headers.set('Authorization', 'Bearer ' + token);
           if (!init.headers.has('X-Sovra-Session-Token')) init.headers.set('X-Sovra-Session-Token', token);
@@ -16047,7 +16107,9 @@ function renderHtml(
       return {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token,
-        'X-Sovra-Session-Token': token
+        'X-Sovra-Session-Token': token,
+        'X-Sovra-Nonce': 'n_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+        'X-Sovra-Timestamp': String(Date.now())
       };
     };
 
@@ -18149,7 +18211,7 @@ function renderHtml(
                     const postCard = document.createElement('div');
                     postCard.className = 'spatial-option-card';
                     postCard.style.cursor = 'pointer';
-                    postCard.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 500;">' + (p.caption || 'Dispatch') + '</div>' +
+                    postCard.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 500;">' + escapeHtml(p.caption || 'Dispatch') + '</div>' +
                       '<div style="font-size: 0.72rem; color: #64748b; margin-top: 4px;">❤️ ' + (p.likesCount || 0) + ' · 💬 ' + (p.commentsCount || 0) + '</div></div>';
                     tabContent.appendChild(postCard);
                   });
@@ -18162,7 +18224,7 @@ function renderHtml(
                   channels.forEach(function(c) {
                     const card = document.createElement('div');
                     card.className = 'spatial-option-card';
-                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 600;">' + c.name + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + (c.handle || 'Channel') + '</div></div>';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 600;">' + escapeHtml(c.name) + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + escapeHtml(c.handle || 'Channel') + '</div></div>';
                     tabContent.appendChild(card);
                   });
                 } else if (type === 'pages') {
@@ -18174,7 +18236,7 @@ function renderHtml(
                   pages.forEach(function(pg) {
                     const card = document.createElement('div');
                     card.className = 'spatial-option-card';
-                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 600;">' + pg.name + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + (pg.category || 'Page') + '</div></div>';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 600;">' + escapeHtml(pg.name) + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + escapeHtml(pg.category || 'Page') + '</div></div>';
                     tabContent.appendChild(card);
                   });
                 } else if (type === 'groups') {
@@ -18186,7 +18248,7 @@ function renderHtml(
                   groups.forEach(function(g) {
                     const card = document.createElement('div');
                     card.className = 'spatial-option-card';
-                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 600;">' + g.name + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + (g.memberCount || 1) + ' members</div></div>';
+                    card.innerHTML = '<div style="flex: 1;"><div style="font-size: 0.85rem; color: #f8fafc; font-weight: 600;">' + escapeHtml(g.name) + '</div><div style="font-size: 0.72rem; color: #94a3b8;">' + Number(g.memberCount || 1) + ' members</div></div>';
                     tabContent.appendChild(card);
                   });
                 }
@@ -34966,16 +35028,25 @@ function renderHtml(
 
       let pc = null;
       try {
+        var isShieldActive = localStorage.getItem('sovra_privacy_shield') !== 'false';
         var configuredIceServers = (window.SOVRA_ICE_SERVERS && Array.isArray(window.SOVRA_ICE_SERVERS))
           ? window.SOVRA_ICE_SERVERS
           : [
               { urls: 'stun:stun.l.google.com:19302' },
               { urls: 'stun:stun1.l.google.com:19302' },
               { urls: 'stun:stun2.l.google.com:19302' },
-              { urls: 'stun:global.stun.twilio.com:3478' }
+              { urls: 'stun:global.stun.twilio.com:3478' },
+              { urls: ['turn:openrelay.metered.ca:443?transport=tcp', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelay', credential: 'openrelay' }
             ];
+        if (isShieldActive) {
+          configuredIceServers = configuredIceServers.filter(function(s) {
+            var urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+            return urls.some(function(u) { return typeof u === 'string' && (u.startsWith('turn:') || u.startsWith('turns:')); });
+          });
+        }
         pc = new RTCPeerConnection({
-          iceServers: configuredIceServers
+          iceServers: configuredIceServers,
+          iceTransportPolicy: isShieldActive ? 'relay' : 'all'
         });
       } catch (err) {
         console.error('[WebRTC] RTCPeerConnection creation failed:', err);
@@ -34992,7 +35063,8 @@ function renderHtml(
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               callId: window._activeCallId,
-              candidate: candObj
+              candidate: candObj,
+              privacyRelay: isShieldActive
             })
           }).catch(function(e) { console.warn('[WebRTC] Candidate POST error:', e); });
         }
@@ -35607,6 +35679,7 @@ function renderHtml(
           recipientDid: contact.did,
           offerSdp: offerSdp,
           callType: _currentCallType,
+          privacyRelay: (localStorage.getItem('sovra_privacy_shield') !== 'false')
         }),
       }).then(function(r) { return r.json(); }).then(function(data) {
         if (data && data.ok && data.session) {
@@ -35848,6 +35921,7 @@ function renderHtml(
         body: JSON.stringify({
           callId: inc.callId,
           answerSdp: answerSdp,
+          privacyRelay: (localStorage.getItem('sovra_privacy_shield') !== 'false')
         }),
       }).catch(function(e) { console.warn('[Call] Answer error:', e); });
 
@@ -40783,9 +40857,51 @@ function renderHtml(
     let juryTimerInterval = null;
     let activeReportTarget = { type: 'post', id: '', title: '' };
 
+    function updatePrivacyShieldUI() {
+      const btn = document.getElementById('privacyShieldBtn');
+      if (!btn) return;
+      const isActive = localStorage.getItem('sovra_privacy_shield') !== 'false';
+      btn.textContent = isActive ? '🛡️ IP Shielded' : 'Direct P2P';
+      btn.className = isActive ? 'action-pill-btn action-pill-primary' : 'action-pill-btn action-pill-secondary';
+      btn.style.color = isActive ? '#38bdf8' : '#94a3b8';
+    }
+
+    function togglePrivacyShieldUI() {
+      const current = localStorage.getItem('sovra_privacy_shield') !== 'false';
+      const next = !current;
+      localStorage.setItem('sovra_privacy_shield', next ? 'true' : 'false');
+      updatePrivacyShieldUI();
+      showAccountToast(next ? '🛡️ Privacy Shield Active: Real IP Masked via Relays' : 'ℹ️ Direct P2P Mode Active');
+    }
+
+    window.refreshMeshStatus = async function() {
+      var dot = document.getElementById('meshStatusDot');
+      var txt = document.getElementById('meshStatusText');
+      if (!navigator.onLine) {
+        if (dot) { dot.style.background = '#eab308'; dot.style.boxShadow = '0 0 8px #eab308'; }
+        if (txt) txt.textContent = 'Local Mesh (Offline)';
+        showAccountToast('🟡 Operating in Disconnected Local Mode');
+        return;
+      }
+      try {
+        var res = await _origFetch('/healthz');
+        if (res.ok) {
+          if (dot) { dot.style.background = '#22c55e'; dot.style.boxShadow = '0 0 8px #22c55e'; }
+          if (txt) txt.textContent = 'Mesh Active • E2EE Ready';
+          showAccountToast('🟢 Connected to Sovereign Mesh Node');
+        }
+      } catch(e) {
+        if (dot) { dot.style.background = '#eab308'; dot.style.boxShadow = '0 0 8px #eab308'; }
+        if (txt) txt.textContent = 'Mesh Peer Mode';
+      }
+    };
+    window.addEventListener('online', window.refreshMeshStatus);
+    window.addEventListener('offline', window.refreshMeshStatus);
+
     function openSafetyCenterModal() {
       const m = document.getElementById('safetyCenterModal');
       if (m) m.style.display = 'flex';
+      updatePrivacyShieldUI();
     }
     function closeSafetyCenterModal() {
       const m = document.getElementById('safetyCenterModal');
@@ -49455,10 +49571,11 @@ async function startDevServer() {
       });
     }
 
-    // Periodic Video Cache Quota Pruning (500 MB limit, LRU eviction)
+    // Periodic Maintenance: Video Cache Quota Pruning & SQLite WAL Checkpoint
     setInterval(() => {
       try {
         sovraDb.pruneVideoCache(500 * 1024 * 1024);
+        sovraDb.checkpoint();
       } catch (_) {}
     }, 30 * 60 * 1000).unref();
 

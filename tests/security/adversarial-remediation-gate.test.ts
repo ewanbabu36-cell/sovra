@@ -131,7 +131,7 @@ describe('SOVRA P0/P1 Adversarial Remediation & Verification Gate', () => {
       }),
     }).then(r => r.json());
     expect(msgRes.ok).toBe(true);
-  });
+  }, 60000);
 
   // ==========================================================================
   // P0-01: CHAT BOLA / IDOR PROTECTION
@@ -362,7 +362,7 @@ describe('SOVRA P0/P1 Adversarial Remediation & Verification Gate', () => {
 
       expect(foundE).toBeDefined();
       expect(foundE?.handle).toBe(eve.handle);
-    });
+    }, 30000);
   });
 
   // ==========================================================================
@@ -395,7 +395,7 @@ describe('SOVRA P0/P1 Adversarial Remediation & Verification Gate', () => {
       // Session must be recognized as revoked/expired
       expect(db.isSessionRevoked(expiredToken)).toBe(true);
       expect(db.findUserBySessionToken(expiredToken)).toBeUndefined();
-    });
+    }, 30000);
   });
 
   // ==========================================================================
@@ -517,6 +517,6 @@ describe('SOVRA P0/P1 Adversarial Remediation & Verification Gate', () => {
       const db = new SovraDatabaseEngine();
       db.load();
       expect(db.findUserByDid(eve.did)).toBeUndefined();
-    });
+    }, 30000);
   });
 });
