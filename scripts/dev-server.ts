@@ -8261,35 +8261,56 @@ function renderHtml(
       animation: statusBlink 2s infinite ease-in-out;
     }
 
+    /* Hero Layout: Identity on Left + Social Stats in Empty Space on Right */
+    .profile-hero-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin-bottom: 0.85rem;
+      flex-wrap: wrap;
+    }
+    .profile-identity-col {
+      flex: 1 1 240px;
+      min-width: 0;
+    }
+    .profile-stats-col {
+      flex: 1 1 440px;
+      min-width: 0;
+      display: flex;
+      justify-content: flex-end;
+    }
+
     /* Production-Grade Social Stats 4-Card Grid */
     .profile-stats-row {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 0.85rem;
-      margin: 1.25rem 0;
+      gap: 0.65rem;
+      margin: 0;
       padding: 0;
       border: none;
       text-align: left;
       width: 100%;
+      max-width: 550px;
       box-sizing: border-box;
     }
     .profile-stat-box {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 0.45rem;
+      gap: 0.35rem;
       background: rgba(30, 41, 59, 0.45);
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 14px;
-      padding: 0.95rem 1rem;
+      padding: 0.75rem 0.85rem;
       box-sizing: border-box;
       position: relative;
       overflow: hidden;
       cursor: pointer;
       user-select: none;
       transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-      min-height: 98px;
+      min-height: 84px;
     }
     .profile-stat-box::before {
       content: '';
@@ -8851,6 +8872,22 @@ function renderHtml(
       .profile-info-body {
         padding: 0.75rem 1rem 1.25rem 1rem;
         text-align: center;
+      }
+      .profile-hero-row {
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        gap: 0.85rem !important;
+      }
+      .profile-identity-col {
+        width: 100% !important;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .profile-stats-col {
+        width: 100% !important;
+        justify-content: center !important;
       }
       .profile-name-row {
         justify-content: center !important;
@@ -12464,22 +12501,83 @@ function renderHtml(
 
           <!-- Profile Details Body -->
           <div class="profile-info-body">
-            <div class="profile-name-row">
-              <span id="meProfileName">—</span>
-              <button id="meVerifiedBadgeBtn" onclick="openSovereignIdCardModal()" class="authoritative-verified-badge" aria-label="Cryptographically Verified Sovereign DID — Click to inspect identity proof" title="Cryptographically Verified Sovereign DID — Click to inspect identity proof">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-                <span id="meEd25519Badge">Verified</span>
-                <span id="meVerifiedCheckmark" style="color: #38bdf8; font-weight: 700; margin-left: 1px;">✓</span>
-              </button>
-              <span id="meRoleBadge" style="display: none;">Sovereign Peer</span>
+            <div class="profile-hero-row">
+              <!-- Left: User Identity Column -->
+              <div class="profile-identity-col">
+                <div class="profile-name-row">
+                  <span id="meProfileName">—</span>
+                  <button id="meVerifiedBadgeBtn" onclick="openSovereignIdCardModal()" class="authoritative-verified-badge" aria-label="Cryptographically Verified Sovereign DID — Click to inspect identity proof" title="Cryptographically Verified Sovereign DID — Click to inspect identity proof">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                    <span id="meEd25519Badge">Verified</span>
+                    <span id="meVerifiedCheckmark" style="color: #38bdf8; font-weight: 700; margin-left: 1px;">✓</span>
+                  </button>
+                  <span id="meRoleBadge" style="display: none;">Sovereign Peer</span>
+                </div>
+                <div class="profile-handle" id="meProfileHandle">— &bull; Sovereign Citizen</div>
+                
+                <div class="profile-did-badge" id="meProfileDidChip" role="button" tabindex="0" onclick="copyProfileDid()" onkeydown="if(event.key==='Enter'||event.key===' ')copyProfileDid()" aria-label="Copy Decentralized Identifier" title="Click to copy full Decentralized Identifier">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; color: #818cf8;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                  <span class="did-chip-prefix">DID:</span>
+                  <span id="meProfileDid" data-full-did="${masterKey.did || ''}">${masterKey.did ? (masterKey.did.length > 20 ? (masterKey.did.slice(0, 12) + '...' + masterKey.did.slice(-4)) : masterKey.did) : 'did:key:z6Mk...EFDD'}</span>
+                  <span id="copyProfileDidBtn" class="did-chip-copy-icon" style="display: inline-flex; align-items: center; margin-left: 2px;" title="Copy to clipboard"><svg id="copyDidIcon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span>
+                </div>
+              </div>
+
+              <!-- Right: Shifted Social Stats Row (Smart & Beautiful in Empty Space) -->
+              <div class="profile-stats-col">
+                <div class="profile-stats-row">
+                  <div class="profile-stat-box stat-box-posts" onclick="viewMyFeedPosts()" title="Click to view published posts" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyFeedPosts()" aria-label="View Feed Posts">
+                    <div class="stat-top-row">
+                      <span class="stat-category-title">Posts</span>
+                      <span class="stat-icon-wrap" style="color: #818cf8;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </span>
+                    </div>
+                    <div class="stat-number" id="meFeedPostsCount">—</div>
+                    <div class="stat-subtext">Published</div>
+                  </div>
+
+                  <div class="profile-stat-box stat-box-friends" onclick="viewMyProfileFriends()" title="Click to view friends" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyProfileFriends()" aria-label="View Friends">
+                    <div class="stat-top-row">
+                      <span class="stat-category-title" id="meFriendsStatTitle">Friends</span>
+                      <span class="stat-icon-wrap" style="color: #38bdf8;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      </span>
+                    </div>
+                    <div class="stat-number" id="meFriendsCount" style="color: #38bdf8;">—</div>
+                    <div class="stat-subtext">Connected</div>
+                  </div>
+
+                  <div class="profile-stat-box stat-box-followers" onclick="openSocialConnectionsModal('followers')" title="Click to view followers" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openSocialConnectionsModal('followers')" aria-label="View Followers">
+                    <div class="stat-top-row">
+                      <span class="stat-category-title">Followers</span>
+                      <span class="stat-icon-wrap" style="color: #34d399;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7.5" r="4"/><line x1="20" x2="20" y1="8" y2="14"/><line x1="23" x2="17" y1="11" y2="11"/></svg>
+                      </span>
+                    </div>
+                    <div class="stat-number" id="meFollowersCount">—</div>
+                    <div class="stat-subtext">Followers</div>
+                  </div>
+
+                  <div class="profile-stat-box stat-box-following" onclick="openSocialConnectionsModal('following')" title="Click to view following" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openSocialConnectionsModal('following')" aria-label="View Following">
+                    <div class="stat-top-row">
+                      <span class="stat-category-title">Following</span>
+                      <span class="stat-icon-wrap" style="color: #c084fc;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                      </span>
+                    </div>
+                    <div class="stat-number" id="meFollowingCount">—</div>
+                    <div class="stat-subtext">Following</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="profile-handle" id="meProfileHandle">— &bull; Sovereign Citizen</div>
-            
-            <div class="profile-did-badge" id="meProfileDidChip" role="button" tabindex="0" onclick="copyProfileDid()" onkeydown="if(event.key==='Enter'||event.key===' ')copyProfileDid()" aria-label="Copy Decentralized Identifier" title="Click to copy full Decentralized Identifier">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; color: #818cf8;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-              <span class="did-chip-prefix">DID:</span>
-              <span id="meProfileDid" data-full-did="${masterKey.did || ''}">${masterKey.did ? (masterKey.did.length > 20 ? (masterKey.did.slice(0, 12) + '...' + masterKey.did.slice(-4)) : masterKey.did) : 'did:key:z6Mk...EFDD'}</span>
-              <span id="copyProfileDidBtn" class="did-chip-copy-icon" style="display: inline-flex; align-items: center; margin-left: 2px;" title="Copy to clipboard"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span>
+
+            <div id="meProfileWebsiteRow" style="font-size: 0.84rem; margin-bottom: 0.75rem; display: none;">
+              <a id="meProfileWebsiteLink" href="#" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                <span id="meProfileWebsiteText">website</span>
+              </a>
             </div>
 
             <!-- Modernized Glassmorphic Profile Bio Container -->
@@ -12506,60 +12604,6 @@ function renderHtml(
                 <span class="bio-pill-badge" style="color: #a5b4fc; border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.1);" title="Creator and media publishing enabled">
                   <span>🎬 Creator</span>
                 </span>
-              </div>
-            </div>
-
-            <div id="meProfileWebsiteRow" style="font-size: 0.84rem; margin-bottom: 0.75rem; display: none;">
-              <a id="meProfileWebsiteLink" href="#" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-                <span id="meProfileWebsiteText">website</span>
-              </a>
-            </div>
-
-            <!-- Standardized 4-Column Social Stats Grid Cards -->
-            <div class="profile-stats-row">
-              <div class="profile-stat-box stat-box-posts" onclick="viewMyFeedPosts()" title="Click to view published posts" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyFeedPosts()" aria-label="View Feed Posts">
-                <div class="stat-top-row">
-                  <span class="stat-category-title">Posts</span>
-                  <span class="stat-icon-wrap" style="color: #818cf8;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  </span>
-                </div>
-                <div class="stat-number" id="meFeedPostsCount">—</div>
-                <div class="stat-subtext">Published</div>
-              </div>
-
-              <div class="profile-stat-box stat-box-friends" onclick="viewMyProfileFriends()" title="Click to view friends" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyProfileFriends()" aria-label="View Friends">
-                <div class="stat-top-row">
-                  <span class="stat-category-title" id="meFriendsStatTitle">Friends</span>
-                  <span class="stat-icon-wrap" style="color: #38bdf8;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  </span>
-                </div>
-                <div class="stat-number" id="meFriendsCount" style="color: #38bdf8;">—</div>
-                <div class="stat-subtext">Connected</div>
-              </div>
-
-              <div class="profile-stat-box stat-box-followers" onclick="openSocialConnectionsModal('followers')" title="Click to view followers" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openSocialConnectionsModal('followers')" aria-label="View Followers">
-                <div class="stat-top-row">
-                  <span class="stat-category-title">Followers</span>
-                  <span class="stat-icon-wrap" style="color: #34d399;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" x2="20" y1="8" y2="14"/><line x1="23" x2="17" y1="11" y2="11"/></svg>
-                  </span>
-                </div>
-                <div class="stat-number" id="meFollowersCount">—</div>
-                <div class="stat-subtext">Followers</div>
-              </div>
-
-              <div class="profile-stat-box stat-box-following" onclick="openSocialConnectionsModal('following')" title="Click to view following" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openSocialConnectionsModal('following')" aria-label="View Following">
-                <div class="stat-top-row">
-                  <span class="stat-category-title">Following</span>
-                  <span class="stat-icon-wrap" style="color: #c084fc;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
-                  </span>
-                </div>
-                <div class="stat-number" id="meFollowingCount">—</div>
-                <div class="stat-subtext">Following</div>
               </div>
             </div>
           </div>
@@ -22758,9 +22802,10 @@ function renderHtml(
 
       if (localProof && localProof.ok) {
         if (badge) {
-          badge.innerText = 'Enclave Verified (' + localProof.durationMs + 'ms)';
+          badge.innerText = 'Verified';
         }
         if (badgeBtn) {
+          badgeBtn.title = 'Cryptographically Verified Sovereign DID — Enclave (' + localProof.durationMs + 'ms)';
           badgeBtn.style.borderColor = 'rgba(52, 211, 153, 0.4)';
           badgeBtn.style.color = '#34d399';
         }
@@ -22778,7 +22823,7 @@ function renderHtml(
         .then(function(r) { return r.json(); })
         .then(function(res) {
           if (res && res.ok && res.verified) {
-            if (badge) badge.innerText = 'Ed25519 Verified';
+            if (badge) badge.innerText = 'Verified';
             if (badgeBtn) {
               badgeBtn.style.borderColor = 'rgba(56, 189, 248, 0.35)';
               badgeBtn.style.color = '#38bdf8';

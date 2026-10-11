@@ -91,10 +91,10 @@ describe('Phase 3: Profile Card Refinement Production E2E Suite', () => {
       expect(statsRowMatch).toBeTruthy();
       const statsRow = statsRowMatch![1];
 
-      // Social stats: Feed Posts, Mutual Friends, Followers, Following
-      expect(statsRow).toContain('Feed Posts');
+      // Social stats: Posts, Friends, Followers, Following
+      expect(statsRow).toMatch(/Posts/);
       expect(statsRow).toContain('id="meFeedPostsCount"');
-      expect(statsRow).toContain('Mutual Friends');
+      expect(statsRow).toMatch(/Friends/);
       expect(statsRow).toContain('id="meFriendsCount"');
       expect(statsRow).toContain('Followers');
       expect(statsRow).toContain('id="meFollowersCount"');
@@ -107,7 +107,7 @@ describe('Phase 3: Profile Card Refinement Production E2E Suite', () => {
       expect(statsRow).not.toContain('id="meBlocksCount"');
 
       // Disk storage is in Node Diagnostics & Telemetry card
-      const diagnosticsCardMatch = serverHtml.match(/<div class="card profile-telemetry-card" id="nodeDiagnosticsCard">([\s\S]*?)<\/div>\s*<\/div>/);
+      const diagnosticsCardMatch = serverHtml.match(/<div class="card profile-telemetry-card" id="nodeDiagnosticsCard"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/);
       expect(diagnosticsCardMatch).toBeTruthy();
       const diagnosticsCard = diagnosticsCardMatch![1];
 
