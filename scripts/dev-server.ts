@@ -64,6 +64,11 @@ import { SearchWorker, type IndexedDocument } from '../services/search/dist/inde
 import { ModerationWorker } from '../services/moderation-worker/dist/index.js';
 import { TranscoderWorker } from '../services/transcoder/dist/index.js';
 import { renderAdminHtml, renderAdminLoginHtml } from './admin-console.ts';
+import { handlePushRoutes } from './routes/push.routes.ts';
+import { handleFeedDiscoveryRoutes } from './routes/feed.routes.ts';
+import { handleCallSignalingRoutes } from './routes/call.routes.ts';
+import { handleChatRoutes } from './routes/chat.routes.ts';
+import { handleVideoRoutes } from './routes/video.routes.ts';
 import {
   sovraDb,
   toPublicUserDTO,
@@ -1661,8 +1666,22 @@ export function getIceServers(userDid?: string): RTCIceServerConfig[] {
   const staticUsername = process.env.WEBRTC_TURN_USERNAME || process.env.SOVRA_TURN_USERNAME;
   const staticCredential = process.env.WEBRTC_TURN_CREDENTIAL || process.env.SOVRA_TURN_CREDENTIAL;
 
+  // Resilient multi-transport community TURN relays (TCP 443 bypasses strict CGNAT and corporate firewalls)
+  const defaultTurnServers: RTCIceServerConfig[] = [
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp',
+        'turns:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelay',
+      credential: 'openrelay'
+    }
+  ];
+
   if (!turnServersEnv) {
-    return stunServers;
+    return [...stunServers, ...defaultTurnServers];
   }
 
   const turnUrls = turnServersEnv.split(',').map(s => s.trim()).filter(Boolean);
@@ -2133,7 +2152,6 @@ function renderHtml(
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
       gap: 0.5rem;
       margin-top: 0.5rem;
       padding-top: 0.65rem;
@@ -2143,7 +2161,14 @@ function renderHtml(
       display: flex;
       align-items: center;
       gap: 0.35rem;
-      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .composer-right-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-left: auto;
+      flex-shrink: 0;
     }
     .composer-media-btn {
       display: inline-flex;
@@ -10601,11 +10626,7 @@ function renderHtml(
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                     <span class="media-btn-label">Photo</span>
                   </button>
-                  <button type="button" class="composer-media-btn" id="composerAddVideoBtn" title="Add Video Reel" onclick="document.getElementById('realFeedVideoInput').click();">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
-                    <span class="media-btn-label">Reel</span>
-                  </button>
-                  <button type="button" class="composer-media-btn" id="composerAddStudioBtn" title="Upload Video or Short" onclick="openVideoUploadModal();">
+                  <button type="button" class="composer-media-btn" id="composerAddVideoBtn" title="Add Video" onclick="document.getElementById('realFeedVideoInput').click();">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ef4444;"><polygon points="23 7 16 12 23 17 23 7"/><rect width="14" height="14" x="1" y="5" rx="2" ry="2"/></svg>
                     <span class="media-btn-label">Video</span>
                   </button>
@@ -10642,14 +10663,14 @@ function renderHtml(
                       </button>
                     </div>
                   </div>
+                </div>
+
+                <div class="composer-right-actions">
                   <select id="dynamicPostTheme" class="composer-theme-select" title="Target Audience">
                     <option value="mesh">Public Feed</option>
                     <option value="dag">Friends Circle</option>
                     <option value="creator">Creator Exclusive</option>
                   </select>
-                </div>
-
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
                   <input id="dynamicPostTags" type="hidden" value="#sovra #community" />
                   <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" class="composer-publish-btn">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -15332,12 +15353,16 @@ function renderHtml(
           <!-- Channel / Persona Selection -->
           <div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-              <label class="social-modal-label" style="margin: 0;">Publish As (Channel / Profile)</label>
+              <label class="social-modal-label" style="margin: 0;">Publish As (Channel / Page / Profile)</label>
               <button type="button" onclick="closeVideoUploadModal(); switchTab('me'); setTimeout(function(){ openCreateChannelModal(); }, 350);" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; text-decoration: underline; font-weight: 600;">+ Create Channel in Studio</button>
             </div>
-            <select id="videoUploadChannelSelect" class="social-modal-input">
-              <option value="personal">👤 Personal Profile</option>
+            <select id="videoUploadChannelSelect" class="social-modal-input" onchange="updateVideoUploadTargetPill()">
+              <option value="personal:self">👤 Personal Profile</option>
             </select>
+            <div id="videoUploadTargetPill" style="margin-top: 6px; padding: 6px 10px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; font-size: 0.76rem; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+              <span>🎯 Destination:</span>
+              <span id="videoUploadTargetPillLabel" style="font-weight: 700;">👤 Personal Profile</span>
+            </div>
           </div>
 
           <!-- Sovereign Monetization & Access Controls -->
@@ -31374,10 +31399,26 @@ function renderHtml(
       if (counterEl) counterEl.innerText = (currentReelIndex + 1) + ' / ' + reelsData.length;
 
       const avatarEl = document.getElementById('reelCreatorAvatar');
-      if (avatarEl) avatarEl.innerText = r.creatorHandle[0].toUpperCase();
+      if (avatarEl) {
+        if (r.entityType === 'channel') {
+          avatarEl.innerText = '📢';
+        } else if (r.entityType === 'page') {
+          avatarEl.innerText = '🏢';
+        } else {
+          avatarEl.innerText = (r.creatorHandle ? r.creatorHandle[0] : 'Y').toUpperCase();
+        }
+      }
 
       const handleEl = document.getElementById('reelCreatorHandle');
-      if (handleEl) handleEl.innerText = '@' + r.creatorHandle;
+      if (handleEl) {
+        if (r.entityType === 'channel') {
+          handleEl.innerText = '📢 ' + (r.creatorName || ('@' + r.creatorHandle));
+        } else if (r.entityType === 'page') {
+          handleEl.innerText = '🏢 ' + (r.creatorName || ('@' + r.creatorHandle));
+        } else {
+          handleEl.innerText = '@' + r.creatorHandle;
+        }
+      }
 
       const captionEl = document.getElementById('reelCaption');
       if (captionEl) captionEl.innerText = r.caption;
@@ -31457,11 +31498,19 @@ function renderHtml(
       const avatarFollowBadge = document.getElementById('reelAvatarFollowBadge');
       const isFollowing = followedCreatorsSet.has(r.creatorHandle);
       if (followBtn) {
-        followBtn.innerText = isFollowing ? 'Following' : 'Follow';
-        followBtn.style.background = isFollowing ? 'rgba(255, 255, 255, 0.2)' : '#0095f6';
+        if (r.entityType === 'channel') {
+          followBtn.innerText = isFollowing ? 'Subscribed' : 'Subscribe';
+          followBtn.style.background = isFollowing ? 'rgba(56, 189, 248, 0.2)' : '#38bdf8';
+        } else if (r.entityType === 'page') {
+          followBtn.innerText = 'Page';
+          followBtn.style.background = 'rgba(192, 132, 252, 0.25)';
+        } else {
+          followBtn.innerText = isFollowing ? 'Following' : 'Follow';
+          followBtn.style.background = isFollowing ? 'rgba(255, 255, 255, 0.2)' : '#0095f6';
+        }
       }
       if (avatarFollowBadge) {
-        avatarFollowBadge.style.display = isFollowing ? 'none' : 'flex';
+        avatarFollowBadge.style.display = (isFollowing || r.entityType === 'page') ? 'none' : 'flex';
       }
 
       // Pre-warm status
@@ -31706,6 +31755,9 @@ function renderHtml(
     function toggleReelFollow() {
       const r = reelsData[currentReelIndex];
       if (!r) return;
+      if (r.entityType === 'page') {
+        return;
+      }
       const handle = r.creatorHandle;
       const isFollowing = followedCreatorsSet.has(handle);
       const btn = document.getElementById('reelFollowBtn');
@@ -31714,15 +31766,25 @@ function renderHtml(
       if (isFollowing) {
         followedCreatorsSet.delete(handle);
         if (btn) {
-          btn.innerText = 'Follow';
-          btn.style.background = '#0095f6';
+          if (r.entityType === 'channel') {
+            btn.innerText = 'Subscribe';
+            btn.style.background = '#38bdf8';
+          } else {
+            btn.innerText = 'Follow';
+            btn.style.background = '#0095f6';
+          }
         }
         if (badge) badge.style.display = 'flex';
       } else {
         followedCreatorsSet.add(handle);
         if (btn) {
-          btn.innerText = 'Following';
-          btn.style.background = 'rgba(255, 255, 255, 0.2)';
+          if (r.entityType === 'channel') {
+            btn.innerText = 'Subscribed';
+            btn.style.background = 'rgba(56, 189, 248, 0.2)';
+          } else {
+            btn.innerText = 'Following';
+            btn.style.background = 'rgba(255, 255, 255, 0.2)';
+          }
         }
         if (badge) badge.style.display = 'none';
       }
@@ -39253,22 +39315,69 @@ function renderHtml(
       }
     }
 
-    function openVideoUploadModal() {
+    function updateVideoUploadTargetPill() {
+      const sel = document.getElementById('videoUploadChannelSelect');
+      const pillLabel = document.getElementById('videoUploadTargetPillLabel');
+      if (!sel || !pillLabel) return;
+      const val = sel.value || 'personal:self';
+      if (val.startsWith('channel:')) {
+        const cId = val.replace('channel:', '');
+        const ch = (typeof allChannelsData !== 'undefined' ? allChannelsData : []).find(function(c) { return c.id === cId; });
+        pillLabel.innerText = '📢 Channel: ' + (ch ? ch.name : cId);
+      } else if (val.startsWith('page:')) {
+        const pId = val.replace('page:', '');
+        const pg = (typeof allPagesData !== 'undefined' ? allPagesData : []).find(function(p) { return p.id === pId; });
+        pillLabel.innerText = '🏢 Page: ' + (pg ? pg.name : pId);
+      } else {
+        const myName = (myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Profile';
+        pillLabel.innerText = '👤 Personal Profile: ' + myName;
+      }
+    }
+
+    function openVideoUploadModal(targetType, targetId) {
       const m = document.getElementById('videoUploadModal');
       if (m) {
         m.style.display = 'flex';
         setVideoUploadStep(1);
 
-        // Populate channels
+        // Populate destination select with optgroups: Personal, Sovereign Channels, Sovereign Pages
         const sel = document.getElementById('videoUploadChannelSelect');
         if (sel) {
           const myName = (myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Profile';
-          let opts = '<option value="personal">👤 ' + myName + '</option>';
+          let opts = '<optgroup label="👤 Personal Identity">';
+          opts += '<option value="personal:self">👤 ' + myName + ' (Personal Profile)</option>';
+          opts += '</optgroup>';
+
           const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
-          for (let i = 0; i < channels.length; i++) {
-            opts += '<option value="' + channels[i].id + '">📢 ' + channels[i].name + ' (' + channels[i].handle + ')</option>';
+          if (channels.length > 0) {
+            opts += '<optgroup label="📢 Sovereign Channels">';
+            for (let i = 0; i < channels.length; i++) {
+              opts += '<option value="channel:' + channels[i].id + '">📢 ' + channels[i].name + ' (' + channels[i].handle + ')</option>';
+            }
+            opts += '</optgroup>';
           }
+
+          const pages = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+          if (pages.length > 0) {
+            opts += '<optgroup label="🏢 Sovereign Pages">';
+            for (let j = 0; j < pages.length; j++) {
+              opts += '<option value="page:' + pages[j].id + '">🏢 ' + pages[j].name + ' (' + pages[j].handle + ')</option>';
+            }
+            opts += '</optgroup>';
+          }
+
           sel.innerHTML = opts;
+
+          if (targetType === 'channel' && targetId) {
+            sel.value = 'channel:' + targetId;
+          } else if (targetType === 'page' && targetId) {
+            sel.value = 'page:' + targetId;
+          } else if (targetType === 'personal') {
+            sel.value = 'personal:self';
+          } else {
+            sel.value = 'personal:self';
+          }
+          updateVideoUploadTargetPill();
         }
 
         // Populate related long videos
@@ -39447,15 +39556,39 @@ function renderHtml(
         publishBtn.innerText = 'Publishing to P2P Mesh... ⏳';
       }
 
-      // Resolve author name & handle
+      // Resolve author name, handle, entityType, and entityId
       const chanSelect = document.getElementById('videoUploadChannelSelect');
-      const chanVal = chanSelect ? chanSelect.value : 'personal';
+      const chanVal = chanSelect ? chanSelect.value : 'personal:self';
       let authorName = (myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Sovereign Creator';
       let authorHandle = (myProfile && myProfile.handle) ? myProfile.handle : '@creator';
+      let entityType = 'personal';
+      let entityId = undefined;
 
-      if (chanVal !== 'personal' && typeof allChannelsData !== 'undefined') {
+      if (chanVal.startsWith('channel:')) {
+        entityType = 'channel';
+        entityId = chanVal.replace('channel:', '');
+        if (typeof allChannelsData !== 'undefined') {
+          const matched = allChannelsData.find(function(c) { return c.id === entityId; });
+          if (matched) {
+            authorName = matched.name;
+            authorHandle = matched.handle;
+          }
+        }
+      } else if (chanVal.startsWith('page:')) {
+        entityType = 'page';
+        entityId = chanVal.replace('page:', '');
+        if (typeof allPagesData !== 'undefined') {
+          const matchedPg = allPagesData.find(function(p) { return p.id === entityId; });
+          if (matchedPg) {
+            authorName = matchedPg.name;
+            authorHandle = matchedPg.handle;
+          }
+        }
+      } else if (chanVal !== 'personal' && chanVal !== 'personal:self' && typeof allChannelsData !== 'undefined') {
         const matched = allChannelsData.find(function(c) { return c.id === chanVal; });
         if (matched) {
+          entityType = 'channel';
+          entityId = matched.id;
           authorName = matched.name;
           authorHandle = matched.handle;
         }
@@ -39495,6 +39628,8 @@ function renderHtml(
             paywallFee: paywallFee,
             tippingEnabled: isTippingEnabled,
             audioTrack: audioTrack || ('Original Audio - ' + authorHandle),
+            entityType: entityType,
+            entityId: entityId,
             isShort: true
           };
 
@@ -39534,6 +39669,8 @@ function renderHtml(
             visibility: visibility,
             relatedVideoId: relatedVideoId,
             paywallFee: paywallFee,
+            entityType: entityType,
+            entityId: entityId,
             monetization: { tippingEnabled: isTippingEnabled, creatorSplitPercent: 95 }
           };
 
@@ -39634,6 +39771,7 @@ function renderHtml(
         '<div style="display: flex; gap: 8px; align-items: center; margin-top: 0.6rem; flex-wrap: wrap;">' +
           '<button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="padding: 7px 15px; font-size: 0.78rem; border-radius: 9px; background: rgba(56, 189, 248, 0.22); border: 1px solid rgba(56, 189, 248, 0.5); color: #38bdf8; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">📢 + Create Channel</button>' +
           '<button type="button" class="btn btn-secondary" onclick="openCreatePageModal()" style="padding: 7px 15px; font-size: 0.78rem; border-radius: 9px; background: rgba(192, 132, 252, 0.18); border: 1px solid rgba(192, 132, 252, 0.45); color: #c084fc; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">🏢 + Create Page</button>' +
+          '<button type="button" class="btn btn-primary" onclick="openVideoUploadModal()" style="padding: 7px 15px; font-size: 0.78rem; border-radius: 9px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(244, 63, 94, 0.32)); border: 1px solid rgba(239, 68, 68, 0.5); color: #fecdd3; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">🎬 + Pro Studio Video Upload</button>' +
         '</div>' +
         '</div>';
 
@@ -39647,6 +39785,7 @@ function renderHtml(
           '<div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">' +
             '<button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 600; cursor: pointer;">+ Create Channel</button>' +
             '<button type="button" class="btn btn-secondary" onclick="openCreatePageModal()" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(192, 132, 252, 0.15); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; font-weight: 600; cursor: pointer;">+ Create Page</button>' +
+            '<button type="button" class="btn btn-secondary" onclick="openVideoUploadModal()" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; font-weight: 600; cursor: pointer;">🎬 + Pro Video Upload</button>' +
             '<button type="button" class="btn btn-secondary" onclick="openOmniSearch(); switchSearchTab(&apos;channels&apos;);" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #cbd5e1; font-weight: 600; cursor: pointer;">🌐 Explore Public Channels (' + allCh.length + ')</button>' +
           '</div>' +
         '</div>';
@@ -39679,6 +39818,7 @@ function renderHtml(
           '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; flex-wrap: wrap; gap: 6px;">' +
             '<div style="font-size: 0.72rem; color: #64748b;">📢 1-to-many broadcast channel &bull; Zero censorship</div>' +
             '<div style="display: flex; gap: 6px; align-items: center;">' +
+              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-weight: 600; cursor: pointer;" data-entity-type="channel" data-entity-id="' + c.id + '" onclick="openVideoUploadModal(this.dataset.entityType, this.dataset.entityId)">🎬 + Upload Video</button>' +
               '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openSpatialChannelManageSurface(this.dataset.channelId, this)">⚙️ Studio</button>' +
               '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 600; cursor: pointer;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">📢 Broadcast</button>' +
               '<button type="button" class="btn btn-primary" style="padding: 4px 12px; font-size: 0.74rem; border-radius: 8px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #f1f5f9; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">Room</button>' +
@@ -39712,6 +39852,7 @@ function renderHtml(
           '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; flex-wrap: wrap; gap: 6px;">' +
             '<div style="font-size: 0.72rem; color: #64748b;">🏢 Official Verified Page &bull; ' + (p.count ? p.count.toLocaleString() : '1') + ' followers</div>' +
             '<div style="display: flex; gap: 6px; align-items: center;">' +
+              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-weight: 600; cursor: pointer;" data-entity-type="page" data-entity-id="' + p.id + '" onclick="openVideoUploadModal(this.dataset.entityType, this.dataset.entityId)">🎬 + Upload Video</button>' +
               '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; cursor: pointer;" data-page-id="' + p.id + '" onclick="openPublicPageShowcase(this.dataset.pageId)">👁️ Showcase</button>' +
               '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; cursor: pointer;" data-page-id="' + p.id + '" onclick="openSpatialPageManageSurface(this.dataset.pageId, this)">⚙️ Studio</button>' +
               (isCurrentActive
@@ -43202,106 +43343,10 @@ async function startDevServer() {
       return;
     }
 
-    // API: Real Dynamic Trending Hashtags
-    if (url.pathname === '/api/feed/trending' && req.method === 'GET') {
-      const posts = sovraDb.getAllPosts();
-      const reels = sovraDb.getAllReels();
-      const tagCounts = new Map<string, number>();
-
-      const extractTags = (text?: string) => {
-        if (!text) return;
-        const matches = text.match(/#[\w\u0590-\u05ff]+/gi);
-        if (matches) {
-          matches.forEach(t => {
-            const clean = t.toLowerCase();
-            tagCounts.set(clean, (tagCounts.get(clean) || 0) + 1);
-          });
-        }
-      };
-
-      posts.forEach(p => {
-        extractTags(p.tags);
-        extractTags(p.caption);
-      });
-
-      reels.forEach(r => {
-        if (Array.isArray(r.tags)) {
-          r.tags.forEach(t => extractTags(t));
-        }
-        extractTags(r.caption);
-      });
-
-      const baseline = [
-        { tag: '#sovra', count: 12 + posts.length, category: 'Protocol' },
-        { tag: '#p2p', count: 9 + posts.length, category: 'Networking' },
-        { tag: '#zeroalgorithms', count: 7, category: 'Privacy' },
-        { tag: '#merkledag', count: 5, category: 'Storage' },
-      ];
-
-      const dynamicList: { tag: string; count: number; category: string }[] = [];
-      tagCounts.forEach((count, tag) => {
-        dynamicList.push({
-          tag,
-          count: count * 150 + 120,
-          category: 'Trending',
-        });
-      });
-
-      for (const base of baseline) {
-        if (!tagCounts.has(base.tag.toLowerCase())) {
-          dynamicList.push({
-            tag: base.tag,
-            count: base.count * 100,
-            category: base.category,
-          });
-        }
-      }
-
-      dynamicList.sort((a, b) => b.count - a.count);
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, trending: dynamicList.slice(0, 5) }));
-      return;
-    }
-
-    // API: Dynamic Feed List (Enforcing Visibility & Privacy)
-    if ((url.pathname === '/api/feed/list' || url.pathname === '/api/feed/posts') && req.method === 'GET') {
-      const principal = resolvePrincipal(req);
-      const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : undefined;
-      const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : undefined;
-      let posts = sovraDb.getFeedPosts(principal?.did);
-      if (typeof offset === 'number' && !isNaN(offset) && offset > 0) {
-        posts = posts.slice(offset);
-      }
-      if (typeof limit === 'number' && !isNaN(limit) && limit > 0) {
-        posts = posts.slice(0, limit);
-      }
-      res.writeHead(200, {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-      });
-      res.end(JSON.stringify({ ok: true, posts, count: posts.length }));
-      return;
-    }
-
-    // API: Get Single Post with Authorization Check
-    if (url.pathname === '/api/feed/get' && req.method === 'GET') {
-      const postId = url.searchParams.get('id') || url.searchParams.get('postId');
-      if (!postId) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'postId parameter required' }));
-        return;
-      }
-      const principal = resolvePrincipal(req);
-      const result = sovraDb.getPost(postId, principal?.did);
-      if (!result.ok) {
-        const isForbidden = result.error?.includes('Forbidden');
-        res.writeHead(isForbidden ? 403 : 404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: result.error }));
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, post: result.post }));
+    // ==========================================
+    // 📰 FEED & CONTENT DISCOVERY API (MODULAR CONTROLLER)
+    // ==========================================
+    if (handleFeedDiscoveryRoutes({ req, res, url, resolvePrincipal })) {
       return;
     }
 
@@ -45509,254 +45554,19 @@ async function startDevServer() {
     }
 
     // ==========================================
-    // API: INSTAGRAM REELS
+    // 🎬 SOVEREIGN REELS & VIDEO API (MODULAR CONTROLLER)
     // ==========================================
-    if (url.pathname === '/api/reels/list' && req.method === 'GET') {
-      const allReels = sovraDb.getAllReels();
-      const reels = allReels.map(r => ({
-        ...r,
-        title: r.caption || 'Reel',
-        likes: r.likesCount,
-      }));
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, reels }));
-      return;
-    }
-
-    if (url.pathname === '/api/reels/create' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 25 * 1024 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        let cid = '';
-        let videoUrl: string | undefined;
-        let videoPath: string | undefined;
-        let mimeType = parsed.mimeType || 'video/mp4';
-
-        const rawVideo = parsed.videoData || parsed.mediaBase64 || parsed.content;
-        if (rawVideo) {
-          let base64Data = String(rawVideo);
-          const commaIdx = base64Data.indexOf(',');
-          if (commaIdx !== -1) {
-            const header = base64Data.substring(0, commaIdx);
-            const match = header.match(/data:([^;]+);base64/);
-            if (match) mimeType = match[1];
-            base64Data = base64Data.substring(commaIdx + 1);
-          }
-          const buffer = Buffer.from(base64Data, 'base64');
-          const hash = crypto.createHash('sha256').update(buffer).digest('hex');
-          cid = 'bafy' + hash.substring(0, 32);
-
-          if (!fs.existsSync(REELS_DIR)) {
-            fs.mkdirSync(REELS_DIR, { recursive: true });
-          }
-
-          const ext = mimeType.includes('webm') ? 'webm' : (mimeType.includes('quicktime') || mimeType.includes('mov') ? 'mov' : 'mp4');
-          const fileName = `${cid}.${ext}`;
-          const filePath = path.join(REELS_DIR, fileName);
-          fs.writeFileSync(filePath, buffer);
-
-          videoPath = filePath;
-          videoUrl = `/api/reels/video/${cid}`;
-
-          try {
-            await storageDaemon.putBlock(cid, buffer);
-          } catch {}
-        } else {
-          cid = 'bafy' + crypto.randomBytes(16).toString('hex');
-        }
-
-        let tags = parsed.tags;
-        if (typeof tags === 'string') {
-          tags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
-        }
-        if (!Array.isArray(tags) || tags.length === 0) {
-          tags = ['#sovra', '#p2p', '#reels'];
-        }
-
-        const newReel = sovraDb.createReel({
-          creatorDid: principal.did,
-          creatorHandle: String(parsed.creatorHandle || 'you_peer').replace('@', ''),
-          creatorName: String(parsed.creatorName || 'You (Sovereign)'),
-          creatorAvatar: parsed.creatorAvatar ? String(parsed.creatorAvatar) : undefined,
-          caption: String(parsed.caption || 'Decentralized Sovereign Reel'),
-          shortHeader: parsed.shortHeader ? String(parsed.shortHeader) : undefined,
-          summary: parsed.summary ? String(parsed.summary) : undefined,
-          description: parsed.description ? String(parsed.description) : undefined,
-          relatedVideoId: parsed.relatedVideoId ? String(parsed.relatedVideoId) : undefined,
-          paywallFee: typeof parsed.paywallFee === 'number' ? parsed.paywallFee : 0,
-          tippingEnabled: parsed.tippingEnabled !== false,
-          tags,
-          audioTrack: parsed.audioTrack ? String(parsed.audioTrack) : undefined,
-          cid,
-          videoUrl,
-          videoPath,
-          videoMimeType: mimeType,
-        });
-
-        reelsStore = sovraDb.getAllReels();
-
-        try {
-          await node.pubsub.publish('sovra/reels/new', new TextEncoder().encode(JSON.stringify({ type: 'new_reel', reel: newReel })));
-        } catch {}
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, reel: newReel }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname.startsWith('/api/reels/video') && req.method === 'GET') {
-      let cid = url.searchParams.get('cid') || '';
-      if (!cid) {
-        const parts = url.pathname.split('/');
-        cid = parts[parts.length - 1] || '';
-      }
-      if (cid.includes('.')) {
-        cid = cid.split('.')[0];
-      }
-
-      if (!cid) {
-        res.writeHead(400, { 'Content-Type': 'text/plain' });
-        res.end('Missing CID');
-        return;
-      }
-
-      let foundFilePath = '';
-      let foundMimeType = 'video/mp4';
-      if (fs.existsSync(REELS_DIR)) {
-        const files = fs.readdirSync(REELS_DIR);
-        const target = files.find(f => f.startsWith(cid));
-        if (target) {
-          foundFilePath = path.join(REELS_DIR, target);
-          if (target.endsWith('.webm')) foundMimeType = 'video/webm';
-          else if (target.endsWith('.mov')) foundMimeType = 'video/quicktime';
-          else foundMimeType = 'video/mp4';
-        }
-      }
-
-      if (!foundFilePath) {
-        try {
-          const blk = await storageDaemon.getBlock(cid);
-          if (blk) {
-            res.writeHead(200, {
-              'Content-Type': 'video/mp4',
-              'Content-Length': blk.length,
-              'Accept-Ranges': 'bytes',
-            });
-            res.end(blk);
-            return;
-          }
-        } catch {}
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Video not found');
-        return;
-      }
-
-      const stat = fs.statSync(foundFilePath);
-      const fileSize = stat.size;
-      const range = req.headers.range;
-
-      if (range) {
-        const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        if (start >= fileSize) {
-          res.writeHead(416, {
-            'Content-Range': `bytes */${fileSize}`,
-          });
-          res.end();
-          return;
-        }
-        const chunksize = end - start + 1;
-        res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunksize,
-          'Content-Type': foundMimeType,
-          'Cache-Control': 'public, max-age=3600',
-        });
-        fs.createReadStream(foundFilePath, { start, end }).pipe(res);
-      } else {
-        res.writeHead(200, {
-          'Content-Length': fileSize,
-          'Accept-Ranges': 'bytes',
-          'Content-Type': foundMimeType,
-          'Cache-Control': 'public, max-age=3600',
-        });
-        fs.createReadStream(foundFilePath).pipe(res);
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/reels/like' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const userDid = principal.did;
-        const result = sovraDb.toggleReelLike(parsed.reelId, userDid);
-        if (result) {
-          reelsStore = sovraDb.getAllReels();
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, likes: result.likesCount, likesCount: result.likesCount, isLiked: result.isLiked }));
-        } else {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Reel not found' }));
-        }
-      } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/reels/comments' && req.method === 'GET') {
-      const reelId = url.searchParams.get('reelId') || '';
-      const comments = sovraDb.getReelComments(reelId);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, comments }));
-      return;
-    }
-
-    if (url.pathname === '/api/reels/comment' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        if (!parsed.reelId || !parsed.text) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'reelId and text required' }));
-          return;
-        }
-        const comment = sovraDb.addReelComment(parsed.reelId, {
-          authorDid: principal.did,
-          authorHandle: String(parsed.authorHandle || 'you_peer'),
-          authorName: String(parsed.authorName || 'Verified Peer'),
-          authorAvatar: parsed.authorAvatar ? String(parsed.authorAvatar) : undefined,
-          text: String(parsed.text),
-        });
-        if (comment) {
-          reelsStore = sovraDb.getAllReels();
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, comment }));
-        } else {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Reel not found' }));
-        }
-      } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
-      }
+    if (await handleVideoRoutes({
+      req,
+      res,
+      url,
+      REELS_DIR,
+      storageDaemon,
+      validateMediaMagicBytes,
+      readBoundedBody,
+      resolvePrincipal,
+      enforceAuth,
+    })) {
       return;
     }
 
@@ -46961,629 +46771,22 @@ async function startDevServer() {
       return;
     }
 
-    if ((url.pathname === '/api/chat/contacts' || url.pathname === '/api/chat/conversations') && req.method === 'GET') {
-      const principal = resolvePrincipal(req);
-      if (!principal) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
-        return;
-      }
-      const queryDid = url.searchParams.get('userDid');
-      if (queryDid && queryDid !== principal.did) {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access contacts for another user' }));
-        return;
-      }
-      const userDid = principal.did;
-      const allPeers = sovraDb.getAllPeers(userDid);
-      const allRels = sovraDb.getFriendRelationships(userDid);
-      const friendDids = new Set(
-        allRels.filter(r => r.status === 'accepted').map(r => r.fromDid === userDid ? r.toDid : r.fromDid)
-      );
-      // Strictly scope messages to authenticated caller to prevent disclosure of other users' private messages
-      const allMessages = sovraDb.getState().chatMessages.filter(
-        m => m.senderDid === userDid || m.recipientDid === userDid || m.recipientDid.startsWith('channel:')
-      );
-
-      const contactsWithThreads = allPeers.map(peer => {
-        const isFriend = friendDids.has(peer.did);
-        const threadId = sovraDb.getThreadId(userDid, peer.did);
-        const threadMessages = allMessages.filter(
-          m => m.threadId === threadId || (m.senderDid === peer.did && m.recipientDid === userDid) || (m.senderDid === userDid && m.recipientDid === peer.did)
-        );
-
-        const lastMsg = threadMessages.length > 0 ? threadMessages[threadMessages.length - 1] : null;
-        const unreadCount = threadMessages.filter(
-          m => m.senderDid === peer.did && (m.recipientDid === userDid || m.recipientDid === 'self') && m.status !== 'read'
-        ).length;
-
-        let lastMessageText = peer.role || (isFriend ? 'Friend on Mesh' : 'Ready to chat');
-        if (lastMsg) {
-          if (lastMsg.isDisappeared) {
-            lastMessageText = '💨 Message disappeared';
-          } else if (lastMsg.isAudio) {
-            lastMessageText = '🎙️ Voice note (' + (lastMsg.audioDurationSec || 0).toFixed(1) + 's)';
-          } else {
-            lastMessageText = lastMsg.text;
-          }
-        }
-
-        return {
-          ...peer,
-          isFriend,
-          isOnline: peer.isOnline !== false,
-          role: isFriend ? (peer.role || 'Friend on Mesh') : peer.role,
-          lastMessage: lastMessageText,
-          lastMessageTimestamp: lastMsg ? lastMsg.timestamp : (peer.lastSeenTimestamp || 0),
-          lastMessageStatus: lastMsg ? lastMsg.status : null,
-          lastMessageIsOutgoing: lastMsg ? (lastMsg.senderDid === userDid || lastMsg.senderDid === 'self') : false,
-          unreadCount,
-        };
-      });
-
-      contactsWithThreads.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, contacts: contactsWithThreads, conversations: contactsWithThreads }));
-      return;
-    }
-
-    if ((url.pathname === '/api/chat/messages' || url.pathname === '/api/chat/history') && req.method === 'GET') {
-      const principal = resolvePrincipal(req);
-      if (!principal) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
-        return;
-      }
-      const queryDid = url.searchParams.get('userDid');
-      if (queryDid && queryDid !== principal.did) {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access messages for another user' }));
-        return;
-      }
-      const userDid = principal.did;
-      const since = Number(url.searchParams.get('since') || 0);
-      const targetThreadId = url.searchParams.get('threadId') || undefined;
-      let messages = sovraDb.getState().chatMessages;
-      if (since > 0) {
-        messages = messages.filter(m => (m.timestamp || 0) > since);
-      }
-      // Strictly scope to principal or verified caller DID
-      messages = messages.filter(
-        m => m.recipientDid.startsWith('channel:') || m.senderDid === userDid || m.recipientDid === userDid
-      );
-      if (targetThreadId) {
-        messages = messages.filter(m => m.threadId === targetThreadId);
-      }
-      const targetContactDid = url.searchParams.get('contactDid') || url.searchParams.get('recipientDid');
-      if (targetContactDid) {
-        messages = messages.filter(
-          m => (m.senderDid === userDid && m.recipientDid === targetContactDid) ||
-               (m.senderDid === targetContactDid && m.recipientDid === userDid) ||
-               (targetContactDid.startsWith('channel:') && (m.threadId === targetContactDid || m.recipientDid === targetContactDid))
-        );
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, messages }));
-      return;
-    }
-
-    if ((url.pathname === '/api/chat/send' || url.pathname === '/api/chat/messages') && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 10 * 1024 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const recipientDid = String(parsed.recipientDid || parsed.recipient || '');
-        if (recipientDid && !recipientDid.startsWith('channel:')) {
-          if (sovraDb.isBlocked(principal.did, recipientDid)) {
-            res.writeHead(403, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot send message: recipient is blocked or has blocked you' }));
-            return;
-          }
-          const recipientUser = sovraDb.findUserByDid(recipientDid);
-          if (recipientUser?.privacySettings) {
-            const canMsg = recipientUser.privacySettings.canMessageMe;
-            if (canMsg === 'none') {
-              res.writeHead(403, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ ok: false, error: 'Recipient does not accept direct messages' }));
-              return;
-            }
-            if (canMsg === 'friends' && !sovraDb.areFriends(principal.did, recipientDid)) {
-              res.writeHead(403, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ ok: false, error: 'Recipient only accepts direct messages from friends' }));
-              return;
-            }
-          }
-        }
-
-        if (!parsed.text && !parsed.isAudio && !parsed.attachment) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Message text, audio or attachment required' }));
-          return;
-        }
-
-        let validAttachment: ChatAttachmentRecord | undefined = undefined;
-        if (parsed.attachment && typeof parsed.attachment === 'object') {
-          const rawName = String(parsed.attachment.name || 'file');
-          const safeName = path.basename(rawName).replace(/["'\r\n\0]/g, '_') || 'file';
-          let mimeType = String(parsed.attachment.type || 'application/octet-stream').toLowerCase();
-          let dataUrl = typeof parsed.attachment.dataUrl === 'string' ? parsed.attachment.dataUrl : '';
-          let size = Number(parsed.attachment.size || 0);
-          let fileBuffer: Buffer | null = null;
-
-          if (dataUrl && dataUrl.includes('base64,')) {
-            const commaIdx = dataUrl.indexOf(',');
-            const base64Data = dataUrl.slice(commaIdx + 1);
-            fileBuffer = Buffer.from(base64Data, 'base64');
-            if (!size) size = fileBuffer.length;
-          }
-
-          if (fileBuffer && fileBuffer.length > 0) {
-            const cidObj = CID.create('raw', fileBuffer, false, 'sha2-256');
-            const realCid = cidObj.toString('base32');
-            const storedFileName = `${realCid}_${safeName}`;
-            const storedPath = path.join(ATTACHMENTS_DIR, storedFileName);
-            fs.writeFileSync(storedPath, fileBuffer);
-
-            if (storageDaemon && storageDaemon.blockstore) {
-              try { await storageDaemon.blockstore.put(cidObj, fileBuffer); } catch (_) {}
-            }
-
-            validAttachment = {
-              name: safeName,
-              type: mimeType,
-              size,
-              dataUrl,
-              cid: realCid,
-              url: `/api/chat/attachment/${realCid}?name=${encodeURIComponent(safeName)}`,
-            };
-          } else if (parsed.attachment.cid) {
-            validAttachment = {
-              name: safeName,
-              type: mimeType,
-              size,
-              dataUrl,
-              cid: String(parsed.attachment.cid),
-              url: `/api/chat/attachment/${parsed.attachment.cid}?name=${encodeURIComponent(safeName)}`,
-            };
-          } else if (dataUrl) {
-            validAttachment = {
-              name: safeName,
-              type: mimeType,
-              size,
-              dataUrl,
-            };
-          }
-        }
-
-        const isE2EE = Boolean(parsed.isE2EE);
-        const record = sovraDb.appendMessage({
-          id: parsed.id,
-          senderDid: principal.did,
-          recipientDid: String(parsed.recipientDid || parsed.recipient || 'channel:local_mesh'),
-          senderName: String(parsed.senderName || 'Peer'),
-          text: isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : String(parsed.text || ''),
-          attachment: validAttachment,
-          isAudio: Boolean(parsed.isAudio),
-          audioDurationSec: Number(parsed.audioDurationSec || 0),
-          waveformBars: Array.isArray(parsed.waveformBars) ? parsed.waveformBars : undefined,
-          status: 'sent',
-          signatureHex: String(parsed.signatureHex || ''),
-          isE2EE: isE2EE,
-          ciphertextHex: String(parsed.ciphertextHex || ''),
-          ivHex: String(parsed.ivHex || ''),
-          tagHex: String(parsed.tagHex || ''),
-          disappearingDurationSec: Number(parsed.disappearingDurationSec || 0),
-          isBitChat: Boolean(parsed.isBitChat),
-          hopCount: Number(parsed.hopCount || 1),
-          route: Array.isArray(parsed.route) ? parsed.route : undefined,
-        });
-
-        if (record && record.recipientDid && !record.recipientDid.startsWith('channel:')) {
-          const senderUser = sovraDb.findUserByDid(principal.did);
-          const sName = record.senderName || senderUser?.displayName || senderUser?.handle || 'Peer';
-          const sHandle = record.senderHandle || senderUser?.handle || '@peer';
-          const notifBody = record.isE2EE
-            ? '🔒 End-to-End Encrypted Message'
-            : (record.isAudio
-              ? '🎤 Voice note'
-              : (record.attachment ? `📎 ${record.attachment.name}` : (record.text.slice(0, 50) || 'Message')));
-
-          sovraDb.addNotification({
-            recipientDid: record.recipientDid,
-            senderDid: principal.did,
-            senderHandle: sHandle,
-            senderName: sName,
-            type: 'message',
-            title: `Message from ${sName}`,
-            body: notifBody,
-            link: '/app',
-            data: {
-              messageId: record.id,
-              threadId: record.threadId,
-              senderDid: principal.did,
-              senderName: sName,
-              senderHandle: sHandle,
-            },
-          });
-
-          // Deliver message instantly to active realtime SSE subscriber
-          broadcastChatEvent(record.recipientDid, record);
-        } else if (record && record.recipientDid && record.recipientDid.startsWith('channel:')) {
-          broadcastChatEvent(record.recipientDid, record);
-        }
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, message: record }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/chat/disappearing' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const peer = sovraDb.getState().contacts_and_peers.find(x => x.did === parsed.peerDid);
-        if (peer) {
-          peer.disappearingDurationSec = Number(parsed.durationSec || 0);
-          sovraDb.save();
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, peerDid: peer.did, disappearingDurationSec: peer.disappearingDurationSec }));
-        } else {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Contact not found' }));
-        }
-      } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/chat/reaction' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const msg = sovraDb.getState().chatMessages.find(x => x.id === parsed.messageId);
-        if (msg) {
-          if (!msg.reactions) msg.reactions = [];
-          const userDid = principal.did;
-          const existingIdx = msg.reactions.findIndex(r => r.senderDid === userDid);
-          if (existingIdx >= 0) {
-            if (msg.reactions[existingIdx].emoji === parsed.emoji) {
-              msg.reactions.splice(existingIdx, 1);
-            } else {
-              msg.reactions[existingIdx].emoji = parsed.emoji;
-            }
-          } else {
-            msg.reactions.push({ emoji: parsed.emoji, senderDid: userDid });
-          }
-          sovraDb.save();
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, reactions: msg.reactions }));
-        } else {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Message not found' }));
-        }
-      } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if ((url.pathname === '/api/chat/delete' || url.pathname === '/api/chat/message/delete' || url.pathname === '/api/chat/messages') && (req.method === 'POST' || req.method === 'DELETE')) {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        let parsed: any = {};
-        if (body && body.trim()) {
-          try { parsed = JSON.parse(body); } catch (_) {}
-        }
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const queryMsgId = url.searchParams.get('messageId') || url.searchParams.get('id');
-        const msgId = String(parsed.messageId || parsed.id || queryMsgId || '');
-        if (!msgId) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'messageId required' }));
-          return;
-        }
-        const delRes = sovraDb.deleteChatMessage(msgId, principal.did);
-        if (!delRes.ok) {
-          const status = delRes.error?.includes('Forbidden') || delRes.error?.includes('Unauthorized') ? 403 : 404;
-          res.writeHead(status, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: delRes.error }));
-          return;
-        }
-        if (delRes.deletedMessage) {
-          broadcastChatEvent(delRes.deletedMessage.recipientDid, { type: 'chat_delete', messageId: msgId, threadId: delRes.deletedMessage.threadId }, 'chat_delete');
-        }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, deletedId: msgId }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid request' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/chat/receipt' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const status = parsed.status === 'read' ? 'read' : 'delivered';
-        const messageIds: string[] = Array.isArray(parsed.messageIds)
-          ? parsed.messageIds
-          : (parsed.messageId ? [String(parsed.messageId)] : []);
-
-        if (messageIds.length === 0) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'messageId or messageIds array required' }));
-          return;
-        }
-
-        const updatedCount = sovraDb.updateMessagesReceipt(messageIds, status);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, updatedCount, status, messageIds }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
     // ==========================================
-    // API: CHAT ATTACHMENTS (UPLOAD & STREAMING)
+    // 💬 SOVEREIGN CHAT, E2EE MESSAGING & OFFLINE MAILBOX (MODULAR CONTROLLER)
     // ==========================================
-    if (url.pathname === '/api/chat/attachment/upload' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 25 * 1024 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const rawData = parsed.dataUrl || parsed.base64 || parsed.content;
-        if (!rawData || typeof rawData !== 'string') {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'File dataUrl is required' }));
-          return;
-        }
-
-        const commaIdx = rawData.indexOf(',');
-        const base64Data = commaIdx >= 0 ? rawData.slice(commaIdx + 1) : rawData;
-        const fileBuffer = Buffer.from(base64Data, 'base64');
-        const rawName = String(parsed.name || 'file');
-        const safeName = path.basename(rawName).replace(/["'\r\n\0]/g, '_') || 'file';
-        const mimeType = String(parsed.type || 'application/octet-stream').toLowerCase();
-
-        // Reject dangerous executables
-        const hex4 = fileBuffer.subarray(0, 4).toString('hex').toLowerCase();
-        const hex8 = fileBuffer.length >= 8 ? fileBuffer.subarray(0, 8).toString('hex').toLowerCase() : '';
-        if (hex4.startsWith('4d5a') || hex8.startsWith('7f454c46')) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Disallowed executable attachment format' }));
-          return;
-        }
-
-        if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) {
-          const magicCheck = validateMediaMagicBytes(fileBuffer, mimeType);
-          if (!magicCheck.valid) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: `Invalid media attachment: ${magicCheck.error || 'Magic byte signature mismatch'}` }));
-            return;
-          }
-        }
-
-        const cidObj = CID.create('raw', fileBuffer, false, 'sha2-256');
-        const cid = cidObj.toString('base32');
-        const storedPath = path.join(ATTACHMENTS_DIR, `${cid}_${safeName}`);
-        fs.writeFileSync(storedPath, fileBuffer);
-
-        if (storageDaemon && storageDaemon.blockstore) {
-          try { await storageDaemon.blockstore.put(cidObj, fileBuffer); } catch (_) {}
-        }
-
-        const attachment = {
-          name: safeName,
-          type: mimeType,
-          size: fileBuffer.length,
-          cid,
-          url: `/api/chat/attachment/${cid}?name=${encodeURIComponent(safeName)}`,
-          dataUrl: rawData,
-        };
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, attachment }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname.startsWith('/api/chat/attachment/') && req.method === 'GET') {
-      const cidOrId = path.basename(url.pathname);
-      if (!cidOrId || cidOrId.includes('..') || cidOrId.includes('/') || cidOrId.includes('\\')) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid attachment identifier' }));
-        return;
-      }
-
-      // Authentication check
-      const principal = resolvePrincipal(req);
-      if (!principal) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to access attachment' }));
-        return;
-      }
-
-      // Authorization: Find matching messages in sovraDb
-      const allMessages = sovraDb.getState().chatMessages;
-      const matchingMessages = allMessages.filter(m => 
-        m.attachment?.cid === cidOrId ||
-        m.id === cidOrId ||
-        (m.attachment?.url && m.attachment.url.includes(cidOrId))
-      );
-      const matchingMsg = matchingMessages[matchingMessages.length - 1];
-
-      if (matchingMessages.length > 0) {
-        const isParticipant =
-          principal.role === 'SUPER_ADMIN' ||
-          principal.role === 'ADMIN' ||
-          matchingMessages.some(m =>
-            principal.did === m.senderDid ||
-            principal.did === m.recipientDid ||
-            m.recipientDid.startsWith('channel:')
-          );
-
-        if (!isParticipant) {
-          res.writeHead(403, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Forbidden: You do not have permission to access this attachment' }));
-          return;
-        }
-      }
-
-      // Locate file in ATTACHMENTS_DIR
-      let targetFile: string | null = null;
-      if (fs.existsSync(ATTACHMENTS_DIR)) {
-        const files = fs.readdirSync(ATTACHMENTS_DIR);
-        const match = files.find(f => f.startsWith(cidOrId + '_') || f === cidOrId || f.startsWith(cidOrId + '.'));
-        if (match) {
-          targetFile = path.join(ATTACHMENTS_DIR, match);
-        }
-      }
-
-      // Fallback: If not on disk, check if matching message has dataUrl to reconstruct
-      if (!targetFile && matchingMsg && matchingMsg.attachment?.dataUrl) {
-        try {
-          const dUrl = matchingMsg.attachment.dataUrl;
-          const commaIdx = dUrl.indexOf(',');
-          const base64Data = commaIdx >= 0 ? dUrl.slice(commaIdx + 1) : dUrl;
-          const buf = Buffer.from(base64Data, 'base64');
-          const safeName = path.basename(matchingMsg.attachment.name || 'file').replace(/["'\r\n\0]/g, '_');
-          const reconstructedPath = path.join(ATTACHMENTS_DIR, `${cidOrId}_${safeName}`);
-          fs.writeFileSync(reconstructedPath, buf);
-          targetFile = reconstructedPath;
-        } catch (_) {}
-      }
-
-      if (!targetFile || !fs.existsSync(targetFile)) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Attachment file not found' }));
-        return;
-      }
-
-      // Resolve filename and MIME type
-      const queryName = url.searchParams.get('name');
-      const filename = queryName
-        ? path.basename(queryName).replace(/["'\r\n\0]/g, '_')
-        : (matchingMsg?.attachment?.name ? path.basename(matchingMsg.attachment.name).replace(/["'\r\n\0]/g, '_') : path.basename(targetFile).replace(/^[a-z0-9]+_/, ''));
-
-      let mimeType = matchingMsg?.attachment?.type || '';
-      if (!mimeType || mimeType === 'application/octet-stream') {
-        const ext = path.extname(filename).toLowerCase();
-        const mimeMap: Record<string, string> = {
-          '.pdf': 'application/pdf',
-          '.jpg': 'image/jpeg',
-          '.jpeg': 'image/jpeg',
-          '.png': 'image/png',
-          '.webp': 'image/webp',
-          '.gif': 'image/gif',
-          '.svg': 'image/svg+xml',
-          '.mp4': 'video/mp4',
-          '.webm': 'video/webm',
-          '.mp3': 'audio/mpeg',
-          '.wav': 'audio/wav',
-          '.ogg': 'audio/ogg',
-          '.txt': 'text/plain; charset=utf-8',
-          '.csv': 'text/csv; charset=utf-8',
-          '.json': 'application/json',
-          '.zip': 'application/zip',
-          '.tar': 'application/x-tar',
-          '.gz': 'application/gzip',
-          '.doc': 'application/msword',
-          '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          '.xls': 'application/vnd.ms-excel',
-          '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        };
-        mimeType = mimeMap[ext] || 'application/octet-stream';
-      }
-
-      // Determine Content-Disposition
-      const forceDownload = url.searchParams.get('download') === '1';
-      const isPreviewable = !forceDownload && (
-        mimeType.startsWith('image/') ||
-        mimeType.startsWith('video/') ||
-        mimeType.startsWith('audio/') ||
-        mimeType === 'application/pdf' ||
-        mimeType.startsWith('text/')
-      );
-      const dispositionType = isPreviewable ? 'inline' : 'attachment';
-      const safeHeaderFilename = filename.replace(/["\r\n]/g, '_');
-
-      const stat = fs.statSync(targetFile);
-      const fileSize = stat.size;
-      const range = req.headers.range;
-
-      // Range support for audio/video media streaming
-      if (range) {
-        const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-
-        if (start >= fileSize || end >= fileSize || start > end) {
-          res.writeHead(416, {
-            'Content-Range': `bytes */${fileSize}`,
-            'Access-Control-Allow-Origin': '*',
-          });
-          res.end();
-          return;
-        }
-
-        const chunkSize = end - start + 1;
-        res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunkSize,
-          'Content-Type': mimeType,
-          'Content-Disposition': `${dispositionType}; filename="${safeHeaderFilename}"`,
-          'Cache-Control': 'private, max-age=86400',
-          'Access-Control-Allow-Origin': '*',
-          'ETag': `"${cidOrId}"`,
-        });
-        fs.createReadStream(targetFile, { start, end }).pipe(res);
-      } else {
-        res.writeHead(200, {
-          'Content-Length': fileSize,
-          'Accept-Ranges': 'bytes',
-          'Content-Type': mimeType,
-          'Content-Disposition': `${dispositionType}; filename="${safeHeaderFilename}"`,
-          'Cache-Control': 'private, max-age=86400',
-          'Access-Control-Allow-Origin': '*',
-          'ETag': `"${cidOrId}"`,
-        });
-        fs.createReadStream(targetFile).pipe(res);
-      }
+    if (await handleChatRoutes({
+      req,
+      res,
+      url,
+      blindPushRelay,
+      storageDaemon,
+      ATTACHMENTS_DIR,
+      broadcastChatEvent,
+      validateMediaMagicBytes,
+      readBoundedBody,
+      resolvePrincipal,
+      enforceAuth,
+    })) {
       return;
     }
 
@@ -47932,656 +47135,6 @@ async function startDevServer() {
           outbox: [],
         }),
       );
-      return;
-    }
-
-    // ==========================================
-    // API: YOUTUBE WATCH PLAYER & TIPPING
-    // ==========================================
-    if ((url.pathname === '/api/youtube/videos' || url.pathname === '/api/watch/videos') && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, videos: sovraDb.getAllVideos() }));
-      return;
-    }
-
-    if ((url.pathname === '/api/youtube/video' || url.pathname === '/api/watch/video') && req.method === 'GET') {
-      const allVideos = sovraDb.getAllVideos();
-      const vidId = url.searchParams.get('id') || allVideos[0]?.id;
-      const found = allVideos.find(v => v.id === vidId) || allVideos[0];
-      const comments = found ? sovraDb.getVideoComments(found.id) : [];
-      const recommended = allVideos.filter(v => found && v.id !== found.id);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          ok: true,
-          video: found,
-          comments,
-          recommended,
-        }),
-      );
-      return;
-    }
-
-    if (url.pathname === '/api/youtube/switch' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const found = sovraDb.getVideoById(parsed.videoId);
-        if (found) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, video: found }));
-        } else {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Video not found' }));
-        }
-      } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    // API: Upload Long-Form Watch Video (Persistent + Magic Byte Validated)
-    if ((url.pathname === '/api/youtube/upload' || url.pathname === '/api/watch/upload') && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 50 * 1024 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const title = String(parsed.title || '').trim();
-        if (!title) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Video title is required' }));
-          return;
-        }
-
-        let cid = '';
-        let mimeType = parsed.mimeType || 'video/mp4';
-        const rawMedia = parsed.videoData || parsed.mediaBase64 || parsed.content;
-        if (rawMedia && typeof rawMedia === 'string') {
-          let base64Data = rawMedia;
-          const commaIdx = base64Data.indexOf(',');
-          if (commaIdx !== -1) {
-            const header = base64Data.substring(0, commaIdx);
-            const match = header.match(/data:([^;]+);base64/);
-            if (match) mimeType = match[1];
-            base64Data = base64Data.substring(commaIdx + 1);
-          }
-          const buffer = Buffer.from(base64Data, 'base64');
-          const magicCheck = validateMediaMagicBytes(buffer, mimeType);
-          if (!magicCheck.valid) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: `Invalid video payload: ${magicCheck.error || 'Magic byte signature mismatch'}` }));
-            return;
-          }
-          const hash = crypto.createHash('sha256').update(buffer).digest('hex');
-          cid = 'bafy' + hash.substring(0, 32);
-          const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
-          const filePath = path.join(POSTS_DIR, `${cid}.${ext}`);
-          fs.writeFileSync(filePath, buffer);
-          if (storageDaemon && typeof (storageDaemon as any).putBlock === 'function') {
-            try { await (storageDaemon as any).putBlock(cid, buffer); } catch (_) {}
-          }
-        } else {
-          cid = 'bafy' + crypto.randomBytes(16).toString('hex');
-        }
-
-        const tags = Array.isArray(parsed.tags) ? parsed.tags : (typeof parsed.tags === 'string' ? parsed.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : ['#sovra', '#p2p']);
-        const newVideo = sovraDb.createVideo({
-          ownerDid: principal.did,
-          title,
-          shortHeader: parsed.shortHeader ? String(parsed.shortHeader) : undefined,
-          summary: parsed.summary ? String(parsed.summary) : undefined,
-          description: String(parsed.description || title).trim(),
-          cid,
-          channelName: parsed.channelName,
-          channelHandle: parsed.channelHandle,
-          duration: parsed.duration || '10:00',
-          durationSeconds: parsed.durationSeconds || 600,
-          tags,
-          category: parsed.category ? String(parsed.category) : 'Technology',
-          visibility: parsed.visibility || 'public',
-          paywallFee: typeof parsed.paywallFee === 'number' ? parsed.paywallFee : 0,
-          tippingEnabled: parsed.tippingEnabled !== false,
-          relatedVideoId: parsed.relatedVideoId ? String(parsed.relatedVideoId) : undefined,
-        });
-        longFormVideosCatalog.unshift(newVideo);
-        currentYoutubeVideo = newVideo;
-
-        if (parsed.isShort) {
-          try {
-            sovraDb.createReel({
-              creatorDid: principal.did,
-              creatorHandle: String(parsed.channelHandle || 'you_peer').replace('@', ''),
-              creatorName: String(parsed.channelName || 'You (Sovereign)'),
-              caption: title,
-              shortHeader: parsed.shortHeader ? String(parsed.shortHeader) : undefined,
-              summary: parsed.summary ? String(parsed.summary) : undefined,
-              description: String(parsed.description || title).trim(),
-              relatedVideoId: parsed.relatedVideoId ? String(parsed.relatedVideoId) : undefined,
-              paywallFee: typeof parsed.paywallFee === 'number' ? parsed.paywallFee : 0,
-              tippingEnabled: parsed.tippingEnabled !== false,
-              tags,
-              cid,
-              videoUrl: `/api/reels/video/${cid}`,
-              videoMimeType: mimeType,
-            });
-            reelsStore = sovraDb.getAllReels();
-          } catch (_) {}
-        }
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, video: newVideo }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    // API: Like / Unlike Video
-    if ((url.pathname === '/api/youtube/like' || url.pathname === '/api/watch/like') && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const videoId = String(parsed.videoId || '');
-        if (!videoId) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'videoId is required' }));
-          return;
-        }
-        const likeRes = sovraDb.toggleVideoLike(videoId, principal.did);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(likeRes));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    // API: Delete Video
-    if ((url.pathname === '/api/youtube/delete' || url.pathname === '/api/watch/delete') && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const videoId = String(parsed.videoId || '');
-        const delRes = sovraDb.deleteVideo(videoId, principal.did);
-        const status = delRes.ok ? 200 : (delRes.error?.includes('Forbidden') ? 403 : 404);
-        res.writeHead(status, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(delRes));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if ((url.pathname === '/api/youtube/tip' || url.pathname === '/api/watch/tip') && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        let fromDid: string | null = null;
-
-        // Check if cryptographic signature is present
-        if (parsed.signature && parsed.senderDid) {
-          // 1. Validate sender DID format
-          let pubKey: Uint8Array;
-          try {
-            pubKey = decodeEd25519DidKey(parsed.senderDid);
-          } catch {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Invalid sender DID format' }));
-            return;
-          }
-
-          // 2. Check nonce replay
-          if (!parsed.nonce || usedTipNonces.has(String(parsed.nonce))) {
-            res.writeHead(409, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Replayed or missing transaction nonce' }));
-            return;
-          }
-
-          // 3. Check timestamp window (5 min)
-          const ts = Number(parsed.timestamp || 0);
-          if (isNaN(ts) || Math.abs(Date.now() - ts) > 300_000) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Transaction timestamp outside acceptable window' }));
-            return;
-          }
-
-          // 4. Verify cryptographic signature
-          const canonicalPayload = new TextEncoder().encode(
-            `TIP:${parsed.senderDid}:${parsed.recipientDid || parsed.creatorDid}:${parsed.amount}:${parsed.asset || 'SOV'}:${parsed.nonce}:${parsed.timestamp}`
-          );
-          const sigBytes = typeof parsed.signature === 'string' ? hexToBytes(parsed.signature) : new Uint8Array(parsed.signature);
-          const isValid = verifyEd25519(pubKey, canonicalPayload, sigBytes);
-          if (!isValid) {
-            res.writeHead(403, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Cryptographic signature verification failed' }));
-            return;
-          }
-
-          usedTipNonces.add(String(parsed.nonce));
-          fromDid = parsed.senderDid;
-        } else {
-          // If no cryptographic signature envelope, require authenticated session
-          const principal = enforceAuth(req, res, parsed);
-          if (!principal) return;
-          fromDid = principal.did;
-
-          // Replay protection on session tips if nonce is provided
-          if (parsed.nonce) {
-            if (usedTipNonces.has(String(parsed.nonce))) {
-              res.writeHead(409, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ ok: false, error: 'Replayed transaction nonce' }));
-              return;
-            }
-            usedTipNonces.add(String(parsed.nonce));
-          }
-        }
-
-        const amount = Number(parsed.amount ?? parsed.amountSov ?? 50);
-        if (isNaN(amount) || amount <= 0) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Invalid tip amount: must be positive number' }));
-          return;
-        }
-
-        const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
-        let toDid = parsed.recipientDid || parsed.creatorDid || 'did:sovra:creator_studio_broadcast';
-        const cleanHandle = toDid.replace(/^@/, '').trim().toLowerCase();
-        const matchedUser = sovraDb.getAllUsers().find(u =>
-          u.did === toDid ||
-          (u.handle && u.handle.toLowerCase().replace(/^@/, '') === cleanHandle)
-        );
-        if (matchedUser) {
-          toDid = matchedUser.did;
-        }
-
-        const tipResult = sovraDb.processTip({
-          fromDid,
-          toDid,
-          amount,
-          videoId: targetVideoId,
-          senderName: parsed.authorName || 'Super Supporter',
-          message: parsed.message ? String(parsed.message) : undefined,
-        });
-
-        if (tipResult.ok) {
-          const senderUser = fromDid ? sovraDb.findUserByDid(fromDid) : null;
-          sovraDb.addNotification({
-            recipientDid: toDid,
-            senderDid: fromDid || 'did:sovra:anonymous',
-            type: 'tip',
-            title: 'Tip Received',
-            body: `You received a tip of ${amount} SOVRA from ${senderUser?.displayName || senderUser?.handle || 'a peer'}!`,
-            link: '/app',
-            data: { amount, voucherId: tipResult.voucher?.id },
-          });
-
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              ok: true,
-              voucher: tipResult.voucher,
-              split: tipResult.split,
-              settlement: { split95_5: tipResult.split },
-              newBalance: tipResult.senderBalance,
-            }),
-          );
-        } else {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: tipResult.error || 'Tip failed', senderBalance: tipResult.senderBalance }));
-        }
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if ((url.pathname === '/api/youtube/subscribe' || url.pathname === '/api/watch/subscribe') && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = body ? JSON.parse(body) : {};
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
-        const targetVideo = sovraDb.getVideoById(targetVideoId) || longFormVideosCatalog.find(v => v.id === targetVideoId) || currentYoutubeVideo;
-        const channelHandle = parsed.channelHandle || targetVideo?.channelHandle || 'sovra';
-        const subResult = sovraDb.toggleVideoSubscribe(channelHandle, principal.did);
-        if (targetVideo) {
-          targetVideo.isSubscribed = subResult.isSubscribed;
-          targetVideo.channelSubscribers = subResult.subscribersCount;
-          targetVideo.channelSubscribersText = `${subResult.subscribersCount.toLocaleString()} subscriber${subResult.subscribersCount === 1 ? '' : 's'}`;
-        }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          ok: true,
-          isSubscribed: subResult.isSubscribed,
-          subscribed: subResult.isSubscribed,
-          subscribersCount: subResult.subscribersCount,
-          subscribersText: `${subResult.subscribersCount.toLocaleString()} subscriber${subResult.subscribersCount === 1 ? '' : 's'}`
-        }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/youtube/comment' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
-        const authorUser = sovraDb.findUserByDid(principal.did);
-
-        if (parsed.parentCommentId) {
-          // Nested reply
-          const reply = sovraDb.addVideoReply(targetVideoId, parsed.parentCommentId, {
-            authorName: parsed.authorName || (authorUser?.displayName || 'Local Peer'),
-            authorAvatar: parsed.authorAvatar || (authorUser?.avatar || 'L'),
-            authorHandle: parsed.authorHandle || (authorUser?.handle || 'peer'),
-            text: String(parsed.text || ''),
-          });
-          if (reply) {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, reply, parentCommentId: parsed.parentCommentId }));
-            return;
-          } else {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Parent comment not found' }));
-            return;
-          }
-        }
-
-        // Top-level comment
-        const comment = sovraDb.addVideoComment(targetVideoId, {
-          authorDid: principal.did,
-          authorName: parsed.authorName ?? (authorUser?.displayName || 'Verified Peer'),
-          authorAvatar: parsed.authorAvatar ?? (authorUser?.avatar || 'V'),
-          authorHandle: parsed.authorHandle ?? (authorUser?.handle || 'peer'),
-          text: String(parsed.text ?? ''),
-        });
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, comment }));
-      } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/youtube/comment/like' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const targetVideoId = parsed.videoId || currentYoutubeVideo.id;
-        const targetCommentId = parsed.commentId;
-        if (!targetCommentId) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Missing commentId' }));
-          return;
-        }
-        const newLikes = sovraDb.likeVideoComment(targetVideoId, targetCommentId);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, likes: newLikes }));
-      } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    // ==========================================
-    // PHASE 5: PLAYLISTS API
-    // ==========================================
-    if (url.pathname === '/api/playlists' && req.method === 'GET') {
-      const channelId = url.searchParams.get('channelId') || undefined;
-      const principal = resolvePrincipal(req);
-      const userDid = principal?.did;
-      const playlists = sovraDb.getAllPlaylists(channelId, userDid);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, playlists }));
-      return;
-    }
-
-    if (url.pathname === '/api/playlists/view' && req.method === 'GET') {
-      const id = url.searchParams.get('id');
-      if (!id) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Playlist ID is required' }));
-        return;
-      }
-      const playlist = sovraDb.getPlaylistById(id);
-      if (!playlist) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Playlist not found' }));
-        return;
-      }
-      const videos = (playlist.videoIds || []).map(vid => {
-        return longFormVideosCatalog.find(v => v.id === vid) || {
-          id: vid,
-          title: `Video ${vid}`,
-          channelName: playlist.creatorName || 'Creator',
-          channelHandle: playlist.creatorHandle || 'creator',
-          channelAvatar: '🎬',
-          views: 1200,
-          viewsText: '1.2K views',
-          duration: '10:00',
-          durationSeconds: 600,
-          publishedAt: 'Recently',
-          description: '',
-          tags: ['#sovra'],
-          likes: 50,
-        };
-      });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, playlist, videos }));
-      return;
-    }
-
-    if (url.pathname === '/api/playlists/create' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const title = String(parsed.title || '').trim();
-        if (!title) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Playlist title is required' }));
-          return;
-        }
-        const user = sovraDb.findUserByDid(principal.did);
-        const playlist = sovraDb.createPlaylist({
-          channelId: parsed.channelId,
-          creatorDid: principal.did,
-          creatorHandle: user?.handle || 'creator',
-          creatorName: user?.displayName || 'Creator',
-          title,
-          description: parsed.description,
-          thumbnailUrl: parsed.thumbnailUrl,
-          videoIds: Array.isArray(parsed.videoIds) ? parsed.videoIds : [],
-          privacy: parsed.privacy || 'public',
-        });
-        res.writeHead(201, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, playlist }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/playlists/update' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const id = String(parsed.id || '');
-        if (!id) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Playlist ID required' }));
-          return;
-        }
-        const result = sovraDb.updatePlaylist(id, principal.did, parsed);
-        if (result.ok) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, playlist: result.playlist }));
-        } else {
-          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
-          res.writeHead(code, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: result.error }));
-        }
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/playlists/reorder' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const id = String(parsed.id || '');
-        const videoIds = parsed.videoIds;
-        if (!id || !Array.isArray(videoIds)) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Playlist ID and videoIds array are required' }));
-          return;
-        }
-        const result = sovraDb.reorderPlaylist(id, principal.did, videoIds);
-        if (result.ok) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, playlist: result.playlist }));
-        } else {
-          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
-          res.writeHead(code, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: result.error }));
-        }
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/playlists/delete' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const id = String(parsed.id || '');
-        if (!id) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Playlist ID required' }));
-          return;
-        }
-        const result = sovraDb.deletePlaylist(id, principal.did);
-        if (result.ok) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true }));
-        } else {
-          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
-          res.writeHead(code, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: result.error }));
-        }
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/playlists/add-video' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const id = String(parsed.id || '');
-        const videoId = String(parsed.videoId || '');
-        if (!id || !videoId) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'id and videoId are required' }));
-          return;
-        }
-        const result = sovraDb.addVideoToPlaylist(id, videoId, principal.did);
-        if (result.ok) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, playlist: result.playlist }));
-        } else {
-          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
-          res.writeHead(code, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: result.error }));
-        }
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/playlists/remove-video' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-        const id = String(parsed.id || '');
-        const videoId = String(parsed.videoId || '');
-        if (!id || !videoId) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'id and videoId are required' }));
-          return;
-        }
-        const result = sovraDb.removeVideoFromPlaylist(id, videoId, principal.did);
-        if (result.ok) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, playlist: result.playlist }));
-        } else {
-          const code = result.error?.startsWith('Unauthorized') ? 403 : 404;
-          res.writeHead(code, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: result.error }));
-        }
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
       return;
     }
 
@@ -49304,359 +47857,18 @@ async function startDevServer() {
     }
 
     // ==========================================
-    // 📞 WEBRTC E2EE CALL SIGNALING API (PRODUCTION HARDENED)
+    // 📞 WEBRTC E2EE CALL SIGNALING API (MODULAR CONTROLLER)
     // ==========================================
-    if ((url.pathname === '/api/call/ice-servers' || url.pathname === '/api/webrtc/ice-servers') && req.method === 'GET') {
-      const principal = resolvePrincipal(req);
-      const iceServers = getIceServers(principal?.did);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, iceServers }));
-      return;
-    }
-
-    if (url.pathname === '/api/call/offer' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 1024 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const recipientDid = String(parsed.recipientDid || '');
-        const offerSdp = String(parsed.offerSdp || parsed.sdp || parsed.sdpOffer || '');
-        const callType = parsed.callType === 'video' ? 'video' : 'audio';
-
-        if (!recipientDid || !offerSdp) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'recipientDid and offerSdp are required' }));
-          return;
-        }
-
-        try {
-          const session = sovraDb.createCallOffer(principal.did, recipientDid, offerSdp, callType);
-
-          // Notify recipient
-          const senderUser = sovraDb.findUserByDid(principal.did);
-          sovraDb.addNotification({
-            recipientDid,
-            senderDid: principal.did,
-            type: 'call',
-            title: `Incoming ${callType.toUpperCase()} Call`,
-            body: `${senderUser?.displayName || senderUser?.handle || 'A peer'} is calling you...`,
-            link: '/app',
-            data: { callId: session.callId, callType },
-          });
-
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, session, sessionId: session.callId }));
-        } catch (callErr: any) {
-          const msg = callErr?.message || 'Call initiation failed';
-          if (callErr?.code === 'BUSY') {
-            res.writeHead(486, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: msg, code: 'BUSY' }));
-          } else if (msg.includes('Forbidden') || msg.includes('Block relationship')) {
-            res.writeHead(403, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: msg }));
-          } else if (msg.includes('engaged in an active call')) {
-            res.writeHead(409, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: msg, code: 'ALREADY_IN_CALL' }));
-          } else {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: msg }));
-          }
-        }
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/call/incoming' && req.method === 'GET') {
-      const principal = resolvePrincipal(req);
-      if (!principal) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
-        return;
-      }
-      const userDid = principal.did;
-      const allCalls = sovraDb.getState().call_sessions || [];
-      const now = Date.now();
-      const incoming = allCalls.find(c =>
-        c.recipientDid === userDid &&
-        (c.status === 'offering' || c.status === 'ringing') &&
-        now - c.createdAt < 45000 &&
-        !sovraDb.isBlocked(c.callerDid, userDid) &&
-        !sovraDb.isBlocked(userDid, c.callerDid)
-      );
-      if (!incoming) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, incomingCall: null }));
-        return;
-      }
-      const callerUser = sovraDb.findUserByDid(incoming.callerDid);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        ok: true,
-        incomingCall: {
-          callId: incoming.callId,
-          callerDid: incoming.callerDid,
-          callerName: callerUser?.displayName || callerUser?.name || incoming.callerName || 'Peer',
-          callerHandle: callerUser?.handle || '@peer',
-          callerAvatar: callerUser?.avatar || incoming.callerAvatar || '📞',
-          callerAvatarBg: callerUser?.avatarBg || '#6366f1',
-          callerAvatarDataUrl: callerUser?.avatarDataUrl,
-          callType: incoming.callType || 'audio',
-          sdpOffer: incoming.sdpOffer,
-          createdAt: incoming.createdAt,
-        }
-      }));
-      return;
-    }
-
-    if (url.pathname === '/api/call/poll' && req.method === 'GET') {
-      const principal = resolvePrincipal(req);
-      if (!principal) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
-        return;
-      }
-      const callId = url.searchParams.get('callId') || '';
-      if (!callId) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'callId required' }));
-        return;
-      }
-      const allCalls = sovraDb.getState().call_sessions || [];
-      const anyCall = allCalls.find(c => c.callId === callId);
-      if (anyCall && anyCall.callerDid !== principal.did && anyCall.recipientDid !== principal.did) {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized access to call session' }));
-        return;
-      }
-      const session = sovraDb.pollCall(callId, principal.did);
-      if (!session) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, session }));
-      return;
-    }
-
-    if (url.pathname === '/api/call/answer' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 1024 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const callId = String(parsed.callId || '');
-        const answerSdp = String(parsed.answerSdp || parsed.sdp || '');
-        if (!callId || !answerSdp) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'callId and answerSdp are required' }));
-          return;
-        }
-
-        const allCalls = sovraDb.getState().call_sessions || [];
-        const existingCall = allCalls.find(c => c.callId === callId);
-        if (!existingCall) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
-          return;
-        }
-
-        if (existingCall.recipientDid !== principal.did) {
-          res.writeHead(403, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Only the designated recipient can answer the call' }));
-          return;
-        }
-
-        if (existingCall.status !== 'offering' && existingCall.status !== 'ringing') {
-          res.writeHead(409, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: `Conflict: Call is in '${existingCall.status}' state and cannot be answered` }));
-          return;
-        }
-
-        try {
-          const session = sovraDb.answerCall(callId, principal.did, answerSdp);
-          if (!session) {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Call session not found or answer rejected' }));
-            return;
-          }
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, session }));
-        } catch (ansErr: any) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: ansErr?.message || 'Answer failed' }));
-        }
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/call/candidate' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const callId = String(parsed.callId || '');
-        const candidate = parsed.candidate;
-        if (!callId || !candidate) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'callId and candidate are required' }));
-          return;
-        }
-
-        const allCalls = sovraDb.getState().call_sessions || [];
-        const existingCall = allCalls.find(c => c.callId === callId);
-        if (!existingCall) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
-          return;
-        }
-
-        if (existingCall.callerDid !== principal.did && existingCall.recipientDid !== principal.did) {
-          res.writeHead(403, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized candidate submission' }));
-          return;
-        }
-
-        if (existingCall.status === 'ended' || existingCall.status === 'rejected') {
-          res.writeHead(409, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Conflict: Call has already ended' }));
-          return;
-        }
-
-        try {
-          const session = sovraDb.addIceCandidate(callId, principal.did, candidate);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: !!session, session }));
-        } catch (candErr: any) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: candErr?.message || 'Candidate error' }));
-        }
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/call/end' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const callId = String(parsed.callId || parsed.sessionId || '');
-        const reason = parsed.reason ? String(parsed.reason) : undefined;
-        if (!callId) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'callId is required' }));
-          return;
-        }
-
-        const allCalls = sovraDb.getState().call_sessions || [];
-        const existingCall = allCalls.find(c => c.callId === callId);
-        if (!existingCall) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
-          return;
-        }
-
-        if (existingCall.callerDid !== principal.did && existingCall.recipientDid !== principal.did) {
-          res.writeHead(403, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized call termination' }));
-          return;
-        }
-
-        const session = sovraDb.endCall(callId, principal.did, reason);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, session }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/call/restart-ice' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body);
-        const principal = enforceAuth(req, res, parsed);
-        if (!principal) return;
-
-        const callId = String(parsed.callId || '');
-        if (!callId) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'callId is required' }));
-          return;
-        }
-
-        const allCalls = sovraDb.getState().call_sessions || [];
-        const existingCall = allCalls.find(c => c.callId === callId);
-        if (!existingCall) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
-          return;
-        }
-
-        if (existingCall.callerDid !== principal.did && existingCall.recipientDid !== principal.did) {
-          res.writeHead(403, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized ICE restart' }));
-          return;
-        }
-
-        existingCall.status = 'reconnecting';
-        existingCall.updatedAt = Date.now();
-        sovraDb.recordCallMetric({
-          callId,
-          eventType: 'ice_restarted',
-          callerDid: existingCall.callerDid,
-          recipientDid: existingCall.recipientDid,
-        });
-        sovraDb.save();
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, status: 'reconnecting' }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/call/metrics' && req.method === 'GET') {
-      const principal = resolvePrincipal(req);
-      if (!principal) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
-        return;
-      }
-
-      const callId = url.searchParams.get('callId') || undefined;
-      const isAdmin = principal.role === 'SUPER_ADMIN' || principal.role === 'SECURITY_ADMIN' || principal.did.startsWith('did:sovra:admin');
-      const metrics = sovraDb.getCallMetrics({
-        callId,
-        userDid: isAdmin ? undefined : principal.did,
-      });
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, metrics, count: metrics.length }));
+    if (await handleCallSignalingRoutes({
+      req,
+      res,
+      url,
+      blindPushRelay,
+      getIceServers,
+      readBoundedBody,
+      resolvePrincipal,
+      enforceAuth,
+    })) {
       return;
     }
 
@@ -50305,64 +48517,16 @@ async function startDevServer() {
       return;
     }
 
-    // Blind Push Gateway: Register Device
-    if (url.pathname === '/api/push/register' && req.method === 'POST') {
-      try {
-        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
-        if (!bodyOk) return;
-        const parsed = reqBody ? JSON.parse(reqBody) : {};
-        if (!parsed.deviceId || !parsed.pushToken || !parsed.blindChannelId) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Missing deviceId, pushToken, or blindChannelId' }));
-          return;
-        }
-        blindPushRelay.registerDevice({
-          deviceId: String(parsed.deviceId),
-          deviceDid: String(parsed.deviceDid || 'did:sovra:anonymous'),
-          platform: (parsed.platform === 'ios' ? 'ios' : (parsed.platform === 'web' ? 'web' : 'android')),
-          pushToken: String(parsed.pushToken),
-          blindChannelId: String(parsed.blindChannelId),
-          updatedAt: Date.now(),
-        });
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, registered: true, totalDevices: blindPushRelay.getRegisteredDeviceCount() }));
-      } catch (err: any) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Push registration failed' }));
-      }
-      return;
-    }
-
-    // Blind Push Gateway: Dispatch Opaque Wakeup Ping
-    if (url.pathname === '/api/push/dispatch' && req.method === 'POST') {
-      try {
-        const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
-        if (!bodyOk) return;
-        const parsed = reqBody ? JSON.parse(reqBody) : {};
-        if (!parsed.blindChannelId) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Missing blindChannelId' }));
-          return;
-        }
-        const dispatchRes = await blindPushRelay.dispatchBlindSignal({
-          blindChannelId: String(parsed.blindChannelId),
-          opaqueWakeupHint: String(parsed.opaqueWakeupHint || crypto.randomBytes(16).toString('hex')),
-          priority: parsed.priority === 'normal' ? 'normal' : 'high',
-          timestamp: Date.now(),
-        });
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: dispatchRes.ok, dispatchedCount: dispatchRes.ok ? dispatchRes.value.length : 0 }));
-      } catch (err: any) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Push dispatch failed' }));
-      }
-      return;
-    }
-
-    // Blind Push Gateway: Status
-    if (url.pathname === '/api/push/status' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, activeDevices: blindPushRelay.getRegisteredDeviceCount() }));
+    // ==========================================
+    // 🔔 ZERO-KNOWLEDGE BLIND PUSH GATEWAY (MODULAR CONTROLLER)
+    // ==========================================
+    if (await handlePushRoutes({
+      req,
+      res,
+      url,
+      blindPushRelay,
+      readBoundedBody,
+    })) {
       return;
     }
 

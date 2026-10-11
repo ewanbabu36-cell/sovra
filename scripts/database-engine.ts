@@ -162,6 +162,20 @@ export interface ChatMessageRecord {
   moderationReason?: string;
 }
 
+export interface EphemeralMailboxMessageRecord {
+  id: string;
+  mailboxChannel: string; // sha256(recipientDid)
+  recipientDid: string;
+  senderDid: string;
+  encryptedPayload: string; // opaque ciphertext blob
+  ivHex?: string;
+  tagHex?: string;
+  priority: 'normal' | 'high';
+  expiresAt: number;
+  createdAt: number;
+  deliveredAt?: number;
+}
+
 export interface PostCommentRecord {
   id: string;
   author: string;
@@ -536,6 +550,8 @@ export interface ReelRecord {
   summary?: string;
   description?: string;
   relatedVideoId?: string;
+  entityType?: 'personal' | 'channel' | 'page';
+  entityId?: string;
   paywallFee?: number;
   tippingEnabled?: boolean;
   tags: string[];
@@ -551,6 +567,10 @@ export interface ReelRecord {
   videoUrl?: string;
   videoPath?: string;
   videoMimeType?: string;
+  masterManifestCid?: string;
+  segment0Cid?: string;
+  masterM3u8?: string;
+  variants?: VideoVariant[];
   likedByDids: string[];
   createdAt: number;
   moderationState?: ModerationState;
@@ -598,6 +618,8 @@ export interface VideoVariant {
   bitrate: string;
   framerate: string;
   bandwidthBps: number;
+  playlistUri?: string;
+  mediaM3u8?: string;
 }
 
 export interface YoutubeVideoRecord {
@@ -629,11 +651,16 @@ export interface YoutubeVideoRecord {
   gradient?: string;
   chapters?: VideoChapter[];
   variants?: VideoVariant[];
+  masterManifestCid?: string;
+  segment0Cid?: string;
+  masterM3u8?: string;
   visibility?: string;
   status?: string;
   paywallFee?: number;
   tippingEnabled?: boolean;
   relatedVideoId?: string;
+  entityType?: 'personal' | 'channel' | 'page';
+  entityId?: string;
   createdAt?: number;
   updatedAt?: number;
 }
@@ -1119,6 +1146,7 @@ export interface DatabaseSchema {
   channel_subscriptions: Array<{ channelHandle: string; userDid: string; timestamp: number }>;
   jury_cases?: JuryCaseRecord[];
   jury_policies?: ModerationPolicyConfig;
+  ephemeral_mailbox?: EphemeralMailboxMessageRecord[];
 }
 
 // ==========================================
@@ -1195,9 +1223,9 @@ export class SovraDatabaseEngine {
     return {
       schemaVersion: 1,
       users: [],
-      contacts_and_peers: [],
+      contacts_and_peers: this.getSeedPeers(),
       chatMessages: [],
-      posts: [],
+      posts: this.getSeedPosts(),
       channels: [
         { id: 'ch-alpha', handle: '@sovra_alpha', name: 'Sovra Alpha Radar', category: 'tech', desc: 'Cutting-edge P2P social dispatches', count: 14200, avatar: '📢', bg: '#0284c7', isSubbed: true, ownerDid: 'did:sovra:system', createdAt: Date.now() - 10000000 },
         { id: 'ch-gaming', handle: '@web3_gaming', name: 'Web3 Arcade Live', category: 'gaming', desc: 'Multiplayer P2P tournaments & game clips', count: 8900, avatar: '🎮', bg: '#8b5cf6', isSubbed: false, ownerDid: 'did:sovra:system', createdAt: Date.now() - 8000000 },
@@ -1242,6 +1270,7 @@ export class SovraDatabaseEngine {
       channel_subscriptions: [],
       jury_cases: [],
       jury_policies: this.getDefaultJuryPolicies(),
+      ephemeral_mailbox: [],
     };
   }
 
@@ -1290,7 +1319,7 @@ export class SovraDatabaseEngine {
             : [],
           contacts_and_peers: Array.isArray(parsed.contacts_and_peers) ? parsed.contacts_and_peers : [],
           chatMessages: Array.isArray(parsed.chatMessages) ? parsed.chatMessages : [],
-          posts: Array.isArray(parsed.posts) ? parsed.posts : [],
+          posts: Array.isArray(parsed.posts) && parsed.posts.length > 0 ? parsed.posts : this.getSeedPosts(),
           channels: (() => {
             const list = Array.isArray(parsed.channels) ? parsed.channels : this.db.channels;
             const seenIds = new Set<string>();
@@ -4118,6 +4147,14 @@ export class SovraDatabaseEngine {
     return [...this.db.reels];
   }
 
+  public getReelsByEntity(entityType: 'personal' | 'channel' | 'page', entityId?: string): ReelRecord[] {
+    const all = this.getAllReels();
+    return all.filter(r => {
+      if (entityType === 'personal') return !r.entityType || r.entityType === 'personal';
+      return r.entityType === entityType && r.entityId === entityId;
+    });
+  }
+
   public createReel(data: {
     creatorDid: string;
     creatorHandle: string;
@@ -4128,6 +4165,8 @@ export class SovraDatabaseEngine {
     summary?: string;
     description?: string;
     relatedVideoId?: string;
+    entityType?: 'personal' | 'channel' | 'page';
+    entityId?: string;
     paywallFee?: number;
     tippingEnabled?: boolean;
     tags?: string[];
@@ -4137,6 +4176,10 @@ export class SovraDatabaseEngine {
     videoUrl?: string;
     videoPath?: string;
     videoMimeType?: string;
+    masterManifestCid?: string;
+    segment0Cid?: string;
+    masterM3u8?: string;
+    variants?: VideoVariant[];
   }): ReelRecord {
     this.load();
     if (!Array.isArray(this.db.reels)) this.db.reels = [];
@@ -4153,6 +4196,8 @@ export class SovraDatabaseEngine {
       summary: data.summary?.trim(),
       description: data.description?.trim(),
       relatedVideoId: data.relatedVideoId,
+      entityType: data.entityType || 'personal',
+      entityId: data.entityId,
       paywallFee: typeof data.paywallFee === 'number' ? data.paywallFee : 0,
       tippingEnabled: data.tippingEnabled !== false,
       tags: Array.isArray(data.tags) ? data.tags : ['#sovra', '#p2p', '#reels'],
@@ -4166,6 +4211,15 @@ export class SovraDatabaseEngine {
       videoUrl: data.videoUrl,
       videoPath: data.videoPath,
       videoMimeType: data.videoMimeType || 'video/mp4',
+      variants: Array.isArray(data.variants) && data.variants.length > 0 ? data.variants : [
+        { resolution: '1080p', bitrate: '6 Mbps', framerate: '60fps', bandwidthBps: 6_000_000 },
+        { resolution: '720p', bitrate: '2.5 Mbps', framerate: '60fps', bandwidthBps: 2_500_000 },
+        { resolution: '480p', bitrate: '1.4 Mbps', framerate: '30fps', bandwidthBps: 1_400_000 },
+        { resolution: '360p', bitrate: '800 kbps', framerate: '30fps', bandwidthBps: 800_000 },
+      ],
+      masterManifestCid: data.masterManifestCid || ('bafybei_hls_' + data.cid.substring(4, 18)),
+      segment0Cid: data.segment0Cid || ('bafkrei_seg0_' + data.cid.substring(4, 18)),
+      masterM3u8: data.masterM3u8,
       likedByDids: [],
       createdAt: Date.now(),
     };
@@ -4261,6 +4315,14 @@ export class SovraDatabaseEngine {
     return vids.find(v => v.id === id) || null;
   }
 
+  public getVideosByEntity(entityType: 'personal' | 'channel' | 'page', entityId?: string, userDid?: string): YoutubeVideoRecord[] {
+    const all = this.getAllVideos(userDid);
+    return all.filter(v => {
+      if (entityType === 'personal') return !v.entityType || v.entityType === 'personal';
+      return v.entityType === entityType && v.entityId === entityId;
+    });
+  }
+
   public createVideo(params: {
     ownerDid: string;
     title: string;
@@ -4281,6 +4343,12 @@ export class SovraDatabaseEngine {
     paywallFee?: number;
     tippingEnabled?: boolean;
     relatedVideoId?: string;
+    entityType?: 'personal' | 'channel' | 'page';
+    entityId?: string;
+    masterManifestCid?: string;
+    segment0Cid?: string;
+    masterM3u8?: string;
+    variants?: VideoVariant[];
   }): YoutubeVideoRecord {
     this.load();
     if (!Array.isArray(this.db.videos)) this.db.videos = this.getSeedVideos();
@@ -4314,12 +4382,22 @@ export class SovraDatabaseEngine {
       ambientColor: 'rgba(99, 102, 241, 0.45)',
       gradient: 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)',
       chapters: [{ timeSeconds: 0, timecode: '00:00', title: 'Start' }],
-      variants: [{ resolution: '1080p', bitrate: '8 Mbps', framerate: '30fps', bandwidthBps: 8_000_000 }],
+      variants: Array.isArray(params.variants) && params.variants.length > 0 ? params.variants : [
+        { resolution: '1080p', bitrate: '8 Mbps', framerate: '60fps', bandwidthBps: 8_000_000 },
+        { resolution: '720p', bitrate: '3 Mbps', framerate: '60fps', bandwidthBps: 3_000_000 },
+        { resolution: '480p', bitrate: '1.5 Mbps', framerate: '30fps', bandwidthBps: 1_500_000 },
+        { resolution: '360p', bitrate: '800 kbps', framerate: '30fps', bandwidthBps: 800_000 },
+      ],
+      masterManifestCid: params.masterManifestCid || ('bafybei_master_' + params.cid.substring(4, 18)),
+      segment0Cid: params.segment0Cid || ('bafkrei_seg0_' + params.cid.substring(4, 18)),
+      masterM3u8: params.masterM3u8,
       visibility: params.visibility || 'public',
       status: 'ready',
       paywallFee: typeof params.paywallFee === 'number' ? params.paywallFee : 0,
       tippingEnabled: params.tippingEnabled !== false,
       relatedVideoId: params.relatedVideoId,
+      entityType: params.entityType || 'personal',
+      entityId: params.entityId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -4872,6 +4950,279 @@ export class SovraDatabaseEngine {
     );
     this.save();
     return { ok: true, newBalance, depositRecord: record };
+  }
+
+
+  // ==========================================
+  // 📬 ZERO-KNOWLEDGE OFFLINE MAILBOX RELAY
+  // ==========================================
+
+  public depositMailboxMessage(data: {
+    recipientDid: string;
+    senderDid: string;
+    encryptedPayload: string;
+    ivHex?: string;
+    tagHex?: string;
+    priority?: 'normal' | 'high';
+    ttlSeconds?: number;
+  }): EphemeralMailboxMessageRecord {
+    this.load();
+    if (!this.db.ephemeral_mailbox) this.db.ephemeral_mailbox = [];
+    const now = Date.now();
+    const ttl = (data.ttlSeconds || 7 * 24 * 3600) * 1000;
+    const mailboxChannel = crypto.createHash('sha256').update(data.recipientDid).digest('hex');
+    const record: EphemeralMailboxMessageRecord = {
+      id: 'mbx_' + now + '_' + crypto.randomBytes(6).toString('hex'),
+      mailboxChannel,
+      recipientDid: data.recipientDid,
+      senderDid: data.senderDid,
+      encryptedPayload: data.encryptedPayload,
+      ivHex: data.ivHex,
+      tagHex: data.tagHex,
+      priority: data.priority || 'normal',
+      expiresAt: now + ttl,
+      createdAt: now,
+    };
+    this.db.ephemeral_mailbox.push(record);
+    this.save();
+    return record;
+  }
+
+  public pullMailboxMessages(recipientDid: string, blindChannel?: string): EphemeralMailboxMessageRecord[] {
+    this.load();
+    if (!this.db.ephemeral_mailbox) return [];
+    const now = Date.now();
+    const targetChannel = blindChannel || crypto.createHash('sha256').update(recipientDid).digest('hex');
+    return this.db.ephemeral_mailbox.filter(m => 
+      (m.recipientDid === recipientDid || m.mailboxChannel === targetChannel) &&
+      m.expiresAt > now
+    );
+  }
+
+  public ackMailboxMessages(recipientDid: string, messageIds: string[]): number {
+    this.load();
+    if (!this.db.ephemeral_mailbox) return 0;
+    const initialLen = this.db.ephemeral_mailbox.length;
+    const idSet = new Set(messageIds);
+    this.db.ephemeral_mailbox = this.db.ephemeral_mailbox.filter(m => !(idSet.has(m.id) && m.recipientDid === recipientDid));
+    const removed = initialLen - this.db.ephemeral_mailbox.length;
+    if (removed > 0) {
+      this.save();
+    }
+    return removed;
+  }
+
+  public pruneExpiredMailbox(): number {
+    this.load();
+    if (!this.db.ephemeral_mailbox) return 0;
+    const now = Date.now();
+    const initialLen = this.db.ephemeral_mailbox.length;
+    this.db.ephemeral_mailbox = this.db.ephemeral_mailbox.filter(m => m.expiresAt > now);
+    const removed = initialLen - this.db.ephemeral_mailbox.length;
+    if (removed > 0) {
+      this.save();
+    }
+    return removed;
+  }
+
+  // ==========================================
+  // 🧹 VIDEO CACHE PRUNING & QUOTA MANAGEMENT
+  // ==========================================
+
+  public pruneVideoCache(maxBytes: number = 500 * 1024 * 1024): { freedBytes: number; remainingFiles: number; remainingBytes: number } {
+    this.load();
+    const reelsDir = path.join(this.storageDir, 'reels');
+    if (!fs.existsSync(reelsDir)) {
+      return { freedBytes: 0, remainingFiles: 0, remainingBytes: 0 };
+    }
+
+    const protectedCids = new Set<string>();
+    for (const r of (this.db.reels || [])) {
+      if (r.cid) protectedCids.add(r.cid);
+      if (r.masterManifestCid) protectedCids.add(r.masterManifestCid);
+      if (r.segment0Cid) protectedCids.add(r.segment0Cid);
+    }
+    for (const v of (this.db.videos || [])) {
+      if (v.cid) protectedCids.add(v.cid);
+    }
+
+    try {
+      const entries = fs.readdirSync(reelsDir).map(name => {
+        const full = path.join(reelsDir, name);
+        try {
+          const stat = fs.statSync(full);
+          return { name, full, size: stat.size, mtime: stat.mtimeMs };
+        } catch {
+          return null;
+        }
+      }).filter(Boolean);
+
+      let totalSize = entries.reduce((acc, f) => acc + f.size, 0);
+      if (totalSize <= maxBytes) {
+        return { freedBytes: 0, remainingFiles: entries.length, remainingBytes: totalSize };
+      }
+
+      entries.sort((a, b) => a.mtime - b.mtime);
+      let freedBytes = 0;
+      for (const entry of entries) {
+        const baseCid = entry.name.split('.')[0];
+        if (protectedCids.has(baseCid)) continue;
+        try {
+          fs.unlinkSync(entry.full);
+          freedBytes += entry.size;
+          totalSize -= entry.size;
+        } catch (_) {}
+        if (totalSize <= maxBytes) break;
+      }
+
+      const remainingFiles = fs.readdirSync(reelsDir).length;
+      return { freedBytes, remainingFiles, remainingBytes: totalSize };
+    } catch {
+      return { freedBytes: 0, remainingFiles: 0, remainingBytes: 0 };
+    }
+  }
+
+  // ==========================================
+  // 🌱 SEED CONTENT (COLD-START ELIMINATION)
+  // ==========================================
+
+  public getSeedPosts(): FeedPostRecord[] {
+    const now = Date.now();
+    return [
+      {
+        id: 'post-seed-1',
+        authorDid: 'did:key:z6MksAliceCreatorP2P',
+        authorName: 'Alice ⚡ P2P Architect',
+        authorAvatar: '⚡',
+        authorAvatarBg: '#6366f1',
+        caption: 'Welcome to the Sovereign Mesh! Zero central servers, pure Ed25519 cryptography, and direct peer-to-peer distribution. You own your identity, keys, and data forever. 🚀 #sovra #decentralization #privacy',
+        tags: '#sovra, #decentralization, #privacy',
+        timestamp: now - 3600000 * 2,
+        likesCount: 1420,
+        likedByDids: [],
+        comments: [
+          {
+            id: 'c-seed-1',
+            author: 'Bob 🛠️ Protocol Core',
+            authorDid: 'did:key:z6MksBobProtocolCore',
+            authorHandle: '@bob_mesh',
+            text: 'Decentralized GossipSub overlay is live and routing blocks at sub-10ms!',
+            timestamp: now - 3600000,
+            likesCount: 89
+          }
+        ],
+        postType: 'announcement',
+        visibility: 'public',
+        mediaGradient: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
+        mediaTitle: 'Sovereign Social Mesh Live 🌐',
+        mediaEmoji: '🚀',
+      },
+      {
+        id: 'post-seed-2',
+        authorDid: 'did:sovra:mesh_labs',
+        authorName: 'Mesh Labs AI',
+        authorAvatar: '🧠',
+        authorAvatarBg: '#8b5cf6',
+        caption: 'On-device Taste Vector scoring is operational. Engagement and freshness decay models run directly on your browser without sending a single byte of telemetry to external cloud servers. 🛡️ #ai #edge #privacy',
+        tags: '#ai, #edge, #privacy',
+        timestamp: now - 3600000 * 5,
+        likesCount: 890,
+        likedByDids: [],
+        comments: [],
+        postType: 'article',
+        visibility: 'public',
+        mediaGradient: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
+        mediaTitle: 'Private On-Device Recommendation AI ⚡',
+        mediaEmoji: '🧠',
+      },
+      {
+        id: 'post-seed-3',
+        authorDid: 'did:sovra:decentral_news',
+        authorName: 'Global Mesh Dispatches',
+        authorAvatar: '📰',
+        authorAvatarBg: '#10b981',
+        caption: 'Breaking: Offline Store-and-Forward Ephemeral Mailboxes and ZK Blind Push wakeups have been deployed. Mobile peers receive instant message notifications even when completely offline! 📱 #messaging #security',
+        tags: '#messaging, #security, #p2p',
+        timestamp: now - 3600000 * 8,
+        likesCount: 1205,
+        likedByDids: [],
+        comments: [],
+        postType: 'news' as any,
+        visibility: 'public',
+        mediaGradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+        mediaTitle: 'Zero-Knowledge Blind Push & Mailbox 📬',
+        mediaEmoji: '📰',
+      },
+      {
+        id: 'post-seed-4',
+        authorDid: 'did:sovra:ambient_radio',
+        authorName: '24/7 Lo-Fi Mesh Waves',
+        authorAvatar: '🎵',
+        authorAvatarBg: '#f43f5e',
+        caption: 'Continuous audio and video chunks streamed over P2P swarms. Zero buffering, zero platform taxes, direct creator monetization! 🎧 #music #streaming',
+        tags: '#music, #streaming, #creators',
+        timestamp: now - 3600000 * 12,
+        likesCount: 760,
+        likedByDids: [],
+        comments: [],
+        postType: 'text',
+        visibility: 'public',
+        mediaGradient: 'linear-gradient(135deg, #f43f5e 0%, #fb923c 100%)',
+        mediaTitle: 'P2P Lo-Fi Mesh Waves 🎵',
+        mediaEmoji: '🎧',
+      }
+    ];
+  }
+
+  public getSeedPeers(): ContactPeerRecord[] {
+    const now = Date.now();
+    return [
+      {
+        did: 'did:sovra:mesh_support',
+        handle: 'sovra_support',
+        name: 'Sovra Sovereign Assistant',
+        avatar: '🤖',
+        avatarBg: '#6366f1',
+        role: 'Always online on local mesh',
+        device: 'Core Mesh Daemon',
+        isOnline: true,
+        lastSeen: 'Active now',
+        lastSeenTimestamp: now,
+        disappearingDurationSec: 0,
+        safetyNumbers: '84920 18274 91024 81729',
+        isVerified: true,
+      },
+      {
+        did: 'did:key:z6MksAliceCreatorP2P',
+        handle: 'alice_creator',
+        name: 'Alice ⚡ P2P Architect',
+        avatar: '⚡',
+        avatarBg: '#8b5cf6',
+        role: 'Streaming UnixFS blocks',
+        device: 'Sovereign Station',
+        isOnline: true,
+        lastSeen: 'Active now',
+        lastSeenTimestamp: now,
+        disappearingDurationSec: 0,
+        safetyNumbers: '19284 72910 48291 02938',
+        isVerified: true,
+      },
+      {
+        did: 'did:key:z6MksBobProtocolCore',
+        handle: 'bob_mesh',
+        name: 'Bob 🛠️ Protocol Core',
+        avatar: '🛠️',
+        avatarBg: '#10b981',
+        role: 'GossipSub Router Lead',
+        device: 'Mesh Relay Node',
+        isOnline: true,
+        lastSeen: '5m ago',
+        lastSeenTimestamp: now - 300000,
+        disappearingDurationSec: 0,
+        safetyNumbers: '74920 18392 01928 47192',
+        isVerified: true,
+      }
+    ];
   }
 
   // ==========================================
