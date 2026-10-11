@@ -532,6 +532,12 @@ export interface ReelRecord {
   creatorName: string;
   creatorAvatar?: string;
   caption: string;
+  shortHeader?: string;
+  summary?: string;
+  description?: string;
+  relatedVideoId?: string;
+  paywallFee?: number;
+  tippingEnabled?: boolean;
   tags: string[];
   audioTrack: string;
   likesCount: number;
@@ -598,6 +604,8 @@ export interface YoutubeVideoRecord {
   id: string;
   ownerDid?: string;
   title: string;
+  shortHeader?: string;
+  summary?: string;
   channelName: string;
   channelHandle: string;
   channelAvatar: string;
@@ -616,12 +624,16 @@ export interface YoutubeVideoRecord {
   publishedAt: string;
   description: string;
   tags: string[];
+  category?: string;
   ambientColor?: string;
   gradient?: string;
   chapters?: VideoChapter[];
   variants?: VideoVariant[];
   visibility?: string;
   status?: string;
+  paywallFee?: number;
+  tippingEnabled?: boolean;
+  relatedVideoId?: string;
   createdAt?: number;
   updatedAt?: number;
 }
@@ -4112,6 +4124,12 @@ export class SovraDatabaseEngine {
     creatorName: string;
     creatorAvatar?: string;
     caption: string;
+    shortHeader?: string;
+    summary?: string;
+    description?: string;
+    relatedVideoId?: string;
+    paywallFee?: number;
+    tippingEnabled?: boolean;
     tags?: string[];
     audioTrack?: string;
     bgGradient?: string;
@@ -4131,6 +4149,12 @@ export class SovraDatabaseEngine {
       creatorName: data.creatorName,
       creatorAvatar: data.creatorAvatar,
       caption: data.caption.trim(),
+      shortHeader: data.shortHeader?.trim(),
+      summary: data.summary?.trim(),
+      description: data.description?.trim(),
+      relatedVideoId: data.relatedVideoId,
+      paywallFee: typeof data.paywallFee === 'number' ? data.paywallFee : 0,
+      tippingEnabled: data.tippingEnabled !== false,
       tags: Array.isArray(data.tags) ? data.tags : ['#sovra', '#p2p', '#reels'],
       audioTrack: data.audioTrack || 'Original Audio - ' + data.creatorHandle,
       likesCount: 0,
@@ -4240,6 +4264,8 @@ export class SovraDatabaseEngine {
   public createVideo(params: {
     ownerDid: string;
     title: string;
+    shortHeader?: string;
+    summary?: string;
     description: string;
     cid: string;
     thumbnailCid?: string;
@@ -4250,7 +4276,11 @@ export class SovraDatabaseEngine {
     duration?: string;
     durationSeconds?: number;
     tags?: string[];
+    category?: string;
     visibility?: string;
+    paywallFee?: number;
+    tippingEnabled?: boolean;
+    relatedVideoId?: string;
   }): YoutubeVideoRecord {
     this.load();
     if (!Array.isArray(this.db.videos)) this.db.videos = this.getSeedVideos();
@@ -4260,6 +4290,8 @@ export class SovraDatabaseEngine {
       id,
       ownerDid: params.ownerDid,
       title: params.title.trim(),
+      shortHeader: params.shortHeader?.trim(),
+      summary: params.summary?.trim(),
       description: params.description.trim(),
       cid: params.cid,
       thumbnailCid: params.thumbnailCid,
@@ -4278,12 +4310,16 @@ export class SovraDatabaseEngine {
       durationSeconds: params.durationSeconds || 30,
       publishedAt: 'Just now',
       tags: Array.isArray(params.tags) ? params.tags : ['#sovra', '#p2p', '#watch'],
+      category: params.category || 'Technology',
       ambientColor: 'rgba(99, 102, 241, 0.45)',
       gradient: 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)',
       chapters: [{ timeSeconds: 0, timecode: '00:00', title: 'Start' }],
       variants: [{ resolution: '1080p', bitrate: '8 Mbps', framerate: '30fps', bandwidthBps: 8_000_000 }],
       visibility: params.visibility || 'public',
       status: 'ready',
+      paywallFee: typeof params.paywallFee === 'number' ? params.paywallFee : 0,
+      tippingEnabled: params.tippingEnabled !== false,
+      relatedVideoId: params.relatedVideoId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -4376,6 +4412,9 @@ export class SovraDatabaseEngine {
       {
         id: 'yt-video-1',
         title: 'Decentralized 4K Master Video & BitSwap Swarm Distribution | Sovra Architecture Deep Dive',
+        shortHeader: 'Sovra 4K Architecture Deep Dive',
+        summary: '• RFC 8216 HLS Master & Variant Playlist architecture breakdown\n• Speculative Segment 0 pre-warming for sub-300ms time-to-first-frame\n• 95/5 creator micropayment vouchers verified off-chain via Ed25519',
+        category: 'Technology',
         channelName: 'Sovra Protocol Lab',
         channelHandle: 'sovralab',
         channelAvatar: 'S',
@@ -4847,6 +4886,9 @@ export class SovraDatabaseEngine {
         creatorHandle: 'alice_creator',
         creatorName: 'Alice ⚡ P2P Architect',
         caption: 'Zero central servers! Streaming raw UnixFS blocks over pure UDP QUIC. ⚡ 60fps gesture physics & instant pre-warm.',
+        shortHeader: 'Pure UDP QUIC Video Swarm ⚡',
+        summary: '• 100% serverless UnixFS blocks streamed over direct UDP QUIC\n• Sub-300ms video startup with Speculative Segment 0 pre-warming\n• Zero central algorithmic feeds, pure P2P mesh distribution',
+        relatedVideoId: 'yt-video-1',
         tags: ['#sovra', '#p2p', '#reels', '#privacy', '#zeroalgorithms'],
         audioTrack: 'Original Audio - alice_creator',
         likesCount: 2489,
@@ -4864,6 +4906,9 @@ export class SovraDatabaseEngine {
         creatorHandle: 'bob_live',
         creatorName: 'Bob | 5G Telecom',
         caption: 'Testing ICE 4-tier hole punching on 5G carrier CGNAT. Sub-300ms video startup! 🔥 No relay bandwidth choked.',
+        shortHeader: '5G CGNAT Hole Punching 🔥',
+        summary: '• 4-tier ICE hole punching verified across commercial 5G carriers\n• Sub-300ms time-to-first-frame across cellular firewalls\n• Zero relay choking via direct BitSwap peer links',
+        relatedVideoId: 'yt-video-2',
         tags: ['#telecom', '#5g', '#cgnat', '#web3'],
         audioTrack: 'P2P Pulse Beats - Sound Collective',
         likesCount: 1845,
@@ -4881,6 +4926,8 @@ export class SovraDatabaseEngine {
         creatorHandle: 'carol_sounds',
         creatorName: 'Carol 🎧 Sound Designer',
         caption: 'Spatial multi-track audio session mixed locally on-device. No lossy compression! 🎧 Stems synced over BitSwap.',
+        shortHeader: 'Lossless Spatial Audio Stems 🎧',
+        summary: '• On-device spatial audio engine without lossy compression\n• Real-time BitSwap multi-track stem synchronization\n• Ed25519 creator audio fingerprinting',
         tags: ['#spatialaudio', '#lossless', '#creator', '#hifi'],
         audioTrack: 'Midnight Echoes (Spatial Mix) - Carol',
         likesCount: 3912,

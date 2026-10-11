@@ -264,6 +264,13 @@ interface ReelRecord {
   videoMimeType?: string;
   likedByDids?: string[];
   createdAt?: number;
+  shortHeader?: string;
+  summary?: string;
+  description?: string;
+  relatedVideoId?: string;
+  paywallFee?: number;
+  tippingEnabled?: boolean;
+  category?: string;
 }
 
 let reelsStore: ReelRecord[] = sovraDb.getAllReels();
@@ -817,12 +824,21 @@ interface YoutubeVideoRecord {
     framerate: string;
     bandwidthBps: number;
   }[];
+  shortHeader?: string;
+  summary?: string;
+  category?: string;
+  relatedVideoId?: string;
+  paywallFee?: number;
+  tippingEnabled?: boolean;
 }
 
 const longFormVideosCatalog: YoutubeVideoRecord[] = [
   {
     id: 'yt-video-1',
     title: 'Decentralized 4K Master Video & BitSwap Swarm Distribution | Sovra Architecture Deep Dive',
+    shortHeader: 'Sovra 4K Architecture Deep Dive',
+    summary: '• RFC 8216 HLS Master & Variant Playlist architecture breakdown\n• Speculative Segment 0 pre-warming for sub-300ms time-to-first-frame\n• 95/5 creator micropayment vouchers verified off-chain via Ed25519',
+    category: 'Technology',
     channelName: 'Sovra Protocol Lab',
     channelHandle: 'sovralab',
     channelAvatar: 'S',
@@ -10589,12 +10605,12 @@ function renderHtml(
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
                     <span class="media-btn-label">Reel</span>
                   </button>
-                  <button type="button" class="composer-media-btn" id="composerAddStudioBtn" title="Upload Video / Short to Channel or Sovereign Studio" onclick="openVideoUploadModal();">
+                  <button type="button" class="composer-media-btn" id="composerAddStudioBtn" title="Upload Video or Short" onclick="openVideoUploadModal();">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ef4444;"><polygon points="23 7 16 12 23 17 23 7"/><rect width="14" height="14" x="1" y="5" rx="2" ry="2"/></svg>
-                    <span class="media-btn-label">Studio</span>
+                    <span class="media-btn-label">Video</span>
                   </button>
                   <div class="composer-more-menu-container">
-                    <button type="button" class="composer-media-btn" id="composerMoreMenuBtn" title="More attachments (Poll, Survey, Q&A, Article, Mood, Card, Studio & Spaces)" onclick="toggleComposerMoreMenu(event)">
+                    <button type="button" class="composer-media-btn" id="composerMoreMenuBtn" title="More attachments (Poll, Survey, Q&A, Article, Mood, Card)" onclick="toggleComposerMoreMenu(event)">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       <span class="media-btn-label">More</span>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 1px;"><polyline points="6 9 12 15 18 9"/></svg>
@@ -10623,24 +10639,6 @@ function renderHtml(
                       <button type="button" class="composer-more-item" onclick="selectSmartAttachment('canvas')">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #6366f1;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.4-.4-.8-.4-1.3 0-.9.7-1.6 1.6-1.6h1.9c3.8 0 6.9-3.1 6.9-6.9 0-5.2-4.1-9.5-9.2-9.5z"/></svg>
                         <span>Card</span>
-                      </button>
-                      <div style="height: 1px; background: rgba(255, 255, 255, 0.1); margin: 5px 0;"></div>
-                      <div style="padding: 3px 8px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;">Studio & Spaces</div>
-                      <button type="button" class="composer-more-item" onclick="closeComposerMoreMenu(); openVideoUploadModal();">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ef4444;"><polygon points="23 7 16 12 23 17 23 7"/><rect width="14" height="14" x="1" y="5" rx="2" ry="2"/></svg>
-                        <span>Upload Video / Short</span>
-                      </button>
-                      <button type="button" class="composer-more-item" onclick="closeComposerMoreMenu(); openCreateChannelModal();">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-                        <span>Create Channel</span>
-                      </button>
-                      <button type="button" class="composer-more-item" onclick="closeComposerMoreMenu(); openCreatePageModal();">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #c084fc;"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="22.01"/><line x1="15" y1="22" x2="15" y2="22.01"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/></svg>
-                        <span>Create Page</span>
-                      </button>
-                      <button type="button" class="composer-more-item" onclick="closeComposerMoreMenu(); switchTab('me'); setTimeout(function(){ var el = document.getElementById('creatorHubEntitiesContainer'); if(el) el.scrollIntoView({behavior:'smooth'}); }, 350);">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                        <span>Manage Spaces</span>
                       </button>
                     </div>
                   </div>
@@ -11169,6 +11167,7 @@ function renderHtml(
 
           <!-- Bottom Meta Overlay -->
           <div class="reels-bottom-overlay">
+            <div id="reelFloatingHookBadge" style="display: none; background: rgba(225, 29, 72, 0.9); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fff; font-size: 0.76rem; font-weight: 800; padding: 4px 10px; border-radius: 6px; width: fit-content; margin-bottom: 6px; border: 1px solid rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.04em;"></div>
             <div class="reels-creator-row">
               <span class="reels-handle" id="reelCreatorHandle" onclick="event.stopPropagation(); openCreatorProfile(reelsData[currentReelIndex].creatorHandle)" style="cursor: pointer;">@${reelsStore[0] ? reelsStore[0].creatorHandle : 'you'}</span>
               <span style="color: #60a5fa; font-size: 0.85rem;" title="Verified Sovereign Identity">✓</span>
@@ -11176,6 +11175,14 @@ function renderHtml(
             </div>
             <div class="reels-caption" id="reelCaption">
               ${reelsStore[0] ? reelsStore[0].caption : 'Welcome to Sovra Reels'}
+            </div>
+            <div id="reelSmartPillsRow" style="display: flex; gap: 6px; align-items: center; margin: 4px 0; flex-wrap: wrap;">
+              <button id="reelSummaryPillBtn" type="button" onclick="event.stopPropagation(); toggleReelSummaryPopup()" style="display: none; background: rgba(168, 85, 247, 0.25); border: 1px solid rgba(168, 85, 247, 0.5); color: #d8b4fe; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; cursor: pointer;">🧠 Summary (TL;DR)</button>
+              <button id="reelRelatedVideoPillBtn" type="button" onclick="event.stopPropagation(); openReelRelatedVideo()" style="display: none; background: rgba(56, 189, 248, 0.25); border: 1px solid rgba(56, 189, 248, 0.5); color: #38bdf8; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; cursor: pointer;">▶ Watch Full Episode</button>
+            </div>
+            <div id="reelSummaryPopupCard" style="display: none; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 10px; padding: 8px 12px; margin: 4px 0; font-size: 0.74rem; color: #e2e8f0; line-height: 1.4; backdrop-filter: blur(12px);" onclick="event.stopPropagation()">
+              <div style="font-weight: 700; color: #c084fc; margin-bottom: 3px; font-size: 0.72rem;">🧠 Smart AI/Mesh Summary:</div>
+              <div id="reelSummaryContent" style="white-space: pre-line;"></div>
             </div>
             <div class="reels-audio-track" onclick="event.stopPropagation(); openAudioTrackSheet()">
               <span>🎵</span>
@@ -12164,6 +12171,12 @@ function renderHtml(
 
             <!-- Expandable Description Box with Clickable Chapters -->
             <div class="yt-desc-box collapsed" id="ytDescBox">
+              <div id="ytSummaryBox" style="${longFormVideosCatalog[0]!.summary ? 'display: block;' : 'display: none;'} background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 0.85rem; font-size: 0.82rem; color: #e9d5ff; line-height: 1.5; backdrop-filter: blur(8px);">
+                <div style="font-weight: 700; color: #c084fc; margin-bottom: 5px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
+                  <span>🧠</span> <span>Smart AI / Mesh Summary (TL;DR)</span>
+                </div>
+                <div id="ytSummaryText" style="white-space: pre-line; color: #f3e8ff;">${longFormVideosCatalog[0]!.summary || ''}</div>
+              </div>
               <div id="ytDescText">
                 ${longFormVideosCatalog[0]!.description}
               </div>
@@ -15176,89 +15189,213 @@ function renderHtml(
       </div>
     </div>
 
-  <!-- 🎥 6B. UPLOAD VIDEO & SHORTS MODAL (Watch & Reels Platform) -->
+  <!-- 🎥 6B. UPLOAD VIDEO & SHORTS MODAL (Sovereign Studio Wizard 3.0) -->
   <div id="videoUploadModal" class="omni-modal-overlay" style="display: none;">
-    <div class="omni-modal-card" style="max-width: 520px;">
-      <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
-        <div style="font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 6px;">
-          <span>🎥</span> <span>Upload Video &amp; Shorts to Sovra</span>
+    <div class="omni-modal-card" style="max-width: 560px; width: 95%;">
+      <div style="padding: 1.15rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 800; font-size: 1.05rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <span>🎥</span> <span>Sovereign Studio &bull; Video &amp; Shorts Ingestion</span>
         </div>
         <button onclick="closeVideoUploadModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
       </div>
-      <div style="padding: 1.25rem; max-height: calc(85vh - 70px); overflow-y: auto;">
+
+      <!-- 3-Step Wizard Navigation Tabs -->
+      <div style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25);">
+        <div id="videoWizardTab1" onclick="setVideoUploadStep(1)" style="flex: 1; text-align: center; padding: 10px 4px; font-size: 0.76rem; font-weight: 700; color: #38bdf8; border-bottom: 2px solid #38bdf8; cursor: pointer; transition: all 0.2s;">
+          1. Media &amp; Format
+        </div>
+        <div id="videoWizardTab2" onclick="setVideoUploadStep(2)" style="flex: 1; text-align: center; padding: 10px 4px; font-size: 0.76rem; font-weight: 600; color: #94a3b8; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s;">
+          2. Details &amp; SEO
+        </div>
+        <div id="videoWizardTab3" onclick="setVideoUploadStep(3)" style="flex: 1; text-align: center; padding: 10px 4px; font-size: 0.76rem; font-weight: 600; color: #94a3b8; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s;">
+          3. Publish &amp; Earn
+        </div>
+      </div>
+
+      <div style="padding: 1.25rem; max-height: calc(85vh - 120px); overflow-y: auto;">
         
-        <!-- Video Destination Switcher (Auto-detected or Manual) -->
-        <label class="social-modal-label">Destination &amp; Feed Format</label>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0.85rem;" id="videoFormatSelectorGroup">
-          <div id="targetFormatWatchTile" onclick="selectVideoUploadTargetFormat('watch')" style="cursor: pointer; padding: 10px; border-radius: 10px; border: 1px solid rgba(225, 29, 72, 0.5); background: rgba(225, 29, 72, 0.12); display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 1.2rem;">🎬</span>
-            <div>
-              <div style="font-weight: 700; font-size: 0.82rem; color: #fff;">16:9 Long-Form</div>
-              <div style="font-size: 0.68rem; color: #fda4af;">Watch Player Feed</div>
-            </div>
-          </div>
-          <div id="targetFormatShortTile" onclick="selectVideoUploadTargetFormat('short')" style="cursor: pointer; padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.03); display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 1.2rem;">📱</span>
-            <div>
-              <div style="font-weight: 700; font-size: 0.82rem; color: #fff;">9:16 Shorts / Reel</div>
-              <div style="font-size: 0.68rem; color: #94a3b8;">60fps Vertical Stage</div>
-            </div>
-          </div>
-        </div>
-        <input type="hidden" id="videoUploadTargetFormat" value="watch">
-
-        <label class="social-modal-label">Video Title / Caption</label>
-        <input type="text" id="videoUploadTitleInput" class="social-modal-input" placeholder="e.g. Decentralized Media &amp; P2P BitSwap Deep Dive" value="Decentralized Media &amp; P2P BitSwap Deep Dive">
-
-        <label class="social-modal-label">Channel / Creator</label>
-        <select id="videoUploadChannelSelect" class="social-modal-input">
-          <option value="personal">👤 Personal Profile</option>
-        </select>
-
-        <label class="social-modal-label">Tags (comma separated)</label>
-        <input type="text" id="videoUploadTagsInput" class="social-modal-input" placeholder="e.g. #P2P, #BitSwap, #Decentralized" value="#P2P, #BitSwap, #Decentralized">
-
-        <!-- File Picker & Live Frame / Thumbnail Preview -->
-        <label class="social-modal-label">Video File &amp; Merkle CID Ingest</label>
-        <div style="border: 2px dashed rgba(255,255,255,0.15); border-radius: 12px; padding: 1rem; text-align: center; cursor: pointer; background: rgba(0,0,0,0.25);" onclick="document.getElementById('videoUploadFileInput').click()">
-          <input type="file" id="videoUploadFileInput" accept="video/*" style="display: none;" onchange="handleVideoFileSelected(event)" />
-          <div style="font-size: 1.8rem; margin-bottom: 0.25rem;">🎬</div>
-          <div style="font-size: 0.84rem; color: #f8fafc; font-weight: 600;" id="videoUploadFilePrompt">Choose video file (MP4, MKV, WebM)</div>
-          <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;" id="videoUploadFormatBadge">Automatic aspect-ratio detection &amp; frame capture</div>
-          <img id="videoUploadThumbPreview" style="display: none; max-height: 120px; border-radius: 8px; object-fit: cover; margin: 8px auto 0; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(0,0,0,0.4);" alt="Thumbnail Preview" />
-        </div>
-
-        <!-- Sovereign Monetization & Access Controls -->
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 0.75rem 0.85rem; margin-top: 0.85rem; display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-weight: 700; font-size: 0.82rem; color: #fbbf24; display: flex; align-items: center; gap: 4px;">
-                <span>⚡</span> <span>P2P Micro-Tipping (Super Thanks)</span>
+        <!-- STEP 1: MEDIA & FORMAT -->
+        <div id="videoUploadStep1" style="display: flex; flex-direction: column; gap: 0.85rem;">
+          <label class="social-modal-label">Target Format &amp; Player Feed</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" id="videoFormatSelectorGroup">
+            <div id="targetFormatWatchTile" onclick="selectVideoUploadTargetFormat('watch')" style="cursor: pointer; padding: 10px; border-radius: 10px; border: 1px solid rgba(225, 29, 72, 0.5); background: rgba(225, 29, 72, 0.12); display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.2rem;">🎬</span>
+              <div>
+                <div style="font-weight: 700; font-size: 0.82rem; color: #fff;">16:9 Long-Form</div>
+                <div style="font-size: 0.68rem; color: #fda4af;">Watch Player Feed</div>
               </div>
-              <div style="font-size: 0.7rem; color: #94a3b8;">95% Creator Split • 0% Platform Middleman Cut</div>
             </div>
-            <label class="switch" style="transform: scale(0.85);">
-              <input type="checkbox" id="videoUploadTippingToggle" checked>
-              <span class="slider"></span>
-            </label>
+            <div id="targetFormatShortTile" onclick="selectVideoUploadTargetFormat('short')" style="cursor: pointer; padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.03); display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.2rem;">📱</span>
+              <div>
+                <div style="font-weight: 700; font-size: 0.82rem; color: #fff;">9:16 Shorts / Reel</div>
+                <div style="font-size: 0.68rem; color: #94a3b8;">60fps Vertical Stage</div>
+              </div>
+            </div>
+          </div>
+          <input type="hidden" id="videoUploadTargetFormat" value="watch">
+
+          <!-- File Picker & Dropzone -->
+          <label class="social-modal-label">Video File (MP4, WebM, MOV)</label>
+          <div style="border: 2px dashed rgba(255,255,255,0.18); border-radius: 12px; padding: 1.25rem 1rem; text-align: center; cursor: pointer; background: rgba(0,0,0,0.25); transition: border-color 0.2s;" onclick="document.getElementById('videoUploadFileInput').click()">
+            <input type="file" id="videoUploadFileInput" accept="video/*" style="display: none;" onchange="handleVideoFileSelected(event)" />
+            <div style="font-size: 2rem; margin-bottom: 0.35rem;">🎬</div>
+            <div style="font-size: 0.88rem; color: #f8fafc; font-weight: 700;" id="videoUploadFilePrompt">Choose video or drag &amp; drop</div>
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 4px;" id="videoUploadFormatBadge">Automatic aspect-ratio detection &amp; frame capture</div>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.05);">
-            <div>
-              <div style="font-weight: 700; font-size: 0.82rem; color: #f1f5f9;">Content Visibility</div>
-              <div style="font-size: 0.7rem; color: #94a3b8;">Global Kademlia DHT announce vs Encrypted pass</div>
+          <!-- Video Thumbnail Frame Scrubber & Preview -->
+          <div id="videoThumbScrubberContainer" style="display: none; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 0.74rem; font-weight: 700; color: #e2e8f0;">🎞️ Select Cover Frame</span>
+              <span style="font-size: 0.68rem; color: #38bdf8;" id="videoThumbScrubLabel">Frame at 1.0s</span>
             </div>
-            <select id="videoUploadVisibilitySelect" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.75rem; border-radius: 6px; padding: 3px 6px;">
-              <option value="public">🌐 Public (Mesh)</option>
-              <option value="unlisted">🔗 Unlisted</option>
-              <option value="members">🔒 Members Only</option>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <img id="videoUploadThumbPreview" style="height: 72px; width: 72px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0;" alt="Thumbnail Preview" />
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                <input type="range" id="videoThumbnailScrubber" min="0" max="100" value="10" style="width: 100%; accent-color: #38bdf8; cursor: pointer;" oninput="handleVideoThumbnailScrub(this.value)" />
+                <div style="font-size: 0.68rem; color: #94a3b8;">Slide to pick the best thumbnail frame for your audience.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: DETAILS & CONTENT INTELLIGENCE -->
+        <div id="videoUploadStep2" style="display: none; flex-direction: column; gap: 0.85rem;">
+          <div>
+            <label class="social-modal-label">Video Title / Headline <span style="color:#ef4444;">*</span></label>
+            <input type="text" id="videoUploadTitleInput" class="social-modal-input" placeholder="e.g. Decentralized Media &amp; P2P BitSwap Deep Dive" value="Decentralized Media &amp; P2P BitSwap Deep Dive">
+          </div>
+
+          <!-- Short Hook / Floating Header (Special for Shorts) -->
+          <div id="shortHookContainer" style="background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="social-modal-label" style="margin: 0; color: #38bdf8;">⚡ Short Hook / Floating Header (First 3-Sec Punchline)</label>
+              <span style="font-size: 0.68rem; color: #94a3b8;">Max 50 chars</span>
+            </div>
+            <input type="text" id="videoUploadShortHeaderInput" class="social-modal-input" placeholder="e.g. WAIT FOR THE END 🔥 or TOP 3 TOOLS IN 2026" maxlength="50" style="border-color: rgba(56, 189, 248, 0.35);">
+            <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 3px;">Displays as an eye-catching floating banner over the reel in user feeds.</div>
+          </div>
+
+          <!-- Smart 3-Bullet Summary (TL;DR - P2P Bandwidth Saver) -->
+          <div style="background: rgba(168, 85, 247, 0.06); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 10px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="social-modal-label" style="margin: 0; color: #c084fc;">🧠 Smart 3-Bullet Summary (TL;DR Preview)</label>
+              <span style="font-size: 0.68rem; color: #a855f7;">P2P Bandwidth Saver</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 4px;">
+              <input type="text" id="videoUploadSummary1" class="social-modal-input" style="padding: 6px 10px; font-size: 0.8rem;" placeholder="🔹 Bullet 1: Core discovery or problem discussed...">
+              <input type="text" id="videoUploadSummary2" class="social-modal-input" style="padding: 6px 10px; font-size: 0.8rem;" placeholder="🔹 Bullet 2: Key demo, technique, or code insight...">
+              <input type="text" id="videoUploadSummary3" class="social-modal-input" style="padding: 6px 10px; font-size: 0.8rem;" placeholder="🔹 Bullet 3: Key takeaway or final result...">
+            </div>
+            <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 4px;">Enables peers on low-bandwidth nodes to read the essence before streaming.</div>
+          </div>
+
+          <!-- Rich Description & Chapters -->
+          <div>
+            <label class="social-modal-label">Description &amp; Chapters (Timestamps)</label>
+            <textarea id="videoUploadDescInput" class="social-modal-input" style="min-height: 75px; resize: vertical; font-size: 0.8rem;" placeholder="Full details, references, and chapters (e.g. 00:00 Intro, 01:25 Demo, 04:30 Wrap-up)..."></textarea>
+          </div>
+
+          <!-- Category & Tags -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>
+              <label class="social-modal-label">Category</label>
+              <select id="videoUploadCategorySelect" class="social-modal-input" style="padding: 7px 10px;">
+                <option value="Technology">💻 Technology &amp; P2P</option>
+                <option value="Education">🎓 Education &amp; Tutorials</option>
+                <option value="Gaming">🎮 Gaming</option>
+                <option value="Music">🎵 Music &amp; Audio</option>
+                <option value="Entertainment">🍿 Comedy &amp; Entertainment</option>
+                <option value="Crypto">⚡ Crypto &amp; Web3</option>
+                <option value="News">📰 News &amp; Sovereign Mesh</option>
+              </select>
+            </div>
+            <div>
+              <label class="social-modal-label">Topic Tags</label>
+              <input type="text" id="videoUploadTagsInput" class="social-modal-input" placeholder="#P2P, #Shorts, #Tech" value="#P2P, #Shorts, #Sovra">
+            </div>
+          </div>
+
+          <!-- Bridge: Link Related Full Video (Optional) -->
+          <div>
+            <label class="social-modal-label">🔗 Link Related Long Video (Watch Full Episode Bridge)</label>
+            <select id="videoUploadRelatedVideoSelect" class="social-modal-input">
+              <option value="">None (Standalone)</option>
+            </select>
+            <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 2px;">Shows a '▶ Watch Full Video' pill directly on the short.</div>
+          </div>
+        </div>
+
+        <!-- STEP 3: PUBLISH DESTINATION, MONETIZATION & ACCESS -->
+        <div id="videoUploadStep3" style="display: none; flex-direction: column; gap: 0.85rem;">
+          <!-- Channel / Persona Selection -->
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="social-modal-label" style="margin: 0;">Publish As (Channel / Profile)</label>
+              <button type="button" onclick="closeVideoUploadModal(); switchTab('me'); setTimeout(function(){ openCreateChannelModal(); }, 350);" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; text-decoration: underline; font-weight: 600;">+ Create Channel in Studio</button>
+            </div>
+            <select id="videoUploadChannelSelect" class="social-modal-input">
+              <option value="personal">👤 Personal Profile</option>
             </select>
           </div>
+
+          <!-- Sovereign Monetization & Access Controls -->
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: 700; font-size: 0.82rem; color: #fbbf24; display: flex; align-items: center; gap: 4px;">
+                  <span>⚡</span> <span>P2P Micro-Tipping (Super Thanks)</span>
+                </div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">95% Direct Creator Split &bull; Instant Off-Chain Vouchers</div>
+              </div>
+              <label class="switch" style="transform: scale(0.85);">
+                <input type="checkbox" id="videoUploadTippingToggle" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <!-- Micro-Paywall Fee -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+              <div>
+                <div style="font-weight: 700; font-size: 0.82rem; color: #34d399;">💎 Micro-Paywall Unlock Fee</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">0 = Free to all peers; &gt;0 = Paid unlock in SOVRA</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <input type="number" id="videoUploadPaywallFeeInput" min="0" max="1000" value="0" class="social-modal-input" style="width: 70px; padding: 4px 8px; text-align: center; font-size: 0.82rem;">
+                <span style="font-size: 0.72rem; color: #34d399; font-weight: 700;">SOVRA</span>
+              </div>
+            </div>
+
+            <!-- Content Visibility -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+              <div>
+                <div style="font-weight: 700; font-size: 0.82rem; color: #f1f5f9;">Content Visibility</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">Global Kademlia DHT announce vs Encrypted pass</div>
+              </div>
+              <select id="videoUploadVisibilitySelect" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.75rem; border-radius: 6px; padding: 4px 8px;">
+                <option value="public">🌐 Public (Mesh)</option>
+                <option value="unlisted">🔗 Unlisted</option>
+                <option value="members">🔒 Members Only</option>
+              </select>
+            </div>
+
+            <!-- Audio Track & Remix (For Shorts) -->
+            <div id="shortsAudioOptionsRow" style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+              <div>
+                <div style="font-weight: 700; font-size: 0.82rem; color: #f1f5f9;">🎵 Audio Attribution</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">Tag as Original Audio</div>
+              </div>
+              <input type="text" id="videoUploadAudioTrackInput" class="social-modal-input" style="width: 140px; padding: 3px 8px; font-size: 0.72rem;" placeholder="Original Audio">
+            </div>
+          </div>
         </div>
 
-        <div style="display: flex; gap: 0.75rem; margin-top: 1.15rem;">
-          <button onclick="closeVideoUploadModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
-          <button onclick="submitVideoUpload()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem; background: #e11d48; border-color: #f43f5e;" id="btnSubmitVideoUpload">Publish Content 🚀</button>
+        <!-- Wizard Navigation Action Buttons -->
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+          <button id="btnVideoWizardBack" onclick="handleVideoWizardBack()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.84rem; display: none;">&larr; Back</button>
+          <button id="btnVideoWizardNext" onclick="handleVideoWizardNext()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem; background: #0284c7; border-color: #38bdf8;">Next Step &rarr;</button>
+          <button id="btnSubmitVideoUpload" onclick="submitVideoUpload()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem; background: #e11d48; border-color: #f43f5e; display: none;">Publish Content 🚀</button>
         </div>
       </div>
     </div>
@@ -31245,6 +31382,43 @@ function renderHtml(
       const captionEl = document.getElementById('reelCaption');
       if (captionEl) captionEl.innerText = r.caption;
 
+      // Smart Floating Hook / Header
+      const hookBadge = document.getElementById('reelFloatingHookBadge');
+      if (hookBadge) {
+        if (r.shortHeader && r.shortHeader.trim()) {
+          hookBadge.innerText = '⚡ ' + r.shortHeader.trim();
+          hookBadge.style.display = 'block';
+        } else {
+          hookBadge.style.display = 'none';
+        }
+      }
+
+      // Smart Summary (TL;DR) Pill & Popup
+      const summaryBtn = document.getElementById('reelSummaryPillBtn');
+      const summaryPopup = document.getElementById('reelSummaryPopupCard');
+      const summaryContent = document.getElementById('reelSummaryContent');
+      if (summaryBtn) {
+        if (r.summary && r.summary.trim()) {
+          summaryBtn.style.display = 'inline-flex';
+          if (summaryContent) summaryContent.innerText = r.summary.trim();
+        } else {
+          summaryBtn.style.display = 'none';
+        }
+      }
+      if (summaryPopup) summaryPopup.style.display = 'none';
+
+      // Related Long-Form Video Bridge
+      const relatedBtn = document.getElementById('reelRelatedVideoPillBtn');
+      if (relatedBtn) {
+        if (r.relatedVideoId && r.relatedVideoId.trim()) {
+          relatedBtn.style.display = 'inline-flex';
+          relatedBtn.setAttribute('data-related-vid', r.relatedVideoId.trim());
+        } else {
+          relatedBtn.style.display = 'none';
+          relatedBtn.removeAttribute('data-related-vid');
+        }
+      }
+
       const audioEl = document.getElementById('reelAudioTrack');
       if (audioEl) audioEl.innerText = r.audioTrack;
 
@@ -31364,6 +31538,43 @@ function renderHtml(
       if (idx !== -1) {
         currentReelIndex = idx;
         renderCurrentReel();
+      }
+    }
+
+    function toggleReelSummaryPopup() {
+      const popup = document.getElementById('reelSummaryPopupCard');
+      if (!popup) return;
+      popup.style.display = (popup.style.display === 'none' || !popup.style.display) ? 'block' : 'none';
+    }
+
+    function openReelRelatedVideo() {
+      const relatedBtn = document.getElementById('reelRelatedVideoPillBtn');
+      const vidId = relatedBtn ? relatedBtn.getAttribute('data-related-vid') : null;
+      if (!vidId) return;
+
+      const videoEl = document.getElementById('reelVideoPlayer');
+      if (videoEl) videoEl.pause();
+      isReelPlaying = false;
+
+      if (typeof switchTab === 'function') {
+        switchTab('youtube');
+      }
+
+      if (typeof ytVideosCatalog !== 'undefined' && Array.isArray(ytVideosCatalog)) {
+        const foundIdx = ytVideosCatalog.findIndex(v => v && v.id === vidId);
+        if (foundIdx !== -1) {
+          if (typeof renderYtVideo === 'function') renderYtVideo(foundIdx, true);
+        } else {
+          fetch('/api/youtube/video?id=' + encodeURIComponent(vidId))
+            .then(res => res.json())
+            .then(data => {
+              if (data && data.video) {
+                ytVideosCatalog.unshift(data.video);
+                if (typeof renderYtVideo === 'function') renderYtVideo(0, true);
+              }
+            })
+            .catch(() => {});
+        }
       }
     }
 
@@ -35954,6 +36165,18 @@ function renderHtml(
         bellBtn.style.display = isSub ? 'flex' : 'none';
       }
 
+      // Smart Summary (TL;DR)
+      const summaryBox = document.getElementById('ytSummaryBox');
+      const summaryText = document.getElementById('ytSummaryText');
+      if (summaryBox) {
+        if (v.summary && v.summary.trim()) {
+          summaryBox.style.display = 'block';
+          if (summaryText) summaryText.innerText = v.summary.trim();
+        } else {
+          summaryBox.style.display = 'none';
+        }
+      }
+
       // Description & Clickable Chapters
       const descText = document.getElementById('ytDescText');
       if (descText) descText.innerText = v.description;
@@ -38965,10 +39188,78 @@ function renderHtml(
     }
 
     // --- Multi-Format Video & Shorts Upload Handlers (Watch & Reels Platform) ---
+    // --- Multi-Format Video & Shorts Upload Handlers (Sovereign Studio Wizard 3.0) ---
+    let currentVideoWizardStep = 1;
+    let activeUploadVideoElement = null;
+    let selectedVideoUploadFile = null;
+
+    function setVideoUploadStep(step) {
+      currentVideoWizardStep = step;
+      const s1 = document.getElementById('videoUploadStep1');
+      const s2 = document.getElementById('videoUploadStep2');
+      const s3 = document.getElementById('videoUploadStep3');
+      if (s1) s1.style.display = (step === 1 ? 'flex' : 'none');
+      if (s2) s2.style.display = (step === 2 ? 'flex' : 'none');
+      if (s3) s3.style.display = (step === 3 ? 'flex' : 'none');
+
+      const t1 = document.getElementById('videoWizardTab1');
+      const t2 = document.getElementById('videoWizardTab2');
+      const t3 = document.getElementById('videoWizardTab3');
+      const activeStyle = 'flex: 1; text-align: center; padding: 10px 4px; font-size: 0.76rem; font-weight: 700; color: #38bdf8; border-bottom: 2px solid #38bdf8; cursor: pointer; transition: all 0.2s;';
+      const inactiveStyle = 'flex: 1; text-align: center; padding: 10px 4px; font-size: 0.76rem; font-weight: 600; color: #94a3b8; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s;';
+      if (t1) t1.style.cssText = (step === 1 ? activeStyle : inactiveStyle);
+      if (t2) t2.style.cssText = (step === 2 ? activeStyle : inactiveStyle);
+      if (t3) t3.style.cssText = (step === 3 ? activeStyle : inactiveStyle);
+
+      const btnBack = document.getElementById('btnVideoWizardBack');
+      const btnNext = document.getElementById('btnVideoWizardNext');
+      const btnSubmit = document.getElementById('btnSubmitVideoUpload');
+      if (btnBack) btnBack.style.display = (step > 1 ? 'inline-flex' : 'none');
+      if (btnNext) btnNext.style.display = (step < 3 ? 'inline-flex' : 'none');
+      if (btnSubmit) btnSubmit.style.display = (step === 3 ? 'inline-flex' : 'none');
+    }
+
+    function handleVideoWizardNext() {
+      if (currentVideoWizardStep === 1) {
+        if (!selectedVideoUploadFile && !window._selectedVideoThumbnail) {
+          alert('Please select a video file first to continue.');
+          return;
+        }
+        setVideoUploadStep(2);
+      } else if (currentVideoWizardStep === 2) {
+        const title = document.getElementById('videoUploadTitleInput');
+        if (!title || !title.value.trim()) {
+          alert('Please enter a Video Title / Headline before continuing.');
+          if (title) title.focus();
+          return;
+        }
+        setVideoUploadStep(3);
+      }
+    }
+
+    function handleVideoWizardBack() {
+      if (currentVideoWizardStep > 1) {
+        setVideoUploadStep(currentVideoWizardStep - 1);
+      }
+    }
+
+    function handleVideoThumbnailScrub(val) {
+      const pct = parseFloat(val) || 0;
+      if (activeUploadVideoElement && activeUploadVideoElement.duration) {
+        const seekTime = (pct / 100) * activeUploadVideoElement.duration;
+        const label = document.getElementById('videoThumbScrubLabel');
+        if (label) label.innerText = 'Frame at ' + seekTime.toFixed(1) + 's';
+        activeUploadVideoElement.currentTime = seekTime;
+      }
+    }
+
     function openVideoUploadModal() {
       const m = document.getElementById('videoUploadModal');
       if (m) {
         m.style.display = 'flex';
+        setVideoUploadStep(1);
+
+        // Populate channels
         const sel = document.getElementById('videoUploadChannelSelect');
         if (sel) {
           const myName = (myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Profile';
@@ -38979,6 +39270,17 @@ function renderHtml(
           }
           sel.innerHTML = opts;
         }
+
+        // Populate related long videos
+        const relSel = document.getElementById('videoUploadRelatedVideoSelect');
+        if (relSel) {
+          let relOpts = '<option value="">None (Standalone)</option>';
+          const vids = (typeof longFormVideosCatalog !== 'undefined' ? longFormVideosCatalog : (typeof ytVideosCatalog !== 'undefined' ? ytVideosCatalog : []));
+          for (let v = 0; v < Math.min(vids.length, 12); v++) {
+            relOpts += '<option value="' + vids[v].id + '">🎬 ' + (vids[v].title || 'Episode ' + (v + 1)) + '</option>';
+          }
+          relSel.innerHTML = relOpts;
+        }
       }
     }
 
@@ -38986,6 +39288,7 @@ function renderHtml(
       const m = document.getElementById('videoUploadModal');
       if (m) m.style.display = 'none';
       selectedVideoUploadFile = null;
+      activeUploadVideoElement = null;
       window._selectedVideoThumbnail = null;
       window._selectedVideoDuration = null;
       const thumbEl = document.getElementById('videoUploadThumbPreview');
@@ -38993,13 +39296,16 @@ function renderHtml(
         thumbEl.style.display = 'none';
         thumbEl.src = '';
       }
+      const scrubberContainer = document.getElementById('videoThumbScrubberContainer');
+      if (scrubberContainer) scrubberContainer.style.display = 'none';
       const promptEl = document.getElementById('videoUploadFilePrompt');
-      if (promptEl) promptEl.innerText = 'Choose video file (MP4, MKV, WebM)';
+      if (promptEl) promptEl.innerText = 'Choose video or drag & drop';
       const badgeEl = document.getElementById('videoUploadFormatBadge');
       if (badgeEl) {
         badgeEl.innerHTML = 'Automatic aspect-ratio detection &amp; frame capture';
         badgeEl.style.color = '#94a3b8';
       }
+      setVideoUploadStep(1);
     }
 
     function selectVideoUploadTargetFormat(fmt) {
@@ -39008,6 +39314,8 @@ function renderHtml(
       const watchTile = document.getElementById('targetFormatWatchTile');
       const shortTile = document.getElementById('targetFormatShortTile');
       const submitBtn = document.getElementById('btnSubmitVideoUpload');
+      const shortHookBox = document.getElementById('shortHookContainer');
+      const audioRow = document.getElementById('shortsAudioOptionsRow');
 
       if (fmt === 'short') {
         if (shortTile) {
@@ -39018,6 +39326,8 @@ function renderHtml(
           watchTile.style.borderColor = 'rgba(255, 255, 255, 0.1)';
           watchTile.style.background = 'rgba(255, 255, 255, 0.03)';
         }
+        if (shortHookBox) shortHookBox.style.display = 'block';
+        if (audioRow) audioRow.style.display = 'flex';
         if (submitBtn) submitBtn.innerText = 'Publish Short to Reels Feed 🚀';
       } else {
         if (watchTile) {
@@ -39028,11 +39338,12 @@ function renderHtml(
           shortTile.style.borderColor = 'rgba(255, 255, 255, 0.1)';
           shortTile.style.background = 'rgba(255, 255, 255, 0.03)';
         }
+        if (shortHookBox) shortHookBox.style.display = 'none';
+        if (audioRow) audioRow.style.display = 'none';
         if (submitBtn) submitBtn.innerText = 'Publish to Sovereign Watch 🚀';
       }
     }
 
-    let selectedVideoUploadFile = null;
     function handleVideoFileSelected(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
@@ -39049,6 +39360,7 @@ function renderHtml(
         tempVideo.playsInline = true;
         const objectUrl = URL.createObjectURL(file);
         tempVideo.src = objectUrl;
+        activeUploadVideoElement = tempVideo;
 
         tempVideo.onloadedmetadata = function() {
           const w = tempVideo.videoWidth || 0;
@@ -39070,7 +39382,10 @@ function renderHtml(
           }
           selectVideoUploadTargetFormat(isVertical ? 'short' : 'watch');
 
-          // Seek to 1s to capture frame preview
+          const scrubberContainer = document.getElementById('videoThumbScrubberContainer');
+          if (scrubberContainer) scrubberContainer.style.display = 'block';
+
+          // Seek to initial frame preview
           tempVideo.currentTime = Math.min(1.0, dur > 1 ? 1.0 : (dur > 0 ? dur / 2 : 0.1));
         };
 
@@ -39093,8 +39408,6 @@ function renderHtml(
             }
           } catch (e) {
             console.warn('[Upload] Frame capture fallback:', e);
-          } finally {
-            URL.revokeObjectURL(objectUrl);
           }
         };
       } catch (err) {
@@ -39103,20 +39416,32 @@ function renderHtml(
     }
 
     async function submitVideoUpload() {
-      const title = document.getElementById('videoUploadTitleInput').value.trim();
-      const tagsStr = document.getElementById('videoUploadTagsInput').value.trim();
+      const title = (document.getElementById('videoUploadTitleInput')?.value || '').trim();
+      const shortHeader = (document.getElementById('videoUploadShortHeaderInput')?.value || '').trim();
+      const s1 = (document.getElementById('videoUploadSummary1')?.value || '').trim();
+      const s2 = (document.getElementById('videoUploadSummary2')?.value || '').trim();
+      const s3 = (document.getElementById('videoUploadSummary3')?.value || '').trim();
+      const summaryBullets = [s1, s2, s3].filter(Boolean);
+      const summary = summaryBullets.length ? ('• ' + summaryBullets.join(String.fromCharCode(10) + '• ')) : '';
+      const description = (document.getElementById('videoUploadDescInput')?.value || '').trim();
+      const category = document.getElementById('videoUploadCategorySelect')?.value || 'Technology';
+      const tagsStr = (document.getElementById('videoUploadTagsInput')?.value || '').trim();
+      const relatedVideoId = document.getElementById('videoUploadRelatedVideoSelect')?.value || '';
       const targetFmt = document.getElementById('videoUploadTargetFormat') ? document.getElementById('videoUploadTargetFormat').value : 'watch';
       const tippingEl = document.getElementById('videoUploadTippingToggle');
       const isTippingEnabled = tippingEl ? tippingEl.checked : true;
+      const paywallFee = parseFloat(document.getElementById('videoUploadPaywallFeeInput')?.value) || 0;
       const visEl = document.getElementById('videoUploadVisibilitySelect');
       const visibility = visEl ? visEl.value : 'public';
+      const audioTrack = (document.getElementById('videoUploadAudioTrackInput')?.value || '').trim();
 
       if (!title) {
-        alert('Please enter a video title or caption.');
+        alert('Please enter a video title or headline.');
+        setVideoUploadStep(2);
         return;
       }
       const tags = tagsStr.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
-      const publishBtn = document.getElementById('btnSubmitVideoUpload') || document.querySelector('#videoUploadModal .action-pill-primary');
+      const publishBtn = document.getElementById('btnSubmitVideoUpload');
       if (publishBtn) {
         publishBtn.disabled = true;
         publishBtn.innerText = 'Publishing to P2P Mesh... ⏳';
@@ -39157,12 +39482,19 @@ function renderHtml(
           // Route 1: 9:16 Vertical Short / Reel Ingestion
           const payload = {
             caption: title,
+            shortHeader: shortHeader,
+            summary: summary,
+            description: description,
             tags: tags.length ? tags : ['#Shorts', '#Sovra', '#P2P'],
             creatorHandle: authorHandle,
             creatorName: authorName,
             videoData: videoData,
             thumbnailData: window._selectedVideoThumbnail,
             mimeType: mimeType,
+            relatedVideoId: relatedVideoId,
+            paywallFee: paywallFee,
+            tippingEnabled: isTippingEnabled,
+            audioTrack: audioTrack || ('Original Audio - ' + authorHandle),
             isShort: true
           };
 
@@ -39188,6 +39520,10 @@ function renderHtml(
           // Route 2: 16:9 Landscape Long-Form Watch Ingestion
           const payload = {
             title: title,
+            shortHeader: shortHeader,
+            summary: summary,
+            description: description || title,
+            category: category,
             tags: tags.length ? tags : ['#Sovereign', '#P2P'],
             channelName: authorName,
             channelHandle: authorHandle,
@@ -39196,6 +39532,8 @@ function renderHtml(
             durationSeconds: window._selectedVideoDuration || 600,
             mimeType: mimeType,
             visibility: visibility,
+            relatedVideoId: relatedVideoId,
+            paywallFee: paywallFee,
             monetization: { tippingEnabled: isTippingEnabled, creatorSplitPercent: 95 }
           };
 
@@ -39292,6 +39630,10 @@ function renderHtml(
             '<span style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 12px; font-weight: 600;">👥 Total Audience: ' + totalAudience.toLocaleString() + '</span>' +
             '<span style="background: rgba(52, 211, 153, 0.12); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); padding: 2px 8px; border-radius: 12px; font-weight: 600;">⚡ 100% Sovereign</span>' +
           '</div>' +
+        '</div>' +
+        '<div style="display: flex; gap: 8px; align-items: center; margin-top: 0.6rem; flex-wrap: wrap;">' +
+          '<button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="padding: 7px 15px; font-size: 0.78rem; border-radius: 9px; background: rgba(56, 189, 248, 0.22); border: 1px solid rgba(56, 189, 248, 0.5); color: #38bdf8; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">📢 + Create Channel</button>' +
+          '<button type="button" class="btn btn-secondary" onclick="openCreatePageModal()" style="padding: 7px 15px; font-size: 0.78rem; border-radius: 9px; background: rgba(192, 132, 252, 0.18); border: 1px solid rgba(192, 132, 252, 0.45); color: #c084fc; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">🏢 + Create Page</button>' +
         '</div>' +
         '</div>';
 
@@ -45240,6 +45582,12 @@ async function startDevServer() {
           creatorName: String(parsed.creatorName || 'You (Sovereign)'),
           creatorAvatar: parsed.creatorAvatar ? String(parsed.creatorAvatar) : undefined,
           caption: String(parsed.caption || 'Decentralized Sovereign Reel'),
+          shortHeader: parsed.shortHeader ? String(parsed.shortHeader) : undefined,
+          summary: parsed.summary ? String(parsed.summary) : undefined,
+          description: parsed.description ? String(parsed.description) : undefined,
+          relatedVideoId: parsed.relatedVideoId ? String(parsed.relatedVideoId) : undefined,
+          paywallFee: typeof parsed.paywallFee === 'number' ? parsed.paywallFee : 0,
+          tippingEnabled: parsed.tippingEnabled !== false,
           tags,
           audioTrack: parsed.audioTrack ? String(parsed.audioTrack) : undefined,
           cid,
@@ -47685,6 +48033,8 @@ async function startDevServer() {
         const newVideo = sovraDb.createVideo({
           ownerDid: principal.did,
           title,
+          shortHeader: parsed.shortHeader ? String(parsed.shortHeader) : undefined,
+          summary: parsed.summary ? String(parsed.summary) : undefined,
           description: String(parsed.description || title).trim(),
           cid,
           channelName: parsed.channelName,
@@ -47692,7 +48042,11 @@ async function startDevServer() {
           duration: parsed.duration || '10:00',
           durationSeconds: parsed.durationSeconds || 600,
           tags,
+          category: parsed.category ? String(parsed.category) : 'Technology',
           visibility: parsed.visibility || 'public',
+          paywallFee: typeof parsed.paywallFee === 'number' ? parsed.paywallFee : 0,
+          tippingEnabled: parsed.tippingEnabled !== false,
+          relatedVideoId: parsed.relatedVideoId ? String(parsed.relatedVideoId) : undefined,
         });
         longFormVideosCatalog.unshift(newVideo);
         currentYoutubeVideo = newVideo;
@@ -47704,6 +48058,12 @@ async function startDevServer() {
               creatorHandle: String(parsed.channelHandle || 'you_peer').replace('@', ''),
               creatorName: String(parsed.channelName || 'You (Sovereign)'),
               caption: title,
+              shortHeader: parsed.shortHeader ? String(parsed.shortHeader) : undefined,
+              summary: parsed.summary ? String(parsed.summary) : undefined,
+              description: String(parsed.description || title).trim(),
+              relatedVideoId: parsed.relatedVideoId ? String(parsed.relatedVideoId) : undefined,
+              paywallFee: typeof parsed.paywallFee === 'number' ? parsed.paywallFee : 0,
+              tippingEnabled: parsed.tippingEnabled !== false,
               tags,
               cid,
               videoUrl: `/api/reels/video/${cid}`,
@@ -50862,6 +51222,7 @@ async function startDevServer() {
     console.error('\n' + '='.repeat(70));
     console.error(`🚨 [FATAL INTEGRITY CHECK ERROR] Client <script> failed syntax validation:`);
     console.error(`   Message: ${err.message}`);
+    console.error(`   Stack: ${err.stack}`);
     console.error(`   The client UI will FREEZE if served!`);
     console.error('='.repeat(70) + '\n');
     if (!process.env.VITEST) {
