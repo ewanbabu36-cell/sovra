@@ -9998,11 +9998,6 @@ function renderHtml(
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
-
-      <a href="/admin" target="_blank" class="ops-console-rail-link" title="Open Dedicated Company Operations Console">
-        <span>🛡️ Ops Console (/admin)</span>
-        <span>↗</span>
-      </a>
     </aside>
 
     <!-- Dev Server Off-Canvas Main Menu Drawer (Zero Popup) -->
@@ -10040,9 +10035,6 @@ function renderHtml(
         </div>
         <div class="dev-drawer-item" onclick="switchTab('chat'); toggleDevMainMenu(false);">
           <span>💬</span> <span>Chats (WhatsApp Mode)</span>
-        </div>
-        <div class="dev-drawer-item" onclick="switchTab('me'); toggleDevMainMenu(false);">
-          <span>👤</span> <span>Profile & Identity</span>
         </div>
         <div class="dev-drawer-item" onclick="toggleDevServerUiMode(); toggleDevMainMenu(false);">
           <span>⚡</span> <span id="devDrawerModeLabel">Toggle Advance HUD Mode</span>
@@ -10886,9 +10878,6 @@ function renderHtml(
             <div style="font-size: 0.75rem; color: #fff; font-weight: 700; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); padding: 0.2rem 0.6rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);" id="reelCounterDisplay">
               1 / ${reelsStore.length}
             </div>
-            <button class="btn btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.3rem;" onclick="event.stopPropagation(); openReelUploadModal()">
-              <span>➕</span> Upload Reel
-            </button>
           </div>
 
           <!-- Tap to Play / Pause Center Floating Indicator -->
@@ -13282,23 +13271,9 @@ function renderHtml(
       <span class="bnav-icon">📺</span>
       <span class="bnav-label">Watch</span>
     </button>
-    <button class="bottom-nav-item" id="bnav-chat" data-action="switch-tab" data-tab="chat" onclick="switchTab('chat')" title="Chats" aria-label="Encrypted Chats">
-      <span class="bnav-icon">💬</span>
-      <span class="bnav-label">Chats</span>
-      <span class="bnav-badge" id="bnavChatBadge" style="display: none; background: #ef4444;">0</span>
-    </button>
     <button class="bottom-nav-item" id="bnav-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" title="Profile" aria-label="Sovereign Profile and Wallet">
       <span class="bnav-icon">👤</span>
       <span class="bnav-label">Me</span>
-    </button>
-    <button class="bottom-nav-item" id="bnav-friends" style="display: none !important;" data-action="switch-tab" data-tab="friends" onclick="switchTab('friends')" title="Friends & Search" aria-label="Friends and Search">
-      <span class="bnav-icon">👥</span>
-      <span class="bnav-label">Friends</span>
-      <span class="bnav-badge" id="bnavFriendsBadge">1</span>
-    </button>
-    <button class="bottom-nav-item" id="bnav-admin" data-action="switch-tab" data-tab="admin" onclick="switchTab('admin')" title="Ops Console" aria-label="Node Operations Console">
-      <span class="bnav-icon">⚙️</span>
-      <span class="bnav-label">Ops</span>
     </button>
   </nav>
 
