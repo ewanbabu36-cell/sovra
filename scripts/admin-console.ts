@@ -1988,6 +1988,10 @@ export function renderAdminLoginHtml(): string {
       <div class="form-group">
         <label for="adminKeyInput">Admin Secret Key</label>
         <input type="password" id="adminKeyInput" placeholder="Enter ADMIN_SECRET_KEY" required autocomplete="current-password" autofocus />
+        <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 6px 10px; border-radius: 6px; border: 1px solid #1e293b;">
+          <span>🔑 Dev Key: <code style="color: #38bdf8; font-family: monospace;">sovra-test-admin-secret-key-32-chars-ok!</code></span>
+          <button type="button" onclick="document.getElementById('adminKeyInput').value='sovra-test-admin-secret-key-32-chars-ok!'" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 0.75rem; font-weight: 500;">Auto-Fill</button>
+        </div>
       </div>
 
       <div class="form-group">

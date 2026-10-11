@@ -48366,7 +48366,7 @@ async function startDevServer() {
         const parsed = JSON.parse(body);
         const did = String(parsed.did || 'did:sovra:admin_operator');
         const role = (parsed.role || 'SUPER_ADMIN') as AdminRole;
-        const adminKey = String(parsed.adminKey || parsed.secretKey || '');
+        const adminKey = String(parsed.adminKey || parsed.secretKey || parsed.adminSecret || '');
         const loginResult = adminSecurity.createAdminSession({
           did,
           role,
