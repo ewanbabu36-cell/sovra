@@ -14647,6 +14647,18 @@ function renderHtml(
         Channel bio goes here.
       </div>
 
+      <!-- Pinned Announcement Banner (Telegram Style) -->
+      <div id="channelRoomPinnedWrap" style="display: none; padding: 0.5rem 1.25rem; background: rgba(245, 158, 11, 0.1); border-bottom: 1px solid rgba(245, 158, 11, 0.25); font-size: 0.78rem; color: #fef3c7; align-items: center; justify-content: space-between; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: pointer;" onclick="scrollToPinnedBroadcast()">
+          <span style="font-size: 1rem; flex-shrink: 0;">📌</span>
+          <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <span style="font-weight: 700; color: #f59e0b; font-size: 0.72rem; margin-right: 4px;">PINNED DISPATCH:</span>
+            <span id="channelRoomPinnedText" style="color: #cbd5e1;">—</span>
+          </div>
+        </div>
+        <button type="button" onclick="unpinChannelAnnouncement()" style="background: none; border: none; color: #94a3b8; font-size: 0.9rem; cursor: pointer; padding: 0 4px;" title="Unpin Announcement">✕</button>
+      </div>
+
       <!-- Broadcast Stream Messages Container -->
       <div id="channelRoomStream" style="flex: 1; overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; background: radial-gradient(circle at 50% 10%, rgba(30, 41, 59, 0.4), #0b1120 70%);">
         <!-- Rendered broadcast cards -->
@@ -14663,14 +14675,53 @@ function renderHtml(
             </div>
           </div>
           <div style="display: flex; gap: 0.6rem; align-items: flex-end;">
-            <textarea id="channelBroadcastInput" placeholder="Broadcast an announcement or link to channel subscribers..." rows="2" style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px 12px; color: #fff; font-size: 0.88rem; outline: none; resize: none; font-family: inherit; line-height: 1.4;"></textarea>
+            <textarea id="channelBroadcastInput" placeholder="Broadcast an announcement, voice note, or poll to subscribers..." rows="2" style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px 12px; color: #fff; font-size: 0.88rem; outline: none; resize: none; font-family: inherit; line-height: 1.4;"></textarea>
             <div style="display: flex; flex-direction: column; gap: 4px;">
-              <button type="button" onclick="triggerChannelPhotoUpload()" class="btn btn-secondary" style="padding: 7px 10px; border-radius: 10px; font-size: 0.85rem;" title="Attach Photo">📷</button>
-              <button type="button" onclick="submitChannelBroadcast()" class="btn btn-primary" style="padding: 7px 14px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; gap: 4px;">
+              <div style="display: flex; gap: 4px;">
+                <button type="button" onclick="triggerChannelPhotoUpload()" class="btn btn-secondary" style="padding: 6px 9px; border-radius: 9px; font-size: 0.82rem;" title="Attach Photo">📷</button>
+                <button type="button" onclick="toggleChannelVoiceRecord()" id="channelVoiceRecordBtn" class="btn btn-secondary" style="padding: 6px 9px; border-radius: 9px; font-size: 0.82rem;" title="Record Voice Dispatch">🎙️</button>
+                <button type="button" onclick="toggleChannelPollCreator()" id="channelPollToggleBtn" class="btn btn-secondary" style="padding: 6px 9px; border-radius: 9px; font-size: 0.82rem;" title="Create Community Poll">📊</button>
+              </div>
+              <button type="button" onclick="submitChannelBroadcast()" class="btn btn-primary" style="padding: 7px 14px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 4px;">
                 <span>🚀</span> <span>Broadcast</span>
               </button>
             </div>
           </div>
+
+          <!-- Voice Note Recorder Bar -->
+          <div id="channelVoiceRecordWrap" style="display: none; align-items: center; justify-content: space-between; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 6px 12px; margin-top: 4px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span>
+              <span style="font-size: 0.76rem; color: #fca5a5; font-weight: 600;" id="channelVoiceStatusText">🎙️ Recording Voice Dispatch (0:14)...</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" onclick="finishChannelVoiceRecord()" class="btn btn-primary" style="padding: 4px 10px; font-size: 0.72rem; border-radius: 6px; background: #ef4444; border: none; color: #fff; font-weight: 700; cursor: pointer;">Attach Voice</button>
+              <button type="button" onclick="cancelChannelVoiceRecord()" style="background: none; border: none; color: #94a3b8; font-size: 0.75rem; cursor: pointer;">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Voice Note Attached Preview -->
+          <div id="channelVoicePreviewWrap" style="display: none; align-items: center; justify-content: space-between; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px; padding: 6px 12px; margin-top: 4px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1rem;">🎙️</span>
+              <span style="font-size: 0.76rem; color: #38bdf8; font-weight: 600;" id="channelVoicePreviewDuration">Voice Dispatch Attached (0:45)</span>
+            </div>
+            <button type="button" onclick="clearChannelVoiceUpload()" style="background: none; border: none; color: #ef4444; font-size: 0.74rem; cursor: pointer; text-decoration: underline;">Remove</button>
+          </div>
+
+          <!-- Quick Community Poll Creator Bar -->
+          <div id="channelPollCreatorWrap" style="display: none; flex-direction: column; gap: 6px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 10px; padding: 8px 12px; margin-top: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.76rem; font-weight: 700; color: #c084fc;">📊 Community Poll Creator</span>
+              <button type="button" onclick="toggleChannelPollCreator()" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">✕</button>
+            </div>
+            <input type="text" id="channelPollQuestionInput" placeholder="Poll question (e.g. Which feature should we build next?)..." style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 0.8rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+              <input type="text" id="channelPollOpt1" placeholder="Option 1 (e.g. P2P Voice Notes)" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 0.76rem;">
+              <input type="text" id="channelPollOpt2" placeholder="Option 2 (e.g. Instant Tipping)" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 0.76rem;">
+            </div>
+          </div>
+
           <div id="channelPhotoPreviewWrap" style="display: none; align-items: center; gap: 8px; margin-top: 2px;">
             <img id="channelPhotoPreviewImg" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
             <span style="font-size: 0.74rem; color: #94a3b8;">Photo attached</span>
@@ -14678,6 +14729,57 @@ function renderHtml(
           </div>
           <input type="file" id="channelPhotoFileInput" accept="image/*" style="display: none;" onchange="handleChannelPhotoFile(event)">
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🏢 6E. PUBLIC BRAND PAGE SHOWCASE (Facebook / Instagram Brand Profile View) -->
+  <div id="pageShowcaseModal" class="omni-modal-overlay" style="display: none; z-index: 10050;">
+    <div class="omni-modal-card" style="max-width: 620px; width: 95%; height: 86vh; max-height: 820px; display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: #0b1120; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
+      <!-- Page Showcase Banner & Nav -->
+      <div id="pageShowcaseCover" style="height: 120px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%); position: relative; padding: 12px 16px; display: flex; justify-content: flex-end; align-items: flex-start;">
+        <button onclick="closePublicPageShowcase()" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; color: #fff; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Close">✕</button>
+        <div id="pageShowcaseAvatarWrap" style="position: absolute; bottom: -28px; left: 20px; width: 68px; height: 68px; border-radius: 18px; background: #0b1120; padding: 4px; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 8px 20px rgba(0,0,0,0.5);">
+          <div id="pageShowcaseAvatar" style="width: 100%; height: 100%; border-radius: 14px; background: #4f46e5; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #fff;">🏢</div>
+        </div>
+      </div>
+
+      <!-- Page Header Body -->
+      <div style="padding: 36px 20px 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(15,23,42,0.95);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span id="pageShowcaseName" style="font-weight: 800; font-size: 1.25rem; color: #fff;">Brand Page</span>
+              <span style="color: #c084fc; font-weight: 700; font-size: 0.9rem;" title="Sovereign Verified Brand">✓</span>
+              <span id="pageShowcaseCategoryBadge" class="badge" style="background: rgba(192, 132, 252, 0.15); color: #c084fc; font-size: 0.68rem; font-weight: 700; margin-left: 4px;">Business</span>
+            </div>
+            <div id="pageShowcaseHandle" style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">@page_handle &bull; Sovereign Entity</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button id="pageShowcaseFollowBtn" onclick="togglePageShowcaseFollow()" class="action-pill-btn action-pill-primary" style="padding: 6px 16px; font-size: 0.78rem; border-radius: 20px;">
+              Follow Page
+            </button>
+            <button id="pageShowcaseCtaBtn" onclick="triggerPageShowcaseCta()" class="action-pill-btn action-pill-secondary" style="padding: 6px 14px; font-size: 0.78rem; border-radius: 20px; border-color: rgba(192, 132, 252, 0.4); color: #c084fc;">
+              Send Message
+            </button>
+          </div>
+        </div>
+
+        <div id="pageShowcaseBio" style="font-size: 0.84rem; color: #cbd5e1; margin-top: 10px; line-height: 1.45;">
+          Brand bio description.
+        </div>
+
+        <!-- Metric strip -->
+        <div style="display: flex; gap: 18px; margin-top: 12px; font-size: 0.76rem; color: #94a3b8; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
+          <div><b id="pageShowcaseFollowersCount" style="color: #fff; font-size: 0.88rem;">1</b> followers</div>
+          <div><b id="pageShowcaseDispatchesCount" style="color: #fff; font-size: 0.88rem;">0</b> published dispatches</div>
+          <div style="color: #34d399; font-weight: 600;">● Official P2P Channel Verified</div>
+        </div>
+      </div>
+
+      <!-- Page Dispatches Stream -->
+      <div id="pageShowcaseStream" style="flex: 1; overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; background: #0b1120;">
+        <!-- Dynamically rendered -->
       </div>
     </div>
   </div>
@@ -37941,7 +38043,7 @@ function renderHtml(
       }
     }
 
-    // --- Profile Creator Hub Dynamic Entities Renderer ---
+    // --- Profile Creator Hub Dynamic Entities Renderer (UI 2.0) ---
     function renderCreatorHubEntities() {
       const container = document.getElementById('creatorHubEntitiesContainer');
       if (!container) return;
@@ -37960,9 +38062,17 @@ function renderHtml(
         return currentDid && p.ownerDid && p.ownerDid === currentDid;
       });
 
-      let html = '<div style="font-size: 0.82rem; font-weight: 700; color: #cbd5e1; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">' +
-        '<span>📋 Your Channels &amp; Pages (' + (channels.length + pages.length) + ')</span>' +
-        '<span style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Broadcast &amp; Brands</span>' +
+      const totalAudience = channels.reduce(function(acc, c) { return acc + (c.count || 0); }, 0) +
+                            pages.reduce(function(acc, p) { return acc + (p.count || 0); }, 0);
+
+      let html = '<div style="margin-bottom: 0.85rem;">' +
+        '<div style="font-size: 0.84rem; font-weight: 700; color: #cbd5e1; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">' +
+          '<span>📋 Your Channels &amp; Pages (' + (channels.length + pages.length) + ')</span>' +
+          '<div style="display: flex; gap: 8px; align-items: center; font-size: 0.72rem;">' +
+            '<span style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 12px; font-weight: 600;">👥 Audience: ' + totalAudience.toLocaleString() + '</span>' +
+            '<span style="color: #38bdf8; font-weight: 600;">Broadcast &amp; Brands</span>' +
+          '</div>' +
+        '</div>' +
         '</div>';
 
       if (channels.length === 0 && pages.length === 0) {
@@ -37983,22 +38093,35 @@ function renderHtml(
         return;
       }
 
-      html += '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
+      html += '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
       for (let i = 0; i < channels.length; i++) {
         const c = channels[i];
-        html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">' +
-          '<div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">' +
-            '<div style="width: 36px; height: 36px; border-radius: 10px; background: ' + (c.bg || '#38bdf8') + '; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #fff;">' + (c.avatar || '📢') + '</div>' +
-            '<div>' +
-              '<div style="font-weight: 700; color: #f8fafc; font-size: 0.88rem;">' + c.name + ' <span style="font-size: 0.7rem; color: #38bdf8; font-weight: 600;">' + c.handle + '</span></div>' +
-              '<div style="font-size: 0.72rem; color: #94a3b8;">📢 Broadcast Channel &bull; ' + (c.count ? c.count.toLocaleString() : '0') + ' subscribers</div>' +
+        html += '<div style="background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(56, 189, 248, 0.25); border-left: 3px solid #38bdf8; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">' +
+          '<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; flex-wrap: wrap;">' +
+            '<div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">' +
+              '<div style="width: 40px; height: 40px; border-radius: 12px; background: ' + (c.bg || '#38bdf8') + '; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: #fff; flex-shrink: 0; box-shadow: 0 4px 10px rgba(56, 189, 248, 0.2);">' + (c.avatar || '📢') + '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #f8fafc; font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">' +
+                  '<span>' + c.name + '</span>' +
+                  '<span style="color: #38bdf8; font-size: 0.75rem;">✓</span>' +
+                  '<span style="font-size: 0.72rem; color: #38bdf8; font-weight: 600; background: rgba(56, 189, 248, 0.12); padding: 1px 6px; border-radius: 6px;">' + c.handle + '</span>' +
+                '</div>' +
+                '<div style="font-size: 0.74rem; color: #94a3b8; margin-top: 2px;">' + (c.desc || 'Decentralized broadcast channel for P2P dispatches.') + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 6px; align-items: center;">' +
+              '<span style="font-size: 0.72rem; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 3px 8px; font-weight: 600;">👥 ' + (c.count ? c.count.toLocaleString() : '1') + ' subs</span>' +
+              '<span style="font-size: 0.72rem; color: #34d399; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 8px; padding: 3px 8px; font-weight: 600;">● Mesh Active</span>' +
             '</div>' +
           '</div>' +
-          '<div style="display: flex; gap: 6px; align-items: center;">' +
-            '<button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8;" data-channel-id="' + c.id + '" onclick="openSpatialChannelManageSurface(this.dataset.channelId, this)">⚙️ Manage</button>' +
-            '<button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">📢 Post As</button>' +
-            '<button type="button" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #f1f5f9;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">Room</button>' +
-            '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this channel" data-type="channel" data-id="' + c.id + '" data-name="' + (c.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
+          '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; flex-wrap: wrap; gap: 6px;">' +
+            '<div style="font-size: 0.72rem; color: #64748b;">📢 1-to-many broadcast channel &bull; Zero censorship</div>' +
+            '<div style="display: flex; gap: 6px; align-items: center;">' +
+              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openSpatialChannelManageSurface(this.dataset.channelId, this)">⚙️ Studio</button>' +
+              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 600; cursor: pointer;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">📢 Broadcast</button>' +
+              '<button type="button" class="btn btn-primary" style="padding: 4px 12px; font-size: 0.74rem; border-radius: 8px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #f1f5f9; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">Room</button>' +
+              '<button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this channel" data-type="channel" data-id="' + c.id + '" data-name="' + (c.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
+            '</div>' +
           '</div>' +
         '</div>';
       }
@@ -38006,21 +38129,35 @@ function renderHtml(
       for (let j = 0; j < pages.length; j++) {
         const p = pages[j];
         const isCurrentActive = (typeof currentActivePersona !== 'undefined' && currentActivePersona.type === 'page' && currentActivePersona.id === p.id);
-        html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">' +
-          '<div style="display: flex; align-items: center; gap: 10px;">' +
-            '<div style="width: 36px; height: 36px; border-radius: 10px; background: ' + (p.bg || '#c084fc') + '; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #fff;">' + (p.avatar || '🏢') + '</div>' +
-            '<div>' +
-              '<div style="font-weight: 700; color: #f8fafc; font-size: 0.88rem;">' + p.name + ' <span style="font-size: 0.7rem; color: #c084fc; font-weight: 600;">' + p.handle + '</span></div>' +
-              '<div style="font-size: 0.72rem; color: #94a3b8;">🏢 Sovereign Page &bull; ' + (p.category || 'Entity') + '</div>' +
+        html += '<div style="background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(192, 132, 252, 0.25); border-left: 3px solid #c084fc; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">' +
+          '<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; flex-wrap: wrap;">' +
+            '<div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" data-page-id="' + p.id + '" onclick="openPublicPageShowcase(this.dataset.pageId)">' +
+              '<div style="width: 40px; height: 40px; border-radius: 12px; background: ' + (p.bg || '#c084fc') + '; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: #fff; flex-shrink: 0; box-shadow: 0 4px 10px rgba(192, 132, 252, 0.2);">' + (p.avatar || '🏢') + '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #f8fafc; font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">' +
+                  '<span>' + p.name + '</span>' +
+                  '<span style="color: #c084fc; font-size: 0.75rem;">✓</span>' +
+                  '<span style="font-size: 0.72rem; color: #c084fc; font-weight: 600; background: rgba(192, 132, 252, 0.12); padding: 1px 6px; border-radius: 6px;">' + p.handle + '</span>' +
+                '</div>' +
+                '<div style="font-size: 0.74rem; color: #94a3b8; margin-top: 2px;">' + (p.bio || 'Official sovereign brand profile.') + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 6px; align-items: center;">' +
+              '<span style="font-size: 0.72rem; color: #c084fc; background: rgba(192, 132, 252, 0.1); border: 1px solid rgba(192, 132, 252, 0.25); border-radius: 8px; padding: 3px 8px; font-weight: 600;">' + (p.category || 'Business') + '</span>' +
+              '<span style="font-size: 0.72rem; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 3px 8px; font-weight: 600;">CTA: ' + (p.cta || 'Message') + '</span>' +
             '</div>' +
           '</div>' +
-          '<div style="display: flex; gap: 6px; align-items: center;">' +
-            '<button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc;" data-page-id="' + p.id + '" onclick="openSpatialPageManageSurface(this.dataset.pageId, this)">⚙️ Manage</button>' +
-            (isCurrentActive
-              ? '<button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">✓ Active</button>'
-              : '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12);" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">🔄 Switch</button>'
-            ) +
-            '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this page" data-type="page" data-id="' + p.id + '" data-name="' + (p.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
+          '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; flex-wrap: wrap; gap: 6px;">' +
+            '<div style="font-size: 0.72rem; color: #64748b;">🏢 Official Verified Page &bull; ' + (p.count ? p.count.toLocaleString() : '1') + ' followers</div>' +
+            '<div style="display: flex; gap: 6px; align-items: center;">' +
+              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; cursor: pointer;" data-page-id="' + p.id + '" onclick="openPublicPageShowcase(this.dataset.pageId)">👁️ Showcase</button>' +
+              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; cursor: pointer;" data-page-id="' + p.id + '" onclick="openSpatialPageManageSurface(this.dataset.pageId, this)">⚙️ Studio</button>' +
+              (isCurrentActive
+                ? '<button type="button" class="btn btn-primary" style="padding: 4px 12px; font-size: 0.74rem; border-radius: 8px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80; cursor: pointer;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">✓ Active</button>'
+                : '<button type="button" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.74rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12); cursor: pointer;" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">🔄 Switch</button>'
+              ) +
+              '<button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this page" data-type="page" data-id="' + p.id + '" data-name="' + (p.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
+            '</div>' +
           '</div>' +
         '</div>';
       }
@@ -38295,8 +38432,13 @@ function renderHtml(
       if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
     }
 
-    // --- Telegram / WhatsApp Broadcast Channel Room ---
+    // --- Telegram / WhatsApp Broadcast Channel Room & Engine ---
     let activeChannelRoomId = null;
+    let activeChannelPinnedText = {};
+    let activeChannelVoiceDataUrl = null;
+    let activeChannelVoiceDuration = '0:45';
+    let channelRecordTimer = null;
+    let channelRecordSeconds = 0;
 
     function openChannelRoom(channelId) {
       const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
@@ -38327,6 +38469,18 @@ function renderHtml(
         subBtn.className = ch.isSubbed ? 'action-pill-btn action-pill-secondary' : 'action-pill-btn action-pill-primary';
       }
 
+      // Restore pinned message if present
+      const pinnedWrap = document.getElementById('channelRoomPinnedWrap');
+      const pinnedTextEl = document.getElementById('channelRoomPinnedText');
+      if (pinnedWrap && pinnedTextEl) {
+        if (activeChannelPinnedText[ch.id]) {
+          pinnedTextEl.innerText = activeChannelPinnedText[ch.id];
+          pinnedWrap.style.display = 'flex';
+        } else {
+          pinnedWrap.style.display = 'none';
+        }
+      }
+
       renderChannelRoomStream(ch);
 
       const modal = document.getElementById('channelRoomModal');
@@ -38343,6 +38497,9 @@ function renderHtml(
       const modal = document.getElementById('channelRoomModal');
       if (modal) modal.style.display = 'none';
       activeChannelRoomId = null;
+      clearChannelPhotoUpload();
+      clearChannelVoiceUpload();
+      clearChannelPollCreator();
     }
 
     function toggleChannelRoomSubscribe() {
@@ -38388,22 +38545,73 @@ function renderHtml(
       for (let i = posts.length - 1; i >= 0; i--) {
         const p = posts[i];
         const timeStr = new Date(p.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        html += '<div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.3);">' +
+        const reactions = p.reactions || { '❤️': (p.likesCount || 0), '🔥': 0, '🚀': 0, '👏': 0, '💡': 0 };
+        const isPinned = (activeChannelPinnedText[ch.id] && activeChannelPinnedText[ch.id] === (p.caption || ''));
+
+        html += '<div id="broadcast-msg-' + p.id + '" style="background: rgba(15, 23, 42, 0.85); border: 1px solid ' + (isPinned ? '#f59e0b' : 'rgba(56, 189, 248, 0.2)') + '; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.3);">' +
           '<div style="display: flex; justify-content: space-between; align-items: center;">' +
             '<div style="display: flex; align-items: center; gap: 6px;">' +
-              '<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.68rem; font-weight: 700;">📢 BROADCAST</span>' +
+              (isPinned ? '<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 0.68rem; font-weight: 700;">📌 PINNED</span>' : '<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.68rem; font-weight: 700;">📢 BROADCAST</span>') +
               '<span style="font-size: 0.74rem; color: #94a3b8; font-family: monospace;">' + (p.mediaCid ? p.mediaCid.slice(0, 12) + '...' : 'Ed25519 Signed') + '</span>' +
             '</div>' +
-            '<span style="font-size: 0.72rem; color: #64748b;">' + timeStr + '</span>' +
-          '</div>' +
-          (p.mediaImage ? '<div style="border-radius: 10px; overflow: hidden; max-height: 280px; background: #000;"><img src="' + p.mediaImage + '" style="width: 100%; max-height: 280px; object-fit: contain; display: block;" /></div>' : '') +
-          '<div style="color: #f8fafc; font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;">' + (p.caption || '') + '</div>' +
-          '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; margin-top: 2px;">' +
-            '<div style="display: flex; gap: 6px;">' +
-              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 12px;" data-msg="❤️ Liked broadcast!" onclick="showAccountToast(this.dataset.msg)">❤️ ' + (p.likesCount || 0) + '</button>' +
-              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 12px;" data-msg="🚀 Boosted to local peers!" onclick="showAccountToast(this.dataset.msg)">🚀 Boost</button>' +
+            '<div style="display: flex; align-items: center; gap: 8px;">' +
+              '<button type="button" data-post-id="' + p.id + '" data-post-caption="' + (p.caption || '').replace(/"/g, '&quot;') + '" onclick="pinChannelAnnouncement(this.dataset.postId, this.dataset.postCaption)" style="background: none; border: none; color: #94a3b8; font-size: 0.75rem; cursor: pointer; padding: 0;" title="Pin to channel top">📌 Pin</button>' +
+              '<span style="font-size: 0.72rem; color: #64748b;">' + timeStr + '</span>' +
             '</div>' +
-            '<span style="font-size: 0.7rem; color: #38bdf8;">✓ P2P Relayed</span>' +
+          '</div>' +
+
+          (p.mediaImage ? '<div style="border-radius: 10px; overflow: hidden; max-height: 280px; background: #000;"><img src="' + p.mediaImage + '" style="width: 100%; max-height: 280px; object-fit: contain; display: block;" /></div>' : '') +
+
+          (p.isVoiceNote ? 
+            '<div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; margin: 4px 0;">' +
+              '<button type="button" class="action-pill-btn action-pill-primary" style="width: 36px; height: 36px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;" data-msg="▶ Playing P2P Opus voice dispatch..." onclick="showAccountToast(this.dataset.msg)">▶</button>' +
+              '<div style="flex: 1;">' +
+                '<div style="display: flex; align-items: center; gap: 3px; height: 20px;">' +
+                  '<span style="height: 60%; width: 3px; background: #38bdf8; border-radius: 2px;"></span>' +
+                  '<span style="height: 100%; width: 3px; background: #38bdf8; border-radius: 2px;"></span>' +
+                  '<span style="height: 40%; width: 3px; background: #38bdf8; border-radius: 2px;"></span>' +
+                  '<span style="height: 80%; width: 3px; background: #38bdf8; border-radius: 2px;"></span>' +
+                  '<span style="height: 50%; width: 3px; background: #38bdf8; border-radius: 2px;"></span>' +
+                  '<span style="height: 90%; width: 3px; background: #38bdf8; border-radius: 2px;"></span>' +
+                  '<span style="height: 70%; width: 3px; background: #38bdf8; border-radius: 2px;"></span>' +
+                  '<span style="height: 30%; width: 3px; background: #38bdf8; border-radius: 2px;"></span>' +
+                '</div>' +
+                '<div style="font-size: 0.72rem; color: #38bdf8; margin-top: 2px;">🎙️ Voice Dispatch &bull; ' + (p.audioDuration || '0:45') + ' &bull; Opus P2P Stream</div>' +
+              '</div>' +
+            '</div>' : '') +
+
+          (p.pollData ? 
+            '<div style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 12px; padding: 12px 14px; margin: 4px 0;">' +
+              '<div style="font-weight: 700; color: #f8fafc; font-size: 0.88rem; margin-bottom: 8px;">📊 ' + (p.pollData.question || 'Community Poll') + '</div>' +
+              '<div style="display: flex; flex-direction: column; gap: 6px;">' +
+                (p.pollData.options || []).map(function(opt, optIdx) {
+                  const pct = p.pollData.totalVotes ? Math.round((opt.votes / p.pollData.totalVotes) * 100) : 0;
+                  return '<div data-post-id="' + p.id + '" data-opt-idx="' + optIdx + '" onclick="voteOnChannelPoll(this.dataset.postId, parseInt(this.dataset.optIdx))" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; cursor: pointer; position: relative; overflow: hidden;">' +
+                    '<div style="position: absolute; top: 0; left: 0; bottom: 0; width: ' + pct + '%; background: rgba(168, 85, 247, 0.25); z-index: 1;"></div>' +
+                    '<div style="position: relative; z-index: 2; display: flex; justify-content: space-between; font-size: 0.78rem;">' +
+                      '<span style="color: #f1f5f9; font-weight: 600;">' + opt.text + '</span>' +
+                      '<span style="color: #c084fc; font-weight: 700;">' + pct + '% (' + (opt.votes || 0) + ')</span>' +
+                    '</div>' +
+                  '</div>';
+                }).join('') +
+              '</div>' +
+              '<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 6px; text-align: right;">' + (p.pollData.totalVotes || 0) + ' peer votes &bull; Tap option to vote</div>' +
+            '</div>' : '') +
+
+          '<div style="color: #f8fafc; font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;">' + (p.caption || '') + '</div>' +
+
+          '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; margin-top: 4px; flex-wrap: wrap; gap: 6px;">' +
+            '<div style="display: flex; gap: 5px; flex-wrap: wrap;">' +
+              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 7px; font-size: 0.72rem; border-radius: 12px;" data-post-id="' + p.id + '" data-emoji="❤️" onclick="reactToBroadcast(this.dataset.postId, this.dataset.emoji)">❤️ ' + (reactions['❤️'] || 0) + '</button>' +
+              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 7px; font-size: 0.72rem; border-radius: 12px;" data-post-id="' + p.id + '" data-emoji="🔥" onclick="reactToBroadcast(this.dataset.postId, this.dataset.emoji)">🔥 ' + (reactions['🔥'] || 0) + '</button>' +
+              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 7px; font-size: 0.72rem; border-radius: 12px;" data-post-id="' + p.id + '" data-emoji="🚀" onclick="reactToBroadcast(this.dataset.postId, this.dataset.emoji)">🚀 ' + (reactions['🚀'] || 0) + '</button>' +
+              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 7px; font-size: 0.72rem; border-radius: 12px;" data-post-id="' + p.id + '" data-emoji="👏" onclick="reactToBroadcast(this.dataset.postId, this.dataset.emoji)">👏 ' + (reactions['👏'] || 0) + '</button>' +
+              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 7px; font-size: 0.72rem; border-radius: 12px;" data-post-id="' + p.id + '" data-emoji="💡" onclick="reactToBroadcast(this.dataset.postId, this.dataset.emoji)">💡 ' + (reactions['💡'] || 0) + '</button>' +
+            '</div>' +
+            '<div style="display: flex; align-items: center; gap: 8px;">' +
+              '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 12px;" data-msg="🚀 Boosted to local peers!" onclick="showAccountToast(this.dataset.msg)">🚀 Boost</button>' +
+              '<span style="font-size: 0.7rem; color: #38bdf8;">✓ P2P Relayed</span>' +
+            '</div>' +
           '</div>' +
         '</div>';
       }
@@ -38439,12 +38647,276 @@ function renderHtml(
       if (fileInput) fileInput.value = '';
     }
 
+    function toggleChannelVoiceRecord() {
+      const wrap = document.getElementById('channelVoiceRecordWrap');
+      if (!wrap) return;
+      if (wrap.style.display === 'none' || !wrap.style.display) {
+        wrap.style.display = 'flex';
+        channelRecordSeconds = 0;
+        const statusEl = document.getElementById('channelVoiceStatusText');
+        if (statusEl) statusEl.innerText = '🎙️ Recording Voice Dispatch (0:01)...';
+        if (channelRecordTimer) clearInterval(channelRecordTimer);
+        channelRecordTimer = setInterval(function() {
+          channelRecordSeconds++;
+          const mins = Math.floor(channelRecordSeconds / 60);
+          const secs = channelRecordSeconds % 60;
+          const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
+          if (statusEl) statusEl.innerText = '🎙️ Recording Voice Dispatch (' + timeStr + ')...';
+        }, 1000);
+      } else {
+        cancelChannelVoiceRecord();
+      }
+    }
+
+    function finishChannelVoiceRecord() {
+      if (channelRecordTimer) clearInterval(channelRecordTimer);
+      const mins = Math.floor(channelRecordSeconds / 60);
+      const secs = channelRecordSeconds % 60;
+      activeChannelVoiceDuration = (channelRecordSeconds > 0 ? (mins + ':' + (secs < 10 ? '0' : '') + secs) : '0:45');
+      activeChannelVoiceDataUrl = 'data:audio/mp3;base64,SOVRA_VOICE_NOTE_MOCK_PAYLOAD';
+      const recordWrap = document.getElementById('channelVoiceRecordWrap');
+      if (recordWrap) recordWrap.style.display = 'none';
+      const prevWrap = document.getElementById('channelVoicePreviewWrap');
+      const prevDur = document.getElementById('channelVoicePreviewDuration');
+      if (prevWrap && prevDur) {
+        prevDur.innerText = 'Voice Dispatch Attached (' + activeChannelVoiceDuration + ')';
+        prevWrap.style.display = 'flex';
+      }
+      showAccountToast('🎙️ Voice dispatch audio attached!');
+    }
+
+    function cancelChannelVoiceRecord() {
+      if (channelRecordTimer) clearInterval(channelRecordTimer);
+      const recordWrap = document.getElementById('channelVoiceRecordWrap');
+      if (recordWrap) recordWrap.style.display = 'none';
+      channelRecordSeconds = 0;
+    }
+
+    function clearChannelVoiceUpload() {
+      activeChannelVoiceDataUrl = null;
+      const prevWrap = document.getElementById('channelVoicePreviewWrap');
+      if (prevWrap) prevWrap.style.display = 'none';
+    }
+
+    function toggleChannelPollCreator() {
+      const wrap = document.getElementById('channelPollCreatorWrap');
+      if (!wrap) return;
+      wrap.style.display = (wrap.style.display === 'none' || !wrap.style.display) ? 'flex' : 'none';
+      if (wrap.style.display === 'flex') {
+        const qInput = document.getElementById('channelPollQuestionInput');
+        if (qInput) qInput.focus();
+      }
+    }
+
+    function clearChannelPollCreator() {
+      const wrap = document.getElementById('channelPollCreatorWrap');
+      if (wrap) wrap.style.display = 'none';
+      const qInput = document.getElementById('channelPollQuestionInput');
+      if (qInput) qInput.value = '';
+      const o1 = document.getElementById('channelPollOpt1');
+      if (o1) o1.value = '';
+      const o2 = document.getElementById('channelPollOpt2');
+      if (o2) o2.value = '';
+    }
+
+    function voteOnChannelPoll(postId, optIdx) {
+      if (typeof feedPostsData === 'undefined') return;
+      const p = feedPostsData.find(function(post) { return post.id === postId; });
+      if (!p || !p.pollData) return;
+      if (p.pollData.hasVoted) {
+        showAccountToast('You have already voted on this community poll.');
+        return;
+      }
+      p.pollData.hasVoted = true;
+      p.pollData.options[optIdx].votes = (p.pollData.options[optIdx].votes || 0) + 1;
+      p.pollData.totalVotes = (p.pollData.totalVotes || 0) + 1;
+      const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const ch = channels.find(function(c) { return c.id === activeChannelRoomId; });
+      if (ch) renderChannelRoomStream(ch);
+      showAccountToast('🗳️ Your cryptographic vote was registered on the P2P mesh!');
+    }
+
+    function reactToBroadcast(postId, emoji) {
+      if (typeof feedPostsData === 'undefined') return;
+      const p = feedPostsData.find(function(post) { return post.id === postId; });
+      if (!p) return;
+      p.reactions = p.reactions || { '❤️': (p.likesCount || 0), '🔥': 0, '🚀': 0, '👏': 0, '💡': 0 };
+      p.reactions[emoji] = (p.reactions[emoji] || 0) + 1;
+      const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const ch = channels.find(function(c) { return c.id === activeChannelRoomId; });
+      if (ch) renderChannelRoomStream(ch);
+      showAccountToast(emoji + ' Reaction relayed over Noise_XX GossipSub!');
+    }
+
+    function pinChannelAnnouncement(postId, text) {
+      if (!activeChannelRoomId) return;
+      activeChannelPinnedText[activeChannelRoomId] = text;
+      const pinnedWrap = document.getElementById('channelRoomPinnedWrap');
+      const pinnedTextEl = document.getElementById('channelRoomPinnedText');
+      if (pinnedWrap && pinnedTextEl) {
+        pinnedTextEl.innerText = text;
+        pinnedWrap.style.display = 'flex';
+      }
+      const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const ch = channels.find(function(c) { return c.id === activeChannelRoomId; });
+      if (ch) renderChannelRoomStream(ch);
+      showAccountToast('📌 Announcement pinned to channel top!');
+    }
+
+    function unpinChannelAnnouncement() {
+      if (!activeChannelRoomId) return;
+      delete activeChannelPinnedText[activeChannelRoomId];
+      const pinnedWrap = document.getElementById('channelRoomPinnedWrap');
+      if (pinnedWrap) pinnedWrap.style.display = 'none';
+      const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
+      const ch = channels.find(function(c) { return c.id === activeChannelRoomId; });
+      if (ch) renderChannelRoomStream(ch);
+      showAccountToast('Unpinned announcement.');
+    }
+
+    function scrollToPinnedBroadcast() {
+      const container = document.getElementById('channelRoomStream');
+      if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // --- Public Brand Page Showcase Handlers ---
+    let activeShowcasePageId = null;
+
+    function openPublicPageShowcase(pageId) {
+      const pages = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+      const page = pages.find(function(p) { return p.id === pageId || p.handle === pageId; });
+      if (!page) {
+        showAccountToast('Page not found');
+        return;
+      }
+      activeShowcasePageId = page.id;
+      const m = document.getElementById('pageShowcaseModal');
+      if (!m) return;
+
+      const nameEl = document.getElementById('pageShowcaseName');
+      if (nameEl) nameEl.innerText = page.name;
+      const handleEl = document.getElementById('pageShowcaseHandle');
+      if (handleEl) handleEl.innerText = page.handle + ' • Sovereign Entity';
+      const avatarEl = document.getElementById('pageShowcaseAvatar');
+      if (avatarEl) {
+        avatarEl.innerText = page.avatar || '🏢';
+        avatarEl.style.background = page.bg || '#4f46e5';
+      }
+      const catBadge = document.getElementById('pageShowcaseCategoryBadge');
+      if (catBadge) catBadge.innerText = (page.category || 'business').toUpperCase();
+      const bioEl = document.getElementById('pageShowcaseBio');
+      if (bioEl) bioEl.innerText = page.bio || 'Official sovereign verified business & brand page.';
+      const ctaBtn = document.getElementById('pageShowcaseCtaBtn');
+      if (ctaBtn) ctaBtn.innerText = page.cta || 'Send Message';
+      const followBtn = document.getElementById('pageShowcaseFollowBtn');
+      if (followBtn) {
+        followBtn.innerText = page.isFollowing ? 'Following ✓' : 'Follow Page';
+        followBtn.className = page.isFollowing ? 'action-pill-btn action-pill-secondary' : 'action-pill-btn action-pill-primary';
+      }
+      const followersEl = document.getElementById('pageShowcaseFollowersCount');
+      if (followersEl) followersEl.innerText = (page.count || 1).toLocaleString();
+
+      const posts = (typeof feedPostsData !== 'undefined' ? feedPostsData : []).filter(function(p) {
+        return (p.authorType === 'page' && (p.authorEntityId === page.id || p.authorEntityHandle === page.handle));
+      });
+      const dispatchesEl = document.getElementById('pageShowcaseDispatchesCount');
+      if (dispatchesEl) dispatchesEl.innerText = posts.length;
+
+      const stream = document.getElementById('pageShowcaseStream');
+      if (stream) {
+        if (posts.length === 0) {
+          stream.innerHTML = '<div style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8;">' +
+            '<div style="font-size: 2rem; margin-bottom: 0.5rem;">🏢</div>' +
+            '<div style="font-weight: 700; color: #f8fafc; font-size: 1rem;">No Page Updates Published Yet</div>' +
+            '<div style="font-size: 0.8rem; margin-top: 4px;">Updates and announcements from ' + page.name + ' will appear here.</div>' +
+            '</div>';
+        } else {
+          stream.innerHTML = posts.map(function(p) {
+            return '<div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">' +
+              '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+                '<span class="badge" style="background: rgba(192, 132, 252, 0.15); color: #c084fc; font-size: 0.7rem; font-weight: 700;">🏢 PAGE UPDATE</span>' +
+                '<span style="font-size: 0.72rem; color: #64748b;">' + new Date(p.timestamp || Date.now()).toLocaleDateString() + '</span>' +
+              '</div>' +
+              (p.mediaImage ? '<img src="' + p.mediaImage + '" style="width: 100%; max-height: 240px; object-fit: cover; border-radius: 10px;" />' : '') +
+              '<div style="color: #f8fafc; font-size: 0.92rem; line-height: 1.45;">' + (p.caption || '') + '</div>' +
+              '</div>';
+          }).join('');
+        }
+      }
+
+      m.style.display = 'flex';
+    }
+
+    function closePublicPageShowcase() {
+      const m = document.getElementById('pageShowcaseModal');
+      if (m) m.style.display = 'none';
+      activeShowcasePageId = null;
+    }
+
+    function togglePageShowcaseFollow() {
+      if (!activeShowcasePageId) return;
+      const pages = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+      const page = pages.find(function(p) { return p.id === activeShowcasePageId; });
+      if (!page) return;
+      page.isFollowing = !page.isFollowing;
+      page.count += page.isFollowing ? 1 : -1;
+      const followBtn = document.getElementById('pageShowcaseFollowBtn');
+      if (followBtn) {
+        followBtn.innerText = page.isFollowing ? 'Following ✓' : 'Follow Page';
+        followBtn.className = page.isFollowing ? 'action-pill-btn action-pill-secondary' : 'action-pill-btn action-pill-primary';
+      }
+      const followersEl = document.getElementById('pageShowcaseFollowersCount');
+      if (followersEl) followersEl.innerText = (page.count || 1).toLocaleString();
+      fetch('/api/social/pages/follow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId: page.id })
+      }).catch(function() {});
+      showAccountToast(page.isFollowing ? '✓ Followed ' + page.name : 'Unfollowed ' + page.name);
+    }
+
+    function triggerPageShowcaseCta() {
+      if (!activeShowcasePageId) return;
+      const pages = (typeof allPagesData !== 'undefined' ? allPagesData : []);
+      const page = pages.find(function(p) { return p.id === activeShowcasePageId; });
+      if (!page) return;
+      if (page.ctaType === 'tip') {
+        if (typeof openTipModal === 'function') openTipModal();
+      } else if (page.ctaType === 'website') {
+        window.open('https://sovra.network', '_blank');
+      } else {
+        closePublicPageShowcase();
+        switchTab('messages');
+        showAccountToast('💬 Opening direct encrypted thread with ' + page.name);
+      }
+    }
+
     function submitChannelBroadcast() {
       if (!activeChannelRoomId) return;
       const input = document.getElementById('channelBroadcastInput');
       const text = input ? input.value.trim() : '';
-      if (!text && !channelPhotoDataUrl) {
-        alert('Please enter a message or attach a photo to broadcast.');
+
+      let pollData = null;
+      const qInput = document.getElementById('channelPollQuestionInput');
+      const qText = qInput ? qInput.value.trim() : '';
+      if (qText) {
+        const o1 = document.getElementById('channelPollOpt1');
+        const o2 = document.getElementById('channelPollOpt2');
+        const t1 = o1 ? o1.value.trim() : 'Yes';
+        const t2 = o2 ? o2.value.trim() : 'No';
+        pollData = {
+          question: qText,
+          options: [
+            { text: t1 || 'Yes', votes: 1 },
+            { text: t2 || 'No', votes: 0 }
+          ],
+          totalVotes: 1,
+          hasVoted: false
+        };
+      }
+
+      if (!text && !channelPhotoDataUrl && !activeChannelVoiceDataUrl && !pollData) {
+        alert('Please enter a message, record voice, or attach media to broadcast.');
         return;
       }
       const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
@@ -38452,13 +38924,17 @@ function renderHtml(
       if (!ch) return;
 
       const payload = {
-        caption: text,
-        postType: 'text',
+        caption: text || (activeChannelVoiceDataUrl ? '🎙️ Voice Dispatch' : (pollData ? ('📊 Poll: ' + pollData.question) : '')),
+        postType: (activeChannelVoiceDataUrl ? 'audio' : (pollData ? 'poll' : 'text')),
         authorType: 'channel',
         authorEntityId: ch.id,
         authorBadge: '📢 Channel',
         authorEntityHandle: ch.handle,
         mediaImage: channelPhotoDataUrl || undefined,
+        mediaAudio: activeChannelVoiceDataUrl || undefined,
+        audioDuration: activeChannelVoiceDataUrl ? activeChannelVoiceDuration : undefined,
+        isVoiceNote: !!activeChannelVoiceDataUrl,
+        pollData: pollData || undefined,
       };
 
       fetch('/api/feed/create', {
@@ -38477,6 +38953,8 @@ function renderHtml(
           }
           if (input) input.value = '';
           clearChannelPhotoUpload();
+          clearChannelVoiceUpload();
+          clearChannelPollCreator();
           renderChannelRoomStream(ch);
           if (typeof renderFeedPosts === 'function') renderFeedPosts();
           showAccountToast('📢 Broadcast dispatched to ' + ch.name + ' subscribers!');
