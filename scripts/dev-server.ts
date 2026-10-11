@@ -4191,10 +4191,10 @@ function renderHtml(
       }
       #currentUserPill,
       .header-avatar-wrap {
-        display: inline-flex !important;
+        display: none !important;
       }
       #bnav-chat {
-        display: flex !important;
+        display: none !important;
       }
       #headerChatBtn {
         display: flex !important;
@@ -4355,28 +4355,59 @@ function renderHtml(
       body.chat-open .app-header {
         display: none !important;
       }
+      #reels-view {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: calc(100vh - 116px) !important;
+        height: calc(100dvh - 116px) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        overflow: hidden !important;
+        position: relative !important;
+      }
       .reels-stage {
-        gap: 0;
-        width: 100%;
-        margin: 0;
-        padding: 0;
-        height: calc(100vh - 128px);
+        gap: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 1 !important;
+      }
+      .reels-phone-wrapper {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 1 !important;
+        position: relative !important;
       }
       .reels-phone {
         width: 100% !important;
         max-width: 100% !important;
-        height: calc(100vh - 128px) !important;
+        height: 100% !important;
+        flex: 1 !important;
         border-radius: 0 !important;
         border: none !important;
         box-shadow: none !important;
+        position: relative !important;
+      }
+      .reel-ambient-cinema-glow {
+        display: none !important;
       }
       .reels-nav-controls {
         display: none !important;
-      }
-      #reels-view {
-        width: 100%;
-        padding: 0;
-        margin: 0;
       }
       #youtube-view {
         width: 100%;
@@ -9908,7 +9939,7 @@ function renderHtml(
   <div class="app-layout">
     <!-- Column 1: Left Navigation Rail (Desktop) -->
     <aside class="app-left-rail">
-      <div class="rail-brand" onclick="toggleDevMainMenu(event); event.stopPropagation();" style="cursor: pointer;" title="Open SOVRA Menu">
+      <div class="rail-brand" onclick="switchTab('feed'); event.stopPropagation();" style="cursor: pointer;" title="SOVRA Home (Return to Feed)">
         <div class="brand-logo" style="background: linear-gradient(135deg, #00f0ff 0%, #3b82f6 50%, #8b5cf6 100%); box-shadow: 0 0 16px rgba(0,240,255,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 11px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; position: relative;">
           <svg class="sovra-core-emblem-svg" viewBox="0 0 40 40" width="32" height="32" aria-hidden="true">
             <text class="sovra-emblem-s" x="20" y="29" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="950" font-size="26" text-anchor="middle">S</text>
@@ -10035,8 +10066,8 @@ function renderHtml(
         </button>
 
         <!-- SOVRA Alien Glassmorphic Command Gateway: Unified Brand Capsule (Zero Hide) -->
-        <div class="sovra-brand-capsule" onclick="toggleDevMainMenu(event); event.stopPropagation();" title="SOVRA Sovereign Mesh Core (Tap to Open Menu)" style="padding: 7px 18px; border-radius: 9999px;">
-          <span class="sovra-core-brand-text" onclick="toggleDevMainMenu(event); event.stopPropagation();" title="SOVRA Main Menu" style="font-size: 1.15rem; letter-spacing: 0.14em;"><span class="sovra-s-lead-highlight">S</span>OVRA</span>
+        <div class="sovra-brand-capsule" onclick="switchTab('feed'); event.stopPropagation();" title="SOVRA Home (Return to Feed)" style="padding: 7px 18px; border-radius: 9999px;">
+          <span class="sovra-core-brand-text" onclick="switchTab('feed'); event.stopPropagation();" title="SOVRA Home (Return to Feed)" style="font-size: 1.15rem; letter-spacing: 0.14em;"><span class="sovra-s-lead-highlight">S</span>OVRA</span>
         </div>
 
         <!-- Fresh, Neat & Streamlined Search Bar (Zero Popup - 100% Inline Dropdown) -->
@@ -10868,7 +10899,7 @@ function renderHtml(
                onclick="handleReelSingleClick(event)" 
                ondblclick="handleReelDoubleTap(event)">
             
-            <video id="reelVideoPlayer" playsinline loop style="width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; display: none; z-index: 1; border-radius: inherit; background: #000;"></video>
+            <video id="reelVideoPlayer" playsinline loop style="width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; display: none; z-index: 1; border-radius: inherit; background: transparent;"></video>
             
             <div class="reels-ambient-bg" id="reelAmbientBg" style="background: ${reelsStore[0] ? reelsStore[0].bgGradient : 'linear-gradient(135deg, #1e1b4b, #312e81)'};">
               <!-- Visualizer Ripple -->
@@ -14977,6 +15008,10 @@ function renderHtml(
     var myProfile = null;
     var currentProfileGridTab = 'posts';
     var walletBalanceSov = 500.0;
+    var cachedRightRailSuggestions = [];
+    var isFetchingRightRailSuggestions = false;
+    var reelsData = ${safeJsonForScript(reelsStore)};
+    var currentReelIndex = 0;
     try {
       var _storedProfile = localStorage.getItem('sovra_user_profile');
       if (_storedProfile) myProfile = JSON.parse(_storedProfile);
@@ -21638,8 +21673,10 @@ function renderHtml(
       const newBio = bioInput ? bioInput.value.trim() : '';
       const newWebsite = (websiteInput && websiteInput.value.trim()) ? websiteInput.value.trim() : '';
 
+      const token = localStorage.getItem('sovra_session_token') || (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) || (myProfile ? myProfile.sessionToken : '') || '';
       const updatedPayload = {
         did: myProfile ? myProfile.did : ('did:sovra:user_' + Math.random().toString(36).substring(2, 8)),
+        sessionToken: token,
         handle: rawHandle,
         name: newName,
         displayName: newName,
@@ -21653,9 +21690,13 @@ function renderHtml(
       };
 
       try {
-        const res = await fetch('/api/user/update', {
+        const fetchFn = (typeof window.authenticatedFetch === 'function') ? window.authenticatedFetch : fetch;
+        const res = await fetchFn('/api/user/update', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
           body: JSON.stringify(updatedPayload)
         });
         const data = await res.json();
@@ -27955,11 +27996,11 @@ function renderHtml(
     // ==========================================
     // 1. INSTAGRAM REELS & STORIES SCRIPT ENGINE
     // ==========================================
-    let reelsData = ${safeJsonForScript(reelsStore)};
+    reelsData = ${safeJsonForScript(reelsStore)};
     const creatorProfilesData = ${safeJsonForScript(creatorProfiles)};
     let storiesData = ${safeJsonForScript(sovraDb.getAllStories(hostUser ? hostUser.did : undefined))};
     let reelCommentsData = ${safeJsonForScript(reelCommentsStore)};
-    let currentReelIndex = 0;
+    currentReelIndex = 0;
     const savedReelsSet = new Set();
     const likedReelsSet = new Set();
     const followedCreatorsSet = new Set();
@@ -28093,13 +28134,28 @@ function renderHtml(
 
       const videoEl = document.getElementById('reelVideoPlayer');
       if (videoEl) {
-        if (r.videoUrl) {
+        videoEl.onerror = function() {
+          videoEl.style.display = 'none';
+        };
+        videoEl.oncanplay = function() {
           videoEl.style.display = 'block';
+        };
+        if (r.videoUrl) {
           if (videoEl.getAttribute('data-cid') !== r.cid) {
             videoEl.src = r.videoUrl;
             videoEl.setAttribute('data-cid', r.cid);
             videoEl.load();
-            videoEl.play().catch(() => {});
+            videoEl.play().then(() => {
+              videoEl.style.display = 'block';
+            }).catch(() => {
+              videoEl.style.display = 'none';
+            });
+          } else {
+            videoEl.play().then(() => {
+              videoEl.style.display = 'block';
+            }).catch(() => {
+              videoEl.style.display = 'none';
+            });
           }
         } else {
           videoEl.pause();
@@ -35452,8 +35508,8 @@ function renderHtml(
       }
     }
 
-    let cachedRightRailSuggestions = [];
-    let isFetchingRightRailSuggestions = false;
+    if (typeof cachedRightRailSuggestions === 'undefined') cachedRightRailSuggestions = [];
+    if (typeof isFetchingRightRailSuggestions === 'undefined') isFetchingRightRailSuggestions = false;
 
     function renderRightRailSuggestions() {
       const container = document.getElementById('rightRailSuggestionsList');
@@ -41396,7 +41452,7 @@ async function startDevServer() {
     }
 
     if (url.pathname === '/api/user/update' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      const { body, ok } = await readBoundedBody(req, res, 15 * 1024 * 1024);
       if (!ok) return;
       try {
         const parsed = JSON.parse(body);
