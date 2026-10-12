@@ -21,7 +21,7 @@ export interface CallRouteContext {
   readBoundedBody: (req: http.IncomingMessage, res: http.ServerResponse, limit?: number) => Promise<{ body: string; ok: boolean }>;
   resolvePrincipal: (req: http.IncomingMessage, parsedBody?: Record<string, any>) => AuthenticatedPrincipal | null;
   enforceAuth: (req: http.IncomingMessage, res: http.ServerResponse, parsedBody?: Record<string, any>) => AuthenticatedPrincipal | null;
-  broadcastChatEvent?: (targetDids: string[], eventType: string, payload: any) => void;
+  broadcastChatEvent?: (recipientDid: string, payload: any, eventType?: string) => void;
 }
 
 interface RelayedAudioChunk {
@@ -77,7 +77,7 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
       const recipientDid = String(parsed.recipientDid || '');
       const offerSdp = String(parsed.offerSdp || parsed.sdp || parsed.sdpOffer || '');
       const callType = parsed.callType === 'video' ? 'video' : 'audio';
-      const privacyRelay = Boolean(parsed.privacyRelay || parsed.shieldedRelay || url.searchParams.get('privacy') === 'relay');
+      const privacyRelay = Boolean(url.searchParams.get('privacy') === 'relay' || req.headers['x-sovra-privacy-mode'] === 'relay');
 
       if (!recipientDid || !offerSdp) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -105,13 +105,15 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
         });
 
         if (broadcastChatEvent) {
-          broadcastChatEvent([recipientDid], 'call_signal', {
-            type: 'offer',
-            callId: session.callId,
-            callerDid: principal.did,
-            recipientDid,
-            callType,
-          });
+          try {
+            broadcastChatEvent(recipientDid, {
+              type: 'offer',
+              callId: session.callId,
+              callerDid: principal.did,
+              recipientDid,
+              callType,
+            }, 'call_signal');
+          } catch (_) {}
         }
 
         // Blind Push Gateway: Wake mobile receiver device in background
@@ -276,12 +278,14 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
           return true;
         }
         if (broadcastChatEvent) {
-          broadcastChatEvent([existingCall.callerDid], 'call_signal', {
-            type: 'answer',
-            callId,
-            answerSdp,
-            status: 'answered',
-          });
+          try {
+            broadcastChatEvent(existingCall.callerDid, {
+              type: 'answer',
+              callId,
+              answerSdp,
+              status: 'answered',
+            }, 'call_signal');
+          } catch (_) {}
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, session }));
@@ -333,7 +337,7 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
         return true;
       }
 
-      const isPrivacyRelay = Boolean((existingCall as any).privacyRelay || parsed.privacyRelay);
+      const isPrivacyRelay = Boolean(url.searchParams.get('privacy') === 'relay' || req.headers['x-sovra-privacy-mode'] === 'relay');
       if (isPrivacyRelay && candidate) {
         const candStr = typeof candidate === 'string' ? candidate : String(candidate.candidate || '');
         // When Privacy Relay is active, strip 'typ host' (internal LAN IP) and 'typ srflx' (public ISP IP)
@@ -354,13 +358,15 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
       try {
         const session = sovraDb.addIceCandidate(callId, principal.did, candidate);
         if (broadcastChatEvent && existingCall) {
-          const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
-          broadcastChatEvent([targetDid], 'call_signal', {
-            type: 'candidate',
-            callId,
-            senderDid: principal.did,
-            candidate,
-          });
+          try {
+            const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
+            broadcastChatEvent(targetDid, {
+              type: 'candidate',
+              callId,
+              senderDid: principal.did,
+              candidate,
+            }, 'call_signal');
+          } catch (_) {}
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: !!session, session }));
@@ -409,12 +415,14 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
       const session = sovraDb.endCall(callId, principal.did, reason);
       callAudioChunkStore.delete(callId);
       if (broadcastChatEvent) {
-        const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
-        broadcastChatEvent([targetDid], 'call_signal', {
-          type: 'end',
-          callId,
-          reason: reason || 'peer_hung_up',
-        });
+        try {
+          const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
+          broadcastChatEvent(targetDid, {
+            type: 'end',
+            callId,
+            reason: reason || 'peer_hung_up',
+          }, 'call_signal');
+        } catch (_) {}
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, session }));
@@ -463,6 +471,7 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
         return true;
       }
 
+      existingCall.updatedAt = Date.now();
       const chunk: RelayedAudioChunk = {
         seq: ++callAudioSeqCounter,
         callId,
@@ -483,8 +492,10 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
       }
 
       if (broadcastChatEvent) {
-        const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
-        broadcastChatEvent([targetDid], 'call_audio', chunk);
+        try {
+          const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
+          broadcastChatEvent(targetDid, chunk, 'call_audio');
+        } catch (_) {}
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });

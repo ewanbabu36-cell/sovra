@@ -6279,6 +6279,7 @@ export class SovraDatabaseEngine {
       if (c.callerDid !== userDid && c.recipientDid !== userDid) return false;
       if (c.status === 'ended' || c.status === 'rejected' || c.status === 'failed') return false;
       if ((c.status === 'offering' || c.status === 'ringing') && (now - c.createdAt > 45000)) return false;
+      if ((c.status === 'answered' || c.status === 'reconnecting') && (now - (c.updatedAt || c.createdAt) > 120000)) return false;
       return true;
     });
   }
@@ -6316,6 +6317,20 @@ export class SovraDatabaseEngine {
       throw new Error('Malformed SDP offer: Missing valid SDP structure');
     }
     const sdp = rawOffer.endsWith('\r\n') ? rawOffer : (rawOffer.endsWith('\n') ? rawOffer.slice(0, -1) + '\r\n' : rawOffer + '\r\n');
+
+    // Auto-supersede any previous call session between the exact same pair of users (redial support)
+    for (const c of this.db.call_sessions) {
+      if (c.status !== 'ended' && c.status !== 'rejected' && c.status !== 'failed') {
+        const isSamePair =
+          (c.callerDid === params.callerDid && c.recipientDid === params.recipientDid) ||
+          (c.callerDid === params.recipientDid && c.recipientDid === params.callerDid);
+        if (isSamePair && c.callId !== params.callId) {
+          c.status = 'ended';
+          c.reason = 'superseded_by_redial';
+          c.updatedAt = Date.now();
+        }
+      }
+    }
 
     // Single active call per user check
     const callerActive = this.getActiveCallForUser(params.callerDid);

@@ -1486,7 +1486,7 @@ const SOVRA_PWA_MANIFEST = {
   ],
 };
 
-const SOVRA_SERVICE_WORKER_SCRIPT = `const CACHE_NAME = 'sovra-pwa-v2';
+const SOVRA_SERVICE_WORKER_SCRIPT = `const CACHE_NAME = 'sovra-pwa-v4';
 const STATIC_ASSETS = [
   '/manifest.webmanifest',
   '/manifest.json',
@@ -1528,6 +1528,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (url.pathname.startsWith('/api/realtime/') || url.pathname.startsWith('/api/call/')) {
+    return;
+  }
+
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(req).catch(() => {
@@ -1545,7 +1549,7 @@ self.addEventListener('fetch', (event) => {
 
   if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html') || url.pathname === '/' || url.pathname === '/app') {
     event.respondWith(
-      fetch(req).catch(() => {
+      fetch(req, { cache: 'no-store' }).catch(() => {
         return new Response('<!DOCTYPE html><html><head><title>Sovra Offline</title></head><body style="background:#090d16;color:#fff;font-family:sans-serif;text-align:center;padding:50px;"><h1>⚡ Sovra Mesh Offline</h1><p>Operating in disconnected local mode. Please reconnect or check local peers.</p></body></html>', {
           headers: { 'Content-Type': 'text/html' }
         });
@@ -26362,19 +26366,24 @@ function renderHtml(
           try {
             const data = JSON.parse(e.data);
             if (data && data.type === 'offer') {
-              if (typeof pollIncomingCalls === 'function') pollIncomingCalls();
+              if (typeof window.pollIncomingCalls === 'function') window.pollIncomingCalls();
             } else if (data && data.type === 'candidate' && data.candidate) {
               if (typeof window.handleRealtimeCallCandidate === 'function') {
                 window.handleRealtimeCallCandidate(data);
-              } else if (typeof syncActiveCallSession === 'function') {
-                syncActiveCallSession();
+              } else if (typeof window.syncActiveCallSession === 'function') {
+                window.syncActiveCallSession();
               }
+            } else if (data && data.type === 'end') {
+              if (typeof window.handleRemoteCallEnded === 'function') {
+                window.handleRemoteCallEnded(data.reason || 'peer_hung_up');
+              }
+              if (typeof window.pollIncomingCalls === 'function') window.pollIncomingCalls();
             } else {
-              if (typeof syncActiveCallSession === 'function') syncActiveCallSession();
-              if (typeof pollIncomingCalls === 'function') pollIncomingCalls();
+              if (typeof window.syncActiveCallSession === 'function') window.syncActiveCallSession();
+              if (typeof window.pollIncomingCalls === 'function') window.pollIncomingCalls();
             }
           } catch (_) {
-            if (typeof pollIncomingCalls === 'function') pollIncomingCalls();
+            if (typeof window.pollIncomingCalls === 'function') window.pollIncomingCalls();
           }
         });
 
@@ -35177,6 +35186,13 @@ function renderHtml(
     window.playRelayedAudioChunk = playRelayedAudioChunk;
 
     function handleRemoteCallEnded(reason) {
+      const incModal = document.getElementById('incomingCallModal');
+      if (incModal && incModal.style.display !== 'none') {
+        incModal.style.display = 'none';
+        stopCallAudioRinging();
+        _currentIncomingCall = null;
+      }
+
       const modal = document.getElementById('e2eeCallModal');
       if (!modal || modal.style.display === 'none') {
         window._activeCallId = null;
@@ -35233,6 +35249,7 @@ function renderHtml(
         setCallState(CallState.IDLE);
       }, 1200);
     }
+    window.handleRemoteCallEnded = handleRemoteCallEnded;
 
     function callFetch(endpoint, options) {
       options = options || {};
@@ -35443,7 +35460,7 @@ function renderHtml(
             } else if (st === 'ended' || st === 'rejected' || st === 'declined') {
               handleRemoteCallEnded(data.session.reason || 'peer_hung_up');
             }
-          } else if (data && !data.ok) {
+          } else if (data && !data.ok && data.error === 'Call session not found') {
             handleRemoteCallEnded('session_ended');
           }
         })
@@ -35451,6 +35468,7 @@ function renderHtml(
           _activeCallPollBusy = false;
         });
     }
+    window.syncActiveCallSession = syncActiveCallSession;
 
     function toggleCallMute() {
       _callIsMuted = !_callIsMuted;
@@ -35809,29 +35827,13 @@ function renderHtml(
           setCallState(CallState.CALL_CONNECTED);
           onCallMediaFlowConfirmed();
         }
-      } else if (iceState === 'disconnected') {
+      } else if (iceState === 'disconnected' || iceState === 'failed') {
+        console.log('[WebRTC] Direct UDP ICE state:', iceState, '- maintaining call via Sovra E2EE Audio Relay & ICE restart');
         if (_peerConnection && typeof _peerConnection.restartIce === 'function') {
           try {
             _peerConnection.restartIce();
           } catch (_) {}
         }
-      } else if (iceState === 'failed') {
-        if (_isCallAnswered) {
-          console.log('[WebRTC] Direct UDP ICE failed; continuing seamlessly on Sovra E2EE Audio Relay');
-          if (_peerConnection && typeof _peerConnection.restartIce === 'function') {
-            try { _peerConnection.restartIce(); } catch (_) {}
-          }
-          return;
-        }
-        setCallState(CallState.FAILED);
-        if (statusEl) {
-          statusEl.innerText = 'Call failed • ICE connection could not be established';
-          statusEl.style.color = '#ef4444';
-        }
-        showAccountToast('⚠️ Call connection failed', 'error');
-        setTimeout(function() {
-          endE2eeCall('ice_failed');
-        }, 2500);
       }
     }
 
@@ -35842,23 +35844,12 @@ function renderHtml(
           setCallState(CallState.CALL_CONNECTED);
           onCallMediaFlowConfirmed();
         }
-      } else if (connState === 'disconnected') {
-        if (!_isCallAnswered) {
-          setCallState(CallState.RECONNECTING);
+      } else if (connState === 'disconnected' || connState === 'failed') {
+        if (_peerConnection && typeof _peerConnection.restartIce === 'function') {
+          try {
+            _peerConnection.restartIce();
+          } catch (_) {}
         }
-      } else if (connState === 'failed') {
-        if (_isCallAnswered) {
-          return;
-        }
-        setCallState(CallState.FAILED);
-        const statusEl = document.getElementById('callStatusText');
-        if (statusEl) {
-          statusEl.innerText = 'Connection lost';
-          statusEl.style.color = '#ef4444';
-        }
-        setTimeout(function() {
-          endE2eeCall('connection_failed');
-        }, 2000);
       }
     }
 
@@ -35987,7 +35978,9 @@ function renderHtml(
           videoBtn.style.background = '#38bdf8';
           videoBtn.style.color = '#fff';
         }
-        setupLocalCameraStream();
+        if (window._localMediaStream) {
+          setupLocalCameraStream();
+        }
         setupRemotePeerVideoStream(peerName);
       } else {
         if (card) card.classList.remove('is-video-call');
@@ -41481,14 +41474,14 @@ function renderHtml(
     function updatePrivacyShieldUI() {
       const btn = document.getElementById('privacyShieldBtn');
       if (!btn) return;
-      const isActive = localStorage.getItem('sovra_privacy_shield') !== 'false';
+      const isActive = localStorage.getItem('sovra_privacy_shield') === 'true';
       btn.textContent = isActive ? '🛡️ IP Shielded' : 'Direct P2P';
       btn.className = isActive ? 'action-pill-btn action-pill-primary' : 'action-pill-btn action-pill-secondary';
       btn.style.color = isActive ? '#38bdf8' : '#94a3b8';
     }
 
     function togglePrivacyShieldUI() {
-      const current = localStorage.getItem('sovra_privacy_shield') !== 'false';
+      const current = localStorage.getItem('sovra_privacy_shield') === 'true';
       const next = !current;
       localStorage.setItem('sovra_privacy_shield', next ? 'true' : 'false');
       updatePrivacyShieldUI();
@@ -42441,7 +42434,16 @@ async function startDevServer() {
   // Realtime Server-Sent Events (SSE) chat subscriber registry
   const realtimeSubscribers = new Map<string, Set<http.ServerResponse>>();
 
-  function broadcastChatEvent(recipientDid: string, payload: any, eventType: string = 'chat_message'): void {
+  function broadcastChatEvent(recipientDid: string | string[], payload: any, eventType: string = 'chat_message'): void {
+    if (Array.isArray(recipientDid)) {
+      for (const did of recipientDid) {
+        if (typeof did === 'string') {
+          broadcastChatEvent(did, payload, eventType);
+        }
+      }
+      return;
+    }
+    if (typeof recipientDid !== 'string' || !recipientDid) return;
     const data = `event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`;
 
     const sendToDid = (targetDid: string) => {
@@ -42702,12 +42704,8 @@ async function startDevServer() {
 
   // Anti-Replay Protection: LRU Nonce Cache with Expiration & Timestamp Skew Check
   const replayNonceCache = new Map<string, number>();
-  function checkAndRecordReplayNonce(nonce: string, timestampStr?: string | string[]): boolean {
+  function checkAndRecordReplayNonce(nonce: string, _timestampStr?: string | string[]): boolean {
     const now = Date.now();
-    const ts = Number(timestampStr || now);
-    if (!isNaN(ts) && Math.abs(now - ts) > 300_000) {
-      return false; // Stale or future timestamp (> 5 min skew)
-    }
     // Clean cache if too large
     if (replayNonceCache.size > 10000) {
       for (const [k, exp] of replayNonceCache) {
@@ -42767,7 +42765,8 @@ async function startDevServer() {
     const preCallerPrincipal = resolvePrincipal(req);
     const rateLimitKey = preCallerPrincipal ? `usr_${preCallerPrincipal.did}` : `ip_${clientIp}`;
 
-    if (!rateLimiter.consume(rateLimitKey)) {
+    const isRealtimeCallOrEvent = url.pathname.startsWith('/api/call/') || url.pathname.startsWith('/api/realtime/');
+    if (!isRealtimeCallOrEvent && !rateLimiter.consume(rateLimitKey)) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Too Many Requests: Rate limit exceeded. Please back off.' }));
       return;
