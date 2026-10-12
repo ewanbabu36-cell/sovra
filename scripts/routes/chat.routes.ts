@@ -69,43 +69,58 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       m => m.senderDid === userDid || m.recipientDid === userDid || m.recipientDid.startsWith('channel:')
     );
 
-    const contactsWithThreads = allPeers.map(peer => {
-      const isFriend = friendDids.has(peer.did);
-      const threadId = sovraDb.getThreadId(userDid, peer.did);
-      const threadMessages = allMessages.filter(
-        m => m.threadId === threadId || (m.senderDid === peer.did && m.recipientDid === userDid) || (m.senderDid === userDid && m.recipientDid === peer.did)
-      );
+    const contactsWithThreads = allPeers
+      .filter(peer => {
+        if (!peer || !peer.did || peer.did === userDid) return false;
+        if (friendDids.has(peer.did)) return true;
+        const threadId = sovraDb.getThreadId(userDid, peer.did);
+        return allMessages.some(
+          m => m.threadId === threadId || (m.senderDid === peer.did && m.recipientDid === userDid) || (m.senderDid === userDid && m.recipientDid === peer.did)
+        );
+      })
+      .map(peer => {
+        const isFriend = friendDids.has(peer.did);
+        const threadId = sovraDb.getThreadId(userDid, peer.did);
+        const threadMessages = allMessages.filter(
+          m => m.threadId === threadId || (m.senderDid === peer.did && m.recipientDid === userDid) || (m.senderDid === userDid && m.recipientDid === peer.did)
+        );
 
-      const lastMsg = threadMessages.length > 0 ? threadMessages[threadMessages.length - 1] : null;
-      const unreadCount = threadMessages.filter(
-        m => m.senderDid === peer.did && (m.recipientDid === userDid || m.recipientDid === 'self') && m.status !== 'read'
-      ).length;
+        const lastMsg = threadMessages.length > 0 ? threadMessages[threadMessages.length - 1] : null;
+        const unreadCount = threadMessages.filter(
+          m => m.senderDid === peer.did && (m.recipientDid === userDid || m.recipientDid === 'self') && m.status !== 'read'
+        ).length;
 
-      let lastMessageText = peer.role || (isFriend ? 'Friend on Mesh' : 'Ready to chat');
-      if (lastMsg) {
-        if (lastMsg.isDisappeared) {
-          lastMessageText = '💨 Message disappeared';
-        } else if (lastMsg.isAudio) {
-          lastMessageText = '🎙️ Voice note (' + (lastMsg.audioDurationSec || 0).toFixed(1) + 's)';
-        } else {
-          lastMessageText = lastMsg.text;
+        let lastMessageText = '';
+        if (lastMsg) {
+          if (lastMsg.isDisappeared) {
+            lastMessageText = '💨 Message disappeared';
+          } else if (lastMsg.isAudio) {
+            lastMessageText = '🎙️ Voice note (' + (lastMsg.audioDurationSec || 0).toFixed(1) + 's)';
+          } else {
+            lastMessageText = lastMsg.text;
+          }
         }
+
+        return {
+          ...peer,
+          isFriend,
+          isOnline: peer.isOnline !== false,
+          role: isFriend ? 'Mutual Friend' : (peer.role || 'Direct Contact'),
+          lastMessage: lastMessageText,
+          lastMessageTimestamp: lastMsg ? lastMsg.timestamp : 0,
+          lastMessageStatus: lastMsg ? lastMsg.status : null,
+          lastMessageIsOutgoing: lastMsg ? (lastMsg.senderDid === userDid || lastMsg.senderDid === 'self') : false,
+          unreadCount,
+          hasThread: Boolean(lastMsg),
+        };
+      });
+
+    contactsWithThreads.sort((a, b) => {
+      if ((b.lastMessageTimestamp || 0) !== (a.lastMessageTimestamp || 0)) {
+        return (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0);
       }
-
-      return {
-        ...peer,
-        isFriend,
-        isOnline: peer.isOnline !== false,
-        role: isFriend ? (peer.role || 'Friend on Mesh') : peer.role,
-        lastMessage: lastMessageText,
-        lastMessageTimestamp: lastMsg ? lastMsg.timestamp : (peer.lastSeenTimestamp || 0),
-        lastMessageStatus: lastMsg ? lastMsg.status : null,
-        lastMessageIsOutgoing: lastMsg ? (lastMsg.senderDid === userDid || lastMsg.senderDid === 'self') : false,
-        unreadCount,
-      };
+      return (a.name || '').localeCompare(b.name || '');
     });
-
-    contactsWithThreads.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, contacts: contactsWithThreads, conversations: contactsWithThreads }));
@@ -297,6 +312,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
 
         // Deliver message instantly to active realtime SSE subscriber
         broadcastChatEvent(record.recipientDid, record);
+        broadcastChatEvent(record.recipientDid, { type: 'message', messageId: record.id, senderDid: principal.did }, 'notification');
 
         // Auto-deposit into Zero-Knowledge Encrypted Mailbox for store-and-forward offline reliability
         if (record.isE2EE && (record.ciphertextHex || record.text)) {

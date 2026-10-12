@@ -2195,7 +2195,47 @@ export class SovraDatabaseEngine {
       });
     }
 
-    conversations.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
+    // Also include accepted friends who don't have a message thread yet
+    const friendRels = this.getFriendRelationships(userDid).filter(r => r.status === 'accepted');
+    for (const rel of friendRels) {
+      const friendDid = rel.fromDid === userDid ? rel.toDid : rel.fromDid;
+      if (!friendDid || friendDid === userDid || threadMap.has(friendDid)) continue;
+      const u = userMap.get(friendDid);
+      const p = peerMap.get(friendDid);
+      if (!u && !p) continue;
+      const name = u?.displayName || u?.name || p?.name || 'Friend';
+      const handle = u?.handle || p?.handle || '';
+      conversations.push({
+        did: friendDid,
+        name,
+        handle,
+        avatar: u?.avatar || p?.avatar || (name ? name[0].toUpperCase() : 'F'),
+        avatarDataUrl: u?.avatarDataUrl || p?.avatarDataUrl,
+        avatarBg: u?.avatarBg || p?.avatarBg || '#10b981',
+        role: 'Mutual Friend',
+        device: u?.deviceType || p?.device || 'Desktop',
+        isFriend: true,
+        isOnline: p?.isOnline !== false,
+        lastSeen: p?.lastSeen || 'Online',
+        lastSeenTimestamp: p?.lastSeenTimestamp || u?.updatedAt || rel.updatedAt || now,
+        disappearingDurationSec: 0,
+        safetyNumbers: '28471 90432 18942 ' + friendDid.slice(-12),
+        isVerified: true,
+        lastMessage: '',
+        lastMessageTimestamp: 0,
+        lastMessageStatus: null,
+        lastMessageIsOutgoing: false,
+        unreadCount: 0,
+        hasThread: false,
+      });
+    }
+
+    conversations.sort((a, b) => {
+      if ((b.lastMessageTimestamp || 0) !== (a.lastMessageTimestamp || 0)) {
+        return (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0);
+      }
+      return (a.name || '').localeCompare(b.name || '');
+    });
     return conversations;
   }
 

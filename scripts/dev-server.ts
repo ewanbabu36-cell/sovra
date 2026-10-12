@@ -32853,33 +32853,33 @@ function renderHtml(
         return p.name.toLowerCase().includes(q) || (p.role && p.role.toLowerCase().includes(q));
       });
 
-      // 2. Direct Conversations (Strictly active threads with messages, or currently open chat)
+      // 2. Direct Conversations & Accepted Friends (Strictly real friends or active message threads)
       const directContactsMap = new Map();
 
-      // Add real conversations from contactsData (populated via getChatConversations)
+      // Add real conversations & accepted friends from contactsData
       (contactsData || []).forEach(function(c) {
-        if (!c || !c.did || c.did === myDid) return;
+        if (!c || !c.did || c.did === myDid || (typeof c.did === 'string' && c.did.startsWith('channel:'))) return;
 
-        // Real world social site logic: A chat only appears in Direct Messages if it has actual messages OR is the currently active chat
         const hasMessages = Boolean(c.lastMessage && c.lastMessageTimestamp && c.lastMessageTimestamp > 0 && c.hasThread !== false);
+        const isFriend = Boolean(c.isFriend);
         const isActiveChat = (c.did === activeContactDid);
 
-        if (hasMessages || isActiveChat) {
+        if (hasMessages || isFriend || isActiveChat) {
           directContactsMap.set(c.did, {
             did: c.did,
             name: c.name || c.displayName || c.handle || 'Peer',
             handle: c.handle || '',
             avatar: c.avatar || 'P',
             avatarDataUrl: c.avatarDataUrl,
-            avatarBg: c.avatarBg || '#6366f1',
-            role: c.role || (c.isFriend ? 'Mutual Friend' : 'Direct Contact'),
-            isFriend: Boolean(c.isFriend),
+            avatarBg: c.avatarBg || (isFriend ? '#10b981' : '#6366f1'),
+            role: isFriend ? 'Mutual Friend' : (c.role || 'Direct Contact'),
+            isFriend: isFriend,
             isOnline: c.isOnline !== false,
             lastSeen: c.lastSeen || 'Online',
-            lastMessage: c.lastMessage || (isActiveChat ? 'Tap to start end-to-end encrypted chat' : ''),
-            lastMessageTimestamp: c.lastMessageTimestamp || 0,
-            lastMessageStatus: c.lastMessageStatus || null,
-            lastMessageIsOutgoing: Boolean(c.lastMessageIsOutgoing),
+            lastMessage: hasMessages ? c.lastMessage : (isFriend || isActiveChat ? 'Tap to start end-to-end encrypted chat' : ''),
+            lastMessageTimestamp: hasMessages ? (c.lastMessageTimestamp || 0) : 0,
+            lastMessageStatus: hasMessages ? (c.lastMessageStatus || null) : null,
+            lastMessageIsOutgoing: hasMessages ? Boolean(c.lastMessageIsOutgoing) : false,
             unreadCount: Number(c.unreadCount || 0),
             disappearingDurationSec: Number(c.disappearingDurationSec || 0),
             isVerified: Boolean(c.isVerified),
@@ -32887,6 +32887,41 @@ function renderHtml(
           });
         }
       });
+
+      // Ensure all accepted friends from friendsData.friends appear in the user's Contacts / Chats list
+      if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
+        friendsData.friends.forEach(function(f) {
+          if (!f || !f.did || f.did === myDid) return;
+          if (!directContactsMap.has(f.did)) {
+            directContactsMap.set(f.did, {
+              did: f.did,
+              name: f.name || f.displayName || f.handle || 'Friend',
+              handle: f.handle || '',
+              avatar: f.avatar || ((f.name && f.name[0]) ? f.name[0].toUpperCase() : 'F'),
+              avatarDataUrl: f.avatarDataUrl,
+              avatarBg: f.avatarBg || '#10b981',
+              role: 'Mutual Friend',
+              isFriend: true,
+              isOnline: f.isOnline !== false,
+              lastSeen: f.lastSeen || 'Online',
+              lastMessage: 'Tap to start end-to-end encrypted chat',
+              lastMessageTimestamp: 0,
+              lastMessageStatus: null,
+              lastMessageIsOutgoing: false,
+              unreadCount: 0,
+              disappearingDurationSec: 0,
+              isVerified: true,
+              hasThread: false,
+            });
+          } else {
+            const existing = directContactsMap.get(f.did);
+            existing.isFriend = true;
+            existing.role = 'Mutual Friend';
+            if (f.isOnline !== undefined) existing.isOnline = f.isOnline;
+            if (f.avatarDataUrl && !existing.avatarDataUrl) existing.avatarDataUrl = f.avatarDataUrl;
+          }
+        });
+      }
 
       // If user currently opened a chat with a contact/friend who has no messages yet
       if (activeContactDid && !activeContactDid.startsWith('channel:') && !directContactsMap.has(activeContactDid)) {
@@ -32940,7 +32975,7 @@ function renderHtml(
       });
       const onlineFriends = Array.from(onlineFriendsMap.values());
 
-      // 📊 Update Real-Time Contacts & Friends Presence Summary Bar
+      // 📊 Update Real-Time Contacts & Friends Presence Summary Bar (Strictly Real Friends & Active Direct Contacts)
       const allKnownContactsMap = new Map();
       if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
         friendsData.friends.forEach(function(f) {
@@ -32948,21 +32983,13 @@ function renderHtml(
           allKnownContactsMap.set(f.did, f);
         });
       }
-      if (typeof contactsData !== 'undefined' && Array.isArray(contactsData)) {
-        contactsData.forEach(function(c) {
-          if (!c || !c.did || c.did === myDid || (typeof c.did === 'string' && c.did.startsWith('channel:'))) return;
-          if (!allKnownContactsMap.has(c.did)) {
-            allKnownContactsMap.set(c.did, c);
-          } else {
-            const ex = allKnownContactsMap.get(c.did);
-            if (c.isOnline !== undefined) ex.isOnline = c.isOnline;
-          }
-        });
-      }
       allDirectList.forEach(function(c) {
         if (!c || !c.did || c.did === myDid || (typeof c.did === 'string' && c.did.startsWith('channel:'))) return;
         if (!allKnownContactsMap.has(c.did)) {
           allKnownContactsMap.set(c.did, c);
+        } else {
+          const ex = allKnownContactsMap.get(c.did);
+          if (c.isOnline !== undefined) ex.isOnline = c.isOnline;
         }
       });
 
@@ -36587,30 +36614,30 @@ function renderHtml(
       const myDid = myProfile ? myProfile.did : 'self';
 
       const candidatesMap = new Map();
-      (contactsData || []).forEach(function(c) {
-        if (c.did !== myDid && !/@(?:attacker|victim|drill_|probe_|snoop_)/.test(c.handle || '')) {
-          candidatesMap.set(c.did, {
-            did: c.did,
-            name: c.name || c.displayName || c.handle || 'User',
-            handle: c.handle || '',
-            avatar: c.avatar || (c.name ? c.name.charAt(0).toUpperCase() : 'P'),
-            avatarBg: c.avatarBg || '#6366f1',
-          });
-        }
-      });
-      if (typeof dynamicCatalogPeople !== 'undefined' && Array.isArray(dynamicCatalogPeople)) {
-        dynamicCatalogPeople.forEach(function(p) {
-          if (p.pubkey !== myDid && !candidatesMap.has(p.pubkey)) {
-            candidatesMap.set(p.pubkey, {
-              did: p.pubkey,
-              name: p.name,
-              handle: p.handle,
-              avatar: p.avatar || (p.name ? p.name.charAt(0).toUpperCase() : 'P'),
-              avatarBg: p.avatarBg || '#6366f1',
+      if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
+        friendsData.friends.forEach(function(f) {
+          if (f && f.did && f.did !== myDid) {
+            candidatesMap.set(f.did, {
+              did: f.did,
+              name: f.name || f.displayName || f.handle || 'Friend',
+              handle: f.handle || '',
+              avatar: f.avatar || (f.name ? f.name.charAt(0).toUpperCase() : 'F'),
+              avatarBg: f.avatarBg || '#10b981',
             });
           }
         });
       }
+      (contactsData || []).forEach(function(c) {
+        if (c && c.did && c.did !== myDid && !c.did.startsWith('channel:') && (c.isFriend || c.hasThread) && !candidatesMap.has(c.did)) {
+          candidatesMap.set(c.did, {
+            did: c.did,
+            name: c.name || c.displayName || c.handle || 'Friend',
+            handle: c.handle || '',
+            avatar: c.avatar || (c.name ? c.name.charAt(0).toUpperCase() : 'F'),
+            avatarBg: c.avatarBg || '#10b981',
+          });
+        }
+      });
 
       const list = Array.from(candidatesMap.values()).filter(function(u) {
         if (!query) return true;
@@ -36693,10 +36720,23 @@ function renderHtml(
       const query = (q || '').toLowerCase().trim();
       const myDid = myProfile ? myProfile.did : 'self';
 
-      const candidates = [];
+      const candidatesMap = new Map();
+      if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
+        friendsData.friends.forEach(function(f) {
+          if (f && f.did && f.did !== myDid) {
+            candidatesMap.set(f.did, {
+              did: f.did,
+              name: f.name || f.displayName || 'Friend',
+              handle: f.handle || '',
+              avatar: f.avatar || (f.name ? f.name.charAt(0).toUpperCase() : 'F'),
+              avatarBg: f.avatarBg || '#10b981',
+            });
+          }
+        });
+      }
       (contactsData || []).forEach(function(c) {
-        if (c.did !== myDid && !c.did.startsWith('channel:') && !c.isGroup) {
-          candidates.push({
+        if (c && c.did && c.did !== myDid && !c.did.startsWith('channel:') && !c.isGroup && (c.isFriend || c.hasThread) && !candidatesMap.has(c.did)) {
+          candidatesMap.set(c.did, {
             did: c.did,
             name: c.name || c.displayName || 'Friend',
             handle: c.handle || '',
@@ -36705,6 +36745,7 @@ function renderHtml(
           });
         }
       });
+      const candidates = Array.from(candidatesMap.values());
 
       const filtered = candidates.filter(function(u) {
         if (!query) return true;
@@ -36712,7 +36753,7 @@ function renderHtml(
       });
 
       if (filtered.length === 0) {
-        listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 1.5rem 0;">No contacts found</div>';
+        listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 1.5rem 0;">No friends found</div>';
         return;
       }
 
