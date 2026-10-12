@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
 import vm from 'node:vm';
+import zlib from 'node:zlib';
 import { validateEnvironment } from './env-validator.ts';
 import { ensureDevTlsCertificates } from './tls-helper.ts';
 import { SovraBackupManager } from './sovra-backup-restore.ts';
@@ -1722,10 +1723,10 @@ function renderHtml(
   socialGraph: DefaultSocialGraphEngine,
   localFeed: DefaultLocalFeedEngine,
 ): string {
-  const livePosts = sovraDb.getAllPosts();
-  const livePeers = sovraDb.getAllPeers();
-  const liveUsers = sovraDb.getAllUsers();
-  const liveReels = sovraDb.getAllReels();
+  const livePosts = sovraDb.getAllPosts().slice(0, 20);
+  const livePeers = sovraDb.getAllPeers().slice(0, 30);
+  const liveUsers = sovraDb.getAllUsers().slice(0, 30);
+  const liveReels = sovraDb.getAllReels().slice(0, 15);
   let hostUser = sovraDb.findUserByDid(masterKey.did);
   if (hostUser && !hostUser.sessionToken) {
     hostUser.sessionToken = 'stk_' + crypto.randomBytes(24).toString('hex');
@@ -32666,9 +32667,9 @@ function renderHtml(
     // ==========================================
     // 2. WHATSAPP E2EE CHAT SCRIPT ENGINE
     // ==========================================
-    let contactsData = ${safeJsonForScript(sovraDb.getChatConversations(masterKey.did || hostUser?.did || 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD'))};
-    let bitchatPeersData = ${safeJsonForScript(bitchatPeersStore)};
-    let chatMessages = ${safeJsonForScript(sovraDb.getState().chatMessages)};
+    let contactsData = ${safeJsonForScript(sovraDb.getChatConversations(masterKey.did || hostUser?.did || 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD').slice(0, 30))};
+    let bitchatPeersData = ${safeJsonForScript(bitchatPeersStore.slice(0, 30))};
+    let chatMessages = ${safeJsonForScript({ 'channel:local_mesh': (sovraDb.getState().chatMessages['channel:local_mesh'] || []).slice(-25) })};
     let bitchatModeActive = true;
     let activeContactDid = 'channel:local_mesh';
     let isRecordingVoice = false;
@@ -49574,13 +49575,28 @@ async function startDevServer() {
 
     // Product A: Sovra Consumer Social App & Creator Studio (Dedicated User Panel)
     if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/app') {
-      res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      });
-      res.end(renderHtml(binding, masterKey, tcpPort, Date.now() - startTime, storageDaemon, socialGraph, localFeed));
+      const htmlStr = renderHtml(binding, masterKey, tcpPort, Date.now() - startTime, storageDaemon, socialGraph, localFeed);
+      const acceptEncoding = String(req.headers['accept-encoding'] || '');
+      if (acceptEncoding.includes('gzip')) {
+        const compressed = zlib.gzipSync(Buffer.from(htmlStr, 'utf8'));
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Encoding': 'gzip',
+          'Content-Length': String(compressed.length),
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        });
+        res.end(compressed);
+      } else {
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        });
+        res.end(htmlStr);
+      }
       return;
     }
 
