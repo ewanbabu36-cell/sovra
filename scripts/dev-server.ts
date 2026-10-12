@@ -16070,12 +16070,15 @@ function renderHtml(
       if (init.headers instanceof Headers) {
         init.headers.set('X-Sovra-Nonce', reqNonce);
         init.headers.set('X-Sovra-Timestamp', reqTimestamp);
+        init.headers.set('bypass-tunnel-reminder', 'true');
       } else if (Array.isArray(init.headers)) {
         init.headers.push(['X-Sovra-Nonce', reqNonce]);
         init.headers.push(['X-Sovra-Timestamp', reqTimestamp]);
+        init.headers.push(['bypass-tunnel-reminder', 'true']);
       } else {
         init.headers['X-Sovra-Nonce'] = reqNonce;
         init.headers['X-Sovra-Timestamp'] = reqTimestamp;
+        init.headers['bypass-tunnel-reminder'] = 'true';
       }
 
       let token = localStorage.getItem('sovra_session_token');
@@ -24093,7 +24096,10 @@ function renderHtml(
       try {
         const res = await fetch('/api/user/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'bypass-tunnel-reminder': 'true'
+          },
           body: JSON.stringify({
             identifier: identifier,
             pin: pinVal,
@@ -24101,7 +24107,17 @@ function renderHtml(
             device: isMobileDevice ? 'Mobile' : 'Desktop'
           })
         });
-        const data = await res.json();
+        let data;
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+        } catch (jsonErr) {
+          if (errBox) {
+            errBox.innerText = 'Server returned proxy notice (' + res.status + '): ' + text.slice(0, 120);
+            errBox.style.display = 'block';
+          }
+          return;
+        }
         if (!res.ok || !data.ok || !data.user) {
           if (errBox) {
             errBox.innerText = data.error || 'Authentication failed. Please check your credentials.';
@@ -25389,6 +25405,7 @@ function renderHtml(
       const nameInput = document.getElementById('womNameInput');
       const handleInput = document.getElementById('womHandleInput');
       const pinInput = document.getElementById('womRegisterPinInput');
+      const submitBtn = document.getElementById('womRegisterSubmitBtn');
       const errorBox = document.getElementById('womErrorMsg');
 
       const nameVal = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : '';
@@ -25406,23 +25423,47 @@ function renderHtml(
       const fullName = nameVal || (handleVal.charAt(0).toUpperCase() + handleVal.slice(1));
       const cleanHandle = '@' + handleVal.toLowerCase();
 
+      // UI Loading Feedback
+      const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.7';
+        submitBtn.innerHTML = '<span>Creating Sovereign Identity... ⏳</span>';
+      }
+      if (errorBox) {
+        errorBox.style.display = 'none';
+      }
+
+      function restoreSubmitBtn() {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
+          submitBtn.innerHTML = originalBtnHtml;
+        }
+      }
+
       // Dynamic Client-Side Proof-of-Work Solver (Botnet & Sybil Defense)
       let powPayload = {};
       try {
-        const chRes = await fetch('/api/auth/challenge');
+        const chRes = await fetch('/api/auth/challenge', {
+          headers: { 'bypass-tunnel-reminder': 'true' }
+        });
         if (chRes.ok) {
           const chData = await chRes.json();
           if (chData.ok && chData.challengeId && chData.prefix) {
             const target = '0'.repeat(chData.difficulty || 3);
             let nonce = 0;
-            while (nonce < 100000) {
-              const msgBuf = new TextEncoder().encode(chData.prefix + nonce);
-              const hashBuf = await crypto.subtle.digest('SHA-256', msgBuf);
-              const hashArr = Array.from(new Uint8Array(hashBuf));
-              const hashHex = hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
-              if (hashHex.startsWith(target)) {
-                powPayload = { challengeId: chData.challengeId, solutionNonce: String(nonce) };
-                break;
+            const startTime = Date.now();
+            while (nonce < 50000 && (Date.now() - startTime < 2000)) {
+              if (window.crypto && crypto.subtle) {
+                const msgBuf = new TextEncoder().encode(chData.prefix + nonce);
+                const hashBuf = await crypto.subtle.digest('SHA-256', msgBuf);
+                const hashArr = Array.from(new Uint8Array(hashBuf));
+                const hashHex = hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
+                if (hashHex.startsWith(target)) {
+                  powPayload = { challengeId: chData.challengeId, solutionNonce: String(nonce) };
+                  break;
+                }
               }
               nonce++;
             }
@@ -25433,7 +25474,10 @@ function renderHtml(
       try {
         const res = await fetch('/api/user/register', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'bypass-tunnel-reminder': 'true'
+          },
           body: JSON.stringify({
             handle: cleanHandle,
             name: fullName,
@@ -25444,8 +25488,22 @@ function renderHtml(
             ...powPayload,
           })
         });
-        const data = await res.json();
+
+        let data;
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+        } catch (jsonErr) {
+          restoreSubmitBtn();
+          if (errorBox) {
+            errorBox.innerText = 'Server returned proxy notice (' + res.status + '): ' + text.slice(0, 120);
+            errorBox.style.display = 'block';
+          }
+          return;
+        }
+
         if (!res.ok || !data.ok) {
+          restoreSubmitBtn();
           if (errorBox) {
             errorBox.innerText = data.error || 'Registration failed. Handle may already be taken.';
             errorBox.style.display = 'block';
@@ -25465,7 +25523,10 @@ function renderHtml(
 
         fetch('/api/peers/register', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'bypass-tunnel-reminder': 'true'
+          },
           body: JSON.stringify(myProfile)
         }).catch(function() {});
 
@@ -25479,8 +25540,9 @@ function renderHtml(
           if (displayEl) displayEl.innerText = currentUserHandle;
         }, 1000);
       } catch (err) {
+        restoreSubmitBtn();
         if (errorBox) {
-          errorBox.innerText = 'Network connection failed: ' + err;
+          errorBox.innerText = 'Network connection failed: ' + (err.message || err);
           errorBox.style.display = 'block';
         }
       }

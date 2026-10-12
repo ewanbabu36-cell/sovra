@@ -58,6 +58,9 @@ Thumbs.db
 tmp/
 *.tmp
 .sovra-storage-dev/
+*.exe
+scripts/cloudflared.exe
+scripts/cloudflare-url.txt
 .sovra-tls/
 .tmp-*
 .test-drill-*
