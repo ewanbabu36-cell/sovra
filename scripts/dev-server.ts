@@ -26357,6 +26357,35 @@ function renderHtml(
           } catch (_) {}
           if (typeof syncChatMessages === 'function') syncChatMessages();
         });
+
+        _realtimeEventSource.addEventListener('call_signal', function(e) {
+          try {
+            const data = JSON.parse(e.data);
+            if (data && data.type === 'offer') {
+              if (typeof pollIncomingCalls === 'function') pollIncomingCalls();
+            } else if (data && data.type === 'candidate' && data.candidate) {
+              if (typeof window.handleRealtimeCallCandidate === 'function') {
+                window.handleRealtimeCallCandidate(data);
+              } else if (typeof syncActiveCallSession === 'function') {
+                syncActiveCallSession();
+              }
+            } else {
+              if (typeof syncActiveCallSession === 'function') syncActiveCallSession();
+              if (typeof pollIncomingCalls === 'function') pollIncomingCalls();
+            }
+          } catch (_) {
+            if (typeof pollIncomingCalls === 'function') pollIncomingCalls();
+          }
+        });
+
+        _realtimeEventSource.addEventListener('call_audio', function(e) {
+          try {
+            const chunk = JSON.parse(e.data);
+            if (chunk && typeof window.playRelayedAudioChunk === 'function') {
+              window.playRelayedAudioChunk(chunk);
+            }
+          } catch (_) {}
+        });
       } catch (_) {
         updateLiveStatus(navigator.onLine ? 'connected' : 'offline');
       }
@@ -34345,11 +34374,17 @@ function renderHtml(
     }
     setInterval(syncPeersAndContacts, 3500);
 
-    // Voice recording handlers
-    function toggleVoiceRecord() {
+    // Voice recording handlers (Real MediaRecorder + Audio Playback)
+    let _voiceMediaRecorder = null;
+    let _voiceMediaStream = null;
+    let _voiceAudioChunks = [];
+    let _voiceAudioPlayers = {};
+
+    async function toggleVoiceRecord() {
       if (isRecordingVoice) return;
       isRecordingVoice = true;
       voiceRecordStartTime = Date.now();
+      _voiceAudioChunks = [];
 
       const standardRow = document.getElementById('standardInputRow');
       const recordDrawer = document.getElementById('voiceRecordingDrawer');
@@ -34357,6 +34392,7 @@ function renderHtml(
       if (recordDrawer) recordDrawer.style.display = 'flex';
 
       const timerEl = document.getElementById('voiceRecordTimer');
+      if (timerEl) timerEl.innerText = '0:00';
       voiceRecordTimerInterval = setInterval(function() {
         const elapsedSec = Math.floor((Date.now() - voiceRecordStartTime) / 1000);
         const mins = Math.floor(elapsedSec / 60);
@@ -34365,11 +34401,60 @@ function renderHtml(
           timerEl.innerText = mins + ':' + (secs < 10 ? '0' : '') + secs;
         }
       }, 500);
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && typeof MediaRecorder !== 'undefined') {
+        try {
+          _voiceMediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          });
+          if (!isRecordingVoice) {
+            _voiceMediaStream.getTracks().forEach(function(t) { t.stop(); });
+            _voiceMediaStream = null;
+            return;
+          }
+          const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+          let chosenMime = '';
+          for (let i = 0; i < mimeTypes.length; i++) {
+            if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(mimeTypes[i])) {
+              chosenMime = mimeTypes[i];
+              break;
+            }
+          }
+          _voiceMediaRecorder = chosenMime ? new MediaRecorder(_voiceMediaStream, { mimeType: chosenMime }) : new MediaRecorder(_voiceMediaStream);
+          _voiceMediaRecorder.ondataavailable = function(e) {
+            if (e.data && e.data.size > 0) {
+              _voiceAudioChunks.push(e.data);
+            }
+          };
+          _voiceMediaRecorder.start(200);
+        } catch (err) {
+          console.warn('[VoiceNote] Microphone capture fallback:', err);
+        }
+      }
+    }
+
+    function stopVoiceCaptureHardware() {
+      if (_voiceMediaRecorder) {
+        try {
+          if (_voiceMediaRecorder.state !== 'inactive') {
+            _voiceMediaRecorder.stop();
+          }
+        } catch (_) {}
+      }
+      if (_voiceMediaStream) {
+        try {
+          _voiceMediaStream.getTracks().forEach(function(t) { t.stop(); });
+        } catch (_) {}
+        _voiceMediaStream = null;
+      }
     }
 
     function cancelVoiceRecord() {
       isRecordingVoice = false;
       if (voiceRecordTimerInterval) clearInterval(voiceRecordTimerInterval);
+      stopVoiceCaptureHardware();
+      _voiceMediaRecorder = null;
+      _voiceAudioChunks = [];
       const standardRow = document.getElementById('standardInputRow');
       const recordDrawer = document.getElementById('voiceRecordingDrawer');
       if (standardRow) standardRow.style.display = 'flex';
@@ -34379,48 +34464,99 @@ function renderHtml(
     function finishAndSendVoiceRecord() {
       if (!isRecordingVoice) return;
       const durationSec = Math.max(1.2, ((Date.now() - voiceRecordStartTime) / 1000));
-      cancelVoiceRecord();
+      isRecordingVoice = false;
+      if (voiceRecordTimerInterval) clearInterval(voiceRecordTimerInterval);
+      const standardRow = document.getElementById('standardInputRow');
+      const recordDrawer = document.getElementById('voiceRecordingDrawer');
+      if (standardRow) standardRow.style.display = 'flex';
+      if (recordDrawer) recordDrawer.style.display = 'none';
 
-      const contact = contactsData.find(function(c) { return c.did === activeContactDid; });
-      const timerSec = contact ? (contact.disappearingDurationSec || 0) : 0;
-      const now = Date.now();
+      const dispatchVoiceNotePayload = function(attachmentObj) {
+        const contact = contactsData.find(function(c) { return c.did === activeContactDid; });
+        const timerSec = contact ? (contact.disappearingDurationSec || 0) : 0;
+        const now = Date.now();
 
-      const waveform = [];
-      for (let i = 0; i < 15; i++) {
-        waveform.push(Math.floor(Math.random() * 75) + 25);
-      }
+        const waveform = [];
+        for (let i = 0; i < 15; i++) {
+          waveform.push(Math.floor(Math.random() * 75) + 25);
+        }
 
-      const myDid = myProfile ? myProfile.did : 'self';
-      const myName = myProfile ? myProfile.name : 'You';
-      const voiceMsg = {
-        id: 'audio-' + now + '-' + Math.random().toString(36).substring(2, 6),
-        senderDid: myDid,
-        recipientDid: activeContactDid,
-        senderName: myName,
-        text: '🎙️ Voice note (' + durationSec.toFixed(1) + 's)',
-        isAudio: true,
-        audioDurationSec: parseFloat(durationSec.toFixed(1)),
-        waveformBars: waveform,
-        timestamp: now,
-        sentAt: now,
-        status: 'sent',
-        signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),
-        disappearingDurationSec: timerSec,
-        expiresAt: timerSec > 0 ? now + timerSec * 1000 : undefined,
-        isDisappeared: false,
-        reactions: [],
+        const myDid = myProfile ? myProfile.did : 'self';
+        const myName = myProfile ? (myProfile.name || myProfile.displayName || 'You') : 'You';
+        const token = (myProfile && myProfile.sessionToken) || localStorage.getItem('sovra_session_token') || '';
+        const voiceMsg = {
+          id: 'audio-' + now + '-' + Math.random().toString(36).substring(2, 6),
+          senderDid: myDid,
+          recipientDid: activeContactDid,
+          senderName: myName,
+          text: '🎙️ Voice note (' + durationSec.toFixed(1) + 's)',
+          isAudio: true,
+          audioDurationSec: parseFloat(durationSec.toFixed(1)),
+          waveformBars: waveform,
+          attachment: attachmentObj || undefined,
+          timestamp: now,
+          sentAt: now,
+          status: 'sent',
+          signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),
+          disappearingDurationSec: timerSec,
+          expiresAt: timerSec > 0 ? now + timerSec * 1000 : undefined,
+          isDisappeared: false,
+          reactions: [],
+          sessionToken: token || undefined,
+        };
+
+        chatMessages.push(voiceMsg);
+        renderChatBubbles();
+
+        try {
+          const fetchFn = window.authenticatedFetch || fetch;
+          fetchFn('/api/chat/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(voiceMsg)
+          }).then(function(r) { return r.json(); }).then(function(resData) {
+            if (resData && resData.ok && resData.message && resData.message.attachment) {
+              voiceMsg.attachment = resData.message.attachment;
+            }
+          }).catch(function() {});
+        } catch (e) {}
       };
 
-      chatMessages.push(voiceMsg);
-      renderChatBubbles();
-
-      try {
-        fetch('/api/chat/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(voiceMsg)
-        });
-      } catch (e) {}
+      if (_voiceMediaRecorder && _voiceMediaRecorder.state !== 'inactive') {
+        const rec = _voiceMediaRecorder;
+        _voiceMediaRecorder = null;
+        rec.onstop = function() {
+          stopVoiceCaptureHardware();
+          if (_voiceAudioChunks.length > 0) {
+            const mimeType = rec.mimeType || 'audio/webm';
+            const blob = new Blob(_voiceAudioChunks, { type: mimeType });
+            _voiceAudioChunks = [];
+            const reader = new FileReader();
+            reader.onloadend = function() {
+              const ext = mimeType.includes('mp4') ? 'm4a' : (mimeType.includes('ogg') ? 'ogg' : 'webm');
+              dispatchVoiceNotePayload({
+                name: 'voice-note-' + Date.now() + '.' + ext,
+                type: mimeType,
+                size: blob.size,
+                dataUrl: String(reader.result || ''),
+              });
+            };
+            reader.readAsDataURL(blob);
+          } else {
+            dispatchVoiceNotePayload(null);
+          }
+        };
+        try {
+          rec.stop();
+        } catch (_) {
+          stopVoiceCaptureHardware();
+          dispatchVoiceNotePayload(null);
+        }
+      } else {
+        stopVoiceCaptureHardware();
+        _voiceMediaRecorder = null;
+        dispatchVoiceNotePayload(null);
+      }
     }
 
     function playVoiceWaveform(btn, msgId) {
@@ -34429,18 +34565,41 @@ function renderHtml(
       const bars = barsContainer.querySelectorAll('.waveform-bar');
       const timeEl = document.getElementById('time-' + msgId);
       const msg = chatMessages.find(function(m) { return m.id === msgId; });
-      const totalSec = msg ? msg.audioDurationSec : 4.0;
+      const totalSec = msg && msg.audioDurationSec ? msg.audioDurationSec : 4.0;
 
       if (voicePlaybackIntervals[msgId]) {
         clearInterval(voicePlaybackIntervals[msgId]);
         delete voicePlaybackIntervals[msgId];
+        if (_voiceAudioPlayers[msgId]) {
+          try { _voiceAudioPlayers[msgId].pause(); } catch (_) {}
+        }
         btn.innerText = '▶';
         return;
       }
 
+      if (msg && msg.attachment && (msg.attachment.dataUrl || msg.attachment.url)) {
+        try {
+          const src = msg.attachment.dataUrl || (typeof getAuthenticatedAttachmentUrl === 'function' ? getAuthenticatedAttachmentUrl(msg.attachment) : msg.attachment.url);
+          let player = _voiceAudioPlayers[msgId];
+          if (!player || player.src !== src) {
+            player = new Audio(src);
+            _voiceAudioPlayers[msgId] = player;
+          }
+          const speedBtn = document.getElementById('speed-' + msgId);
+          if (speedBtn) {
+            const sp = parseFloat(speedBtn.innerText.replace('x', '')) || 1.0;
+            player.playbackRate = sp;
+          }
+          player.currentTime = 0;
+          player.play().catch(function(e) { console.warn('[VoiceNote] Audio play warning:', e); });
+        } catch (e) {
+          console.warn('[VoiceNote] Audio element error:', e);
+        }
+      }
+
       btn.innerText = '⏸';
       let step = 0;
-      const intervalMs = Math.max(80, Math.floor((totalSec * 1000) / bars.length));
+      const intervalMs = Math.max(80, Math.floor((totalSec * 1000) / Math.max(1, bars.length)));
 
       voicePlaybackIntervals[msgId] = setInterval(function() {
         if (step < bars.length) {
@@ -34462,7 +34621,13 @@ function renderHtml(
       const speeds = ['1x', '1.5x', '2x'];
       const current = btn.innerText;
       const nextIdx = (speeds.indexOf(current) + 1) % speeds.length;
-      btn.innerText = speeds[nextIdx];
+      const nextSpeedStr = speeds[nextIdx];
+      btn.innerText = nextSpeedStr;
+      if (_voiceAudioPlayers[msgId]) {
+        try {
+          _voiceAudioPlayers[msgId].playbackRate = parseFloat(nextSpeedStr.replace('x', '')) || 1.0;
+        } catch (_) {}
+      }
     }
 
     function insertEmojiToInput(emoji) {
@@ -34723,12 +34888,22 @@ function renderHtml(
     let _callVideoEnabled = false;
     let _peerConnection = null;
     let _iceCandidateQueue = [];
+    let _pendingOutboundCandidates = [];
+    let _appliedRemoteCandidates = new Set();
     let _hasRemoteDescription = false;
     let _statsInterval = null;
     let _iceConnectedTicks = 0;
     let _voiceVisualizerAnimId = null;
     let _voiceVisualizerCtx = null;
     let _activeCallPollBusy = false;
+    let _lastRelayedAudioSeq = 0;
+    let _relayAudioProcessor = null;
+    let _relayAudioSource = null;
+    let _nextRelayPlayTime = 0;
+    let _relayedBytesSent = 0;
+    let _relayedBytesRecv = 0;
+    let _relayedPktsSent = 0;
+    let _relayedPktsRecv = 0;
 
     let _callDiagnostics = {
       callState: 'IDLE',
@@ -34804,13 +34979,6 @@ function renderHtml(
         clearInterval(_callRingInterval);
         _callRingInterval = null;
       }
-      if (_callAudioCtx) {
-        try {
-          if (_callAudioCtx.state === 'running') {
-            _callAudioCtx.suspend();
-          }
-        } catch (_) {}
-      }
     }
 
     function playCallDisconnectTone() {
@@ -34833,6 +35001,9 @@ function renderHtml(
 
     function primeMediaPlayback() {
       try {
+        if (!_callAudioCtx) _callAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (_callAudioCtx.state === 'suspended') _callAudioCtx.resume();
+
         let remoteAudio = document.getElementById('remoteAudioPlayer');
         if (!remoteAudio) {
           remoteAudio = document.createElement('audio');
@@ -34856,6 +35027,155 @@ function renderHtml(
       } catch (_) {}
     }
 
+    function startCallAudioRelayBridge(stream) {
+      stopCallAudioRelayBridge();
+      if (!stream) return;
+      try {
+        const audioTracks = stream.getAudioTracks();
+        if (!audioTracks || audioTracks.length === 0) return;
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        if (!_callAudioCtx) _callAudioCtx = new AC();
+        if (_callAudioCtx.state === 'suspended') _callAudioCtx.resume();
+
+        const src = _callAudioCtx.createMediaStreamSource(stream);
+        const proc = _callAudioCtx.createScriptProcessor(4096, 1, 1);
+        const zeroGain = _callAudioCtx.createGain();
+        zeroGain.gain.value = 0;
+
+        let sampleAccumulator = [];
+        const targetRate = 8000;
+        const inputRate = _callAudioCtx.sampleRate || 48000;
+        const downsampleRatio = Math.max(1, Math.round(inputRate / targetRate));
+
+        proc.onaudioprocess = function(e) {
+          if (!_isCallAnswered || _callIsMuted || !window._activeCallId) return;
+          // If native WebRTC P2P RTP is actively receiving audio packets (> 4KB), skip HTTP relay overhead
+          const nativeIceConnected = _peerConnection && (_peerConnection.iceConnectionState === 'connected' || _peerConnection.iceConnectionState === 'completed');
+          if (nativeIceConnected && (_callDiagnostics.audio.bytesReceived - _relayedBytesRecv) > 4096) {
+            return;
+          }
+
+          const inputData = e.inputBuffer.getChannelData(0);
+          for (let i = 0; i < inputData.length; i += downsampleRatio) {
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            sampleAccumulator.push(s < 0 ? Math.round(s * 32768) : Math.round(s * 32767));
+          }
+
+          // Dispatch ~250ms audio frame (2000 samples @ 8kHz = 4000 bytes)
+          if (sampleAccumulator.length >= 2000) {
+            const int16 = new Int16Array(sampleAccumulator.splice(0, 2000));
+            const uint8 = new Uint8Array(int16.buffer);
+            let bin = '';
+            for (let j = 0; j < uint8.length; j++) {
+              bin += String.fromCharCode(uint8[j]);
+            }
+            const pcmBase64 = btoa(bin);
+            _relayedBytesSent += uint8.length;
+            _relayedPktsSent += 1;
+            _callDiagnostics.audio.bytesSent = Math.max(_callDiagnostics.audio.bytesSent || 0, _relayedBytesSent);
+            _callDiagnostics.audio.packetsSent = Math.max(_callDiagnostics.audio.packetsSent || 0, _relayedPktsSent);
+
+            callFetch('/api/call/audio', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                callId: window._activeCallId,
+                pcmBase64: pcmBase64,
+                sampleRate: Math.round(inputRate / downsampleRatio)
+              })
+            }).catch(function() {});
+          }
+        };
+
+        src.connect(proc);
+        proc.connect(zeroGain);
+        zeroGain.connect(_callAudioCtx.destination);
+        _relayAudioSource = src;
+        _relayAudioProcessor = proc;
+      } catch (err) {
+        console.warn('[CallAudioRelay] Failed to start live audio relay bridge:', err);
+      }
+    }
+
+    function stopCallAudioRelayBridge() {
+      if (_relayAudioProcessor) {
+        try {
+          _relayAudioProcessor.onaudioprocess = null;
+          _relayAudioProcessor.disconnect();
+        } catch (_) {}
+        _relayAudioProcessor = null;
+      }
+      if (_relayAudioSource) {
+        try {
+          _relayAudioSource.disconnect();
+        } catch (_) {}
+        _relayAudioSource = null;
+      }
+      _nextRelayPlayTime = 0;
+    }
+
+    function playRelayedAudioChunk(chunk) {
+      if (!chunk || !chunk.pcmBase64 || !window._activeCallId) return;
+      if (chunk.callId && chunk.callId !== window._activeCallId) return;
+      const myDid = myProfile ? myProfile.did : '';
+      if (chunk.senderDid && chunk.senderDid === myDid) return;
+      if (chunk.seq && chunk.seq <= _lastRelayedAudioSeq) return;
+      if (chunk.seq) _lastRelayedAudioSeq = chunk.seq;
+
+      // Avoid double playback if native WebRTC RTP is actively receiving packets
+      const nativeIceConnected = _peerConnection && (_peerConnection.iceConnectionState === 'connected' || _peerConnection.iceConnectionState === 'completed');
+      if (nativeIceConnected && (_callDiagnostics.audio.bytesReceived - _relayedBytesRecv) > 4096) {
+        return;
+      }
+
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        if (!_callAudioCtx) _callAudioCtx = new AC();
+        if (_callAudioCtx.state === 'suspended') _callAudioCtx.resume();
+
+        const bin = atob(chunk.pcmBase64);
+        const uint8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) {
+          uint8[i] = bin.charCodeAt(i);
+        }
+        const int16 = new Int16Array(uint8.buffer);
+        const sampleRate = chunk.sampleRate || 8000;
+        const audioBuf = _callAudioCtx.createBuffer(1, int16.length, sampleRate);
+        const channelData = audioBuf.getChannelData(0);
+        let energySum = 0;
+        for (let i = 0; i < int16.length; i++) {
+          const val = int16[i] / 32768.0;
+          channelData[i] = val;
+          energySum += Math.abs(val);
+        }
+
+        const bufSrc = _callAudioCtx.createBufferSource();
+        bufSrc.buffer = audioBuf;
+        bufSrc.connect(_callAudioCtx.destination);
+
+        const nowTime = _callAudioCtx.currentTime;
+        if (_nextRelayPlayTime < nowTime || _nextRelayPlayTime > nowTime + 1.0) {
+          _nextRelayPlayTime = nowTime + 0.04;
+        }
+        bufSrc.start(_nextRelayPlayTime);
+        _nextRelayPlayTime += audioBuf.duration;
+
+        _relayedBytesRecv += uint8.length;
+        _relayedPktsRecv += 1;
+        _callDiagnostics.audio.bytesReceived = Math.max(_callDiagnostics.audio.bytesReceived || 0, _relayedBytesRecv);
+        _callDiagnostics.audio.packetsReceived = Math.max(_callDiagnostics.audio.packetsReceived || 0, _relayedPktsRecv);
+        const avgLevel = Math.min(100, Math.round((energySum / Math.max(1, int16.length)) * 350));
+        if (avgLevel > 2) {
+          _callDiagnostics.audio.audioLevel = Math.max(_callDiagnostics.audio.audioLevel || 0, avgLevel);
+        }
+      } catch (err) {
+        console.warn('[CallAudioRelay] Playback decode warning:', err);
+      }
+    }
+    window.playRelayedAudioChunk = playRelayedAudioChunk;
+
     function handleRemoteCallEnded(reason) {
       const modal = document.getElementById('e2eeCallModal');
       if (!modal || modal.style.display === 'none') {
@@ -34867,6 +35187,7 @@ function renderHtml(
       }
 
       stopCallAudioRinging();
+      stopCallAudioRelayBridge();
       playCallDisconnectTone();
 
       if (callTimerInterval) {
@@ -34988,19 +35309,36 @@ function renderHtml(
       }
     }
 
+    function getCandidateKey(candidateData) {
+      if (!candidateData) return '';
+      if (typeof candidateData === 'string') return candidateData;
+      return String(candidateData.candidate || JSON.stringify(candidateData));
+    }
+
     async function queueOrApplyIceCandidate(candidateData) {
       if (!_peerConnection || !candidateData) return;
+      const key = getCandidateKey(candidateData);
+      if (key && _appliedRemoteCandidates.has(key)) return;
+
       if (!_hasRemoteDescription || !_peerConnection.remoteDescription) {
         _iceCandidateQueue.push(candidateData);
         return;
       }
       try {
         const candObj = (typeof candidateData === 'string') ? JSON.parse(candidateData) : candidateData;
+        if (key) _appliedRemoteCandidates.add(key);
         await _peerConnection.addIceCandidate(new RTCIceCandidate(candObj));
       } catch (err) {
         console.warn('[WebRTC] addIceCandidate warning:', err);
       }
     }
+
+    window.handleRealtimeCallCandidate = function(data) {
+      if (!data || !data.candidate || !window._activeCallId || data.callId !== window._activeCallId) return;
+      const myDid = myProfile ? myProfile.did : '';
+      if (data.senderDid && data.senderDid === myDid) return;
+      queueOrApplyIceCandidate(data.candidate);
+    };
 
     async function flushQueuedIceCandidates() {
       if (!_peerConnection || !_peerConnection.remoteDescription) return;
@@ -35008,7 +35346,10 @@ function renderHtml(
       _iceCandidateQueue = [];
       for (let i = 0; i < queue.length; i++) {
         try {
+          const key = getCandidateKey(queue[i]);
+          if (key && _appliedRemoteCandidates.has(key)) continue;
           const candObj = (typeof queue[i] === 'string') ? JSON.parse(queue[i]) : queue[i];
+          if (key) _appliedRemoteCandidates.add(key);
           await _peerConnection.addIceCandidate(new RTCIceCandidate(candObj));
         } catch (e) {
           console.warn('[WebRTC] Error applying queued ICE candidate:', e);
@@ -35016,16 +35357,71 @@ function renderHtml(
       }
     }
 
+    function flushPendingOutboundCandidates() {
+      if (!window._activeCallId || _pendingOutboundCandidates.length === 0) return;
+      const isShieldActive = localStorage.getItem('sovra_privacy_shield') === 'true';
+      const pending = _pendingOutboundCandidates.slice();
+      _pendingOutboundCandidates = [];
+      for (let i = 0; i < pending.length; i++) {
+        callFetch('/api/call/candidate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            callId: window._activeCallId,
+            candidate: pending[i],
+            privacyRelay: isShieldActive
+          })
+        }).catch(function(e) { console.warn('[WebRTC] Buffered candidate POST error:', e); });
+      }
+    }
+
+    function waitForInitialIceGathering(pc, timeoutMs) {
+      return new Promise(function(resolve) {
+        if (!pc || pc.iceGatheringState === 'complete') {
+          resolve();
+          return;
+        }
+        let done = false;
+        const finish = function() {
+          if (done) return;
+          done = true;
+          resolve();
+        };
+        const timer = setTimeout(finish, timeoutMs || 500);
+        pc.addEventListener('icegatheringstatechange', function onGather() {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', onGather);
+            clearTimeout(timer);
+            finish();
+          }
+        });
+      });
+    }
+
     function syncActiveCallSession() {
       if (!window._activeCallId || _activeCallPollBusy) return;
       _activeCallPollBusy = true;
-      callFetch('/api/call/poll?callId=' + encodeURIComponent(window._activeCallId))
+      callFetch('/api/call/poll?callId=' + encodeURIComponent(window._activeCallId) + '&afterAudioSeq=' + _lastRelayedAudioSeq)
         .then(function(r) { return r.json(); })
         .then(async function(data) {
           _activeCallPollBusy = false;
+          if (data && Array.isArray(data.audioChunks)) {
+            for (let a = 0; a < data.audioChunks.length; a++) {
+              playRelayedAudioChunk(data.audioChunks[a]);
+            }
+          }
           if (data && data.ok && data.session) {
             const st = data.session.status;
-            if (st === 'answered') {
+            if (_peerConnection && Array.isArray(data.session.iceCandidates)) {
+              const myDid = myProfile ? myProfile.did : '';
+              for (let i = 0; i < data.session.iceCandidates.length; i++) {
+                const item = data.session.iceCandidates[i];
+                if (item.senderDid !== myDid && item.candidate) {
+                  await queueOrApplyIceCandidate(item.candidate);
+                }
+              }
+            }
+            if (st === 'answered' || st === 'reconnecting') {
               if (_peerConnection && data.session.sdpAnswer && !_hasRemoteDescription && _peerConnection.signalingState === 'have-local-offer') {
                 try {
                   console.log('[WebRTC] Applying remote SDP answer from signaling');
@@ -35040,15 +35436,9 @@ function renderHtml(
                   console.warn('[WebRTC] setRemoteDescription error:', e);
                 }
               }
-
-              if (_peerConnection && Array.isArray(data.session.iceCandidates)) {
-                const myDid = myProfile ? myProfile.did : '';
-                for (let i = 0; i < data.session.iceCandidates.length; i++) {
-                  const item = data.session.iceCandidates[i];
-                  if (item.senderDid !== myDid && item.candidate) {
-                    await queueOrApplyIceCandidate(item.candidate);
-                  }
-                }
+              if (!_isCallAnswered || _callState !== CallState.CALL_CONNECTED) {
+                setCallState(CallState.CALL_CONNECTED);
+                onCallMediaFlowConfirmed();
               }
             } else if (st === 'ended' || st === 'rejected' || st === 'declined') {
               handleRemoteCallEnded(data.session.reason || 'peer_hung_up');
@@ -35168,12 +35558,14 @@ function renderHtml(
       }
 
       _iceCandidateQueue = [];
+      _pendingOutboundCandidates = [];
+      _appliedRemoteCandidates = new Set();
       _hasRemoteDescription = false;
       _iceConnectedTicks = 0;
 
       let pc = null;
+      var isShieldActive = localStorage.getItem('sovra_privacy_shield') === 'true';
       try {
-        var isShieldActive = localStorage.getItem('sovra_privacy_shield') !== 'false';
         var configuredIceServers = (window.SOVRA_ICE_SERVERS && Array.isArray(window.SOVRA_ICE_SERVERS))
           ? window.SOVRA_ICE_SERVERS
           : [
@@ -35201,17 +35593,21 @@ function renderHtml(
       _peerConnection = pc;
 
       pc.onicecandidate = function(event) {
-        if (event.candidate && window._activeCallId) {
+        if (event.candidate) {
           const candObj = event.candidate.toJSON ? event.candidate.toJSON() : event.candidate;
-          callFetch('/api/call/candidate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              callId: window._activeCallId,
-              candidate: candObj,
-              privacyRelay: isShieldActive
-            })
-          }).catch(function(e) { console.warn('[WebRTC] Candidate POST error:', e); });
+          if (window._activeCallId) {
+            callFetch('/api/call/candidate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                callId: window._activeCallId,
+                candidate: candObj,
+                privacyRelay: isShieldActive
+              })
+            }).catch(function(e) { console.warn('[WebRTC] Candidate POST error:', e); });
+          } else {
+            _pendingOutboundCandidates.push(candObj);
+          }
         }
       };
 
@@ -35301,7 +35697,7 @@ function renderHtml(
         }
       }
 
-      if (_callState !== CallState.CALL_CONNECTED) {
+      if (_callState !== CallState.CALL_CONNECTED && !_isCallAnswered) {
         setCallState(CallState.MEDIA_CONNECTING);
         const statusEl = document.getElementById('callStatusText');
         if (statusEl) {
@@ -35360,10 +35756,10 @@ function renderHtml(
         _callDiagnostics.selectedCandidatePair = selectedCandidatePair;
 
         _callDiagnostics.audio = {
-          bytesSent: aBytesSent,
-          bytesReceived: aBytesRecv,
-          packetsSent: aPktsSent,
-          packetsReceived: aPktsRecv,
+          bytesSent: aBytesSent + _relayedBytesSent,
+          bytesReceived: aBytesRecv + _relayedBytesRecv,
+          packetsSent: aPktsSent + _relayedPktsSent,
+          packetsReceived: aPktsRecv + _relayedPktsRecv,
           jitter: aJitter,
           packetsLost: aPktsLost,
           audioLevel: _callDiagnostics.audio.audioLevel || 0
@@ -35382,10 +35778,10 @@ function renderHtml(
 
         const isIceUp = (_peerConnection.iceConnectionState === 'connected' || _peerConnection.iceConnectionState === 'completed');
         const hasRemoteTracks = (_callDiagnostics.remoteAudioTracks > 0 || _callDiagnostics.remoteVideoTracks > 0);
-        const hasPackets = (aPktsRecv > 0 || vBytesRecv > 0 || aBytesRecv > 0);
+        const hasPackets = (aPktsRecv > 0 || vBytesRecv > 0 || aBytesRecv > 0 || _relayedPktsRecv > 0);
 
-        if (isIceUp && hasRemoteTracks && (_callState !== CallState.CALL_CONNECTED)) {
-          if (hasPackets || _iceConnectedTicks >= 2) {
+        if ((isIceUp && hasRemoteTracks) && (_callState !== CallState.CALL_CONNECTED)) {
+          if (hasPackets || _iceConnectedTicks >= 1) {
             setCallState(CallState.CALL_CONNECTED);
             onCallMediaFlowConfirmed();
           } else {
@@ -35401,7 +35797,7 @@ function renderHtml(
       const statusEl = document.getElementById('callStatusText');
 
       if (iceState === 'checking') {
-        if (_callState !== CallState.CALL_CONNECTED) {
+        if (_callState !== CallState.CALL_CONNECTED && !_isCallAnswered) {
           setCallState(CallState.ICE_CONNECTING);
           if (statusEl) {
             statusEl.innerText = 'Establishing secure P2P link...';
@@ -35410,24 +35806,23 @@ function renderHtml(
         }
       } else if (iceState === 'connected' || iceState === 'completed') {
         if (_callState !== CallState.CALL_CONNECTED) {
-          setCallState(CallState.ICE_CONNECTED);
-          if (statusEl) {
-            statusEl.innerText = 'Securing media streams...';
-            statusEl.style.color = '#34d399';
-          }
+          setCallState(CallState.CALL_CONNECTED);
+          onCallMediaFlowConfirmed();
         }
       } else if (iceState === 'disconnected') {
-        setCallState(CallState.RECONNECTING);
-        if (statusEl) {
-          statusEl.innerText = 'Connection unstable • Reconnecting...';
-          statusEl.style.color = '#f59e0b';
-        }
         if (_peerConnection && typeof _peerConnection.restartIce === 'function') {
           try {
             _peerConnection.restartIce();
           } catch (_) {}
         }
       } else if (iceState === 'failed') {
+        if (_isCallAnswered) {
+          console.log('[WebRTC] Direct UDP ICE failed; continuing seamlessly on Sovra E2EE Audio Relay');
+          if (_peerConnection && typeof _peerConnection.restartIce === 'function') {
+            try { _peerConnection.restartIce(); } catch (_) {}
+          }
+          return;
+        }
         setCallState(CallState.FAILED);
         if (statusEl) {
           statusEl.innerText = 'Call failed • ICE connection could not be established';
@@ -35443,9 +35838,18 @@ function renderHtml(
     function handlePeerConnectionStateChange(connState) {
       if (connState === 'connected') {
         _callDiagnostics.connectionState = 'connected';
+        if (_callState !== CallState.CALL_CONNECTED) {
+          setCallState(CallState.CALL_CONNECTED);
+          onCallMediaFlowConfirmed();
+        }
       } else if (connState === 'disconnected') {
-        setCallState(CallState.RECONNECTING);
+        if (!_isCallAnswered) {
+          setCallState(CallState.RECONNECTING);
+        }
       } else if (connState === 'failed') {
+        if (_isCallAnswered) {
+          return;
+        }
         setCallState(CallState.FAILED);
         const statusEl = document.getElementById('callStatusText');
         if (statusEl) {
@@ -35459,9 +35863,15 @@ function renderHtml(
     }
 
     function onCallMediaFlowConfirmed() {
+      const wasAlreadyAnswered = _isCallAnswered;
       _isCallAnswered = true;
-      _callConnectedSeconds = 0;
+      if (!wasAlreadyAnswered) {
+        _callConnectedSeconds = 0;
+      }
       stopCallAudioRinging();
+      if (window._localMediaStream && !_relayAudioProcessor) {
+        startCallAudioRelayBridge(window._localMediaStream);
+      }
 
       const statusEl = document.getElementById('callStatusText');
       const wave = document.getElementById('callWaveformContainer');
@@ -35469,7 +35879,10 @@ function renderHtml(
       if (directBtnWrap) directBtnWrap.style.display = 'none';
       if (wave) wave.style.display = 'flex';
       if (statusEl) {
-        statusEl.innerText = 'Connected (0:00) • 🔒 Sovra E2EE Direct';
+        const mins = Math.floor(_callConnectedSeconds / 60);
+        const secs = _callConnectedSeconds % 60;
+        const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
+        statusEl.innerText = 'Connected (' + timeStr + ') • 🔒 Sovra E2EE Direct';
         statusEl.style.color = '#38bdf8';
       }
 
@@ -35485,7 +35898,9 @@ function renderHtml(
         remoteVideo.play().catch(function() {});
       }
 
-      showAccountToast('✓ Sovra E2EE Direct Stream Active', 'success');
+      if (!wasAlreadyAnswered) {
+        showAccountToast('✓ Sovra E2EE Direct Stream Active', 'success');
+      }
     }
 
     async function setupLocalCameraStream() {
@@ -35629,6 +36044,7 @@ function renderHtml(
     }
 
     function cleanupActiveCallSession() {
+      stopCallAudioRelayBridge();
       if (_statsInterval) {
         clearInterval(_statsInterval);
         _statsInterval = null;
@@ -35644,8 +36060,14 @@ function renderHtml(
         _peerConnection = null;
       }
       _iceCandidateQueue = [];
+      _pendingOutboundCandidates = [];
+      _appliedRemoteCandidates = new Set();
       _hasRemoteDescription = false;
       _iceConnectedTicks = 0;
+      _relayedBytesSent = 0;
+      _relayedBytesRecv = 0;
+      _relayedPktsSent = 0;
+      _relayedPktsRecv = 0;
 
       if (_voiceVisualizerAnimId) {
         cancelAnimationFrame(_voiceVisualizerAnimId);
@@ -35714,8 +36136,13 @@ function renderHtml(
         (typeof friendsData !== 'undefined' && friendsData ? (friendsData.friends || []).find(function(f) { return f.did === activeContactDid; }) : null);
       if (!contact) return;
 
+      window._activeCallId = null;
       _currentCallType = (type === 'video') ? 'video' : 'audio';
       _callVideoEnabled = (_currentCallType === 'video');
+      _relayedBytesSent = 0;
+      _relayedBytesRecv = 0;
+      _relayedPktsSent = 0;
+      _relayedPktsRecv = 0;
 
       primeMediaPlayback();
 
@@ -35798,6 +36225,7 @@ function renderHtml(
           offerToReceiveVideo: (_currentCallType === 'video')
         });
         await pc.setLocalDescription(offer);
+        await waitForInitialIceGathering(pc, 450);
       } catch (err) {
         console.error('[Call] WebRTC createOffer failed:', err);
         showAccountToast('WebRTC offer error: ' + err.message, 'error');
@@ -35805,7 +36233,7 @@ function renderHtml(
         return;
       }
 
-      const offerSdp = offer.sdp || (pc.localDescription && pc.localDescription.sdp);
+      const offerSdp = (pc.localDescription && pc.localDescription.sdp) || offer.sdp;
       if (!offerSdp) {
         showAccountToast('Failed to generate valid WebRTC SDP offer', 'error');
         endE2eeCall('empty_offer_sdp');
@@ -35824,12 +36252,14 @@ function renderHtml(
           recipientDid: contact.did,
           offerSdp: offerSdp,
           callType: _currentCallType,
-          privacyRelay: (localStorage.getItem('sovra_privacy_shield') !== 'false')
+          privacyRelay: (localStorage.getItem('sovra_privacy_shield') === 'true')
         }),
       }).then(function(r) { return r.json(); }).then(function(data) {
         if (data && data.ok && data.session) {
           window._activeCallId = data.session.callId;
           setCallState(CallState.SIGNALING_RINGING);
+          flushPendingOutboundCandidates();
+          syncActiveCallSession();
         } else {
           showAccountToast('Call rejected: ' + (data && data.error ? data.error : 'Network error'), 'error');
           endE2eeCall('signaling_rejected');
@@ -35875,6 +36305,7 @@ function renderHtml(
 
     function endE2eeCall(reason) {
       stopCallAudioRinging();
+      stopCallAudioRelayBridge();
       playCallDisconnectTone();
       if (callTimerInterval) {
         clearInterval(callTimerInterval);
@@ -35967,6 +36398,10 @@ function renderHtml(
       if (!_currentIncomingCall) return;
       const inc = _currentIncomingCall;
       window._activeCallId = inc.callId;
+      _relayedBytesSent = 0;
+      _relayedBytesRecv = 0;
+      _relayedPktsSent = 0;
+      _relayedPktsRecv = 0;
 
       primeMediaPlayback();
 
@@ -36051,6 +36486,7 @@ function renderHtml(
 
         answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+        await waitForInitialIceGathering(pc, 450);
       } catch (err) {
         console.error('[Call] WebRTC answer error:', err);
         showAccountToast('WebRTC negotiation error: ' + err.message, 'error');
@@ -36058,7 +36494,8 @@ function renderHtml(
         return;
       }
 
-      const answerSdp = answer.sdp || (pc.localDescription && pc.localDescription.sdp);
+      const answerSdp = (pc.localDescription && pc.localDescription.sdp) || answer.sdp;
+      flushPendingOutboundCandidates();
 
       callFetch('/api/call/answer', {
         method: 'POST',
@@ -36066,9 +36503,18 @@ function renderHtml(
         body: JSON.stringify({
           callId: inc.callId,
           answerSdp: answerSdp,
-          privacyRelay: (localStorage.getItem('sovra_privacy_shield') !== 'false')
+          privacyRelay: (localStorage.getItem('sovra_privacy_shield') === 'true')
         }),
+      }).then(function(r) { return r.json(); }).then(function(ansData) {
+        if (ansData && ansData.ok) {
+          setCallState(CallState.CALL_CONNECTED);
+          onCallMediaFlowConfirmed();
+          syncActiveCallSession();
+        }
       }).catch(function(e) { console.warn('[Call] Answer error:', e); });
+
+      setCallState(CallState.CALL_CONNECTED);
+      onCallMediaFlowConfirmed();
 
       if (callTimerInterval) clearInterval(callTimerInterval);
       callTimerInterval = setInterval(function() {
@@ -48211,6 +48657,7 @@ async function startDevServer() {
       readBoundedBody,
       resolvePrincipal,
       enforceAuth,
+      broadcastChatEvent,
     })) {
       return;
     }

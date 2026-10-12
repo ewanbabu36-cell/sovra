@@ -21,10 +21,23 @@ export interface CallRouteContext {
   readBoundedBody: (req: http.IncomingMessage, res: http.ServerResponse, limit?: number) => Promise<{ body: string; ok: boolean }>;
   resolvePrincipal: (req: http.IncomingMessage, parsedBody?: Record<string, any>) => AuthenticatedPrincipal | null;
   enforceAuth: (req: http.IncomingMessage, res: http.ServerResponse, parsedBody?: Record<string, any>) => AuthenticatedPrincipal | null;
+  broadcastChatEvent?: (targetDids: string[], eventType: string, payload: any) => void;
 }
 
+interface RelayedAudioChunk {
+  seq: number;
+  callId: string;
+  senderDid: string;
+  pcmBase64: string;
+  sampleRate: number;
+  ts: number;
+}
+
+const callAudioChunkStore = new Map<string, RelayedAudioChunk[]>();
+let callAudioSeqCounter = 0;
+
 export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<boolean> {
-  const { req, res, url, blindPushRelay, getIceServers, readBoundedBody, resolvePrincipal, enforceAuth } = ctx;
+  const { req, res, url, blindPushRelay, getIceServers, readBoundedBody, resolvePrincipal, enforceAuth, broadcastChatEvent } = ctx;
 
   // 1. ICE Servers configuration with Privacy Relay Mode (IP Leakage Shielding)
   if ((url.pathname === '/api/call/ice-servers' || url.pathname === '/api/webrtc/ice-servers') && req.method === 'GET') {
@@ -90,6 +103,16 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
           link: '/app',
           data: { callId: session.callId, callType },
         });
+
+        if (broadcastChatEvent) {
+          broadcastChatEvent([recipientDid], 'call_signal', {
+            type: 'offer',
+            callId: session.callId,
+            callerDid: principal.did,
+            recipientDid,
+            callType,
+          });
+        }
 
         // Blind Push Gateway: Wake mobile receiver device in background
         try {
@@ -197,8 +220,14 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
       res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
       return true;
     }
+    const afterAudioSeq = Number(url.searchParams.get('afterAudioSeq') || 0);
+    const storedChunks = callAudioChunkStore.get(callId) || [];
+    const audioChunks = storedChunks.filter(
+      c => c.senderDid !== principal.did && c.seq > afterAudioSeq && Date.now() - c.ts < 8000
+    );
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, session }));
+    res.end(JSON.stringify({ ok: true, session, audioChunks }));
     return true;
   }
 
@@ -245,6 +274,14 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Call session not found or answer rejected' }));
           return true;
+        }
+        if (broadcastChatEvent) {
+          broadcastChatEvent([existingCall.callerDid], 'call_signal', {
+            type: 'answer',
+            callId,
+            answerSdp,
+            status: 'answered',
+          });
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, session }));
@@ -316,6 +353,15 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
 
       try {
         const session = sovraDb.addIceCandidate(callId, principal.did, candidate);
+        if (broadcastChatEvent && existingCall) {
+          const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
+          broadcastChatEvent([targetDid], 'call_signal', {
+            type: 'candidate',
+            callId,
+            senderDid: principal.did,
+            candidate,
+          });
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: !!session, session }));
       } catch (candErr: any) {
@@ -361,8 +407,88 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
       }
 
       const session = sovraDb.endCall(callId, principal.did, reason);
+      callAudioChunkStore.delete(callId);
+      if (broadcastChatEvent) {
+        const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
+        broadcastChatEvent([targetDid], 'call_signal', {
+          type: 'end',
+          callId,
+          reason: reason || 'peer_hung_up',
+        });
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, session }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 7b. Live E2EE Audio Relay Chunk (CGNAT / Symmetric NAT Fallback Stream)
+  if (url.pathname === '/api/call/audio' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 256 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const callId = String(parsed.callId || '');
+      const pcmBase64 = String(parsed.pcmBase64 || '');
+      const sampleRate = Number(parsed.sampleRate || 8000);
+      if (!callId || !pcmBase64) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'callId and pcmBase64 are required' }));
+        return true;
+      }
+
+      const allCalls = sovraDb.getState().call_sessions || [];
+      const existingCall = allCalls.find(c => c.callId === callId);
+      if (!existingCall) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
+        return true;
+      }
+
+      if (existingCall.callerDid !== principal.did && existingCall.recipientDid !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized audio relay submission' }));
+        return true;
+      }
+
+      if (existingCall.status === 'ended' || existingCall.status === 'rejected') {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Conflict: Call has already ended' }));
+        return true;
+      }
+
+      const chunk: RelayedAudioChunk = {
+        seq: ++callAudioSeqCounter,
+        callId,
+        senderDid: principal.did,
+        pcmBase64,
+        sampleRate,
+        ts: Date.now(),
+      };
+
+      let list = callAudioChunkStore.get(callId);
+      if (!list) {
+        list = [];
+        callAudioChunkStore.set(callId, list);
+      }
+      list.push(chunk);
+      if (list.length > 25) {
+        list.splice(0, list.length - 25);
+      }
+
+      if (broadcastChatEvent) {
+        const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
+        broadcastChatEvent([targetDid], 'call_audio', chunk);
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, seq: chunk.seq }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
