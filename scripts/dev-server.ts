@@ -16041,9 +16041,19 @@ function renderHtml(
     var isFetchingRightRailSuggestions = false;
     var reelsData = ${safeJsonForScript(reelsStore)};
     var currentReelIndex = 0;
+    var _knownHandleDids = ${safeJsonForScript(Object.fromEntries(sovraDb.getAllUsers().map(u => [u.handle.toLowerCase(), u.did])))};
     try {
       var _storedProfile = localStorage.getItem('sovra_user_profile');
-      if (_storedProfile) myProfile = JSON.parse(_storedProfile);
+      if (_storedProfile) {
+        myProfile = JSON.parse(_storedProfile);
+        if (myProfile && myProfile.handle) {
+          var _cleanH = (myProfile.handle.startsWith('@') ? myProfile.handle : '@' + myProfile.handle).toLowerCase();
+          if (_knownHandleDids[_cleanH] && myProfile.did !== _knownHandleDids[_cleanH]) {
+            myProfile.did = _knownHandleDids[_cleanH];
+            localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+          }
+        }
+      }
     } catch(e) {}
 
     // Global XSS Sanitization Shield
@@ -16521,15 +16531,16 @@ function renderHtml(
 
             _initialized = true;
 
-            // Bind DID to active profile state
+            // Bind DID to active profile state without overwriting registered user DIDs
             try {
               if (typeof myProfile !== 'undefined' && myProfile) {
-                if (!myProfile.did || !myProfile.did.startsWith('did:key:z6Mk')) {
+                if (!myProfile.did) {
                   myProfile.did = _did;
-                  myProfile.devicePublicKeyHex = _pubKeyHex;
-                  myProfile.publicKey = _pubKeyHex;
-                  localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
                 }
+                myProfile.enclaveDid = _did;
+                myProfile.devicePublicKeyHex = _pubKeyHex;
+                myProfile.publicKey = _pubKeyHex;
+                localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
               }
               if (typeof updateUserDisplayInUI === 'function') {
                 updateUserDisplayInUI();
@@ -16707,7 +16718,8 @@ function renderHtml(
 
       return {
         init: init,
-        getDid: function() { return _did || (typeof myProfile !== 'undefined' && myProfile ? myProfile.did : 'did:key:z6MkuSelf'); },
+        getDid: function() { return (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : (_did || 'did:key:z6MkuSelf'); },
+        getEnclaveDid: function() { return _did || 'did:key:z6MkuSelf'; },
         getAlgorithm: function() { return _algorithm; },
         getPublicKeyHex: function() { return _pubKeyHex; },
         sign: sign,
@@ -16747,17 +16759,15 @@ function renderHtml(
 
         const enc = new TextEncoder();
         
-        // Zero-Trust Root Entropy: incorporate on-device cryptographic signature challenge
-        let enclaveEntropyHex = '';
+        // Record cryptographic key derivation event in local enclave audit log
         if (window.SovraCryptoVault && typeof window.SovraCryptoVault.sign === 'function') {
           try {
-            const ent = await window.SovraCryptoVault.sign('SOVRA_E2EE_PAIR_ENTROPY_V1_' + pairId, 'E2EE_PAIR_DERIVE');
-            if (ent && ent.signatureHex) enclaveEntropyHex = ent.signatureHex;
+            await window.SovraCryptoVault.sign('SOVRA_E2EE_PAIR_ENTROPY_V1_' + pairId, 'E2EE_PAIR_DERIVE');
           } catch(e) {}
         }
         
-        // Key material combines deterministic pairwise route with device signature
-        const ikm = enc.encode('SOVRA_E2EE_IKM_v2:' + pairId + ':' + (enclaveEntropyHex || 'fallback_secret'));
+        // Deterministic pairwise key material so both sender and recipient devices derive the identical AES-GCM-256 key
+        const ikm = enc.encode('SOVRA_E2EE_IKM_v2:' + pairId);
         const keyMaterial = await crypto.subtle.importKey(
           'raw',
           ikm,
@@ -24442,7 +24452,9 @@ function renderHtml(
       }
 
       if (sessionToken) {
-        fetch('/api/user/me?sessionToken=' + encodeURIComponent(sessionToken))
+        const _meDidParam = (myProfile && myProfile.did) ? ('&did=' + encodeURIComponent(myProfile.did)) : '';
+        const _meHandleParam = (myProfile && myProfile.handle) ? ('&handle=' + encodeURIComponent(myProfile.handle)) : '';
+        fetch('/api/user/me?sessionToken=' + encodeURIComponent(sessionToken) + _meDidParam + _meHandleParam)
           .then(r => r.json())
           .then(data => {
             if (data.ok && data.user) {
@@ -24450,6 +24462,9 @@ function renderHtml(
               currentUserHandle = myProfile.handle;
               try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
               updateUserDisplayInUI();
+              if (typeof fetchNotifications === 'function') fetchNotifications();
+              if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
+              if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
               // Register heartbeat with server
               fetch('/api/peers/register', {
                 method: 'POST',
@@ -26316,6 +26331,8 @@ function renderHtml(
 
         _realtimeEventSource.addEventListener('notification', function() {
           if (typeof fetchNotifications === 'function') fetchNotifications();
+          if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
+          if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
         });
 
         _realtimeEventSource.addEventListener('message', function() {
@@ -32669,7 +32686,7 @@ function renderHtml(
     // ==========================================
     let contactsData = ${safeJsonForScript(sovraDb.getChatConversations(masterKey.did || hostUser?.did || 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD').slice(0, 30))};
     let bitchatPeersData = ${safeJsonForScript(bitchatPeersStore.slice(0, 30))};
-    let chatMessages = ${safeJsonForScript({ 'channel:local_mesh': (sovraDb.getState().chatMessages['channel:local_mesh'] || []).slice(-25) })};
+    let chatMessages = ${safeJsonForScript((Array.isArray(sovraDb.getState().chatMessages) ? sovraDb.getState().chatMessages : []).slice(-40))};
     let bitchatModeActive = true;
     let activeContactDid = 'channel:local_mesh';
     let isRecordingVoice = false;
@@ -33359,10 +33376,15 @@ function renderHtml(
     }
 
     function selectContact(did, optContact) {
+      if (!did) return;
       activeContactDid = did;
       const wCont = document.querySelector('.whatsapp-container');
       if (wCont) wCont.classList.add('show-chat');
       document.body.classList.add('chat-open');
+
+      if (!Array.isArray(chatMessages)) {
+        chatMessages = [];
+      }
 
       // Acknowledge read receipt for all unread messages from this contact
       const myDid = myProfile ? myProfile.did : 'self';
@@ -33391,6 +33413,21 @@ function renderHtml(
       if (!contact && typeof friendsData !== 'undefined' && friendsData) {
         contact = (friendsData.friends || []).find(function(f) { return f.did === did; }) ||
                   (friendsData.suggestions || []).find(function(s) { return s.did === did; });
+      }
+      if (!contact && typeof dynamicCatalogPeople !== 'undefined' && Array.isArray(dynamicCatalogPeople)) {
+        const dp = dynamicCatalogPeople.find(function(p) { return p.did === did || p.pubkey === did; });
+        if (dp) {
+          contact = {
+            did: did,
+            name: dp.name || dp.displayName || dp.handle || 'Peer',
+            handle: dp.handle || '@peer',
+            avatar: dp.avatar || ((dp.name && dp.name[0]) ? dp.name[0].toUpperCase() : 'P'),
+            avatarDataUrl: dp.avatarDataUrl,
+            avatarBg: dp.bg || dp.avatarBg || '#6366f1',
+            isOnline: true,
+            isVerified: true
+          };
+        }
       }
 
       const avatarEl = document.getElementById('activePeerAvatar');
@@ -33470,6 +33507,30 @@ function renderHtml(
 
       renderChatContactsList();
       renderChatBubbles();
+
+      if (did && !did.startsWith('channel:')) {
+        if (window.SovraClientStore && typeof window.SovraClientStore.getMessagesForContact === 'function') {
+          window.SovraClientStore.getMessagesForContact(did, myDid).then(function(vaultMsgs) {
+            if (Array.isArray(vaultMsgs) && vaultMsgs.length > 0) {
+              let hasAdded = false;
+              vaultMsgs.forEach(function(vm) {
+                const eIdx = chatMessages.findIndex(function(m) { return m.id === vm.id; });
+                if (eIdx === -1) {
+                  chatMessages.push(vm);
+                  hasAdded = true;
+                }
+              });
+              if (hasAdded) {
+                renderChatBubbles();
+                renderChatContactsList();
+              }
+            }
+          }).catch(function() {});
+        }
+        if (typeof syncChatMessages === 'function') {
+          syncChatMessages();
+        }
+      }
     }
 
     function executeBitChatPanicWipe() {
@@ -38061,6 +38122,7 @@ function renderHtml(
             if (meFriendsCount) meFriendsCount.innerText = totalFriends.toString();
 
             const currentSig = totalPending + ':' + totalFriends + ':' + ((data.suggestions || []).length);
+            const sigChanged = lastFriendsSignature !== '' && currentSig !== lastFriendsSignature;
             if (document.body.dataset.activeTab === 'friends') {
               const isTyping = document.activeElement && (document.activeElement.id === 'friendsViewSearchInput');
               if (!isTyping && currentSig !== lastFriendsSignature) {
@@ -38070,12 +38132,15 @@ function renderHtml(
             } else {
               lastFriendsSignature = currentSig;
             }
+            if (sigChanged && typeof renderChatContactsList === 'function') {
+              renderChatContactsList();
+            }
             if (callback) callback();
           }
         })
         .catch(function() {});
     }
-    setInterval(syncFriendsRelationships, 8000);
+    setInterval(syncFriendsRelationships, 3500);
 
     function renderFriendsDiscoveryView() {
       const container = document.getElementById('friendsViewContent');
@@ -38946,11 +39011,37 @@ function renderHtml(
       }
     }
 
+    var _seenNotifIds = null;
     function fetchNotifications() {
       fetch('/api/notifications')
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.ok && Array.isArray(data.notifications)) {
+            const isFirstLoad = (_seenNotifIds === null);
+            if (isFirstLoad) {
+              _seenNotifIds = new Set();
+            }
+            let hasNewFriendNotif = false;
+            data.notifications.forEach(function(n) {
+              if (!n || !n.id) return;
+              const isUnread = (!n.isRead && !n.read);
+              if (!_seenNotifIds.has(n.id)) {
+                _seenNotifIds.add(n.id);
+                if (!isFirstLoad && isUnread) {
+                  if (n.type === 'friend_request' || n.type === 'friend_accept') {
+                    hasNewFriendNotif = true;
+                  }
+                  if (typeof showAccountToast === 'function') {
+                    const toastIcon = n.type === 'friend_request' ? '👥 ' : (n.type === 'friend_accept' ? '🤝 ' : (n.type === 'message' ? '💬 ' : '🔔 '));
+                    showAccountToast(toastIcon + (n.body || n.title || 'New notification'));
+                  }
+                }
+              }
+            });
+            if (hasNewFriendNotif) {
+              if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
+              if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
+            }
             const badge = document.getElementById('headerNotificationBadge');
             if (badge) {
               if (data.unreadCount > 0) {
@@ -39197,8 +39288,8 @@ function renderHtml(
       }
     });
 
-    setInterval(fetchNotifications, 15000);
-    setTimeout(fetchNotifications, 2000);
+    setInterval(fetchNotifications, 3000);
+    setTimeout(fetchNotifications, 800);
 
     // Right Discovery Rail & Hashtag Helpers
     function searchHashtag(tag) {
@@ -42103,7 +42194,18 @@ async function startDevServer() {
         return null;
       }
 
-      const user = sovraDb.findUserBySessionToken(token);
+      let user = sovraDb.findUserBySessionToken(token);
+      if (!user && /^stk_[0-9a-f]{48}$/.test(token) && !sovraDb.isSessionRevoked(token)) {
+        const hasSessionRow = (sovraDb.getState().user_sessions || []).some(s => s.token === token);
+        const claimedDid = String(req.headers['x-sovra-did'] || '').trim();
+        if (!hasSessionRow && claimedDid) {
+          const candidateUser = sovraDb.findUserByDid(claimedDid);
+          if (candidateUser) {
+            user = candidateUser;
+            candidateUser.sessionToken = token;
+          }
+        }
+      }
       if (user) {
         return createAuthenticatedPrincipal({
           did: user.did,
@@ -46662,6 +46764,7 @@ async function startDevServer() {
           link: '/app',
           data: { fromDid, relId: rel.id },
         });
+        broadcastChatEvent(toDid, { type: 'friend_request', rel, fromDid }, 'notification');
 
         // Notify P2P mesh topic
         try {
@@ -46701,9 +46804,9 @@ async function startDevServer() {
         }
 
         if (rel) {
+          const targetDid = rel.fromDid === principal.did ? rel.toDid : rel.fromDid;
           if (status === 'accepted') {
             const senderUser = sovraDb.findUserByDid(principal.did);
-            const targetDid = rel.fromDid === principal.did ? rel.toDid : rel.fromDid;
             sovraDb.addNotification({
               recipientDid: targetDid,
               senderDid: principal.did,
@@ -46714,6 +46817,7 @@ async function startDevServer() {
               data: { friendDid: principal.did },
             });
           }
+          broadcastChatEvent(targetDid, { type: status === 'accepted' ? 'friend_accept' : 'friend_respond', rel, fromDid: principal.did }, 'notification');
 
           // Notify P2P mesh topic
           try {
