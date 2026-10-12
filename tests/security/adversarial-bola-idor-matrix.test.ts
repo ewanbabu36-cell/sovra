@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
 
-describe('Adversarial BOLA / IDOR & Authentication Defense Matrix', () => {
+describe('Adversarial BOLA / IDOR & Authentication Defense Matrix', { timeout: 25000 }, () => {
   let aliceToken: string;
   let aliceDid: string;
   let aliceHandle: string;

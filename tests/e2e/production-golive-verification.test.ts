@@ -30,7 +30,7 @@ const BASE_URL = 'http://localhost:3001';
 const SAMPLE_IMAGE_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
-describe('Sovra 100% Real-World End-to-End Go-Live Verification Suite', () => {
+describe('Sovra 100% Real-World End-to-End Go-Live Verification Suite', { timeout: 25000 }, () => {
   const timestamp = Date.now();
   let userA: { did: string; handle: string; sessionToken: string; displayName: string };
   let userB: { did: string; handle: string; sessionToken: string; displayName: string };

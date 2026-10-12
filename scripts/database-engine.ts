@@ -1313,6 +1313,9 @@ export class SovraDatabaseEngine {
         const parsed = JSON.parse(raw);
         if (usedBackup) {
           console.log('[SovraDB] Successfully restored state from rolling backup .bak');
+          try {
+            fs.writeFileSync(this.dbFilePath, raw, 'utf-8');
+          } catch (_) {}
         }
 
         this.db = {
@@ -1612,12 +1615,13 @@ export class SovraDatabaseEngine {
         fs.mkdirSync(this.storageDir, { recursive: true });
       }
       this.db.schemaVersion = 1;
-      const isTestEnv = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
-      const data = isTestEnv ? JSON.stringify(this.db) : JSON.stringify(this.db, null, 2);
+      const data = JSON.stringify(this.db);
 
-      // Create rolling backup at most once every 5 seconds to prevent I/O thrashing
+      // Create rolling backup if no backup exists or at most once every throttle interval to prevent I/O thrashing
       const now = Date.now();
-      if (!isTestEnv && fs.existsSync(this.dbFilePath) && (!this.lastBackupAt || now - this.lastBackupAt > 5000)) {
+      const isTestEnv = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
+      const shouldBackup = isTestEnv || !fs.existsSync(this.dbBackupPath) || !this.lastBackupAt || (now - this.lastBackupAt > 5000);
+      if (fs.existsSync(this.dbFilePath) && shouldBackup) {
         try {
           fs.copyFileSync(this.dbFilePath, this.dbBackupPath);
           this.lastBackupAt = now;
@@ -4867,6 +4871,26 @@ export class SovraDatabaseEngine {
         platformTake: 0,
       },
     };
+  }
+
+  public createTipVoucher(params: {
+    videoId?: string;
+    senderDid: string;
+    senderName?: string;
+    senderComment?: string;
+    creatorDid?: string;
+    totalAmount?: string | number;
+    timestamp?: number;
+  }): TipVoucherRecord {
+    const res = this.processTip({
+      fromDid: params.senderDid,
+      toDid: params.creatorDid,
+      amount: Number(params.totalAmount || 5),
+      videoId: params.videoId || 'yt-video-1',
+      senderName: params.senderName,
+      message: params.senderComment,
+    });
+    return res.voucher;
   }
 
   public withdrawFunds(params: {

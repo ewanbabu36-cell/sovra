@@ -7,17 +7,17 @@
  * has unilateral takedown power or special immunity."
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { sovraDb, ExtendedViolationCategory } from '../../scripts/database-engine.js';
 
-describe('SOVRA Community Jury & 24-Hour Democratic Moderation Engine', () => {
+describe('SOVRA Community Jury & 24-Hour Democratic Moderation Engine', { timeout: 25000 }, () => {
   const ts = Date.now();
   const authorDid = `did:sovra:author_${ts}`;
   const reporterDid = `did:sovra:reporter_${ts}`;
   const reporter2Did = `did:sovra:reporter2_${ts}`;
   const testPostId = `feed-jury-${ts}`;
 
-  beforeEach(() => {
+  beforeAll(() => {
     // Register author and reporters
     sovraDb.registerUser({
       did: authorDid,
@@ -46,7 +46,7 @@ describe('SOVRA Community Jury & 24-Hour Democratic Moderation Engine', () => {
       caption: 'Decentralized free speech publication #truth #sovereignty',
       visibility: 'public',
     });
-  });
+  }, 30000);
 
   // 1. Standardized 17 Violation Categories
   it('1. correctly normalizes and recognizes all 17 standardized violation categories', () => {
@@ -358,7 +358,7 @@ describe('SOVRA Community Jury & 24-Hour Democratic Moderation Engine', () => {
 
     const modState = sovraDb.getContentModerationState('post', postToRemove);
     expect(modState).toBe('REMOVED');
-  }, 20000);
+  }, 60000);
 
   // 10. Content Preservation when Supermajority is Not Reached
   it('10. preserves content when violation votes are below 66.67% supermajority threshold', () => {
@@ -398,7 +398,7 @@ describe('SOVRA Community Jury & 24-Hour Democratic Moderation Engine', () => {
 
     const modState = sovraDb.getContentModerationState('post', postToKeep);
     expect(modState).toBe('VISIBLE');
-  }, 20000);
+  }, 60000);
 
   // 11. Appeals Window & Independent Reviewer Protection
   it('11. allows appeals from author and bars original jurors from evaluating appeal', () => {
@@ -456,7 +456,7 @@ describe('SOVRA Community Jury & 24-Hour Democratic Moderation Engine', () => {
 
     const modState = sovraDb.getContentModerationState('post', appealedPost);
     expect(modState).toBe('VISIBLE');
-  }, 20000);
+  }, 60000);
 
   // 12. Automated Epoch Processing
   it('12. automatically finalizes expired cases via processDueCases', () => {

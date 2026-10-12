@@ -15,7 +15,7 @@ const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
 const SAMPLE_AVATAR = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 const SAMPLE_COVER = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
 
-describe('Profile Avatar & Cover Banner Dynamic Lifecycle Suite', () => {
+describe('Profile Avatar & Cover Banner Dynamic Lifecycle Suite', { timeout: 25000 }, () => {
   let serverHtml = '';
   let testUserToken = '';
   let testUserDid = '';

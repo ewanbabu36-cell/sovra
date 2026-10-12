@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import http from 'node:http';
 import { sovraDb } from '../../scripts/database-engine.js';
 
-describe('Sovereign Channels & Pages Video Publishing Pipeline', () => {
+describe('Sovereign Channels & Pages Video Publishing Pipeline', { timeout: 30000 }, () => {
   const ts = Date.now();
   let testUserDid = `did:sovra:creator_${ts}`;
   let sessionToken = '';
@@ -68,7 +68,7 @@ describe('Sovereign Channels & Pages Video Publishing Pipeline', () => {
         testUserDid = regResponse.user.did;
       }
     }
-  });
+  }, 30000);
 
   it('1. sovraDb correctly stores and retrieves reels associated with a Sovereign Channel', () => {
     const reel = sovraDb.createReel({

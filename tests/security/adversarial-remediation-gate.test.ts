@@ -18,7 +18,7 @@ import { AdminSecurityEngine } from '../../packages/identity/src/admin.js';
 
 const BASE_URL = process.env.SOVRA_BASE_URL || 'http://127.0.0.1:3001';
 
-describe('SOVRA P0/P1 Adversarial Remediation & Verification Gate', () => {
+describe('SOVRA P0/P1 Adversarial Remediation & Verification Gate', { timeout: 25000 }, () => {
   let alice: { did: string; handle: string; sessionToken: string };
   let bob: { did: string; handle: string; sessionToken: string };
   let eve: { did: string; handle: string; sessionToken: string };

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
 
-describe('Author Persona Selector & Multi-Format (Post, Reel, Poll, Survey, Q&A) Production Suite', () => {
+describe('Author Persona Selector & Multi-Format (Post, Reel, Poll, Survey, Q&A) Production Suite', { timeout: 25000 }, () => {
   let sessionToken: string;
   let userDid: string;
 

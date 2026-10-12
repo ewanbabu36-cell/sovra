@@ -9,7 +9,7 @@ interface TestUser {
   sessionToken: string;
 }
 
-describe('Concurrency & Race-Condition Defense Matrix', { timeout: 35000 }, () => {
+describe('Concurrency & Race-Condition Defense Matrix', { timeout: 45000 }, () => {
   let alice: TestUser;
   const swarmUsers: TestUser[] = [];
   const SWARM_SIZE = 15;

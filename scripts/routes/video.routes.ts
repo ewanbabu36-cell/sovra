@@ -473,21 +473,43 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       const principal = enforceAuth(req, res, parsed);
       if (!principal) return true;
 
-      const voucher = sovraDb.createTipVoucher({
-        videoId: parsed.videoId,
-        senderDid: principal.did,
-        senderName: principal.displayName || 'Generous Peer',
-        senderComment: parsed.comment || 'Awesome content!',
-        creatorDid: parsed.creatorDid,
-        totalAmount: String(parsed.amount || '5.0'),
-        timestamp: Date.now(),
+      const amount = Number(parsed.amountSov || parsed.amount || 5.0);
+      const videoId = String(parsed.videoId || 'yt-video-1');
+      const tipResult = sovraDb.processTip({
+        fromDid: principal.did,
+        toDid: parsed.creatorDid || parsed.recipientDid,
+        amount,
+        videoId,
+        senderName: principal.displayName,
+        message: parsed.message || parsed.comment,
       });
 
+      if (!tipResult.ok) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: tipResult.error || 'Failed to process micro-tip' }));
+        return true;
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, voucher }));
-    } catch {
+      res.end(
+        JSON.stringify({
+          ok: true,
+          voucher: tipResult.voucher,
+          newBalance: tipResult.senderBalance,
+          settlement: {
+            total: tipResult.split.total,
+            creator: tipResult.split.creator,
+            seeder: tipResult.split.seeder,
+            split95_5: {
+              creatorShare: tipResult.split.creator,
+              seederShare: tipResult.split.seeder,
+            },
+          },
+        }),
+      );
+    } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
     }
     return true;
   }

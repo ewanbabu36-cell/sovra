@@ -1681,6 +1681,9 @@ export function getIceServers(userDid?: string): RTCIceServerConfig[] {
   ];
 
   if (!turnServersEnv) {
+    if (process.env.VITEST || process.env.NODE_ENV === 'test' || process.env.SOVRA_DISABLE_DEFAULT_TURN === 'true') {
+      return stunServers;
+    }
     return [...stunServers, ...defaultTurnServers];
   }
 
@@ -10327,6 +10330,13 @@ function renderHtml(
           <div id="headerSearchDropdown" class="header-search-dropdown" style="display: none;"></div>
         </div>
 
+        <!-- Consolidated Node Status Pill (Hidden from Consumer Cleanliness View) -->
+        <div class="node-status-pill" style="display: none !important;" aria-hidden="true">
+          <span class="status-pulse-dot"></span>
+          <span class="status-text">Online</span>
+          <span class="badge tcp-port-badge">TCP :${tcpPort}</span>
+        </div>
+
         <div style="display: flex; gap: 0.6rem; align-items: center; flex-shrink: 0; position: relative;">
           <!-- Real-Time Notifications Bell -->
           <div id="headerNotificationBell" class="header-action-icon-btn" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" title="Real-Time Notifications" aria-label="Notifications">
@@ -10734,6 +10744,7 @@ function renderHtml(
                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                       <span style="font-weight: 700; font-size: 0.95rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">${escapeHtml(post.authorName)}</span>
                       <span style="color: #38bdf8; font-size: 0.85rem;" title="Verified Sovereign Identity">✓</span>
+                      ${(post as any).authorType === 'page' ? `<span class="badge badge-page" style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399;">📄 Page</span>` : ((post as any).authorType === 'channel' ? `<span class="badge badge-channel" style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24;">📢 Channel</span>` : '')}
                       ${(post as any).authorEntityHandle ? `<span style="color: #94a3b8; font-size: 0.82rem; font-weight: 500;">${escapeHtml((post as any).authorEntityHandle)}</span>` : ''}
                       <span style="color: #64748b; font-size: 0.8rem;">&bull;</span>
                       <span style="color: #94a3b8; font-size: 0.82rem;" title="${tsInfo.fullDate}">${tsInfo.timeAgo}</span>
@@ -10891,6 +10902,9 @@ function renderHtml(
                          style="position: relative; overflow: hidden; height: auto; max-height: 640px; background: #000000; display: flex; align-items: center; justify-content: center;"
                          ondblclick="handleFeedDoubleTap('${post.id}', event)">
                       <video src="${post.mediaVideo}" controls playsinline preload="metadata" style="width: 100%; height: auto; max-height: 640px; object-fit: contain; display: block; margin: 0 auto;"></video>
+                      <div style="position: absolute; bottom: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">
+                        <span>🎬 REEL &bull; CID:</span> <span>${(post.mediaCid || post.videoCid || 'bafy...').substring(0, 14)}...</span>
+                      </div>
                       <div id="heart-pop-${post.id}"></div>
                     </div>
                     ${post.tags ? `
@@ -12590,10 +12604,16 @@ function renderHtml(
 
           <!-- Avatar & Action Buttons Row -->
           <div class="profile-avatar-row">
-            <div class="profile-avatar-wrapper">
+            <div class="profile-avatar-wrapper" style="position: relative;">
               <div class="profile-avatar-large" id="meProfileAvatarContainer" onclick="viewMyAvatarLightbox(event)" title="Click to View or Change Profile Photo" aria-label="Profile Avatar" style="cursor: pointer;">
                 <span id="meProfileAvatarText">S</span>
               </div>
+              <button type="button" class="avatar-badge-btn" id="avatarCameraBadge" onclick="triggerDirectAvatarUpload(event)" title="Change Profile Photo" aria-label="Change Profile Photo" style="display: none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </button>
+              <button type="button" class="avatar-badge-btn avatar-badge-danger" id="avatarRemoveBadge" onclick="removeDirectAvatar(event)" title="Remove Profile Photo" aria-label="Remove Profile Photo" style="display: none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              </button>
               <input type="file" id="directAvatarFileInput" accept="image/*" style="display: none;" onchange="handleDirectAvatarChange(event)">
             </div>
             <div class="profile-actions-wrap">
@@ -29161,6 +29181,7 @@ function renderHtml(
               '<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">' +
                 '<span style="font-weight: 700; font-size: 0.95rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">' + post.authorName + '</span>' +
                 '<span style="color: #38bdf8; font-size: 0.85rem;" title="Verified Sovereign Identity">✓</span>' +
+                (post.authorType === 'page' ? '<span class="badge badge-page" style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399;">📄 Page</span>' : (post.authorType === 'channel' ? '<span class="badge badge-channel" style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24;">📢 Channel</span>' : '')) +
                 (post.authorEntityHandle ? '<span style="color: #94a3b8; font-size: 0.82rem; font-weight: 500;">' + post.authorEntityHandle + '</span>' : '') +
                 '<span style="color: #64748b; font-size: 0.8rem;">&bull;</span>' +
                 '<span style="color: #94a3b8; font-size: 0.82rem;" title="' + formatFeedFullDateTime(post.timestamp) + '">' + formatFeedTimeAgo(post.timestamp) + '</span>' +
@@ -38548,8 +38569,8 @@ function renderHtml(
       }
 
       // Global Navigation Quick Buttons
-      html += '<div style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 6px; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">' +
-        '<button type="button" onclick="searchEverywhereFriends()" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px;">👥 Search Everywhere →</button>' +
+      html += '<div style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 6px; padding-top: 6px; display: flex; justify-content: space-between; align-items: center; gap: 6px;">' +
+        '<button type="button" onclick="openOmniSearch();" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 6px; color: #a5b4fc; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 4px 8px;">🔍 Deep Omni-Search (Ctrl+K) →</button>' +
         '<button type="button" onclick="clearHeaderSearch();" style="background: none; border: none; color: #94a3b8; font-size: 0.72rem; cursor: pointer; padding: 4px;">Clear Filter ✕</button>' +
       '</div>';
 

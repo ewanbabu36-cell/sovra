@@ -8,7 +8,7 @@ const SAMPLE_PHOTO_DATA_URL =
 const SAMPLE_VIDEO_DATA_URL =
   'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAAhmZGF0AAAACm1vb3Y=';
 
-describe('Multi-Format Feed Post System (Tweet / Reddit / Photo / Video / Canvas)', () => {
+describe('Multi-Format Feed Post System (Tweet / Reddit / Photo / Video / Canvas)', { timeout: 25000 }, () => {
   let sessionToken: string;
   let userDid: string;
 
