@@ -464,8 +464,15 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     return true;
   }
 
-  // Tip Video Creator
-  if ((url.pathname === '/api/youtube/tip' || url.pathname === '/api/watch/tip') && req.method === 'POST') {
+  // Universal Creator SOV Tipping (Watch Videos, Reels, Feed Posts & Profiles)
+  if (
+    (url.pathname === '/api/youtube/tip' ||
+      url.pathname === '/api/watch/tip' ||
+      url.pathname === '/api/reels/tip' ||
+      url.pathname === '/api/feed/tip' ||
+      url.pathname === '/api/creator/tip') &&
+    req.method === 'POST'
+  ) {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
@@ -474,19 +481,37 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       if (!principal) return true;
 
       const amount = Number(parsed.amountSov || parsed.amount || 5.0);
-      const videoId = String(parsed.videoId || 'yt-video-1');
+      const targetType: 'video' | 'reel' | 'post' | 'profile' =
+        parsed.targetType ||
+        (url.pathname === '/api/reels/tip' || parsed.reelId
+          ? 'reel'
+          : url.pathname === '/api/feed/tip' || parsed.postId
+            ? 'post'
+            : parsed.videoId
+              ? 'video'
+              : 'profile');
+      const targetId = String(
+        parsed.targetId || parsed.reelId || parsed.postId || parsed.videoId || 'yt-video-1'
+      );
+
       const tipResult = sovraDb.processTip({
         fromDid: principal.did,
-        toDid: parsed.creatorDid || parsed.recipientDid,
+        toDid: parsed.creatorDid || parsed.recipientDid || parsed.toDid,
         amount,
-        videoId,
-        senderName: principal.displayName,
+        targetType,
+        targetId,
+        videoId: parsed.videoId,
+        reelId: parsed.reelId,
+        postId: parsed.postId,
+        senderName: parsed.authorName || principal.displayName,
         message: parsed.message || parsed.comment,
+        signatureHex: parsed.signatureHex || parsed.signature,
+        rootHash: parsed.rootHash || (parsed.voucher && parsed.voucher.rootHash),
       });
 
       if (!tipResult.ok) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: tipResult.error || 'Failed to process micro-tip' }));
+        res.end(JSON.stringify({ ok: false, error: tipResult.error || 'Failed to process SOV micro-tip' }));
         return true;
       }
 
@@ -496,10 +521,12 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
           ok: true,
           voucher: tipResult.voucher,
           newBalance: tipResult.senderBalance,
+          recipientBalance: tipResult.recipientBalance,
           settlement: {
             total: tipResult.split.total,
             creator: tipResult.split.creator,
             seeder: tipResult.split.seeder,
+            platformTake: 0,
             split95_5: {
               creatorShare: tipResult.split.creator,
               seederShare: tipResult.split.seeder,
@@ -514,6 +541,15 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     return true;
   }
 
+  // Get Creator SOV Tipping Ledger & Earnings Breakdown
+  if (url.pathname === '/api/creator/tips/ledger' && req.method === 'GET') {
+    const creatorDid = url.searchParams.get('did') || url.searchParams.get('creatorDid') || undefined;
+    const ledger = sovraDb.getCreatorTipsLedger(creatorDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, ...ledger }));
+    return true;
+  }
+
   // Subscribe to Channel
   if ((url.pathname === '/api/youtube/subscribe' || url.pathname === '/api/watch/subscribe') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
@@ -523,10 +559,15 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       const principal = enforceAuth(req, res, parsed);
       if (!principal) return true;
 
-      const handle = String(parsed.channelHandle || '');
+      const handle = String(parsed.channelHandle || parsed.channelId || parsed.channel || '');
       const result = sovraDb.toggleChannelSubscription(handle, principal.did);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, isSubscribed: result.isSubscribed }));
+      res.end(JSON.stringify({
+        ok: true,
+        isSubscribed: result.isSubscribed,
+        subscribed: result.isSubscribed,
+        subscribersCount: result.subscribersCount,
+      }));
     } catch {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));

@@ -32,6 +32,14 @@ export interface UserPrivacySettings {
   blockedDids?: string[];
 }
 
+export interface WebAuthnCredentialRecord {
+  id: string; // Base64url credential ID
+  jwk: Record<string, any>; // JSON Web Key of the public key
+  counter: number;
+  transports?: string[];
+  createdAt: number;
+}
+
 export interface UserRecord {
   did: string;
   handle: string; // e.g. '@rahul_phone'
@@ -53,6 +61,7 @@ export interface UserRecord {
   totpSecret?: string; // Base32 RFC 6238 TOTP Secret Key for Google Authenticator
   totpEnabled?: boolean; // Whether Google Authenticator 2FA is active
   recoveryPhrase?: string; // 12-Word Sovereign Disaster Recovery Seed Phrase
+  webauthnCredentials?: WebAuthnCredentialRecord[]; // Native Hardware Enclave / Biometric credentials
   createdAt: number;
   updatedAt: number;
 }
@@ -75,6 +84,7 @@ export interface PublicUserDTO {
   privacySettings?: UserPrivacySettings;
   totpEnabled?: boolean;
   hasSecurityPin?: boolean;
+  hasWebAuthn?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -99,6 +109,7 @@ export function toPublicUserDTO(user: UserRecord | undefined | null): PublicUser
     privacySettings: user.privacySettings,
     totpEnabled: Boolean(user.totpEnabled),
     hasSecurityPin: Boolean(user.securityPinHash),
+    hasWebAuthn: Boolean(user.webauthnCredentials && user.webauthnCredentials.length > 0),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -555,6 +566,8 @@ export interface ReelRecord {
   entityId?: string;
   paywallFee?: number;
   tippingEnabled?: boolean;
+  tipsCount?: number;
+  tipsTotalSov?: number;
   tags: string[];
   audioTrack: string;
   likesCount: number;
@@ -689,7 +702,11 @@ export interface YoutubeCommentRecord {
 export interface TipVoucherRecord {
   voucherId: string;
   type?: string;
+  targetType?: 'video' | 'reel' | 'post' | 'profile';
+  targetId?: string;
   videoId?: string;
+  reelId?: string;
+  postId?: string;
   senderDid?: string;
   senderName?: string;
   senderComment?: string;
@@ -703,6 +720,7 @@ export interface TipVoucherRecord {
   seederAmount?: string;
   platformAmount?: string;
   timestamp: number;
+  rootHash?: string;
   signatureHex?: string;
   status?: string;
   txHash?: string;
@@ -1066,6 +1084,30 @@ export interface LiveChatMessageRecord {
   text: string;
   timestamp: number;
   isModerator?: boolean;
+  isTip?: boolean;
+  tipAmount?: number;
+}
+
+export interface LiveTipRecord {
+  id: string;
+  sessionId: string;
+  senderDid: string;
+  senderName: string;
+  amountSov: number;
+  creatorShareSov: number;
+  seederShareSov: number;
+  note?: string;
+  timestamp: number;
+}
+
+export interface LiveSignalRecord {
+  id: string;
+  sessionId: string;
+  fromDid: string;
+  toDid?: string;
+  type: 'offer' | 'answer' | 'candidate';
+  payload: any;
+  timestamp: number;
 }
 
 export interface LiveSessionRecord {
@@ -1085,8 +1127,14 @@ export interface LiveSessionRecord {
   actualStartTime?: number;
   endedAt?: number;
   viewerCount: number;
+  peakViewers?: number;
+  viewers?: string[];
   likesCount: number;
   category?: string;
+  tipTotalSov?: number;
+  tips?: LiveTipRecord[];
+  signals?: LiveSignalRecord[];
+  archiveVideoId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -1108,6 +1156,63 @@ export interface SavedMediaRecord {
   title?: string;
   thumbnailUrl?: string;
   savedAt: number;
+}
+
+export interface WellbeingLimitsRecord {
+  userDid: string;
+  dailyAppLimitMinutes: number;
+  feedLimitMinutes: number;
+  shortVideoLimitMinutes: number;
+  exploreLimitMinutes: number;
+  quietHoursEnabled: boolean;
+  quietHoursStart: string; // "23:00"
+  quietHoursEnd: string;   // "07:00"
+  mindfulBreaksEnabled: boolean;
+  breakIntervalMinutes: number;
+  lockoutEnforced: boolean;
+  tamperProofClock: boolean;
+  unlockedUntil?: number;
+  updatedAt: number;
+}
+
+export interface WellbeingUsageRecord {
+  userDid: string;
+  date: string; // "YYYY-MM-DD"
+  appUsageSeconds: number;
+  feedUsageSeconds: number;
+  reelsUsageSeconds: number;
+  exploreUsageSeconds: number;
+  breaksTaken: number;
+  lockoutTriggeredCount: number;
+  lastActiveTimestamp: number;
+}
+
+export interface StudioJobRecord {
+  jobId: string;
+  creatorDid: string;
+  title: string;
+  description?: string;
+  tags?: string;
+  sourceCid: string;
+  targetResolutions: string[];
+  status: 'queued' | 'transcoding' | 'completed' | 'failed';
+  progress: number;
+  masterManifestCid?: string;
+  masterPlaylistUrl?: string;
+  resolutionCids: Record<string, string>;
+  scheduledPublishAt?: number;
+  published: boolean;
+  publishedVideoId?: string;
+  thumbnailUrl?: string;
+  category?: string;
+  chapters?: Array<{ time: string; title: string; seconds: number }>;
+  monetization?: {
+    tier: 'free' | 'supporter_gated' | 'subscribers_only';
+    tipPriceSov?: number;
+    previewSeconds?: number;
+  };
+  createdAt: number;
+  completedAt?: number;
 }
 
 export interface DatabaseSchema {
@@ -1148,6 +1253,9 @@ export interface DatabaseSchema {
   jury_cases?: JuryCaseRecord[];
   jury_policies?: ModerationPolicyConfig;
   ephemeral_mailbox?: EphemeralMailboxMessageRecord[];
+  wellbeing_limits?: WellbeingLimitsRecord[];
+  wellbeing_usage?: WellbeingUsageRecord[];
+  studio_jobs?: StudioJobRecord[];
 }
 
 // ==========================================
@@ -1278,6 +1386,9 @@ export class SovraDatabaseEngine {
       jury_cases: [],
       jury_policies: this.getDefaultJuryPolicies(),
       ephemeral_mailbox: [],
+      wellbeing_limits: [],
+      wellbeing_usage: [],
+      studio_jobs: [],
     };
   }
 
@@ -1666,6 +1777,39 @@ export class SovraDatabaseEngine {
     this.load();
     const cleanHandle = handle.startsWith('@') ? handle.toLowerCase() : '@' + handle.toLowerCase();
     return this.db.users.find(u => u.handle.toLowerCase() === cleanHandle);
+  }
+
+  public findUserByWebauthnCredentialId(credentialId: string): UserRecord | undefined {
+    this.load();
+    return this.db.users.find(u =>
+      (u.webauthnCredentials || []).some(c => c.id === credentialId)
+    );
+  }
+
+  public addWebauthnCredential(did: string, cred: WebAuthnCredentialRecord): boolean {
+    this.load();
+    const user = this.db.users.find(u => u.did === did);
+    if (!user) return false;
+    if (!user.webauthnCredentials) user.webauthnCredentials = [];
+    const existingIndex = user.webauthnCredentials.findIndex(c => c.id === cred.id);
+    if (existingIndex >= 0) {
+      user.webauthnCredentials[existingIndex] = cred;
+    } else {
+      user.webauthnCredentials.push(cred);
+    }
+    user.updatedAt = Date.now();
+    this.save();
+    return true;
+  }
+
+  public removeWebauthnCredential(did: string, credentialId: string): boolean {
+    this.load();
+    const user = this.db.users.find(u => u.did === did);
+    if (!user || !user.webauthnCredentials) return false;
+    user.webauthnCredentials = user.webauthnCredentials.filter(c => c.id !== credentialId);
+    user.updatedAt = Date.now();
+    this.save();
+    return true;
   }
 
   public findUserBySessionToken(token: string): UserRecord | undefined {
@@ -4354,14 +4498,13 @@ export class SovraDatabaseEngine {
       this.db.videos = this.getSeedVideos();
       this.save();
     }
-    if (userDid) {
-      return this.db.videos.map(v => ({
-        ...v,
-        isSubscribed: this.isVideoSubscribed(v.channelHandle, userDid),
-        isLiked: this.isVideoLiked(v.id, userDid),
-      }));
-    }
-    return [...this.db.videos];
+    return this.db.videos.map(v => ({
+      ...v,
+      duration: v.duration || (v as any).durationFormatted || '2:00',
+      durationSeconds: v.durationSeconds || (v as any).durationSec || 120,
+      isSubscribed: userDid ? this.isVideoSubscribed(v.channelHandle, userDid) : !!v.isSubscribed,
+      isLiked: userDid ? this.isVideoLiked(v.id, userDid) : !!v.isLiked,
+    }));
   }
 
   public getVideoById(id: string, userDid?: string): YoutubeVideoRecord | null {
@@ -4525,6 +4668,10 @@ export class SovraDatabaseEngine {
     }
     this.save();
     return { ok: true, isSubscribed, subscribersCount: finalCount };
+  }
+
+  public toggleChannelSubscription(channelHandle: string, userDid: string): { ok: boolean; isSubscribed: boolean; subscribersCount: number } {
+    return this.toggleVideoSubscribe(channelHandle, userDid);
   }
 
   public isVideoSubscribed(channelHandle: string, userDid: string): boolean {
@@ -4776,12 +4923,20 @@ export class SovraDatabaseEngine {
     fromDid?: string;
     toDid?: string;
     amount: number;
-    videoId: string;
+    videoId?: string;
+    reelId?: string;
+    postId?: string;
+    targetType?: 'video' | 'reel' | 'post' | 'profile';
+    targetId?: string;
     senderName?: string;
     message?: string;
+    signatureHex?: string;
+    signature?: string;
+    rootHash?: string;
   }): {
     ok: boolean;
     senderBalance: number;
+    recipientBalance?: number;
     voucher: TipVoucherRecord;
     split: { total: number; creator: number; seeder: number; platformTake: number; creatorAmount?: number; seederAmount?: number };
     error?: string;
@@ -4835,41 +4990,98 @@ export class SovraDatabaseEngine {
     }
 
     const newBalance = Math.round((currentBalance - amount) * 100) / 100;
-    if (sender) {
-      sender.balanceSov = newBalance;
-    }
+    sender.balanceSov = newBalance;
 
     const creatorSplit = Math.round(amount * 0.95 * 100) / 100;
     const seederSplit = Math.round(amount * 0.05 * 100) / 100;
 
-    if (params.toDid) {
-      const cleanTo = params.toDid.replace(/^@/, '').trim().toLowerCase();
+    let resolvedCreatorDid = params.creatorDid || params.toDid || '';
+    let recipientBalance: number | undefined;
+
+    // Resolve target entity (Reel, Post, Video) to infer creator if needed and increment tip counters
+    const resolvedTargetType: 'video' | 'reel' | 'post' | 'profile' =
+      params.targetType ||
+      (params.reelId ? 'reel' : params.postId ? 'post' : params.videoId ? 'video' : 'profile');
+    const resolvedTargetId =
+      params.targetId || params.reelId || params.postId || params.videoId || 'yt-video-1';
+
+    let targetTotalTipsSov: number | undefined;
+
+    if (resolvedTargetType === 'reel' || params.reelId) {
+      const reel = this.db.reels.find(r => r.id === (params.reelId || resolvedTargetId));
+      if (reel) {
+        reel.tipsCount = (reel.tipsCount || 0) + 1;
+        reel.tipsTotalSov = Math.round(((reel.tipsTotalSov || 0) + amount) * 100) / 100;
+        (reel as any).tipsSov = reel.tipsTotalSov;
+        targetTotalTipsSov = reel.tipsTotalSov;
+        if (!resolvedCreatorDid) {
+          resolvedCreatorDid = reel.creatorDid || reel.creatorHandle;
+        }
+      }
+    } else if (resolvedTargetType === 'post' || params.postId) {
+      const post = this.db.posts.find(p => p.id === (params.postId || resolvedTargetId));
+      if (post) {
+        (post as any).tipsCount = ((post as any).tipsCount || 0) + 1;
+        (post as any).tipsTotalSov = Math.round((((post as any).tipsTotalSov || 0) + amount) * 100) / 100;
+        targetTotalTipsSov = (post as any).tipsTotalSov;
+        if (!resolvedCreatorDid) {
+          resolvedCreatorDid = post.authorDid || post.authorHandle;
+        }
+      }
+    }
+
+    if (resolvedCreatorDid) {
+      const cleanTo = resolvedCreatorDid.replace(/^did:sovra:/, '').replace(/^@/, '').trim().toLowerCase();
       const recipient = this.db.users.find(u =>
-        u.did === params.toDid ||
+        u.did === resolvedCreatorDid ||
         (u.handle && u.handle.toLowerCase().replace(/^@/, '') === cleanTo)
       );
       if (recipient) {
         const recBal = typeof recipient.balanceSov === 'number' ? recipient.balanceSov : 500.0;
         recipient.balanceSov = Math.round((recBal + creatorSplit) * 100) / 100;
-        params.toDid = recipient.did;
+        recipientBalance = recipient.balanceSov;
+        resolvedCreatorDid = recipient.did;
       }
     }
 
+    const nowTs = Date.now();
+    const voucherId = 'vouch_' + nowTs + '_' + crypto.randomBytes(8).toString('hex');
+    const finalCreatorDid = resolvedCreatorDid || 'did:sovra:creator_studio_broadcast';
+    const computedRootHash =
+      params.rootHash ||
+      crypto
+        .createHash('sha256')
+        .update(`${voucherId}|${sender.did}|${finalCreatorDid}|${amount}|${creatorSplit}|${seederSplit}|${nowTs}`)
+        .digest('hex')
+        .slice(0, 32);
+    const computedSignatureHex =
+      params.signatureHex ||
+      params.signature ||
+      crypto
+        .createHmac('sha256', 'sovra-voucher-state-channel-v1')
+        .update(computedRootHash)
+        .digest('hex');
+
     const voucher: TipVoucherRecord = {
-      voucherId: 'vouch_' + Date.now() + '_' + crypto.randomBytes(8).toString('hex'),
+      voucherId,
       type: 'tip',
-      videoId: params.videoId || 'yt-video-1',
-      senderDid: sender ? sender.did : params.fromDid,
-      senderName: params.senderName || (sender ? sender.displayName : 'Verified Peer'),
+      targetType: resolvedTargetType,
+      targetId: resolvedTargetId,
+      videoId: resolvedTargetType === 'video' ? resolvedTargetId : params.videoId,
+      reelId: resolvedTargetType === 'reel' ? resolvedTargetId : params.reelId,
+      postId: resolvedTargetType === 'post' ? resolvedTargetId : params.postId,
+      senderDid: sender.did,
+      senderName: params.senderName || sender.displayName || 'Verified Peer',
       senderComment: params.message,
-      creatorDid: params.toDid || 'did:sovra:creator_studio_broadcast',
+      creatorDid: finalCreatorDid,
       seederDid: 'did:sovra:edge_seeder_relay',
       totalAmount: amount.toString(),
       creatorAmount: creatorSplit.toString(),
       seederAmount: seederSplit.toString(),
       platformAmount: '0',
-      timestamp: Date.now(),
-      signatureHex: (params as any).signatureHex || (params as any).signature || '',
+      timestamp: nowTs,
+      rootHash: computedRootHash,
+      signatureHex: computedSignatureHex,
       status: 'settled_on_l1',
     };
 
@@ -4879,28 +5091,44 @@ export class SovraDatabaseEngine {
     this.db.tip_vouchers.push(voucher);
 
     if (params.message) {
-      this.addVideoComment(params.videoId || 'yt-video-1', {
-        authorName: params.senderName || (sender ? sender.displayName : 'Super Supporter'),
-        authorHandle: sender ? sender.handle.replace('@', '') : 'supporter',
-        authorAvatar: sender ? sender.avatar : '⭐',
-        text: params.message,
-        isSuperThanks: true,
-        superThanksAmount: '₹' + amount + ' (' + amount + ' SOV)',
-        likes: 1,
-      });
+      if (resolvedTargetType === 'reel') {
+        this.addReelComment({
+          reelId: resolvedTargetId,
+          authorDid: sender.did,
+          authorHandle: sender.handle.replace('@', ''),
+          authorName: params.senderName || sender.displayName || 'Super Supporter',
+          authorAvatar: sender.avatar || '⚡',
+          text: `⚡ [Tipped ${amount} SOV]: ${params.message}`,
+        });
+      } else {
+        this.addVideoComment(params.videoId || resolvedTargetId || 'yt-video-1', {
+          authorName: params.senderName || (sender ? sender.displayName : 'Super Supporter'),
+          authorHandle: sender ? sender.handle.replace('@', '') : 'supporter',
+          authorAvatar: sender ? sender.avatar : '⭐',
+          text: params.message,
+          isSuperThanks: true,
+          superThanksAmount: '₹' + amount + ' (' + amount + ' SOV)',
+          likes: 1,
+        });
+      }
     }
 
     this.logActivity(
       'TIP_VOUCHER',
       voucher.senderDid || 'supporter',
       voucher.senderName,
-      `Signed off-chain voucher: ₹${amount} (${amount} SOV) - ${creatorSplit} SOV to creator, ${seederSplit} SOV to seeders`,
+      `Signed off-chain voucher (${resolvedTargetType}:${resolvedTargetId}): ₹${amount} (${amount} SOV) - ${creatorSplit} SOV to creator, ${seederSplit} SOV to seeders`,
     );
     this.save();
 
     return {
       ok: true,
       senderBalance: newBalance,
+      newBalanceSov: newBalance,
+      recipientBalance,
+      creatorCut: creatorSplit,
+      seederCut: seederSplit,
+      targetTotalTipsSov: targetTotalTipsSov,
       voucher,
       split: {
         total: amount,
@@ -4910,6 +5138,35 @@ export class SovraDatabaseEngine {
         seederAmount: seederSplit,
         platformTake: 0,
       },
+    };
+  }
+
+  public getCreatorTipsLedger(creatorDid?: string): {
+    totalTipsSov: number;
+    creatorEarnedSov: number;
+    totalEarnedAsCreatorSov: number;
+    seederPoolSov: number;
+    vouchersCount: number;
+    vouchers: TipVoucherRecord[];
+    records: TipVoucherRecord[];
+  } {
+    this.load();
+    const all = (this.db.tip_vouchers || []).filter(v => !v.type || v.type === 'tip');
+    const filtered = creatorDid
+      ? all.filter(v => v.creatorDid === creatorDid || v.toDid === creatorDid || v.senderDid === creatorDid)
+      : all;
+    const totalTipsSov = Math.round(filtered.reduce((acc, v) => acc + Number(v.totalAmount || 0), 0) * 100) / 100;
+    const creatorEarnedSov = Math.round(filtered.reduce((acc, v) => acc + Number(v.creatorAmount || 0), 0) * 100) / 100;
+    const seederPoolSov = Math.round(filtered.reduce((acc, v) => acc + Number(v.seederAmount || 0), 0) * 100) / 100;
+    const vouchersList = filtered.slice(-50).reverse();
+    return {
+      totalTipsSov,
+      creatorEarnedSov,
+      totalEarnedAsCreatorSov: creatorEarnedSov,
+      seederPoolSov,
+      vouchersCount: filtered.length,
+      vouchers: vouchersList,
+      records: vouchersList,
     };
   }
 
@@ -5155,6 +5412,773 @@ export class SovraDatabaseEngine {
     } catch {
       return { freedBytes: 0, remainingFiles: 0, remainingBytes: 0 };
     }
+  }
+
+  // ==========================================
+  // COLLECTION 10: DEVICE-SIDE SCREEN-TIME CONTROLS & DIGITAL WELLBEING (PHASE 8)
+  // ==========================================
+
+  public getDefaultWellbeingLimits(userDid: string = 'did:sovra:device_local'): WellbeingLimitsRecord {
+    return {
+      userDid,
+      dailyAppLimitMinutes: 60,
+      feedLimitMinutes: 30,
+      shortVideoLimitMinutes: 20,
+      exploreLimitMinutes: 15,
+      quietHoursEnabled: true,
+      quietHoursStart: '23:00',
+      quietHoursEnd: '07:00',
+      mindfulBreaksEnabled: true,
+      breakIntervalMinutes: 20,
+      lockoutEnforced: true,
+      tamperProofClock: true,
+      updatedAt: Date.now(),
+    };
+  }
+
+  public getWellbeingLimits(userDid: string = 'did:sovra:device_local'): WellbeingLimitsRecord {
+    this.load();
+    if (!this.db.wellbeing_limits) this.db.wellbeing_limits = [];
+    let record = this.db.wellbeing_limits.find(l => l.userDid === userDid);
+    if (!record) {
+      record = this.getDefaultWellbeingLimits(userDid);
+      this.db.wellbeing_limits.push(record);
+      this.save();
+    }
+    return record;
+  }
+
+  public updateWellbeingLimits(userDid: string, updates: Partial<WellbeingLimitsRecord>): WellbeingLimitsRecord {
+    this.load();
+    if (!this.db.wellbeing_limits) this.db.wellbeing_limits = [];
+    let record = this.db.wellbeing_limits.find(l => l.userDid === userDid);
+    if (!record) {
+      record = this.getDefaultWellbeingLimits(userDid);
+      this.db.wellbeing_limits.push(record);
+    }
+
+    if (typeof updates.dailyAppLimitMinutes === 'number') {
+      record.dailyAppLimitMinutes = Math.max(1, Math.min(1440, Math.round(updates.dailyAppLimitMinutes)));
+    }
+    if (typeof updates.feedLimitMinutes === 'number') {
+      record.feedLimitMinutes = Math.max(1, Math.min(1440, Math.round(updates.feedLimitMinutes)));
+    }
+    if (typeof updates.shortVideoLimitMinutes === 'number') {
+      record.shortVideoLimitMinutes = Math.max(1, Math.min(1440, Math.round(updates.shortVideoLimitMinutes)));
+    }
+    if (typeof updates.exploreLimitMinutes === 'number') {
+      record.exploreLimitMinutes = Math.max(1, Math.min(1440, Math.round(updates.exploreLimitMinutes)));
+    }
+    if (typeof updates.quietHoursEnabled === 'boolean') {
+      record.quietHoursEnabled = updates.quietHoursEnabled;
+    }
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    if (typeof updates.quietHoursStart === 'string' && timeRegex.test(updates.quietHoursStart)) {
+      record.quietHoursStart = updates.quietHoursStart;
+    }
+    if (typeof updates.quietHoursEnd === 'string' && timeRegex.test(updates.quietHoursEnd)) {
+      record.quietHoursEnd = updates.quietHoursEnd;
+    }
+    if (typeof updates.mindfulBreaksEnabled === 'boolean') {
+      record.mindfulBreaksEnabled = updates.mindfulBreaksEnabled;
+    }
+    if (typeof updates.breakIntervalMinutes === 'number') {
+      record.breakIntervalMinutes = Math.max(5, Math.min(240, Math.round(updates.breakIntervalMinutes)));
+    }
+    if (typeof updates.lockoutEnforced === 'boolean') {
+      record.lockoutEnforced = updates.lockoutEnforced;
+    }
+    if (typeof updates.tamperProofClock === 'boolean') {
+      record.tamperProofClock = updates.tamperProofClock;
+    }
+    record.updatedAt = Date.now();
+    this.save();
+    return record;
+  }
+
+  public isQuietHoursActive(limits: WellbeingLimitsRecord, date: Date = new Date()): boolean {
+    if (!limits.quietHoursEnabled) return false;
+    const currentMins = date.getHours() * 60 + date.getMinutes();
+    const [startH, startM] = limits.quietHoursStart.split(':').map(Number);
+    const [endH, endM] = limits.quietHoursEnd.split(':').map(Number);
+    const startMins = startH * 60 + startM;
+    const endMins = endH * 60 + endM;
+
+    if (startMins <= endMins) {
+      return currentMins >= startMins && currentMins < endMins;
+    } else {
+      return currentMins >= startMins || currentMins < endMins;
+    }
+  }
+
+  public getOrCreateWellbeingUsage(userDid: string, dateStr?: string): WellbeingUsageRecord {
+    this.load();
+    if (!this.db.wellbeing_usage) this.db.wellbeing_usage = [];
+    const date = dateStr || new Date().toISOString().split('T')[0];
+    let record = this.db.wellbeing_usage.find(u => u.userDid === userDid && u.date === date);
+    if (!record) {
+      record = {
+        userDid,
+        date,
+        appUsageSeconds: 0,
+        feedUsageSeconds: 0,
+        reelsUsageSeconds: 0,
+        exploreUsageSeconds: 0,
+        breaksTaken: 0,
+        lockoutTriggeredCount: 0,
+        lastActiveTimestamp: Date.now(),
+      };
+      this.db.wellbeing_usage.push(record);
+      this.save();
+    }
+    return record;
+  }
+
+  public logWellbeingUsage(userDid: string, category: 'feed' | 'reels' | 'explore' | 'app', seconds: number): {
+    usage: WellbeingUsageRecord;
+    limits: WellbeingLimitsRecord;
+    isQuietHours: boolean;
+    isLockoutActive: boolean;
+    exceededCategories: string[];
+    gracePeriodRemainingMs: number;
+  } {
+    this.load();
+    const limits = this.getWellbeingLimits(userDid);
+    const usage = this.getOrCreateWellbeingUsage(userDid);
+    const sec = Math.max(0, Math.min(3600, Math.round(seconds)));
+
+    usage.appUsageSeconds += sec;
+    if (category === 'feed') usage.feedUsageSeconds += sec;
+    else if (category === 'reels') usage.reelsUsageSeconds += sec;
+    else if (category === 'explore') usage.exploreUsageSeconds += sec;
+    usage.lastActiveTimestamp = Date.now();
+
+    const exceededCategories: string[] = [];
+    if (usage.appUsageSeconds >= limits.dailyAppLimitMinutes * 60) exceededCategories.push('app');
+    if (usage.feedUsageSeconds >= limits.feedLimitMinutes * 60) exceededCategories.push('feed');
+    if (usage.reelsUsageSeconds >= limits.shortVideoLimitMinutes * 60) exceededCategories.push('reels');
+    if (usage.exploreUsageSeconds >= limits.exploreLimitMinutes * 60) exceededCategories.push('explore');
+
+    const now = Date.now();
+    const gracePeriodRemainingMs = limits.unlockedUntil && limits.unlockedUntil > now ? limits.unlockedUntil - now : 0;
+    const isLockoutActive = limits.lockoutEnforced && exceededCategories.length > 0 && gracePeriodRemainingMs === 0;
+
+    if (isLockoutActive) {
+      usage.lockoutTriggeredCount += 1;
+    }
+
+    this.save();
+    return {
+      usage,
+      limits,
+      isQuietHours: this.isQuietHoursActive(limits),
+      isLockoutActive,
+      exceededCategories,
+      gracePeriodRemainingMs,
+    };
+  }
+
+  public getWellbeingSummary(userDid: string, dateStr?: string): {
+    usage: WellbeingUsageRecord;
+    limits: WellbeingLimitsRecord;
+    isQuietHours: boolean;
+    isLockoutActive: boolean;
+    exceededCategories: string[];
+    gracePeriodRemainingMs: number;
+  } {
+    this.load();
+    const limits = this.getWellbeingLimits(userDid);
+    const usage = this.getOrCreateWellbeingUsage(userDid, dateStr);
+    const exceededCategories: string[] = [];
+    if (usage.appUsageSeconds >= limits.dailyAppLimitMinutes * 60) exceededCategories.push('app');
+    if (usage.feedUsageSeconds >= limits.feedLimitMinutes * 60) exceededCategories.push('feed');
+    if (usage.reelsUsageSeconds >= limits.shortVideoLimitMinutes * 60) exceededCategories.push('reels');
+    if (usage.exploreUsageSeconds >= limits.exploreLimitMinutes * 60) exceededCategories.push('explore');
+
+    const now = Date.now();
+    const gracePeriodRemainingMs = limits.unlockedUntil && limits.unlockedUntil > now ? limits.unlockedUntil - now : 0;
+    const isLockoutActive = limits.lockoutEnforced && exceededCategories.length > 0 && gracePeriodRemainingMs === 0;
+
+    return {
+      usage,
+      limits,
+      isQuietHours: this.isQuietHoursActive(limits),
+      isLockoutActive,
+      exceededCategories,
+      gracePeriodRemainingMs,
+    };
+  }
+
+  public completeBreakChallenge(userDid: string, graceMinutes: number = 5): {
+    ok: boolean;
+    unlockedUntil: number;
+    graceMinutes: number;
+    breaksTaken: number;
+  } {
+    this.load();
+    const limits = this.getWellbeingLimits(userDid);
+    const usage = this.getOrCreateWellbeingUsage(userDid);
+    usage.breaksTaken += 1;
+    const validGrace = Math.max(1, Math.min(60, graceMinutes));
+    const unlockedUntil = Date.now() + validGrace * 60 * 1000;
+    limits.unlockedUntil = unlockedUntil;
+    this.save();
+    return {
+      ok: true,
+      unlockedUntil,
+      graceMinutes: validGrace,
+      breaksTaken: usage.breaksTaken,
+    };
+  }
+
+  // ==========================================
+  // COLLECTION 11: SOVEREIGN CREATOR STUDIO & TRANSCODING QUEUE (PHASE 10)
+  // ==========================================
+
+  public createStudioJob(params: {
+    creatorDid: string;
+    title: string;
+    description?: string;
+    tags?: string;
+    sourceCid: string;
+    targetResolutions?: string[];
+    scheduledPublishAt?: number;
+    thumbnailUrl?: string;
+    category?: string;
+    chapters?: Array<{ time: string; title: string; seconds: number }>;
+    monetization?: {
+      tier: 'free' | 'supporter_gated' | 'subscribers_only';
+      tipPriceSov?: number;
+      previewSeconds?: number;
+    };
+  }): StudioJobRecord {
+    this.load();
+    if (!this.db.studio_jobs) this.db.studio_jobs = [];
+    const jobId = `job_studio_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const record: StudioJobRecord = {
+      jobId,
+      creatorDid: params.creatorDid,
+      title: params.title || 'Untitled Studio Video',
+      description: params.description || '',
+      tags: params.tags || '#creator #sovra',
+      sourceCid: params.sourceCid,
+      targetResolutions: params.targetResolutions && params.targetResolutions.length > 0
+        ? params.targetResolutions
+        : ['1080p', '720p', '480p', '360p'],
+      status: 'queued',
+      progress: 0,
+      resolutionCids: {},
+      scheduledPublishAt: params.scheduledPublishAt,
+      published: false,
+      thumbnailUrl: params.thumbnailUrl,
+      category: params.category || 'tech',
+      chapters: params.chapters || [],
+      monetization: params.monetization || { tier: 'free' },
+      createdAt: Date.now(),
+    };
+    this.db.studio_jobs.push(record);
+    this.save();
+    return record;
+  }
+
+  public getStudioJob(jobId: string): StudioJobRecord | null {
+    this.load();
+    if (!this.db.studio_jobs) return null;
+    return this.db.studio_jobs.find(j => j.jobId === jobId) || null;
+  }
+
+  public updateStudioJob(jobId: string, updates: Partial<StudioJobRecord>): StudioJobRecord | null {
+    this.load();
+    if (!this.db.studio_jobs) return null;
+    const job = this.db.studio_jobs.find(j => j.jobId === jobId);
+    if (!job) return null;
+    Object.assign(job, updates);
+    this.save();
+    return job;
+  }
+
+  public getCreatorStudioJobs(creatorDid: string): StudioJobRecord[] {
+    this.load();
+    if (!this.db.studio_jobs) return [];
+    return this.db.studio_jobs
+      .filter(j => j.creatorDid === creatorDid)
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  public getScheduledStudioQueue(creatorDid?: string): StudioJobRecord[] {
+    this.load();
+    if (!this.db.studio_jobs) return [];
+    return this.db.studio_jobs
+      .filter(j => !j.published && j.scheduledPublishAt && (!creatorDid || j.creatorDid === creatorDid))
+      .sort((a, b) => (a.scheduledPublishAt || 0) - (b.scheduledPublishAt || 0));
+  }
+
+  public publishStudioJob(jobId: string): { ok: boolean; video?: YoutubeVideoRecord; error?: string } {
+    this.load();
+    const job = this.getStudioJob(jobId);
+    if (!job) return { ok: false, error: 'Studio job not found' };
+    if (job.published) {
+      return { ok: false, error: 'Studio job already published' };
+    }
+
+    const videoId = `yt_studio_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const user = this.findUserByDid(job.creatorDid);
+    const newVideo: YoutubeVideoRecord = {
+      id: videoId,
+      title: job.title,
+      description: job.description || '',
+      channelId: `ch_${job.creatorDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 16)}`,
+      channelName: user?.displayName || user?.name || 'Sovereign Creator',
+      channelHandle: user?.handle ? user.handle.replace('@', '') : 'creator',
+      channelAvatar: user?.avatar || '🎬',
+      channelVerified: true,
+      subscriberCount: 1,
+      cid: job.masterManifestCid || job.sourceCid,
+      videoUrl: job.masterPlaylistUrl || `/api/feed/video/${job.sourceCid}`,
+      hlsMasterUrl: job.masterPlaylistUrl,
+      thumbnailUrl: job.thumbnailUrl || `/api/feed/image/${job.sourceCid}`,
+      duration: '2:00',
+      durationSeconds: 120,
+      durationSec: 120,
+      durationFormatted: '2:00',
+      views: 0,
+      viewsCount: 0,
+      likes: 0,
+      likesCount: 0,
+      dislikes: 0,
+      commentsCount: 0,
+      isSubscribed: false,
+      isLiked: false,
+      isDisliked: false,
+      isSaved: false,
+      tags: job.tags ? job.tags.split(',').map(t => t.trim()) : ['#creator'],
+      resolutions: job.targetResolutions,
+      category: job.category || 'tech',
+      chapters: job.chapters || [],
+      monetization: job.monetization || { tier: 'free' },
+      uploadedAt: Date.now(),
+      createdAt: Date.now(),
+    };
+
+    if (!this.db.videos) this.db.videos = [];
+    this.db.videos.unshift(newVideo);
+    job.published = true;
+    job.publishedAt = Date.now();
+    job.publishedVideoId = videoId;
+    this.save();
+
+    return { ok: true, video: newVideo };
+  }
+
+  public getCreatorStudioDashboard(creatorDid: string): {
+    totalJobs: number;
+    totalVideosCount: number;
+    publishedVideos: number;
+    scheduledVideos: number;
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+    activeJobsCount: number;
+    scheduledCount: number;
+    totalEarnedSov: number;
+    recentJobs: StudioJobRecord[];
+  } {
+    this.load();
+    const jobs = this.getCreatorStudioJobs(creatorDid);
+    const prefix = creatorDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
+    const videos = (this.db.videos || []).filter(v => typeof v.channelId === 'string' && v.channelId.includes(prefix));
+    const tips = this.getCreatorTipsLedger(creatorDid);
+
+    const totalViews = videos.reduce((acc, v) => acc + (v.viewsCount || v.views || 0), 0);
+    const totalLikes = videos.reduce((acc, v) => acc + (v.likesCount || v.likes || 0), 0);
+    const totalComments = videos.reduce((acc, v) => acc + (v.commentsCount || 0), 0);
+    const activeJobs = jobs.filter(j => j.status === 'queued' || j.status === 'transcoding');
+    const scheduled = jobs.filter(j => !j.published && j.scheduledPublishAt);
+    const publishedVideos = jobs.filter(j => j.published).length;
+
+    return {
+      totalJobs: jobs.length,
+      totalVideosCount: videos.length + publishedVideos,
+      publishedVideos,
+      scheduledVideos: scheduled.length,
+      totalViews,
+      totalLikes,
+      totalComments,
+      activeJobsCount: activeJobs.length,
+      scheduledCount: scheduled.length,
+      totalEarnedSov: tips.creatorEarnedSov,
+      recentJobs: jobs.slice(0, 10),
+    };
+  }
+
+  public getCreatorStudioAnalytics(creatorDid: string): {
+    summary: {
+      totalViews: number;
+      totalWatchMinutes: number;
+      totalEarnedSov: number;
+      creatorSplitSov: number;
+      seederSplitSov: number;
+      subscribersCount: number;
+      avgRetentionRate: number;
+    };
+    viewsTrend: Array<{ date: string; day: string; views: number }>;
+    watchTimeTrend: Array<{ date: string; day: string; watchMinutes: number }>;
+    sovEarningsTrend: Array<{ date: string; day: string; sovEarned: number; creatorSplitSov: number; seederSplitSov: number }>;
+    retentionCurve: Array<{ percent: number; retention: number }>;
+    topPerforming: {
+      video: YoutubeVideoRecord | null;
+      reel: FeedPostRecord | null;
+    };
+  } {
+    this.load();
+    const prefix = creatorDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
+    const videos = (this.db.videos || []).filter(v => typeof v.channelId === 'string' && v.channelId.includes(prefix));
+    const tips = this.getCreatorTipsLedger(creatorDid);
+    const user = this.findUserByDid(creatorDid);
+
+    const totalViews = videos.reduce((acc, v) => acc + (v.viewsCount || v.views || 0), 0);
+    const totalWatchMinutes = Math.round(totalViews * 1.8);
+    const totalEarnedSov = Number((tips.creatorEarnedSov || 0).toFixed(2));
+    const creatorSplitSov = Number((totalEarnedSov * 0.95).toFixed(2));
+    const seederSplitSov = Number((totalEarnedSov * 0.05).toFixed(2));
+    const subscribersCount = user?.subscribersCount || 1;
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const viewsTrend: Array<{ date: string; day: string; views: number }> = [];
+    const watchTimeTrend: Array<{ date: string; day: string; watchMinutes: number }> = [];
+    const sovEarningsTrend: Array<{ date: string; day: string; sovEarned: number; creatorSplitSov: number; seederSplitSov: number }> = [];
+
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 86400000);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = dayNames[d.getDay()];
+      const dayViews = Math.round(Math.max(1, (totalViews / 7) * (0.8 + (i % 3) * 0.2)));
+      const dayWatch = Math.round(dayViews * 1.7);
+      const daySov = Number(((totalEarnedSov / 7) * (0.7 + (i % 2) * 0.3)).toFixed(2));
+
+      viewsTrend.push({ date: dateStr, day: dayName, views: dayViews });
+      watchTimeTrend.push({ date: dateStr, day: dayName, watchMinutes: dayWatch });
+      sovEarningsTrend.push({
+        date: dateStr,
+        day: dayName,
+        sovEarned: daySov,
+        creatorSplitSov: Number((daySov * 0.95).toFixed(2)),
+        seederSplitSov: Number((daySov * 0.05).toFixed(2)),
+      });
+    }
+
+    const retentionCurve = [
+      { percent: 0, retention: 100 },
+      { percent: 25, retention: 84 },
+      { percent: 50, retention: 68 },
+      { percent: 75, retention: 55 },
+      { percent: 100, retention: 42 },
+    ];
+
+    const sortedVideos = [...videos].sort((a, b) => (b.viewsCount || b.views || 0) - (a.viewsCount || a.views || 0));
+    const topVideo = sortedVideos.length > 0 ? sortedVideos[0] : null;
+
+    const reels = (this.db.posts || []).filter(p => p.authorDid === creatorDid && p.mediaType === 'video');
+    const sortedReels = [...reels].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
+    const topReel = sortedReels.length > 0 ? sortedReels[0] : null;
+
+    return {
+      summary: {
+        totalViews,
+        totalWatchMinutes,
+        totalEarnedSov,
+        creatorSplitSov,
+        seederSplitSov,
+        subscribersCount,
+        avgRetentionRate: 68.4,
+      },
+      viewsTrend,
+      watchTimeTrend,
+      sovEarningsTrend,
+      retentionCurve,
+      topPerforming: {
+        video: topVideo,
+        reel: topReel,
+      },
+    };
+  }
+
+  public getCreatorStudioContent(creatorDid: string): {
+    count: number;
+    items: Array<{
+      id: string;
+      jobId?: string;
+      title: string;
+      description?: string;
+      thumbnailUrl: string;
+      status: 'published' | 'scheduled' | 'transcoding' | 'draft';
+      duration: string;
+      views: number;
+      likes: number;
+      commentsCount: number;
+      earnedSov: number;
+      monetization: { tier: string; tipPriceSov?: number; previewSeconds?: number };
+      category: string;
+      chapters: any[];
+      scheduledPublishAt?: number;
+      createdAt: number;
+    }>;
+  } {
+    this.load();
+    const prefix = creatorDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
+    const videos = (this.db.videos || []).filter(v => typeof v.channelId === 'string' && v.channelId.includes(prefix));
+    const jobs = this.getCreatorStudioJobs(creatorDid);
+
+    const items: any[] = [];
+
+    videos.forEach(v => {
+      items.push({
+        id: v.id,
+        title: v.title,
+        description: v.description,
+        thumbnailUrl: v.thumbnailUrl || '/assets/icon.svg',
+        status: 'published',
+        duration: v.duration || '2:00',
+        views: v.viewsCount || v.views || 0,
+        likes: v.likesCount || v.likes || 0,
+        commentsCount: v.commentsCount || 0,
+        earnedSov: 0,
+        monetization: v.monetization || { tier: 'free' },
+        category: v.category || 'tech',
+        chapters: v.chapters || [],
+        createdAt: v.createdAt || Date.now(),
+      });
+    });
+
+    jobs.forEach(j => {
+      if (!j.published) {
+        items.push({
+          id: j.jobId,
+          jobId: j.jobId,
+          title: j.title,
+          description: j.description,
+          thumbnailUrl: j.thumbnailUrl || '/assets/icon.svg',
+          status: j.scheduledPublishAt ? 'scheduled' : (j.status as any),
+          duration: '2:00',
+          views: 0,
+          likes: 0,
+          commentsCount: 0,
+          earnedSov: 0,
+          monetization: j.monetization || { tier: 'free' },
+          category: j.category || 'tech',
+          chapters: j.chapters || [],
+          scheduledPublishAt: j.scheduledPublishAt,
+          createdAt: j.createdAt,
+        });
+      }
+    });
+
+    items.sort((a, b) => b.createdAt - a.createdAt);
+    return { count: items.length, items };
+  }
+
+  public updateCreatorStudioContent(creatorDid: string, contentId: string, updates: Record<string, any>): { ok: boolean; item?: any; error?: string } {
+    this.load();
+    if (this.db.videos) {
+      const vid = this.db.videos.find(v => v.id === contentId);
+      if (vid) {
+        if (updates.title) vid.title = String(updates.title).trim();
+        if (updates.description !== undefined) vid.description = String(updates.description).trim();
+        if (updates.tags) vid.tags = Array.isArray(updates.tags) ? updates.tags : String(updates.tags).split(',').map(t => t.trim());
+        if (updates.category) vid.category = String(updates.category).trim();
+        if (updates.chapters) vid.chapters = updates.chapters;
+        if (updates.monetization) vid.monetization = updates.monetization;
+        if (updates.thumbnailUrl) vid.thumbnailUrl = updates.thumbnailUrl;
+        if (updates.subtitleTracks) (vid as any).subtitleTracks = updates.subtitleTracks;
+        this.save();
+        return { ok: true, item: vid };
+      }
+    }
+
+    if (this.db.studio_jobs) {
+      const job = this.db.studio_jobs.find(j => j.jobId === contentId);
+      if (job) {
+        if (updates.title) job.title = String(updates.title).trim();
+        if (updates.description !== undefined) job.description = String(updates.description).trim();
+        if (updates.tags) job.tags = String(updates.tags).trim();
+        if (updates.category) job.category = String(updates.category).trim();
+        if (updates.chapters) job.chapters = updates.chapters;
+        if (updates.monetization) job.monetization = updates.monetization;
+        if (updates.thumbnailUrl) job.thumbnailUrl = updates.thumbnailUrl;
+        if (updates.subtitleTracks) (job as any).subtitleTracks = updates.subtitleTracks;
+        this.save();
+        return { ok: true, item: job };
+      }
+    }
+
+    return { ok: false, error: 'Content item not found' };
+  }
+
+  public deleteCreatorStudioContent(creatorDid: string, contentId: string): { ok: boolean; error?: string } {
+    this.load();
+    let found = false;
+    if (this.db.videos) {
+      const idx = this.db.videos.findIndex(v => v.id === contentId);
+      if (idx !== -1) {
+        this.db.videos.splice(idx, 1);
+        found = true;
+      }
+    }
+    if (this.db.studio_jobs) {
+      const idx = this.db.studio_jobs.findIndex(j => j.jobId === contentId);
+      if (idx !== -1) {
+        this.db.studio_jobs.splice(idx, 1);
+        found = true;
+      }
+    }
+    if (found) {
+      this.save();
+      return { ok: true };
+    }
+    return { ok: false, error: 'Content item not found' };
+  }
+
+  public getCreatorStudioComments(creatorDid: string, filter?: string): Array<YoutubeCommentRecord & { videoTitle: string; videoThumbnail: string; hasCreatorReplied: boolean; isQuestion: boolean }> {
+    this.load();
+    const prefix = creatorDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
+    const creatorVideos = (this.db.videos || []).filter(v => typeof v.channelId === 'string' && (v.channelId.includes(prefix) || creatorDid.includes('creator')));
+    const allVideos = creatorVideos.length > 0 ? creatorVideos : (this.db.videos || []).slice(0, 5);
+
+    const result: any[] = [];
+    allVideos.forEach(v => {
+      const comms = this.getVideoComments(v.id);
+      comms.forEach(c => {
+        const hasCreatorReplied = Array.isArray(c.replies) && c.replies.some(r => r.isCreator || r.authorDid === creatorDid);
+        const isQuestion = c.text.includes('?') || /\b(how|what|why|when|where|who|can|is)\b/i.test(c.text);
+        result.push({
+          ...c,
+          videoTitle: v.title,
+          videoThumbnail: v.thumbnailUrl || '/assets/icon.svg',
+          hasCreatorReplied,
+          isQuestion,
+        });
+      });
+    });
+
+    if (filter === 'unanswered') {
+      return result.filter(c => !c.hasCreatorReplied);
+    } else if (filter === 'questions') {
+      return result.filter(c => c.isQuestion);
+    }
+    return result.sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  public getCreatorChannelCustomization(creatorDid: string) {
+    this.load();
+    const user = this.findUserByDid(creatorDid);
+    const stored = (this.db as any).creator_customizations?.[creatorDid] || {};
+    return {
+      channelName: stored.channelName || user?.displayName || user?.name || 'Sovereign Creator Studio',
+      channelHandle: stored.channelHandle || (user?.handle ? user.handle.replace('@', '') : 'creator_studio'),
+      channelBio: stored.channelBio || user?.bio || 'Decentralized P2P streaming node broadcasting 4K video swarms with 95/5 sovereign economics.',
+      channelAvatar: stored.channelAvatar || user?.avatar || '🎬',
+      bannerUrl: stored.bannerUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1600&q=80',
+      watermarkUrl: stored.watermarkUrl || '/assets/icon.svg',
+      trailerVideoId: stored.trailerVideoId || (this.db.videos?.[0]?.id || 'yt-video-1'),
+      featuredVideoId: stored.featuredVideoId || (this.db.videos?.[1]?.id || 'yt-video-2'),
+      externalLinks: stored.externalLinks || [
+        { title: 'Website', url: 'https://sovra.network' },
+        { title: 'GitHub', url: 'https://github.com/sovra/monorepo' },
+        { title: 'Documentation', url: 'https://docs.sovra.network' }
+      ]
+    };
+  }
+
+  public saveCreatorChannelCustomization(creatorDid: string, data: any) {
+    this.load();
+    if (!(this.db as any).creator_customizations) {
+      (this.db as any).creator_customizations = {};
+    }
+    (this.db as any).creator_customizations[creatorDid] = {
+      ...(this.db as any).creator_customizations[creatorDid],
+      ...data,
+      updatedAt: Date.now()
+    };
+    this.save();
+    return { ok: true, customization: (this.db as any).creator_customizations[creatorDid] };
+  }
+
+  public getCreatorAudioLibrary() {
+    return [
+      {
+        id: 'track-cyber-1',
+        title: 'Cyberpunk Neon Pulse',
+        artist: 'Sovereign Audio Collective',
+        genre: 'Cyberpunk',
+        mood: 'High Energy',
+        duration: '02:45',
+        durationSec: 165,
+        license: 'Royalty-Free Creative Commons 4.0',
+        waveform: [25, 45, 60, 85, 95, 75, 90, 100, 80, 65, 90, 85, 70, 45, 60, 75, 90, 65, 40, 20],
+        streamUrl: '/audio/cyberpunk-pulse.mp3'
+      },
+      {
+        id: 'track-lofi-2',
+        title: 'Midnight Decentralized Lo-Fi',
+        artist: 'MeshBeat Records',
+        genre: 'Lo-Fi',
+        mood: 'Chill & Study',
+        duration: '03:12',
+        durationSec: 192,
+        license: 'Royalty-Free Creative Commons 4.0',
+        waveform: [15, 30, 40, 50, 45, 60, 55, 65, 50, 45, 55, 60, 45, 35, 40, 45, 35, 25, 20, 15],
+        streamUrl: '/audio/lofi-mesh.mp3'
+      },
+      {
+        id: 'track-ambient-3',
+        title: 'Sub-Zero DAG Ambience',
+        artist: 'BitSwap Synthesis',
+        genre: 'Ambient',
+        mood: 'Focus & Coding',
+        duration: '04:05',
+        durationSec: 245,
+        license: 'Royalty-Free Creative Commons 4.0',
+        waveform: [10, 20, 30, 35, 40, 42, 45, 48, 50, 45, 42, 40, 38, 35, 30, 25, 20, 15, 12, 10],
+        streamUrl: '/audio/ambient-dag.mp3'
+      },
+      {
+        id: 'track-cinematic-4',
+        title: 'Orchestral Dawn of Web3',
+        artist: 'Protocol Philharmonic',
+        genre: 'Cinematic',
+        mood: 'Epic & Dramatic',
+        duration: '03:30',
+        durationSec: 210,
+        license: 'Royalty-Free Creative Commons 4.0',
+        waveform: [20, 35, 50, 65, 75, 85, 90, 95, 100, 92, 85, 78, 85, 90, 70, 55, 40, 30, 25, 15],
+        streamUrl: '/audio/cinematic-dawn.mp3'
+      },
+      {
+        id: 'track-sfx-5',
+        title: 'Block Confirmation Chime',
+        artist: 'Sovra Studio FX',
+        genre: 'Sound Effects',
+        mood: 'Notification',
+        duration: '00:03',
+        durationSec: 3,
+        license: 'Free Commercial Use',
+        waveform: [10, 60, 100, 80, 50, 20, 5],
+        streamUrl: '/audio/sfx-block-chime.mp3'
+      },
+      {
+        id: 'track-sfx-6',
+        title: 'P2P Swarm Peer Connected Whoosh',
+        artist: 'Sovra Studio FX',
+        genre: 'Sound Effects',
+        mood: 'Transition',
+        duration: '00:02',
+        durationSec: 2,
+        license: 'Free Commercial Use',
+        waveform: [5, 40, 90, 70, 30, 10],
+        streamUrl: '/audio/sfx-whoosh.mp3'
+      }
+    ];
   }
 
   // ==========================================
@@ -6893,7 +7917,12 @@ export class SovraDatabaseEngine {
       status: 'SCHEDULED',
       scheduledStartTime: params.scheduledStartTime || now,
       viewerCount: 0,
+      peakViewers: 0,
+      viewers: [],
       likesCount: 0,
+      tipTotalSov: 0,
+      tips: [],
+      signals: [],
       category: params.category || 'tech',
       createdAt: now,
       updatedAt: now,
@@ -7006,6 +8035,8 @@ export class SovraDatabaseEngine {
       text,
       timestamp: Date.now(),
       isModerator: Boolean(message.isModerator),
+      isTip: Boolean((message as any).isTip),
+      tipAmount: (message as any).tipAmount,
     };
     this.db.live_chat_messages.push(record);
     this.save();
@@ -7022,6 +8053,214 @@ export class SovraDatabaseEngine {
     this.db.live_chat_messages.splice(idx, 1);
     this.save();
     return true;
+  }
+
+  public joinLiveStream(sessionId: string, viewerDid: string): { ok: boolean; session?: LiveSessionRecord; viewerCount: number; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) return { ok: false, viewerCount: 0, error: 'Live sessions not initialized' };
+    const session = this.db.live_sessions.find(s => s.id === sessionId);
+    if (!session) return { ok: false, viewerCount: 0, error: 'Live session not found' };
+
+    if (!Array.isArray(session.viewers)) session.viewers = [];
+    if (!session.viewers.includes(viewerDid)) {
+      session.viewers.push(viewerDid);
+    }
+    session.viewerCount = session.viewers.length;
+    session.peakViewers = Math.max(session.peakViewers || 0, session.viewerCount);
+    session.updatedAt = Date.now();
+    this.save();
+    return { ok: true, session, viewerCount: session.viewerCount };
+  }
+
+  public leaveLiveStream(sessionId: string, viewerDid: string): { ok: boolean; session?: LiveSessionRecord; viewerCount: number; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) return { ok: false, viewerCount: 0, error: 'Live sessions not initialized' };
+    const session = this.db.live_sessions.find(s => s.id === sessionId);
+    if (!session) return { ok: false, viewerCount: 0, error: 'Live session not found' };
+
+    if (Array.isArray(session.viewers)) {
+      session.viewers = session.viewers.filter(d => d !== viewerDid);
+      session.viewerCount = session.viewers.length;
+    } else {
+      session.viewerCount = 0;
+    }
+    session.updatedAt = Date.now();
+    this.save();
+    return { ok: true, session, viewerCount: session.viewerCount };
+  }
+
+  public sendLiveStreamTip(params: {
+    sessionId: string;
+    senderDid: string;
+    senderName?: string;
+    amountSov: number;
+    note?: string;
+  }): { ok: boolean; tip?: LiveTipRecord; tipTotalSov: number; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) return { ok: false, tipTotalSov: 0, error: 'Live sessions not initialized' };
+    const session = this.db.live_sessions.find(s => s.id === params.sessionId);
+    if (!session) return { ok: false, tipTotalSov: 0, error: 'Live session not found' };
+
+    const amount = Number(params.amountSov);
+    if (isNaN(amount) || amount <= 0) {
+      return { ok: false, tipTotalSov: session.tipTotalSov || 0, error: 'amountSov must be a positive number' };
+    }
+
+    const creatorShareSov = Number((amount * 0.95).toFixed(4));
+    const seederShareSov = Number((amount * 0.05).toFixed(4));
+
+    if (!Array.isArray(session.tips)) session.tips = [];
+    const tip: LiveTipRecord = {
+      id: 'ltip-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
+      sessionId: params.sessionId,
+      senderDid: params.senderDid,
+      senderName: params.senderName || 'Anonymous Peer',
+      amountSov: amount,
+      creatorShareSov,
+      seederShareSov,
+      note: params.note,
+      timestamp: Date.now(),
+    };
+    session.tips.push(tip);
+    session.tipTotalSov = Number(((session.tipTotalSov || 0) + amount).toFixed(4));
+    session.updatedAt = Date.now();
+
+    // Record in global tipping ledger
+    this.createTipVoucher({
+      fromDid: params.senderDid,
+      toCreatorDid: session.creatorDid,
+      amountSov: amount,
+      targetType: 'video',
+      targetId: session.id,
+      note: params.note || 'Live Stream Tip',
+    });
+
+    // Add chat message event
+    this.addLiveChatMessage(params.sessionId, {
+      senderDid: params.senderDid,
+      senderHandle: (params.senderName || 'supporter').toLowerCase().replace(/\s+/g, '_'),
+      senderName: params.senderName || 'Supporter',
+      senderAvatar: '⚡',
+      text: `⚡ Sent ${amount.toFixed(2)} SOV Tip! ${params.note ? `"${params.note}"` : ''}`.trim(),
+      isModerator: false,
+      isTip: true,
+      tipAmount: amount,
+    } as any);
+
+    this.save();
+    return { ok: true, tip, tipTotalSov: session.tipTotalSov };
+  }
+
+  public sendLiveStreamSignal(params: {
+    sessionId: string;
+    fromDid: string;
+    toDid?: string;
+    type: 'offer' | 'answer' | 'candidate';
+    payload: any;
+  }): { ok: boolean; signal?: LiveSignalRecord; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) return { ok: false, error: 'Live sessions not initialized' };
+    const session = this.db.live_sessions.find(s => s.id === params.sessionId);
+    if (!session) return { ok: false, error: 'Live session not found' };
+
+    if (!Array.isArray(session.signals)) session.signals = [];
+    const signal: LiveSignalRecord = {
+      id: 'lsig-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
+      sessionId: params.sessionId,
+      fromDid: params.fromDid,
+      toDid: params.toDid,
+      type: params.type,
+      payload: params.payload,
+      timestamp: Date.now(),
+    };
+    session.signals.push(signal);
+    if (session.signals.length > 100) {
+      session.signals = session.signals.slice(-100);
+    }
+    this.save();
+    return { ok: true, signal };
+  }
+
+  public getLiveStreamSignals(sessionId: string, peerDid?: string, since?: number): LiveSignalRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) return [];
+    const session = this.db.live_sessions.find(s => s.id === sessionId);
+    if (!session || !Array.isArray(session.signals)) return [];
+
+    return session.signals.filter(s => {
+      if (since && s.timestamp <= since) return false;
+      if (peerDid && s.toDid && s.toDid !== peerDid && s.fromDid !== peerDid) return false;
+      return true;
+    });
+  }
+
+  public endLiveBroadcast(sessionId: string, requesterDid: string): { ok: boolean; session?: LiveSessionRecord; archiveVideo?: YoutubeVideoRecord; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.live_sessions)) return { ok: false, error: 'Live sessions not initialized' };
+    const session = this.db.live_sessions.find(s => s.id === sessionId);
+    if (!session) return { ok: false, error: 'Live session not found' };
+
+    const isOwner = session.creatorDid === requesterDid || session.creatorDid === 'did:sovra:system' || requesterDid === 'did:sovra:admin';
+    if (!isOwner) {
+      return { ok: false, error: 'Unauthorized: Only broadcaster can end live broadcast' };
+    }
+
+    const now = Date.now();
+    session.status = 'ENDED';
+    session.endedAt = now;
+    if (!session.playbackUrl) {
+      session.playbackUrl = session.streamUrl;
+    }
+    session.updatedAt = now;
+
+    // Archive to Watch VOD catalog
+    const archiveVideoId = 'yt_live_' + now + '_' + crypto.randomBytes(3).toString('hex');
+    const start = session.actualStartTime || session.createdAt || (now - 60000);
+    const durationSec = Math.max(1, Math.round((now - start) / 1000));
+    const durationMins = Math.floor(durationSec / 60);
+    const durationSecs = durationSec % 60;
+    const durationFormatted = `${durationMins}:${durationSecs < 10 ? '0' : ''}${durationSecs}`;
+
+    const archiveVideo: YoutubeVideoRecord = {
+      id: archiveVideoId,
+      title: `[Live Replay] ${session.title}`,
+      description: session.description || `Decentralized live swarm broadcast replay recorded on ${new Date(now).toLocaleDateString()}.`,
+      channelId: session.channelId || `ch_${session.creatorDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 16)}`,
+      channelName: session.creatorName,
+      channelHandle: session.creatorHandle,
+      channelAvatar: session.creatorAvatar,
+      channelVerified: true,
+      subscriberCount: 1,
+      cid: `bafybeilive_${session.id}`,
+      videoUrl: session.playbackUrl || session.streamUrl,
+      hlsMasterUrl: session.playbackUrl,
+      thumbnailUrl: session.thumbnailUrl || '/assets/icon.svg',
+      duration: durationFormatted,
+      durationSeconds: durationSec,
+      durationSec: durationSec,
+      durationFormatted: durationFormatted,
+      views: session.peakViewers || session.viewerCount || 1,
+      viewsCount: session.peakViewers || session.viewerCount || 1,
+      likes: session.likesCount || 0,
+      likesCount: session.likesCount || 0,
+      dislikes: 0,
+      commentsCount: 0,
+      isSubscribed: false,
+      isLiked: false,
+      isDisliked: false,
+      isSaved: false,
+      tags: ['#live', '#replay', '#broadcast', '#sovra'],
+      resolutions: ['1080p', '720p', '480p'],
+      uploadedAt: now,
+      createdAt: now,
+    };
+
+    if (!Array.isArray(this.db.videos)) this.db.videos = [];
+    this.db.videos.unshift(archiveVideo);
+    session.archiveVideoId = archiveVideoId;
+
+    this.save();
+    return { ok: true, session, archiveVideo };
   }
 
   // ==========================================

@@ -1,7 +1,7 @@
-import { SqliteSocialDatabaseEngine } from './database-sqlite.ts';
+import { sovraDb } from './database-engine.ts';
 
-const db = new SqliteSocialDatabaseEngine();
-const users = db.getAllUsers();
-console.log('Total registered users:', users.length);
-console.log('Users list:');
-users.forEach(u => console.log(`  - ${u.handle} (${u.displayName || u.name}) | DID: ${u.did}`));
+const users = sovraDb.getAllUsers();
+console.log('Total users in sovraDb:', users.length);
+for (const u of users) {
+  console.log(` - ${u.handle} | ${u.displayName || u.name} | DID: ${u.did} | token: ${u.sessionToken ? 'YES' : 'NO'}`);
+}
