@@ -3227,20 +3227,21 @@ function renderHtml(
        ======================================================= */
     .sovra-floating-return-pill {
       position: fixed;
-      top: 68px;
-      left: 50%;
-      transform: translateX(-50%);
+      top: 16px;
+      right: 28px;
+      left: auto;
+      transform: none;
       z-index: 99999;
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: rgba(15, 23, 42, 0.92);
+      background: rgba(15, 23, 42, 0.94);
       backdrop-filter: blur(24px) saturate(180%);
       -webkit-backdrop-filter: blur(24px) saturate(180%);
       border: 1.5px solid rgba(56, 189, 248, 0.5);
       border-radius: 999px;
-      padding: 7px 18px;
-      font-size: 0.82rem;
+      padding: 6px 16px;
+      font-size: 0.8rem;
       font-weight: 700;
       color: #38bdf8;
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.65), 0 0 20px rgba(56, 189, 248, 0.35);
@@ -3254,17 +3255,17 @@ function renderHtml(
       background: rgba(30, 41, 59, 0.96);
       border-color: #38bdf8;
       color: #fff;
-      transform: translateX(-50%) translateY(-2px);
+      transform: translateY(-2px);
       box-shadow: 0 10px 35px rgba(56, 189, 248, 0.45);
     }
 
     .sovra-floating-return-pill:active {
-      transform: translateX(-50%) scale(0.96);
+      transform: scale(0.96);
     }
 
     @keyframes sovraPillSlideDown {
-      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      from { opacity: 0; transform: translateY(-14px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes frictionlessPulse {
@@ -14754,13 +14755,13 @@ function renderHtml(
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #c084fc;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span>🔄 Switch Profile / Page</span>
                   </div>
-                  <div class="overflow-menu-item" id="profileWalletMenuItem" role="menuitem" tabindex="0" onclick="openFullPageWallet(); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-                    <span>💳 My Wallet (Full Page)</span>
+                  <!-- Hidden duplicate to preserve ID without visual redundancy -->
+                  <div class="overflow-menu-item" id="profileWalletMenuItem" role="menuitem" tabindex="0" style="display: none;" onclick="openFullPageWallet(); hideProfileOverflowMenu();">
+                    <span>💳 My Wallet</span>
                   </div>
                   <div class="overflow-menu-item" id="profileSettingsMenuItem" role="menuitem" tabindex="0" onclick="openSpatialSettingsSurface(this); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #94a3b8;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                    <span>Account &amp; Security Settings</span>
+                    <span>Account Security &amp; Passkeys</span>
                   </div>
                   <div class="overflow-menu-divider"></div>
                   <div class="overflow-menu-item item-danger" role="menuitem" tabindex="0" onclick="quickLockSession(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
@@ -14807,7 +14808,7 @@ function renderHtml(
                     <div class="stat-top-row">
                       <span class="stat-category-title">Posts</span>
                       <span class="stat-icon-wrap" style="color: #818cf8;">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
                       </span>
                     </div>
                     <div class="stat-number" id="meFeedPostsCount">—</div>
@@ -14857,17 +14858,13 @@ function renderHtml(
               </a>
             </div>
 
-            <!-- Modernized Glassmorphic Profile Bio Container -->
+            <!-- Modernized Glassmorphic Profile Bio Container (Single Authoritative Edit Profile in Header) -->
             <div class="profile-bio-card">
               <div class="profile-bio-header">
                 <div class="profile-bio-title">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                   <span>About &amp; Bio</span>
                 </div>
-                <button type="button" class="profile-bio-edit-btn" onclick="openEditProfileModal()" title="Edit bio &amp; profile information" aria-label="Edit Profile Bio">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  <span>Edit</span>
-                </button>
               </div>
               <div class="profile-bio-text" id="meProfileBio">—</div>
               <div class="profile-bio-badges">
@@ -14893,7 +14890,7 @@ function renderHtml(
           <div class="sovereign-hub-ribbon" onclick="toggleSovereignHubExpanded()">
             <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
               <span style="font-size: 1rem;">🛡️</span>
-              <span style="font-weight: 800; font-size: 0.88rem; color: #f8fafc; letter-spacing: -0.01em;">Account &amp; Creator Studio</span>
+              <span style="font-weight: 800; font-size: 0.88rem; color: #f8fafc; letter-spacing: -0.01em;">Account &amp; Security Settings</span>
               <span class="badge" id="hubGlanceStatusBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.68rem; padding: 2px 7px;">
                 <span class="pulse-dot" id="hubGlancePulseDot" style="width: 6px; height: 6px; background: #10b981; display: inline-block; border-radius: 50%; margin-right: 4px;"></span>
                 <span id="hubGlanceStatusText">Online &bull; Secured</span>
@@ -14901,14 +14898,14 @@ function renderHtml(
             </div>
             
             <div style="display: flex; align-items: center; gap: 8px;">
-              <!-- Quick Glance Telemetry Pills -->
-              <div class="sovereign-hub-glance-pills" style="display: flex; align-items: center; gap: 6px;">
-                <span class="hub-glance-pill" id="hubGlanceLatencyPill" title="Live Network Ping Latency" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #38bdf8; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">
+              <!-- Calm Consumer Security Pill -->
+              <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.72rem; padding: 2px 8px; border-radius: 12px; font-weight: 600;">🔒 Passkey Protected</span>
+              <!-- Raw Telemetry Elements (Preserved in DOM for script health) -->
+              <div class="sovereign-hub-glance-pills" style="display: none;">
+                <span class="hub-glance-pill" id="hubGlanceLatencyPill">
                   <span id="hubGlanceLatency">⚡ 12ms</span>
                 </span>
-                <span class="hub-glance-pill" title="Local Storage Used" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #34d399; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;" id="hubGlanceStorage">
-                  💾 20 MB
-                </span>
+                <span class="hub-glance-pill" id="hubGlanceStorage">💾 20 MB</span>
               </div>
 
               <!-- View Switcher & Expand Toggle -->
@@ -14935,7 +14932,8 @@ function renderHtml(
             <button type="button" class="sovereign-hub-tab-btn" id="hubBtnDisplay" onclick="switchSovereignHubTab('uiDisplayModeCard', this)">
               <span>✨</span> <span>Theme &amp; Display</span>
             </button>
-            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnWallet" onclick="switchSovereignHubTab('walletSettingsCard', this)">
+            <!-- Preserved for ID integrity without redundant duplicate tab -->
+            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnWallet" style="display: none;" onclick="switchSovereignHubTab('walletSettingsCard', this)">
               <span>💳</span> <span>My Wallet</span>
             </button>
             <!-- Node Operator Diagnostic Tabs (Hidden by default for regular citizens) -->
@@ -14960,7 +14958,7 @@ function renderHtml(
                 <span class="badge" id="meCardCryptoBadge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.72rem;">Secured &bull; Verified</span>
               </div>
               <div class="key-val">
-                <span class="key-label">Sovereign ID (DID)</span>
+                <span class="key-label">Sovereign Identity Key (DID)</span>
                 <div class="key-data-copy-row">
                   <span class="key-data" id="meCardDid" style="cursor: pointer; font-family: monospace; font-size: 0.8rem; color: #38bdf8;" onclick="copyCardItem('meCardDid', event)" title="Click to copy full ID">—</span>
                   <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardDid', event)" title="Copy Sovereign ID" aria-label="Copy Sovereign ID">
@@ -14969,27 +14967,36 @@ function renderHtml(
                 </div>
               </div>
               <div class="key-val">
-                <span class="key-label">Device Connection ID</span>
-                <div class="key-data-copy-row">
-                  <span class="key-data" id="meCardPeerId" style="cursor: pointer; font-family: monospace; font-size: 0.8rem; color: #a5b4fc;" onclick="copyCardItem('meCardPeerId', event)" title="Click to copy Device ID">—</span>
-                  <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardPeerId', event)" title="Copy Device Connection ID" aria-label="Copy Device Connection ID">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div class="key-val">
-                <span class="key-label">Device Security Key</span>
-                <div class="key-data-copy-row">
-                  <span class="key-data" id="meCardDeviceKey" style="cursor: pointer; font-family: monospace; font-size: 0.8rem; color: #6ee7b7;" onclick="copyCardItem('meCardDeviceKey', event)" title="Click to copy Security Key">—</span>
-                  <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardDeviceKey', event)" title="Copy Device Security Key" aria-label="Copy Device Security Key">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div class="key-val">
                 <span class="key-label">Connection Security</span>
-                <span class="key-data" id="meCardTransport" style="font-size: 0.82rem; color: #94a3b8;">End-to-End Encrypted (P2P)</span>
+                <span class="key-data" id="meCardTransport" style="font-size: 0.82rem; color: #34d399; font-weight: 600;">End-to-End Encrypted (Hardware Protected)</span>
               </div>
+
+              <!-- Collapsible Advanced Keys (Clean Zero-Friction UX) -->
+              <details style="margin-top: 0.75rem; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 0.6rem;">
+                <summary style="font-size: 0.74rem; color: #94a3b8; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 5px;">
+                  <span>⚙️</span> <span>Advanced Cryptographic Keys &amp; Peer ID</span>
+                </summary>
+                <div style="margin-top: 0.55rem; display: flex; flex-direction: column; gap: 0.55rem;">
+                  <div class="key-val">
+                    <span class="key-label">Device Connection ID</span>
+                    <div class="key-data-copy-row">
+                      <span class="key-data" id="meCardPeerId" style="cursor: pointer; font-family: monospace; font-size: 0.78rem; color: #a5b4fc;" onclick="copyCardItem('meCardPeerId', event)" title="Click to copy Device ID">—</span>
+                      <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardPeerId', event)" title="Copy Device Connection ID" aria-label="Copy Device Connection ID">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="key-val">
+                    <span class="key-label">Device Security Key</span>
+                    <div class="key-data-copy-row">
+                      <span class="key-data" id="meCardDeviceKey" style="cursor: pointer; font-family: monospace; font-size: 0.78rem; color: #6ee7b7;" onclick="copyCardItem('meCardDeviceKey', event)" title="Click to copy Security Key">—</span>
+                      <button type="button" class="key-copy-btn" onclick="copyCardItem('meCardDeviceKey', event)" title="Copy Device Security Key" aria-label="Copy Device Security Key">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </details>
             </div>
             <div class="card-footer-actions">
               <button type="button" class="btn-card-action" onclick="openSovereignIdCardModal()" style="background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;">
@@ -27782,20 +27789,20 @@ function renderHtml(
           badge.innerText = 'Verified';
         }
         if (cardBadge) {
-          cardBadge.innerHTML = '✓ Enclave Verified (' + localProof.durationMs + 'ms)';
+          cardBadge.innerHTML = '✓ Biometric Enclave Verified';
           cardBadge.style.color = '#34d399';
           cardBadge.style.borderColor = 'rgba(52, 211, 153, 0.4)';
           cardBadge.style.background = 'rgba(16, 185, 129, 0.15)';
         }
         if (badgeBtn) {
-          badgeBtn.title = 'Cryptographically Verified Sovereign DID — Enclave (' + localProof.durationMs + 'ms)';
+          badgeBtn.title = 'Cryptographically Verified Sovereign DID — Hardware Protected';
           badgeBtn.style.borderColor = 'rgba(52, 211, 153, 0.4)';
           badgeBtn.style.color = '#34d399';
         }
         if (checkmark) checkmark.style.display = 'inline-block';
         if (profile) profile.isVerified = true;
         if (typeof showAccountToast === 'function') {
-          showAccountToast('🛡️ WebCrypto Hardware Enclave Verified: Cryptographic signature matches ' + localProof.did.slice(0, 16) + '... (' + localProof.durationMs + 'ms)', 'success');
+          showAccountToast('🛡️ Biometric Hardware Enclave Verified: Cryptographic signature verified', 'success');
         }
         return;
       }
@@ -28134,7 +28141,7 @@ function renderHtml(
 
       const cardTransport = document.getElementById('meCardTransport');
       if (cardTransport) {
-        const cipherName = (window.crypto && window.crypto.subtle) ? 'Noise_XX (ChaCha20-Poly1305) • WebCrypto Active' : 'Noise_XX P2P (Local E2EE)';
+        const cipherName = (window.crypto && window.crypto.subtle) ? 'End-to-End Encrypted (Hardware Protected)' : 'End-to-End Encrypted (P2P Mesh)';
         cardTransport.innerHTML = '<span style="color: #34d399; font-weight: 600;">● ' + cipherName + '</span>';
       }
 
@@ -49558,9 +49565,7 @@ function renderHtml(
           '</div>' +
         '</div>' +
         '<div style="display: flex; gap: 8px; align-items: center; margin-top: 0.6rem; flex-wrap: wrap;">' +
-          '<button type="button" class="btn btn-primary" onclick="openCreateChannelModal()" style="padding: 7px 15px; font-size: 0.78rem; border-radius: 9px; background: rgba(56, 189, 248, 0.22); border: 1px solid rgba(56, 189, 248, 0.5); color: #38bdf8; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">📢 + Create Channel</button>' +
-          '<button type="button" class="btn btn-secondary" onclick="openCreatePageModal()" style="padding: 7px 15px; font-size: 0.78rem; border-radius: 9px; background: rgba(192, 132, 252, 0.18); border: 1px solid rgba(192, 132, 252, 0.45); color: #c084fc; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">🏢 + Create Page</button>' +
-          '<button type="button" class="btn btn-primary" onclick="openVideoUploadModal()" style="padding: 7px 15px; font-size: 0.78rem; border-radius: 9px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(244, 63, 94, 0.32)); border: 1px solid rgba(239, 68, 68, 0.5); color: #fecdd3; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">🎬 + Pro Studio Video Upload</button>' +
+          '<button type="button" class="btn btn-primary" onclick="openVideoUploadModal()" style="padding: 7px 16px; font-size: 0.78rem; border-radius: 9px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(244, 63, 94, 0.32)); border: 1px solid rgba(239, 68, 68, 0.5); color: #fecdd3; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">🎬 + Pro Studio Video Upload</button>' +
         '</div>' +
         '</div>';
 
@@ -49607,11 +49612,10 @@ function renderHtml(
           '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; flex-wrap: wrap; gap: 6px;">' +
             '<div style="font-size: 0.72rem; color: #64748b;">📢 1-to-many broadcast channel &bull; Zero censorship</div>' +
             '<div style="display: flex; gap: 6px; align-items: center;">' +
-              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-weight: 600; cursor: pointer;" data-entity-type="channel" data-entity-id="' + c.id + '" onclick="openVideoUploadModal(this.dataset.entityType, this.dataset.entityId)">🎬 + Upload Video</button>' +
-              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openSpatialChannelManageSurface(this.dataset.channelId, this)">⚙️ Studio</button>' +
-              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 600; cursor: pointer;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">📢 Broadcast</button>' +
-              '<button type="button" class="btn btn-primary" style="padding: 4px 12px; font-size: 0.74rem; border-radius: 8px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #f1f5f9; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">Room</button>' +
-              '<button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this channel" data-type="channel" data-id="' + c.id + '" data-name="' + (c.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
+              '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.75rem; border-radius: 8px; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 700; cursor: pointer;" data-entity="channel:' + c.id + '" onclick="publishAsEntity(this.dataset.entity)">📢 Broadcast</button>' +
+              '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.75rem; border-radius: 8px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openSpatialChannelManageSurface(this.dataset.channelId, this)">⚙️ Studio</button>' +
+              '<button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.75rem; border-radius: 8px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #f1f5f9; cursor: pointer;" data-channel-id="' + c.id + '" onclick="openChannelRoom(this.dataset.channelId)">🎙️ Audio Stage</button>' +
+              '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.75rem; border-radius: 8px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this channel" data-type="channel" data-id="' + c.id + '" data-name="' + (c.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
             '</div>' +
           '</div>' +
         '</div>';
@@ -49641,14 +49645,13 @@ function renderHtml(
           '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; flex-wrap: wrap; gap: 6px;">' +
             '<div style="font-size: 0.72rem; color: #64748b;">🏢 Official Verified Page &bull; ' + (p.count ? p.count.toLocaleString() : '1') + ' followers</div>' +
             '<div style="display: flex; gap: 6px; align-items: center;">' +
-              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-weight: 600; cursor: pointer;" data-entity-type="page" data-entity-id="' + p.id + '" onclick="openVideoUploadModal(this.dataset.entityType, this.dataset.entityId)">🎬 + Upload Video</button>' +
-              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; cursor: pointer;" data-page-id="' + p.id + '" onclick="openPublicPageShowcase(this.dataset.pageId)">👁️ Showcase</button>' +
-              '<button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; cursor: pointer;" data-page-id="' + p.id + '" onclick="openSpatialPageManageSurface(this.dataset.pageId, this)">⚙️ Studio</button>' +
+              '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.75rem; border-radius: 8px; background: rgba(192, 132, 252, 0.15); border: 1px solid rgba(192, 132, 252, 0.4); color: #c084fc; font-weight: 600; cursor: pointer;" data-page-id="' + p.id + '" onclick="openPublicPageShowcase(this.dataset.pageId)">👁️ Showcase</button>' +
+              '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.75rem; border-radius: 8px; background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; cursor: pointer;" data-page-id="' + p.id + '" onclick="openSpatialPageManageSurface(this.dataset.pageId, this)">⚙️ Studio</button>' +
               (isCurrentActive
-                ? '<button type="button" class="btn btn-primary" style="padding: 4px 12px; font-size: 0.74rem; border-radius: 8px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80; cursor: pointer;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">✓ Active</button>'
-                : '<button type="button" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.74rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12); cursor: pointer;" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">🔄 Switch</button>'
+                ? '<button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.75rem; border-radius: 8px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80; cursor: pointer;" data-persona="personal" onclick="switchToPersona(this.dataset.persona)">✓ Active</button>'
+                : '<button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.75rem; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.35); color: #c084fc; background: rgba(192, 132, 252, 0.12); cursor: pointer;" data-persona="page:' + p.id + '" onclick="switchToPersona(this.dataset.persona)">🔄 Switch</button>'
               ) +
-              '<button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.74rem; border-radius: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this page" data-type="page" data-id="' + p.id + '" data-name="' + (p.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
+              '<button type="button" class="btn btn-danger" style="padding: 5px 8px; font-size: 0.75rem; border-radius: 8px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer;" title="Delete this page" data-type="page" data-id="' + p.id + '" data-name="' + (p.name || '').replace(/"/g, '&quot;') + '" onclick="deleteEntityPrompt(this.dataset.type, this.dataset.id, this.dataset.name)">🗑️</button>' +
             '</div>' +
           '</div>' +
         '</div>';
