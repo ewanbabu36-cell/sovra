@@ -11,7 +11,25 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { sovraDb, type ReelRecord, type YoutubeVideoRecord } from '../database-engine.ts';
+import { VideoTranscodePipeline } from '../video-transcode-pipeline.ts';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
+
+export interface ActiveResumableUpload {
+  uploadId: string;
+  ownerDid: string;
+  title: string;
+  fileSize: number;
+  mimeType: string;
+  receivedBytes: number;
+  chunkCount: number;
+  stagingDir: string;
+  stagingFile: string;
+  metadata: Record<string, any>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export const activeResumableUploads = new Map<string, ActiveResumableUpload>();
 
 export interface VideoRouteContext {
   req: http.IncomingMessage;
@@ -143,8 +161,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     return true;
   }
 
-  // Stream Reel Video Chunks (HTTP 206 Partial Content)
-  if (url.pathname.startsWith('/api/reels/video/') && req.method === 'GET') {
+  // Stream Reel & Watch Video Chunks (HTTP 206 Partial Content)
+  if ((url.pathname.startsWith('/api/reels/video/') || url.pathname.startsWith('/api/watch/video/') || url.pathname.startsWith('/api/video/stream/')) && req.method === 'GET') {
     const cid = path.basename(url.pathname);
     if (!cid || cid.includes('..') || cid.includes('/') || cid.includes('\\')) {
       res.writeHead(400, { 'Content-Type': 'text/plain' });
@@ -337,7 +355,355 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     return true;
   }
 
-  // Upload Watch Video
+  // ==========================================
+  // 3. RESUMABLE CHUNKED VIDEO INGESTION & ABR HLS PIPELINE
+  // ==========================================
+
+  // 3.1 Initialize Resumable Upload Session
+  if (url.pathname === '/api/videos/upload/init' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 1024 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const title = String(parsed.title || '').trim();
+      if (!title) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Video title is required' }));
+        return true;
+      }
+
+      const fileSize = Number(parsed.fileSize || 0);
+      const mimeType = String(parsed.mimeType || 'video/mp4');
+      const uploadId = 'upl_' + Date.now() + '_' + crypto.randomBytes(6).toString('hex');
+      const stagingDir = path.join(REELS_DIR, 'staging', uploadId);
+      if (!fs.existsSync(stagingDir)) fs.mkdirSync(stagingDir, { recursive: true });
+      const stagingFile = path.join(stagingDir, 'upload.raw');
+
+      if (fs.existsSync(stagingFile)) fs.unlinkSync(stagingFile);
+
+      const session: ActiveResumableUpload = {
+        uploadId,
+        ownerDid: principal.did,
+        title,
+        fileSize,
+        mimeType,
+        receivedBytes: 0,
+        chunkCount: 0,
+        stagingDir,
+        stagingFile,
+        metadata: parsed,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      activeResumableUploads.set(uploadId, session);
+
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        uploadId,
+        chunkSize: 8 * 1024 * 1024,
+        totalBytes: fileSize,
+      }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to initialize upload session' }));
+    }
+    return true;
+  }
+
+  // 3.2 Stream Upload Chunk (Zero-RAM Streaming Directly to Staging File)
+  if (url.pathname === '/api/videos/upload/chunk' && (req.method === 'PATCH' || req.method === 'PUT' || req.method === 'POST')) {
+    const uploadId = url.searchParams.get('uploadId') || String(req.headers['x-upload-id'] || '');
+    const session = activeResumableUploads.get(uploadId);
+    if (!session) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Upload session not found or expired' }));
+      return true;
+    }
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const fileStream = fs.createWriteStream(session.stagingFile, { flags: 'a' });
+        let bytesWritten = 0;
+
+        req.on('data', chunk => {
+          bytesWritten += chunk.length;
+        });
+
+        req.pipe(fileStream);
+
+        fileStream.on('finish', () => {
+          session.receivedBytes += bytesWritten;
+          session.chunkCount += 1;
+          session.updatedAt = Date.now();
+          resolve();
+        });
+
+        fileStream.on('error', err => reject(err));
+        req.on('error', err => reject(err));
+      });
+
+      const progressPercent = session.fileSize > 0
+        ? Math.min(100, Math.round((session.receivedBytes / session.fileSize) * 100))
+        : 100;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        uploadId: session.uploadId,
+        bytesReceived: session.receivedBytes,
+        totalBytes: session.fileSize,
+        chunkCount: session.chunkCount,
+        progressPercent,
+      }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Chunk write failure' }));
+    }
+    return true;
+  }
+
+  // 3.3 Query Resumable Upload Status (For Instant Network Reconnect Resume)
+  if (url.pathname === '/api/videos/upload/status' && req.method === 'GET') {
+    const uploadId = url.searchParams.get('uploadId') || '';
+    const session = activeResumableUploads.get(uploadId);
+    if (!session) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Upload session not found' }));
+      return true;
+    }
+
+    let currentDiskSize = session.receivedBytes;
+    if (fs.existsSync(session.stagingFile)) {
+      try {
+        currentDiskSize = fs.statSync(session.stagingFile).size;
+        session.receivedBytes = currentDiskSize;
+      } catch (_) {}
+    }
+
+    const progressPercent = session.fileSize > 0
+      ? Math.min(100, Math.round((currentDiskSize / session.fileSize) * 100))
+      : 100;
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      uploadId: session.uploadId,
+      bytesReceived: currentDiskSize,
+      totalBytes: session.fileSize,
+      progressPercent,
+      chunkCount: session.chunkCount,
+      isComplete: session.fileSize > 0 && currentDiskSize >= session.fileSize,
+    }));
+    return true;
+  }
+
+  // 3.4 Complete Resumable Upload & Dispatch Background ABR Transcoder
+  if (url.pathname === '/api/videos/upload/complete' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 1024 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const uploadId = String(parsed.uploadId || url.searchParams.get('uploadId') || '');
+      const session = activeResumableUploads.get(uploadId);
+      if (!session) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Upload session not found or already finalized' }));
+        return true;
+      }
+
+      if (!fs.existsSync(session.stagingFile)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Staging video file not found on disk' }));
+        return true;
+      }
+
+      const actualSize = fs.statSync(session.stagingFile).size;
+      const ext = session.mimeType.includes('webm') ? 'webm' : 'mp4';
+
+      // Compute SHA-256 for Content-Addressed CID
+      const hash = crypto.createHash('sha256');
+      const readStream = fs.createReadStream(session.stagingFile);
+      await new Promise<void>((resolve, reject) => {
+        readStream.on('data', chunk => hash.update(chunk));
+        readStream.on('end', () => resolve());
+        readStream.on('error', err => reject(err));
+      });
+      const cid = 'bafy' + hash.digest('hex').substring(0, 32);
+
+      if (!fs.existsSync(REELS_DIR)) fs.mkdirSync(REELS_DIR, { recursive: true });
+      const finalRawPath = path.join(REELS_DIR, `${cid}.${ext}`);
+
+      // Atomically move from staging to permanent raw storage
+      fs.renameSync(session.stagingFile, finalRawPath);
+
+      // Clean up staging directory
+      try {
+        if (fs.existsSync(session.stagingDir)) {
+          fs.rmSync(session.stagingDir, { recursive: true, force: true });
+        }
+      } catch (_) {}
+
+      const meta = session.metadata || {};
+      const user = sovraDb.findUserByDid(session.ownerDid);
+
+      const video = sovraDb.createVideo({
+        ownerDid: session.ownerDid,
+        channelName: meta.channelName || user?.displayName || 'Verified Creator',
+        channelHandle: meta.channelHandle || user?.handle || 'creator',
+        channelAvatar: user?.avatar || '🎬',
+        title: session.title,
+        description: String(meta.description || session.title),
+        duration: String(meta.duration || '10:00'),
+        durationSeconds: Number(meta.durationSeconds || 600),
+        tags: Array.isArray(meta.tags) ? meta.tags : ['#sovra', '#p2p', '#watch'],
+        category: meta.category || 'Technology',
+        cid,
+        videoUrl: `/api/watch/video/${cid}`,
+        videoPath: finalRawPath,
+        videoMimeType: session.mimeType,
+        visibility: meta.visibility || 'public',
+        paywallFee: typeof meta.paywallFee === 'number' ? meta.paywallFee : 0,
+        tippingEnabled: meta.tippingEnabled !== false,
+        relatedVideoId: meta.relatedVideoId,
+        entityType: meta.entityType || 'personal',
+        entityId: meta.entityId,
+      });
+
+      // Update record with raw file size and processing status
+      sovraDb.updateVideo(video.id, {
+        status: 'processing',
+        transcodeProgress: 15,
+        rawFileSize: actualSize,
+        hlsMasterUrl: `/api/videos/hls/${encodeURIComponent(video.id)}/master.m3u8`,
+        storyboardUrl: `/api/videos/storyboard/${encodeURIComponent(video.id)}/storyboard.vtt`,
+      });
+
+      // Dispatch background ABR HLS transcode job
+      const baseStorage = path.dirname(REELS_DIR);
+      VideoTranscodePipeline.processVideo(video.id, finalRawPath, {
+        outputDir: baseStorage,
+        storageDaemon,
+      }).catch(transcodeErr => {
+        console.error(`[Transcoder] Background transcode job error for ${video.id}:`, transcodeErr);
+      });
+
+      activeResumableUploads.delete(uploadId);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        videoId: video.id,
+        cid: video.cid,
+        video,
+        status: 'processing',
+        hlsMasterUrl: `/api/videos/hls/${encodeURIComponent(video.id)}/master.m3u8`,
+        storyboardUrl: `/api/videos/storyboard/${encodeURIComponent(video.id)}/storyboard.vtt`,
+        message: 'Resumable upload completed. Multi-resolution ABR HLS transcoding running in background.',
+      }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to complete resumable upload' }));
+    }
+    return true;
+  }
+
+  // ==========================================
+  // 4. HLS STREAMING & STORYBOARD SERVING ROUTES
+  // ==========================================
+
+  // 4.1 Serve HLS Master Playlist & Variant Playlists
+  if (url.pathname.startsWith('/api/videos/hls/') && req.method === 'GET') {
+    const parts = url.pathname.replace('/api/videos/hls/', '').split('/');
+    const videoId = parts[0];
+    const filename = parts[1] || 'master.m3u8';
+    const baseStorage = path.dirname(REELS_DIR);
+    const targetFile = path.join(baseStorage, 'hls', videoId, filename);
+
+    if (fs.existsSync(targetFile)) {
+      const mime = filename.endsWith('.m3u8')
+        ? 'application/vnd.apple.mpegurl'
+        : filename.endsWith('.ts')
+          ? 'video/mp2t'
+          : 'video/mp4';
+
+      res.writeHead(200, {
+        'Content-Type': mime,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': filename.endsWith('.m3u8') ? 'no-cache' : 'public, max-age=86400',
+      });
+      fs.createReadStream(targetFile).pipe(res);
+      return true;
+    }
+
+    // Dynamic Fallback Master Playlist if transcode is still in progress
+    if (filename === 'master.m3u8') {
+      const fallbackMaster = [
+        '#EXTM3U',
+        '#EXT-X-VERSION:3',
+        '#EXT-X-INDEPENDENT-SEGMENTS',
+        '#EXT-X-STREAM-INF:BANDWIDTH=4500000,RESOLUTION=1920x1080,CODECS="avc1.64002a,mp4a.40.2"',
+        `/api/videos/hls/${encodeURIComponent(videoId)}/1080p.m3u8`,
+        '#EXT-X-STREAM-INF:BANDWIDTH=2200000,RESOLUTION=1280x720,CODECS="avc1.4d401f,mp4a.40.2"',
+        `/api/videos/hls/${encodeURIComponent(videoId)}/720p.m3u8`,
+        ''
+      ].join('\n');
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.apple.mpegurl',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(fallbackMaster);
+      return true;
+    }
+
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('HLS asset not found');
+    return true;
+  }
+
+  // 4.2 Serve Storyboard Timeline Scrub WebVTT & Thumbnail Images
+  if (url.pathname.startsWith('/api/videos/storyboard/') && req.method === 'GET') {
+    const parts = url.pathname.replace('/api/videos/storyboard/', '').split('/');
+    const videoId = parts[0];
+    const filename = parts[1] || 'storyboard.vtt';
+    const baseStorage = path.dirname(REELS_DIR);
+    const targetFile = path.join(baseStorage, 'storyboards', videoId, filename);
+
+    if (fs.existsSync(targetFile)) {
+      const mime = filename.endsWith('.vtt')
+        ? 'text/vtt; charset=utf-8'
+        : filename.endsWith('.webp')
+          ? 'image/webp'
+          : 'image/jpeg';
+      res.writeHead(200, {
+        'Content-Type': mime,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=86400',
+      });
+      fs.createReadStream(targetFile).pipe(res);
+      return true;
+    }
+
+    // Default dynamic WebVTT fallback
+    if (filename.endsWith('.vtt')) {
+      const vtt = 'WEBVTT\n\n00:00:00.000 --> 01:00:00.000\n#thumb\n';
+      res.writeHead(200, {
+        'Content-Type': 'text/vtt; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(vtt);
+      return true;
+    }
+
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Storyboard not found');
+    return true;
+  }
+
+  // Upload Watch Video (Legacy Single-Shot)
   if ((url.pathname === '/api/youtube/upload' || url.pathname === '/api/watch/upload') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 50 * 1024 * 1024);
     if (!ok) return true;
@@ -353,8 +719,10 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
         return true;
       }
 
-      let cid = '';
+      let cid = parsed.cid ? String(parsed.cid) : '';
       let mimeType = parsed.mimeType || 'video/mp4';
+      let videoUrl: string | undefined = parsed.videoUrl ? String(parsed.videoUrl) : undefined;
+      let videoPath: string | undefined = parsed.videoPath ? String(parsed.videoPath) : undefined;
       const rawMedia = parsed.videoData || parsed.mediaBase64 || parsed.content;
       if (rawMedia && typeof rawMedia === 'string') {
         let base64Data = rawMedia;
@@ -383,10 +751,13 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
         const filePath = path.join(REELS_DIR, `${cid}.${ext}`);
         fs.writeFileSync(filePath, fileBuffer);
 
+        videoPath = filePath;
+        videoUrl = `/api/watch/video/${cid}`;
+
         try {
           if (storageDaemon) await storageDaemon.putBlock(cid, fileBuffer);
         } catch {}
-      } else {
+      } else if (!cid) {
         cid = 'bafy' + crypto.randomBytes(16).toString('hex');
       }
 
@@ -395,9 +766,9 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
 
       const user = sovraDb.findUserByDid(principal.did);
       const video = sovraDb.createVideo({
-        creatorDid: principal.did,
-        channelName: user?.displayName || principal.displayName || 'You',
-        channelHandle: user?.handle || principal.handle || 'you_peer',
+        ownerDid: principal.did,
+        channelName: parsed.channelName || user?.displayName || principal.displayName || 'You',
+        channelHandle: parsed.channelHandle || user?.handle || principal.handle || 'you_peer',
         channelAvatar: user?.avatar || '🎬',
         title,
         description: String(parsed.description || ''),
@@ -407,6 +778,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
         entityId,
         tags: Array.isArray(parsed.tags) ? parsed.tags : ['#sovra'],
         cid,
+        videoUrl,
+        videoPath,
         videoMimeType: mimeType,
       });
 

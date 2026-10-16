@@ -618,7 +618,7 @@ export class SqliteSocialDatabaseEngine {
   }
 
   public getAllUsers(): UserRecord[] {
-    const rows = this.db.prepare('SELECT * FROM users ORDER BY created_at DESC').all() as any[];
+    const rows = this.prepareCached('SELECT * FROM users ORDER BY created_at DESC').all() as any[];
     return rows.map(r => this.mapUserRow(r));
   }
 
@@ -788,17 +788,17 @@ export class SqliteSocialDatabaseEngine {
   }
 
   public unfollowUser(followerDid: string, targetDid: string): { ok: boolean; following: boolean } {
-    const res = this.db.prepare('DELETE FROM follows WHERE follower_did = ? AND target_did = ?').run(followerDid, targetDid);
+    const res = this.prepareCached('DELETE FROM follows WHERE follower_did = ? AND target_did = ?').run(followerDid, targetDid);
     return { ok: true, following: false };
   }
 
   public isFollowing(followerDid: string, targetDid: string): boolean {
-    const row = this.db.prepare('SELECT 1 FROM follows WHERE follower_did = ? AND target_did = ?').get(followerDid, targetDid);
+    const row = this.prepareCached('SELECT 1 FROM follows WHERE follower_did = ? AND target_did = ?').get(followerDid, targetDid);
     return !!row;
   }
 
   public getFollowers(targetDid: string): UserRecord[] {
-    const rows = this.db.prepare(`
+    const rows = this.prepareCached(`
       SELECT u.* FROM users u
       JOIN follows f ON u.did = f.follower_did
       WHERE f.target_did = ?
@@ -808,7 +808,7 @@ export class SqliteSocialDatabaseEngine {
   }
 
   public getFollowing(followerDid: string): UserRecord[] {
-    const rows = this.db.prepare(`
+    const rows = this.prepareCached(`
       SELECT u.* FROM users u
       JOIN follows f ON u.did = f.target_did
       WHERE f.follower_did = ?
@@ -818,8 +818,8 @@ export class SqliteSocialDatabaseEngine {
   }
 
   public getFollowStats(did: string): { followersCount: number; followingCount: number } {
-    const followers = (this.db.prepare('SELECT COUNT(*) as c FROM follows WHERE target_did = ?').get(did) as any)?.c || 0;
-    const following = (this.db.prepare('SELECT COUNT(*) as c FROM follows WHERE follower_did = ?').get(did) as any)?.c || 0;
+    const followers = (this.prepareCached('SELECT COUNT(*) as c FROM follows WHERE target_did = ?').get(did) as any)?.c || 0;
+    const following = (this.prepareCached('SELECT COUNT(*) as c FROM follows WHERE follower_did = ?').get(did) as any)?.c || 0;
     return { followersCount: followers, followingCount: following };
   }
 
@@ -1030,7 +1030,7 @@ export class SqliteSocialDatabaseEngine {
   }
 
   public getNotifications(recipientDid: string): { notifications: NotificationRecord[]; unreadCount: number } {
-    const rows = this.db.prepare('SELECT * FROM notifications WHERE recipient_did = ? ORDER BY created_at DESC LIMIT 100').all(recipientDid) as any[];
+    const rows = this.prepareCached('SELECT * FROM notifications WHERE recipient_did = ? ORDER BY created_at DESC LIMIT 100').all(recipientDid) as any[];
     const notifs: NotificationRecord[] = rows.map(r => ({
       id: r.id,
       recipientDid: r.recipient_did,

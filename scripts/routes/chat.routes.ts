@@ -142,6 +142,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       return true;
     }
     const userDid = principal.did;
+    try { sovraDb.purgeExpiredDisappearingMessages(); } catch (_) {}
     const since = Number(url.searchParams.get('since') || 0);
     const targetThreadId = url.searchParams.get('threadId') || undefined;
     let messages = sovraDb.getState().chatMessages;
@@ -239,6 +240,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
             dataUrl,
             cid: realCid,
             url: `/api/chat/attachment/${realCid}?name=${encodeURIComponent(safeName)}`,
+            isViewOnce: Boolean(parsed.isViewOnce || parsed.attachment.isViewOnce),
           };
         } else if (parsed.attachment.cid) {
           validAttachment = {
@@ -248,6 +250,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
             dataUrl,
             cid: String(parsed.attachment.cid),
             url: `/api/chat/attachment/${parsed.attachment.cid}?name=${encodeURIComponent(safeName)}`,
+            isViewOnce: Boolean(parsed.isViewOnce || parsed.attachment.isViewOnce),
           };
         } else if (dataUrl) {
           validAttachment = {
@@ -255,11 +258,13 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
             type: mimeType,
             size,
             dataUrl,
+            isViewOnce: Boolean(parsed.isViewOnce || parsed.attachment.isViewOnce),
           };
         }
       }
 
       const isE2EE = Boolean(parsed.isE2EE);
+      const isViewOnceMsg = Boolean(parsed.isViewOnce || (validAttachment && validAttachment.isViewOnce));
       const record = sovraDb.appendMessage({
         id: parsed.id,
         senderDid: principal.did,
@@ -278,8 +283,21 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         tagHex: String(parsed.tagHex || ''),
         disappearingDurationSec: Number(parsed.disappearingDurationSec || 0),
         isBitChat: Boolean(parsed.isBitChat),
+        isViewOnce: isViewOnceMsg,
+        isSealedSender: Boolean(parsed.isSealedSender),
+        sealedDeliveryToken: parsed.sealedDeliveryToken ? String(parsed.sealedDeliveryToken) : undefined,
         hopCount: Number(parsed.hopCount || 1),
         route: Array.isArray(parsed.route) ? parsed.route : undefined,
+        replyTo: parsed.replyTo && typeof parsed.replyTo === 'object' ? {
+          id: String(parsed.replyTo.id || ''),
+          senderDid: String(parsed.replyTo.senderDid || ''),
+          senderName: String(parsed.replyTo.senderName || 'Peer'),
+          text: String(parsed.replyTo.text || ''),
+          isAudio: Boolean(parsed.replyTo.isAudio),
+          attachmentName: parsed.replyTo.attachmentName ? String(parsed.replyTo.attachmentName) : undefined
+        } : undefined,
+        caption: parsed.caption ? String(parsed.caption) : undefined,
+        isForwarded: Boolean(parsed.isForwarded),
       });
 
       if (record && record.recipientDid && !record.recipientDid.startsWith('channel:')) {
@@ -378,6 +396,77 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     return true;
   }
 
+  // 4B. Signal View-Once Media Burn on Open
+  if ((url.pathname === '/api/chat/viewonce/open' || url.pathname === '/api/chat/view-once/burn' || url.pathname === '/api/chat/viewonce/burn') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+      const messageId = String(parsed.messageId || '');
+      if (!messageId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'messageId is required' }));
+        return true;
+      }
+      const result = sovraDb.markViewOnceOpened(messageId, principal.did);
+      if (result.ok && result.message) {
+        broadcastChatEvent(result.message.recipientDid, { messageId, isViewed: true, text: result.message.text }, 'viewonce_opened');
+        broadcastChatEvent(result.message.senderDid, { messageId, isViewed: true, text: result.message.text }, 'viewonce_opened');
+      }
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: e?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 4C. Signal Safety Numbers & Cryptographic Verification
+  if (url.pathname === '/api/chat/safety-number/verify' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+      const { peerDid, isVerified, fingerprint } = parsed;
+      if (!peerDid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'peerDid is required' }));
+        return true;
+      }
+      sovraDb.setContactSafetyVerification(principal.did, String(peerDid), Boolean(isVerified), fingerprint ? String(fingerprint) : undefined);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, peerDid, isVerified: Boolean(isVerified) }));
+    } catch (e: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: e?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  if (url.pathname === '/api/chat/safety-number/status' && req.method === 'GET') {
+    const principal = resolvePrincipal(req);
+    if (!principal) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+      return true;
+    }
+    const peerDid = url.searchParams.get('peerDid');
+    if (!peerDid) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'peerDid is required' }));
+      return true;
+    }
+    const status = sovraDb.getContactSafetyVerification(principal.did, peerDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, peerDid, ...status }));
+    return true;
+  }
+
   // 5. Message Reaction
   if (url.pathname === '/api/chat/reaction' && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
@@ -473,8 +562,201 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       }
 
       const updatedCount = sovraDb.updateMessagesReceipt(messageIds, status);
+
+      // Instant SSE push to original senders so ticks turn blue/grey in real-time
+      try {
+        const allMsgs = sovraDb.getState().chatMessages;
+        const targetSenders = new Set<string>();
+        for (const id of messageIds) {
+          const m = allMsgs.find(x => x.id === id);
+          if (m && m.senderDid && m.senderDid !== principal.did) {
+            targetSenders.add(m.senderDid);
+          }
+        }
+        for (const senderDid of targetSenders) {
+          broadcastChatEvent(senderDid, {
+            type: 'chat_receipt',
+            messageIds,
+            status,
+            readerDid: principal.did,
+            timestamp: Date.now(),
+          }, 'chat_receipt');
+        }
+      } catch (_) {}
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, updatedCount, status, messageIds }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 7.1 Real-Time Typing & Recording Indicator Broadcast
+  if (url.pathname === '/api/chat/typing' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const recipientDid = String(parsed.recipientDid || '');
+      const isTyping = Boolean(parsed.isTyping);
+      const isRecording = Boolean(parsed.isRecording);
+
+      if (recipientDid) {
+        broadcastChatEvent(recipientDid, {
+          type: 'typing',
+          senderDid: principal.did,
+          senderName: parsed.senderName || 'Peer',
+          isTyping,
+          isRecording,
+          timestamp: Date.now(),
+        }, 'typing');
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, recipientDid, isTyping, isRecording }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 7.2 In-Place Message Edit (WhatsApp 15-Minute Window)
+  if (url.pathname === '/api/chat/edit' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const messageId = String(parsed.messageId || parsed.id || '');
+      const newText = String(parsed.text || parsed.newText || '').trim();
+
+      if (!messageId || !newText) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'messageId and newText are required' }));
+        return true;
+      }
+
+      const result = sovraDb.editChatMessage(messageId, principal.did, newText);
+      if (!result.ok || !result.message) {
+        const statusCode = result.error?.includes('Forbidden') ? 403 : (result.error?.includes('expired') ? 400 : 404);
+        res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: result.error }));
+        return true;
+      }
+
+      // Broadcast edit to recipient
+      broadcastChatEvent(result.message.recipientDid, {
+        type: 'chat_edit',
+        message: result.message,
+      }, 'chat_edit');
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, message: result.message }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 7.3 Message Pinning to Thread Header
+  if (url.pathname === '/api/chat/pin' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const messageId = String(parsed.messageId || parsed.id || '');
+      const threadId = String(parsed.threadId || '');
+      const recipientDid = String(parsed.recipientDid || '');
+
+      const result = sovraDb.pinChatMessage(threadId, messageId, principal.did);
+      if (!result.ok) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: result.error }));
+        return true;
+      }
+
+      if (recipientDid) {
+        broadcastChatEvent(recipientDid, {
+          type: 'chat_pin',
+          threadId,
+          messageId,
+          pinnedBy: principal.did,
+        }, 'chat_pin');
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, pinnedMessageId: messageId, threadId }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 7.4 Multi-Recipient Message Forwarding
+  if (url.pathname === '/api/chat/forward' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const messageId = String(parsed.messageId || parsed.id || '');
+      const targetDids: string[] = Array.isArray(parsed.targetDids)
+        ? parsed.targetDids
+        : (parsed.recipientDid ? [String(parsed.recipientDid)] : []);
+
+      if (!messageId || targetDids.length === 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'messageId and targetDids are required' }));
+        return true;
+      }
+
+      const original = sovraDb.getState().chatMessages.find(m => m.id === messageId);
+      if (!original) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Original message not found' }));
+        return true;
+      }
+
+      const senderUser = sovraDb.findUserByDid(principal.did);
+      const sName = senderUser?.displayName || senderUser?.handle || 'Peer';
+
+      const forwardedMessages: any[] = [];
+      for (const targetDid of targetDids) {
+        const fwdRecord = sovraDb.appendMessage({
+          senderDid: principal.did,
+          recipientDid: targetDid,
+          senderName: sName,
+          text: original.text,
+          attachment: original.attachment,
+          isAudio: original.isAudio,
+          audioDurationSec: original.audioDurationSec,
+          waveformBars: original.waveformBars,
+          isForwarded: true,
+          status: 'sent',
+          signatureHex: 'fwd_sig_' + crypto.randomBytes(8).toString('hex'),
+        });
+
+        broadcastChatEvent(targetDid, fwdRecord);
+        forwardedMessages.push(fwdRecord);
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, forwardedCount: forwardedMessages.length, messages: forwardedMessages }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));

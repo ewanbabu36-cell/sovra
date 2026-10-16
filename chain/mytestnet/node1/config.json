@@ -1,0 +1,20 @@
+{
+  "moniker": "validator-1",
+  "chain_id": "sovra-testnet-0",
+  "rpc_port": 26667,
+  "rpc_laddr": "tcp://0.0.0.0:26667",
+  "p2p_port": 26666,
+  "key_name": "validator-1",
+  "node_address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+  "node_id": "664a83c922035ce28bb723e4e92aed1e60e26ea1",
+  "p2p": {
+    "laddr": "tcp://0.0.0.0:26666",
+    "external_address": "127.0.0.1:26666",
+    "pex": true,
+    "seeds": [
+      "2a806ca82d506a025d580d40600abc77a69e10e7@127.0.0.1:26656"
+    ],
+    "persistent_peers": [],
+    "max_peers": 50
+  }
+}

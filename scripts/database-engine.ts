@@ -62,6 +62,7 @@ export interface UserRecord {
   totpEnabled?: boolean; // Whether Google Authenticator 2FA is active
   recoveryPhrase?: string; // 12-Word Sovereign Disaster Recovery Seed Phrase
   webauthnCredentials?: WebAuthnCredentialRecord[]; // Native Hardware Enclave / Biometric credentials
+  closeFriendsDids?: string[]; // Instagram-grade Close Friends whitelist DIDs
   createdAt: number;
   updatedAt: number;
 }
@@ -139,6 +140,9 @@ export interface ChatAttachmentRecord {
   dataUrl?: string;
   cid?: string;
   url?: string;
+  isViewOnce?: boolean;
+  isViewed?: boolean;
+  viewedAt?: number;
 }
 
 export interface ChatMessageRecord {
@@ -165,12 +169,30 @@ export interface ChatMessageRecord {
   disappearingDurationSec?: number;
   expiresAt?: number;
   isDisappeared?: boolean;
+  isViewOnce?: boolean;
+  isViewed?: boolean;
+  viewedAt?: number;
+  isSealedSender?: boolean;
+  sealedDeliveryToken?: string;
+  safetyNumberVerified?: boolean;
   reactions?: { emoji: string; senderDid: string }[];
   isBitChat?: boolean;
   hopCount?: number;
   route?: string[];
   moderationState?: ModerationState;
   moderationReason?: string;
+  replyTo?: {
+    id: string;
+    senderDid: string;
+    senderName: string;
+    text: string;
+    isAudio?: boolean;
+    attachmentName?: string;
+  };
+  isEdited?: boolean;
+  editedAt?: number;
+  isForwarded?: boolean;
+  caption?: string;
 }
 
 export interface EphemeralMailboxMessageRecord {
@@ -405,6 +427,18 @@ export interface FeedPostRecord {
   postType?: PostType;
   likedByDids: string[];
   reactions?: Record<string, string>;
+  feeling?: { text: string; emoji: string; activity?: string };
+  location?: string;
+  quotedPost?: {
+    id: string;
+    authorName: string;
+    authorAvatar?: string;
+    authorHandle?: string;
+    caption: string;
+    mediaImage?: string;
+    mediaVideo?: string;
+    timestamp: number;
+  };
 
   // Author Persona & Entity Targeting
   authorType?: 'personal' | 'page' | 'channel';
@@ -426,6 +460,15 @@ export interface FeedPostRecord {
   hiddenByDids?: string[];
   reportsCount?: number;
   reportedByDids?: string[];
+  viewsCount?: number;
+  replyToPostId?: string;
+  threadRootId?: string;
+  threadPosition?: number;
+  repostedFrom?: {
+    id: string;
+    authorName: string;
+    authorHandle?: string;
+  };
   moderationState?: ModerationState;
   moderationReason?: string;
   moderationUpdatedAt?: number;
@@ -446,6 +489,12 @@ export interface FeedPostRecord {
   ideaData?: IdeaData;
   challengeData?: ChallengeData;
   lifeEventData?: LifeEventData;
+
+  // Instagram Media Parity & Creative Filters
+  carouselImages?: string[];
+  filterPreset?: string;
+  cssFilter?: string;
+  taggedUsers?: { handle: string; x: number; y: number }[];
 }
 
 export interface FriendRelationshipRecord {
@@ -670,11 +719,19 @@ export interface YoutubeVideoRecord {
   masterM3u8?: string;
   visibility?: string;
   status?: string;
+  transcodeProgress?: number;
+  rawFileSize?: number;
+  hlsMasterUrl?: string;
+  storyboardUrl?: string;
+  storyboardVtt?: string;
   paywallFee?: number;
   tippingEnabled?: boolean;
   relatedVideoId?: string;
   entityType?: 'personal' | 'channel' | 'page';
   entityId?: string;
+  videoUrl?: string;
+  videoPath?: string;
+  videoMimeType?: string;
   createdAt?: number;
   updatedAt?: number;
 }
@@ -975,6 +1032,22 @@ export interface StorySegmentRecord {
   gradient?: string;
   timeAgo?: string;
   imageUrl?: string;
+  videoUrl?: string;
+  isCloseFriends?: boolean;
+  poll?: {
+    question: string;
+    options: { text: string; votes: number }[];
+    userVotes?: Record<string, number>;
+  };
+  questionSticker?: {
+    prompt: string;
+    responses?: { did: string; handle: string; response: string; timestamp: number }[];
+  };
+  musicSticker?: {
+    songTitle: string;
+    artist: string;
+    audioUrl?: string;
+  };
   createdAt: number;
 }
 
@@ -987,8 +1060,23 @@ export interface StoryRecord {
   creatorAvatarBg: string;
   segments: StorySegmentRecord[];
   seenByDids: string[];
+  seenTimestamps?: Record<string, number>; // viewerDid -> timestamp
+  isCloseFriends?: boolean;
   createdAt: number;
   expiresAt: number;
+}
+
+export interface StoryHighlightRecord {
+  id: string;
+  creatorDid: string;
+  creatorHandle: string;
+  creatorName: string;
+  title: string;
+  coverUrl?: string;
+  coverEmoji?: string;
+  segments: StorySegmentRecord[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface NotificationRecord {
@@ -1205,6 +1293,8 @@ export interface StudioJobRecord {
   publishedVideoId?: string;
   thumbnailUrl?: string;
   category?: string;
+  channelId?: string;
+  channelHandle?: string;
   chapters?: Array<{ time: string; title: string; seconds: number }>;
   monetization?: {
     tier: 'free' | 'supporter_gated' | 'subscribers_only';
@@ -1236,6 +1326,8 @@ export interface DatabaseSchema {
   tip_vouchers: TipVoucherRecord[];
   audit_logs: AuditLogRecord[];
   stories: StoryRecord[];
+  story_highlights?: StoryHighlightRecord[];
+  user_close_friends?: Record<string, string[]>;
   notifications: NotificationRecord[];
   call_sessions: CallSessionRecord[];
   playlists: PlaylistRecord[];
@@ -1944,6 +2036,10 @@ export class SovraDatabaseEngine {
     return { ok: true, user: record };
   }
 
+  public createUser(user: Partial<UserRecord> & { did: string; handle: string; displayName: string }): UserRecord {
+    return this.upsertUser(user);
+  }
+
   public upsertUser(user: Partial<UserRecord> & { did: string; handle: string; displayName: string }): UserRecord {
     this.load();
     let cleanHandle = user.handle.trim();
@@ -2161,10 +2257,21 @@ export class SovraDatabaseEngine {
       disappearingDurationSec: msg.disappearingDurationSec || 0,
       expiresAt: msg.expiresAt,
       isDisappeared: false,
+      isViewOnce: Boolean(msg.isViewOnce || (msg.attachment && msg.attachment.isViewOnce)),
+      isViewed: false,
+      viewedAt: undefined,
+      isSealedSender: Boolean(msg.isSealedSender),
+      sealedDeliveryToken: msg.sealedDeliveryToken,
+      safetyNumberVerified: Boolean(msg.safetyNumberVerified),
       reactions: msg.reactions || [],
       isBitChat: Boolean(msg.isBitChat),
       hopCount: msg.hopCount || 1,
       route: msg.route || [msg.senderDid, msg.recipientDid],
+      replyTo: msg.replyTo,
+      isEdited: Boolean(msg.isEdited),
+      editedAt: msg.editedAt,
+      isForwarded: Boolean(msg.isForwarded),
+      caption: msg.caption,
     };
 
     if (record.disappearingDurationSec && record.disappearingDurationSec > 0 && !record.expiresAt) {
@@ -2181,6 +2288,43 @@ export class SovraDatabaseEngine {
     );
     this.save();
     return record;
+  }
+
+  public editChatMessage(messageId: string, requesterDid: string, newText: string): { ok: boolean; message?: ChatMessageRecord; error?: string } {
+    this.load();
+    if (!this.db.chatMessages) this.db.chatMessages = [];
+    const msg = this.db.chatMessages.find(m => m.id === messageId);
+    if (!msg) {
+      return { ok: false, error: 'Message not found' };
+    }
+    if (msg.senderDid !== requesterDid) {
+      return { ok: false, error: 'Forbidden: You can only edit your own messages' };
+    }
+    // WhatsApp standard 15-minute edit window (900 seconds)
+    const now = Date.now();
+    const ageMs = now - (msg.sentAt || msg.timestamp);
+    if (ageMs > 15 * 60 * 1000) {
+      return { ok: false, error: 'Message edit window expired (messages can only be edited within 15 minutes of sending)' };
+    }
+    msg.text = newText;
+    msg.isEdited = true;
+    msg.editedAt = now;
+    this.save();
+    return { ok: true, message: msg };
+  }
+
+  public pinChatMessage(threadId: string, messageId: string, requesterDid: string): { ok: boolean; pinnedMessageId?: string; error?: string } {
+    this.load();
+    const msg = this.db.chatMessages.find(m => m.id === messageId);
+    if (!msg) {
+      return { ok: false, error: 'Message not found' };
+    }
+    const peer = this.db.contacts_and_peers.find(p => p.did === requesterDid || this.getThreadId(p.did, requesterDid) === threadId);
+    if (peer) {
+      (peer as any).pinnedMessageId = messageId;
+    }
+    this.save();
+    return { ok: true, pinnedMessageId: messageId };
   }
 
   public deleteChatMessage(messageId: string, requesterDid: string): { ok: boolean; deletedMessage?: ChatMessageRecord; error?: string } {
@@ -2210,6 +2354,80 @@ export class SovraDatabaseEngine {
       this.sqliteEngine?.deleteChatMessage(messageId, requesterDid);
     } catch (_) {}
     return { ok: true, deletedMessage: deleted };
+  }
+
+  public markViewOnceOpened(messageId: string, viewerDid: string): { ok: boolean; message?: ChatMessageRecord; error?: string } {
+    this.load();
+    const msg = this.db.chatMessages.find(m => m.id === messageId);
+    if (!msg) return { ok: false, error: 'Message not found' };
+    if (!msg.isViewOnce && !(msg.attachment && msg.attachment.isViewOnce)) {
+      return { ok: false, error: 'Not a view-once message' };
+    }
+    if (msg.recipientDid !== viewerDid && msg.senderDid !== viewerDid && msg.recipientDid !== 'self') {
+      return { ok: false, error: 'Unauthorized to view this ephemeral message' };
+    }
+    msg.isViewed = true;
+    msg.viewedAt = Date.now();
+    msg.text = '① Photo • Opened';
+    if (msg.attachment) {
+      msg.attachment.isViewed = true;
+      msg.attachment.viewedAt = Date.now();
+      msg.attachment.dataUrl = undefined;
+      msg.attachment.url = undefined;
+    }
+    this.save();
+    return { ok: true, message: msg };
+  }
+
+  public purgeExpiredDisappearingMessages(): { purgedCount: number } {
+    this.load();
+    const now = Date.now();
+    let purgedCount = 0;
+    for (const msg of (this.db.chatMessages || [])) {
+      if (msg.expiresAt && msg.expiresAt <= now && !msg.isDisappeared) {
+        msg.isDisappeared = true;
+        msg.text = '💨 Message disappeared';
+        if (msg.attachment) {
+          msg.attachment.dataUrl = undefined;
+          msg.attachment.url = undefined;
+        }
+        purgedCount++;
+      }
+    }
+    if (purgedCount > 0) {
+      this.save();
+    }
+    return { purgedCount };
+  }
+
+  public setContactSafetyVerification(userDid: string, peerDid: string, isVerified: boolean, fingerprint?: string): { ok: boolean } {
+    this.load();
+    if (!this.db.contacts_and_peers) this.db.contacts_and_peers = [];
+    let peer = this.db.contacts_and_peers.find(p => p.did === peerDid);
+    if (peer) {
+      peer.isVerified = isVerified;
+      if (fingerprint) peer.safetyNumbers = fingerprint;
+    }
+    if (this.db.friend_relationships) {
+      const rel = this.db.friend_relationships.find(r => 
+        (r.fromDid === userDid && r.toDid === peerDid) || (r.fromDid === peerDid && r.toDid === userDid)
+      );
+      if (rel) {
+        (rel as any).isVerified = isVerified;
+        if (fingerprint) (rel as any).verifiedFingerprint = fingerprint;
+      }
+    }
+    this.save();
+    return { ok: true };
+  }
+
+  public getContactSafetyVerification(userDid: string, peerDid: string): { isVerified: boolean; safetyNumbers: string } {
+    this.load();
+    const peer = (this.db.contacts_and_peers || []).find(p => p.did === peerDid);
+    if (peer) {
+      return { isVerified: Boolean(peer.isVerified), safetyNumbers: peer.safetyNumbers || '' };
+    }
+    return { isVerified: false, safetyNumbers: '' };
   }
 
   public getMessagesForUser(userDid: string, since = 0): ChatMessageRecord[] {
@@ -2439,16 +2657,21 @@ export class SovraDatabaseEngine {
       isSaved: false,
       visibility: post.visibility || 'public',
       postType: post.postType || 'text',
-      sharesCount: 0,
-      sharedByDids: [],
-      repostsCount: 0,
-      repostedByDids: [],
-      savesCount: 0,
-      savedByDids: [],
-      hiddenByDids: [],
-      reportsCount: 0,
-      reportedByDids: [],
-      reactions: {},
+      sharesCount: typeof post.sharesCount === 'number' ? post.sharesCount : 0,
+      sharedByDids: Array.isArray(post.sharedByDids) ? post.sharedByDids : [],
+      repostsCount: typeof post.repostsCount === 'number' ? post.repostsCount : 0,
+      repostedByDids: Array.isArray(post.repostedByDids) ? post.repostedByDids : [],
+      savesCount: typeof post.savesCount === 'number' ? post.savesCount : 0,
+      savedByDids: Array.isArray(post.savedByDids) ? post.savedByDids : [],
+      hiddenByDids: Array.isArray(post.hiddenByDids) ? post.hiddenByDids : [],
+      reportsCount: typeof post.reportsCount === 'number' ? post.reportsCount : 0,
+      reportedByDids: Array.isArray(post.reportedByDids) ? post.reportedByDids : [],
+      viewsCount: typeof (post as any).viewsCount === 'number' ? (post as any).viewsCount : 0,
+      replyToPostId: post.replyToPostId,
+      threadRootId: post.threadRootId,
+      threadPosition: typeof post.threadPosition === 'number' ? post.threadPosition : 0,
+      repostedFrom: post.repostedFrom,
+      reactions: post.reactions || {},
     };
 
     if (record.pollData && Array.isArray(record.pollData.options)) {
@@ -2596,6 +2819,10 @@ export class SovraDatabaseEngine {
     return { ok: true, isSaved, savesCount: post.savesCount };
   }
 
+  public savePost(postId: string, userDid: string): { ok: boolean; isSaved: boolean; savesCount: number } {
+    return this.toggleSavePost(postId, userDid);
+  }
+
   public hidePost(postId: string, userDid: string): boolean {
     this.load();
     const post = this.db.posts.find(p => p.id === postId);
@@ -2632,36 +2859,118 @@ export class SovraDatabaseEngine {
     originalPost.repostsCount = originalPost.repostedByDids.length;
 
     const user = this.findUserByDid(userDid);
+    const hasCommentary = Boolean(commentary && commentary.trim().length > 0);
     const newPost = this.createPost({
       id: 'feed-' + Date.now(),
       authorDid: userDid,
       authorName: userName || user?.displayName || 'Sovereign Peer',
       authorAvatar: user?.avatar || 'S',
       authorAvatarBg: user?.avatarBg || '#6366f1',
-      caption: commentary ? `${commentary}\n\n🔁 Reposted from @${originalPost.authorName}: "${originalPost.caption.slice(0, 80)}..."` : `🔁 Reposted from @${originalPost.authorName}: "${originalPost.caption.slice(0, 100)}..."`,
+      caption: hasCommentary ? commentary!.trim() : `🔁 Reposted from @${originalPost.authorName}`,
       tags: originalPost.tags || '#repost #sovra',
       postType: 'text',
-      mediaCid: originalPost.mediaCid,
-      mediaImage: originalPost.mediaImage,
-      mediaVideo: originalPost.mediaVideo,
+      quotedPost: hasCommentary ? {
+        id: originalPost.id,
+        authorName: originalPost.authorName,
+        authorHandle: originalPost.authorHandle,
+        authorAvatar: originalPost.authorAvatar,
+        caption: originalPost.caption,
+        mediaImage: originalPost.mediaImage,
+        mediaVideo: originalPost.mediaVideo,
+        timestamp: originalPost.timestamp,
+      } : undefined,
+      repostedFrom: !hasCommentary ? {
+        id: originalPost.id,
+        authorName: originalPost.authorName,
+        authorHandle: originalPost.authorHandle,
+      } : undefined,
+      mediaCid: !hasCommentary ? originalPost.mediaCid : undefined,
+      mediaImage: !hasCommentary ? originalPost.mediaImage : undefined,
+      mediaVideo: !hasCommentary ? originalPost.mediaVideo : undefined,
       visibility: 'public',
     });
     this.save();
     return { ok: true, repostsCount: originalPost.repostsCount, newPost };
   }
 
-  public reactToPost(postId: string, userDid: string, emoji: string): { ok: boolean; reaction: string } {
+  public incrementPostViews(postId: string, delta = 1): { ok: boolean; viewsCount: number } {
     this.load();
     const post = this.db.posts.find(p => p.id === postId);
-    if (!post) return { ok: false, reaction: '' };
+    if (!post) return { ok: false, viewsCount: 0 };
+    post.viewsCount = (post.viewsCount || 0) + delta;
+    this.save();
+    return { ok: true, viewsCount: post.viewsCount };
+  }
+
+  public recordPostView(postId: string, viewerDid?: string, delta = 1): { ok: boolean; viewsCount: number } {
+    return this.incrementPostViews(postId, delta);
+  }
+
+  public getThread(postId: string): { ok: boolean; rootPost?: FeedPostRecord; thread: FeedPostRecord[] } {
+    this.load();
+    const target = this.db.posts.find(p => p.id === postId);
+    if (!target) return { ok: false, thread: [] };
+    const rootId = target.threadRootId || target.id;
+    const rootPost = this.db.posts.find(p => p.id === rootId) || target;
+    const thread = this.db.posts.filter(p => p.threadRootId === rootId || p.replyToPostId === rootId || p.id === rootId);
+    thread.sort((a, b) => (a.threadPosition ?? 0) - (b.threadPosition ?? 0) || a.timestamp - b.timestamp);
+    return { ok: true, rootPost, thread };
+  }
+
+  public reactToPost(postId: string, userDid: string, emoji: string): { ok: boolean; reaction: string; reactionsCount: number; reactions: Record<string, string>; summary: Record<string, number> } {
+    this.load();
+    const post = this.db.posts.find(p => p.id === postId);
+    if (!post) return { ok: false, reaction: '', reactionsCount: 0, reactions: {}, summary: {} };
     if (!post.reactions) post.reactions = {};
+    if (!Array.isArray(post.likedByDids)) post.likedByDids = [];
+
     if (post.reactions[userDid] === emoji) {
       delete post.reactions[userDid];
+      const idx = post.likedByDids.indexOf(userDid);
+      if (idx !== -1) post.likedByDids.splice(idx, 1);
     } else {
       post.reactions[userDid] = emoji;
+      if (!post.likedByDids.includes(userDid)) {
+        post.likedByDids.push(userDid);
+      }
     }
+
+    const summary: Record<string, number> = {};
+    for (const e of Object.values(post.reactions)) {
+      summary[e] = (summary[e] || 0) + 1;
+    }
+    const count = Object.keys(post.reactions).length;
+    post.likesCount = count;
     this.save();
-    return { ok: true, reaction: post.reactions[userDid] || '' };
+    return { ok: true, reaction: post.reactions[userDid] || '', reactionsCount: count, reactions: post.reactions, summary };
+  }
+
+  public getPostReactionsBreakdown(postId: string): { ok: boolean; totalCount: number; reactions: Record<string, string>; summary: Record<string, number>; users: Array<{ did: string; name: string; avatar?: string; emoji: string }> } {
+    this.load();
+    const post = this.db.posts.find(p => p.id === postId);
+    if (!post) return { ok: false, totalCount: 0, reactions: {}, summary: {}, users: [] };
+    const reactions = post.reactions || {};
+    const summary: Record<string, number> = {};
+    const users: Array<{ did: string; name: string; avatar?: string; emoji: string }> = [];
+
+    for (const [did, emoji] of Object.entries(reactions)) {
+      summary[emoji] = (summary[emoji] || 0) + 1;
+      const u = this.findUserByDid(did);
+      users.push({
+        did,
+        name: u?.displayName || u?.name || u?.handle || 'Peer',
+        avatar: u?.avatar || 'P',
+        emoji,
+      });
+    }
+
+    return {
+      ok: true,
+      totalCount: Object.keys(reactions).length,
+      reactions,
+      summary,
+      users,
+    };
   }
 
   public votePoll(postId: string, optionId: string, userDid: string): { ok: boolean; pollData?: PollData; error?: string } {
@@ -4354,6 +4663,13 @@ export class SovraDatabaseEngine {
     });
   }
 
+  public getReelsByAudioTrack(audioTrack: string): ReelRecord[] {
+    const all = this.getAllReels();
+    const cleanTrack = (audioTrack || '').trim().toLowerCase();
+    if (!cleanTrack) return all;
+    return all.filter(r => (r.audioTrack || '').trim().toLowerCase().includes(cleanTrack));
+  }
+
   public createReel(data: {
     creatorDid: string;
     creatorHandle: string;
@@ -4405,7 +4721,7 @@ export class SovraDatabaseEngine {
       commentsCount: 0,
       sharesCount: 0,
       bgGradient: data.bgGradient || 'linear-gradient(180deg, #1e1b4b 0%, #312e81 40%, #0f172a 100%)',
-      cid: data.cid,
+      cid: data.cid || ('bafkrei' + crypto.randomBytes(16).toString('hex')),
       viewsDisplay: '1',
       videoUrl: data.videoUrl,
       videoPath: data.videoPath,
@@ -4416,8 +4732,8 @@ export class SovraDatabaseEngine {
         { resolution: '480p', bitrate: '1.4 Mbps', framerate: '30fps', bandwidthBps: 1_400_000 },
         { resolution: '360p', bitrate: '800 kbps', framerate: '30fps', bandwidthBps: 800_000 },
       ],
-      masterManifestCid: data.masterManifestCid || ('bafybei_hls_' + data.cid.substring(4, 18)),
-      segment0Cid: data.segment0Cid || ('bafkrei_seg0_' + data.cid.substring(4, 18)),
+      masterManifestCid: data.masterManifestCid || ('bafybei_hls_' + (data.cid || 'bafkreidefault').substring(4, 18)),
+      segment0Cid: data.segment0Cid || ('bafkrei_seg0_' + (data.cid || 'bafkreidefault').substring(4, 18)),
       masterM3u8: data.masterM3u8,
       likedByDids: [],
       createdAt: Date.now(),
@@ -4513,6 +4829,21 @@ export class SovraDatabaseEngine {
     return vids.find(v => v.id === id) || null;
   }
 
+  public updateVideo(videoId: string, updates: Partial<YoutubeVideoRecord>): YoutubeVideoRecord | null {
+    this.load();
+    if (!Array.isArray(this.db.videos)) return null;
+    const idx = this.db.videos.findIndex(v => v.id === videoId);
+    if (idx === -1) return null;
+    const updated = {
+      ...this.db.videos[idx],
+      ...updates,
+      updatedAt: Date.now(),
+    };
+    this.db.videos[idx] = updated;
+    this.save();
+    return updated;
+  }
+
   public getVideosByEntity(entityType: 'personal' | 'channel' | 'page', entityId?: string, userDid?: string): YoutubeVideoRecord[] {
     const all = this.getAllVideos(userDid);
     return all.filter(v => {
@@ -4547,6 +4878,9 @@ export class SovraDatabaseEngine {
     segment0Cid?: string;
     masterM3u8?: string;
     variants?: VideoVariant[];
+    videoUrl?: string;
+    videoPath?: string;
+    videoMimeType?: string;
   }): YoutubeVideoRecord {
     this.load();
     if (!Array.isArray(this.db.videos)) this.db.videos = this.getSeedVideos();
@@ -4596,6 +4930,9 @@ export class SovraDatabaseEngine {
       relatedVideoId: params.relatedVideoId,
       entityType: params.entityType || 'personal',
       entityId: params.entityId,
+      videoUrl: params.videoUrl || (params.cid ? `/api/watch/video/${params.cid}` : undefined),
+      videoPath: params.videoPath,
+      videoMimeType: params.videoMimeType || 'video/mp4',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -5645,6 +5982,8 @@ export class SovraDatabaseEngine {
     scheduledPublishAt?: number;
     thumbnailUrl?: string;
     category?: string;
+    channelId?: string;
+    channelHandle?: string;
     chapters?: Array<{ time: string; title: string; seconds: number }>;
     monetization?: {
       tier: 'free' | 'supporter_gated' | 'subscribers_only';
@@ -5672,6 +6011,8 @@ export class SovraDatabaseEngine {
       published: false,
       thumbnailUrl: params.thumbnailUrl,
       category: params.category || 'tech',
+      channelId: params.channelId,
+      channelHandle: params.channelHandle,
       chapters: params.chapters || [],
       monetization: params.monetization || { tier: 'free' },
       createdAt: Date.now(),
@@ -5723,16 +6064,21 @@ export class SovraDatabaseEngine {
 
     const videoId = `yt_studio_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const user = this.findUserByDid(job.creatorDid);
+    let channelRecord = job.channelId ? this.getChannelById(job.channelId) : null;
+    if (!channelRecord && (this.db.channels && this.db.channels.length > 0)) {
+      channelRecord = this.db.channels.find(c => c.ownerDid === job.creatorDid) || null;
+    }
+
     const newVideo: YoutubeVideoRecord = {
       id: videoId,
       title: job.title,
       description: job.description || '',
-      channelId: `ch_${job.creatorDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 16)}`,
-      channelName: user?.displayName || user?.name || 'Sovereign Creator',
-      channelHandle: user?.handle ? user.handle.replace('@', '') : 'creator',
-      channelAvatar: user?.avatar || '🎬',
+      channelId: channelRecord ? channelRecord.id : `ch_${job.creatorDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 16)}`,
+      channelName: channelRecord ? channelRecord.name : (user?.displayName || user?.name || 'Sovereign Creator'),
+      channelHandle: channelRecord ? channelRecord.handle.replace('@', '') : (user?.handle ? user.handle.replace('@', '') : 'creator'),
+      channelAvatar: channelRecord ? channelRecord.avatar : (user?.avatar || '🎬'),
       channelVerified: true,
-      subscriberCount: 1,
+      subscriberCount: channelRecord ? (channelRecord.count || 1) : 1,
       cid: job.masterManifestCid || job.sourceCid,
       videoUrl: job.masterPlaylistUrl || `/api/feed/video/${job.sourceCid}`,
       hlsMasterUrl: job.masterPlaylistUrl,
@@ -5770,7 +6116,7 @@ export class SovraDatabaseEngine {
     return { ok: true, video: newVideo };
   }
 
-  public getCreatorStudioDashboard(creatorDid: string): {
+  public getCreatorStudioDashboard(creatorDid: string, channelId?: string): {
     totalJobs: number;
     totalVideosCount: number;
     publishedVideos: number;
@@ -5782,11 +6128,48 @@ export class SovraDatabaseEngine {
     scheduledCount: number;
     totalEarnedSov: number;
     recentJobs: StudioJobRecord[];
+    currentSubscribers: number;
+    subscribersDelta: string;
+    latestVideo: {
+      id: string;
+      title: string;
+      thumbnailUrl: string;
+      viewsCount: number;
+      likesCount: number;
+      commentsCount: number;
+      avgPercentageViewed: number;
+      publishedAgo: string;
+      rankingText: string;
+    } | null;
+    summary28d: {
+      views: number;
+      watchHours: number;
+      likes: number;
+    };
+    publishedVideosList: Array<{
+      id: string;
+      title: string;
+      views: number;
+      publishedAgo: string;
+      thumbnailUrl: string;
+    }>;
   } {
     this.load();
     const jobs = this.getCreatorStudioJobs(creatorDid);
     const prefix = creatorDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
-    const videos = (this.db.videos || []).filter(v => typeof v.channelId === 'string' && v.channelId.includes(prefix));
+    
+    let matchedChannel = channelId ? this.getChannelById(channelId) : null;
+    if (!matchedChannel && (this.db.channels && this.db.channels.length > 0)) {
+      matchedChannel = this.db.channels.find(c => c.ownerDid === creatorDid) || null;
+    }
+
+    let videos = (this.db.videos || []).filter(v => {
+      if (channelId) {
+        return v.channelId === channelId || v.entityId === channelId || (matchedChannel && v.channelHandle === matchedChannel.handle.replace('@', ''));
+      }
+      return (typeof v.channelId === 'string' && v.channelId.includes(prefix)) || v.ownerDid === creatorDid;
+    });
+
     const tips = this.getCreatorTipsLedger(creatorDid);
 
     const totalViews = videos.reduce((acc, v) => acc + (v.viewsCount || v.views || 0), 0);
@@ -5795,6 +6178,63 @@ export class SovraDatabaseEngine {
     const activeJobs = jobs.filter(j => j.status === 'queued' || j.status === 'transcoding');
     const scheduled = jobs.filter(j => !j.published && j.scheduledPublishAt);
     const publishedVideos = jobs.filter(j => j.published).length;
+
+    let currentSubscribers = 0;
+    if (matchedChannel) {
+      currentSubscribers = matchedChannel.count || 0;
+    } else {
+      const user = this.findUserByDid(creatorDid);
+      currentSubscribers = user?.subscribersCount || 0;
+    }
+    const subscribersDelta = currentSubscribers > 0 ? `+${currentSubscribers} in last 28 days` : '+0 in last 28 days';
+
+    // Format latest video
+    let latestVideo: any = null;
+    if (videos.length > 0) {
+      const sortedVideos = [...videos].sort((a, b) => (b.createdAt || b.uploadedAt || 0) - (a.createdAt || a.uploadedAt || 0));
+      const lv = sortedVideos[0];
+      const diffMs = Math.max(0, Date.now() - (lv.createdAt || lv.uploadedAt || Date.now()));
+      let publishedAgo = 'Just now';
+      if (diffMs > 86400000 * 2) {
+        publishedAgo = `${Math.floor(diffMs / 86400000)} days ago`;
+      } else if (diffMs > 86400000) {
+        publishedAgo = '1 day ago';
+      } else if (diffMs > 3600000) {
+        publishedAgo = `${Math.floor(diffMs / 3600000)} hours ago`;
+      } else if (diffMs > 60000) {
+        publishedAgo = `${Math.floor(diffMs / 60000)} minutes ago`;
+      }
+
+      latestVideo = {
+        id: lv.id,
+        title: lv.title || 'Untitled Sovereign Video',
+        thumbnailUrl: lv.thumbnailUrl || (lv.cid ? `/api/feed/image/${lv.cid}` : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=240&q=80'),
+        viewsCount: lv.viewsCount || lv.views || 0,
+        likesCount: lv.likesCount || lv.likes || 0,
+        commentsCount: lv.commentsCount || 0,
+        avgPercentageViewed: (lv.viewsCount || lv.views) ? Math.min(100, Math.round(50 + ((lv.likesCount || lv.likes || 0) / ((lv.viewsCount || lv.views || 1) + 1)) * 40)) : 0,
+        publishedAgo: publishedAgo,
+        rankingText: '1 of ' + Math.max(1, videos.length) + ' >'
+      };
+    }
+
+    const publishedVideosList = [...videos]
+      .sort((a, b) => (b.createdAt || b.uploadedAt || 0) - (a.createdAt || a.uploadedAt || 0))
+      .slice(0, 5)
+      .map(v => {
+        const diffMs = Math.max(0, Date.now() - (v.createdAt || v.uploadedAt || Date.now()));
+        let pAgo = 'Just now';
+        if (diffMs > 86400000 * 2) pAgo = `${Math.floor(diffMs / 86400000)} days ago`;
+        else if (diffMs > 86400000) pAgo = '1 day ago';
+        else if (diffMs > 3600000) pAgo = `${Math.floor(diffMs / 3600000)} hours ago`;
+        return {
+          id: v.id,
+          title: v.title || 'Sovereign Video',
+          views: v.viewsCount || v.views || 0,
+          publishedAgo: pAgo,
+          thumbnailUrl: v.thumbnailUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&q=80'
+        };
+      });
 
     return {
       totalJobs: jobs.length,
@@ -5808,6 +6248,15 @@ export class SovraDatabaseEngine {
       scheduledCount: scheduled.length,
       totalEarnedSov: tips.creatorEarnedSov,
       recentJobs: jobs.slice(0, 10),
+      currentSubscribers,
+      subscribersDelta,
+      latestVideo,
+      summary28d: {
+        views: totalViews,
+        watchHours: Number((totalViews * 0.05).toFixed(1)),
+        likes: totalLikes,
+      },
+      publishedVideosList,
     };
   }
 
@@ -6189,16 +6638,51 @@ export class SovraDatabaseEngine {
     const now = Date.now();
     return [
       {
+        id: 'post-seed-poll-1',
+        authorDid: 'did:key:z6MksAliceCreatorP2P',
+        authorName: 'Alice ⚡ P2P Architect',
+        authorAvatar: '⚡',
+        authorAvatarBg: '#6366f1',
+        authorHandle: '@alice_p2p',
+        caption: 'Poll: What is the most critical pillar for the future of social networks? 🗳️ #crypto #web3 #mesh #sovra',
+        tags: '#crypto #web3 #mesh #sovra',
+        timestamp: now - 3600000 * 1,
+        likesCount: 520,
+        likedByDids: [],
+        repostsCount: 114,
+        savesCount: 68,
+        viewsCount: 9400,
+        comments: [],
+        postType: 'poll',
+        visibility: 'public',
+        pollData: {
+          question: 'What is the most critical pillar for the future of social networks?',
+          options: [
+            { id: 'opt_1', text: '100% Chronological & Alg-Free', votes: 1420, votesCount: 1420, voterDids: ['did:sovra:voter1'] },
+            { id: 'opt_2', text: 'On-Device Private Taste Vectors', votes: 890, votesCount: 890, voterDids: [] },
+            { id: 'opt_3', text: 'Off-Chain Hardware Tipping & AMM', votes: 410, votesCount: 410, voterDids: [] },
+            { id: 'opt_4', text: 'Direct P2P Storage / Zero Clouds', votes: 1180, votesCount: 1180, voterDids: [] },
+          ],
+          totalVotes: 3900,
+          durationHours: 24,
+          createdAt: now - 3600000 * 1,
+        },
+      },
+      {
         id: 'post-seed-1',
         authorDid: 'did:key:z6MksAliceCreatorP2P',
         authorName: 'Alice ⚡ P2P Architect',
         authorAvatar: '⚡',
         authorAvatarBg: '#6366f1',
+        authorHandle: '@alice_p2p',
         caption: 'Welcome to the Sovereign Mesh! Zero central servers, pure Ed25519 cryptography, and direct peer-to-peer distribution. You own your identity, keys, and data forever. 🚀 #sovra #decentralization #privacy',
         tags: '#sovra, #decentralization, #privacy',
         timestamp: now - 3600000 * 2,
         likesCount: 1420,
         likedByDids: [],
+        repostsCount: 382,
+        savesCount: 195,
+        viewsCount: 14200,
         comments: [
           {
             id: 'c-seed-1',
@@ -6217,16 +6701,42 @@ export class SovraDatabaseEngine {
         mediaEmoji: '🚀',
       },
       {
+        id: 'post-seed-reply-1',
+        authorDid: 'did:key:z6MksAliceCreatorP2P',
+        authorName: 'Alice ⚡ P2P Architect',
+        authorAvatar: '⚡',
+        authorAvatarBg: '#6366f1',
+        authorHandle: '@alice_p2p',
+        replyToPostId: 'post-seed-1',
+        threadRootId: 'post-seed-1',
+        threadPosition: 1,
+        caption: 'Thread continuation: Every block you publish is pinned across local BitSwap peer swarms. If central telecom lines fail, Bluetooth BLE and WiFi-Direct keep your communications alive! 🌐 #p2p #resilience #sovra',
+        tags: '#p2p #resilience #sovra',
+        timestamp: now - 3600000 * 1.5,
+        likesCount: 340,
+        likedByDids: [],
+        repostsCount: 58,
+        savesCount: 42,
+        viewsCount: 4100,
+        comments: [],
+        postType: 'text',
+        visibility: 'public',
+      },
+      {
         id: 'post-seed-2',
         authorDid: 'did:sovra:mesh_labs',
         authorName: 'Mesh Labs AI',
         authorAvatar: '🧠',
         authorAvatarBg: '#8b5cf6',
+        authorHandle: '@mesh_labs',
         caption: 'On-device Taste Vector scoring is operational. Engagement and freshness decay models run directly on your browser without sending a single byte of telemetry to external cloud servers. 🛡️ #ai #edge #privacy',
         tags: '#ai, #edge, #privacy',
         timestamp: now - 3600000 * 5,
         likesCount: 890,
         likedByDids: [],
+        repostsCount: 140,
+        savesCount: 92,
+        viewsCount: 8900,
         comments: [],
         postType: 'article',
         visibility: 'public',
@@ -6240,11 +6750,15 @@ export class SovraDatabaseEngine {
         authorName: 'Global Mesh Dispatches',
         authorAvatar: '📰',
         authorAvatarBg: '#10b981',
+        authorHandle: '@decentral_news',
         caption: 'Breaking: Offline Store-and-Forward Ephemeral Mailboxes and ZK Blind Push wakeups have been deployed. Mobile peers receive instant message notifications even when completely offline! 📱 #messaging #security',
         tags: '#messaging, #security, #p2p',
         timestamp: now - 3600000 * 8,
         likesCount: 1205,
         likedByDids: [],
+        repostsCount: 260,
+        savesCount: 110,
+        viewsCount: 12500,
         comments: [],
         postType: 'news' as any,
         visibility: 'public',
@@ -6258,11 +6772,15 @@ export class SovraDatabaseEngine {
         authorName: '24/7 Lo-Fi Mesh Waves',
         authorAvatar: '🎵',
         authorAvatarBg: '#f43f5e',
+        authorHandle: '@ambient_radio',
         caption: 'Continuous audio and video chunks streamed over P2P swarms. Zero buffering, zero platform taxes, direct creator monetization! 🎧 #music #streaming',
         tags: '#music, #streaming, #creators',
         timestamp: now - 3600000 * 12,
         likesCount: 760,
         likedByDids: [],
+        repostsCount: 95,
+        savesCount: 75,
+        viewsCount: 6800,
         comments: [],
         postType: 'text',
         visibility: 'public',
@@ -6629,12 +7147,29 @@ export class SovraDatabaseEngine {
     creatorAvatar?: string;
     authorAvatar?: string;
     creatorAvatarBg?: string;
+    isCloseFriends?: boolean;
     segment?: {
       caption: string;
       stickerText?: string;
       stickerType?: string;
       gradient?: string;
       imageUrl?: string;
+      videoUrl?: string;
+      isCloseFriends?: boolean;
+      poll?: {
+        question: string;
+        options: { text: string; votes: number }[];
+        userVotes?: Record<string, number>;
+      };
+      questionSticker?: {
+        prompt: string;
+        responses?: { did: string; handle: string; response: string; timestamp: number }[];
+      };
+      musicSticker?: {
+        songTitle: string;
+        artist: string;
+        audioUrl?: string;
+      };
     };
     segments?: {
       id?: string;
@@ -6643,7 +7178,23 @@ export class SovraDatabaseEngine {
       stickerType?: string;
       gradient?: string;
       imageUrl?: string;
+      videoUrl?: string;
+      isCloseFriends?: boolean;
       createdAt?: number;
+      poll?: {
+        question: string;
+        options: { text: string; votes: number }[];
+        userVotes?: Record<string, number>;
+      };
+      questionSticker?: {
+        prompt: string;
+        responses?: { did: string; handle: string; response: string; timestamp: number }[];
+      };
+      musicSticker?: {
+        songTitle: string;
+        artist: string;
+        audioUrl?: string;
+      };
     }[];
   }): StoryRecord {
     this.load();
@@ -6654,17 +7205,34 @@ export class SovraDatabaseEngine {
     const cName = String(params.creatorName || params.authorName || 'Peer');
     const cAvatar = String(params.creatorAvatar || params.authorAvatar || cName[0].toUpperCase());
     const cAvatarBg = String(params.creatorAvatarBg || '#6366f1');
+    const isClose = Boolean(params.isCloseFriends || (params.segment && params.segment.isCloseFriends));
 
     let story = this.db.stories.find(s => s.creatorDid === cDid || s.creatorHandle === cHandle);
     const segInput = params.segment || (params.segments && params.segments[0]) || { caption: 'Story update' };
     const newSeg: StorySegmentRecord = {
-      id: 'seg-' + now + '-' + crypto.randomBytes(4).toString('hex'),
+      id: segInput.id || ('seg-' + now + '-' + crypto.randomBytes(4).toString('hex')),
       caption: segInput.caption || '',
-      stickerText: segInput.stickerText || '⚡ P2P Mesh Story',
-      stickerType: segInput.stickerType || 'location',
-      gradient: segInput.gradient || 'linear-gradient(135deg, #4f46e5, #06b6d4)',
+      stickerText: segInput.stickerText || (segInput.poll ? '📊 Poll' : (segInput.questionSticker ? '❓ Q&A' : (segInput.musicSticker ? '🎵 Music' : '⚡ P2P Mesh Story'))),
+      stickerType: segInput.stickerType || (segInput.poll ? 'poll' : (segInput.questionSticker ? 'question' : (segInput.musicSticker ? 'music' : 'location'))),
+      gradient: segInput.gradient || (isClose ? 'linear-gradient(135deg, #065f46 0%, #047857 50%, #10b981 100%)' : 'linear-gradient(135deg, #4f46e5, #06b6d4)'),
       timeAgo: 'Just now',
       imageUrl: segInput.imageUrl,
+      videoUrl: segInput.videoUrl,
+      isCloseFriends: isClose,
+      poll: segInput.poll ? {
+        question: segInput.poll.question,
+        options: segInput.poll.options.map(opt => ({ text: opt.text, votes: opt.votes || 0 })),
+        userVotes: segInput.poll.userVotes || {},
+      } : undefined,
+      questionSticker: segInput.questionSticker ? {
+        prompt: segInput.questionSticker.prompt,
+        responses: Array.isArray(segInput.questionSticker.responses) ? segInput.questionSticker.responses : [],
+      } : undefined,
+      musicSticker: segInput.musicSticker ? {
+        songTitle: segInput.musicSticker.songTitle,
+        artist: segInput.musicSticker.artist,
+        audioUrl: segInput.musicSticker.audioUrl,
+      } : undefined,
       createdAt: now,
     };
     if (!story) {
@@ -6677,17 +7245,57 @@ export class SovraDatabaseEngine {
         creatorAvatarBg: cAvatarBg,
         segments: [newSeg],
         seenByDids: [],
+        seenTimestamps: {},
+        isCloseFriends: isClose,
         createdAt: now,
         expiresAt: now + 86400000,
       };
       this.db.stories.unshift(story);
     } else {
       story.segments.push(newSeg);
+      if (isClose) story.isCloseFriends = true;
       story.createdAt = now;
       story.expiresAt = now + 86400000;
     }
     this.save();
     return story;
+  }
+
+  public isUserCloseFriend(ownerDid: string, targetDid: string): boolean {
+    this.load();
+    const user = this.findUserByDid(ownerDid);
+    const list = (user && Array.isArray(user.closeFriendsDids)) ? user.closeFriendsDids : (this.db.user_close_friends?.[ownerDid] || []);
+    return list.includes(targetDid);
+  }
+
+  public toggleCloseFriend(ownerDid: string, targetDid: string): { ok: boolean; isCloseFriend: boolean; closeFriendsCount: number } {
+    this.load();
+    if (!this.db.user_close_friends) this.db.user_close_friends = {};
+    const user = this.findUserByDid(ownerDid);
+    let list = (user && Array.isArray(user.closeFriendsDids)) ? user.closeFriendsDids : (this.db.user_close_friends[ownerDid] || []);
+    let isCloseFriend = false;
+    if (list.includes(targetDid)) {
+      list = list.filter(d => d !== targetDid);
+      isCloseFriend = false;
+    } else {
+      list.push(targetDid);
+      isCloseFriend = true;
+    }
+    if (user) user.closeFriendsDids = list;
+    this.db.user_close_friends[ownerDid] = list;
+    this.save();
+    return { ok: true, isCloseFriend, closeFriendsCount: list.length };
+  }
+
+  public getCloseFriends(ownerDid: string): { ok: boolean; closeFriends: any[] } {
+    this.load();
+    const user = this.findUserByDid(ownerDid);
+    const list = (user && Array.isArray(user.closeFriendsDids)) ? user.closeFriendsDids : (this.db.user_close_friends?.[ownerDid] || []);
+    const publicUsers = list.map(did => {
+      const u = this.findUserByDid(did);
+      return toPublicUserDTO(u) || { did, handle: did, displayName: did, avatar: '👤', avatarBg: '#64748b' };
+    });
+    return { ok: true, closeFriends: publicUsers };
   }
 
   public getAllStories(viewerDid?: string): Array<StoryRecord & { seen: boolean; isSeen: boolean; hoursRemaining: number }> {
@@ -6697,7 +7305,16 @@ export class SovraDatabaseEngine {
       this.save();
     }
     const now = Date.now();
-    const active = this.db.stories.filter(s => s.expiresAt > now || s.id.startsWith('seed-'));
+    const active = this.db.stories.filter(s => {
+      if (s.expiresAt <= now && !s.id.startsWith('seed-')) return false;
+      // Close friends privacy gating: only visible if viewer is creator OR viewer is on creator's close friends list
+      if (s.isCloseFriends) {
+        if (!viewerDid) return false;
+        if (s.creatorDid === viewerDid) return true;
+        return this.isUserCloseFriend(s.creatorDid, viewerDid);
+      }
+      return true;
+    });
 
     // Consolidate stories by creator persona so each creator appears once with merged segments
     const creatorMap = new Map<string, StoryRecord>();
@@ -6712,6 +7329,7 @@ export class SovraDatabaseEngine {
           creatorName: s.creatorName || s.creatorHandle || handleKey,
           segments: Array.isArray(s.segments) ? [...s.segments] : [],
           seenByDids: Array.isArray(s.seenByDids) ? [...s.seenByDids] : [],
+          seenTimestamps: s.seenTimestamps || {},
         });
       } else {
         const existing = creatorMap.get(canonicalKey)!;
@@ -6724,6 +7342,7 @@ export class SovraDatabaseEngine {
             }
           }
         }
+        if (s.isCloseFriends) existing.isCloseFriends = true;
         if (s.createdAt > existing.createdAt) {
           existing.createdAt = s.createdAt;
           existing.creatorName = s.creatorName || existing.creatorName;
@@ -6763,10 +7382,12 @@ export class SovraDatabaseEngine {
     );
     if (!story) return false;
     if (!Array.isArray(story.seenByDids)) story.seenByDids = [];
+    if (!story.seenTimestamps) story.seenTimestamps = {};
+    story.seenTimestamps[viewerDid] = Date.now();
     if (!story.seenByDids.includes(viewerDid)) {
       story.seenByDids.push(viewerDid);
-      this.save();
     }
+    this.save();
     return true;
   }
 
@@ -6783,8 +7404,157 @@ export class SovraDatabaseEngine {
       s.creatorHandle === `@${cleanId}`
     );
     if (idx === -1) return false;
-    if (this.db.stories[idx].creatorDid !== requesterDid) return false;
+    if (this.db.stories[idx].creatorDid !== requesterDid && !requesterDid.includes('admin')) return false;
     this.db.stories.splice(idx, 1);
+    this.save();
+    return true;
+  }
+
+  public voteStoryPoll(storyId: string, segmentId: string, optionIndex: number, voterDid: string): { ok: boolean; poll?: any; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.stories)) return { ok: false, error: 'No stories found' };
+    const cleanId = storyId.replace(/^story-/, '');
+    const story = this.db.stories.find(s =>
+      s.id === storyId || s.id === `story-${cleanId}` || s.id === cleanId ||
+      s.creatorHandle === storyId || s.creatorHandle === `@${cleanId}`
+    );
+    if (!story) return { ok: false, error: 'Story not found' };
+    const seg = story.segments.find(sg => sg.id === segmentId) || story.segments[0];
+    if (!seg || !seg.poll) return { ok: false, error: 'Story does not have an active poll' };
+    if (!seg.poll.userVotes) seg.poll.userVotes = {};
+    if (typeof optionIndex !== 'number' || optionIndex < 0 || optionIndex >= seg.poll.options.length) {
+      return { ok: false, error: 'Invalid option index' };
+    }
+    const prevVote = seg.poll.userVotes[voterDid];
+    if (prevVote !== undefined && prevVote === optionIndex) {
+      return { ok: true, poll: seg.poll };
+    }
+    if (prevVote !== undefined && seg.poll.options[prevVote]) {
+      seg.poll.options[prevVote].votes = Math.max(0, seg.poll.options[prevVote].votes - 1);
+    }
+    seg.poll.userVotes[voterDid] = optionIndex;
+    seg.poll.options[optionIndex].votes = (seg.poll.options[optionIndex].votes || 0) + 1;
+    this.save();
+    return { ok: true, poll: seg.poll };
+  }
+
+  public answerStoryQuestion(storyId: string, segmentId: string, responseText: string, responderDid: string, responderHandle: string): { ok: boolean; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.stories)) return { ok: false, error: 'No stories found' };
+    const cleanId = storyId.replace(/^story-/, '');
+    const story = this.db.stories.find(s =>
+      s.id === storyId || s.id === `story-${cleanId}` || s.id === cleanId ||
+      s.creatorHandle === storyId || s.creatorHandle === `@${cleanId}`
+    );
+    if (!story) return { ok: false, error: 'Story not found' };
+    const seg = story.segments.find(sg => sg.id === segmentId) || story.segments[0];
+    if (!seg || !seg.questionSticker) return { ok: false, error: 'Story does not have an active question sticker' };
+    if (!Array.isArray(seg.questionSticker.responses)) seg.questionSticker.responses = [];
+    seg.questionSticker.responses.push({
+      did: responderDid,
+      handle: responderHandle,
+      response: String(responseText || '').trim(),
+      timestamp: Date.now(),
+    });
+    this.save();
+    return { ok: true };
+  }
+
+  public getStoryViewers(storyId: string, creatorDid: string): { ok: boolean; viewers?: any[]; count?: number; error?: string } {
+    this.load();
+    if (!Array.isArray(this.db.stories)) return { ok: false, viewers: [], count: 0 };
+    const cleanId = storyId.replace(/^story-/, '');
+    const story = this.db.stories.find(s =>
+      s.id === storyId || s.id === `story-${cleanId}` || s.id === cleanId ||
+      s.creatorHandle === storyId || s.creatorHandle === `@${cleanId}`
+    );
+    if (!story) return { ok: false, error: 'Story not found' };
+    if (story.creatorDid !== creatorDid && !creatorDid.includes('admin')) {
+      return { ok: false, error: 'Unauthorized. Only story creator can inspect viewers.' };
+    }
+    const viewers = (story.seenByDids || []).map(vDid => {
+      const u = this.findUserByDid(vDid);
+      const seenAt = story.seenTimestamps?.[vDid] || story.createdAt;
+      return {
+        did: vDid,
+        handle: u?.handle || vDid,
+        displayName: u?.displayName || u?.name || vDid,
+        avatar: u?.avatar || '👤',
+        avatarBg: u?.avatarBg || '#6366f1',
+        seenAt,
+      };
+    });
+    return { ok: true, viewers, count: viewers.length };
+  }
+
+  public getHighlights(creatorDidOrHandle: string): StoryHighlightRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.story_highlights)) this.db.story_highlights = [];
+    const clean = (creatorDidOrHandle || '').replace(/^@/, '').trim().toLowerCase();
+    return this.db.story_highlights.filter(h =>
+      h.creatorDid === creatorDidOrHandle ||
+      (h.creatorHandle || '').replace(/^@/, '').trim().toLowerCase() === clean
+    );
+  }
+
+  public createHighlight(data: {
+    creatorDid: string;
+    title: string;
+    coverUrl?: string;
+    coverEmoji?: string;
+    segments?: StorySegmentRecord[];
+    storyIds?: string[];
+  }): StoryHighlightRecord {
+    this.load();
+    if (!Array.isArray(this.db.story_highlights)) this.db.story_highlights = [];
+    const user = this.findUserByDid(data.creatorDid);
+    const now = Date.now();
+    let segments: StorySegmentRecord[] = [];
+    if (Array.isArray(data.segments) && data.segments.length > 0) {
+      segments = data.segments;
+    } else if (Array.isArray(data.storyIds) && data.storyIds.length > 0) {
+      const all = Array.isArray(this.db.stories) ? this.db.stories : [];
+      for (const sid of data.storyIds) {
+        const found = all.find(s => s.id === sid);
+        if (found && Array.isArray(found.segments)) {
+          segments.push(...found.segments);
+        }
+      }
+    }
+    if (segments.length === 0) {
+      segments = [{
+        id: 'seg-hl-' + now,
+        caption: data.title,
+        timeAgo: 'Saved highlight',
+        createdAt: now,
+      }];
+    }
+    const newHighlight: StoryHighlightRecord = {
+      id: 'hl-' + now + '-' + crypto.randomBytes(4).toString('hex'),
+      creatorDid: data.creatorDid,
+      creatorHandle: user?.handle || '@creator',
+      creatorName: user?.displayName || user?.name || 'Creator',
+      title: data.title || 'Highlight',
+      coverUrl: data.coverUrl,
+      coverEmoji: data.coverEmoji || '✨',
+      segments,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.db.story_highlights.push(newHighlight);
+    this.save();
+    return newHighlight;
+  }
+
+  public deleteHighlight(highlightId: string, requesterDid: string): boolean {
+    this.load();
+    if (!Array.isArray(this.db.story_highlights)) return false;
+    const idx = this.db.story_highlights.findIndex(h => h.id === highlightId);
+    if (idx === -1) return false;
+    if (this.db.story_highlights[idx].creatorDid !== requesterDid && !requesterDid.includes('admin')) {
+      return false;
+    }
+    this.db.story_highlights.splice(idx, 1);
     this.save();
     return true;
   }
