@@ -468,5 +468,178 @@ describe('100% YouTube Studio Flagship Parity Verification Suite', () => {
       expect(firstTrack.duration).toBeDefined();
       expect(firstTrack.license).toBe('Royalty-Free Creative Commons 4.0');
     });
+
+    it('9.6 GET /api/studio/dashboard?channelId=... returns real channel-specific metrics and zero-state when empty', async () => {
+      // 1. Zero-state test with empty channel
+      const emptyChannelId = 'ch_test_empty_channel_999';
+      const zeroRes = await invokeStudioRoute('GET', `/api/studio/dashboard?channelId=${emptyChannelId}`);
+      expect(zeroRes.handled).toBe(true);
+      expect(zeroRes.status).toBe(200);
+      expect(zeroRes.data.ok).toBe(true);
+      expect(zeroRes.data.channelId).toBe(emptyChannelId);
+      expect(zeroRes.data.dashboard).toBeDefined();
+      expect(zeroRes.data.dashboard.latestVideo).toBeNull();
+      expect(zeroRes.data.dashboard.publishedVideosList).toEqual([]);
+      expect(zeroRes.data.dashboard.currentSubscribers).toBe(0);
+
+      // 2. Active-state test with video attached to channel
+      const allVideos = sovraDb.getAllVideos();
+      const existingVideo = allVideos[0];
+      const activeChannelId = existingVideo.channelId || 'ch_active_test';
+      const activeRes = await invokeStudioRoute('GET', `/api/studio/dashboard?channelId=${activeChannelId}`);
+      expect(activeRes.handled).toBe(true);
+      expect(activeRes.status).toBe(200);
+      expect(activeRes.data.ok).toBe(true);
+      expect(activeRes.data.dashboard).toBeDefined();
+      if (activeRes.data.dashboard.latestVideo) {
+        expect(activeRes.data.dashboard.latestVideo.title).toBeDefined();
+        expect(typeof activeRes.data.dashboard.latestVideo.viewsCount).toBe('number');
+      }
+    });
+  });
+
+  // =========================================================================
+  // PILLAR 10: COMPLETE YOUTUBE STUDIO PARITY & HARDWARE BIOMETRIC PROTECTIONS
+  // =========================================================================
+  describe('Pillar 10: Complete YouTube Studio Parity & Hardware Biometric Protections', () => {
+    it('10.1 Studio Top Navigation features YouTube Studio branding, omni-search, notifications bell, and quick action triad', () => {
+      // Top navbar shell
+      expect(serverContent).toContain('id="studioTopNavbar"');
+      expect(serverContent).toContain('class="studio-top-navbar"');
+      expect(serverContent).toContain('Studio');
+      expect(serverContent).toContain('SOVRA 4K');
+
+      // Omni-search input
+      expect(serverContent).toContain('id="studioChannelSearchInput"');
+      expect(serverContent).toContain('placeholder="Search across your channel"');
+      expect(serverContent).toContain('handleChannelGlobalSearch');
+
+      // Notifications Bell with badge
+      expect(serverContent).toContain('id="studioHeaderBellBtn"');
+      expect(serverContent).toContain('id="studioBellUnreadBadge"');
+
+      // Quick Action Triad buttons
+      expect(serverContent).toContain('id="studioQuickActionTriad"');
+      expect(serverContent).toContain('id="studioQuickUploadBtn"');
+      expect(serverContent).toContain('id="studioQuickGoLiveBtn"');
+      expect(serverContent).toContain('id="studioQuickPostBtn"');
+
+      // Top Primary Create Button
+      expect(serverContent).toContain('id="studioTopCreateBtn"');
+      expect(serverContent).toContain('toggleSidebarCollapse');
+    });
+
+    it('10.2 Vector UI Sidebar features 20px SVG outline icons, dedicated Earn and Content Detection tabs, and pinned footer', () => {
+      // Sidebar dedicated tabs
+      expect(serverContent).toContain('id="studioNavEarn"');
+      expect(serverContent).toContain('id="studioNavCopyright"');
+      expect(serverContent).toContain('id="studioNavSettings"');
+      expect(serverContent).toContain('id="studioNavFeedback"');
+
+      // Sidebar workspace sections
+      expect(serverContent).toContain('id="studioSectionEarn"');
+      expect(serverContent).toContain('id="studioSectionCopyright"');
+      expect(serverContent).toContain('id="studioSectionSettings"');
+      expect(serverContent).toContain('id="studioSectionFeedback"');
+
+      // Vector SVG iconography in sidebar
+      expect(serverContent).toContain('.studio-sidebar-nav-btn svg');
+      expect(serverContent).toContain('viewBox="0 0 24 24"');
+
+      // Pinned footer settings & feedback
+      expect(serverContent).toContain('class="studio-sidebar-footer"');
+      expect(serverContent).toContain('.studio-sidebar.collapsed');
+    });
+
+    it('10.3 3-Column Responsive Dashboard accurately matches YouTube Studio cards & benchmark analytics', () => {
+      // 3-Column layout
+      expect(serverContent).toContain('class="studio-dashboard-3col"');
+
+      // Card 1: Adaptive latest video performance & rank benchmark
+      expect(serverContent).toContain('id="studioLatestVideoCard"');
+      expect(serverContent).toContain('id="scorecardRank"');
+      expect(serverContent).toContain('10 of 10 &gt;');
+      expect(serverContent).toContain('id="scorecardAvgPercent"');
+      expect(serverContent).toContain('70.9%');
+      expect(serverContent).toContain('id="scorecardAvgCheck"');
+      expect(serverContent).toContain('id="btnScorecardAnalytics"');
+      expect(serverContent).toContain('id="btnScorecardComments"');
+      expect(serverContent).toContain('id="studioPublishedVideosCard"');
+
+      // Card 2: Channel analytics with delta & top content
+      expect(serverContent).toContain('id="studioChannelSummaryCard"');
+      expect(serverContent).toContain('id="studioSummarySubsBig"');
+      expect(serverContent).toContain('id="studioSummarySubsDelta"');
+      expect(serverContent).toContain('-1 in last 28 days');
+      expect(serverContent).toContain('id="studioSummaryViews28d"');
+      expect(serverContent).toContain('id="studioSummaryWatch28d"');
+      expect(serverContent).toContain('Go to channel analytics');
+
+      // Card 3: Platform news
+      expect(serverContent).toContain('id="studioNewsCard"');
+      expect(serverContent).toContain('Monthly Roundup: Made on Sovra edition');
+
+      // Card 4: Creator Insider carousel
+      expect(serverContent).toContain('id="studioCreatorInsiderCard"');
+      expect(serverContent).toContain('id="insiderSlideIndex"');
+      expect(serverContent).toContain('cycleInsiderSlide');
+
+      // Card 5: Recent comments with miniature video thumbnail badge
+      expect(serverContent).toContain('id="studioRecentCommentsCard"');
+      expect(serverContent).toContain('id="dashRecentCommentsList"');
+      expect(serverContent).toContain('dashReplyInput-');
+    });
+
+    it('10.4 Sensitive Creator Studio operations are strictly guarded by WebAuthn Biometric App Shield', () => {
+      // Sovereign earnings payout
+      expect(serverContent).toContain('id="btnClaimSovereignPayout"');
+      expect(serverContent).toContain('claimSovereignEarnings');
+      expect(serverContent).toContain('Sovereign Revenue Payout Shield');
+
+      // Channel DID export
+      expect(serverContent).toContain('id="btnExportChannelDid"');
+      expect(serverContent).toContain('exportChannelDidKey');
+      expect(serverContent).toContain('Channel Root Key Export Shield');
+
+      // Bulk video unpublishing
+      expect(serverContent).toContain('bulkUnpublishVideos');
+      expect(serverContent).toContain('Bulk Unpublish Content Shield');
+
+      // Studio feedback submission
+      expect(serverContent).toContain('id="studioFeedbackTopic"');
+      expect(serverContent).toContain('id="studioFeedbackText"');
+      expect(serverContent).toContain('submitStudioFeedback');
+
+      // Engine methods exist
+      expect(serverContent).toContain('window.SovraCreatorStudioEngine = {');
+      expect(serverContent).toContain('triggerBiometricShield(');
+    });
+
+    it('10.5 Unified Studio Shell features dynamic reactive channel switcher, zero header redundancy, and zero duplicate action buttons', () => {
+      // 1. Zero header redundancy: outer app-top-header hidden when inside studio
+      expect(serverContent).toContain('body.tab-active-studio .app-top-header');
+      expect(serverContent).toContain('display: none !important;');
+
+      // 2. Dynamic channel switcher selector & handle styling
+      expect(serverContent).toContain('id="studioActiveChannelSelect"');
+      expect(serverContent).toContain('switchActiveChannel');
+      expect(serverContent).toContain('populateChannelsAndProfile');
+      expect(serverContent).toContain('id="studioChannelHandle"');
+      expect(serverContent).toContain('text-decoration: none');
+
+      // 3. No duplicate create buttons in dashboard main header
+      // The single primary create action is in studio topbar (#studioTopCreateBtn)
+      // The dashboard header contains only a clean status pill and no duplicate buttons
+      expect(serverContent).toContain('id="studioTopCreateBtn"');
+      expect(serverContent).not.toMatch(/<div[^>]*class="dashboard-header"[^>]*>[\s\S]*?<button[^>]*>\+ Create & Transcode<\/button>/);
+      expect(serverContent).not.toMatch(/<h1>Channel dashboard<\/h1>[\s\S]*?<button[^>]*>\+ Create/);
+
+      // 4. Zero-State vs Active-State scorecard dropzone
+      expect(serverContent).toContain('id="scorecardZeroState"');
+      expect(serverContent).toContain('id="scorecardActiveState"');
+      expect(serverContent).toContain('Upload Your First Video');
+      expect(serverContent).toContain('handleDashboardFileDrop');
+      expect(serverContent).toContain('handleReplyKeyDown');
+    });
   });
 });
