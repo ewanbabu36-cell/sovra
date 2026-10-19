@@ -46,7 +46,12 @@ func (vm *WasmVM) Instantiate(bytecode []byte, storage StorageDriver, env types.
 		return ExecuteCW721Instantiate(storage, env, info, msgBz)
 	}
 
-	// 3. If standard CW20 Creator Token bytecode or manifest, execute CW20 instantiate logic
+	// 3. If Creator Revenue Split contract
+	if isSplitContract(bytecode, msgBz) {
+		return ExecuteSplitInstantiate(storage, env, info, msgBz)
+	}
+
+	// 4. If standard CW20 Creator Token bytecode or manifest, execute CW20 instantiate logic
 	if isCW20Contract(bytecode, msgBz) {
 		return ExecuteCW20Instantiate(storage, env, info, msgBz)
 	}
@@ -73,6 +78,10 @@ func (vm *WasmVM) Execute(bytecode []byte, storage StorageDriver, env types.Env,
 		return ExecuteCW721Execute(storage, env, info, msgBz)
 	}
 
+	if isSplitContract(bytecode, msgBz) {
+		return ExecuteSplitExecute(storage, env, info, msgBz)
+	}
+
 	if isCW20Contract(bytecode, msgBz) {
 		return ExecuteCW20Execute(storage, env, info, msgBz)
 	}
@@ -96,6 +105,10 @@ func (vm *WasmVM) Query(bytecode []byte, storage StorageDriver, env types.Env, q
 
 	if isCW721Contract(bytecode, queryBz) {
 		return ExecuteCW721Query(storage, env, queryBz)
+	}
+
+	if isSplitContract(bytecode, queryBz) {
+		return ExecuteSplitQuery(storage, env, queryBz)
 	}
 
 	if isCW20Contract(bytecode, queryBz) {
@@ -139,6 +152,20 @@ func isCW721Contract(bytecode []byte, msgBz []byte) bool {
 	return false
 }
 
+func isSplitContract(bytecode []byte, msgBz []byte) bool {
+	msgStr := string(msgBz)
+	if stringsContainsAny(msgStr, "distribute", "update_recipients", "simulate_distribute", "recipient_share") {
+		return true
+	}
+	if stringsContainsAny(msgStr, "\"recipients\"") && stringsContainsAny(msgStr, "\"weight\"") {
+		return true
+	}
+	if bytes.Contains(bytecode, []byte("split")) || bytes.Contains(bytecode, []byte("cw_split")) || bytes.Contains(bytecode, []byte("revenue_split")) {
+		return true
+	}
+	return false
+}
+
 func isCW20Contract(bytecode []byte, msgBz []byte) bool {
 	// Check for CW20 marker or JSON schema keywords in message/bytecode
 	msgStr := string(msgBz)
@@ -148,8 +175,8 @@ func isCW20Contract(bytecode []byte, msgBz []byte) bool {
 	if bytes.Contains(bytecode, []byte("cw20")) || bytes.Contains(bytecode, []byte("cw20_creator_token")) {
 		return true
 	}
-	// Fallback: If not valid wasm magic and not swap, assume native test CW20 token
-	if !IsWasmBytecode(bytecode) && !isSwapContract(bytecode, msgBz) && !isCW721Contract(bytecode, msgBz) {
+	// Fallback: If not valid wasm magic and not swap, split, or cw721, assume native test CW20 token
+	if !IsWasmBytecode(bytecode) && !isSwapContract(bytecode, msgBz) && !isCW721Contract(bytecode, msgBz) && !isSplitContract(bytecode, msgBz) {
 		return true
 	}
 	return false

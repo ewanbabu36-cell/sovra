@@ -9,10 +9,15 @@ import { ReelsScreen } from '../screens/ReelsScreen.js';
 import { WatchScreen } from '../screens/WatchScreen.js';
 import { ChatsScreen } from '../screens/ChatsScreen.js';
 import { MeScreen } from '../screens/MeScreen.js';
+import { CallScreen } from '../screens/CallScreen.js';
 import {
   fetchMeshStatus,
   updateMeshControls,
   type MobileMeshStatus,
+  fetchIncomingCall,
+  declineCall,
+  endCall,
+  type MobileIncomingCall,
 } from '../services/api.js';
 
 export type TabKey = 'feed' | 'reels' | 'watch' | 'chats' | 'me';
@@ -35,6 +40,170 @@ export function BottomTabNavigator(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabKey>('feed');
   const [meshStatus, setMeshStatus] = useState<MobileMeshStatus | null>(null);
   const [showMeshDrawer, setShowMeshDrawer] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<MobileIncomingCall | null>(null);
+  const [activeCallSession, setActiveCallSession] = useState<{
+    callId: string;
+    peerName: string;
+    peerDid: string;
+    mediaType: 'audio' | 'video';
+  } | null>(null);
+
+  // Background incoming call polling - maintains active listening even when screen is locked
+  useEffect(() => {
+    let mounted = true;
+    let wakeLockSentinel: any = null;
+
+    const checkIncoming = async () => {
+      if (activeCallSession) return;
+      try {
+        const inc = await fetchIncomingCall();
+        if (!mounted) return;
+        if (inc) {
+          setIncomingCall(prev => {
+            if (prev?.callId === inc.callId) return prev;
+            // Native Android Heads-Up / Full-Screen Intent Bridge
+            if (typeof (window as any).SovraCallNative?.showIncomingCallNotification === 'function') {
+              (window as any).SovraCallNative.showIncomingCallNotification(
+                inc.callId,
+                inc.callerName || 'Peer',
+                inc.callType || 'audio',
+              );
+            }
+            // Screen Wake Lock & Vibration
+            try {
+              if (navigator.wakeLock?.request) {
+                navigator.wakeLock.request('screen').then(w => { wakeLockSentinel = w; }).catch(() => {});
+              }
+              if (navigator.vibrate) {
+                navigator.vibrate([500, 300, 500, 300, 500, 300, 500, 300]);
+              }
+            } catch (_) {}
+            return inc;
+          });
+        } else {
+          setIncomingCall(prev => {
+            if (prev) {
+              if (typeof (window as any).SovraCallNative?.cancelIncomingCallNotification === 'function') {
+                (window as any).SovraCallNative.cancelIncomingCallNotification(prev.callId);
+              }
+              if (navigator.vibrate) navigator.vibrate(0);
+              if (wakeLockSentinel) {
+                wakeLockSentinel.release().catch(() => {});
+                wakeLockSentinel = null;
+              }
+            }
+            return null;
+          });
+        }
+      } catch (_) {}
+    };
+
+    checkIncoming();
+    const interval = setInterval(checkIncoming, 2500);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+      if (wakeLockSentinel) wakeLockSentinel.release().catch(() => {});
+      if (navigator.vibrate) navigator.vibrate(0);
+    };
+  }, [activeCallSession]);
+
+  // Global hooks for native Android PendingIntent and Service Worker auto-answer & decline
+  useEffect(() => {
+    const handleAutoAnswer = (targetCallId?: string) => {
+      setIncomingCall(current => {
+        const call = current || (targetCallId ? {
+          callId: targetCallId,
+          callerName: 'Peer',
+          callerDid: 'did:key:z6MksPeer',
+          callerHandle: '@peer',
+          callerAvatar: '📞',
+          callerAvatarBg: '#10b981',
+          callType: 'audio' as const,
+          createdAt: Date.now(),
+        } : null);
+
+        if (call) {
+          if (typeof (window as any).SovraCallNative?.cancelIncomingCallNotification === 'function') {
+            (window as any).SovraCallNative.cancelIncomingCallNotification(call.callId);
+          }
+          if (navigator.vibrate) navigator.vibrate(0);
+          setActiveCallSession({
+            callId: call.callId,
+            peerName: call.callerName || 'Peer',
+            peerDid: call.callerDid || 'did:key:z6MksPeer',
+            mediaType: call.callType || 'audio',
+          });
+        }
+        return null;
+      });
+    };
+
+    const handleDecline = () => {
+      setIncomingCall(current => {
+        if (current) {
+          declineCall(current.callId).catch(() => {});
+          if (typeof (window as any).SovraCallNative?.cancelIncomingCallNotification === 'function') {
+            (window as any).SovraCallNative.cancelIncomingCallNotification(current.callId);
+          }
+          if (navigator.vibrate) navigator.vibrate(0);
+        }
+        return null;
+      });
+    };
+
+    (window as any).autoAnswerIncomingCallById = handleAutoAnswer;
+    (window as any).declineIncomingCall = handleDecline;
+
+    // Check query params for autoAnswerCall from Service Worker / Intent
+    if (typeof window !== 'undefined' && window.location) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const autoAnswerId = urlParams.get('autoAnswerCall');
+      if (autoAnswerId) {
+        handleAutoAnswer(autoAnswerId);
+      }
+    }
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SOVRA_AUTO_ANSWER_CALL' && event.data.callId) {
+        handleAutoAnswer(event.data.callId);
+      }
+    };
+    window.addEventListener('message', onMessage);
+
+    return () => {
+      window.removeEventListener('message', onMessage);
+      delete (window as any).autoAnswerIncomingCallById;
+      delete (window as any).declineIncomingCall;
+    };
+  }, []);
+
+  const handleAcceptIncomingCall = () => {
+    if (!incomingCall) return;
+    if (typeof (window as any).SovraCallNative?.cancelIncomingCallNotification === 'function') {
+      (window as any).SovraCallNative.cancelIncomingCallNotification(incomingCall.callId);
+    }
+    if (navigator.vibrate) navigator.vibrate(0);
+    setActiveCallSession({
+      callId: incomingCall.callId,
+      peerName: incomingCall.callerName || 'Peer',
+      peerDid: incomingCall.callerDid || 'did:key:z6MksPeer',
+      mediaType: incomingCall.callType || 'audio',
+    });
+    setIncomingCall(null);
+  };
+
+  const handleDeclineIncomingCall = () => {
+    if (!incomingCall) return;
+    declineCall(incomingCall.callId).catch(() => {});
+    if (typeof (window as any).SovraCallNative?.cancelIncomingCallNotification === 'function') {
+      (window as any).SovraCallNative.cancelIncomingCallNotification(incomingCall.callId);
+    }
+    if (navigator.vibrate) navigator.vibrate(0);
+    setIncomingCall(null);
+  };
+
 
   useEffect(() => {
     let mounted = true;
@@ -136,10 +305,17 @@ export function BottomTabNavigator(): React.JSX.Element {
       case 'CONNECTING':
         return { text: '🟣 CONNECTING...', color: '#c084fc', bg: 'rgba(192, 132, 252, 0.15)' };
       case 'NO_PEERS':
-        return { text: '🟡 OFFLINE (SCANNING)', color: '#facc15', bg: 'rgba(250, 204, 21, 0.15)' };
+        return { text: '🟡 OFFLINE MESH (SCANNING)', color: '#facc15', bg: 'rgba(250, 204, 21, 0.15)' };
       case 'OFFLINE':
       default:
-        return { text: '🔴 OFFLINE / DISCONNECTED', color: '#f87171', bg: 'rgba(239, 68, 68, 0.15)' };
+        if (meshStatus.controls?.bluetoothMeshEnabled !== false) {
+          return {
+            text: '🟣 OFFLINE MESH (BLE GATT & DTN READY)',
+            color: '#c084fc',
+            bg: 'rgba(192, 132, 252, 0.2)',
+          };
+        }
+        return { text: '🔴 MESH RADIO DISABLED', color: '#f87171', bg: 'rgba(239, 68, 68, 0.15)' };
     }
   };
 
@@ -364,6 +540,129 @@ export function BottomTabNavigator(): React.JSX.Element {
           </div>
         ))}
       </div>
+
+      {/* WhatsApp-Style High-Priority Incoming Call Heads-Up Overlay */}
+      {incomingCall && !activeCallSession && (
+        <div
+          id="mobileIncomingCallOverlay"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 99999,
+            backgroundColor: 'rgba(11, 20, 26, 0.96)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderBottom: '2px solid rgba(34, 197, 94, 0.4)',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.85)',
+            padding: '24px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+          }}
+        >
+          {/* E2EE Security Badge */}
+          <div style={{ fontSize: 11, color: '#34d399', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🔒</span>
+            <span>End-to-End Encrypted (Noise_XX / DTLS)</span>
+          </div>
+
+          {/* Caller Avatar & Name */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: '50%',
+                backgroundColor: incomingCall.callerAvatarBg || '#10b981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 32,
+                boxShadow: '0 0 24px rgba(34, 197, 94, 0.5)',
+                border: '3px solid #22c55e',
+              }}
+            >
+              {incomingCall.callerAvatar || '📞'}
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#f8fafc' }}>
+              {incomingCall.callerName}
+            </div>
+            <div style={{ fontSize: 13, color: '#94a3b8' }}>
+              Incoming {incomingCall.callType === 'video' ? 'Video' : 'Voice'} Call...
+            </div>
+          </div>
+
+          {/* Accept / Decline Action Buttons */}
+          <div style={{ display: 'flex', gap: 40, alignItems: 'center', marginTop: 8 }}>
+            {/* Decline */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <button
+                id="btnDeclineIncomingCall"
+                onClick={handleDeclineIncomingCall}
+                style={{
+                  width: 58,
+                  height: 58,
+                  borderRadius: '50%',
+                  backgroundColor: '#ef4444',
+                  border: 'none',
+                  fontSize: 24,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(239, 68, 68, 0.6)',
+                }}
+                title="Decline Call"
+              >
+                🔴
+              </button>
+              <span style={{ fontSize: 11, color: '#f87171', fontWeight: 600 }}>Decline</span>
+            </div>
+
+            {/* Accept */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <button
+                id="btnAcceptIncomingCall"
+                onClick={handleAcceptIncomingCall}
+                style={{
+                  width: 58,
+                  height: 58,
+                  borderRadius: '50%',
+                  backgroundColor: '#22c55e',
+                  border: 'none',
+                  fontSize: 24,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(34, 197, 94, 0.6)',
+                }}
+                title="Accept Call"
+              >
+                🟢
+              </button>
+              <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 600 }}>Accept</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Call Fullscreen View (Available anywhere across all tabs) */}
+      {activeCallSession && (
+        <CallScreen
+          peerName={activeCallSession.peerName}
+          peerDid={activeCallSession.peerDid}
+          mediaType={activeCallSession.mediaType}
+          onEndCall={() => {
+            endCall(activeCallSession.callId, 'completed').catch(() => {});
+            setActiveCallSession(null);
+          }}
+        />
+      )}
     </div>
   );
 }
+

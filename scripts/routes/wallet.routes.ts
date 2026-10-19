@@ -320,10 +320,178 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
   // 3. GET /api/wallet/pools - List active AMM liquidity pools
   if (url.pathname === '/api/wallet/pools' && req.method === 'GET') {
-    const dbAny = sovraDb as any;
-    const pools: any[] = (dbAny && dbAny.db && Array.isArray(dbAny.db.amm_pools)) ? dbAny.db.amm_pools : [];
+    const pools: any[] = typeof (sovraDb as any).getAmmPools === 'function' ? (sovraDb as any).getAmmPools() : (((sovraDb as any).db && Array.isArray((sovraDb as any).db.amm_pools)) ? (sovraDb as any).db.amm_pools : []);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, pools, count: pools.length }));
+    return true;
+  }
+
+  // 4. GET /api/wallet/bridge/chains - Supported Layer-1 IBC cross-chain targets
+  if (url.pathname === '/api/wallet/bridge/chains' && req.method === 'GET') {
+    const chains = [
+      {
+        id: 'osmosis-1',
+        name: 'Osmosis DEX Hub',
+        channelId: 'channel-0',
+        relayerStatus: 'OPTIMAL',
+        counterpartyPrefix: 'osmo',
+        nativeDenom: 'uosmo',
+        symbol: 'OSMO',
+        gasFeeSov: '0.10',
+        blockHeight: 18492040,
+        latencyMs: 14,
+      },
+      {
+        id: 'cosmoshub-4',
+        name: 'Cosmos Hub Interchain',
+        channelId: 'channel-1',
+        relayerStatus: 'OPTIMAL',
+        counterpartyPrefix: 'cosmos',
+        nativeDenom: 'uatom',
+        symbol: 'ATOM',
+        gasFeeSov: '0.25',
+        blockHeight: 22104910,
+        latencyMs: 22,
+      },
+      {
+        id: 'injective-1',
+        name: 'Injective Financial Mesh',
+        channelId: 'channel-2',
+        relayerStatus: 'ONLINE',
+        counterpartyPrefix: 'inj',
+        nativeDenom: 'inj',
+        symbol: 'INJ',
+        gasFeeSov: '0.15',
+        blockHeight: 67104922,
+        latencyMs: 18,
+      },
+      {
+        id: 'sovra-mesh',
+        name: 'Sovra L1 Pure Mesh',
+        channelId: 'loopback-0',
+        relayerStatus: 'ACTIVE',
+        counterpartyPrefix: 'sovra',
+        nativeDenom: 'usov',
+        symbol: 'SOV',
+        gasFeeSov: '0.00',
+        blockHeight: 142091,
+        latencyMs: 1,
+      },
+    ];
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, chains, count: chains.length }));
+    return true;
+  }
+
+  // 5. GET /api/wallet/bridge/history - Historical cross-chain settlements
+  if (url.pathname === '/api/wallet/bridge/history' && req.method === 'GET') {
+    const userAddress = resolveUserAddress(ctx);
+    const transfers = typeof (sovraDb as any).getBridgeTransfers === 'function'
+      ? (sovraDb as any).getBridgeTransfers(userAddress)
+      : [];
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, address: userAddress, transfers, count: transfers.length }));
+    return true;
+  }
+
+  // 6. POST /api/wallet/bridge/transfer - Multi-Chain Layer-1 IBC Bridge & Creator Settlement
+  if ((url.pathname === '/api/wallet/bridge/transfer' || url.pathname === '/api/wallet/bridge/deposit') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+
+    try {
+      const parsed = JSON.parse(body);
+      const senderAddress = parsed.senderAddress || resolveUserAddress(ctx);
+      const targetChain = (parsed.targetChain || 'osmosis').toLowerCase();
+      const targetAddress = (parsed.targetAddress || parsed.recipient || '').trim();
+      const amount = String(parsed.amount || '0');
+      const sourceAsset = (parsed.sourceAsset || 'SOV').toUpperCase();
+      const destinationAsset = (parsed.destinationAsset || (targetChain === 'osmosis' ? 'OSMO' : (targetChain === 'cosmoshub' ? 'ATOM' : 'INJ'))).toUpperCase();
+      const principal = ctx.resolvePrincipal(ctx.req);
+
+      if (!targetAddress || amount === '0' || Number(amount) <= 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'targetAddress and positive amount are required' }));
+        return true;
+      }
+
+      // Execute bridge transfer in database
+      const transferRecord = (sovraDb as any).createBridgeTransfer({
+        senderAddress,
+        senderDid: principal?.did,
+        targetChain,
+        targetAddress,
+        amount,
+        sourceAsset,
+        destinationAsset,
+        relayerFee: '500000',
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        transfer: transferRecord,
+        txHash: transferRecord.txHash,
+        stages: transferRecord.stages,
+        status: 'SETTLED',
+        receipt: {
+          bridgeTxId: transferRecord.id,
+          sourceChain: 'sovra-l1-mesh',
+          targetChain,
+          targetAddress,
+          amountSent: amount + ' ' + sourceAsset,
+          amountReceived: (Number(amount) * 0.98).toFixed(2) + ' ' + destinationAsset,
+          relayerFee: '0.50 SOV',
+          settlementProof: 'ibc_merkle_packet_attestation_' + transferRecord.id,
+          completedAt: transferRecord.settledAt,
+        },
+      }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Bridge transfer failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 6. POST /api/wallet/faucet/claim - Genesis 50 SOV Starter Grant
+  if (url.pathname === '/api/wallet/faucet/claim' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const targetDid = parsed.did || (principal ? principal.did : 'did:sovra:guest');
+      const amount = Number(parsed.amount || 50);
+
+      const result = (sovraDb as any).depositFunds({
+        did: targetDid,
+        amount,
+        sourceTx: 'faucet_claim_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'),
+      });
+
+      if (result.ok) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          claimed: amount,
+          amount,
+          newBalance: result.newBalance,
+          newBalanceFiat: Number((result.newBalance * 3.0).toFixed(2)),
+          currency: 'SOV',
+          txHash: '0x' + crypto.randomBytes(16).toString('hex'),
+          message: `🎁 ${amount.toFixed(2)} SOV Genesis Starter Grant claimed successfully!`,
+        }));
+      } else {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: result.error || 'Faucet claim failed' }));
+      }
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Server error' }));
+    }
     return true;
   }
 

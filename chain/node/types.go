@@ -14,6 +14,8 @@ const (
 	TxTypeStoreCode           TxType = "store_code"
 	TxTypeInstantiateContract TxType = "instantiate"
 	TxTypeExecuteContract     TxType = "execute"
+	TxTypeDelegate            TxType = "delegate"
+	TxTypeUndelegate          TxType = "undelegate"
 )
 
 // SignedTransaction represents a standard signed transaction in Sovra
@@ -33,6 +35,9 @@ type SignedTransaction struct {
 	Admin           string `json:"admin,omitempty"`
 	Msg             string `json:"msg,omitempty"`
 	Funds           string `json:"funds,omitempty"`
+
+	// Staking & PoS Fields
+	Validator string `json:"validator,omitempty"`
 
 	PubKeyHex string `json:"pub_key"` // ed25519 public key hex
 	SigHex    string `json:"sig"`     // ed25519 signature hex
@@ -54,6 +59,7 @@ func (tx *SignedTransaction) GetSignBytes() []byte {
 		Admin           string `json:"admin,omitempty"`
 		Msg             string `json:"msg,omitempty"`
 		Funds           string `json:"funds,omitempty"`
+		Validator       string `json:"validator,omitempty"`
 	}{
 		Type:            tx.Type,
 		Sender:          tx.Sender,
@@ -68,6 +74,7 @@ func (tx *SignedTransaction) GetSignBytes() []byte {
 		Admin:           tx.Admin,
 		Msg:             tx.Msg,
 		Funds:           tx.Funds,
+		Validator:       tx.Validator,
 	}
 	bz, _ := json.Marshal(payload)
 	return bz
@@ -99,4 +106,32 @@ type KeyPair struct {
 	PrivateKey ed25519.PrivateKey `json:"-"`
 	PubKeyHex  string            `json:"pub_key"`
 	PrivKeyHex string            `json:"priv_key"`
+}
+
+// Slashing & Misbehavior Types
+type MisbehaviorType string
+
+const (
+	MisbehaviorDoubleSign MisbehaviorType = "double_sign"
+	MisbehaviorDowntime   MisbehaviorType = "downtime"
+)
+
+// Evidence represents verifiable proof of Byzantine fault or downtime
+type Evidence struct {
+	Type          MisbehaviorType `json:"type"`
+	Validator     string          `json:"validator"`
+	Height        int64           `json:"height"`
+	Time          int64           `json:"time"`
+	SlashFraction string          `json:"slash_fraction"`
+	JailedUntil   int64           `json:"jailed_until"`
+}
+
+// ValidatorSigningInfo tracks liveness and jailing state for a validator
+type ValidatorSigningInfo struct {
+	Address             string `json:"address"`
+	StartHeight         int64  `json:"start_height"`
+	IndexOffset         int64  `json:"index_offset"`
+	JailedUntil         int64  `json:"jailed_until"`
+	Tombstoned          bool   `json:"tombstoned"`
+	MissedBlocksCounter int64  `json:"missed_blocks_counter"`
 }

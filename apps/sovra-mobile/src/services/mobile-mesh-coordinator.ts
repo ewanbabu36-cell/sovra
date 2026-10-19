@@ -19,6 +19,7 @@ import {
   type MeshDiagnostics,
   type MeshUserControls,
   type MeshDiscoveredPeer,
+  type DeliveryReceipt,
 } from '@sovra/p2p';
 import { bytesToHex } from '@sovra/crypto';
 import { NativeMobileBleAdapter } from './native-ble-bridge.js';
@@ -45,6 +46,7 @@ export class MobileMeshCoordinator {
   private listeners: Array<(state: MobileMeshRuntimeState) => void> = [];
   private peerListeners: Array<(peers: MeshDiscoveredPeer[]) => void> = [];
   private messageListeners: Array<(message: CachedMessage) => void> = [];
+  private receiptListeners: Array<(receipt: DeliveryReceipt) => void> = [];
 
   private constructor() {
     // 1. Resolve or generate persistent local Ed25519 identity for mesh routing
@@ -173,6 +175,19 @@ export class MobileMeshCoordinator {
         }
       } catch (err) {
         console.warn('[MobileMeshCoordinator] Error processing incoming envelope payload:', err);
+      }
+    });
+
+    this.router.onDeliveryReceipt(async receipt => {
+      try {
+        await localDb.updateMessageStatus(receipt.targetEnvelopeId, 'delivered', 'SYNCED');
+        for (const rl of this.receiptListeners) {
+          try {
+            rl(receipt);
+          } catch {}
+        }
+      } catch (err) {
+        console.warn('[MobileMeshCoordinator] Error processing delivery receipt:', err);
       }
     });
 
@@ -356,6 +371,53 @@ export class MobileMeshCoordinator {
     return () => {
       this.messageListeners = this.messageListeners.filter(h => h !== handler);
     };
+  }
+
+  public onDeliveryReceipt(handler: (receipt: DeliveryReceipt) => void): () => void {
+    this.receiptListeners.push(handler);
+    return () => {
+      this.receiptListeners = this.receiptListeners.filter(h => h !== handler);
+    };
+  }
+
+  public isDirectPeerConnected(targetDid: string): boolean {
+    return this.router.getConnectedPeerDids().includes(targetDid);
+  }
+
+  public getPeerLinkInfo(targetDid: string): {
+    status: 'DIRECT_BLE' | 'MESH_RELAY' | 'INTERNET' | 'OFFLINE_QUEUED';
+    isDirect: boolean;
+    hops: number;
+    rssi?: number;
+    distanceMeters?: number;
+    peerName?: string;
+  } {
+    if (this.isDirectPeerConnected(targetDid)) {
+      return { status: 'DIRECT_BLE', isDirect: true, hops: 1 };
+    }
+    const discovered = this.getDiscoveredPeers().find(
+      p => p.peerAddress === targetDid || p.ephemeralToken === targetDid,
+    );
+    if (discovered) {
+      return {
+        status: 'DIRECT_BLE',
+        isDirect: true,
+        hops: 1,
+        ...(discovered.rssi !== undefined ? { rssi: discovered.rssi } : {}),
+        ...(discovered.distanceMeters !== undefined ? { distanceMeters: discovered.distanceMeters } : {}),
+        peerName: (discovered as any).name || (discovered as any).peerName || discovered.peerAddress.slice(0, 8),
+      };
+    }
+    if (this.transportManager.getNetworkStatus() === 'ONLINE') {
+      return { status: 'INTERNET', isDirect: false, hops: 0 };
+    }
+    if (
+      this.transportManager.getNetworkStatus() === 'BLUETOOTH_MESH' ||
+      this.getDiscoveredPeers().length > 0
+    ) {
+      return { status: 'MESH_RELAY', isDirect: false, hops: 2 };
+    }
+    return { status: 'OFFLINE_QUEUED', isDirect: false, hops: 0 };
   }
 
   private notifyListeners(): void {

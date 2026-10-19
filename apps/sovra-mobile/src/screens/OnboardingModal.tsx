@@ -11,6 +11,7 @@
 
 import React, { useState } from 'react';
 import { AccountLifecycleEngine, type UserAccountProfile } from '@sovra/identity';
+import { claimReferralCode } from '../services/api.js';
 
 export interface OnboardingModalProps {
   readonly isOpen: boolean;
@@ -26,6 +27,8 @@ export function OnboardingModal({
   const [step, setStep] = useState<1 | 2 | 3 | 'qr_scan'>(1);
   const [handle, setHandle] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [referralClaimedBonus, setReferralClaimedBonus] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<UserAccountProfile | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -51,6 +54,21 @@ export function OnboardingModal({
 
       if (res.ok) {
         setCreatedProfile(res.value.profile);
+        if (referralCode.trim()) {
+          try {
+            const claimRes = await claimReferralCode({
+              referralCode: referralCode.trim(),
+              inviteeDid: res.value.profile.did,
+              inviteeHandle: res.value.profile.handle,
+              deviceId: res.value.profile.deviceId,
+            });
+            if (claimRes.ok) {
+              setReferralClaimedBonus(claimRes.bonusSov || 25);
+            }
+          } catch (cErr) {
+            console.warn('[Onboarding] Referral claim attempt:', cErr);
+          }
+        }
         setIsProcessing(false);
         setStep(3);
       } else {
@@ -233,6 +251,31 @@ export function OnboardingModal({
                   }}
                 />
               </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#facc15', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <span>🎁</span> Referral Code (Optional — Get 25 SOV Bonus)
+                </label>
+                <input
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase().trim())}
+                  placeholder="e.g. SOV-686ABE"
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    backgroundColor: '#1e293b',
+                    border: referralCode ? '1px solid rgba(250, 204, 21, 0.6)' : '1px solid #334155',
+                    borderRadius: 12,
+                    color: '#facc15',
+                    fontSize: 14,
+                    fontFamily: 'monospace',
+                    letterSpacing: 1,
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
             </div>
 
             <button
@@ -397,6 +440,32 @@ export function OnboardingModal({
                 <span style={{ color: '#f8fafc' }}>&lt; 5 seconds</span>
               </div>
             </div>
+
+            {referralClaimedBonus && (
+              <div
+                style={{
+                  backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                  border: '1px solid rgba(234, 179, 8, 0.4)',
+                  borderRadius: 12,
+                  padding: '10px 14px',
+                  marginBottom: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 22 }}>🎁</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fef08a' }}>
+                    +{referralClaimedBonus} SOV Welcome Grant Awarded!
+                  </div>
+                  <div style={{ fontSize: 10, color: '#fde047', opacity: 0.85 }}>
+                    Credited directly to your sovereign Web3 wallet.
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={handleFinish}

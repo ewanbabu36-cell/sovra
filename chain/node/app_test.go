@@ -275,3 +275,189 @@ func TestSovraAppPersistentRestart(t *testing.T) {
 	}
 }
 
+func TestStakingDelegationAndUndelegation(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	genesisTime := int64(1_700_000_000)
+	app := node.NewSovraApp(memStore, genesisTime)
+
+	alice := generateTestKeyPair(t, "alice")
+	val1 := generateTestKeyPair(t, "val1")
+
+	gen := node.GenesisState{
+		ChainID:     "sovra-testnet-0",
+		GenesisTime: genesisTime,
+		Accounts: map[string]string{
+			alice.Address: "10000000000000", // 10M SOV
+			val1.Address:  "20000000000000", // 20M SOV
+		},
+		Validators: []node.GenesisValidator{
+			{Name: "val1", Address: val1.Address, PubKeyHex: val1.PubKeyHex, VotingPower: 100},
+		},
+	}
+
+	if err := app.InitChain(gen); err != nil {
+		t.Fatalf("InitChain failed: %v", err)
+	}
+
+	if err := app.BeginBlock(1, genesisTime); err != nil {
+		t.Fatalf("BeginBlock failed: %v", err)
+	}
+
+	// 1. Alice delegates 2,000,000 uSOV (2 SOV) to val1
+	delTx := node.SignedTransaction{
+		Type:      node.TxTypeDelegate,
+		Recipient: val1.Address,
+		Validator: val1.Address,
+		Amount:    "2000000",
+		Nonce:     0,
+		Fee:       "1000",
+	}
+	signTransaction(alice, &delTx)
+
+	if err := app.CheckTx(delTx); err != nil {
+		t.Fatalf("CheckTx delegate failed: %v", err)
+	}
+	if err := app.DeliverTx(delTx); err != nil {
+		t.Fatalf("DeliverTx delegate failed: %v", err)
+	}
+
+	// Verify delegation amount in store
+	delBal := app.GetDelegation(memStore, alice.Address, val1.Address)
+	if !delBal.Equal(math.NewInt(2_000_000)) {
+		t.Fatalf("expected 2,000,000 uSOV delegation, got %s", delBal)
+	}
+
+	// 2. Alice undelegates 500,000 uSOV from val1
+	undelTx := node.SignedTransaction{
+		Type:      node.TxTypeUndelegate,
+		Recipient: val1.Address,
+		Validator: val1.Address,
+		Amount:    "500000",
+		Nonce:     1,
+		Fee:       "1000",
+	}
+	signTransaction(alice, &undelTx)
+
+	if err := app.CheckTx(undelTx); err != nil {
+		t.Fatalf("CheckTx undelegate failed: %v", err)
+	}
+	if err := app.DeliverTx(undelTx); err != nil {
+		t.Fatalf("DeliverTx undelegate failed: %v", err)
+	}
+
+	// Verify delegation decreased to 1,500,000 uSOV
+	delBal2 := app.GetDelegation(memStore, alice.Address, val1.Address)
+	if !delBal2.Equal(math.NewInt(1_500_000)) {
+		t.Fatalf("expected 1,500,000 uSOV delegation, got %s", delBal2)
+	}
+
+	// 3. Excess undelegate attempt must fail CheckTx
+	excessUndelTx := node.SignedTransaction{
+		Type:      node.TxTypeUndelegate,
+		Recipient: val1.Address,
+		Validator: val1.Address,
+		Amount:    "10000000", // exceeds 1.5M remaining
+		Nonce:     2,
+		Fee:       "1000",
+	}
+	signTransaction(alice, &excessUndelTx)
+
+	if err := app.CheckTx(excessUndelTx); err == nil {
+		t.Fatalf("expected excess undelegation to fail CheckTx")
+	}
+}
+
+func TestSlashingAndGenesisExport(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	genesisTime := int64(1_700_000_000)
+	app := node.NewSovraApp(memStore, genesisTime)
+
+	alice := generateTestKeyPair(t, "alice")
+	bob := generateTestKeyPair(t, "bob")
+
+	gen := node.GenesisState{
+		ChainID:     "sovra-testnet-0",
+		GenesisTime: genesisTime,
+		Accounts: map[string]string{
+			alice.Address: "20000000000000", // 20M SOV
+			bob.Address:   "10000000000000", // 10M SOV
+		},
+		Validators: []node.GenesisValidator{
+			{Name: "val-alice", Address: alice.Address, PubKeyHex: alice.PubKeyHex, VotingPower: 50},
+			{Name: "val-bob", Address: bob.Address, PubKeyHex: bob.PubKeyHex, VotingPower: 50},
+		},
+	}
+
+	if err := app.InitChain(gen); err != nil {
+		t.Fatalf("InitChain failed: %v", err)
+	}
+
+	// 1. Export genesis and verify state round-trip
+	exported, err := app.ExportGenesis()
+	if err != nil {
+		t.Fatalf("ExportGenesis failed: %v", err)
+	}
+	if exported.ChainID != "sovra-testnet-0" {
+		t.Fatalf("expected ChainID sovra-testnet-0, got %s", exported.ChainID)
+	}
+	if exported.Accounts[alice.Address] != "20000000000000" {
+		t.Fatalf("exported balance mismatch for alice")
+	}
+	if len(exported.Validators) != 2 {
+		t.Fatalf("expected 2 validators, got %d", len(exported.Validators))
+	}
+
+	// 2. Double-Sign Slashing on Alice (5% = 500 bps)
+	now := int64(1_700_000_100)
+	slashedAmt, err := app.SlashValidator(alice.Address, 500, 3600, node.MisbehaviorDoubleSign)
+	if err != nil {
+		t.Fatalf("SlashValidator failed: %v", err)
+	}
+	expectedSlash := math.NewInt(20_000_000_000_000).Mul(math.NewInt(500)).Quo(math.NewInt(10000))
+	if !slashedAmt.Equal(expectedSlash) {
+		t.Fatalf("expected slash %s, got %s", expectedSlash, slashedAmt)
+	}
+	if !app.IsValidatorJailed(alice.Address, now) {
+		t.Fatalf("expected Alice to be jailed after double-signing")
+	}
+	// Tombstoned validator can NEVER be unjailed
+	if err := app.UnjailValidator(alice.Address, now+7200); err == nil {
+		t.Fatalf("expected unjailing tombstoned validator to fail")
+	}
+
+	// 3. Downtime Tracking & Slashing on Bob
+	// Simulate 4 missed blocks (threshold is 5)
+	for i := 0; i < 4; i++ {
+		slashed, err := app.RecordValidatorBlockActivity(bob.Address, false, now+int64(i), 5)
+		if err != nil || slashed {
+			t.Fatalf("unexpected slashing on block %d", i)
+		}
+	}
+	if app.IsValidatorJailed(bob.Address, now) {
+		t.Fatalf("Bob should not be jailed yet at 4 missed blocks")
+	}
+
+	// 5th missed block triggers downtime jail
+	slashed, err := app.RecordValidatorBlockActivity(bob.Address, false, now+5, 5)
+	if err != nil || !slashed {
+		t.Fatalf("expected Bob to be slashed/jailed on 5th missed block")
+	}
+	if !app.IsValidatorJailed(bob.Address, now+5) {
+		t.Fatalf("Bob should be jailed at 5 missed blocks")
+	}
+
+	// Cannot unjail before jail duration (600s) expires
+	if err := app.UnjailValidator(bob.Address, now+5+100); err == nil {
+		t.Fatalf("expected early unjail to fail")
+	}
+
+	// Can unjail after jail duration expires
+	if err := app.UnjailValidator(bob.Address, now+5+601); err != nil {
+		t.Fatalf("unjail after expiry failed: %v", err)
+	}
+	if app.IsValidatorJailed(bob.Address, now+5+601) {
+		t.Fatalf("Bob should not be jailed after successful unjail")
+	}
+}
+
+

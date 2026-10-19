@@ -114,6 +114,7 @@ describe('Sovra Two-Session Realtime Chat SSE Test Suite', () => {
   const timestamp = Date.now();
   let alice: { did: string; handle: string; sessionToken: string };
   let bob: { did: string; handle: string; sessionToken: string };
+  let aliceClient: SseClient;
   let bobClient1: SseClient;
   let bobClient2: SseClient;
 
@@ -148,6 +149,7 @@ describe('Sovra Two-Session Realtime Chat SSE Test Suite', () => {
   });
 
   afterAll(() => {
+    if (aliceClient) aliceClient.close();
     if (bobClient1) bobClient1.close();
     if (bobClient2) bobClient2.close();
   });
@@ -229,5 +231,246 @@ describe('Sovra Two-Session Realtime Chat SSE Test Suite', () => {
     const [msg1, msg2] = await Promise.all([waitClient1, waitClient2]);
     expect(msg1.text).toBe(broadcastText);
     expect(msg2.text).toBe(broadcastText);
+  });
+
+  it('handles receipt transitions (delivered and read) via SSE without polling', async () => {
+    // Connect Alice to SSE stream to observe incoming receipt acknowledgments
+    if (!aliceClient) {
+      aliceClient = await connectSse(alice.sessionToken);
+      const connAlice = await aliceClient.waitForEvent('connected', 3000);
+      expect(connAlice.did).toBe(alice.did);
+    }
+
+    const testMsgId = `msg_receipt_${Date.now()}`;
+    const waitBobMsg = bobClient1.waitForEvent('chat_message', 4000, d => d && d.id === testMsgId);
+
+    // 1. Alice sends message (starts optimistic locally, reaches server as 'sent')
+    const sendRes = await fetch(`${BASE_URL}/api/chat/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${alice.sessionToken}`,
+      },
+      body: JSON.stringify({
+        id: testMsgId,
+        recipientDid: bob.did,
+        senderName: 'Alice Realtime',
+        text: 'Hello Bob, receipt testing message',
+      }),
+    });
+    expect(sendRes.status).toBe(200);
+
+    const bobReceived = await waitBobMsg;
+    expect(bobReceived.id).toBe(testMsgId);
+
+    // 2. Bob acknowledges delivery -> Alice receives 'delivered' receipt via SSE
+    const waitDelivered = aliceClient.waitForEvent('chat_receipt', 4000, d => d && d.status === 'delivered' && Array.isArray(d.messageIds) && d.messageIds.includes(testMsgId));
+    const delivRes = await fetch(`${BASE_URL}/api/chat/receipt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bob.sessionToken}`,
+      },
+      body: JSON.stringify({
+        messageIds: [testMsgId],
+        status: 'delivered',
+      }),
+    });
+    expect(delivRes.status).toBe(200);
+
+    const deliveredReceipt = await waitDelivered;
+    expect(deliveredReceipt.status).toBe('delivered');
+    expect(deliveredReceipt.messageIds).toContain(testMsgId);
+    expect(deliveredReceipt.readerDid).toBe(bob.did);
+
+    // 3. Bob opens chat / reads message -> Alice receives 'read' receipt via SSE (ticks turn blue)
+    const waitRead = aliceClient.waitForEvent('chat_receipt', 4000, d => d && d.status === 'read' && Array.isArray(d.messageIds) && d.messageIds.includes(testMsgId));
+    const readRes = await fetch(`${BASE_URL}/api/chat/receipt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bob.sessionToken}`,
+      },
+      body: JSON.stringify({
+        messageIds: [testMsgId],
+        status: 'read',
+      }),
+    });
+    expect(readRes.status).toBe(200);
+
+    const readReceipt = await waitRead;
+    expect(readReceipt.status).toBe('read');
+    expect(readReceipt.messageIds).toContain(testMsgId);
+    expect(readReceipt.readerDid).toBe(bob.did);
+  });
+
+  it('synchronizes quick-reactions in real time across sessions', async () => {
+    if (!aliceClient) {
+      aliceClient = await connectSse(alice.sessionToken);
+      await aliceClient.waitForEvent('connected', 3000);
+    }
+
+    const testMsgId = `msg_react_${Date.now()}`;
+    await fetch(`${BASE_URL}/api/chat/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${alice.sessionToken}`,
+      },
+      body: JSON.stringify({
+        id: testMsgId,
+        recipientDid: bob.did,
+        senderName: 'Alice Realtime',
+        text: 'React to this message please',
+      }),
+    });
+
+    // Bob reacts with ❤️
+    const waitReactionHeart = aliceClient.waitForEvent('chat_reaction', 4000, d => d && d.messageId === testMsgId && d.emoji === '❤️');
+    const reactRes1 = await fetch(`${BASE_URL}/api/chat/reaction`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bob.sessionToken}`,
+      },
+      body: JSON.stringify({
+        messageId: testMsgId,
+        emoji: '❤️',
+      }),
+    });
+    expect(reactRes1.status).toBe(200);
+
+    const heartEvent = await waitReactionHeart;
+    expect(heartEvent.messageId).toBe(testMsgId);
+    expect(heartEvent.emoji).toBe('❤️');
+    expect(heartEvent.senderDid).toBe(bob.did);
+    expect(heartEvent.reactions.some((r: any) => r.emoji === '❤️' && r.senderDid === bob.did)).toBe(true);
+
+    // Bob changes reaction to 👍
+    const waitReactionThumbs = aliceClient.waitForEvent('chat_reaction', 4000, d => d && d.messageId === testMsgId && d.emoji === '👍');
+    const reactRes2 = await fetch(`${BASE_URL}/api/chat/reaction`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bob.sessionToken}`,
+      },
+      body: JSON.stringify({
+        messageId: testMsgId,
+        emoji: '👍',
+      }),
+    });
+    expect(reactRes2.status).toBe(200);
+
+    const thumbsEvent = await waitReactionThumbs;
+    expect(thumbsEvent.messageId).toBe(testMsgId);
+    expect(thumbsEvent.emoji).toBe('👍');
+    expect(thumbsEvent.reactions.some((r: any) => r.emoji === '👍' && r.senderDid === bob.did)).toBe(true);
+  });
+
+  it('broadcasts real-time typing and voice recording indicators over SSE', async () => {
+    // Alice starts typing
+    const waitTypingStart = bobClient1.waitForEvent('typing', 4000, d => d && d.senderDid === alice.did && d.isTyping === true);
+    const typingRes = await fetch(`${BASE_URL}/api/chat/typing`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${alice.sessionToken}`,
+      },
+      body: JSON.stringify({
+        recipientDid: bob.did,
+        senderName: 'Alice Realtime',
+        isTyping: true,
+        isRecording: false,
+      }),
+    });
+    expect(typingRes.status).toBe(200);
+
+    const typingEvt = await waitTypingStart;
+    expect(typingEvt.isTyping).toBe(true);
+    expect(typingEvt.isRecording).toBe(false);
+    expect(typingEvt.senderDid).toBe(alice.did);
+
+    // Alice switches to voice recording
+    const waitRecordingStart = bobClient1.waitForEvent('typing', 4000, d => d && d.senderDid === alice.did && d.isRecording === true);
+    const recordRes = await fetch(`${BASE_URL}/api/chat/typing`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${alice.sessionToken}`,
+      },
+      body: JSON.stringify({
+        recipientDid: bob.did,
+        senderName: 'Alice Realtime',
+        isTyping: true,
+        isRecording: true,
+      }),
+    });
+    expect(recordRes.status).toBe(200);
+
+    const recordEvt = await waitRecordingStart;
+    expect(recordEvt.isRecording).toBe(true);
+
+    // Alice stops typing and recording
+    const waitTypingStop = bobClient1.waitForEvent('typing', 4000, d => d && d.senderDid === alice.did && d.isTyping === false && d.isRecording === false);
+    const stopRes = await fetch(`${BASE_URL}/api/chat/typing`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${alice.sessionToken}`,
+      },
+      body: JSON.stringify({
+        recipientDid: bob.did,
+        senderName: 'Alice Realtime',
+        isTyping: false,
+        isRecording: false,
+      }),
+    });
+    expect(stopRes.status).toBe(200);
+
+    const stopEvt = await waitTypingStop;
+    expect(stopEvt.isTyping).toBe(false);
+    expect(stopEvt.isRecording).toBe(false);
+  });
+
+  it('reconciles queued offline messages deterministically', async () => {
+    const offlineMsgId = `msg_offline_${Date.now()}`;
+    const offlineText = 'Message created while offline and queued in SovraOfflineOutbox';
+
+    // Simulate offline outbox state: locally pending_sync
+    const localOutboxItem = {
+      id: offlineMsgId,
+      senderDid: alice.did,
+      recipientDid: bob.did,
+      senderName: 'Alice Realtime',
+      text: offlineText,
+      timestamp: Date.now(),
+      status: 'pending_sync',
+    };
+    expect(localOutboxItem.status).toBe('pending_sync');
+
+    // Network re-established: Outbox flushes queued request to server
+    const waitBobReceive = bobClient1.waitForEvent('chat_message', 4000, d => d && d.id === offlineMsgId);
+    const flushRes = await fetch(`${BASE_URL}/api/chat/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${alice.sessionToken}`,
+      },
+      body: JSON.stringify({
+        id: localOutboxItem.id,
+        recipientDid: localOutboxItem.recipientDid,
+        senderName: localOutboxItem.senderName,
+        text: localOutboxItem.text,
+      }),
+    });
+    expect(flushRes.status).toBe(200);
+    const flushData = await flushRes.json();
+    expect(flushData.ok).toBe(true);
+    expect(flushData.message.status).toBe('sent');
+
+    // Bob receives it live without polling
+    const receivedMsg = await waitBobReceive;
+    expect(receivedMsg.id).toBe(offlineMsgId);
+    expect(receivedMsg.text).toBe(offlineText);
   });
 });

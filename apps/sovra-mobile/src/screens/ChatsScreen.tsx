@@ -243,10 +243,20 @@ export function ChatsScreen(): React.JSX.Element {
       }
     });
 
+    const unsubReceipt = mobileMesh.onDeliveryReceipt(receipt => {
+      refreshConversations();
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === receipt.targetEnvelopeId ? { ...m, tickState: 'delivered' } : m,
+        ),
+      );
+    });
+
     return () => {
       unsubPeers();
       unsubState();
       unsubMsg();
+      unsubReceipt();
     };
   }, [activeRecipient, refreshConversations]);
 
@@ -330,6 +340,54 @@ export function ChatsScreen(): React.JSX.Element {
       syncStatus: 'LOCAL',
     });
 
+    // Phase 3: Smart Transport Selection: Prefer direct BLE link / offline mesh if connected or offline
+    const isDirectPeer = mobileMesh.isDirectPeerConnected(targetDid);
+    const isMeshActive = meshRuntimeState.status === 'BLUETOOTH_MESH' || discoveredPeers.length > 0;
+    const hasInternet = typeof navigator !== 'undefined' ? navigator.onLine : false;
+
+    if (isDirectPeer || (!hasInternet && isMeshActive)) {
+      try {
+        const meshRes = await mobileMesh.sendChatMessage(targetDid, text, 'You');
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === tempId
+              ? {
+                  ...m,
+                  id: meshRes.envelopeId,
+                  tickState: 'sent',
+                  isBitChat: true,
+                  hopCount: isDirectPeer ? 1 : 2,
+                  transportUsed: isDirectPeer ? 'ble_direct' : 'mesh_relay',
+                }
+              : m,
+          ),
+        );
+        await localDb.enqueueOperation('SEND_CHAT', myDid, {
+          recipientDid: targetDid,
+          text,
+          senderName: 'You',
+          envelopeId: meshRes.envelopeId,
+        });
+      } catch {
+        await localDb.enqueueOperation('SEND_CHAT', myDid, {
+          recipientDid: targetDid,
+          text,
+          senderName: 'You',
+        });
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === tempId
+              ? { ...m, tickState: 'queued', transportUsed: 'outbox_queued' }
+              : m,
+          ),
+        );
+      } finally {
+        setIsSending(false);
+        refreshConversations();
+      }
+      return;
+    }
+
     try {
       const res = await sendChatMessage({
         recipientDid: targetDid,
@@ -346,6 +404,7 @@ export function ChatsScreen(): React.JSX.Element {
                   ...m,
                   id: res.message.id,
                   tickState: res.message.status || 'delivered',
+                  transportUsed: 'internet',
                 }
               : m,
           ),
@@ -353,8 +412,7 @@ export function ChatsScreen(): React.JSX.Element {
       } else {
         throw new Error(res.error || 'Server unreachable');
       }
-    } catch (err) {
-      console.warn('[ChatsScreen] Offline fallback: enqueuing message to durable outbox & BLE mesh');
+    } catch {
       await localDb.enqueueOperation('SEND_CHAT', myDid, {
         recipientDid: targetDid,
         text,
@@ -366,7 +424,16 @@ export function ChatsScreen(): React.JSX.Element {
       syncEngine.triggerSync().catch(() => {});
 
       setMessages(prev =>
-        prev.map(m => (m.id === tempId ? { ...m, tickState: 'sent' } : m)),
+        prev.map(m =>
+          m.id === tempId
+            ? {
+                ...m,
+                tickState: isMeshActive ? 'sent' : 'queued',
+                isBitChat: isMeshActive,
+                transportUsed: isMeshActive ? 'mesh_relay' : 'outbox_queued',
+              }
+            : m,
+        ),
       );
     } finally {
       setIsSending(false);
@@ -437,16 +504,28 @@ export function ChatsScreen(): React.JSX.Element {
     setTimeout(() => setPanicToast(null), 3000);
   };
 
-  const renderTickIcon = (state: MobileChatMessage['tickState']) => {
+  const renderTickIcon = (state: MobileChatMessage['tickState'], transport?: MobileChatMessage['transportUsed']) => {
     switch (state) {
+      case 'queued':
+        return <span title="Saved locally in Outbox (Waiting for peer or network)" style={{ color: '#f59e0b', fontSize: 10 }}>⏳</span>;
       case 'sending':
-        return <span style={{ color: '#94a3b8', fontSize: 10 }}>🕒</span>;
+        return <span title="Transmitting..." style={{ color: '#94a3b8', fontSize: 10 }}>🕒</span>;
       case 'sent':
-        return <span style={{ color: '#94a3b8', fontSize: 11 }}>✓</span>; // Grey single tick
+        if (transport === 'ble_direct') {
+          return <span title="Sent directly over Bluetooth LE" style={{ color: '#38bdf8', fontSize: 11, fontWeight: 700 }}>📶✓</span>;
+        }
+        if (transport === 'mesh_relay') {
+          return <span title="Relayed through Mesh" style={{ color: '#a855f7', fontSize: 11, fontWeight: 700 }}>🔀✓</span>;
+        }
+        return <span title="Sent" style={{ color: '#94a3b8', fontSize: 11 }}>✓</span>; // Grey single tick
+      case 'relayed':
+        return <span title="Relayed through Mesh" style={{ color: '#a855f7', fontSize: 11, fontWeight: 700 }}>🔀✓</span>;
       case 'delivered':
-        return <span style={{ color: '#94a3b8', fontSize: 11 }}>✓✓</span>; // Grey double tick
+        return <span title="Delivered to Recipient (Cryptographic Receipt Verified)" style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700 }}>✓✓</span>; // Grey double tick
       case 'read':
-        return <span style={{ color: '#38bdf8', fontSize: 11 }}>✓✓</span>; // Blue double tick
+        return <span title="Read by Recipient" style={{ color: '#38bdf8', fontSize: 11, fontWeight: 700 }}>✓✓</span>; // Blue double tick
+      case 'failed':
+        return <span title="Delivery Failed" style={{ color: '#ef4444', fontSize: 10 }}>⚠️</span>;
     }
   };
 
@@ -521,14 +600,33 @@ export function ChatsScreen(): React.JSX.Element {
             <div
               style={{
                 fontSize: 10,
-                color: activeRecipient.isEmergency ? '#ef4444' : '#34d399',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                color: activeRecipient.isEmergency
+                  ? '#ef4444'
+                  : activeRecipient.isChannel
+                  ? '#38bdf8'
+                  : mobileMesh.isDirectPeerConnected(activeRecipient.did)
+                  ? '#22c55e'
+                  : meshRuntimeState.status === 'BLUETOOTH_MESH'
+                  ? '#38bdf8'
+                  : typeof navigator !== 'undefined' && navigator.onLine
+                  ? '#34d399'
+                  : '#f59e0b',
               }}
             >
               {activeRecipient.isEmergency
-                ? '🚨 Emergency SOS Swarm (Zero-Internet)'
+                ? '🚨 Emergency SOS Swarm (Zero-Internet BLE)'
                 : activeRecipient.isChannel
-                ? '📶 Hyperlocal Broadcast (50m Swarm)'
-                : '● E2EE Double Ratchet Active'}
+                ? '📶 Hyperlocal Broadcast Channel (#local-mesh)'
+                : mobileMesh.isDirectPeerConnected(activeRecipient.did)
+                ? '🟢 Direct BLE Link Connected (1 Hop)'
+                : meshRuntimeState.status === 'BLUETOOTH_MESH'
+                ? `🟣 Relayed through Mesh (${discoveredPeers.length} Peers in Range)`
+                : typeof navigator !== 'undefined' && navigator.onLine
+                ? '🔵 Internet Connected (E2EE Signal Ratchet)'
+                : '⏳ Offline (Saved locally in Outbox)'}
             </div>
           </div>
 
@@ -782,7 +880,7 @@ export function ChatsScreen(): React.JSX.Element {
                 <span>
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
-                {msg.isOutgoing && renderTickIcon(msg.tickState)}
+                {msg.isOutgoing && renderTickIcon(msg.tickState, msg.transportUsed)}
               </div>
             </div>
           ))}

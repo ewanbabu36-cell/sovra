@@ -11,7 +11,6 @@
  */
 
 import {
-  generateEd25519KeyPair,
   getEd25519PublicKey,
   encryptChaCha20Poly1305,
   decryptChaCha20Poly1305,
@@ -20,7 +19,7 @@ import {
   bytesToHex,
   hexToBytes,
 } from '@sovra/crypto';
-import { encodeEd25519DidKey } from '@sovra/identity';
+import { generateMnemonic, mnemonicToIdentity, validateMnemonic } from './mnemonic.js';
 
 interface EncryptedKeyVault {
   version: 1;
@@ -29,6 +28,13 @@ interface EncryptedKeyVault {
   nonceHex: string;
   ciphertextHex: string;
   updatedAt: number;
+}
+
+export interface StoredIdentity {
+  did: string;
+  privateKey: Uint8Array;
+  publicKey: Uint8Array;
+  mnemonic?: string | undefined;
 }
 
 const VAULT_STORAGE_KEY = 'sovra_secure_key_vault_v1';
@@ -94,9 +100,9 @@ export class SecureKeyStore {
 
   /**
    * Resolves or generates the persistent mesh identity.
-   * Ensures private keys are NEVER persisted in plaintext.
+   * Generates a BIP-39 mnemonic phrase and ensures private keys are NEVER persisted in plaintext.
    */
-  public getOrGenerateMeshIdentity(): { did: string; privateKey: Uint8Array; publicKey: Uint8Array } {
+  public getOrGenerateMeshIdentity(): StoredIdentity {
     // 1. Check encrypted vault
     const existing = this.loadFromEncryptedVault();
     if (existing) {
@@ -109,28 +115,61 @@ export class SecureKeyStore {
       return migrated;
     }
 
-    // 3. Generate fresh identity and encrypt at rest
-    const kp = generateEd25519KeyPair();
-    const did = encodeEd25519DidKey(kp.publicKey);
-    this.storeEncryptedIdentity(did, kp.privateKey);
+    // 3. Generate fresh BIP-39 12-word mnemonic identity and encrypt at rest
+    const mnemonic = generateMnemonic(12);
+    const mIdent = mnemonicToIdentity(mnemonic);
+    this.storeEncryptedIdentity(mIdent.did, mIdent.privateKey, mIdent.mnemonic);
 
     return {
-      did,
-      privateKey: kp.privateKey,
-      publicKey: kp.publicKey,
+      did: mIdent.did,
+      privateKey: mIdent.privateKey,
+      publicKey: mIdent.publicKey,
+      mnemonic: mIdent.mnemonic,
     };
   }
 
   /**
-   * Encrypts and securely saves an Ed25519 private key.
+   * Restores an account from a 12-word or 24-word BIP-39 seed phrase.
    */
-  public storeEncryptedIdentity(did: string, privateKey: Uint8Array): void {
+  public restoreFromMnemonic(mnemonic: string, passphrase = ''): StoredIdentity {
+    if (!validateMnemonic(mnemonic)) {
+      throw new Error('Invalid seed phrase. Please verify your 12 recovery words and try again.');
+    }
+    const mIdent = mnemonicToIdentity(mnemonic, passphrase);
+    this.storeEncryptedIdentity(mIdent.did, mIdent.privateKey, mIdent.mnemonic);
+
+    return {
+      did: mIdent.did,
+      privateKey: mIdent.privateKey,
+      publicKey: mIdent.publicKey,
+      mnemonic: mIdent.mnemonic,
+    };
+  }
+
+  /**
+   * Returns the decrypted mnemonic seed phrase for user backup, if available in the vault.
+   */
+  public getMnemonic(): string | null {
+    const ident = this.loadFromEncryptedVault();
+    return ident?.mnemonic ?? null;
+  }
+
+  /**
+   * Encrypts and securely saves an Ed25519 private key and optional mnemonic seed phrase.
+   */
+  public storeEncryptedIdentity(did: string, privateKey: Uint8Array, mnemonic?: string): void {
     const salt = secureRandomBytes(16);
     const nonce = secureRandomBytes(12);
     const encryptionKey = this.deriveVaultKey(salt, did);
 
     const associatedData = new TextEncoder().encode(did);
-    const ciphertext = encryptChaCha20Poly1305(encryptionKey, nonce, privateKey, associatedData);
+    const payload = JSON.stringify({
+      privateKeyHex: bytesToHex(privateKey),
+      mnemonic: mnemonic || null,
+      savedAt: Date.now(),
+    });
+    const plaintext = new TextEncoder().encode(payload);
+    const ciphertext = encryptChaCha20Poly1305(encryptionKey, nonce, plaintext, associatedData);
 
     const vault: EncryptedKeyVault = {
       version: 1,
@@ -147,7 +186,7 @@ export class SecureKeyStore {
   /**
    * Loads and decrypts identity from encrypted vault.
    */
-  private loadFromEncryptedVault(): { did: string; privateKey: Uint8Array; publicKey: Uint8Array } | null {
+  private loadFromEncryptedVault(): StoredIdentity | null {
     try {
       const raw = this.getItem(VAULT_STORAGE_KEY);
       if (!raw) return null;
@@ -163,13 +202,30 @@ export class SecureKeyStore {
       const encryptionKey = this.deriveVaultKey(salt, vault.did);
 
       const associatedData = new TextEncoder().encode(vault.did);
-      const privateKey = decryptChaCha20Poly1305(encryptionKey, nonce, ciphertext, associatedData);
+      const decryptedBytes = decryptChaCha20Poly1305(encryptionKey, nonce, ciphertext, associatedData);
+
+      let privateKey: Uint8Array;
+      let mnemonic: string | undefined = undefined;
+
+      // Handle transparent backward compatibility: raw 32-byte vs JSON payload
+      if (decryptedBytes.length === 32) {
+        privateKey = decryptedBytes;
+      } else {
+        const decodedText = new TextDecoder().decode(decryptedBytes);
+        const parsed = JSON.parse(decodedText);
+        privateKey = hexToBytes(parsed.privateKeyHex);
+        if (parsed.mnemonic) {
+          mnemonic = parsed.mnemonic;
+        }
+      }
+
       const publicKey = getEd25519PublicKey(privateKey);
 
       return {
         did: vault.did,
         privateKey,
         publicKey,
+        mnemonic,
       };
     } catch (e) {
       console.warn('[SecureKeyStore] Decryption failed or vault tampered:', e);

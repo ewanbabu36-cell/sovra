@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { signEd25519, bytesToHex } from '../../packages/crypto/dist/index.js';
-import { sovraDb } from '../database-engine.ts';
+import { sovraDb, type SpaceRole, type SpaceType } from '../database-engine.ts';
 import { TranscoderWorker, type VideoResolution } from '../../services/transcoder/dist/index.js';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
 
@@ -846,6 +846,36 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
+  // 7.1 GET /api/studio/analytics/export - Export post performance breakdown as CSV or JSON
+  if (url.pathname === '/api/studio/analytics/export' && req.method === 'GET') {
+    const creatorDid = resolveCreatorDid(ctx);
+    const analytics = sovraDb.getCreatorStudioAnalytics(creatorDid);
+    const format = (url.searchParams.get('format') || 'csv').toLowerCase();
+    const items = (analytics as any).postPerformance || [];
+
+    if (format === 'json') {
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': 'attachment; filename="creator-studio-performance.json"',
+      });
+      res.end(JSON.stringify({ ok: true, creatorDid, postPerformance: items, exportTimestamp: Date.now() }, null, 2));
+      return true;
+    }
+
+    let csv = 'Video ID,Title,Release Date,Views,Impressions,CTR (%),Avg View Duration,SOV Earned (SOV),Category\n';
+    items.forEach((item: any) => {
+      const cleanTitle = (item.title || '').replace(/"/g, '""');
+      csv += `"${item.id}","${cleanTitle}","${item.releaseDate}","${item.views}","${item.impressions}","${item.ctrPercent}%","${item.avgViewDuration}","${item.sovEarned}","${item.category || 'Tech'}"\n`;
+    });
+
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="creator-studio-performance.csv"',
+    });
+    res.end(csv);
+    return true;
+  }
+
   // 8. GET /api/studio/content - All creator library content (videos, reels, scheduled)
   if (url.pathname === '/api/studio/content' && req.method === 'GET') {
     const creatorDid = resolveCreatorDid(ctx);
@@ -1101,6 +1131,172 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     const tracks = sovraDb.getCreatorAudioLibrary();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, count: tracks.length, tracks }));
+    return true;
+  }
+
+  // 20. GET /api/studio/space - Space metadata, subscriber stats & pinned announcement
+  if (url.pathname === '/api/studio/space' && req.method === 'GET') {
+    const spaceId = url.searchParams.get('spaceId') || '';
+    const spaceType = (url.searchParams.get('spaceType') || 'channel') as SpaceType;
+    const principal = ctx.resolvePrincipal(ctx.req);
+    const userDid = principal?.did || '';
+
+    let spaceEntity: any = null;
+    if (spaceType === 'channel') spaceEntity = sovraDb.getChannelById(spaceId);
+    else if (spaceType === 'page') spaceEntity = sovraDb.getPageById(spaceId);
+    else if (spaceType === 'group') spaceEntity = sovraDb.getGroupById(spaceId);
+
+    if (!spaceEntity) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Space entity not found' }));
+      return true;
+    }
+
+    const userRole = userDid ? sovraDb.getSpaceMemberRole(spaceId, userDid) : null;
+    const allPosts = sovraDb.getAllPosts().filter(p => p.channelTargetId === spaceId || p.authorEntityId === spaceId);
+    const members = sovraDb.getSpaceMembers(spaceId, spaceType);
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      space: spaceEntity,
+      spaceType,
+      userRole,
+      isManager: userRole === 'OWNER' || userRole === 'ADMIN',
+      stats: {
+        contentCount: allPosts.length,
+        memberCount: spaceType === 'group' ? (spaceEntity.memberCount || members.length) : (spaceEntity.count || 0),
+        recentActivityCount: allPosts.length,
+      },
+    }));
+    return true;
+  }
+
+  // 21. GET /api/studio/team - Space team members with verified role badges
+  if (url.pathname === '/api/studio/team' && req.method === 'GET') {
+    const spaceId = url.searchParams.get('spaceId') || '';
+    const spaceType = (url.searchParams.get('spaceType') || 'channel') as SpaceType;
+    const members = sovraDb.getSpaceMembers(spaceId, spaceType);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, spaceId, members }));
+    return true;
+  }
+
+  // 22. POST /api/studio/team/role & POST /api/studio/team/update - Update space member roles
+  if ((url.pathname === '/api/studio/team/role' || url.pathname === '/api/studio/team/update') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+      const spaceId = String(parsed.spaceId || '');
+      const targetDid = String(parsed.targetDid || '');
+      const newRole = parsed.role as SpaceRole;
+      const updateRes = sovraDb.updateSpaceMemberRole(spaceId, targetDid, newRole, principal.did);
+      if (!updateRes.ok) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: updateRes.error }));
+        return true;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, spaceId, targetDid, role: newRole }));
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 23. POST /api/studio/announcement/pin - Pin announcement to space header
+  if (url.pathname === '/api/studio/announcement/pin' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+      const spaceId = String(parsed.spaceId || '');
+      const text = String(parsed.text || '').trim();
+      const postId = parsed.postId ? String(parsed.postId) : undefined;
+      if (!spaceId || !text) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'spaceId and text are required' }));
+        return true;
+      }
+      const pinRes = sovraDb.pinSpaceAnnouncement(spaceId, { postId, text, pinnedByDid: principal.did }, principal.did);
+      if (!pinRes.ok) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: pinRes.error }));
+        return true;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, space: pinRes.space, pinnedAnnouncement: pinRes.pinnedAnnouncement }));
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 24. POST /api/studio/announcement/unpin - Unpin announcement from space header
+  if (url.pathname === '/api/studio/announcement/unpin' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+      const spaceId = String(parsed.spaceId || '');
+      if (!spaceId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'spaceId is required' }));
+        return true;
+      }
+      const unpinRes = sovraDb.unpinSpaceAnnouncement(spaceId, principal.did);
+      if (!unpinRes.ok) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: unpinRes.error }));
+        return true;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, space: unpinRes.space, pinnedAnnouncement: null }));
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 14. GET /api/studio/payouts - Sovereign creator payout receipts & unclaimed pool
+  if (url.pathname === '/api/studio/payouts' && req.method === 'GET') {
+    const creatorDid = resolveCreatorDid(ctx);
+    const data = sovraDb.getCreatorPayouts(creatorDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, creatorDid, ...data }));
+    return true;
+  }
+
+  // 15. POST /api/studio/payout - Authenticated Merkle claim settlement to Ed25519 wallet
+  if (url.pathname === '/api/studio/payout' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = (ok && body) ? JSON.parse(body) : {};
+      const creatorDid = parsed.creatorDid || resolveCreatorDid(ctx);
+      const requestedAmount = typeof parsed.amount === 'number' ? parsed.amount : undefined;
+      const result = sovraDb.claimCreatorPayout(creatorDid, requestedAmount);
+      if (!result.ok) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: result.error || 'Payout failed' }));
+        return true;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, creatorDid, ...result }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid payout payload: ' + (err?.message || err) }));
+    }
     return true;
   }
 

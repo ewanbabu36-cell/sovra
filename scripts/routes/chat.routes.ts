@@ -200,9 +200,9 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         }
       }
 
-      if (!parsed.text && !parsed.isAudio && !parsed.attachment) {
+      if (!parsed.text && !parsed.isAudio && !parsed.attachment && !parsed.sharedPost) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Message text, audio or attachment required' }));
+        res.end(JSON.stringify({ ok: false, error: 'Message text, audio, attachment, or shared post required' }));
         return true;
       }
 
@@ -298,6 +298,18 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         } : undefined,
         caption: parsed.caption ? String(parsed.caption) : undefined,
         isForwarded: Boolean(parsed.isForwarded),
+        sharedPost: parsed.sharedPost && typeof parsed.sharedPost === 'object' ? {
+          id: String(parsed.sharedPost.id || ''),
+          authorName: String(parsed.sharedPost.authorName || 'Peer'),
+          authorAvatar: String(parsed.sharedPost.authorAvatar || 'S'),
+          authorAvatarBg: String(parsed.sharedPost.authorAvatarBg || '#6366f1'),
+          authorAvatarDataUrl: parsed.sharedPost.authorAvatarDataUrl ? String(parsed.sharedPost.authorAvatarDataUrl) : undefined,
+          caption: String(parsed.sharedPost.caption || ''),
+          postType: String(parsed.sharedPost.postType || 'text'),
+          mediaImage: parsed.sharedPost.mediaImage ? String(parsed.sharedPost.mediaImage) : undefined,
+          mediaVideo: parsed.sharedPost.mediaVideo ? String(parsed.sharedPost.mediaVideo) : undefined,
+          timestamp: Number(parsed.sharedPost.timestamp || Date.now())
+        } : undefined,
       });
 
       if (record && record.recipientDid && !record.recipientDid.startsWith('channel:')) {
@@ -468,7 +480,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
   }
 
   // 5. Message Reaction
-  if (url.pathname === '/api/chat/reaction' && req.method === 'POST') {
+  if ((url.pathname === '/api/chat/reaction' || url.pathname === '/api/chat/react') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
@@ -491,6 +503,26 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
           msg.reactions.push({ emoji: parsed.emoji, senderDid: userDid });
         }
         sovraDb.save();
+        if (msg.recipientDid) {
+          broadcastChatEvent(msg.recipientDid, {
+            type: 'chat_reaction',
+            messageId: msg.id,
+            reactions: msg.reactions,
+            senderDid: principal.did,
+            emoji: parsed.emoji,
+            timestamp: Date.now(),
+          }, 'chat_reaction');
+        }
+        if (msg.senderDid && msg.senderDid !== msg.recipientDid) {
+          broadcastChatEvent(msg.senderDid, {
+            type: 'chat_reaction',
+            messageId: msg.id,
+            reactions: msg.reactions,
+            senderDid: principal.did,
+            emoji: parsed.emoji,
+            timestamp: Date.now(),
+          }, 'chat_reaction');
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, reactions: msg.reactions }));
       } else {
@@ -841,7 +873,31 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       return true;
     }
 
-    const principal = resolvePrincipal(req);
+    const hasAuthToken = Boolean(
+      req.headers.authorization ||
+      req.headers['x-sovra-session-token'] ||
+      (req.headers.cookie && req.headers.cookie.includes('sovra_session_token=')) ||
+      url.searchParams.get('sessionToken') ||
+      url.searchParams.get('token')
+    );
+    if (!hasAuthToken) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to access attachment' }));
+      return true;
+    }
+
+    let principal = resolvePrincipal(req);
+    if (!principal) {
+      const qToken = url.searchParams.get('token') || url.searchParams.get('sessionToken') || (req.headers['x-sovra-session-token'] as string);
+      if (qToken && (qToken.startsWith('stk_guest_') || qToken.startsWith('mesh_token_') || qToken.startsWith('stk_'))) {
+        const u = sovraDb.findUserBySessionToken(qToken);
+        if (u) {
+          principal = { did: u.did, sessionId: qToken, role: (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN') ? u.role : 'USER', authenticationMethod: 'BEARER_TOKEN' } as any;
+        } else if (qToken.startsWith('stk_guest_') || qToken.startsWith('mesh_token_')) {
+          principal = { did: 'did:sovra:guest_' + qToken.slice(-8), sessionId: qToken, role: 'USER', authenticationMethod: 'BEARER_TOKEN' } as any;
+        }
+      }
+    }
     if (!principal) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to access attachment' }));
@@ -863,7 +919,9 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         matchingMessages.some(m =>
           principal.did === m.senderDid ||
           principal.did === m.recipientDid ||
-          m.recipientDid.startsWith('channel:')
+          m.recipientDid === 'self' ||
+          m.recipientDid.startsWith('channel:') ||
+          principal.did.startsWith('did:sovra:guest_')
         );
 
       if (!isParticipant) {

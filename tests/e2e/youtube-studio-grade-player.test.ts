@@ -253,4 +253,42 @@ describe('Sovra YouTube Studio Grade Watch & Reels Player Suite', () => {
     expect(content).toContain('window.SovraPipEngine.closePip');
     expect(content).toContain('initYtStickyMiniplayer()');
   });
+
+  it('15. Viewport-Aware Zero-Buffer Feed Autoplay & Global Mute Persistence', () => {
+    // Feed post video intersection observer
+    expect(content).toContain('initPostImpressionObserver()');
+    expect(content).toContain('sovra_video_muted');
+    expect(content).toContain('isMuted = localStorage.getItem(\'sovra_video_muted\') !== \'0\'');
+    expect(content).toContain('entry.intersectionRatio >= 0.65');
+    expect(content).toContain('entry.intersectionRatio < 0.25');
+    expect(content).toContain('nextVid.preload = \'auto\'');
+  });
+
+  it('16. Cumulative Directional Seek Indicator (+10s, +20s / -10s, -20s) in Watch & Reels', () => {
+    // Reels cumulative seek indicator
+    expect(content).toContain('function triggerReelSeek(direction)');
+    expect(content).toContain('(isLeft ? \'-\' : \'+\') + reelSeekAccumulatedSeconds + \'s\'');
+
+    // YouTube cumulative seek indicator
+    expect(content).toContain('function triggerYtSeekRipple(direction)');
+    expect(content).toContain('(isLeft ? \'-\' : \'+\') + ytSeekAccumulatedSeconds + \'s\'');
+  });
+
+  it('17. Seamless Cross-Tab Navigation Mini-Player Hand-off (SovraPipEngine.openPip)', () => {
+    // switchTab PiP activation when navigating away
+    expect(content).toContain('window.SovraPipEngine.openPip');
+    expect(content).toContain('window.SovraPipEngine.closePip');
+    expect(content).toContain('function switchTab(tab)');
+  });
+
+  it('18. Creator Studio Pro 4-Stage Resilient Video Upload & Transcode Monitor', () => {
+    // Workspace upload stages
+    expect(content).toContain('Stage 1/4: Uploading (Chunked/Direct Ingest)...');
+    expect(content).toContain('Stage 2/4: Transcoding/Processing (1080p, 720p, 480p, 360p ABR)...');
+    expect(content).toContain('Stage 3/4: HD Ready & Content Verified');
+    expect(content).toContain('Stage 4/4:');
+    expect(content).toContain('studioWsTranscodeProgressBar');
+    expect(content).toContain('studioWsTranscodePct');
+  });
 });
+
