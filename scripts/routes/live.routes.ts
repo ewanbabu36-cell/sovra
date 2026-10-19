@@ -28,6 +28,7 @@ export interface LiveRouteContext {
   readBoundedBody: (req: http.IncomingMessage, res: http.ServerResponse, maxBytes: number) => Promise<{ body: string; ok: boolean }>;
   resolvePrincipal: (req: http.IncomingMessage) => AuthenticatedPrincipal | null;
   enforceAuth: (req: http.IncomingMessage, res: http.ServerResponse) => AuthenticatedPrincipal | null;
+  broadcastChatEvent?: (recipientDid: string | string[], payload: any, eventType?: string) => void;
 }
 
 function resolveUserDid(ctx: LiveRouteContext, bodyObj?: Record<string, any>): string {
@@ -251,11 +252,24 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
       const message = String(parsed.message || parsed.text || 'Awesome stream! 🚀').trim();
 
       const numAmount = Number(amount) / 1_000_000;
-      let tier: 'bronze' | 'silver' | 'gold' | 'diamond' = 'bronze';
+      let tier: 'bronze' | 'silver' | 'gold' | 'diamond' | 'blue' | 'crimson' = 'bronze';
       let bannerColor = '#2563eb'; // blue
       let durationMs = 5000;
 
-      if (numAmount >= 500) {
+      const requestedTier = (parsed.tier || '').toLowerCase();
+      if (requestedTier === 'crimson') {
+        tier = 'crimson';
+        bannerColor = '#dc2626'; // crimson red
+        durationMs = 600000; // 10 min
+      } else if (requestedTier === 'gold') {
+        tier = 'gold';
+        bannerColor = '#eab308'; // gold
+        durationMs = 300000; // 5 min
+      } else if (requestedTier === 'blue') {
+        tier = 'blue';
+        bannerColor = '#2563eb'; // blue
+        durationMs = 60000; // 1 min
+      } else if (numAmount >= 500) {
         tier = 'diamond';
         bannerColor = '#ec4899'; // magenta diamond
         durationMs = 30000;
@@ -267,6 +281,18 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
         tier = 'silver';
         bannerColor = '#8b5cf6'; // purple
         durationMs = 10000;
+      } else if (numAmount >= 20) {
+        tier = 'crimson';
+        bannerColor = '#dc2626';
+        durationMs = 600000;
+      } else if (numAmount >= 5) {
+        tier = 'gold';
+        bannerColor = '#eab308';
+        durationMs = 300000;
+      } else {
+        tier = 'blue';
+        bannerColor = '#2563eb';
+        durationMs = 60000;
       }
 
       const dbAny = sovraDb as any;
@@ -391,6 +417,14 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
 
       if (typeof dbAny.save === 'function') dbAny.save();
 
+      if (typeof ctx.broadcastChatEvent === 'function') {
+        ctx.broadcastChatEvent('channel:local_mesh', {
+          sessionId,
+          superchat: superchatRecord,
+          leaderboard
+        }, 'livestream_superchat');
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
@@ -403,6 +437,53 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'SuperChat failed: ' + (err?.message || err) }));
     }
+    return true;
+  }
+
+  // 5.1.1 POST /api/live/reaction - Real-time SSE broadcast for live stream reactions
+  if ((url.pathname === '/api/live/reaction' || url.pathname === '/api/livestream/reaction') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const sessionId = String(parsed.sessionId || parsed.id || 'live_stream_default');
+      const reaction = String(parsed.reaction || '❤️');
+      const senderDid = resolveUserDid(ctx, parsed);
+      const session = (sovraDb as any).db?.live_sessions?.find((s: any) => s.id === sessionId);
+      const viewerCount = session?.viewersCount || 14;
+
+      if (typeof ctx.broadcastChatEvent === 'function') {
+        ctx.broadcastChatEvent('channel:local_mesh', {
+          sessionId,
+          reaction,
+          senderDid,
+          viewerCount,
+          timestamp: Date.now()
+        }, 'livestream_reaction');
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, reaction, sessionId, viewerCount }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid payload' }));
+    }
+    return true;
+  }
+
+  // 5.1.2 POST /api/live/stream/viewers - Real-time SSE pulse for viewer count
+  if ((url.pathname === '/api/live/stream/viewers' || url.pathname === '/api/livestream/viewers') && (req.method === 'POST' || req.method === 'GET')) {
+    const sessionId = url.searchParams.get('sessionId') || 'live_stream_default';
+    const count = Math.max(1, ((sovraDb as any).db?.live_sessions?.find((s: any) => s.id === sessionId)?.viewersCount || 24));
+    if (typeof ctx.broadcastChatEvent === 'function') {
+      ctx.broadcastChatEvent('channel:local_mesh', {
+        sessionId,
+        viewerCount: count,
+        timestamp: Date.now()
+      }, 'livestream_viewers');
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, sessionId, viewerCount: count }));
     return true;
   }
 

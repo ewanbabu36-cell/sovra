@@ -29,6 +29,13 @@ export function CallScreen({
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(mediaType === 'video');
+  const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
+  const [isInCallChatOpen, setIsInCallChatOpen] = useState(false);
+  const [inCallMessages, setInCallMessages] = useState<Array<{ id: string; sender: 'me' | 'peer'; text: string; time: string }>>([
+    { id: '1', sender: 'peer', text: `Encrypted call connected with ${peerName}.`, time: 'Now' },
+  ]);
+  const [inCallInputText, setInCallInputText] = useState('');
+  const [isPipMinimized, setIsPipMinimized] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -42,6 +49,59 @@ export function CallScreen({
     const secs = sec % 60;
     return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
+
+  const handleSendInCallMessage = () => {
+    const trimmed = inCallInputText.trim();
+    if (!trimmed) return;
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    setInCallMessages(prev => [
+      ...prev,
+      { id: Date.now().toString(), sender: 'me', text: trimmed, time: timeStr },
+    ]);
+    setInCallInputText('');
+  };
+
+  if (isPipMinimized) {
+    return (
+      <div
+        onClick={() => setIsPipMinimized(false)}
+        style={{
+          position: 'fixed',
+          right: 16,
+          top: 48,
+          width: 140,
+          height: 190,
+          backgroundColor: '#0b141a',
+          borderRadius: 16,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.8)',
+          border: '2px solid rgba(56, 189, 248, 0.4)',
+          zIndex: 999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: 10,
+          cursor: 'pointer',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          color: '#fff',
+        }}
+        title="Tap to return to full call"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#34d399' }}>
+          <span>🔒</span>
+          <span>{formatTimer(duration)}</span>
+        </div>
+        <div style={{ fontSize: '2rem' }}>{mediaType === 'video' ? '📹' : '🎙️'}</div>
+        <div style={{ fontSize: 11, fontWeight: 600, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+          {peerName}
+        </div>
+        <div style={{ fontSize: 9, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '2px 6px', borderRadius: 4 }}>
+          Tap to Expand
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -123,10 +183,27 @@ export function CallScreen({
             {isVideoMuted ? (
               <span>Camera Off</span>
             ) : (
-              <>
-                <span style={{ fontSize: '1.8rem' }}>👤</span>
-                <span style={{ marginTop: 4 }}>You (Self)</span>
-              </>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  transform: cameraFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)',
+                  transition: 'transform 0.3s ease',
+                }}
+              >
+                <span style={{ fontSize: '1.8rem' }}>{cameraFacing === 'user' ? '👤' : '📷'}</span>
+                <span
+                  style={{
+                    marginTop: 4,
+                    fontSize: 10,
+                    color: '#38bdf8',
+                    transform: cameraFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)',
+                  }}
+                >
+                  {cameraFacing === 'user' ? 'Front Lens' : 'Rear Lens'}
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -174,6 +251,160 @@ export function CallScreen({
         </div>
       )}
 
+      {/* In-Call Text Chat Drawer (WhatsApp-Style Overlaid Sliding Sheet) */}
+      {isInCallChatOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 96,
+            height: '55%',
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderTop: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: '24px 24px 0 0',
+            display: 'flex',
+            flexDirection: 'column',
+            zIndex: 50,
+            boxShadow: '0 -8px 32px rgba(0,0,0,0.7)',
+            padding: '16px',
+          }}
+        >
+          {/* Drawer Header */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingBottom: 10,
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 14 }}>💬</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
+                In-Call Encrypted Chat
+              </span>
+              <span style={{ fontSize: 10, color: '#34d399', background: 'rgba(52, 211, 153, 0.15)', padding: '2px 6px', borderRadius: 10 }}>
+                E2EE Active
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => setIsPipMinimized(true)}
+                title="Minimize Call to PiP"
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  color: '#94a3b8',
+                  borderRadius: 8,
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                }}
+              >
+                ⤢ PiP
+              </button>
+              <button
+                onClick={() => setIsInCallChatOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Messages List Feed */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '12px 0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            {inCallMessages.map(msg => (
+              <div
+                key={msg.id}
+                style={{
+                  alignSelf: msg.sender === 'me' ? 'flex-end' : 'flex-start',
+                  maxWidth: '80%',
+                  backgroundColor: msg.sender === 'me' ? '#0284c7' : 'rgba(30, 41, 59, 0.9)',
+                  color: '#fff',
+                  borderRadius: 12,
+                  padding: '8px 12px',
+                  fontSize: 13,
+                  lineHeight: 1.4,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                }}
+              >
+                <div>{msg.text}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', textAlign: 'right', marginTop: 2 }}>
+                  {msg.time}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Message Input Bar */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              paddingTop: 8,
+              borderTop: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <input
+              type="text"
+              value={inCallInputText}
+              onChange={e => setInCallInputText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSendInCallMessage()}
+              placeholder="Send text message during call..."
+              style={{
+                flex: 1,
+                backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 20,
+                padding: '8px 14px',
+                color: '#fff',
+                fontSize: 13,
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={handleSendInCallMessage}
+              style={{
+                backgroundColor: '#0284c7',
+                border: 'none',
+                color: '#fff',
+                borderRadius: '50%',
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: 14,
+              }}
+            >
+              ➤
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* WhatsApp Bottom Control Bar */}
       <div
         style={{
@@ -200,6 +431,7 @@ export function CallScreen({
             justifyContent: 'center',
             cursor: 'pointer',
           }}
+          title={isAudioMuted ? 'Unmute' : 'Mute'}
         >
           {isAudioMuted ? '🔇' : '🎙️'}
         </button>
@@ -221,27 +453,66 @@ export function CallScreen({
                 justifyContent: 'center',
                 cursor: 'pointer',
               }}
+              title={isVideoMuted ? 'Turn Camera On' : 'Turn Camera Off'}
             >
               {isVideoMuted ? '🚫' : '📹'}
             </button>
             <button
+              onClick={() => setCameraFacing(prev => (prev === 'user' ? 'environment' : 'user'))}
+              title={`Flip to ${cameraFacing === 'user' ? 'Rear' : 'Front'} Camera`}
               style={{
                 width: 52,
                 height: 52,
                 borderRadius: '50%',
-                backgroundColor: 'rgba(255,255,255,0.15)',
-                border: 'none',
+                backgroundColor: cameraFacing === 'environment' ? '#6366f1' : 'rgba(255,255,255,0.15)',
+                border: cameraFacing === 'environment' ? '1px solid #818cf8' : 'none',
                 fontSize: 20,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
+                transition: 'all 0.2s ease',
               }}
             >
               🔄
             </button>
           </>
         )}
+
+        {/* In-Call Text Chat Drawer Button */}
+        <button
+          onClick={() => setIsInCallChatOpen(prev => !prev)}
+          title="In-Call Encrypted Chat"
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: '50%',
+            backgroundColor: isInCallChatOpen ? '#059669' : 'rgba(255,255,255,0.15)',
+            border: isInCallChatOpen ? '1px solid #34d399' : 'none',
+            fontSize: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            position: 'relative',
+          }}
+        >
+          💬
+          {inCallMessages.length > 0 && !isInCallChatOpen && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 4,
+                right: 4,
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                backgroundColor: '#10b981',
+                border: '2px solid #0b141a',
+              }}
+            />
+          )}
+        </button>
 
         {/* Speaker Toggle */}
         <button
@@ -258,6 +529,7 @@ export function CallScreen({
             justifyContent: 'center',
             cursor: 'pointer',
           }}
+          title={isSpeakerOn ? 'Speaker On' : 'Earpiece Mode'}
         >
           🔊
         </button>
@@ -278,6 +550,7 @@ export function CallScreen({
             cursor: 'pointer',
             boxShadow: '0 4px 14px rgba(220, 38, 38, 0.5)',
           }}
+          title="End Call"
         >
           🔴
         </button>

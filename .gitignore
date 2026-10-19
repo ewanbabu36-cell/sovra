@@ -77,5 +77,8 @@ local.properties
 
 # Chain testnet node data
 chain/mytestnet/**/data/
+chain/mytestnet/**/exported-genesis.json
+chain/mytestnet/**/priv_validator_state.json
+chain/mytestnet/signer*
 *.sst
 test_tmp_*

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -26,13 +27,26 @@ var (
 	KeyPrefixGenesisTime = []byte{0x33}
 	KeyPrefixInitialized = []byte{0x34}
 	KeyPrefixBlock       = []byte{0x35}
+	KeyPrefixValidators  = []byte{0x36}
+	KeyPrefixDelegation  = []byte{0x40}
+	KeyPrefixSigningInfo = []byte{0x41}
 )
+
+func SigningInfoKey(validator string) []byte {
+	return append(KeyPrefixSigningInfo, []byte(validator)...)
+}
 
 func BlockKey(height int64) []byte {
 	k := make([]byte, 9)
 	k[0] = 0x35
 	binary.BigEndian.PutUint64(k[1:], uint64(height))
 	return k
+}
+
+func DelegationKey(delegator, validator string) []byte {
+	k := append(KeyPrefixDelegation, []byte(delegator)...)
+	k = append(k, byte(':'))
+	return append(k, []byte(validator)...)
 }
 
 // SovraApp is the complete Sovra blockchain state machine
@@ -123,6 +137,8 @@ func (app *SovraApp) InitChain(gen GenesisState) error {
 	genTimeBz := make([]byte, 8)
 	binary.BigEndian.PutUint64(genTimeBz, uint64(gen.GenesisTime))
 	app.store.Set(KeyPrefixGenesisTime, genTimeBz)
+	valBz, _ := json.Marshal(gen.Validators)
+	app.store.Set(KeyPrefixValidators, valBz)
 	app.store.Set(KeyPrefixInitialized, []byte{0x01})
 
 	return nil
@@ -244,6 +260,33 @@ func (app *SovraApp) DeliverTx(tx SignedTransaction) error {
 			return fmt.Errorf("execute contract failed: %w", err)
 		}
 
+	case TxTypeDelegate:
+		amt, _ := math.NewIntFromString(tx.Amount)
+		targetVal := tx.Validator
+		if targetVal == "" {
+			targetVal = tx.Recipient
+		}
+		if err := app.bankKeeper.SendCoinsFromAccountToModule(cacheStore, tx.Sender, "bonded_tokens_pool", amt); err != nil {
+			return fmt.Errorf("delegation transfer failed: %w", err)
+		}
+		curDel := app.GetDelegation(cacheStore, tx.Sender, targetVal)
+		app.SetDelegation(cacheStore, tx.Sender, targetVal, curDel.Add(amt))
+
+	case TxTypeUndelegate:
+		amt, _ := math.NewIntFromString(tx.Amount)
+		targetVal := tx.Validator
+		if targetVal == "" {
+			targetVal = tx.Recipient
+		}
+		curDel := app.GetDelegation(cacheStore, tx.Sender, targetVal)
+		if curDel.LT(amt) {
+			return fmt.Errorf("insufficient delegated balance to undelegate")
+		}
+		app.SetDelegation(cacheStore, tx.Sender, targetVal, curDel.Sub(amt))
+		if err := app.bankKeeper.SendCoinsFromModuleToAccount(cacheStore, "bonded_tokens_pool", tx.Sender, amt); err != nil {
+			return fmt.Errorf("undelegation refund failed: %w", err)
+		}
+
 	default:
 		return fmt.Errorf("unsupported transaction type: %s", tx.Type)
 	}
@@ -352,6 +395,37 @@ func (app *SovraApp) validateTx(s store.KVStore, tx SignedTransaction, isDeliver
 			if ok && f.IsPositive() {
 				amt = f
 			}
+		}
+
+	case TxTypeDelegate:
+		a, ok := math.NewIntFromString(tx.Amount)
+		if !ok || !a.IsPositive() {
+			return fmt.Errorf("invalid delegation amount: %s", tx.Amount)
+		}
+		val := tx.Validator
+		if val == "" {
+			val = tx.Recipient
+		}
+		if val == "" {
+			return fmt.Errorf("validator address required for delegation")
+		}
+		amt = a
+
+	case TxTypeUndelegate:
+		a, ok := math.NewIntFromString(tx.Amount)
+		if !ok || !a.IsPositive() {
+			return fmt.Errorf("invalid undelegation amount: %s", tx.Amount)
+		}
+		val := tx.Validator
+		if val == "" {
+			val = tx.Recipient
+		}
+		if val == "" {
+			return fmt.Errorf("validator address required for undelegation")
+		}
+		curDel := app.GetDelegation(s, tx.Sender, val)
+		if curDel.LT(a) {
+			return fmt.Errorf("insufficient delegated balance: have %s, requested %s", curDel, a)
 		}
 
 	default:
@@ -492,6 +566,14 @@ func (app *SovraApp) LoadLastState() (int64, []byte, error) {
 		app.genesisTime = int64(binary.BigEndian.Uint64(genTimeBz))
 	}
 
+	valBz := app.store.Get(KeyPrefixValidators)
+	if len(valBz) > 0 {
+		var vals []GenesisValidator
+		if err := json.Unmarshal(valBz, &vals); err == nil {
+			app.validators = vals
+		}
+	}
+
 	return app.height, app.appHash, nil
 }
 
@@ -540,6 +622,209 @@ func (app *SovraApp) QueryWasmCode(codeID uint64) (*wasmtypes.CodeInfo, error) {
 
 func (app *SovraApp) WasmKeeper() *wasmkeeper.Keeper {
 	return app.wasmKeeper
+}
+
+// Delegation & PoS Staking Methods
+func (app *SovraApp) GetDelegation(s store.KVStore, delegator, validator string) math.Int {
+	bz := s.Get(DelegationKey(delegator, validator))
+	if len(bz) == 0 {
+		return math.ZeroInt()
+	}
+	var val math.Int
+	if err := val.Unmarshal(bz); err != nil {
+		return math.ZeroInt()
+	}
+	return val
+}
+
+func (app *SovraApp) SetDelegation(s store.KVStore, delegator, validator string, amt math.Int) {
+	bz, err := amt.Marshal()
+	if err != nil {
+		panic(err)
+	}
+	s.Set(DelegationKey(delegator, validator), bz)
+}
+
+// ExportGenesis dumps the current persistent chain state as GenesisState
+func (app *SovraApp) ExportGenesis() (GenesisState, error) {
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+
+	accounts := make(map[string]string)
+	iter := app.store.Iterator(bank.KeyPrefixBalance)
+	defer iter.Close()
+	for ; iter.Valid(); iter.Next() {
+		rawKey := iter.Key()
+		if len(rawKey) <= 1 {
+			continue
+		}
+		addr := string(rawKey[1:])
+		var val math.Int
+		if err := val.Unmarshal(iter.Value()); err == nil && val.IsPositive() {
+			accounts[addr] = val.String()
+		}
+	}
+
+	return GenesisState{
+		ChainID:     app.chainID,
+		GenesisTime: app.genesisTime,
+		Accounts:    accounts,
+		Validators:  app.validators,
+	}, nil
+}
+
+// Validator Signing Info & Slashing
+func (app *SovraApp) GetValidatorSigningInfo(validator string) ValidatorSigningInfo {
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+
+	bz := app.store.Get(SigningInfoKey(validator))
+	if len(bz) == 0 {
+		return ValidatorSigningInfo{Address: validator}
+	}
+	var info ValidatorSigningInfo
+	if err := json.Unmarshal(bz, &info); err != nil {
+		return ValidatorSigningInfo{Address: validator}
+	}
+	return info
+}
+
+func (app *SovraApp) SetValidatorSigningInfo(info ValidatorSigningInfo) error {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+
+	bz, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+	app.store.Set(SigningInfoKey(info.Address), bz)
+	return nil
+}
+
+// SlashValidator slashes a validator's bonded stake or account balance and jails them
+func (app *SovraApp) SlashValidator(validatorAddr string, fractionBps int64, jailDurationSeconds int64, misbehavior MisbehaviorType) (math.Int, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+
+	infoBz := app.store.Get(SigningInfoKey(validatorAddr))
+	var info ValidatorSigningInfo
+	if len(infoBz) > 0 {
+		_ = json.Unmarshal(infoBz, &info)
+	}
+	info.Address = validatorAddr
+
+	// Determine amount to slash from balance or bonded pool
+	balance := app.bankKeeper.GetBalance(app.store, validatorAddr)
+	if balance.IsZero() {
+		bondedPoolAddr := bank.ModuleAccountAddress("bonded_tokens_pool")
+		balance = app.bankKeeper.GetBalance(app.store, bondedPoolAddr)
+	}
+
+	// Slashed amount = balance * fractionBps / 10000
+	slashAmount := balance.Mul(math.NewInt(fractionBps)).Quo(math.NewInt(10000))
+	if slashAmount.IsPositive() {
+		if app.bankKeeper.GetBalance(app.store, validatorAddr).GTE(slashAmount) {
+			_ = app.bankKeeper.SendCoinsFromAccountToModule(app.store, validatorAddr, issuancetypes.ModuleName, slashAmount)
+		} else {
+			bondedPoolAddr := bank.ModuleAccountAddress("bonded_tokens_pool")
+			if app.bankKeeper.GetBalance(app.store, bondedPoolAddr).GTE(slashAmount) {
+				_ = app.bankKeeper.SendCoinsFromModuleToModule(app.store, "bonded_tokens_pool", issuancetypes.ModuleName, slashAmount)
+			}
+		}
+		// Burn slashed tokens to punish Byzantine fault
+		burnHandler := func(burner string, burnAmt math.Int) error {
+			return app.bankKeeper.BurnCoins(app.store, issuancetypes.ModuleName, burnAmt)
+		}
+		_ = app.issuanceKeeper.ExecuteBurn(app.store, issuancetypes.ModuleName, slashAmount, burnHandler)
+	}
+
+	now := time.Now().Unix()
+	info.JailedUntil = now + jailDurationSeconds
+	if misbehavior == MisbehaviorDoubleSign {
+		info.Tombstoned = true
+	}
+
+	bz, _ := json.Marshal(info)
+	app.store.Set(SigningInfoKey(validatorAddr), bz)
+
+	return slashAmount, nil
+}
+
+// IsValidatorJailed returns true if the validator is currently jailed or tombstoned
+func (app *SovraApp) IsValidatorJailed(validatorAddr string, currentTime int64) bool {
+	info := app.GetValidatorSigningInfo(validatorAddr)
+	if info.Tombstoned {
+		return true
+	}
+	return info.JailedUntil > currentTime
+}
+
+// UnjailValidator clears the jail status if jail duration has passed and validator is not tombstoned
+func (app *SovraApp) UnjailValidator(validatorAddr string, currentTime int64) error {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+
+	infoBz := app.store.Get(SigningInfoKey(validatorAddr))
+	if len(infoBz) == 0 {
+		return fmt.Errorf("validator %s signing info not found", validatorAddr)
+	}
+	var info ValidatorSigningInfo
+	if err := json.Unmarshal(infoBz, &info); err != nil {
+		return err
+	}
+
+	if info.Tombstoned {
+		return fmt.Errorf("validator %s is permanently tombstoned for double-signing", validatorAddr)
+	}
+	if info.JailedUntil > currentTime {
+		return fmt.Errorf("validator %s jail time not expired yet: remaining %d seconds", validatorAddr, info.JailedUntil-currentTime)
+	}
+
+	info.JailedUntil = 0
+	info.MissedBlocksCounter = 0
+	bz, _ := json.Marshal(info)
+	app.store.Set(SigningInfoKey(validatorAddr), bz)
+	return nil
+}
+
+// RecordValidatorBlockActivity tracks liveness and triggers slashing if downtime threshold exceeded
+func (app *SovraApp) RecordValidatorBlockActivity(validatorAddr string, signed bool, currentTime int64, maxMissedBlocks int64) (bool, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+
+	infoBz := app.store.Get(SigningInfoKey(validatorAddr))
+	var info ValidatorSigningInfo
+	if len(infoBz) > 0 {
+		_ = json.Unmarshal(infoBz, &info)
+	}
+	info.Address = validatorAddr
+
+	if info.Tombstoned || info.JailedUntil > currentTime {
+		return false, nil // already jailed
+	}
+
+	if signed {
+		if info.MissedBlocksCounter > 0 {
+			info.MissedBlocksCounter--
+		}
+		bz, _ := json.Marshal(info)
+		app.store.Set(SigningInfoKey(validatorAddr), bz)
+		return false, nil
+	}
+
+	// Missed block
+	info.MissedBlocksCounter++
+	if info.MissedBlocksCounter >= maxMissedBlocks {
+		// Slash 1% (100 bps) and jail for 10 minutes (600s)
+		info.JailedUntil = currentTime + 600
+		bz, _ := json.Marshal(info)
+		app.store.Set(SigningInfoKey(validatorAddr), bz)
+		return true, nil
+	}
+
+	bz, _ := json.Marshal(info)
+	app.store.Set(SigningInfoKey(validatorAddr), bz)
+	return false, nil
 }
 
 

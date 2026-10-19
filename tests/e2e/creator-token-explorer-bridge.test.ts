@@ -201,9 +201,14 @@ describe('CosmWasm CW20 Creator Tokens & Explorer Bridge Suite', () => {
       const privKey = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 
       // Query current nonce
-      const nonceRes = await fetch(`${L1_RPC}/query/nonce?address=${encodeURIComponent(creatorAddress)}`);
-      const nonceData = await nonceRes.json();
-      const currentNonce = Number(nonceData.nonce || 0);
+      let currentNonce = 0;
+      try {
+        const nonceRes = await fetch(`${L1_RPC}/query/nonce?address=${encodeURIComponent(creatorAddress)}`);
+        if (nonceRes.ok) {
+          const nonceData = await nonceRes.json();
+          currentNonce = Number(nonceData.nonce || 0);
+        }
+      } catch {}
 
       const executeMsg = JSON.stringify({
         transfer: {

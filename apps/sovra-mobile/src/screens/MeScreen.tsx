@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { OnboardingModal } from './OnboardingModal.js';
 import { AccountSettingsModal } from './AccountSettingsModal.js';
+import { ReferralModal } from './ReferralModal.js';
 import type { UserAccountProfile } from '@sovra/identity';
 import {
   fetchUserProfile,
@@ -40,6 +41,7 @@ export function MeScreen(): React.JSX.Element {
   const [isLocked, setIsLocked] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isReferralOpen, setIsReferralOpen] = useState(false);
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -343,6 +345,50 @@ export function MeScreen(): React.JSX.Element {
             </div>
           </div>
         </div>
+
+        {/* Viral Referral Banner: Invite & Earn 50 SOV */}
+        <div
+          onClick={() => setIsReferralOpen(true)}
+          style={{
+            background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.18) 0%, rgba(245, 158, 11, 0.28) 100%)',
+            border: '1px solid rgba(234, 179, 8, 0.5)',
+            borderRadius: 14,
+            padding: '12px 14px',
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            boxShadow: '0 4px 18px rgba(234, 179, 8, 0.12)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 26 }}>🎁</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fef08a' }}>
+                Invite Friends &amp; Earn 50 SOV
+              </div>
+              <div style={{ fontSize: 11, color: '#fde047', opacity: 0.9, marginTop: 1 }}>
+                Give 25 SOV, get 50 SOV on WhatsApp / Telegram
+              </div>
+            </div>
+          </div>
+          <div
+            style={{
+              backgroundColor: '#eab308',
+              color: '#000',
+              fontSize: 11,
+              fontWeight: 800,
+              padding: '6px 12px',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            Invite ➔
+          </div>
+        </div>
       </div>
 
       {/* Tabs (Posts, Reels, Saved) */}
@@ -442,6 +488,13 @@ export function MeScreen(): React.JSX.Element {
           setIsSettingsOpen(false);
           setActiveSession(null);
         }}
+      />
+
+      <ReferralModal
+        isOpen={isReferralOpen}
+        onClose={() => setIsReferralOpen(false)}
+        userDid={profile?.did}
+        onBalanceUpdated={(newBal) => setWalletBalance(newBal.toFixed(2))}
       />
     </div>
   );

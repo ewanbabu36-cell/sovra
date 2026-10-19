@@ -107,9 +107,13 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
         if (broadcastChatEvent) {
           try {
             broadcastChatEvent(recipientDid, {
-              type: 'offer',
+              type: 'call_invite',
+              signalType: 'call_invite',
               callId: session.callId,
               callerDid: principal.did,
+              callerName: senderUser?.displayName || senderUser?.handle || 'Peer',
+              callerAvatar: senderUser?.avatar || '📞',
+              callerAvatarBg: (senderUser as any)?.avatarBg || '#10b981',
               recipientDid,
               callType,
             }, 'call_signal');
@@ -280,7 +284,8 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
         if (broadcastChatEvent) {
           try {
             broadcastChatEvent(existingCall.callerDid, {
-              type: 'answer',
+              type: 'call_accept',
+              signalType: 'call_accept',
               callId,
               answerSdp,
               status: 'answered',
@@ -361,7 +366,8 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
           try {
             const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
             broadcastChatEvent(targetDid, {
-              type: 'candidate',
+              type: 'ice_candidate',
+              signalType: 'ice_candidate',
               callId,
               senderDid: principal.did,
               candidate,
@@ -412,13 +418,50 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
         return true;
       }
 
+      const wasConnected = Boolean(existingCall.status === 'connected' || existingCall.status === 'answered' || (existingCall as any).answeredAt);
+      const isDeclined = reason === 'declined' || reason === 'rejected';
+      const sigType = isDeclined ? 'call_reject' : 'call_hangup';
+
       const session = sovraDb.endCall(callId, principal.did, reason);
       callAudioChunkStore.delete(callId);
+
+      // WhatsApp-Grade: Auto-insert Missed Call / Call Summary bubble in chat log
+      try {
+        const callerUser = sovraDb.findUserByDid(existingCall.callerDid);
+        const isVideo = existingCall.callType === 'video';
+        let bubbleText = '';
+        if (wasConnected) {
+          const startTime = (existingCall as any).answeredAt || existingCall.createdAt;
+          const durSec = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+          const mins = Math.floor(durSec / 60);
+          const secs = durSec % 60;
+          const durFormatted = (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+          bubbleText = isVideo ? `📹 Video Call ended • ${durFormatted}` : `📞 Voice Call ended • ${durFormatted}`;
+        } else if (isDeclined) {
+          bubbleText = isVideo ? '📹 Declined Video Call' : '📞 Declined Voice Call';
+        } else {
+          bubbleText = isVideo ? '📹 Missed Video Call' : '📞 Missed Voice Call';
+        }
+
+        sovraDb.appendMessage({
+          senderDid: existingCall.callerDid,
+          recipientDid: existingCall.recipientDid,
+          senderName: callerUser?.displayName || callerUser?.handle || 'Peer',
+          text: bubbleText,
+          status: 'delivered',
+          isE2EE: true,
+          caption: wasConnected ? 'Call completed' : (isDeclined ? 'Declined call' : 'Missed call'),
+        });
+      } catch (bubbleErr) {
+        console.warn('[Call] Failed to append call log bubble to chat:', bubbleErr);
+      }
+
       if (broadcastChatEvent) {
         try {
           const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
           broadcastChatEvent(targetDid, {
-            type: 'end',
+            type: sigType,
+            signalType: sigType,
             callId,
             reason: reason || 'peer_hung_up',
           }, 'call_signal');
@@ -549,6 +592,69 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, status: 'reconnecting' }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 8b. Switch Call Mode (Audio <-> Video)
+  if (url.pathname === '/api/call/switch-mode' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const callId = String(parsed.callId || '');
+      const mode = parsed.mode === 'video' ? 'video' : 'audio';
+      if (!callId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'callId is required' }));
+        return true;
+      }
+
+      const allCalls = sovraDb.getState().call_sessions || [];
+      const existingCall = allCalls.find(c => c.callId === callId);
+      if (!existingCall) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Call session not found' }));
+        return true;
+      }
+
+      if (existingCall.callerDid !== principal.did && existingCall.recipientDid !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized mode switch' }));
+        return true;
+      }
+
+      existingCall.callType = mode;
+      existingCall.updatedAt = Date.now();
+      sovraDb.recordCallMetric({
+        callId,
+        eventType: 'call_mode_switched',
+        callerDid: existingCall.callerDid,
+        recipientDid: existingCall.recipientDid,
+      });
+      sovraDb.save();
+
+      if (broadcastChatEvent) {
+        try {
+          const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
+          broadcastChatEvent(targetDid, {
+            type: 'mode_switch',
+            signalType: 'mode_switch',
+            callId,
+            mode,
+            senderDid: principal.did,
+          }, 'call_signal');
+        } catch (_) {}
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, mode, callId }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));

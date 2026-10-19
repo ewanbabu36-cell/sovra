@@ -1,0 +1,51 @@
+{
+  "chain_id": "sovra-testnet-0",
+  "genesis_time": 1792061459,
+  "accounts": {
+    "sovra12a806ca82d506a025d580d40600abc77a69e10e7": "7500000000000",
+    "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1": "7500000000000",
+    "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb": "7500000000000",
+    "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20": "7500000000000",
+    "sovra1faucet0000000000000000000000000000000000": "1000000000000"
+  },
+  "validators": [
+    {
+      "name": "seed-validator-0",
+      "address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+      "pub_key": "50dec499bc1281f64488a3ca9500c9c1a4eea67f5147af0450ee0deebf8601be",
+      "voting_power": 25,
+      "node_id": "2a806ca82d506a025d580d40600abc77a69e10e7",
+      "p2p_addr": "2a806ca82d506a025d580d40600abc77a69e10e7@seed1.testnet.sovra.network:26656"
+    },
+    {
+      "name": "seed-validator-1",
+      "address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+      "pub_key": "a81cd7b53eb1edcfc9abce54679faf08ccaa002bd5898b63431f29cc964e67e3",
+      "voting_power": 25,
+      "node_id": "664a83c922035ce28bb723e4e92aed1e60e26ea1",
+      "p2p_addr": "664a83c922035ce28bb723e4e92aed1e60e26ea1@seed2.testnet.sovra.network:26656"
+    },
+    {
+      "name": "seed-validator-2",
+      "address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+      "pub_key": "d6cbcf5c5acf4688995801c2993a53f4c5ff164bd897362909fb2f1a5ede7724",
+      "voting_power": 25,
+      "node_id": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+      "p2p_addr": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb@seed3.testnet.sovra.network:26656"
+    },
+    {
+      "name": "seed-validator-3",
+      "address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+      "pub_key": "b5fc366f668f7d6dfc43a9b2942895ccb9e4eea5d7b1ca46f1e8c710347977ec",
+      "voting_power": 25,
+      "node_id": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+      "p2p_addr": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20@seed4.testnet.sovra.network:26656"
+    }
+  ],
+  "seed_nodes": [
+    "2a806ca82d506a025d580d40600abc77a69e10e7@seed1.testnet.sovra.network:26656",
+    "664a83c922035ce28bb723e4e92aed1e60e26ea1@seed2.testnet.sovra.network:26656",
+    "cb55be9a3d2afab1c9bcbffb88367bec797d11cb@seed3.testnet.sovra.network:26656",
+    "2a806ca82d506a025d580d40600abc77a69e10e7@127.0.0.1:26656"
+  ]
+}

@@ -52,7 +52,13 @@ describe('Client Script Integrity & UI Freeze Prevention Gate', () => {
       'postOptionsModal',
       'repostModal',
       'omniSearchModal',
-      'safetyCenterModal'
+      'safetyCenterModal',
+      'sovereignOnboardingWizard',
+      'globalCommandPaletteModal',
+      'spatialCallOverlay',
+      'spatialCallPipFloating',
+      'sovereignKeyVaultModal',
+      'deviceLinkModal'
     ];
 
     for (const modalId of requiredModals) {
@@ -232,5 +238,120 @@ describe('Client Script Integrity & UI Freeze Prevention Gate', () => {
     // Reels modal auto-routes missing vertical video or caption
     expect(html).toContain('reelUploadDropzonePrompt');
   }, 30000);
+
+  it('verifies Consumer WhatsApp-Grade Active Chat Header Parity, Clean Overflow Dropdown, and Legacy ID Compatibility', async () => {
+    const html = await new Promise<string>((resolve, reject) => {
+      http.get('http://127.0.0.1:3001', (res) => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => resolve(body));
+      }).on('error', reject);
+    });
+
+    // 1. Prominent contact identity (avatar, bold name, clean status)
+    expect(html).toContain('id="activePeerAvatar"');
+    expect(html).toContain('id="activePeerName"');
+    expect(html).toContain('id="activePeerStatus"');
+    expect(html).toContain('Public Mesh Chat');
+
+    // 2. Minimalist WhatsApp top action buttons
+    expect(html).toContain('id="headerVideoCallBtn"');
+    expect(html).toContain('id="headerAudioCallBtn"');
+    expect(html).toContain('id="headerChatSearchBtn"');
+    expect(html).toContain('id="chatHeaderMenuBtn"');
+
+    // 3. WhatsApp 3-dots overflow dropdown menu with secondary actions
+    expect(html).toContain('id="chatHeaderDropdownMenu"');
+    expect(html).toContain('Search in chat');
+    expect(html).toContain('Disappearing messages');
+    expect(html).toContain('id="menuConfidentialLabel"');
+    expect(html).toContain('Privacy Relays');
+    expect(html).toContain('Encryption details');
+
+    // 4. Backward compatibility: technical buttons preserved in DOM with display: none
+    expect(html).toMatch(/id="headerDisappearingBtn"[^>]*style="[^"]*display:\s*none/i);
+    expect(html).toMatch(/id="chatConfidentialShieldBtn"[^>]*style="[^"]*display:\s*none/i);
+    expect(html).toMatch(/id="privacyRelayToggleBtn"[^>]*style="[^"]*display:\s*none/i);
+    expect(html).toMatch(/id="bitchatHeaderRoute"[^>]*style="[^"]*display:\s*none/i);
+
+    // 5. Clean WhatsApp consumer input bar placeholder (not technical jargon)
+    expect(html).toContain('placeholder="Type a message..."');
+
+    // 6. Client helper routines for dropdown and in-chat search
+    expect(html).toContain('window.toggleChatHeaderMenu = toggleChatHeaderMenu');
+    expect(html).toContain('window.closeChatHeaderMenu = closeChatHeaderMenu');
+    expect(html).toContain('window.toggleInChatSearch = toggleInChatSearch');
+    expect(html).toContain('window.closeInChatSearch = closeInChatSearch');
+    expect(html).toContain('window.handleInChatSearch = handleInChatSearch');
+  }, 30000);
+
+  it('verifies Industry-Standard Top Heads-Up Notification Banner Engine, Anti-Flood Batching, and Screen-Center Freeze Prevention', async () => {
+    const html = await new Promise<string>((resolve, reject) => {
+      http.get('http://127.0.0.1:3001', (res) => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => resolve(body));
+      }).on('error', reject);
+    });
+
+    // 1. Top Heads-Up Banner container & card styles present
+    expect(html).toContain('.sovra-inapp-banner-container');
+    expect(html).toContain('.sovra-inapp-banner');
+    expect(html).toContain('.sovra-banner-avatar-wrap');
+    expect(html).toContain('.sovra-banner-title');
+    expect(html).toContain('.sovra-banner-btn-action');
+    expect(html).toContain('.sovra-banner-btn-close');
+
+    // 2. Bottom Toast is safely anchored above bottom tab bar, never in screen center
+    expect(html).toContain('bottom: max(78px, calc(env(safe-area-inset-bottom) + 68px));');
+    expect(html).not.toContain('bottom: 28px;\n      left: 50%;');
+
+    // 3. Client banner routines & window globals present
+    expect(html).toContain('window.showInAppNotification = showInAppNotification');
+    expect(html).toContain('window.showToast = showAccountToast');
+    expect(html).toContain('var _recentInAppNotifMap = new Map()');
+
+    // 4. Strict concurrency limit (max 2 cards with card depth stack)
+    expect(html).toContain('existingCards.length >= 2');
+    expect(html).toContain('existingCards[0].classList.add("stacked-behind")');
+
+    // 5. Anti-flood batching in fetchNotifications
+    expect(html).toContain('unreadNewList.length > 2');
+    expect(html).toContain('showInAppNotification({');
+  }, 30000);
+
+  it('verifies Facebook Standard Notification Bell and Snug Edge-Anchored Badge UX', async () => {
+    const html = await new Promise<string>((resolve, reject) => {
+      http.get('http://127.0.0.1:3001', (res) => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => resolve(body));
+      }).on('error', reject);
+    });
+
+    // 1. Frameless Icon Buttons: Transparent background, no dark solid enclosing circle (#3a3b3c)
+    expect(html).toContain('background: transparent !important; /* Completely free - NO solid inside circle or box */');
+    expect(html).toContain('.header-action-icon-btn .header-icon-wrap');
+    expect(html).toContain('.header-action-icon-btn .header-bell-icon');
+
+    // 2. Facebook Standard Badge Placement: Edge-anchored to top-right shoulder of icon
+    expect(html).toContain('background: #e41e3f !important; /* Facebook Red */');
+    expect(html).toContain('border: 2px solid #0b141a !important; /* Facebook cutout border matching header background */');
+    expect(html).toContain('top: -5px !important;');
+    expect(html).toContain('right: -8px !important;');
+
+    // 3. Essential DOM IDs and SVGs
+    expect(html).toContain('id="headerNotificationBell"');
+    expect(html).toContain('id="headerNotificationBadge"');
+    expect(html).toContain('id="headerChatBtn"');
+    expect(html).toContain('id="headerChatBadge"');
+
+    // 4. Bell icon SVG path (Facebook standard filled bell)
+    expect(html).toContain('d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"');
+
+    // 5. Unread count cap formatting at 99+
+    expect(html).toContain("data.unreadCount > 99 ? '99+' : String(data.unreadCount)");
+  }, 30000);
 });
+
 

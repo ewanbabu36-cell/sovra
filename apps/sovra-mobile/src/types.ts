@@ -43,8 +43,9 @@ export interface MobileChatMessage {
   text: string;
   timestamp: number;
   isOutgoing: boolean;
-  tickState: 'sending' | 'sent' | 'delivered' | 'read';
+  tickState: 'sending' | 'sent' | 'delivered' | 'read' | 'queued' | 'relayed' | 'failed';
   isAudioNote?: boolean | undefined;
   isBitChat?: boolean | undefined;
   hopCount?: number | undefined;
+  transportUsed?: 'ble_direct' | 'mesh_relay' | 'internet' | 'outbox_queued' | undefined;
 }

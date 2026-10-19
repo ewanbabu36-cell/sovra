@@ -1,0 +1,15 @@
+# ==============================================================================
+# SOVRA PHASE 2 PUBLIC TESTNET SEED NODES REGISTRY
+# Chain ID: sovra-testnet-0
+# P2P Protocol: CometBFT / Noise_XX Handshake (Port 26656)
+# ==============================================================================
+
+# Primary Public Seed Nodes (Multi-Host Anycast Discovery Relays)
+2a806ca82d506a025d580d40600abc77a69e10e7@seed1.testnet.sovra.network:26656
+664a83c922035ce28bb723e4e92aed1e60e26ea1@seed2.testnet.sovra.network:26656
+cb55be9a3d2afab1c9bcbffb88367bec797d11cb@seed3.testnet.sovra.network:26656
+
+# Fallback Development Loopback Seed Nodes
+2a806ca82d506a025d580d40600abc77a69e10e7@127.0.0.1:26656
+664a83c922035ce28bb723e4e92aed1e60e26ea1@127.0.0.1:26666
+cb55be9a3d2afab1c9bcbffb88367bec797d11cb@127.0.0.1:26676
