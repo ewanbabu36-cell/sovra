@@ -27,7 +27,7 @@ describe('Modern UI/UX Design System & Smart Omnibar E2E Suite', () => {
     expect(content).toContain('class="composer-avatar"');
     expect(content).toContain('class="composer-textarea"');
     expect(content).toContain('class="composer-actions-bar"');
-    expect(content).toContain('class="composer-media-tray"');
+    expect(content).toContain('composer-media-tray');
     expect(content).toContain('class="composer-media-btn"');
     expect(content).toContain('class="composer-publish-btn"');
     expect(content).toContain('id="dynamicPostCaption"');
@@ -35,6 +35,26 @@ describe('Modern UI/UX Design System & Smart Omnibar E2E Suite', () => {
     expect(content).toContain('id="dynamicPostTags"');
     expect(content).toContain('id="dynamicPostPublishBtn"');
     expect(content).toContain('submitDynamicPost');
+  });
+
+  it('verifies permanent two-tier post composer architecture with guaranteed zero-overflow publish dock', () => {
+    // 1. Two-tier HTML markup structure
+    expect(content).toContain('class="composer-media-tray composer-media-row"');
+    expect(content).toContain('class="composer-dock-row composer-right-actions"');
+    expect(content).toContain('class="composer-dock-left"');
+
+    // 2. Guaranteed publish button anchoring
+    expect(content).toContain('id="dynamicPostPublishBtn"');
+    expect(content).toContain('margin-left: auto; flex-shrink: 0 !important;');
+
+    // 3. Single-source two-tier CSS guarantees
+    expect(content).toContain('.composer-media-row,');
+    expect(content).toContain('.composer-dock-row,');
+    expect(content).toContain('max-width: 680px;');
+
+    // 4. Mode-Advance cyber neon button styling & corner safety
+    expect(content).toContain('body.mode-advance .composer-publish-btn');
+    expect(content).toContain('linear-gradient(135deg, #0284c7, #38bdf8)');
   });
 
   it('verifies live header search supports multi-category matching (People, Channels, Hashtags)', () => {
