@@ -2293,6 +2293,18 @@ export class SovraDatabaseEngine {
     return undefined;
   }
 
+  public findUserByRecoveryPhrase(phrase: string): UserRecord | undefined {
+    this.load();
+    if (!phrase) return undefined;
+    const normInput = phrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+    if (!normInput) return undefined;
+    return this.db.users.find(u => {
+      if (!u.recoveryPhrase) return false;
+      const normStored = u.recoveryPhrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+      return normStored === normInput;
+    });
+  }
+
   public revokeAllSessions(): number {
     this.load();
     let count = 0;

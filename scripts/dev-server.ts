@@ -10,6 +10,7 @@ import zlib from 'node:zlib';
 import { validateEnvironment } from './env-validator.ts';
 import { ensureDevTlsCertificates } from './tls-helper.ts';
 import { SovraBackupManager } from './sovra-backup-restore.ts';
+import { LocalDiskMediaDriver } from './media-storage-adapter.ts';
 import {
   generateEd25519KeyPair,
   bytesToHex,
@@ -172,6 +173,13 @@ if (!fs.existsSync(ATTACHMENTS_DIR)) {
     fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true });
   } catch {}
 }
+const MEDIA_DIR = path.join(STORAGE_DIR, 'media');
+if (!fs.existsSync(MEDIA_DIR)) {
+  try {
+    fs.mkdirSync(MEDIA_DIR, { recursive: true });
+  } catch {}
+}
+const localMediaDriver = new LocalDiskMediaDriver(MEDIA_DIR);
 
 const searchWorker = new SearchWorker();
 const moderationWorker = new ModerationWorker();
@@ -18026,6 +18034,14 @@ function renderHtml(
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                   <span>Encryption details</span>
                 </div>
+                <div class="chat-dropdown-item" style="color: #fca5a5;" onclick="closeChatHeaderMenu(); reportCurrentChatContact();">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                  <span>🚩 Report Conversation</span>
+                </div>
+                <div class="chat-dropdown-item" style="color: #ef4444;" onclick="closeChatHeaderMenu(); blockCurrentChatContact();">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                  <span>🚫 Block Contact</span>
+                </div>
               </div>
             </div>
           </div>
@@ -19562,6 +19578,10 @@ function renderHtml(
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                 <span>Wallet</span>
               </button>
+              <button class="profile-btn profile-btn-secondary" id="btnBackupSovereignIdentity" onclick="openSovereignBackupModal()" aria-label="Backup Sovereign Identity" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.35); color: #a5b4fc; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;" title="Backup 12-Word Sovereign Mnemonic Seed Phrase">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                <span>🔑 Backup</span>
+              </button>
               <!-- Hidden duplicate to preserve ID without visual redundancy (Single Authoritative trigger below Bio) -->
               <button class="profile-btn profile-btn-secondary" id="profileChannelsBtn" onclick="openSpatialChannelsPagesSurface(this)" aria-label="Channels &amp; Public Pages" style="display: none;">
                 <span>Channels &amp; Pages</span>
@@ -19575,6 +19595,10 @@ function renderHtml(
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                 </button>
                 <div id="profileOverflowDropdown" class="profile-overflow-dropdown" role="menu" style="display: none;">
+                  <div class="overflow-menu-item" id="profileBackupMenuItem" role="menuitem" tabindex="0" onclick="openSovereignBackupModal(); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a5b4fc;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                    <span>🔑 Backup Sovereign Identity</span>
+                  </div>
                   <div class="overflow-menu-item" id="profileGhostModeMenuItem" role="menuitem" tabindex="0" onclick="toggleGhostMode(event); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <span id="ghostModeMenuItemIcon" style="font-size: 1rem; width: 16px; display: inline-flex; justify-content: center;">🟢</span>
                     <span id="ghostModeMenuItemText">Appear Offline (Ghost Mode)</span>
@@ -19864,6 +19888,10 @@ function renderHtml(
               <button type="button" class="btn-card-action" onclick="openSovereignIdCardModal()" style="background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 10h4"/><path d="M14 14h4"/></svg>
                 <span>Show QR &amp; Card</span>
+              </button>
+              <button type="button" class="btn-card-action" id="btnCardBackupMnemonic" onclick="openSovereignBackupModal()" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Backup 12-Word Seed Phrase">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                <span>🔑 12 Words</span>
               </button>
               <button type="button" class="btn-card-action" onclick="verifyCurrentIdentityCrypto(myProfile)" style="background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.35); color: #34d399; flex: 0.5;" title="Verify security keys">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -25671,6 +25699,27 @@ function renderHtml(
         <button type="button" id="sovWizardStep1NextBtn" onclick="sovWizardGoToStep(2)" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);">
           <span>Continue to Recommended Creators &amp; Channels</span> <span>➔</span>
         </button>
+
+        <div style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px dashed rgba(255,255,255,0.12); text-align: center;">
+          <button type="button" id="btnImport12Words" onclick="toggleMnemonicImportDrawer()" style="background: none; border: none; color: #38bdf8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; text-decoration: underline;">
+            <span>🔑 Already have an account? Import with 12 words / keystore</span>
+          </button>
+        </div>
+
+        <!-- Inline Mnemonic Restore Drawer -->
+        <div id="mnemonicImportDrawer" style="display: none; margin-top: 0.85rem; padding: 12px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; text-align: left;">
+          <label style="font-size: 0.78rem; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 5px;">Enter Your 12-Word BIP-39 Seed Phrase</label>
+          <textarea id="importMnemonicInput" placeholder="word1 word2 word3 ... word12" rows="3" style="width: 100%; box-sizing: border-box; background: #0b1120; border: 1px solid #334155; border-radius: 8px; color: #f8fafc; font-family: monospace; font-size: 0.82rem; padding: 8px; resize: none; outline: none;"></textarea>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button type="button" id="btnExecuteMnemonicImport" onclick="executeMnemonicImport()" style="flex: 1; padding: 8px 12px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
+              ✓ Restore Identity
+            </button>
+            <label style="padding: 8px 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              📁 Keystore JSON
+              <input type="file" id="importKeystoreFileInput" accept=".json" style="display: none;" onchange="handleKeystoreFileImport(event)">
+            </label>
+          </div>
+        </div>
       </div>
 
       <!-- STEP 2: FOLLOW STARTER PACK -->
@@ -26963,6 +27012,54 @@ function renderHtml(
           <button onclick="closeSafetyReportModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
           <button onclick="submitSafetyReport()" class="action-pill-btn action-pill-danger" style="flex: 1.4; padding: 0.75rem; justify-content: center; font-size: 0.85rem;">Initiate 24h Jury Ballot ⚖️</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔑 10. SOVEREIGN 12-WORD MNEMONIC SEED & IDENTITY BACKUP MODAL (Apple/Telegram Grade) -->
+  <div id="sovereignBackupModal" class="omni-modal-overlay" style="display: none; z-index: 999999; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); background: rgba(5, 8, 16, 0.85);">
+    <div class="omni-modal-card" style="max-width: 520px; width: 94%; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 24px; background: linear-gradient(145deg, #0f172a 0%, #111a33 100%); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.85); padding: 0; overflow: hidden;">
+      <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, #6366f1, #38bdf8); display: flex; align-items: center; justify-content: center; font-size: 1.15rem;">🔑</div>
+          <div>
+            <div style="font-weight: 800; font-size: 1.05rem; color: #f8fafc; letter-spacing: -0.01em;">Sovereign Identity Backup</div>
+            <div style="font-size: 0.74rem; color: #94a3b8;">12-Word BIP-39 Disaster Recovery Seed</div>
+          </div>
+        </div>
+        <button onclick="closeSovereignBackupModal()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;">✕</button>
+      </div>
+
+      <div style="padding: 1.5rem;">
+        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 1.25rem; font-size: 0.78rem; color: #fca5a5; line-height: 1.45; display: flex; gap: 10px; align-items: flex-start;">
+          <span style="font-size: 1.1rem; line-height: 1;">⚠️</span>
+          <div>
+            <strong style="color: #fff;">Do NOT share these words with anyone.</strong> Anyone with this 12-word recovery phrase can recreate your Ed25519 keys, decrypt your confidential messages, and control your wallet.
+          </div>
+        </div>
+
+        <!-- 12 Words Grid Container with Blur Mask -->
+        <div style="position: relative; margin-bottom: 1.25rem;">
+          <div id="mnemonicWordsGrid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; filter: blur(0px); transition: filter 0.2s ease;">
+            <!-- Rendered dynamically by openSovereignBackupModal() -->
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 1.25rem;">
+          <button type="button" id="btnCopyMnemonicPhrase" onclick="copyMnemonicToClipboard()" class="action-pill-btn" style="flex: 1; padding: 10px 14px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 700; font-size: 0.82rem; border-radius: 12px; cursor: pointer; justify-content: center; gap: 6px;">
+            <span>📋</span> <span id="copyMnemonicBtnText">Copy Phrase</span>
+          </button>
+          <button type="button" id="btnDownloadKeystore" onclick="downloadKeystoreFile()" class="action-pill-btn" style="flex: 1; padding: 10px 14px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: #c7d2fe; font-weight: 700; font-size: 0.82rem; border-radius: 12px; cursor: pointer; justify-content: center; gap: 6px;">
+            <span>💾</span> <span>Download Keystore</span>
+          </button>
+          <button type="button" id="btnToggleMnemonicMask" onclick="toggleMnemonicWordsVisibility()" class="action-pill-btn" style="padding: 10px 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #cbd5e1; font-weight: 600; font-size: 0.82rem; border-radius: 12px; cursor: pointer; justify-content: center;" title="Show or hide words">
+            <span id="toggleMnemonicIcon">👁️</span>
+          </button>
+        </div>
+
+        <button type="button" onclick="closeSovereignBackupModal()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.92rem; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
+          ✓ I Have Saved My Seed Phrase Safely
+        </button>
       </div>
     </div>
   </div>
@@ -38889,6 +38986,174 @@ function renderHtml(
           prompt('Copy Recovery Phrase:', phrase);
         }
       });
+    }
+
+    // ========================================================
+    // 🔑 SOVEREIGN 12-WORD MNEMONIC IDENTITY BACKUP & RESTORE
+    // ========================================================
+    var _activeMnemonicPhrase = '';
+    var _isMnemonicMasked = false;
+
+    function openSovereignBackupModal() {
+      var modal = document.getElementById('sovereignBackupModal');
+      var grid = document.getElementById('mnemonicWordsGrid');
+      if (!modal || !grid) return;
+
+      modal.style.display = 'flex';
+
+      function renderWords(phrase) {
+        _activeMnemonicPhrase = phrase;
+        var words = phrase.trim().split(/\s+/).filter(Boolean);
+        grid.innerHTML = '';
+        words.forEach(function(word, idx) {
+          var chip = document.createElement('div');
+          chip.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; user-select: all;';
+          chip.innerHTML = '<span style="color: #64748b; font-size: 0.72rem; font-weight: 700; width: 18px;">' + (idx + 1) + '</span>' +
+                           '<span style="color: #38bdf8; font-family: monospace; font-weight: 700; font-size: 0.9rem;">' + word + '</span>';
+          grid.appendChild(chip);
+        });
+      }
+
+      if (myProfile && myProfile.recoveryPhrase && myProfile.recoveryPhrase.trim()) {
+        renderWords(myProfile.recoveryPhrase);
+      } else {
+        fetch('/api/user/recovery-phrase')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data && data.ok && data.recoveryPhrase) {
+              if (myProfile) myProfile.recoveryPhrase = data.recoveryPhrase;
+              renderWords(data.recoveryPhrase);
+            } else {
+              var fallback = generateClientDeterministicPhrase(myProfile ? (myProfile.did || myProfile.handle) : '');
+              if (myProfile) myProfile.recoveryPhrase = fallback;
+              renderWords(fallback);
+            }
+          })
+          .catch(function() {
+            var fallback = generateClientDeterministicPhrase(myProfile ? (myProfile.did || myProfile.handle) : '');
+            if (myProfile) myProfile.recoveryPhrase = fallback;
+            renderWords(fallback);
+          });
+      }
+    }
+
+    function closeSovereignBackupModal() {
+      var modal = document.getElementById('sovereignBackupModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function copyMnemonicToClipboard() {
+      var phrase = _activeMnemonicPhrase || (myProfile && myProfile.recoveryPhrase) || '';
+      if (!phrase) return;
+      copyToClipboard(phrase, function(success) {
+        var btnText = document.getElementById('copyMnemonicBtnText');
+        if (btnText) {
+          btnText.innerText = '✓ Copied!';
+          setTimeout(function() { btnText.innerText = 'Copy Phrase'; }, 2500);
+        }
+        showAccountToast('📋 12-Word Mnemonic Phrase copied to clipboard!');
+      });
+    }
+
+    function downloadKeystoreFile() {
+      var phrase = _activeMnemonicPhrase || (myProfile && myProfile.recoveryPhrase) || '';
+      var did = (myProfile && myProfile.did) || 'did:sovra:identity';
+      var handle = (myProfile && myProfile.handle) || '@pioneer';
+      var payload = {
+        format: 'sovra-keystore-v1',
+        exportedAt: new Date().toISOString(),
+        did: did,
+        handle: handle,
+        recoveryPhrase: phrase,
+        securityNote: 'Keep this file in a secure offline location. Never share it with anyone.'
+      };
+      var dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+      var downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', 'sovra-identity-' + handle.replace('@', '') + '-keystore.json');
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showAccountToast('💾 Sovereign Keystore file downloaded!');
+    }
+
+    function toggleMnemonicWordsVisibility() {
+      var grid = document.getElementById('mnemonicWordsGrid');
+      var icon = document.getElementById('toggleMnemonicIcon');
+      if (!grid) return;
+      _isMnemonicMasked = !_isMnemonicMasked;
+      grid.style.filter = _isMnemonicMasked ? 'blur(8px)' : 'blur(0px)';
+      if (icon) icon.innerText = _isMnemonicMasked ? '🙈' : '👁️';
+    }
+
+    function toggleMnemonicImportDrawer() {
+      var drawer = document.getElementById('mnemonicImportDrawer');
+      if (!drawer) return;
+      drawer.style.display = drawer.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function executeMnemonicImport() {
+      var input = document.getElementById('importMnemonicInput');
+      var phrase = input ? input.value.trim() : '';
+      if (!phrase) {
+        showAccountToast('⚠️ Please enter your 12-word recovery phrase.');
+        return;
+      }
+      var words = phrase.split(/\s+/).filter(Boolean);
+      if (words.length < 12) {
+        showAccountToast('⚠️ Mnemonic must be at least 12 words (found ' + words.length + ').');
+        return;
+      }
+
+      showAccountToast('🔄 Restoring sovereign identity from hardware seed...');
+      fetch('/api/user/restore-mnemonic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recoveryPhrase: phrase })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          if (data.sessionToken) {
+            localStorage.setItem('sovra_session_token', data.sessionToken);
+            document.cookie = 'sovra_session_token=' + data.sessionToken + '; path=/; max-age=31536000';
+          }
+          if (data.user) {
+            myProfile = data.user;
+          }
+          showAccountToast('🎉 Identity restored successfully! Welcome back, ' + ((data.user && data.user.displayName) || 'Citizen') + '!');
+          closeSovereignOnboardingWizard();
+          setTimeout(function() { window.location.reload(); }, 1200);
+        } else {
+          showAccountToast('⚠️ ' + (data.error || 'Restore failed. Please verify your 12 words.'));
+        }
+      })
+      .catch(function(err) {
+        console.error('[Restore] Error:', err);
+        showAccountToast('⚠️ Network error restoring account.');
+      });
+    }
+
+    function handleKeystoreFileImport(event) {
+      var file = event.target.files && event.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var parsed = JSON.parse(e.target.result);
+          if (parsed && parsed.recoveryPhrase) {
+            var input = document.getElementById('importMnemonicInput');
+            if (input) input.value = parsed.recoveryPhrase;
+            showAccountToast('📁 Keystore loaded. Restoring identity...');
+            executeMnemonicImport();
+          } else {
+            showAccountToast('⚠️ Invalid keystore JSON format: missing recoveryPhrase.');
+          }
+        } catch (_) {
+          showAccountToast('⚠️ Invalid JSON file.');
+        }
+      };
+      reader.readAsText(file);
     }
 
     // ========================================================
@@ -72168,7 +72433,36 @@ function renderHtml(
       closePostOptionsModal();
       const card = document.getElementById('card-' + activeTargetPost.id);
       if (card) card.style.display = 'none';
+      if (activeTargetPost && (activeTargetPost.authorDid || activeTargetPost.author)) {
+        fetch('/api/social/block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetDid: activeTargetPost.authorDid || activeTargetPost.author, reason: 'Blocked from post options' })
+        }).catch(function(e) { console.warn('[Block] Error:', e); });
+      }
       showAccountToast('🚫 Blocked @' + activeTargetPost.author);
+    }
+
+    function reportCurrentChatContact() {
+      var activeContact = (window.SovraState && window.SovraState.activeChatContact) || (typeof currentChatPeer !== 'undefined' ? currentChatPeer : null);
+      var targetDid = (activeContact && (activeContact.did || activeContact.id)) || 'did:sovra:chat_partner';
+      var targetName = (activeContact && (activeContact.name || activeContact.handle)) || 'Peer';
+      triggerSafetyReportModal('chat', targetDid, targetName);
+    }
+
+    function blockCurrentChatContact() {
+      var activeContact = (window.SovraState && window.SovraState.activeChatContact) || (typeof currentChatPeer !== 'undefined' ? currentChatPeer : null);
+      var targetDid = (activeContact && (activeContact.did || activeContact.id)) || '';
+      var targetName = (activeContact && (activeContact.name || activeContact.handle)) || 'this contact';
+      if (!confirm('Are you sure you want to block ' + targetName + '? They will no longer be able to message or call you.')) return;
+      if (targetDid) {
+        fetch('/api/social/block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetDid: targetDid, reason: 'Blocked in direct chat' })
+        }).catch(function(e) { console.warn('[Block] Error:', e); });
+      }
+      showAccountToast('🚫 Blocked ' + targetName);
     }
     function triggerDeleteFromModal() {
       closePostOptionsModal();
@@ -77121,9 +77415,10 @@ async function startDevServer() {
             if (storageDaemon && storageDaemon.blockstore) {
               await storageDaemon.blockstore.put(cidObj, mediaBuffer);
             }
-            // Save to physical disk in posts directory
+            // Save to physical disk in posts directory and CAS media driver
             const postFilePath = path.join(POSTS_DIR, `${realCid}.webp`);
             fs.writeFileSync(postFilePath, mediaBuffer);
+            try { await localMediaDriver.save(realCid, mediaBuffer, 'image/webp'); } catch (_) {}
           } catch (cidErr) {
             console.warn('[StorageDaemon] Image ingestion warning:', cidErr);
           }
@@ -77140,6 +77435,7 @@ async function startDevServer() {
             }
             const postFilePath = path.join(POSTS_DIR, `${realCid}.mp4`);
             fs.writeFileSync(postFilePath, mediaBuffer);
+            try { await localMediaDriver.save(realCid, mediaBuffer, 'video/mp4'); } catch (_) {}
           } catch (cidErr) {
             console.warn('[StorageDaemon] Video ingestion warning:', cidErr);
           }
@@ -77230,8 +77526,8 @@ async function startDevServer() {
           mediaCid: realCid,
           caption: caption || (postType === 'photo' ? 'Photo update from sovereign peer' : (postType === 'video' ? 'Video reel from sovereign peer' : (postType === 'survey' ? (parsed.surveyData?.title || 'Community Survey') : 'Status update'))),
           tags: String(parsed.tags || '#sovra #p2p #mesh'),
-          mediaImage: parsed.mediaImage ? String(parsed.mediaImage) : undefined,
-          mediaVideo: parsed.mediaVideo ? String(parsed.mediaVideo) : undefined,
+          mediaImage: parsed.mediaImage ? (String(parsed.mediaImage).startsWith('data:') ? (`/api/media/${realCid}`) : String(parsed.mediaImage)) : undefined,
+          mediaVideo: parsed.mediaVideo ? (String(parsed.mediaVideo).startsWith('data:') ? (`/api/media/${realCid}`) : String(parsed.mediaVideo)) : undefined,
           postType: postType,
           visibility: postVisibility,
           pollData: parsed.pollData,
@@ -77394,6 +77690,127 @@ async function startDevServer() {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
       }
+      return;
+    }
+
+    // ==========================================
+    // 📦 UNIFIED CONTENT-ADDRESSED STORAGE (CAS) MEDIA STREAMING (/api/media/:cid)
+    // ==========================================
+    if (url.pathname.startsWith('/api/media/') && req.method === 'GET' && !url.pathname.startsWith('/api/media/save') && !url.pathname.startsWith('/api/media/unsave') && !url.pathname.startsWith('/api/media/saved') && !url.pathname.startsWith('/api/media/delete')) {
+      const rawCid = path.basename(url.pathname);
+      const cid = rawCid.includes('.') ? rawCid.split('.')[0]! : rawCid;
+
+      // 1. Try LocalDiskMediaDriver
+      const driverRes = await localMediaDriver.read(cid);
+      if (driverRes) {
+        const range = req.headers.range;
+        const total = driverRes.buffer.length;
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+          if (start >= total) {
+            res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+            res.end();
+            return;
+          }
+          const chunk = driverRes.buffer.subarray(start, end + 1);
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${total}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunk.length,
+            'Content-Type': driverRes.mimeType,
+            'Cache-Control': 'public, max-age=86400',
+          });
+          res.end(chunk);
+          return;
+        } else {
+          res.writeHead(200, {
+            'Content-Length': total,
+            'Accept-Ranges': 'bytes',
+            'Content-Type': driverRes.mimeType,
+            'Cache-Control': 'public, max-age=86400',
+          });
+          res.end(driverRes.buffer);
+          return;
+        }
+      }
+
+      // 2. Check local posts / reels / storage folders
+      const possibleCandidates = [
+        path.join(MEDIA_DIR, `${cid}.webp`),
+        path.join(MEDIA_DIR, `${cid}.png`),
+        path.join(MEDIA_DIR, `${cid}.jpg`),
+        path.join(MEDIA_DIR, `${cid}.mp4`),
+        path.join(MEDIA_DIR, `${cid}.webm`),
+        path.join(POSTS_DIR, `${cid}.webp`),
+        path.join(POSTS_DIR, `${cid}.png`),
+        path.join(POSTS_DIR, `${cid}.jpg`),
+        path.join(POSTS_DIR, `${cid}.mp4`),
+        path.join(POSTS_DIR, `${cid}.webm`),
+        path.join(REELS_DIR, `${cid}.mp4`),
+        path.join(REELS_DIR, `${cid}.webm`),
+      ];
+
+      const foundPath = possibleCandidates.find(p => fs.existsSync(p));
+      if (foundPath) {
+        const ext = path.extname(foundPath).toLowerCase();
+        const isVideo = ext === '.mp4' || ext === '.webm';
+        const mime = ext === '.png' ? 'image/png' :
+                     (ext === '.jpg' || ext === '.jpeg') ? 'image/jpeg' :
+                     ext === '.mp4' ? 'video/mp4' :
+                     ext === '.webm' ? 'video/webm' : 'image/webp';
+        const stat = fs.statSync(foundPath);
+        const total = stat.size;
+        const range = req.headers.range;
+
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+          if (start >= total) {
+            res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+            res.end();
+            return;
+          }
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${total}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': end - start + 1,
+            'Content-Type': mime,
+            'Cache-Control': 'public, max-age=86400',
+          });
+          fs.createReadStream(foundPath, { start, end }).pipe(res);
+          return;
+        } else {
+          res.writeHead(200, {
+            'Content-Length': total,
+            'Accept-Ranges': 'bytes',
+            'Content-Type': mime,
+            'Cache-Control': 'public, max-age=86400',
+          });
+          fs.createReadStream(foundPath).pipe(res);
+          return;
+        }
+      }
+
+      // 3. Fallback: Blockstore Bitswap
+      try {
+        const blk = await storageDaemon.getBlock(cid);
+        if (blk) {
+          res.writeHead(200, {
+            'Content-Length': blk.length,
+            'Accept-Ranges': 'bytes',
+            'Content-Type': 'image/webp',
+            'Cache-Control': 'public, max-age=86400',
+          });
+          res.end(blk);
+          return;
+        }
+      } catch (_) {}
+
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Media not found' }));
       return;
     }
 
@@ -80367,6 +80784,71 @@ async function startDevServer() {
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, recoveryPhrase: user.recoveryPhrase || '' }));
+      return;
+    }
+
+    // API: Sovereign 12-Word Mnemonic Recovery & Identity Restore
+    if (url.pathname === '/api/user/restore-mnemonic' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const phrase = String(parsed.recoveryPhrase || parsed.phrase || '').trim();
+        if (!phrase) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: '12-word recovery phrase is required' }));
+          return;
+        }
+
+        const words = phrase.split(/\s+/).filter(Boolean);
+        if (words.length < 12) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Recovery phrase must contain at least 12 words' }));
+          return;
+        }
+
+        let user = sovraDb.findUserByRecoveryPhrase(phrase);
+        if (!user) {
+          const normInput = words.join(' ').toLowerCase();
+          user = sovraDb.getAllUsers().find(u => {
+            if (!u.recoveryPhrase) return false;
+            return u.recoveryPhrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ') === normInput;
+          });
+        }
+
+        if (!user) {
+          const seedHash = crypto.createHash('sha256').update(words.join(' ').toLowerCase()).digest('hex');
+          const derivedDid = 'did:sovra:seed_' + seedHash.slice(0, 16);
+          const derivedHandle = '@citizen_' + seedHash.slice(0, 8);
+          const newToken = 'stk_' + crypto.randomBytes(24).toString('hex');
+
+          user = sovraDb.upsertUser({
+            did: derivedDid,
+            handle: derivedHandle,
+            displayName: 'Sovereign Pioneer',
+            avatar: '🚀',
+            avatarBg: '#6366f1',
+            sessionToken: newToken,
+            recoveryPhrase: words.join(' ').toLowerCase(),
+            balanceSov: 500.0,
+          });
+        } else if (!user.sessionToken) {
+          const newToken = 'stk_' + crypto.randomBytes(24).toString('hex');
+          user.sessionToken = newToken;
+          sovraDb.upsertUser(user);
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          user: toPublicUserDTO(user),
+          sessionToken: user.sessionToken,
+          recoveryPhrase: user.recoveryPhrase,
+        }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
       return;
     }
 
@@ -84026,6 +84508,46 @@ async function startDevServer() {
       return;
     }
 
+    // ==========================================
+    // 🌐 WEBRTC DYNAMIC ICE SERVERS & TURN RELAYS
+    // ==========================================
+    if (url.pathname === '/api/webrtc/ice-servers' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      const iceServers = getIceServers(principal?.did);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, iceServers }));
+      return;
+    }
+
+    // ==========================================
+    // 💾 DISASTER RECOVERY & SYSTEM SNAPSHOT BACKUPS
+    // ==========================================
+    if ((url.pathname === '/api/admin/backup/status' || url.pathname === '/api/backup/status') && req.method === 'GET') {
+      try {
+        const mgr = new SovraBackupManager(STORAGE_DIR);
+        const backups = mgr.listBackups();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, count: backups.length, backups: backups.slice(0, 10) }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to list backups' }));
+      }
+      return;
+    }
+
+    if ((url.pathname === '/api/admin/backup/create' || url.pathname === '/api/backup/create') && req.method === 'POST') {
+      try {
+        const mgr = new SovraBackupManager(STORAGE_DIR);
+        const result = mgr.createBackup({ tag: 'api_trigger' });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: result.ok, backup: result }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to create backup' }));
+      }
+      return;
+    }
+
     // Product A: Sovra Consumer Social App & Creator Studio (Dedicated User Panel)
     if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/app' || url.pathname === '/join' || url.pathname.startsWith('/join')) {
       const now = Date.now();
@@ -84195,6 +84717,17 @@ async function startDevServer() {
       }
     }, 6 * 60 * 60 * 1000);
     backupInterval.unref();
+
+    // Initial automated startup snapshot (5 seconds after boot)
+    setTimeout(() => {
+      try {
+        const mgr = new SovraBackupManager(STORAGE_DIR);
+        mgr.createBackup({ tag: 'startup_snapshot' });
+        console.log('[BACKUP] Initial startup snapshot completed.');
+      } catch (backupErr) {
+        console.warn('[BACKUP] Initial startup snapshot warning:', backupErr);
+      }
+    }, 5000).unref();
   });
 }
 
