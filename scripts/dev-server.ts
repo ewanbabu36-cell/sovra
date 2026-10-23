@@ -2094,6 +2094,10 @@ function renderHtml(
       --fb-divider: rgba(255, 255, 255, 0.1);
       --glass-bg: rgba(15, 23, 42, 0.82);
       --glass-border: rgba(255, 255, 255, 0.12);
+      /* Unified Composer Tokens */
+      --composer-bg: #242526;
+      --composer-border: rgba(255, 255, 255, 0.08);
+      --composer-publish-bg: linear-gradient(135deg, #0284c7, #38bdf8);
       /* Apple & Linear Tier Spring Curves */
       --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
       --spring-easing: cubic-bezier(0.16, 1, 0.3, 1);
@@ -2323,6 +2327,9 @@ function renderHtml(
     }
 
     body.mode-advance {
+      --composer-bg: rgba(10, 20, 36, 0.88);
+      --composer-border: rgba(0, 240, 255, 0.35);
+      --composer-publish-bg: linear-gradient(135deg, #0284c7, #38bdf8);
       background-color: #060e1a !important;
       background-image: radial-gradient(circle at 50% 10%, rgba(0, 240, 255, 0.1) 0%, transparent 60%) !important;
     }
@@ -2378,8 +2385,7 @@ function renderHtml(
     }
     body.mode-advance .card::after,
     body.mode-advance .post-card::after,
-    body.mode-advance .insta-post-card::after,
-    body.mode-advance .feed-composer-card::after {
+    body.mode-advance .insta-post-card::after {
       content: "";
       position: absolute;
       bottom: 0; right: 0; width: 22px; height: 22px;
@@ -2388,6 +2394,16 @@ function renderHtml(
       border-bottom-right-radius: 16px;
       pointer-events: none;
       z-index: 1;
+    }
+    body.mode-advance .feed-composer-card::after {
+      content: "";
+      position: absolute;
+      bottom: 4px; right: 4px; width: 22px; height: 22px;
+      border-bottom: 2.5px solid #00f0ff;
+      border-right: 2.5px solid #00f0ff;
+      border-bottom-right-radius: 14px;
+      pointer-events: none !important;
+      z-index: 1 !important;
     }
     @keyframes typingDotBounce {
       0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
@@ -2629,17 +2645,19 @@ function renderHtml(
       margin-bottom: 16px;
       padding: 14px 16px 12px 16px;
       border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: #242526;
+      border: 1px solid var(--composer-border, rgba(255, 255, 255, 0.08));
+      background: var(--composer-bg, #242526);
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
       transition: box-shadow 0.2s ease, border-color 0.2s ease;
       box-sizing: border-box !important;
       position: relative;
       width: 100%;
+      overflow: visible;
     }
     .feed-composer-card * {
       box-sizing: border-box;
       max-width: 100%;
+      min-width: 0;
     }
     .feed-composer-card:focus-within {
       box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
@@ -2733,7 +2751,7 @@ function renderHtml(
       border: 1px solid rgba(255, 255, 255, 0.08) !important;
       color: #cbd5e1 !important;
       height: 36px;
-      padding: 0 12px;
+      padding: 0 10px;
       border-radius: 10px !important;
       font-size: 13px !important;
       font-weight: 600 !important;
@@ -2768,10 +2786,10 @@ function renderHtml(
       justify-content: space-between !important;
       gap: 10px !important;
       width: 100% !important;
-      margin-top: 2px !important;
+      margin-top: 10px !important;
       margin-left: 0 !important;
-      padding-top: 8px !important;
-      border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+      padding-top: 10px !important;
+      border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
       box-sizing: border-box !important;
       flex-wrap: nowrap !important;
     }
@@ -2800,13 +2818,33 @@ function renderHtml(
       outline: none;
       cursor: pointer;
     }
+    .composer-theme-select option {
+      background: #111827;
+      color: #fff;
+    }
+    .composer-tags-input {
+      width: 120px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #94a3b8;
+      padding: 5px 8px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      outline: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .composer-tags-input:focus {
+      width: 160px;
+      border-color: #6366f1;
+      color: #fff;
+    }
     .composer-publish-btn,
     #dynamicPostPublishBtn {
       margin-left: auto !important;
       flex-shrink: 0 !important;
-      min-width: 96px !important;
+      min-width: 90px !important;
       height: 38px !important;
-      background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
+      background: var(--composer-publish-bg, linear-gradient(135deg, #0284c7, #38bdf8)) !important;
       color: #ffffff !important;
       font-size: 14px !important;
       font-weight: 700 !important;
@@ -2914,58 +2952,6 @@ function renderHtml(
       background: rgba(239, 68, 68, 0.4);
       color: #fca5a5;
     }
-    .composer-theme-select {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #cbd5e1;
-      padding: 5px 8px;
-      border-radius: 8px;
-      font-size: 0.76rem;
-      outline: none;
-      cursor: pointer;
-    }
-    .composer-theme-select option {
-      background: #111827;
-      color: #fff;
-    }
-    .composer-tags-input {
-      width: 120px;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #94a3b8;
-      padding: 5px 8px;
-      border-radius: 8px;
-      font-size: 0.76rem;
-      outline: none;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .composer-tags-input:focus {
-      width: 160px;
-      border-color: #6366f1;
-      color: #fff;
-    }
-    .composer-publish-btn {
-      background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
-      border: 1px solid rgba(56, 189, 248, 0.75) !important;
-      color: #fff !important;
-      font-weight: 700 !important;
-      font-size: 14px !important;
-      padding: 6px 18px !important;
-      border-radius: 12px !important;
-      cursor: pointer !important;
-      display: inline-flex !important;
-      visibility: visible !important;
-      align-items: center !important;
-      gap: 6px !important;
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.45) !important;
-      transition: all 0.2s ease !important;
-    }
-    .composer-publish-btn:hover {
-      background: linear-gradient(135deg, #0369a1, #0284c7) !important;
-      transform: translateY(-1px) scale(1.02);
-      box-shadow: 0 0 24px rgba(56, 189, 248, 0.75) !important;
-    }
-
     .composer-top-header {
       display: none;
     }
@@ -3007,32 +2993,15 @@ function renderHtml(
         display: none !important;
       }
       .composer-actions-bar {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 10px !important;
         margin-top: 10px !important;
         padding-top: 10px !important;
         border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-      }
-      .composer-media-tray {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        gap: 8px !important;
-        width: 100% !important;
-        overflow-x: auto !important;
-        scrollbar-width: none !important;
-      }
-      .composer-media-tray::-webkit-scrollbar {
-        display: none !important;
+        gap: 10px !important;
       }
       .composer-media-btn {
-        flex: 0 0 40px !important;
-        width: 40px !important;
-        height: 40px !important;
+        flex: 0 0 38px !important;
+        width: 38px !important;
+        height: 38px !important;
         padding: 0 !important;
         border-radius: 50% !important;
         background: rgba(255, 255, 255, 0.08) !important;
@@ -3041,48 +3010,23 @@ function renderHtml(
         justify-content: center !important;
       }
       .composer-media-btn svg {
-        width: 20px !important;
-        height: 20px !important;
-      }
-      .composer-dock-row,
-      .composer-right-actions {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        gap: 10px !important;
-        width: 100% !important;
-        margin-left: 0 !important;
-        box-sizing: border-box !important;
+        width: 18px !important;
+        height: 18px !important;
       }
       #composerAddThreadBtn {
         display: none !important;
       }
       .composer-theme-select {
-        flex: 0 0 auto !important;
-        max-width: 130px !important;
-        font-size: 13px !important;
-        padding: 6px 8px !important;
-        border-radius: 8px !important;
-        background: rgba(30, 41, 59, 0.9) !important;
-        color: #cbd5e1 !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        max-width: 120px !important;
+        font-size: 12px !important;
+        padding: 5px 8px !important;
       }
-      .composer-publish-btn {
-        flex: 0 0 auto !important;
-        min-width: 90px !important;
-        height: 40px !important;
-        font-size: 14px !important;
-        font-weight: 700 !important;
-        border-radius: 12px !important;
-        background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
-        color: #ffffff !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 8px !important;
-        box-shadow: 0 4px 14px rgba(56, 189, 248, 0.45) !important;
-        border: 1px solid rgba(56, 189, 248, 0.75) !important;
-        cursor: pointer !important;
+      .composer-publish-btn,
+      #dynamicPostPublishBtn {
+        min-width: 86px !important;
+        height: 36px !important;
+        padding: 5px 14px !important;
+        font-size: 13px !important;
       }
       #composerFilterTray {
         display: flex !important;
@@ -7404,10 +7348,11 @@ function renderHtml(
     .feed-container {
       max-width: 680px;
       width: 100%;
-      margin: 0 auto;
+      margin: 0 auto 5rem auto;
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
+      box-sizing: border-box;
     }
     .admin-layout {
       display: grid;
@@ -12266,14 +12211,6 @@ function renderHtml(
     }
 
     /* Tab 1: Instagram Feed Styles */
-    .feed-container {
-      max-width: 680px;
-      width: 100%;
-      margin: 0 auto 5rem auto;
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
     .insta-post-card {
       background: rgba(17, 24, 39, 0.78);
       backdrop-filter: blur(16px);
@@ -15949,6 +15886,9 @@ function renderHtml(
         <!-- Privacy & Security -->
         <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 6px 14px; padding-top: 6px;">
           <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 4px 6px;">Security &amp; Account</div>
+          <div class="dev-drawer-item" id="drawerBackupSovereignIdentity" onclick="openSovereignBackupModal(); toggleDevMainMenu(false);" style="color: #a5b4fc; font-weight: 700;">
+            <span>🔑</span> <span>Backup Sovereign Identity</span>
+          </div>
           <div class="dev-drawer-item" onclick="openWellbeingModal(); toggleDevMainMenu(false);">
             <span>🌱</span> <span style="color: #34d399; font-weight: 600;">Digital Wellbeing &amp; Limits</span>
           </div>
@@ -16388,8 +16328,8 @@ function renderHtml(
                     <svg viewBox="0 0 24 24" fill="#f7b125"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
                     <span class="media-btn-label">Feeling</span>
                   </button>
-                  <!-- 4. Location (more actions) -->
-                  <button type="button" class="composer-media-btn" id="composerLocationBtn" title="Check in / Location" onclick="toggleComposerLocationTray()" style="display: none;">
+                  <!-- 4. Location -->
+                  <button type="button" class="composer-media-btn" id="composerLocationBtn" title="Check in / Location" onclick="toggleComposerLocationTray()">
                     <span style="font-size: 0.95rem; color: #38bdf8;">📍</span>
                     <span class="media-btn-label">Location</span>
                   </button>
@@ -16454,7 +16394,7 @@ function renderHtml(
                   <input id="dynamicPostTags" type="hidden" value="#sovra #community" />
 
                   <!-- Permanent Pinned Publish Button -->
-                  <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" class="composer-publish-btn" style="margin-left: auto; flex-shrink: 0 !important;">
+                  <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" class="composer-publish-btn" style="margin-left: auto; flex-shrink: 0 !important; min-width: 90px; height: 38px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     <span>Post</span>
                   </button>
