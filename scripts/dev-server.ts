@@ -3159,7 +3159,7 @@ function renderHtml(
     .app-layout {
       display: flex;
       justify-content: center;
-      min-height: 100vh;
+      min-height: calc(100vh - 56px);
       width: 100%;
       background: var(--bg);
     }
@@ -3168,8 +3168,8 @@ function renderHtml(
     .app-left-rail {
       width: 250px;
       position: sticky;
-      top: 0;
-      height: 100vh;
+      top: 56px;
+      height: calc(100vh - 56px);
       display: flex;
       flex-direction: column;
       padding: 1.25rem 0.85rem 1.25rem 0.85rem;
@@ -7049,14 +7049,46 @@ function renderHtml(
     .app-top-header {
       position: sticky;
       top: 0;
-      z-index: 90;
+      z-index: 1000;
+      width: 100%;
+      height: 56px;
       background: #0b141a;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 0.5rem 1rem;
+      padding: 0 1rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
+      gap: 1rem;
+      box-sizing: border-box;
+    }
+    .header-left-zone {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      flex: 0 1 360px;
+      min-width: 0;
+    }
+    .header-left-zone .header-search-wrap {
+      flex: 1;
+      min-width: 0;
+      max-width: 280px;
+    }
+    .header-right-zone {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      flex: 0 1 360px;
+      justify-content: flex-end;
+      position: relative;
+    }
+    @media (max-width: 860px) {
+      .header-left-zone {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+      }
+      .header-right-zone {
+        flex: 0 0 auto !important;
+      }
     }
     .mobile-brand {
       display: none;
@@ -7078,8 +7110,8 @@ function renderHtml(
     .app-right-rail {
       width: 320px;
       position: sticky;
-      top: 0;
-      height: 100vh;
+      top: 56px;
+      height: calc(100vh - 56px);
       overflow-y: auto;
       padding: 1.25rem 1rem;
       display: flex;
@@ -15429,6 +15461,173 @@ function renderHtml(
     </div>
   </div>
 
+  <!-- Top Level Sticky Navigation Header (Full-Width Facebook/YouTube 3-Zone Architecture) -->
+  <header class="app-top-header" onclick="handleDevHeaderContainerClick(event)">
+    <!-- Zone 1: Left (Brand, Menu & Search) -->
+    <div class="header-left-zone">
+      <button type="button" class="header-menu-toggle-btn" onclick="toggleDevMainMenu(true); event.stopPropagation();" title="SOVRA Menu (☰)" aria-label="Open Menu" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #fff; border-radius: 10px; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; font-size: 1.25rem;">
+        ☰
+      </button>
+
+      <!-- SOVRA Apple & Siri Animated Optical Fingerprint "S" Emblem (Clean & Neat) -->
+      <div id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="switchTab('feed'); event.stopPropagation();" aria-label="Open SOVRA holographic command center" title="SOVRA Home (Return to Feed)">
+        <div class="siri-fingerprint-core">
+          <div class="siri-chromatic-ring"></div>
+          <div class="fingerprint-optic-pulse"></div>
+          <svg class="siri-s-glyph" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="siriGlyphGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff"/>
+                <stop offset="30%" stop-color="#38bdf8"/>
+                <stop offset="70%" stop-color="#818cf8"/>
+                <stop offset="100%" stop-color="#ec4899"/>
+              </linearGradient>
+              <filter id="siriGlyphGlow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="2.5" result="blur"/>
+                <feMerge>
+                  <feMergeNode in="blur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <!-- Outer Luminous Bold S -->
+            <path class="siri-s-path" d="M 64 34 C 64 24 57 19 49 19 C 39 19 32 25 32 35 C 32 46 44 50 54 54 C 65 58 71 64 71 74 C 71 85 63 91 50 91 C 38 91 30 84 29 73" 
+                  stroke="url(#siriGlyphGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" filter="url(#siriGlyphGlow)"/>
+            <!-- Specular White High-Energy Core Filament -->
+            <path class="siri-s-core" d="M 64 34 C 64 24 57 19 49 19 C 39 19 32 25 32 35 C 32 46 44 50 54 54 C 65 58 71 64 71 74 C 71 85 63 91 50 91 C 38 91 30 84 29 73" 
+                  stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Fresh, Neat & Streamlined Search Bar (Zero Popup - 100% Inline Dropdown) -->
+      <div class="header-search-wrap">
+        <div class="header-search-bar" onclick="document.getElementById('headerFriendSearchInput').focus(); showHeaderSearchDropdown();">
+          <span class="header-search-icon" style="font-size: 0.85rem; color: #38bdf8; opacity: 0.85; margin-right: 4px; pointer-events: none; flex-shrink: 0;">🔍</span>
+          <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search posts, friends, tags..." aria-label="Search friends, channels, and tags" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown();" />
+          <button id="headerSearchClearBtn" onclick="clearHeaderSearch(event);" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.85rem;" aria-label="Clear search input">✕</button>
+          <kbd class="search-kbd-shortcut" style="display: none !important;" aria-hidden="true">Ctrl K</kbd>
+        </div>
+        <div id="headerSearchDropdown" class="header-search-dropdown" style="display: none;"></div>
+      </div>
+    </div>
+
+    <!-- Zone 2: Center Quick Nav Pills (Sovra Super App 5 Core Modules - Rule of 4 Simplicity) -->
+    <nav class="header-desktop-nav" aria-label="Desktop Quick Navigation">
+      <button type="button" class="header-nav-btn active" id="navTabHome" onclick="switchTab('feed')" title="Home (Feed)">
+        <span class="hnav-icon">🏠</span> <span>Home</span>
+      </button>
+      <button type="button" class="header-nav-btn" id="navTabWatch" onclick="switchTab('watch')" title="Watch (Shorts & 4K Videos)">
+        <span class="hnav-icon">🎬</span> <span>Watch</span>
+      </button>
+      <button type="button" class="header-nav-btn" id="navTabCreate" onclick="openUniversalCreateModal(event)" title="Create Post or Video" style="background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; font-weight: 800; border-radius: 20px; box-shadow: 0 2px 10px rgba(56, 189, 248, 0.35);">
+        <span class="hnav-icon">➕</span> <span>Create</span>
+      </button>
+      <button type="button" class="header-nav-btn" id="navTabChats" onclick="switchTab('chat')" title="Chats (Encrypted Messaging)">
+        <span class="hnav-icon">💬</span> <span>Chats</span>
+      </button>
+      <button type="button" class="header-nav-btn" id="navTabYou" onclick="switchTab('me')" title="You (Profile & Studio)">
+        <span class="hnav-icon">👤</span> <span>You</span>
+      </button>
+      <!-- Secondary items kept in DOM for backwards compatibility -->
+      <button type="button" class="header-nav-btn" id="hnav-feed" onclick="switchTab('feed')" style="display: none;" title="Home (Feed)"><span class="hnav-icon">🏠</span> <span>Home</span></button>
+      <button type="button" class="header-nav-btn" id="hnav-youtube" onclick="switchTab('watch')" style="display: none;" title="Watch"><span class="hnav-icon">🎬</span> <span>Watch</span></button>
+      <button type="button" class="header-nav-btn" id="hnav-create" onclick="openUniversalCreateModal()" style="display: none;" title="Create"><span class="hnav-icon">➕</span> <span>Create</span></button>
+      <button type="button" class="header-nav-btn" id="hnav-chat" onclick="switchTab('chat')" style="display: none;" title="Chats"><span class="hnav-icon">💬</span> <span>Chats</span></button>
+      <button type="button" class="header-nav-btn" id="hnav-me" onclick="switchTab('me')" style="display: none;" title="You"><span class="hnav-icon">👤</span> <span>You</span></button>
+      <button type="button" class="header-nav-btn" id="hnav-reels" onclick="switchTab('reels')" style="display: none;" title="Shorts"><span class="hnav-icon">🎞️</span> <span>Shorts</span></button>
+      <button type="button" class="header-nav-btn" id="hnav-calls" onclick="switchTab('calls')" style="display: none;" title="Calls"><span class="hnav-icon">📞</span> <span>Calls</span></button>
+      <button type="button" class="header-nav-btn" id="hnav-live" onclick="switchTab('live')" style="display: none;" title="Live"><span class="hnav-icon">🔴</span> <span>Live</span></button>
+      <button type="button" class="header-nav-btn" id="hnav-communities" onclick="switchTab('communities')" style="display: none;" title="Communities"><span class="hnav-icon">🌐</span> <span>Communities</span></button>
+      <button type="button" class="header-nav-btn" id="hnav-hub" onclick="switchTab('hub')" style="display: none;" title="Hub"><span class="hnav-icon">⚡</span> <span>Hub</span></button>
+    </nav>
+
+    <!-- Consolidated Node Status Pill (Hidden from Consumer Cleanliness View) -->
+    <div class="node-status-pill" style="display: none !important;" aria-hidden="true">
+      <span class="status-pulse-dot"></span>
+      <span class="status-text">Online</span>
+      <span class="badge tcp-port-badge">TCP :${tcpPort}</span>
+    </div>
+
+    <!-- Zone 3: Right Quick Actions -->
+    <div class="header-right-zone">
+      <!-- Universal Watch & Studio Discovery Glowing Pill (Gap 6) -->
+      <button id="headerWatchStudioPill" type="button" class="header-action-icon-btn header-watch-studio-pill" onclick="switchTab('watch')" title="Sovra Watch &amp; Creator Studio" aria-label="Watch &amp; Studio" style="display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(168, 85, 247, 0.22)); border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 20px; padding: 5px 12px; color: #fca5a5; font-weight: 700; font-size: 0.78rem; cursor: pointer; box-shadow: 0 0 12px rgba(239, 68, 68, 0.25); transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+        <span style="font-size: 0.92rem; filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));">🎬</span>
+        <span style="letter-spacing: 0.02em; background: linear-gradient(90deg, #fca5a5, #d8b4fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Watch &amp; Studio</span>
+      </button>
+
+      <!-- Universal Header Create Button & High-Conversion Popover Menu -->
+      <div id="headerCreateWrap" class="header-create-wrap">
+        <button id="headerCreateBtn" type="button" class="header-action-icon-btn" onclick="toggleHeaderCreateMenu(event)" aria-label="Create new content" aria-expanded="false" title="Create New Content" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; transition: all 0.2s ease;">
+          <span>➕</span>
+        </button>
+        <div id="headerCreateDropdown" class="header-create-dropdown" style="display: none;">
+          <button type="button" class="header-create-item" data-action="create-post" onclick="hideHeaderCreateMenu(); if(typeof openCreateModal==='function'){openCreateModal('post');}else{switchTab('feed');}">
+            <span>📝</span> <span>Create Post</span>
+          </button>
+          <button type="button" class="header-create-item" data-action="create-story" onclick="hideHeaderCreateMenu(); if(typeof openStoryCreator==='function'){openStoryCreator();}else{openCreateModal('story');}">
+            <span>⚡</span> <span>Add Story</span>
+          </button>
+          <button type="button" class="header-create-item" data-action="create-reel" onclick="hideHeaderCreateMenu(); if(typeof openCreateModal==='function'){openCreateModal('reel');}else{switchTab('reels');}">
+            <span>🎬</span> <span>Create Reel</span>
+          </button>
+          <button type="button" class="header-create-item" data-action="upload-video" onclick="hideHeaderCreateMenu(); if(typeof openVideoUploadModal==='function'){openVideoUploadModal();}else{switchTab('studio');}">
+            <span>📹</span> <span>Upload Video</span>
+          </button>
+          <button type="button" class="header-create-item" data-action="go-live" onclick="hideHeaderCreateMenu(); switchWatchSubTab('live'); switchTab('watch');">
+            <span>🔴</span> <span>Go Live</span>
+          </button>
+          <button type="button" class="header-create-item" data-action="create-channel" onclick="hideHeaderCreateMenu(); switchTab('studio');">
+            <span>📺</span> <span>Create Channel</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- PWA Install Action Pill (Header) -->
+      <button id="pwaInstallBtn" type="button" class="header-action-icon-btn" onclick="triggerPwaInstall(event)" title="Install Sovra App to Device" aria-label="Install Sovra App" style="display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(168, 85, 247, 0.25)); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 20px; padding: 4px 10px; color: #c084fc; font-weight: 700; font-size: 0.75rem; cursor: pointer;">
+        <span style="font-size: 0.88rem;">📲</span>
+        <span id="pwaHeaderInstallLabel">Install App</span>
+      </button>
+
+      <!-- Real-Time Notifications Bell (Facebook Standard: Free Floating Vector Bell & Edge-Anchored Badge) -->
+      <div id="headerNotificationBell" class="header-action-icon-btn" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" title="Notifications" aria-label="Notifications">
+        <div class="header-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-bell-icon" aria-hidden="true">
+            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+          </svg>
+          <span id="headerNotificationBadge" class="header-action-badge" style="display: none;">0</span>
+        </div>
+      </div>
+
+      <!-- Encrypted Direct Chats (Facebook Standard: Free Floating Messenger & Edge-Anchored Badge) -->
+      <div id="headerChatBtn" class="header-action-icon-btn" role="button" tabindex="0" onclick="if(typeof openFbFloatingChat==='function'){openFbFloatingChat('','Messenger','');}else{switchTab('chat');}" onkeydown="if(event.key==='Enter'||event.key===' '){if(typeof openFbFloatingChat==='function'){openFbFloatingChat('','Messenger','');}else{switchTab('chat');}}" title="Messenger (Encrypted Chats &amp; Messages)" aria-label="Chats">
+        <div class="header-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-chat-icon" aria-hidden="true">
+            <path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.86 7.07-.15.93-.65 2.58-1.74 3.69-.19.19-.24.47-.13.71.11.24.35.4.61.4 2.87 0 5.09-1.29 6.08-1.99.43.08.87.12 1.32.12 5.52 0 10-4.03 10-9s-4.48-9-10-9z"/>
+          </svg>
+          <span id="headerChatBadge" class="header-action-badge" style="display: none;">0</span>
+        </div>
+      </div>
+
+      <div id="notificationDropdown" style="display: none; position: absolute; top: 44px; right: 0; width: 320px; max-height: 400px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <span style="font-weight: 700; color: #fff; font-size: 0.85rem;">🔔 Notifications</span>
+          <button onclick="markAllNotificationsRead()" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; font-weight: 600;" aria-label="Mark all notifications read">Mark all read</button>
+        </div>
+        <div id="notificationListItems">
+          <div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 20px;">No notifications yet</div>
+        </div>
+      </div>
+
+      <!-- User Profile Avatar with Integrated Presence Badge (Desktop Only) -->
+      <div id="currentUserPill" class="header-avatar-wrap is-online" role="button" tabindex="0" onclick="switchTab('me'); event.stopPropagation();" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" title="Open Your Profile (Click to View / Toggle Ghost Mode)" aria-label="Your Sovereign Profile">
+        <span id="currentUserAvatar" class="header-avatar-circle">👤</span>
+        <span id="headerLiveIndicator" class="header-live-indicator"><span class="avatar-presence-dot live-connected" id="liveDotPulse" title="Status: Online (Live Mesh)"></span></span>
+      </div>
+    </div>
+  </header>
+
   <div class="app-layout">
     <!-- Column 1: Left Navigation Rail (Desktop) -->
     <aside class="app-left-rail">
@@ -15640,169 +15839,6 @@ function renderHtml(
 
     <!-- Column 2: Center Stage -->
     <div class="app-center-stage">
-      <!-- Center Sticky Top Header with Expansive Search -->
-      <header class="app-top-header" onclick="handleDevHeaderContainerClick(event)">
-        <button type="button" class="header-menu-toggle-btn" onclick="toggleDevMainMenu(true); event.stopPropagation();" title="SOVRA Menu (☰)" aria-label="Open Menu" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #fff; border-radius: 10px; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; font-size: 1.25rem;">
-          ☰
-        </button>
-
-        <!-- SOVRA Apple & Siri Animated Optical Fingerprint "S" Emblem (Clean & Neat) -->
-        <div id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="switchTab('feed'); event.stopPropagation();" aria-label="Open SOVRA holographic command center" title="SOVRA Home (Return to Feed)">
-          <div class="siri-fingerprint-core">
-            <div class="siri-chromatic-ring"></div>
-            <div class="fingerprint-optic-pulse"></div>
-            <svg class="siri-s-glyph" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="siriGlyphGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#ffffff"/>
-                  <stop offset="30%" stop-color="#38bdf8"/>
-                  <stop offset="70%" stop-color="#818cf8"/>
-                  <stop offset="100%" stop-color="#ec4899"/>
-                </linearGradient>
-                <filter id="siriGlyphGlow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feGaussianBlur stdDeviation="2.5" result="blur"/>
-                  <feMerge>
-                    <feMergeNode in="blur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                  </feMerge>
-                </filter>
-              </defs>
-              <!-- Outer Luminous Bold S -->
-              <path class="siri-s-path" d="M 64 34 C 64 24 57 19 49 19 C 39 19 32 25 32 35 C 32 46 44 50 54 54 C 65 58 71 64 71 74 C 71 85 63 91 50 91 C 38 91 30 84 29 73" 
-                    stroke="url(#siriGlyphGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" filter="url(#siriGlyphGlow)"/>
-              <!-- Specular White High-Energy Core Filament -->
-              <path class="siri-s-core" d="M 64 34 C 64 24 57 19 49 19 C 39 19 32 25 32 35 C 32 46 44 50 54 54 C 65 58 71 64 71 74 C 71 85 63 91 50 91 C 38 91 30 84 29 73" 
-                    stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
-            </svg>
-          </div>
-        </div>
-
-        <!-- Desktop Quick Nav Pills (Sovra Super App 5 Core Modules - Rule of 4 Simplicity) -->
-        <nav class="header-desktop-nav" aria-label="Desktop Quick Navigation">
-          <button type="button" class="header-nav-btn active" id="navTabHome" onclick="switchTab('feed')" title="Home (Feed)">
-            <span class="hnav-icon">🏠</span> <span>Home</span>
-          </button>
-          <button type="button" class="header-nav-btn" id="navTabWatch" onclick="switchTab('watch')" title="Watch (Shorts & 4K Videos)">
-            <span class="hnav-icon">🎬</span> <span>Watch</span>
-          </button>
-          <button type="button" class="header-nav-btn" id="navTabCreate" onclick="openUniversalCreateModal(event)" title="Create Post or Video" style="background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; font-weight: 800; border-radius: 20px; box-shadow: 0 2px 10px rgba(56, 189, 248, 0.35);">
-            <span class="hnav-icon">➕</span> <span>Create</span>
-          </button>
-          <button type="button" class="header-nav-btn" id="navTabChats" onclick="switchTab('chat')" title="Chats (Encrypted Messaging)">
-            <span class="hnav-icon">💬</span> <span>Chats</span>
-          </button>
-          <button type="button" class="header-nav-btn" id="navTabYou" onclick="switchTab('me')" title="You (Profile & Studio)">
-            <span class="hnav-icon">👤</span> <span>You</span>
-          </button>
-          <!-- Secondary items kept in DOM for backwards compatibility -->
-          <button type="button" class="header-nav-btn" id="hnav-feed" onclick="switchTab('feed')" style="display: none;" title="Home (Feed)"><span class="hnav-icon">🏠</span> <span>Home</span></button>
-          <button type="button" class="header-nav-btn" id="hnav-youtube" onclick="switchTab('watch')" style="display: none;" title="Watch"><span class="hnav-icon">🎬</span> <span>Watch</span></button>
-          <button type="button" class="header-nav-btn" id="hnav-create" onclick="openUniversalCreateModal()" style="display: none;" title="Create"><span class="hnav-icon">➕</span> <span>Create</span></button>
-          <button type="button" class="header-nav-btn" id="hnav-chat" onclick="switchTab('chat')" style="display: none;" title="Chats"><span class="hnav-icon">💬</span> <span>Chats</span></button>
-          <button type="button" class="header-nav-btn" id="hnav-me" onclick="switchTab('me')" style="display: none;" title="You"><span class="hnav-icon">👤</span> <span>You</span></button>
-          <button type="button" class="header-nav-btn" id="hnav-reels" onclick="switchTab('reels')" style="display: none;" title="Shorts"><span class="hnav-icon">🎞️</span> <span>Shorts</span></button>
-          <button type="button" class="header-nav-btn" id="hnav-calls" onclick="switchTab('calls')" style="display: none;" title="Calls"><span class="hnav-icon">📞</span> <span>Calls</span></button>
-          <button type="button" class="header-nav-btn" id="hnav-live" onclick="switchTab('live')" style="display: none;" title="Live"><span class="hnav-icon">🔴</span> <span>Live</span></button>
-          <button type="button" class="header-nav-btn" id="hnav-communities" onclick="switchTab('communities')" style="display: none;" title="Communities"><span class="hnav-icon">🌐</span> <span>Communities</span></button>
-          <button type="button" class="header-nav-btn" id="hnav-hub" onclick="switchTab('hub')" style="display: none;" title="Hub"><span class="hnav-icon">⚡</span> <span>Hub</span></button>
-        </nav>
-
-        <!-- Fresh, Neat & Streamlined Search Bar (Zero Popup - 100% Inline Dropdown) -->
-        <div class="header-search-wrap">
-          <div class="header-search-bar" onclick="document.getElementById('headerFriendSearchInput').focus(); showHeaderSearchDropdown();">
-            <span class="header-search-icon" style="font-size: 0.85rem; color: #38bdf8; opacity: 0.85; margin-right: 4px; pointer-events: none; flex-shrink: 0;">🔍</span>
-            <input type="text" id="headerFriendSearchInput" class="header-search-input" placeholder="Search posts, friends, tags..." aria-label="Search friends, channels, and tags" oninput="handleHeaderFriendSearch(this.value)" onfocus="showHeaderSearchDropdown();" />
-            <button id="headerSearchClearBtn" onclick="clearHeaderSearch(event);" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0 4px; font-size: 0.85rem;" aria-label="Clear search input">✕</button>
-            <kbd class="search-kbd-shortcut" style="display: none !important;" aria-hidden="true">Ctrl K</kbd>
-          </div>
-          <div id="headerSearchDropdown" class="header-search-dropdown" style="display: none;"></div>
-        </div>
-
-        <!-- Consolidated Node Status Pill (Hidden from Consumer Cleanliness View) -->
-        <div class="node-status-pill" style="display: none !important;" aria-hidden="true">
-          <span class="status-pulse-dot"></span>
-          <span class="status-text">Online</span>
-          <span class="badge tcp-port-badge">TCP :${tcpPort}</span>
-        </div>
-
-        <div style="display: flex; gap: 0.6rem; align-items: center; flex-shrink: 0; position: relative;">
-          <!-- Universal Watch & Studio Discovery Glowing Pill (Gap 6) -->
-          <button id="headerWatchStudioPill" type="button" class="header-action-icon-btn header-watch-studio-pill" onclick="switchTab('watch')" title="Sovra Watch &amp; Creator Studio" aria-label="Watch &amp; Studio" style="display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(168, 85, 247, 0.22)); border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 20px; padding: 5px 12px; color: #fca5a5; font-weight: 700; font-size: 0.78rem; cursor: pointer; box-shadow: 0 0 12px rgba(239, 68, 68, 0.25); transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
-            <span style="font-size: 0.92rem; filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));">🎬</span>
-            <span style="letter-spacing: 0.02em; background: linear-gradient(90deg, #fca5a5, #d8b4fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Watch &amp; Studio</span>
-          </button>
-
-          <!-- Universal Header Create Button & High-Conversion Popover Menu -->
-          <div id="headerCreateWrap" class="header-create-wrap">
-            <button id="headerCreateBtn" type="button" class="header-action-icon-btn" onclick="toggleHeaderCreateMenu(event)" aria-label="Create new content" aria-expanded="false" title="Create New Content" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; transition: all 0.2s ease;">
-              <span>➕</span>
-            </button>
-            <div id="headerCreateDropdown" class="header-create-dropdown" style="display: none;">
-              <button type="button" class="header-create-item" data-action="create-post" onclick="hideHeaderCreateMenu(); if(typeof openCreateModal==='function'){openCreateModal('post');}else{switchTab('feed');}">
-                <span>📝</span> <span>Create Post</span>
-              </button>
-              <button type="button" class="header-create-item" data-action="create-story" onclick="hideHeaderCreateMenu(); if(typeof openStoryCreator==='function'){openStoryCreator();}else{openCreateModal('story');}">
-                <span>⚡</span> <span>Add Story</span>
-              </button>
-              <button type="button" class="header-create-item" data-action="create-reel" onclick="hideHeaderCreateMenu(); if(typeof openCreateModal==='function'){openCreateModal('reel');}else{switchTab('reels');}">
-                <span>🎬</span> <span>Create Reel</span>
-              </button>
-              <button type="button" class="header-create-item" data-action="upload-video" onclick="hideHeaderCreateMenu(); if(typeof openVideoUploadModal==='function'){openVideoUploadModal();}else{switchTab('studio');}">
-                <span>📹</span> <span>Upload Video</span>
-              </button>
-              <button type="button" class="header-create-item" data-action="go-live" onclick="hideHeaderCreateMenu(); switchWatchSubTab('live'); switchTab('watch');">
-                <span>🔴</span> <span>Go Live</span>
-              </button>
-              <button type="button" class="header-create-item" data-action="create-channel" onclick="hideHeaderCreateMenu(); switchTab('studio');">
-                <span>📺</span> <span>Create Channel</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- PWA Install Action Pill (Header) -->
-          <button id="pwaInstallBtn" type="button" class="header-action-icon-btn" onclick="triggerPwaInstall(event)" title="Install Sovra App to Device" aria-label="Install Sovra App" style="display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(168, 85, 247, 0.25)); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 20px; padding: 4px 10px; color: #c084fc; font-weight: 700; font-size: 0.75rem; cursor: pointer;">
-            <span style="font-size: 0.88rem;">📲</span>
-            <span id="pwaHeaderInstallLabel">Install App</span>
-          </button>
-
-          <!-- Real-Time Notifications Bell (Facebook Standard: Free Floating Vector Bell & Edge-Anchored Badge) -->
-          <div id="headerNotificationBell" class="header-action-icon-btn" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" title="Notifications" aria-label="Notifications">
-            <div class="header-icon-wrap">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-bell-icon" aria-hidden="true">
-                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-              </svg>
-              <span id="headerNotificationBadge" class="header-action-badge" style="display: none;">0</span>
-            </div>
-          </div>
-
-          <!-- Encrypted Direct Chats (Facebook Standard: Free Floating Messenger & Edge-Anchored Badge) -->
-          <div id="headerChatBtn" class="header-action-icon-btn" role="button" tabindex="0" onclick="if(typeof openFbFloatingChat==='function'){openFbFloatingChat('','Messenger','');}else{switchTab('chat');}" onkeydown="if(event.key==='Enter'||event.key===' '){if(typeof openFbFloatingChat==='function'){openFbFloatingChat('','Messenger','');}else{switchTab('chat');}}" title="Messenger (Encrypted Chats &amp; Messages)" aria-label="Chats">
-            <div class="header-icon-wrap">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-chat-icon" aria-hidden="true">
-                <path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.86 7.07-.15.93-.65 2.58-1.74 3.69-.19.19-.24.47-.13.71.11.24.35.4.61.4 2.87 0 5.09-1.29 6.08-1.99.43.08.87.12 1.32.12 5.52 0 10-4.03 10-9s-4.48-9-10-9z"/>
-              </svg>
-              <span id="headerChatBadge" class="header-action-badge" style="display: none;">0</span>
-            </div>
-          </div>
-
-          <div id="notificationDropdown" style="display: none; position: absolute; top: 44px; right: 0; width: 320px; max-height: 400px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <span style="font-weight: 700; color: #fff; font-size: 0.85rem;">🔔 Notifications</span>
-              <button onclick="markAllNotificationsRead()" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; font-weight: 600;" aria-label="Mark all notifications read">Mark all read</button>
-            </div>
-            <div id="notificationListItems">
-              <div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 20px;">No notifications yet</div>
-            </div>
-          </div>
-
-          <!-- User Profile Avatar with Integrated Presence Badge (Desktop Only) -->
-          <div id="currentUserPill" class="header-avatar-wrap is-online" role="button" tabindex="0" onclick="switchTab('me'); event.stopPropagation();" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" title="Open Your Profile (Click to View / Toggle Ghost Mode)" aria-label="Your Sovereign Profile">
-            <span id="currentUserAvatar" class="header-avatar-circle">👤</span>
-            <span id="headerLiveIndicator" class="header-live-indicator"><span class="avatar-presence-dot live-connected" id="liveDotPulse" title="Status: Online (Live Mesh)"></span></span>
-          </div>
-        </div>
-      </header>
-
       <!-- 💬 Non-Intrusive Floating Top Chat Message Capsule (Dynamic Heads-Up) -->
       <div id="floatingChatToast" class="floating-chat-toast" onclick="handleFloatingToastClick(event)" aria-live="polite">
         <div class="toast-avatar" id="toastAvatar">👤</div>
