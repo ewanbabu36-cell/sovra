@@ -994,6 +994,118 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     return true;
   }
 
+  // Pin Video Comment (YouTube Parity)
+  if (url.pathname === '/api/youtube/comment/pin' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const videoId = String(parsed.videoId || '');
+      const commentId = String(parsed.commentId || '');
+      if (!videoId || !commentId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'videoId and commentId are required' }));
+        return true;
+      }
+
+      const result = sovraDb.togglePinVideoComment(videoId, commentId, principal.did);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, isPinned: result.isPinned, comment: result.comment }));
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // Creator Heart on Comment (YouTube Parity)
+  if (url.pathname === '/api/youtube/comment/heart' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const videoId = String(parsed.videoId || '');
+      const commentId = String(parsed.commentId || '');
+      if (!videoId || !commentId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'videoId and commentId are required' }));
+        return true;
+      }
+
+      const result = sovraDb.toggleCreatorHeartVideoComment(videoId, commentId, principal.did);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, creatorHeart: result.creatorHeart, comment: result.comment }));
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // Watch History Resume Progress Beacon / API
+  if ((url.pathname === '/api/watch/history/progress' || url.pathname === '/api/youtube/history/progress') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = resolvePrincipal(req, parsed);
+      const userDid = parsed.userDid || principal?.did || 'did:sovra:user_rahul_sharma_core';
+      const videoId = String(parsed.videoId || '');
+      const durationWatchedSec = Number(parsed.durationWatchedSec || parsed.currentTimeSec || 0);
+      const currentTimeSec = Number(parsed.currentTimeSec || durationWatchedSec);
+      const durationTotalSec = parsed.durationTotalSec ? Number(parsed.durationTotalSec) : undefined;
+      const completed = Boolean(parsed.completed);
+
+      if (!videoId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'videoId is required' }));
+        return true;
+      }
+
+      const record = sovraDb.recordWatchHistory(
+        userDid,
+        videoId,
+        durationWatchedSec,
+        completed,
+        durationTotalSec,
+        currentTimeSec
+      );
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, history: record }));
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // Subscriptions Feed API (Video Routes Fallthrough)
+  if ((url.pathname === '/api/subscriptions/feed' || url.pathname === '/api/subscriptions') && req.method === 'GET') {
+    const principal = resolvePrincipal(req);
+    const userDid = url.searchParams.get('userDid') || principal?.did || 'did:sovra:user_rahul_sharma_core';
+    const videos = sovraDb.getSubscriptionsFeed(userDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, videos, count: videos.length }));
+    return true;
+  }
+
+  // Subscriptions Channels Shelf API (Video Routes Fallthrough)
+  if (url.pathname === '/api/subscriptions/channels' && req.method === 'GET') {
+    const principal = resolvePrincipal(req);
+    const userDid = url.searchParams.get('userDid') || principal?.did || 'did:sovra:user_rahul_sharma_core';
+    const channels = sovraDb.getSubscribedChannels(userDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, channels, count: channels.length }));
+    return true;
+  }
+
   // ==========================================
   // 3. PLAYLISTS API
   // ==========================================

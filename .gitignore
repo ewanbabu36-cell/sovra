@@ -63,8 +63,10 @@ scripts/cloudflared.exe
 scripts/cloudflare-url.txt
 .sovra-tls/
 .tmp-*
+.test-*
 .test-drill-*
 .sovra-backups/
+.test-bench-*
 .test-bench-sqlite-*
 .test-final-restore-*
 *.apk

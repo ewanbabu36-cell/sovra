@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 
 const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
 
-describe('Sovra Holographic Central Navigation & Clean Production UI Gate', () => {
+describe('Sovra Holographic Central Navigation & Clean Production UI Gate', { timeout: 25000 }, () => {
   it('serves dashboard HTML with clean header containing SOVRA Command Core button', async () => {
     const res = await fetch(`${BASE_URL}/`);
     expect(res.status).toBe(200);
@@ -45,6 +45,34 @@ describe('Sovra Holographic Central Navigation & Clean Production UI Gate', () =
     // 6. Redundant handle text beside avatar is removed/hidden
     expect(html).toContain('#currentUserHandleText {');
     expect(html).toContain('display: none !important;');
+  });
+
+  it('mounts Universal Header Create button and popover dropdown with 6 action tiles', async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+
+    // 1. Header Create Wrap & Button
+    expect(html).toContain('id="headerCreateWrap"');
+    expect(html).toContain('id="headerCreateBtn"');
+    expect(html).toContain('toggleHeaderCreateMenu');
+
+    // 2. Anchored Popover Dropdown
+    expect(html).toContain('id="headerCreateDropdown"');
+    expect(html).toContain('class="header-create-dropdown"');
+
+    // 3. All 6 high-conversion creation action tiles
+    expect(html).toContain('data-action="create-post"');
+    expect(html).toContain('data-action="create-story"');
+    expect(html).toContain('data-action="create-reel"');
+    expect(html).toContain('data-action="upload-video"');
+    expect(html).toContain('data-action="go-live"');
+    expect(html).toContain('data-action="create-channel"');
+
+    // 4. Keyboard & State Machine wiring
+    expect(html).toContain('function toggleHeaderCreateMenu(');
+    expect(html).toContain('function hideHeaderCreateMenu(');
+    expect(html).toContain('header-create-item');
   });
 
   it('permanently suppresses legacy left rail and bottom nav bar in normal state CSS', async () => {

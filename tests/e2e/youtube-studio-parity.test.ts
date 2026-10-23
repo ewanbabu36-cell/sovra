@@ -496,6 +496,58 @@ describe('100% YouTube Studio Flagship Parity Verification Suite', () => {
         expect(typeof activeRes.data.dashboard.latestVideo.viewsCount).toBe('number');
       }
     });
+
+    it('9.7 GET & POST /api/studio/monetization/* endpoints manage creator revenue, tiers, tips, and payouts', async () => {
+      // 1. GET /api/studio/monetization/summary
+      const summaryRes = await invokeStudioRoute('GET', `/api/studio/monetization/summary?creatorDid=${testCreatorDid}`);
+      expect(summaryRes.handled).toBe(true);
+      expect(summaryRes.status).toBe(200);
+      expect(summaryRes.data.ok).toBe(true);
+      expect(typeof summaryRes.data.unclaimedBalanceSov).toBe('number');
+      expect(summaryRes.data.creatorRevenueSharePct).toBe(95.0);
+      expect(typeof summaryRes.data.activeMembersCount).toBe('number');
+      expect(typeof summaryRes.data.monthlyRecurringRevenueSov).toBe('number');
+      expect(Array.isArray(summaryRes.data.tiers)).toBe(true);
+      expect(summaryRes.data.tiers.length).toBeGreaterThanOrEqual(3);
+      expect(summaryRes.data.eligibility.isMonetized).toBe(true);
+      expect(summaryRes.data.eligibility.subscribersProgress.reached).toBe(true);
+
+      // 2. GET /api/studio/monetization/tips
+      const tipsRes = await invokeStudioRoute('GET', `/api/studio/monetization/tips?creatorDid=${testCreatorDid}&limit=10`);
+      expect(tipsRes.handled).toBe(true);
+      expect(tipsRes.status).toBe(200);
+      expect(tipsRes.data.ok).toBe(true);
+      expect(Array.isArray(tipsRes.data.tips)).toBe(true);
+      expect(tipsRes.data.tips.length).toBeGreaterThan(0);
+
+      // 3. POST /api/studio/monetization/tiers/save
+      const customTiers = [
+        { tierLevel: 1, name: 'Sovereign Supporter', priceSov: 6.0, badgeColor: '#10b981', perks: ['Comments Badge', 'VIP Chat'] },
+        { tierLevel: 2, name: 'Mesh Insider', priceSov: 18.0, badgeColor: '#38bdf8', perks: ['4K Early Access', 'Private AMAs'] },
+        { tierLevel: 3, name: 'VIP Patron Council', priceSov: 60.0, badgeColor: '#a855f7', perks: ['Direct Messaging', 'Credit Roll'] },
+      ];
+      const saveTiersRes = await invokeStudioRoute('POST', '/api/studio/monetization/tiers/save', {
+        creatorDid: testCreatorDid,
+        channelId: 'ch_monetize_test',
+        tiers: customTiers,
+      });
+      expect(saveTiersRes.handled).toBe(true);
+      expect(saveTiersRes.status).toBe(200);
+      expect(saveTiersRes.data.ok).toBe(true);
+      expect(saveTiersRes.data.count).toBe(3);
+      expect(saveTiersRes.data.tiers[0].name).toBe('Sovereign Supporter');
+      expect(saveTiersRes.data.tiers[0].priceSov).toBe(6.0);
+
+      // 4. POST /api/studio/monetization/claim-payout
+      const claimRes = await invokeStudioRoute('POST', '/api/studio/monetization/claim-payout', {
+        creatorDid: testCreatorDid,
+        amount: 25.0,
+      });
+      expect(claimRes.handled).toBe(true);
+      expect(claimRes.status).toBe(200);
+      expect(claimRes.data.ok).toBe(true);
+      expect(claimRes.data.claimedAmount).toBe(25.0);
+    });
   });
 
   // =========================================================================
@@ -640,6 +692,41 @@ describe('100% YouTube Studio Flagship Parity Verification Suite', () => {
       expect(serverContent).toContain('Upload Your First Video');
       expect(serverContent).toContain('handleDashboardFileDrop');
       expect(serverContent).toContain('handleReplyKeyDown');
+    });
+
+    it('10.6 Flagship Sovereign Monetization Hub features 4-pillar subtabs, tier configuration modal, and top channel header badge', () => {
+      // 1. Studio Header Channel Pill with Avatar, Verified badge, and Subs count
+      expect(serverContent).toContain('id="studioHeaderChannelPill"');
+      expect(serverContent).toContain('id="studioTopChannelAvatar"');
+      expect(serverContent).toContain('id="studioTopVerifiedBadge"');
+      expect(serverContent).toContain('id="studioHeaderSubCount"');
+
+      // 2. 4 Subtab Pills in Sovereign Monetization Hub
+      expect(serverContent).toContain('id="studioEarnSubtabBtnOverview"');
+      expect(serverContent).toContain('id="studioEarnSubtabBtnTiers"');
+      expect(serverContent).toContain('id="studioEarnSubtabBtnTips"');
+      expect(serverContent).toContain('id="studioEarnSubtabBtnEligibility"');
+
+      // 3. 4 Subtab Panes
+      expect(serverContent).toContain('id="studioEarnSubtabOverview"');
+      expect(serverContent).toContain('id="studioEarnSubtabTiers"');
+      expect(serverContent).toContain('id="studioEarnSubtabTips"');
+      expect(serverContent).toContain('id="studioEarnSubtabEligibility"');
+
+      // 4. Tier Configuration Modal
+      expect(serverContent).toContain('id="studioTierModal"');
+      expect(serverContent).toContain('id="tier1NameInput"');
+      expect(serverContent).toContain('id="tier1PriceInput"');
+      expect(serverContent).toContain('id="tier2NameInput"');
+      expect(serverContent).toContain('id="tier2PriceInput"');
+      expect(serverContent).toContain('id="tier3NameInput"');
+      expect(serverContent).toContain('id="tier3PriceInput"');
+      expect(serverContent).toContain('openTierModal');
+      expect(serverContent).toContain('saveMembershipTiers');
+      expect(serverContent).toContain('switchEarnSubtab');
+
+      // 5. Studio Tools section in sidebar
+      expect(serverContent).toContain('Studio Tools');
     });
   });
 });

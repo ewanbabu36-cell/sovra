@@ -876,6 +876,24 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
+  // 7.2 GET /api/studio/analytics/retention - Audience retention curves with 5s buckets, intro %, spikes & dips
+  if (url.pathname === '/api/studio/analytics/retention' && req.method === 'GET') {
+    const videoId = url.searchParams.get('videoId') || 'yt-video-1';
+    const retentionData = sovraDb.getVideoRetentionData(videoId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(retentionData));
+    return true;
+  }
+
+  // 7.3 GET /api/studio/analytics/realtime - 60-minute & 48-hour realtime views telemetry & live sub ticker
+  if (url.pathname === '/api/studio/analytics/realtime' && req.method === 'GET') {
+    const creatorDid = resolveCreatorDid(ctx);
+    const realtimeData = sovraDb.getRealtimeAnalytics(creatorDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(realtimeData));
+    return true;
+  }
+
   // 8. GET /api/studio/content - All creator library content (videos, reels, scheduled)
   if (url.pathname === '/api/studio/content' && req.method === 'GET') {
     const creatorDid = resolveCreatorDid(ctx);
@@ -947,6 +965,158 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
+  // 10b. POST /api/studio/content/bulk-action - Batch operations on multiple videos (YouTube Studio Parity)
+  if (url.pathname === '/api/studio/content/bulk-action' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 128 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const creatorDid = resolveCreatorDid(ctx);
+      const videoIds: string[] = Array.isArray(parsed.videoIds) ? parsed.videoIds : [];
+      const action = parsed.action; // 'visibility' | 'delete' | 'add-to-playlist'
+      let modifiedCount = 0;
+
+      if (!action || videoIds.length === 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Action and non-empty videoIds are required' }));
+        return true;
+      }
+
+      if (action === 'delete') {
+        for (const vid of videoIds) {
+          const resDel = sovraDb.deleteCreatorStudioContent(creatorDid, vid);
+          if (resDel.ok) modifiedCount++;
+        }
+      } else if (action === 'visibility') {
+        const visibility = parsed.visibility || 'public';
+        for (const vid of videoIds) {
+          const resUpd = sovraDb.updateCreatorStudioContent(creatorDid, vid, { visibility });
+          if (resUpd.ok) modifiedCount++;
+        }
+      } else if (action === 'add-to-playlist') {
+        const playlistId = parsed.playlistId;
+        if (playlistId) {
+          for (const vid of videoIds) {
+            const resAdd = sovraDb.addVideoToPlaylist(playlistId, vid, creatorDid);
+            if (resAdd.ok) modifiedCount++;
+          }
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, action, modifiedCount, total: videoIds.length }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Bulk action failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 10c. GET /api/studio/playlists - Returns playlists owned by channel or creator
+  if (url.pathname === '/api/studio/playlists' && req.method === 'GET') {
+    const creatorDid = resolveCreatorDid(ctx);
+    const channelId = url.searchParams.get('channelId') || undefined;
+    const playlists = sovraDb.getStudioPlaylists(creatorDid, channelId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, count: playlists.length, playlists }));
+    return true;
+  }
+
+  // 10d. POST /api/studio/playlists/create - Create a new playlist
+  if (url.pathname === '/api/studio/playlists/create' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const creatorDid = resolveCreatorDid(ctx);
+      if (!parsed.title || !parsed.title.trim()) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Playlist title is required' }));
+        return true;
+      }
+      const user = sovraDb.findUserByDid(creatorDid);
+      const playlist = sovraDb.createPlaylist({
+        channelId: parsed.channelId,
+        creatorDid,
+        creatorHandle: user?.handle || 'creator',
+        creatorName: user?.displayName || user?.name || 'Creator',
+        title: parsed.title.trim(),
+        description: parsed.description,
+        thumbnailUrl: parsed.thumbnailUrl,
+        videoIds: Array.isArray(parsed.videoIds) ? parsed.videoIds : [],
+        privacy: parsed.privacy || 'public'
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, playlist }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid playlist payload: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 10e. POST /api/studio/playlists/update - Update playlist metadata or video order
+  if (url.pathname === '/api/studio/playlists/update' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const creatorDid = resolveCreatorDid(ctx);
+      const playlistId = parsed.id || parsed.playlistId;
+      if (!playlistId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing playlistId' }));
+        return true;
+      }
+      const updRes = sovraDb.updatePlaylist(playlistId, creatorDid, {
+        title: parsed.title,
+        description: parsed.description,
+        thumbnailUrl: parsed.thumbnailUrl,
+        privacy: parsed.privacy,
+        videoIds: parsed.videoIds
+      });
+      if (!updRes.ok) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: updRes.error }));
+        return true;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, playlist: updRes.playlist }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid update payload: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 10f. POST /api/studio/playlists/delete - Delete a playlist
+  if (url.pathname === '/api/studio/playlists/delete' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const creatorDid = resolveCreatorDid(ctx);
+      const playlistId = parsed.id || parsed.playlistId;
+      if (!playlistId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing playlistId' }));
+        return true;
+      }
+      const delRes = sovraDb.deletePlaylist(playlistId, creatorDid);
+      if (!delRes.ok) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: delRes.error }));
+        return true;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, message: 'Playlist deleted successfully' }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid delete payload: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
   // 11. GET /api/studio/video/details - Full video metadata for Post-Production Editor Modal
   if (url.pathname === '/api/studio/video/details' && req.method === 'GET') {
     const videoId = url.searchParams.get('id') || url.searchParams.get('videoId');
@@ -1006,6 +1176,102 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
+  // 12.1 POST /api/studio/video/trim - In-Browser Lossless Video Trimmer
+  if (url.pathname === '/api/studio/video/trim' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const videoId = parsed.videoId || parsed.id;
+      const startOffsetSec = Number(parsed.startOffsetSec) || 0;
+      const endOffsetSec = Number(parsed.endOffsetSec) || 0;
+      if (!videoId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing videoId' }));
+        return true;
+      }
+      const video = sovraDb.trimVideo(videoId, startOffsetSec, endOffsetSec);
+      if (!video) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Video not found' }));
+        return true;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, video, trimConfig: video.trimConfig }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Trim failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 12.2 POST /api/studio/video/thumbnail-ab - Save up to 3 thumbnail variants & toggle A/B test
+  if (url.pathname === '/api/studio/video/thumbnail-ab' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const videoId = parsed.videoId || parsed.id;
+      if (!videoId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing videoId' }));
+        return true;
+      }
+      const video = sovraDb.updateThumbnailAbVariants(videoId, parsed.variants || [], parsed.isAbTestingEnabled);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, video, variants: video?.thumbnailAbVariants, isAbTestingEnabled: video?.isAbTestingEnabled }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 12.3 POST /api/studio/video/thumbnail-ab/telemetry - Record impression or click for A/B variant
+  if (url.pathname === '/api/studio/video/thumbnail-ab/telemetry' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const { videoId, variantId, event } = parsed;
+      const result = sovraDb.recordThumbnailAbTelemetry(videoId, variantId, event);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Telemetry failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 12.4 GET /api/studio/video/endscreens - Get End Screens metadata
+  if (url.pathname === '/api/studio/video/endscreens' && req.method === 'GET') {
+    const videoId = url.searchParams.get('videoId') || 'yt-video-1';
+    const result = sovraDb.getVideoEndScreens(videoId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+    return true;
+  }
+
+  // 12.5 POST /api/studio/video/endscreens - Save End Screens 16:9 positioning elements
+  if (url.pathname === '/api/studio/video/endscreens' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const videoId = parsed.videoId || parsed.id;
+      const elements = parsed.elements || [];
+      const enabled = parsed.enabled !== false;
+      const video = sovraDb.updateVideoEndScreens(videoId, elements, enabled);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, video, endScreenConfig: video?.endScreenConfig }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'End screens save failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
   // 13. GET /api/studio/comments - Community Comments & Moderation Studio
   if (url.pathname === '/api/studio/comments' && req.method === 'GET') {
     const creatorDid = resolveCreatorDid(ctx);
@@ -1048,6 +1314,28 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Reply failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 14.1 POST /api/studio/comments/moderate - Approve, reject or delete comment
+  if (url.pathname === '/api/studio/comments/moderate' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const { videoId, commentId, action } = parsed;
+      if (!commentId || !action) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing commentId or action' }));
+        return true;
+      }
+      const result = sovraDb.moderateComment(videoId || 'yt-video-1', commentId, action);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Moderation failed: ' + (err?.message || err) }));
     }
     return true;
   }
@@ -1126,9 +1414,78 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
+  // 18.1 GET /api/studio/customization/shelves - Get channel homepage shelf layout
+  if (url.pathname === '/api/studio/customization/shelves' && req.method === 'GET') {
+    const creatorDid = resolveCreatorDid(ctx);
+    const shelves = sovraDb.getCreatorShelves(creatorDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, shelves }));
+    return true;
+  }
+
+  // 18.2 POST /api/studio/customization/shelves - Save channel homepage shelf layout
+  if (url.pathname === '/api/studio/customization/shelves' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const creatorDid = resolveCreatorDid(ctx);
+      const shelves = parsed.shelves || [];
+      const result = sovraDb.saveCreatorShelves(creatorDid, shelves);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Shelves save failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 18.3 GET /api/studio/settings/moderation - Get channel community guidelines & blocked words
+  if (url.pathname === '/api/studio/settings/moderation' && req.method === 'GET') {
+    const creatorDid = resolveCreatorDid(ctx);
+    const result = sovraDb.getCreatorModerationSettings(creatorDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+    return true;
+  }
+
+  // 18.4 POST /api/studio/settings/moderation - Save channel community guidelines & blocked words
+  if (url.pathname === '/api/studio/settings/moderation' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const creatorDid = resolveCreatorDid(ctx);
+      const result = sovraDb.saveCreatorModerationSettings(creatorDid, {
+        guidelines: parsed.guidelines,
+        blockedWords: parsed.blockedWords,
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Moderation settings save failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
   // 19. GET /api/studio/audio-library - Sovereign Royalty-Free Audio & SFX Library
   if (url.pathname === '/api/studio/audio-library' && req.method === 'GET') {
-    const tracks = sovraDb.getCreatorAudioLibrary();
+    let tracks = sovraDb.getCreatorAudioLibrary();
+    const typeParam = url.searchParams.get('type');
+    const genreParam = url.searchParams.get('genre');
+    const searchParam = url.searchParams.get('q') || url.searchParams.get('search');
+    if (typeParam && (typeParam === 'music' || typeParam === 'sfx')) {
+      tracks = tracks.filter((t: any) => t.type === typeParam || (typeParam === 'sfx' ? t.genre === 'Sound Effects' : t.genre !== 'Sound Effects'));
+    }
+    if (genreParam && genreParam !== 'all') {
+      tracks = tracks.filter((t: any) => t.genre.toLowerCase() === genreParam.toLowerCase() || (t.category && t.category.toLowerCase() === genreParam.toLowerCase()));
+    }
+    if (searchParam) {
+      const q = searchParam.toLowerCase();
+      tracks = tracks.filter((t: any) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.genre.toLowerCase().includes(q) || (t.category && t.category.toLowerCase().includes(q)));
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, count: tracks.length, tracks }));
     return true;
@@ -1268,17 +1625,52 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
-  // 14. GET /api/studio/payouts - Sovereign creator payout receipts & unclaimed pool
-  if (url.pathname === '/api/studio/payouts' && req.method === 'GET') {
+  // 14. GET /api/studio/payouts & GET /api/studio/monetization/summary
+  if ((url.pathname === '/api/studio/payouts' || url.pathname === '/api/studio/monetization/summary') && req.method === 'GET') {
     const creatorDid = resolveCreatorDid(ctx);
-    const data = sovraDb.getCreatorPayouts(creatorDid);
+    const channelId = url.searchParams.get('channelId') || undefined;
+    const summary = (sovraDb as any).getCreatorMonetizationSummary(creatorDid, channelId);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, creatorDid, ...data }));
+    res.end(JSON.stringify(summary));
     return true;
   }
 
-  // 15. POST /api/studio/payout - Authenticated Merkle claim settlement to Ed25519 wallet
-  if (url.pathname === '/api/studio/payout' && req.method === 'POST') {
+  // 14b. GET /api/studio/monetization/tips - Recent peer tips & member subscriptions ledger
+  if (url.pathname === '/api/studio/monetization/tips' && req.method === 'GET') {
+    const creatorDid = resolveCreatorDid(ctx);
+    const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+    const tips = (sovraDb as any).getCreatorTipReceiptsLedger(creatorDid, limit);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, creatorDid, tips, count: tips.length }));
+    return true;
+  }
+
+  // 14c. POST /api/studio/monetization/tiers/save - Configure channel membership tiers
+  if (url.pathname === '/api/studio/monetization/tiers/save' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const creatorDid = parsed.creatorDid || resolveCreatorDid(ctx);
+      const channelId = parsed.channelId || '';
+      const tiers = Array.isArray(parsed.tiers) ? parsed.tiers : [];
+      if (tiers.length === 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Tiers array is required' }));
+        return true;
+      }
+      const result = (sovraDb as any).saveCreatorMembershipTiers(creatorDid, tiers, channelId);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, creatorDid, ...result }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid tiers payload: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 15. POST /api/studio/payout & POST /api/studio/monetization/claim-payout - Authenticated Merkle claim settlement to Ed25519 wallet
+  if ((url.pathname === '/api/studio/payout' || url.pathname === '/api/studio/monetization/claim-payout') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
