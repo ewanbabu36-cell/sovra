@@ -247,6 +247,207 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
       return 'general';
     };
 
+    const curatedSeedExploreItems: ExploreItem[] = [
+      {
+        id: 'exp-tech-1',
+        type: 'post',
+        span: '2x2',
+        mediaUrl: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=900&q=80',
+        caption: 'Quantum Mesh Node activated across 48 local peering relays #tech #p2p',
+        likesCount: 1420,
+        commentsCount: 89,
+        authorHandle: '@cipher_core',
+        authorName: 'CipherNode Dev',
+        authorAvatar: '⚡',
+        category: 'tech',
+        filterPreset: 'Clarendon',
+        createdAt: Date.now() - 3600000
+      },
+      {
+        id: 'exp-reel-1',
+        type: 'reel',
+        span: '1x2',
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        mediaUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&q=80',
+        caption: 'Neon horizons & decentralized telemetry in 60fps #reels #design',
+        likesCount: 2890,
+        commentsCount: 214,
+        authorHandle: '@neon_vibe',
+        authorName: 'Aura Visuals',
+        authorAvatar: '🎬',
+        category: 'design',
+        audioTrack: 'Synthwave Odyssey - L1 Beats',
+        createdAt: Date.now() - 7200000
+      },
+      {
+        id: 'exp-photo-1',
+        type: 'post',
+        span: '1x1',
+        mediaUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80',
+        caption: 'Himalayan dawn captured from off-grid solar satellite station #photography',
+        likesCount: 940,
+        commentsCount: 62,
+        authorHandle: '@wanderer',
+        authorName: 'Tara Sharma',
+        authorAvatar: '🏔️',
+        category: 'photography',
+        filterPreset: 'Juno',
+        createdAt: Date.now() - 10800000
+      },
+      {
+        id: 'exp-crypto-1',
+        type: 'post',
+        span: '1x1',
+        mediaUrl: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80',
+        caption: 'Cosmos IBC Sovereign Bridge verified with Zero-Knowledge proofs #crypto #defi',
+        likesCount: 1830,
+        commentsCount: 128,
+        authorHandle: '@sov_finance',
+        authorName: 'Sovra Liquidity',
+        authorAvatar: '🪙',
+        category: 'crypto',
+        filterPreset: 'Lark',
+        createdAt: Date.now() - 14400000
+      },
+      {
+        id: 'exp-art-1',
+        type: 'post',
+        span: '1x1',
+        mediaUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80',
+        caption: 'Generative fluid dynamics rendered on P2P GPU compute swarm #design #art',
+        likesCount: 750,
+        commentsCount: 41,
+        authorHandle: '@fractal_lab',
+        authorName: 'Nexus Studio',
+        authorAvatar: '🎨',
+        category: 'design',
+        filterPreset: 'Ludwig',
+        createdAt: Date.now() - 18000000
+      },
+      {
+        id: 'exp-music-1',
+        type: 'post',
+        span: '1x1',
+        mediaUrl: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&q=80',
+        caption: 'Modular synthesizer jam session streaming lossless FLAC via BitChat #music',
+        likesCount: 1120,
+        commentsCount: 95,
+        authorHandle: '@sub_freq',
+        authorName: 'Kavita Beats',
+        authorAvatar: '🎵',
+        category: 'music',
+        filterPreset: 'Slumber',
+        createdAt: Date.now() - 21600000
+      },
+      {
+        id: 'exp-reel-2',
+        type: 'reel',
+        span: '1x2',
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        mediaUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
+        caption: 'Cybernetic drone flight through smart city architecture #tech #reels',
+        likesCount: 3410,
+        commentsCount: 310,
+        authorHandle: '@sky_crawler',
+        authorName: 'Aero Mesh',
+        authorAvatar: '🚀',
+        category: 'tech',
+        audioTrack: 'Original Ambient Audio (Spatial 3D)',
+        createdAt: Date.now() - 25200000
+      },
+      {
+        id: 'exp-photo-2',
+        type: 'post',
+        span: '1x1',
+        mediaUrl: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&q=80',
+        caption: 'Rainy Shibuya reflections on 35mm film #photography #cinematic',
+        likesCount: 2150,
+        commentsCount: 173,
+        authorHandle: '@film_junkie',
+        authorName: 'Kenji Sato',
+        authorAvatar: '📸',
+        category: 'photography',
+        filterPreset: 'Gingham',
+        createdAt: Date.now() - 28800000
+      },
+      {
+        id: 'exp-tech-2',
+        type: 'post',
+        span: '1x1',
+        mediaUrl: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80',
+        caption: 'Hardware enclave WebAuthn key generator deployed on sovereign RISC-V board #tech',
+        likesCount: 880,
+        commentsCount: 54,
+        authorHandle: '@open_hardware',
+        authorName: 'Rust Enclave',
+        authorAvatar: '💻',
+        category: 'tech',
+        filterPreset: 'Normal',
+        createdAt: Date.now() - 32400000
+      },
+      {
+        id: 'exp-crypto-2',
+        type: 'post',
+        span: '1x1',
+        mediaUrl: 'https://images.unsplash.com/photo-1621416894569-0f39ed31d247?w=800&q=80',
+        caption: 'Decentralized AMM pool volume crossed 2.5M SOV in 24 hours #crypto #token',
+        likesCount: 1670,
+        commentsCount: 112,
+        authorHandle: '@amm_oracle',
+        authorName: 'Sovra AMM Hub',
+        authorAvatar: '💎',
+        category: 'crypto',
+        filterPreset: 'Inkwell',
+        createdAt: Date.now() - 36000000
+      },
+      {
+        id: 'exp-art-2',
+        type: 'post',
+        span: '1x1',
+        mediaUrl: 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=800&q=80',
+        caption: 'Prismatic light dispersion study for upcoming NFT community drop #design',
+        likesCount: 1290,
+        commentsCount: 87,
+        authorHandle: '@chroma',
+        authorName: 'Studio Iris',
+        authorAvatar: '✨',
+        category: 'design',
+        filterPreset: 'Clarendon',
+        createdAt: Date.now() - 39600000
+      },
+      {
+        id: 'exp-music-2',
+        type: 'post',
+        span: '1x1',
+        mediaUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80',
+        caption: 'Live mesh festival audio broadcast streaming to 4,200 connected nodes #music',
+        likesCount: 2950,
+        commentsCount: 230,
+        authorHandle: '@pulse_festival',
+        authorName: 'Decentral Beats',
+        authorAvatar: '🎧',
+        category: 'music',
+        filterPreset: 'Juno',
+        createdAt: Date.now() - 43200000
+      }
+    ];
+
+    // Helper to sanitize dummy transparent 1x1 pixels
+    const sanitizeMedia = (url?: string, cat = 'general'): string => {
+      if (!url || (url.startsWith('data:image/png;base64,iVBOR') && url.length < 200)) {
+        const fallbacks: Record<string, string> = {
+          tech: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80',
+          design: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80',
+          music: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&q=80',
+          crypto: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80',
+          photography: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80',
+          general: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80'
+        };
+        return fallbacks[cat] || fallbacks.general;
+      }
+      return url;
+    };
+
     // Include reels
     if (category === 'all' || category === 'reels' || category === 'video') {
       reels.forEach((r, idx) => {
@@ -257,6 +458,7 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
           type: 'reel',
           span: '1x2', // 9:16 vertical tile span in 3-column mosaic
           videoUrl: r.videoUrl,
+          mediaUrl: sanitizeMedia(r.coverUrl || r.thumbnailUrl, itemCat),
           bgGradient: r.bgGradient,
           caption: r.caption || '',
           likesCount: r.likesCount || 0,
@@ -286,11 +488,12 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
         span = '2x2';
       }
 
+      const rawMedia = p.mediaImage || (p.carouselImages && p.carouselImages[0]);
       items.push({
         id: p.id,
         type: 'post',
         span,
-        mediaUrl: p.mediaImage || (p.carouselImages && p.carouselImages[0]),
+        mediaUrl: sanitizeMedia(rawMedia, itemCat),
         videoUrl: p.mediaVideo,
         bgGradient: p.mediaGradient,
         carouselCount: p.carouselImages?.length || (p.mediaImage ? 1 : 0),
@@ -308,6 +511,15 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
         createdAt: p.timestamp || Date.now(),
       });
     });
+
+    // Supplement with curated explore items to guarantee rich, diverse visual catalog
+    for (const cItem of curatedSeedExploreItems) {
+      if (category === 'all' || (category === 'reels' && cItem.type === 'reel') || cItem.category === category) {
+        if (!items.some(it => it.id === cItem.id)) {
+          items.push(cItem);
+        }
+      }
+    }
 
     // Shuffle / sort for algorithmic freshness
     items.sort((a, b) => (b.likesCount * 2 + b.commentsCount * 3) - (a.likesCount * 2 + a.commentsCount * 3));
@@ -335,6 +547,62 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
       reels: matchingReels,
       count: matchingReels.length,
     }));
+    return true;
+  }
+
+  // 10. Story Emoji Slider Telemetry & Status
+  if (url.pathname === '/api/stories/slider/status' && req.method === 'GET') {
+    const storyId = url.searchParams.get('storyId') || '';
+    const segmentId = url.searchParams.get('segmentId') || '';
+    const stories = sovraDb.getAllStories();
+    const story = stories.find(s => s.id === storyId || s.creatorHandle === storyId);
+    const seg = story?.segments.find(sg => sg.id === segmentId) || story?.segments[0];
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      emojiSlider: seg?.emojiSlider || null,
+    }));
+    return true;
+  }
+
+  // 11. Story Countdown Remind Status
+  if (url.pathname === '/api/stories/countdown/status' && req.method === 'GET') {
+    const storyId = url.searchParams.get('storyId') || '';
+    const segmentId = url.searchParams.get('segmentId') || '';
+    const stories = sovraDb.getAllStories();
+    const story = stories.find(s => s.id === storyId || s.creatorHandle === storyId);
+    const seg = story?.segments.find(sg => sg.id === segmentId) || story?.segments[0];
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      countdown: seg?.countdown || null,
+    }));
+    return true;
+  }
+
+  // 12. Subscriptions Feed API (YouTube Parity)
+  if ((url.pathname === '/api/subscriptions/feed' || url.pathname === '/api/subscriptions') && req.method === 'GET') {
+    const principal = resolvePrincipal(req);
+    const userDid = url.searchParams.get('userDid') || principal?.did || 'did:sovra:user_rahul_sharma_core';
+    const videos = sovraDb.getSubscriptionsFeed(userDid);
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+    });
+    res.end(JSON.stringify({ ok: true, videos, count: videos.length }));
+    return true;
+  }
+
+  // 13. Subscribed Channels Shelf API (YouTube Parity)
+  if (url.pathname === '/api/subscriptions/channels' && req.method === 'GET') {
+    const principal = resolvePrincipal(req);
+    const userDid = url.searchParams.get('userDid') || principal?.did || 'did:sovra:user_rahul_sharma_core';
+    const channels = sovraDb.getSubscribedChannels(userDid);
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+    });
+    res.end(JSON.stringify({ ok: true, channels, count: channels.length }));
     return true;
   }
 

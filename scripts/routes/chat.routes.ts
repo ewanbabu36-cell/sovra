@@ -104,6 +104,8 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         return {
           ...peer,
           isFriend,
+          isRequest: !isFriend,
+          inboxCategory: isFriend ? 'primary' : 'requests',
           isOnline: peer.isOnline !== false,
           role: isFriend ? 'Mutual Friend' : (peer.role || 'Direct Contact'),
           lastMessage: lastMessageText,
@@ -125,6 +127,53 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, contacts: contactsWithThreads, conversations: contactsWithThreads }));
     return true;
+  }
+
+  // 1b. Accept Chat Request (Instagram-grade Two-Tier Inbox Parity)
+  if (url.pathname === '/api/chat/request/accept' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+      const targetDid = parsed.contactDid || parsed.senderDid || parsed.did;
+      if (!targetDid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing contactDid' }));
+        return true;
+      }
+      sovraDb.acceptDirectChatRequest(principal.did, targetDid);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, accepted: true, targetDid }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Server error' }));
+      return true;
+    }
+  }
+
+  // 1c. Decline or Block Chat Request
+  if (url.pathname === '/api/chat/request/decline' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+      const targetDid = parsed.contactDid || parsed.senderDid || parsed.did;
+      if (parsed.block && targetDid) {
+        sovraDb.blockUser(principal.did, targetDid);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, declined: true, targetDid }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Server error' }));
+      return true;
+    }
   }
 
   // 2. Chat Messages History

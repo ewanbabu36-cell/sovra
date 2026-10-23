@@ -2081,8 +2081,8 @@ function renderHtml(
       --fb-text: #e4e6eb;
       --fb-secondary-text: #b0b3b8;
       --fb-divider: rgba(255, 255, 255, 0.1);
-      --glass-bg: rgba(36, 37, 38, 0.95);
-      --glass-border: rgba(255, 255, 255, 0.1);
+      --glass-bg: rgba(15, 23, 42, 0.82);
+      --glass-border: rgba(255, 255, 255, 0.12);
       /* Apple & Linear Tier Spring Curves */
       --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
       --spring-easing: cubic-bezier(0.16, 1, 0.3, 1);
@@ -2332,34 +2332,62 @@ function renderHtml(
       filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.7)) !important;
     }
 
-    /* Ref Image 5: Circuit Traced Glass Panels */
+    /* Ref Image 5: Circuit Traced Glass Panels & Ultra-Smart Cards */
     body.mode-advance .card,
     body.mode-advance .post-card,
+    body.mode-advance .insta-post-card,
     body.mode-advance .feed-composer-card {
       position: relative;
-      background: rgba(10, 20, 36, 0.85) !important;
-      backdrop-filter: blur(14px) !important;
+      background: rgba(10, 20, 36, 0.88) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
       border: 1px solid rgba(0, 240, 255, 0.35) !important;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0, 240, 255, 0.05) !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(0, 240, 255, 0.05) !important;
+      border-radius: 18px !important;
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease !important;
+    }
+    body.mode-advance .insta-post-card:hover,
+    body.mode-advance .feed-composer-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 240, 255, 0.6) !important;
+      box-shadow: 0 16px 45px rgba(0, 0, 0, 0.75), 0 0 28px rgba(0, 240, 255, 0.22), inset 0 0 25px rgba(0, 240, 255, 0.08) !important;
     }
     body.mode-advance .card::before,
-    body.mode-advance .post-card::before {
+    body.mode-advance .post-card::before,
+    body.mode-advance .insta-post-card::before,
+    body.mode-advance .feed-composer-card::before {
       content: "";
       position: absolute;
-      top: 0; left: 0; width: 20px; height: 20px;
-      border-top: 2px solid #00f0ff;
-      border-left: 2px solid #00f0ff;
+      top: 0; left: 0; width: 22px; height: 22px;
+      border-top: 2.5px solid #00f0ff;
+      border-left: 2.5px solid #00f0ff;
+      border-top-left-radius: 16px;
       pointer-events: none;
+      z-index: 2;
     }
     body.mode-advance .card::after,
-    body.mode-advance .post-card::after {
+    body.mode-advance .post-card::after,
+    body.mode-advance .insta-post-card::after,
+    body.mode-advance .feed-composer-card::after {
       content: "";
       position: absolute;
-      bottom: 0; right: 0; width: 20px; height: 20px;
-      border-bottom: 2px solid #00f0ff;
-      border-right: 2px solid #00f0ff;
+      bottom: 0; right: 0; width: 22px; height: 22px;
+      border-bottom: 2.5px solid #00f0ff;
+      border-right: 2.5px solid #00f0ff;
+      border-bottom-right-radius: 16px;
       pointer-events: none;
+      z-index: 2;
     }
+    @keyframes typingDotBounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+      40% { transform: translateY(-4px); opacity: 1; }
+    }
+    .typing-dots-wave span {
+      display: inline-block;
+      animation: typingDotBounce 1.2s infinite ease-in-out;
+    }
+    .typing-dots-wave span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots-wave span:nth-child(3) { animation-delay: 0.4s; }
 
     @keyframes instaHeartBurst {
       0% { transform: scale(0.3); opacity: 0; }
@@ -2701,23 +2729,40 @@ function renderHtml(
       font-weight: 600;
       color: #b0b3b8;
     }
-    .composer-publish-btn {
-      background: #1877f2 !important;
+    .composer-publish-btn,
+    #dynamicPostPublishBtn {
+      background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
       color: #ffffff !important;
       font-size: 14px !important;
-      font-weight: 600 !important;
-      border: none !important;
-      border-radius: 6px !important;
-      padding: 6px 16px !important;
+      font-weight: 700 !important;
+      border: 1px solid rgba(56, 189, 248, 0.6) !important;
+      border-radius: 20px !important;
+      padding: 6px 18px !important;
       height: 36px;
       cursor: pointer;
-      display: inline-flex;
+      display: inline-flex !important;
+      visibility: visible !important;
       align-items: center;
       gap: 6px;
-      transition: background 0.15s ease;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.45) !important;
+      transition: all 0.2s ease;
     }
-    .composer-publish-btn:hover {
-      background: #166fe5 !important;
+    .composer-publish-btn:hover,
+    #dynamicPostPublishBtn:hover {
+      background: linear-gradient(135deg, #0369a1, #0284c7) !important;
+      box-shadow: 0 0 22px rgba(56, 189, 248, 0.7) !important;
+      transform: translateY(-1px);
+    }
+    body.mode-advance .composer-publish-btn,
+    body.mode-advance #dynamicPostPublishBtn {
+      background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.45) !important;
+      border: 1px solid rgba(56, 189, 248, 0.6) !important;
+      border-radius: 20px !important;
+      font-weight: 700 !important;
+      display: inline-flex !important;
+      visibility: visible !important;
     }
     .composer-more-menu-container {
       position: relative;
@@ -3759,9 +3804,105 @@ function renderHtml(
       filter: drop-shadow(0 0 6px rgba(24, 119, 242, 0.4));
     }
 
+    /* Dedicated Glowing Create Pill Button with Instant Tactile Feedback */
+    #navTabCreate.header-nav-btn {
+      background: linear-gradient(135deg, rgba(2, 132, 199, 0.28), rgba(99, 102, 241, 0.35)) !important;
+      border: 1px solid rgba(56, 189, 248, 0.5) !important;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.5) !important;
+      border-radius: 20px !important;
+      color: #ffffff !important;
+      font-weight: 700 !important;
+      height: 38px !important;
+      padding: 0 16px !important;
+      flex: 0 0 auto !important;
+      min-width: 90px !important;
+      box-shadow: 0 2px 10px rgba(56, 189, 248, 0.25) !important;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      cursor: pointer !important;
+      touch-action: manipulation !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+    #navTabCreate.header-nav-btn:hover {
+      background: linear-gradient(135deg, rgba(2, 132, 199, 0.48), rgba(99, 102, 241, 0.58)) !important;
+      border-color: rgba(56, 189, 248, 0.85) !important;
+      border-bottom-color: rgba(56, 189, 248, 0.85) !important;
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.5) !important;
+      color: #ffffff !important;
+      transform: translateY(-1px);
+    }
+    #navTabCreate.header-nav-btn:active {
+      transform: scale(0.95) translateY(0);
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.4) !important;
+    }
+
+    /* Responsive Navigation Breakpoints (Desktop, Laptop, Tablet, Mobile) */
+    @media (max-width: 1080px) {
+      .header-desktop-nav {
+        gap: 2px;
+        max-width: 440px;
+      }
+      .header-nav-btn {
+        min-width: 68px;
+        padding: 0 6px;
+        font-size: 13px;
+        gap: 4px;
+      }
+      .header-search-wrap {
+        max-width: 180px;
+      }
+    }
+
     @media (max-width: 860px) {
+      .app-top-header {
+        padding: 0.5rem 0.85rem !important;
+        gap: 0.5rem !important;
+        justify-content: space-between !important;
+      }
       .header-desktop-nav {
         display: none !important;
+      }
+      .header-search-wrap {
+        display: none !important;
+      }
+      #headerWatchStudioPill {
+        display: none !important;
+      }
+      #pwaInstallBtn {
+        display: none !important;
+      }
+      #headerChatBtn {
+        display: none !important;
+      }
+      .header-menu-toggle-btn {
+        display: none !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header-nav-btn span:not(.hnav-icon) {
+        display: none !important;
+      }
+      .header-nav-btn {
+        min-width: 36px !important;
+        max-width: 44px !important;
+        height: 38px !important;
+      }
+      #navTabCreate.header-nav-btn {
+        min-width: 40px !important;
+        height: 36px !important;
+      }
+      .universal-create-card {
+        padding: 1rem !important;
+        width: 95% !important;
+        max-width: 360px !important;
+      }
+      .universal-action-tile {
+        padding: 0.85rem 0.5rem !important;
+      }
+      .universal-action-tile div:first-child {
+        width: 38px !important;
+        height: 38px !important;
+        font-size: 1.25rem !important;
       }
     }
 
@@ -10260,10 +10401,10 @@ function renderHtml(
       100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
     }
 
-    /* YouTube Watch Player Styles */
+    /* YouTube Watch Player Styles (YouTube-Grade 70/30 Split) */
     .youtube-container {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 380px;
+      grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
       gap: 1.5rem;
       position: relative;
       width: 100%;
@@ -15059,7 +15200,7 @@ function renderHtml(
     }
   </style>
 </head>
-<body class="nav-mode-auto" data-active-tab="feed">
+<body class="nav-mode-auto mode-advance" data-active-tab="feed">
   <!-- 🚀 NATIVE-GRADE INSTANT APP LAUNCH SPLASH SCREEN (Zero Blank Screen / Instant Perceived Launch) -->
   <div id="sovraAppSplashScreen" style="position: fixed; inset: 0; background: #060812; z-index: 999999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: all;">
     <div style="position: relative; width: 96px; height: 96px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
@@ -15457,7 +15598,7 @@ function renderHtml(
           <button type="button" class="header-nav-btn" id="navTabWatch" onclick="switchTab('watch')" title="Watch (Shorts & 4K Videos)">
             <span class="hnav-icon">🎬</span> <span>Watch</span>
           </button>
-          <button type="button" class="header-nav-btn" id="navTabCreate" onclick="openUniversalCreateModal()" title="Create Post or Video" style="background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; font-weight: 800; border-radius: 20px; box-shadow: 0 2px 10px rgba(56, 189, 248, 0.35);">
+          <button type="button" class="header-nav-btn" id="navTabCreate" onclick="openUniversalCreateModal(event)" title="Create Post or Video" style="background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; font-weight: 800; border-radius: 20px; box-shadow: 0 2px 10px rgba(56, 189, 248, 0.35);">
             <span class="hnav-icon">➕</span> <span>Create</span>
           </button>
           <button type="button" class="header-nav-btn" id="navTabChats" onclick="switchTab('chat')" title="Chats (Encrypted Messaging)">
@@ -15498,6 +15639,39 @@ function renderHtml(
         </div>
 
         <div style="display: flex; gap: 0.6rem; align-items: center; flex-shrink: 0; position: relative;">
+          <!-- Universal Watch & Studio Discovery Glowing Pill (Gap 6) -->
+          <button id="headerWatchStudioPill" type="button" class="header-action-icon-btn header-watch-studio-pill" onclick="switchTab('watch')" title="Sovra Watch &amp; Creator Studio" aria-label="Watch &amp; Studio" style="display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(168, 85, 247, 0.22)); border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 20px; padding: 5px 12px; color: #fca5a5; font-weight: 700; font-size: 0.78rem; cursor: pointer; box-shadow: 0 0 12px rgba(239, 68, 68, 0.25); transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+            <span style="font-size: 0.92rem; filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));">🎬</span>
+            <span style="letter-spacing: 0.02em; background: linear-gradient(90deg, #fca5a5, #d8b4fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Watch &amp; Studio</span>
+          </button>
+
+          <!-- Universal Header Create Button & High-Conversion Popover Menu -->
+          <div id="headerCreateWrap" class="header-create-wrap">
+            <button id="headerCreateBtn" type="button" class="header-action-icon-btn" onclick="toggleHeaderCreateMenu(event)" aria-label="Create new content" aria-expanded="false" title="Create New Content" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; transition: all 0.2s ease;">
+              <span>➕</span>
+            </button>
+            <div id="headerCreateDropdown" class="header-create-dropdown" style="display: none;">
+              <button type="button" class="header-create-item" data-action="create-post" onclick="hideHeaderCreateMenu(); if(typeof openCreateModal==='function'){openCreateModal('post');}else{switchTab('feed');}">
+                <span>📝</span> <span>Create Post</span>
+              </button>
+              <button type="button" class="header-create-item" data-action="create-story" onclick="hideHeaderCreateMenu(); if(typeof openStoryCreator==='function'){openStoryCreator();}else{openCreateModal('story');}">
+                <span>⚡</span> <span>Add Story</span>
+              </button>
+              <button type="button" class="header-create-item" data-action="create-reel" onclick="hideHeaderCreateMenu(); if(typeof openCreateModal==='function'){openCreateModal('reel');}else{switchTab('reels');}">
+                <span>🎬</span> <span>Create Reel</span>
+              </button>
+              <button type="button" class="header-create-item" data-action="upload-video" onclick="hideHeaderCreateMenu(); if(typeof openVideoUploadModal==='function'){openVideoUploadModal();}else{switchTab('studio');}">
+                <span>📹</span> <span>Upload Video</span>
+              </button>
+              <button type="button" class="header-create-item" data-action="go-live" onclick="hideHeaderCreateMenu(); switchWatchSubTab('live'); switchTab('watch');">
+                <span>🔴</span> <span>Go Live</span>
+              </button>
+              <button type="button" class="header-create-item" data-action="create-channel" onclick="hideHeaderCreateMenu(); switchTab('studio');">
+                <span>📺</span> <span>Create Channel</span>
+              </button>
+            </div>
+          </div>
+
           <!-- PWA Install Action Pill (Header) -->
           <button id="pwaInstallBtn" type="button" class="header-action-icon-btn" onclick="triggerPwaInstall(event)" title="Install Sovra App to Device" aria-label="Install Sovra App" style="display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(168, 85, 247, 0.25)); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 20px; padding: 4px 10px; color: #c084fc; font-weight: 700; font-size: 0.75rem; cursor: pointer;">
             <span style="font-size: 0.88rem;">📲</span>
@@ -15818,6 +15992,23 @@ function renderHtml(
                   <option value="Zen / Node Running Smoothly">Zen / Node Running Smoothly</option>
                   <option value="Inventing New Protocols">Inventing New Protocols</option>
                 </select>
+              </div>
+
+              <!-- ⚡ Smart AI Suggestions Toolbar -->
+              <div class="composer-smart-toolbar" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 5px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;">
+                  <span style="font-size: 0.72rem; color: #38bdf8; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                    <span>⚡</span> <span>Smart:</span>
+                  </span>
+                  <button type="button" class="smart-tag-pill" onclick="appendComposerTag('#sovra')" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 12px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">#sovra</button>
+                  <button type="button" class="smart-tag-pill" onclick="appendComposerTag('#p2p')" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; border-radius: 12px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">#p2p</button>
+                  <button type="button" class="smart-tag-pill" onclick="appendComposerTag('#mesh')" style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); color: #c084fc; border-radius: 12px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">#mesh</button>
+                  <button type="button" class="smart-tag-pill" onclick="appendComposerTag('#zerocensorship')" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; border-radius: 12px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">#zerocensorship</button>
+                  <button type="button" class="smart-tag-pill" onclick="appendComposerTag('#web3')" style="background: rgba(236, 72, 153, 0.12); border: 1px solid rgba(236, 72, 153, 0.35); color: #f472b6; border-radius: 12px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">#web3</button>
+                </div>
+                <button type="button" onclick="triggerSmartAIEnhance()" class="smart-ai-polish-btn" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.3)); border: 1px solid rgba(168, 85, 247, 0.5); color: #e9d5ff; border-radius: 12px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 0 10px rgba(168, 85, 247, 0.25); transition: all 0.2s;" title="Enhance post with AI magic">
+                  <span>✨</span> <span>AI Polish</span>
+                </button>
               </div>
 
               <textarea id="dynamicPostCaption" class="composer-textarea" placeholder="What's on your mind, ${hostUser ? (escapeHtml(hostUser.displayName || hostUser.handle || '').split(' ')[0] || 'Friend') : 'Friend'}?" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';if(typeof handleTweetComposerInput==='function')handleTweetComposerInput();"></textarea>
@@ -17573,7 +17764,20 @@ function renderHtml(
             </div>
             <div id="chatOnlineFriendsItems" style="display: flex; gap: 0.65rem; overflow-x: auto; padding-bottom: 3px; scrollbar-width: none;"></div>
           </div>
-          <div class="chat-contacts-list" id="contactsList">
+          <!-- Segmented Tabs: Primary vs Requests (Gap 2) -->
+          <div id="chatInboxSegmentedControl" class="chat-inbox-segmented-control" style="display: flex; gap: 6px; padding: 6px 12px; background: rgba(15, 23, 42, 0.65); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <button type="button" id="chatTabPrimary" class="chat-inbox-tab-btn active" onclick="switchChatInboxTab('primary')" style="flex: 1; border: none; border-radius: 8px; padding: 6px 10px; font-weight: 700; font-size: 0.78rem; cursor: pointer; transition: all 0.2s; background: rgba(56, 189, 248, 0.15); color: #38bdf8; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>🤝 Primary</span>
+              <span id="chatPrimaryBadge" class="badge" style="display: none; background: #38bdf8; color: #000; font-size: 0.65rem; padding: 1px 5px; border-radius: 10px;">0</span>
+            </button>
+            <button type="button" id="chatTabRequests" class="chat-inbox-tab-btn" onclick="switchChatInboxTab('requests')" style="flex: 1; border: none; border-radius: 8px; padding: 6px 10px; font-weight: 700; font-size: 0.78rem; cursor: pointer; transition: all 0.2s; background: transparent; color: #94a3b8; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>📩 Requests</span>
+              <span id="chatRequestsBadge" class="badge" style="display: none; background: rgba(244, 63, 94, 0.2); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.4); font-size: 0.65rem; padding: 1px 5px; border-radius: 10px;">0</span>
+            </button>
+          </div>
+
+          <div class="chat-contacts-list" id="chatContactsList">
+            <div id="contactsList" style="display: contents;"></div>
             ${contactsStore
               .map(
                 c => `
@@ -17622,6 +17826,7 @@ function renderHtml(
                   </span>
                 </div>
                 <div style="font-size: 0.74rem; color: #8696a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="activePeerStatus">Public Mesh Chat</div>
+                <div id="activePeerTypingNotice" style="display: none; font-size: 0.72rem; color: #22c55e; font-weight: 600; align-items: center; gap: 4px;"><span class="typing-dots-wave"><span>•</span><span>•</span><span>•</span></span> <span>Typing over Signal E2EE...</span></div>
               </div>
             </div>
             
@@ -17707,6 +17912,24 @@ function renderHtml(
               <span id="chatStickyPinnedText" style="color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">...</span>
             </div>
             <button onclick="event.stopPropagation(); unpinCurrentMessage()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.8rem; margin-left: 8px;">✕</button>
+          </div>
+
+          <!-- Instagram-Grade Inbound Message Request Action Banner (Gap 2) -->
+          <div id="chatRequestActionBar" class="chat-request-action-bar" style="display: none; padding: 10px 16px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98)); border-bottom: 1px solid rgba(255, 255, 255, 0.12); align-items: center; justify-content: space-between; gap: 12px; z-index: 20;">
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 700; color: #fff; font-size: 0.82rem; display: flex; align-items: center; gap: 6px;">
+                <span>📩</span> <span>Message Request from <strong id="chatRequestSenderName">Peer</strong></span>
+              </div>
+              <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">They won't know you've seen this message until you accept.</div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+              <button type="button" id="btnAcceptChatRequest" onclick="acceptCurrentChatRequest()" style="background: linear-gradient(135deg, #16a34a, #22c55e); color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-weight: 700; font-size: 0.76rem; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);">
+                <span>✓ Accept</span>
+              </button>
+              <button type="button" id="btnDeclineChatRequest" onclick="declineCurrentChatRequest()" style="background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; border-radius: 8px; padding: 6px 12px; font-weight: 700; font-size: 0.76rem; cursor: pointer;">
+                <span>✕ Decline</span>
+              </button>
+            </div>
           </div>
 
           <!-- Chat Messages Scroll Area -->
@@ -18618,9 +18841,9 @@ function renderHtml(
               </div>
             </div>
 
-            <!-- Channel Bar -->
+            <!-- Channel Bar (Gap 3 YouTube Watch Layout Parity) -->
             <div class="yt-channel-row">
-              <div class="yt-channel-left" onclick="openChannelProfile()">
+              <div class="yt-channel-left" onclick="openPublicChannelView(ytVideosCatalog[activeYtVideoIndex]?.channelHandle || 'sovralab')" style="cursor: pointer;">
                 <div class="yt-channel-avatar" id="ytChannelAvatar" style="background: ${longFormVideosCatalog[0]!.channelAvatarBg};">
                   ${longFormVideosCatalog[0]!.channelAvatar}
                 </div>
@@ -18635,8 +18858,23 @@ function renderHtml(
                 </div>
               </div>
 
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <!-- BitSwap Seeder Health Capsule -->
+                <span id="ytSeederHealthCapsule" class="yt-seeder-health-capsule" style="display: inline-flex; align-items: center; gap: 5px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; padding: 4px 10px; font-size: 0.74rem; color: #34d399; font-weight: 700;">
+                  <span>🟢</span> <span id="ytSeederCountText">14 Local Seeders • 4K 60fps</span>
+                </span>
+                <!-- Smart Telemetry Capsule -->
+                <span class="yt-telemetry-pill" style="display: inline-flex; align-items: center; gap: 5px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 20px; padding: 4px 10px; font-size: 0.74rem; color: #38bdf8; font-weight: 700;">
+                  <span>⚡</span> <span>Sub-300ms • 0% Loss</span>
+                </span>
+
                 <button class="btn-subscribe" id="btnSubscribe" onclick="toggleYtSubscribe()">Subscribe</button>
+
+                <!-- Super Thanks Button -->
+                <button type="button" class="btn btn-secondary yt-super-thanks-btn" onclick="openSuperThanksModal()" title="Send Super Thanks" style="display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(234, 88, 12, 0.2)); border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24; border-radius: 20px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
+                  <span>⚡</span> <span>Super Thanks</span>
+                </button>
+
                 <button class="yt-btn" id="btnBellNotify" style="background: rgba(255,255,255,0.1); border-radius: 50%; width: 36px; height: 36px; display: none;" onclick="cycleBellNotification()" title="Notification Preference">
                   <span id="bellIcon">🔔</span>
                 </button>
@@ -18740,14 +18978,46 @@ function renderHtml(
           </div>
         </div>
 
-        <!-- Right Recommendations & Autoplay Queue Sidebar -->
+        <!-- Right Recommendations & Autoplay Queue Sidebar (30% Split) -->
         <aside class="yt-sidebar-recommendations" style="display: flex; flex-direction: column; gap: 0.85rem; min-width: 0;">
           <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.25rem;">
             <span style="font-weight: 700; color: #cbd5e1; font-size: 0.95rem;">
               Up Next &bull; P2P Swarms
             </span>
-            <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #34d399;">
-              <span>⚡ BitSwap Autoplay</span>
+            <button type="button" id="ytSidebarAutoplayBtn" class="watch-seg-pill active" onclick="toggleAutoplay()" title="Toggle BitSwap Autoplay" style="border: 1px solid rgba(52, 211, 153, 0.4); border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; background: rgba(52, 211, 153, 0.12); color: #34d399; display: flex; align-items: center; gap: 5px;">
+              <span>⚡ Autoplay</span> <span id="ytSidebarAutoplayStatus">ON</span>
+            </button>
+          </div>
+
+          <!-- YouTube-Grade Category Filter Chips -->
+          <div id="ytCategoryChipsBar" class="yt-category-chips-bar" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;">
+            <button type="button" class="yt-cat-chip active" onclick="filterYtCategory('all', this)" style="border: none; border-radius: 8px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; background: #38bdf8; color: #000; white-space: nowrap;">All</button>
+            <button type="button" class="yt-cat-chip" onclick="filterYtCategory('protocol', this)" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 4px 10px; font-size: 0.72rem; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.06); color: #cbd5e1; white-space: nowrap;">P2P Protocol</button>
+            <button type="button" class="yt-cat-chip" onclick="filterYtCategory('4k', this)" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 4px 10px; font-size: 0.72rem; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.06); color: #cbd5e1; white-space: nowrap;">4K UHD</button>
+            <button type="button" class="yt-cat-chip" onclick="filterYtCategory('cyber', this)" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 4px 10px; font-size: 0.72rem; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.06); color: #cbd5e1; white-space: nowrap;">Cyber HUD</button>
+            <button type="button" class="yt-cat-chip" onclick="filterYtCategory('seeders', this)" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 4px 10px; font-size: 0.72rem; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.06); color: #cbd5e1; white-space: nowrap;">BitSwap Swarms</button>
+          </div>
+
+          <!-- Collapsible Live Swarm Chat -->
+          <div id="ytLiveSwarmChatCard" class="yt-live-swarm-chat-card" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; overflow: hidden; backdrop-filter: blur(12px); box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer;" onclick="toggleLiveSwarmChat()">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; color: #f8fafc;">
+                <span>💬</span> <span>Live Swarm Chat</span>
+                <span style="font-size: 0.68rem; background: rgba(34, 197, 94, 0.2); color: #34d399; border: 1px solid rgba(34, 197, 94, 0.35); padding: 1px 6px; border-radius: 10px;">🟢 14 Local Seeders • 4K 60fps</span>
+              </div>
+              <button id="ytLiveSwarmChatToggleBtn" type="button" style="background: none; border: none; color: #94a3b8; font-size: 0.75rem; cursor: pointer; font-weight: 600;">Hide</button>
+            </div>
+            <div id="ytLiveSwarmChatBody" style="display: flex; flex-direction: column;">
+              <div id="ytLiveSwarmChatMessages" style="height: 150px; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.76rem;">
+                <div style="color: #94a3b8;"><span style="color: #38bdf8; font-weight: 700;">Alice (Seeder #4):</span> 4K 60fps stream is buttery smooth over BitSwap!</div>
+                <div style="color: #94a3b8;"><span style="color: #34d399; font-weight: 700;">Bob (Relay #12):</span> Sub-300ms peer latency confirmed. 0 dropped frames.</div>
+                <div style="color: #94a3b8;"><span style="color: #eab308; font-weight: 700;">Charlie:</span> BitSwap seed ratio 4.8x. Pinning to local blockstore.</div>
+                <div style="color: #94a3b8;"><span style="color: #c084fc; font-weight: 700;">Elena:</span> Ambient glow illumination looks incredible on OLED ✨</div>
+              </div>
+              <div style="display: flex; gap: 6px; padding: 6px 10px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25);">
+                <input type="text" id="ytLiveSwarmChatInput" class="social-modal-input" placeholder="Chat with peer swarm..." onkeydown="if(event.key==='Enter') sendLiveSwarmChatMessage()" style="flex: 1; padding: 4px 8px; font-size: 0.76rem; border-radius: 6px;" />
+                <button type="button" class="btn btn-primary" onclick="sendLiveSwarmChatMessage()" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px;">Send</button>
+              </div>
             </div>
           </div>
 
@@ -18760,67 +19030,52 @@ function renderHtml(
     </main>
     </div>
 
-    <!-- Modal 1: YouTube Channel Profile Hub Modal -->
-    <div class="yt-modal-overlay" id="channelProfileModal" style="display: none;" onclick="closeYtModal('channelProfileModal')">
-      <div class="yt-modal-card" onclick="event.stopPropagation()">
-        <div style="height: 100px; background: linear-gradient(135deg, #4f46e5, #9333ea); position: relative;">
-          <button style="position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; cursor: pointer;" onclick="closeYtModal('channelProfileModal')">✕</button>
+    <!-- Modal 1: Universal YouTube Public Channel Profile Surface (Gap 1 Parity) -->
+    <div class="yt-modal-overlay" id="publicChannelSurface" style="display: none; z-index: 1000;" onclick="closePublicChannelView()">
+      <div class="yt-modal-card" id="channelProfileModal" onclick="event.stopPropagation()" style="max-width: 680px; width: 95%; max-height: 90vh; overflow-y: auto; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
+        <!-- 16:9 Channel Banner -->
+        <div id="publicChannelBanner" style="height: 140px; background: linear-gradient(135deg, #4f46e5, #9333ea); position: relative; border-radius: 18px 18px 0 0; background-size: cover; background-position: center;">
+          <button style="position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5;" onclick="closePublicChannelView()">✕</button>
         </div>
         <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
-          <div style="display: flex; gap: 1rem; align-items: center; margin-top: -45px;">
-            <div style="width: 72px; height: 72px; border-radius: 50%; background: #6366f1; border: 3px solid #18181b; color: #fff; font-size: 2rem; font-weight: bold; display: flex; align-items: center; justify-content: center;" id="modalChannelAvatar">S</div>
-            <div style="margin-top: 30px;">
-              <div style="font-size: 1.2rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.35rem;">
-                <span id="modalChannelName">Sovra Protocol Lab</span>
-                <span style="color: #60a5fa;">✓</span>
+          <div style="display: flex; gap: 1rem; align-items: center; margin-top: -50px;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: #6366f1; border: 3px solid #0f172a; color: #fff; font-size: 2.2rem; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0,0,0,0.4); flex-shrink: 0;" id="publicChannelAvatar">🎬</div>
+            <div style="margin-top: 35px; min-width: 0; flex: 1;">
+              <div style="font-size: 1.3rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.35rem;">
+                <span id="publicChannelName">Sovra Protocol Lab</span>
+                <span style="color: #60a5fa; font-size: 0.9rem;" title="Verified Sovereign Identity">✓</span>
               </div>
-              <div style="font-size: 0.8rem; color: var(--text-muted);" id="modalChannelSubscribers">@sovralab &bull; 142.8K subscribers &bull; 4 long-form videos</div>
+              <div style="font-size: 0.8rem; color: #94a3b8; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;" id="publicChannelSubscribers">
+                <span id="publicChannelHandleText" style="color: #cbd5e1; font-weight: 600;">@sovralab</span> &bull; 
+                <span id="publicChannelSubCountText">142.8K subscribers</span> &bull; 
+                <span id="publicChannelVideosCountText">4 videos</span>
+              </div>
             </div>
           </div>
 
-          <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.4;">
+          <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.45;" id="publicChannelBio">
             Official sovereign research laboratory for the Sovra decentralized social protocol. Publishing 4K master architectural deep dives, cellular NAT benchmarks, and BitSwap swarm implementations.
           </div>
 
-          <div style="display: flex; gap: 0.75rem;">
-            <button class="btn-subscribe" id="modalSubscribeBtn" onclick="toggleYtSubscribe()">Subscribe</button>
-            <button class="btn-join" onclick="closeYtModal('channelProfileModal'); openMembershipModal();">Join Channel</button>
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button class="btn-subscribe" id="publicChannelSubscribeBtn" onclick="togglePublicChannelSubscription()" style="padding: 8px 20px; font-size: 0.85rem; font-weight: 800; border-radius: 20px; cursor: pointer;">Subscribe</button>
+            <button class="btn-join" onclick="closePublicChannelView(); openMembershipModal();" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 700; border-radius: 20px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #fff; cursor: pointer;">Join Channel</button>
           </div>
 
-          <!-- Channel Navigation Tabs -->
+          <!-- 4 Channel Navigation Tabs: [Videos], [Shorts], [Playlists], [About] -->
           <div style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.1); margin-top: 0.25rem;">
-            <button class="profile-tab-btn active" id="chTabVideos" onclick="switchChannelModalTab('videos')" style="font-size: 0.8rem; padding: 0.5rem 0.75rem;">📹 Videos</button>
-            <button class="profile-tab-btn" id="chTabPlaylists" onclick="switchChannelModalTab('playlists')" style="font-size: 0.8rem; padding: 0.5rem 0.75rem;">📑 Playlists</button>
-            <button class="profile-tab-btn" id="chTabCommunity" onclick="switchChannelModalTab('community')" style="font-size: 0.8rem; padding: 0.5rem 0.75rem;">💬 Community</button>
-            <button class="profile-tab-btn" id="chTabAbout" onclick="switchChannelModalTab('about')" style="font-size: 0.8rem; padding: 0.5rem 0.75rem;">ℹ️ About</button>
+            <button class="profile-tab-btn active" id="publicChannelTabVideos" onclick="switchPublicChannelTab('videos')" style="font-size: 0.82rem; padding: 0.6rem 1rem; background: none; border: none; color: #38bdf8; border-bottom: 2px solid #38bdf8; font-weight: 700; cursor: pointer;">📹 Videos</button>
+            <button class="profile-tab-btn" id="publicChannelTabShorts" onclick="switchPublicChannelTab('shorts')" style="font-size: 0.82rem; padding: 0.6rem 1rem; background: none; border: none; color: #94a3b8; font-weight: 600; cursor: pointer;">📱 Shorts</button>
+            <button class="profile-tab-btn" id="publicChannelTabPlaylists" onclick="switchPublicChannelTab('playlists')" style="font-size: 0.82rem; padding: 0.6rem 1rem; background: none; border: none; color: #94a3b8; font-weight: 600; cursor: pointer;">📑 Playlists</button>
+            <button class="profile-tab-btn" id="publicChannelTabAbout" onclick="switchPublicChannelTab('about')" style="font-size: 0.82rem; padding: 0.6rem 1rem; background: none; border: none; color: #94a3b8; font-weight: 600; cursor: pointer;">ℹ️ About</button>
           </div>
 
           <!-- Channel Tab Content Container -->
-          <div id="chTabContent" style="font-size: 0.82rem; color: #cbd5e1; max-height: 180px; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-              <span style="font-weight: 700; color: #fff;">Videos (4)</span>
-              <div style="display: flex; gap: 0.35rem;">
-                <button class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="alert('Sorted by Latest (HLC order)')">Latest</button>
-                <button class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="alert('Sorted by Popular (BitSwap swarm seeds)')">Popular</button>
-              </div>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-              <div style="background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeYtModal('channelProfileModal'); renderYtVideo(0, true);">
-                <span>🎬 4K HLS Master Stream</span>
-                <span style="color: #34d399; font-size: 0.72rem;">284K views &bull; 4K UHD</span>
-              </div>
-              <div style="background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeYtModal('channelProfileModal'); renderYtVideo(1, true);">
-                <span>⚡ Cell Carrier NAT Penetration</span>
-                <span style="color: #34d399; font-size: 0.72rem;">92K views &bull; 1080p60</span>
-              </div>
-              <div style="background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeYtModal('channelProfileModal'); renderYtVideo(2, true);">
-                <span>🎵 Spatial Multi-Track Audio Master</span>
-                <span style="color: #34d399; font-size: 0.72rem;">64K views &bull; FLAC 24-bit</span>
-              </div>
-            </div>
+          <div id="publicChannelTabContent" style="font-size: 0.82rem; color: #cbd5e1; min-height: 160px; max-height: 280px; overflow-y: auto;">
+            <!-- Dynamically populated by switchPublicChannelTab -->
           </div>
 
-          <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.75rem; font-size: 0.78rem; color: #94a3b8; font-family: monospace;">
+          <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.75rem; font-size: 0.74rem; color: #94a3b8; font-family: monospace;" id="publicChannelDidFooter">
             Channel DID: did:sovra:channel_lab_4k_master_stream
           </div>
         </div>
@@ -19406,8 +19661,8 @@ function renderHtml(
             <button type="button" class="sovereign-hub-tab-btn" id="hubBtnDisplay" onclick="switchSovereignHubTab('uiDisplayModeCard', this)">
               <span>✨</span> <span>Theme &amp; Display</span>
             </button>
-            <!-- Preserved for ID integrity without redundant duplicate tab -->
-            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnWallet" style="display: none;" onclick="switchSovereignHubTab('walletSettingsCard', this)">
+            <!-- Preserved for ID integrity & direct access -->
+            <button type="button" class="sovereign-hub-tab-btn" id="hubBtnWallet" style="display: inline-flex; align-items: center; gap: 6px;" onclick="switchSovereignHubTab('walletSettingsCard', this)">
               <span>💳</span> <span>My Wallet</span>
             </button>
             <!-- Node Operator Diagnostic Tabs (Hidden by default for regular citizens) -->
@@ -19723,6 +19978,36 @@ function renderHtml(
               </div>
               <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.4;">
                 Self-custodial sovereign wallet with zero platform cuts, instant P2P voucher settlements, and Merkle-verified payment receipts.
+              </div>
+
+              <!-- P2P BitSwap Seeder Node Mining HUD Tile (Gap 4) -->
+              <div id="walletSeederMiningTile" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; margin-bottom: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span style="font-weight: 700; color: #38bdf8; font-size: 0.82rem; display: flex; align-items: center; gap: 6px;">
+                    <span>⚡</span> <span>P2P Seeder Node Mining</span>
+                  </span>
+                  <span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.65rem; font-weight: 700;">🟢 RELAY MINING ACTIVE</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; font-size: 0.75rem;">
+                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
+                    <div style="color: #94a3b8; font-size: 0.65rem;">Blocks Relayed</div>
+                    <div id="seederBlocksRelayedCount" style="font-weight: 800; color: #fff; font-size: 0.95rem; margin-top: 2px;">1,428</div>
+                  </div>
+                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
+                    <div style="color: #94a3b8; font-size: 0.65rem;">Bandwidth Shared</div>
+                    <div id="seederBandwidthSharedText" style="font-weight: 800; color: #38bdf8; font-size: 0.95rem; margin-top: 2px;">14.2 GB</div>
+                  </div>
+                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
+                    <div style="color: #94a3b8; font-size: 0.65rem;">Unclaimed Yield</div>
+                    <div id="seederUnclaimedYieldText" style="font-weight: 800; color: #10b981; font-size: 0.95rem; margin-top: 2px;">5.25 SOV</div>
+                  </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                  <span style="font-size: 0.72rem; color: #94a3b8;">Est. daily yield: <b>~2.40 SOV / day</b></span>
+                  <button type="button" id="btnClaimSeederRewards" onclick="claimBitSwapSeederRewards()" style="background: linear-gradient(135deg, #059669, #10b981); color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-size: 0.75rem; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4); display: flex; align-items: center; gap: 5px;">
+                    <span>⚡ Claim 5.25 SOV</span>
+                  </button>
+                </div>
               </div>
             </div>
             <div class="card-footer-actions" style="display: flex; flex-direction: column; gap: 8px;">
@@ -20254,6 +20539,11 @@ function renderHtml(
             <select id="studioActiveChannelSelect" class="studio-channel-select" onchange="SovraCreatorStudioEngine.switchActiveChannel(this.value)" title="Switch Active Channel">
               <option value="">🎬 Loading channels...</option>
             </select>
+            <div id="studioHeaderChannelPill" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.12);">
+              <span id="studioTopChannelAvatar" style="font-size: 1.1rem;">🎬</span>
+              <span id="studioTopVerifiedBadge" style="color: #38bdf8; font-size: 0.8rem; font-weight: 800;">✓</span>
+              <span id="studioHeaderSubCount" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">142.8K subs</span>
+            </div>
           </div>
 
           <!-- Center: Search across your channel -->
@@ -20356,6 +20646,7 @@ function renderHtml(
 
             <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 6px 0;"></div>
 
+            <div style="font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin: 10px 0 4px 12px;">Studio Tools</div>
             <button type="button" class="studio-sidebar-nav-btn" id="studioNavIngest" onclick="SovraCreatorStudioEngine.switchStudioTab('ingest')" style="color: #38bdf8;">
               <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span> <span>Ingest / Create</span>
             </button>
@@ -21350,44 +21641,151 @@ function renderHtml(
                     <h2 style="font-size: 1.4rem; font-weight: 900; color: #fff; margin: 0;">Sovereign Earn &amp; Monetization</h2>
                     <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">95% Net Creator settlement with self-custodial WebAuthn hardware passkey security</div>
                   </div>
-                  <button type="button" class="btn btn-primary" id="btnClaimSovereignPayout" onclick="SovraCreatorStudioEngine.claimSovereignEarnings()" style="padding: 9px 20px; font-size: 0.84rem; font-weight: 800; background: linear-gradient(135deg, #10b981, #059669); border-radius: 20px;">
-                    🛡️ Claim Net SOV Payout
-                  </button>
-                </div>
-
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-                  <div class="studio-metric-card">
-                    <div style="font-size: 0.76rem; color: #94a3b8; font-weight: 600;">Unclaimed Balance</div>
-                    <div style="font-size: 1.8rem; font-weight: 900; color: #10b981;" id="studioEarnUnclaimed">324.50 SOV</div>
-                    <div style="font-size: 0.7rem; color: #34d399; margin-top: 3px;">✓ Ready for instant settlement</div>
-                  </div>
-                  <div class="studio-metric-card">
-                    <div style="font-size: 0.76rem; color: #94a3b8; font-weight: 600;">Creator Revenue Share</div>
-                    <div style="font-size: 1.8rem; font-weight: 900; color: #38bdf8;">95.0%</div>
-                    <div style="font-size: 0.7rem; color: #64748b; margin-top: 3px;">5% autonomous relay swarm fee</div>
-                  </div>
-                  <div class="studio-metric-card">
-                    <div style="font-size: 0.76rem; color: #94a3b8; font-weight: 600;">Active Channel Members</div>
-                    <div style="font-size: 1.8rem; font-weight: 900; color: #a855f7;">42 Peers</div>
-                    <div style="font-size: 0.7rem; color: #64748b; margin-top: 3px;">Supporter passes &amp; recurring tiers</div>
+                  <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary" onclick="openTierModal()" style="padding: 9px 16px; font-size: 0.84rem; font-weight: 700; border-radius: 20px;">
+                      ⚙️ Membership Tiers
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btnClaimSovereignPayout" onclick="SovraCreatorStudioEngine.claimSovereignEarnings()" style="padding: 9px 20px; font-size: 0.84rem; font-weight: 800; background: linear-gradient(135deg, #10b981, #059669); border-radius: 20px;">
+                      🛡️ Claim Net SOV Payout
+                    </button>
                   </div>
                 </div>
 
-                <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
-                  <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">Recent Peer Micro-Tips &amp; Payout Receipts</div>
-                  <table class="studio-content-table">
-                    <thead>
-                      <tr>
-                        <th>DATE</th>
-                        <th>TRANSACTION TYPE</th>
-                        <th>SUPPORTER DID</th>
-                        <th>NET REVENUE</th>
-                        <th>STATUS</th>
-                      </tr>
-                    </thead>
-                    <tbody id="studioEarnReceiptsTableBody">
-                    </tbody>
-                  </table>
+                <!-- 4-Pillar Subtab Navigation -->
+                <div style="display: flex; gap: 8px; margin-bottom: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+                  <button type="button" id="studioEarnSubtabBtnOverview" onclick="switchEarnSubtab('overview')" class="active" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Overview</button>
+                  <button type="button" id="studioEarnSubtabBtnTiers" onclick="switchEarnSubtab('tiers')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Membership Tiers</button>
+                  <button type="button" id="studioEarnSubtabBtnTips" onclick="switchEarnSubtab('tips')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Super Thanks &amp; Tips</button>
+                  <button type="button" id="studioEarnSubtabBtnEligibility" onclick="switchEarnSubtab('eligibility')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Eligibility</button>
+                </div>
+
+                <!-- Subtab 1: Overview -->
+                <div id="studioEarnSubtabOverview">
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="studio-metric-card">
+                      <div style="font-size: 0.76rem; color: #94a3b8; font-weight: 600;">Unclaimed Balance</div>
+                      <div style="font-size: 1.8rem; font-weight: 900; color: #10b981;" id="studioEarnUnclaimed">324.50 SOV</div>
+                      <div style="font-size: 0.7rem; color: #34d399; margin-top: 3px;">✓ Ready for instant settlement</div>
+                    </div>
+                    <div class="studio-metric-card">
+                      <div style="font-size: 0.76rem; color: #94a3b8; font-weight: 600;">Creator Revenue Share</div>
+                      <div style="font-size: 1.8rem; font-weight: 900; color: #38bdf8;">95.0%</div>
+                      <div style="font-size: 0.7rem; color: #64748b; margin-top: 3px;">5% autonomous relay swarm fee</div>
+                    </div>
+                    <div class="studio-metric-card">
+                      <div style="font-size: 0.76rem; color: #94a3b8; font-weight: 600;">Active Channel Members</div>
+                      <div style="font-size: 1.8rem; font-weight: 900; color: #a855f7;">42 Peers</div>
+                      <div style="font-size: 0.7rem; color: #64748b; margin-top: 3px;">Supporter passes &amp; recurring tiers</div>
+                    </div>
+                  </div>
+
+                  <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+                    <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">Recent Peer Micro-Tips &amp; Payout Receipts</div>
+                    <table class="studio-content-table">
+                      <thead>
+                        <tr>
+                          <th>DATE</th>
+                          <th>TRANSACTION TYPE</th>
+                          <th>SUPPORTER DID</th>
+                          <th>NET REVENUE</th>
+                          <th>STATUS</th>
+                        </tr>
+                      </thead>
+                      <tbody id="studioEarnReceiptsTableBody">
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Subtab 2: Tiers -->
+                <div id="studioEarnSubtabTiers" style="display: none;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div style="font-size: 0.9rem; font-weight: 700; color: #fff;">Configured Membership Tiers</div>
+                    <button type="button" class="btn btn-secondary" onclick="openTierModal()" style="padding: 6px 12px; font-size: 0.78rem;">Configure Tiers</button>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 14px; padding: 1.25rem;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 800; color: #10b981;">Tier 1: Sovereign Supporter</span>
+                        <span style="font-weight: 900; color: #fff;">5.0 SOV/mo</span>
+                      </div>
+                      <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">Comments Badge, VIP Chat</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; padding: 1.25rem;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 800; color: #38bdf8;">Tier 2: Mesh Insider</span>
+                        <span style="font-weight: 900; color: #fff;">15.0 SOV/mo</span>
+                      </div>
+                      <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">4K Early Access, Private AMAs</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 14px; padding: 1.25rem;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 800; color: #a855f7;">Tier 3: VIP Patron Council</span>
+                        <span style="font-weight: 900; color: #fff;">50.0 SOV/mo</span>
+                      </div>
+                      <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">Direct Messaging, Credit Roll</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Subtab 3: Tips -->
+                <div id="studioEarnSubtabTips" style="display: none;">
+                  <div style="font-size: 0.9rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem;">Super Thanks &amp; Livestream Tips Stream</div>
+                  <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1rem; color: #94a3b8; font-size: 0.85rem;">
+                    Real-time peer micro-tipping stream active via P2P relay. 95% is instantly deposited to your sovereign wallet.
+                  </div>
+                </div>
+
+                <!-- Subtab 4: Eligibility -->
+                <div id="studioEarnSubtabEligibility" style="display: none;">
+                  <div style="font-size: 0.9rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem;">Monetization Criteria &amp; Partner Status</div>
+                  <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 1rem;">
+                      <div style="font-size: 0.78rem; font-weight: 700; color: #10b981;">Subscribers Milestone</div>
+                      <div style="font-size: 1.2rem; font-weight: 900; color: #fff;">✓ Reached (1,000+ required)</div>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 1rem;">
+                      <div style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;">Watch Hours Milestone</div>
+                      <div style="font-size: 1.2rem; font-weight: 900; color: #fff;">✓ Reached (4,000 hrs required)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tier Configuration Modal -->
+            <div id="studioTierModal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); align-items: center; justify-content: center;">
+              <div style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 18px; padding: 1.5rem; width: 90%; max-width: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                  <h3 style="margin: 0; font-size: 1.2rem; color: #fff;">Configure Membership Tiers</h3>
+                  <button type="button" onclick="closeTierModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">&times;</button>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                  <div>
+                    <label style="font-size: 0.75rem; color: #94a3b8;">Tier 1 Name &amp; Price (SOV):</label>
+                    <div style="display: flex; gap: 8px;">
+                      <input id="tier1NameInput" value="Sovereign Supporter" style="flex: 2; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                      <input id="tier1PriceInput" type="number" value="5.0" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                    </div>
+                  </div>
+                  <div>
+                    <label style="font-size: 0.75rem; color: #94a3b8;">Tier 2 Name &amp; Price (SOV):</label>
+                    <div style="display: flex; gap: 8px;">
+                      <input id="tier2NameInput" value="Mesh Insider" style="flex: 2; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                      <input id="tier2PriceInput" type="number" value="15.0" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                    </div>
+                  </div>
+                  <div>
+                    <label style="font-size: 0.75rem; color: #94a3b8;">Tier 3 Name &amp; Price (SOV):</label>
+                    <div style="display: flex; gap: 8px;">
+                      <input id="tier3NameInput" value="VIP Patron Council" style="flex: 2; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                      <input id="tier3PriceInput" type="number" value="50.0" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 0.5rem;">
+                    <button type="button" onclick="closeTierModal()" class="btn btn-secondary" style="border-radius: 16px; padding: 6px 14px;">Cancel</button>
+                    <button type="button" onclick="saveMembershipTiers()" class="btn btn-primary" style="border-radius: 16px; padding: 6px 14px; background: #38bdf8; color: #000; font-weight: 800;">Save Tiers</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -21741,7 +22139,7 @@ function renderHtml(
         <!-- Video Feeds Container -->
         <div class="calls-feed-canvas" style="position: relative; width: 100%; height: 560px; background: radial-gradient(circle at 50% 50%, #0f172a 0%, #020617 100%); border-radius: 20px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;">
           <!-- Remote Video Feed (Simulation Canvas / Poster) -->
-          <div id="remoteVideoContainer" style="width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: url('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1280&q=80') center/cover no-repeat;">
+          <div id="callsRemoteVideoContainer" style="width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: url('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1280&q=80') center/cover no-repeat;">
             <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(2,6,23,0.3) 0%, rgba(2,6,23,0.7) 100%);"></div>
             
             <div style="position: absolute; bottom: 100px; left: 24px; z-index: 10; display: flex; align-items: center; gap: 10px;">
@@ -21772,7 +22170,7 @@ function renderHtml(
               <button type="button" class="call-dock-btn" id="callShareBtn" onclick="toggleCallScreenShare()" title="Share Screen">
                 <span>🖥️</span>
               </button>
-              <button type="button" class="call-dock-btn danger" id="callEndBtn" onclick="terminateActiveCall()" title="End Call">
+              <button type="button" class="call-dock-btn danger" id="callsCallEndBtn" onclick="terminateActiveCall()" title="End Call">
                 <span>📵</span>
               </button>
             </div>
@@ -29722,45 +30120,45 @@ function renderHtml(
           // Display Name
           html += '<div>' +
             '<label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase;">Display Name</label>' +
-            '<input type="text" id="editProfileNameInput" value="' + (u.displayName || u.name || '') + '" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;" />' +
+            '<input type="text" id="spatialEditProfileNameInput" value="' + (u.displayName || u.name || '') + '" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;" />' +
           '</div>';
 
           // Handle with live validator
           html += '<div>' +
             '<label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase;">Handle</label>' +
-            '<input type="text" id="editProfileHandleInput" value="' + (u.handle || '@user') + '" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #38bdf8; font-family: monospace; font-size: 0.9rem;" />' +
-            '<div id="editProfileHandleStatus" style="font-size: 0.72rem; margin-top: 4px; color: #64748b;">Handle must be 3-30 characters with alphanumeric characters, dots, or underscores.</div>' +
+            '<input type="text" id="spatialEditProfileHandleInput" value="' + (u.handle || '@user') + '" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #38bdf8; font-family: monospace; font-size: 0.9rem;" />' +
+            '<div id="spatialEditProfileHandleStatus" style="font-size: 0.72rem; margin-top: 4px; color: #64748b;">Handle must be 3-30 characters with alphanumeric characters, dots, or underscores.</div>' +
           '</div>';
 
           // Bio
           html += '<div>' +
             '<label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase;">Bio</label>' +
-            '<textarea id="editProfileBioInput" rows="3" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; resize: none;">' + (u.bio || '') + '</textarea>' +
+            '<textarea id="spatialEditProfileBioInput" rows="3" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; resize: none;">' + (u.bio || '') + '</textarea>' +
           '</div>';
 
           // Website
           html += '<div>' +
             '<label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase;">Website</label>' +
-            '<input type="text" id="editProfileWebsiteInput" value="' + (u.website || u.websiteUrl || '') + '" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;" placeholder="https://..." />' +
+            '<input type="text" id="spatialEditProfileWebsiteInput" value="' + (u.website || u.websiteUrl || '') + '" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;" placeholder="https://..." />' +
           '</div>';
 
           // Error / Status
-          html += '<div id="editProfileFeedback" style="font-size: 0.8rem; display: none;"></div>';
+          html += '<div id="spatialEditProfileFeedback" style="font-size: 0.8rem; display: none;"></div>';
 
           // Actions
           html += '<div style="display: flex; gap: 8px; margin-top: 8px;">' +
-            '<button class="action-pill-btn action-pill-primary" id="saveProfileBtn" style="flex: 1; padding: 10px; font-weight: 600;">Save Changes</button>' +
-            '<button class="action-pill-btn action-pill-secondary" id="cancelProfileBtn" style="padding: 10px 16px;">Cancel</button>' +
+            '<button class="action-pill-btn action-pill-primary" id="spatialSaveProfileBtn" style="flex: 1; padding: 10px; font-weight: 600;">Save Changes</button>' +
+            '<button class="action-pill-btn action-pill-secondary" id="spatialCancelProfileBtn" style="padding: 10px 16px;">Cancel</button>' +
           '</div>';
 
           html += '</div>';
           bodyEl.innerHTML = html;
 
-          const handleInput = bodyEl.querySelector('#editProfileHandleInput');
-          const handleStatus = bodyEl.querySelector('#editProfileHandleStatus');
-          const feedback = bodyEl.querySelector('#editProfileFeedback');
-          const saveBtn = bodyEl.querySelector('#saveProfileBtn');
-          const cancelBtn = bodyEl.querySelector('#cancelProfileBtn');
+          const handleInput = bodyEl.querySelector('#spatialEditProfileHandleInput');
+          const handleStatus = bodyEl.querySelector('#spatialEditProfileHandleStatus');
+          const feedback = bodyEl.querySelector('#spatialEditProfileFeedback');
+          const saveBtn = bodyEl.querySelector('#spatialSaveProfileBtn');
+          const cancelBtn = bodyEl.querySelector('#spatialCancelProfileBtn');
 
           if (cancelBtn) {
             cancelBtn.onclick = function() { window.SovraSurfaceManager.popSurface(); };
@@ -29790,10 +30188,10 @@ function renderHtml(
 
           if (saveBtn) {
             saveBtn.onclick = function() {
-              const name = (bodyEl.querySelector('#editProfileNameInput')).value.trim();
-              const handle = (bodyEl.querySelector('#editProfileHandleInput')).value.trim();
-              const bio = (bodyEl.querySelector('#editProfileBioInput')).value.trim();
-              const website = (bodyEl.querySelector('#editProfileWebsiteInput')).value.trim();
+              const name = (bodyEl.querySelector('#spatialEditProfileNameInput')).value.trim();
+              const handle = (bodyEl.querySelector('#spatialEditProfileHandleInput')).value.trim();
+              const bio = (bodyEl.querySelector('#spatialEditProfileBioInput')).value.trim();
+              const website = (bodyEl.querySelector('#spatialEditProfileWebsiteInput')).value.trim();
 
               saveBtn.disabled = true;
               saveBtn.textContent = 'Saving...';
@@ -40827,7 +41225,7 @@ function renderHtml(
     // ========================================================
     // DUAL-MODE ENGINE & ZERO-POPUP NAVIGATION FOR DEV-SERVER
     // ========================================================
-    let currentDevUiMode = localStorage.getItem('sovra_ui_mode_v1') || 'simple';
+    let currentDevUiMode = localStorage.getItem('sovra_ui_mode_v1') || 'advance';
 
     function setDevServerUiMode(mode) {
       currentDevUiMode = mode;
@@ -41034,6 +41432,14 @@ function renderHtml(
     // Call on startup
     window.addEventListener('DOMContentLoaded', function() {
       updateDevServerUiModeVisuals();
+      const navCreateBtn = document.getElementById('navTabCreate');
+      if (navCreateBtn) {
+        navCreateBtn.addEventListener('click', function(ev) {
+          if (typeof window.openUniversalCreateModal === 'function') {
+            window.openUniversalCreateModal(ev);
+          }
+        });
+      }
     });
 
     // ========================================================
@@ -45134,6 +45540,61 @@ function renderHtml(
       }
     }
 
+    function appendComposerTag(tag) {
+      const caption = document.getElementById('dynamicPostCaption');
+      if (!caption) return;
+      const current = caption.value;
+      if (!current.includes(tag)) {
+        caption.value = (current.trim() + ' ' + tag).trim() + ' ';
+        caption.style.height = 'auto';
+        caption.style.height = (caption.scrollHeight) + 'px';
+        if (typeof handleTweetComposerInput === 'function') handleTweetComposerInput();
+        if (typeof showAccountToast === 'function') showAccountToast('🏷️ Added ' + tag);
+      }
+      caption.focus();
+    }
+    window.appendComposerTag = appendComposerTag;
+
+    function triggerSmartAIEnhance() {
+      const caption = document.getElementById('dynamicPostCaption');
+      if (!caption) return;
+      let text = caption.value.trim();
+      if (!text) {
+        text = "Decentralized P2P mesh network operating with zero central points of failure. Verified sovereign identity and end-to-end encryption active across all peers.";
+      }
+      const enhanced = text.charAt(0).toUpperCase() + text.slice(1) + 
+        (text.includes('#') ? '' : '\\n\\n#sovra #p2p #mesh #sovereign');
+      caption.value = enhanced;
+      caption.style.height = 'auto';
+      caption.style.height = (caption.scrollHeight) + 'px';
+      if (typeof handleTweetComposerInput === 'function') handleTweetComposerInput();
+      if (typeof showAccountToast === 'function') showAccountToast('✨ Post enhanced with AI formatting & tags!');
+    }
+    window.triggerSmartAIEnhance = triggerSmartAIEnhance;
+
+    function generateSmartPostSummary(text) {
+      if (!text) return 'Decentralized dispatch from sovereign peer.';
+      const clean = text.replace(/#\\w+/g, '').replace(/https?:\\/\\/\\S+/g, '').trim();
+      if (clean.length <= 80) return clean;
+      const sentences = clean.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+      if (sentences.length > 1) {
+        return '• ' + sentences.slice(0, 2).join('.\\n• ') + '.';
+      }
+      return clean.substring(0, 110) + '...';
+    }
+    window.generateSmartPostSummary = generateSmartPostSummary;
+
+    function togglePostSmartTldr(postId) {
+      const box = document.getElementById('tldr-box-' + postId);
+      if (!box) return;
+      if (box.style.display === 'none' || !box.style.display) {
+        box.style.display = 'block';
+      } else {
+        box.style.display = 'none';
+      }
+    }
+    window.togglePostSmartTldr = togglePostSmartTldr;
+
     let selectedFeedCarouselImages = null;
     let selectedFilterPreset = 'normal';
 
@@ -46592,11 +47053,23 @@ function renderHtml(
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
             }).join(' ') + '</div>' : '');
       } else {
-        // Clean Native Text Post
+        // Clean Native Text Post with Smart AI Summary
+        const smartSummaryPill = (post.caption && post.caption.length > 70) ?
+          '<div style="padding: 0 1.15rem 0.4rem 1.15rem;">' +
+            '<button type="button" class="smart-tldr-btn" onclick="togglePostSmartTldr(&quot;' + post.id + '&quot;)" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; border-radius: 12px; padding: 2px 9px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;">' +
+              '<span>🧠</span> <span>Smart AI TL;DR</span>' +
+            '</button>' +
+            '<div id="tldr-box-' + post.id + '" style="display: none; margin-top: 6px; padding: 8px 12px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px; font-size: 0.78rem; color: #cbd5e1; line-height: 1.45;">' +
+              '<div style="font-weight: 700; color: #38bdf8; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><span>⚡</span> <span>Smart Mesh Key Points:</span></div>' +
+              '<div>' + generateSmartPostSummary(post.caption) + '</div>' +
+            '</div>' +
+          '</div>' : '';
+
         postBodyHtml =
           '<div class="feed-post-text-body">' +
             post.caption +
           '</div>' +
+          smartSummaryPill +
           (post.tags ? '<div class="feed-post-tags">' +
             post.tags.split(' ').filter(Boolean).map(function(t) {
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
@@ -48153,7 +48626,7 @@ function renderHtml(
             }
           });
         }, {
-          threshold: [0.2, 0.5, 0.65]
+          threshold: [0.5, 0.2, 0.65] // threshold: [0.5]
         });
       }
 
@@ -49116,6 +49589,46 @@ function renderHtml(
       }
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
+    }
+
+    async function claimBitSwapSeederRewards() {
+      const btn = document.getElementById('btnClaimSeederRewards');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳ Claiming...</span>'; }
+      try {
+        const res = await fetch('/api/wallet/claim-seeder-rewards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: 5.25 })
+        });
+        const data = await res.json();
+        if (data && data.ok) {
+          const yieldEl = document.getElementById('seederUnclaimedYieldText');
+          if (yieldEl) yieldEl.innerText = '0.00 SOV';
+          if (btn) {
+            btn.disabled = true;
+            btn.style.background = 'rgba(16, 185, 129, 0.2)';
+            btn.style.border = '1px solid #10b981';
+            btn.style.color = '#34d399';
+            btn.innerHTML = '<span>✓ 5.25 SOV Claimed</span>';
+          }
+          if (typeof walletBalanceSov !== 'undefined') {
+            walletBalanceSov = Number(data.newBalanceSov || (walletBalanceSov + 5.25));
+            const disp = document.getElementById('walletSettingsBalanceSovDisplay');
+            if (disp) disp.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+            const fiatDisp = document.getElementById('walletSettingsBalanceFiatDisplay');
+            if (fiatDisp) fiatDisp.innerText = '≈ $' + (walletBalanceSov * 3.0).toFixed(2) + ' USD';
+          }
+          if (typeof showTopNotification === 'function') {
+            showTopNotification('🎉 Successfully claimed 5.25 SOV BitSwap P2P seeder mining yield!');
+          }
+        } else {
+          if (btn) { btn.disabled = false; btn.innerHTML = '<span>⚡ Claim 5.25 SOV</span>'; }
+          alert('Failed to claim rewards: ' + (data?.error || 'Server error'));
+        }
+      } catch (err) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span>⚡ Claim 5.25 SOV</span>'; }
+        alert('Network error while claiming rewards');
+      }
     }
 
     function openWithdrawModal() {
@@ -53732,6 +54245,45 @@ function renderHtml(
     // ========================================================
     // 🎬 PHASE 10: SOVEREIGN CREATOR STUDIO PRO & MULTI-RESOLUTION TRANSCODER ENGINE
     // ========================================================
+    function switchEarnSubtab(tab) {
+      const tabs = ['overview', 'tiers', 'tips', 'eligibility'];
+      tabs.forEach(function(t) {
+        const btn = document.getElementById('studioEarnSubtabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+        const pane = document.getElementById('studioEarnSubtab' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (btn) {
+          if (t === tab) {
+            btn.style.background = 'rgba(56, 189, 248, 0.2)';
+            btn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+            btn.style.color = '#38bdf8';
+          } else {
+            btn.style.background = 'rgba(255, 255, 255, 0.05)';
+            btn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+            btn.style.color = '#94a3b8';
+          }
+        }
+        if (pane) pane.style.display = (t === tab ? 'block' : 'none');
+      });
+    }
+    window.switchEarnSubtab = switchEarnSubtab;
+
+    function openTierModal() {
+      const m = document.getElementById('studioTierModal');
+      if (m) m.style.display = 'flex';
+    }
+    window.openTierModal = openTierModal;
+
+    function closeTierModal() {
+      const m = document.getElementById('studioTierModal');
+      if (m) m.style.display = 'none';
+    }
+    window.closeTierModal = closeTierModal;
+
+    function saveMembershipTiers() {
+      if (typeof showAccountToast === 'function') showAccountToast('✓ Membership tiers saved successfully!');
+      closeTierModal();
+    }
+    window.saveMembershipTiers = saveMembershipTiers;
+
     window.SovraCreatorStudioEngine = {
       isTranscoding: false,
       activeJobId: null,
@@ -55935,20 +56487,26 @@ function renderHtml(
           var status = item.status || 'PUBLISHED';
           var views = (item.viewsCount != null ? item.viewsCount : (item.views || 0)).toLocaleString();
           var commentsCount = item.commentsCount || 0;
+          var seeders = item.seederCount || item.seeders || 14;
           var sov = (item.earnedSov != null ? item.earnedSov : 0).toFixed(2);
           var date = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Recent';
-          var gatingBadge = item.monetizationGating === 'supporter_gated' || (item.monetization && item.monetization.tier === 'supporter_gated')
-            ? '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 0.65rem; padding: 2px 6px;">🔒 Supporter</span>'
-            : '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.65rem; padding: 2px 6px;">🌐 Public</span>';
+          var isSupporter = item.monetizationGating === 'supporter_gated' || (item.monetization && item.monetization.tier === 'supporter_gated');
+          var gatingBadge = isSupporter
+            ? '<button type="button" class="badge" onclick="SovraCreatorStudioEngine.toggleMonetizationGating(&quot;' + item.id + '&quot;)" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 0.65rem; padding: 2px 7px; border-radius: 6px; cursor: pointer;" title="Click to toggle tier">🔒 Supporter Tier</button>'
+            : '<button type="button" class="badge" onclick="SovraCreatorStudioEngine.toggleMonetizationGating(&quot;' + item.id + '&quot;)" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.65rem; padding: 2px 7px; border-radius: 6px; cursor: pointer;" title="Click to toggle tier">🌐 Public Free</button>';
           var hlsUrl = item.hlsMasterPlaylistUrl || ('/api/video/hls/' + item.id + '/master.m3u8');
           var safeId = item.id;
+          var isPinned = Boolean(item.isPinned);
 
           return '<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">' +
             '<td style="padding: 10px 8px; display: flex; align-items: center; gap: 10px;">' +
               '<img src="' + thumb + '" style="width: 58px; height: 34px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">' +
               '<div style="min-width: 0;">' +
-                '<div style="font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;" title="' + title + '">' + title + '</div>' +
-                '<div style="font-size: 0.7rem; color: #94a3b8;">' + (item.duration || '2:00') + ' &bull; 4K HLS</div>' +
+                '<div style="font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; display: flex; align-items: center; gap: 5px;" title="' + title + '">' +
+                  (isPinned ? '<span style="color:#f59e0b; font-size:0.75rem;">📌</span> ' : '') +
+                  '<span>' + title + '</span>' +
+                '</div>' +
+                '<div style="font-size: 0.7rem; color: #94a3b8;">' + (item.duration || '2:00') + ' &bull; 4K HLS &bull; <span style="color:#34d399; font-weight:700;">🟢 ' + seeders + ' seeders</span></div>' +
               '</div>' +
             '</td>' +
             '<td style="padding: 10px 8px;">' + gatingBadge + '</td>' +
@@ -55959,14 +56517,57 @@ function renderHtml(
             '<td style="padding: 10px 8px; color: #34d399; font-weight: 700;">98.4% 👍</td>' +
             '<td style="padding: 10px 8px; color: #10b981; font-weight: 700;">' + sov + ' SOV</td>' +
             '<td style="padding: 10px 8px; text-align: right; white-space: nowrap;">' +
-              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.openVideoDetailsModal(&quot;' + safeId + '&quot;)" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;" title="Edit Video Details">✏️</button>' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.openVideoDetailsModal(&quot;' + safeId + '&quot;)" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;" title="Edit Video Title &amp; Details">✏️ Edit</button>' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.togglePinContent(&quot;' + safeId + '&quot;)" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;' + (isPinned ? ' color:#f59e0b;' : '') + '" title="' + (isPinned ? 'Unpin dispatch' : 'Pin dispatch') + '">' + (isPinned ? '📌 Unpin' : '📌 Pin') + '</button>' +
               '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.switchStudioTab(&quot;analytics&quot;)" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;" title="Analytics">📊</button>' +
-              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.switchStudioTab(&quot;comments&quot;)" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;" title="Comments">💬</button>' +
               '<button type="button" class="btn btn-secondary" data-url="' + hlsUrl + '" onclick="SovraCreatorStudioEngine.copyHlsUrl(this.getAttribute(&quot;data-url&quot;))" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;" title="Copy RFC 8216 HLS Master Link">📋</button>' +
               '<button type="button" class="btn" onclick="SovraCreatorStudioEngine.deleteContentItem(&quot;' + safeId + '&quot;)" style="padding: 3px 7px; font-size: 0.7rem; background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #ef4444; cursor: pointer;" title="Delete">🗑️</button>' +
             '</td>' +
           '</tr>';
         }).join('');
+      },
+
+      toggleMonetizationGating: function(id) {
+        var item = (this.contentLibrary || []).find(function(x) { return x.id === id; });
+        if (!item) return;
+        var currentTier = item.monetizationGating || (item.monetization ? item.monetization.tier : 'public');
+        var newTier = currentTier === 'supporter_gated' ? 'public' : 'supporter_gated';
+        var self = this;
+        fetch('/api/studio/video/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: id, monetizationGating: newTier, monetization: { tier: newTier } })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok) {
+            item.monetizationGating = newTier;
+            if (item.monetization) item.monetization.tier = newTier;
+            self.renderContentTable(self.contentLibrary);
+            if (typeof showToast === 'function') showToast('Paywall tier updated to: ' + newTier, 'success');
+          }
+        })
+        .catch(function() {});
+      },
+
+      togglePinContent: function(id) {
+        var item = (this.contentLibrary || []).find(function(x) { return x.id === id; });
+        if (!item) return;
+        item.isPinned = !item.isPinned;
+        var self = this;
+        fetch('/api/studio/video/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: id, isPinned: item.isPinned })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok) {
+            self.renderContentTable(self.contentLibrary);
+            if (typeof showToast === 'function') showToast(item.isPinned ? '📌 Video pinned to top' : 'Unpinned video', 'info');
+          }
+        })
+        .catch(function() {});
       },
 
       copyHlsUrl: function(url) {
@@ -58386,8 +58987,35 @@ function renderHtml(
       selectContact(activeContactDid);
     }
 
+    let activeChatInboxTab = 'primary';
+
+    function switchChatInboxTab(tab) {
+      activeChatInboxTab = tab;
+      const primaryBtn = document.getElementById('chatTabPrimary');
+      const reqBtn = document.getElementById('chatTabRequests');
+      if (primaryBtn && reqBtn) {
+        if (tab === 'primary') {
+          primaryBtn.classList.add('active');
+          primaryBtn.style.background = 'rgba(56, 189, 248, 0.15)';
+          primaryBtn.style.color = '#38bdf8';
+          reqBtn.classList.remove('active');
+          reqBtn.style.background = 'transparent';
+          reqBtn.style.color = '#94a3b8';
+        } else {
+          reqBtn.classList.add('active');
+          reqBtn.style.background = 'rgba(244, 63, 94, 0.15)';
+          reqBtn.style.color = '#f43f5e';
+          primaryBtn.classList.remove('active');
+          primaryBtn.style.background = 'transparent';
+          primaryBtn.style.color = '#94a3b8';
+        }
+      }
+      renderChatContactsList();
+    }
+    window.switchChatInboxTab = switchChatInboxTab;
+
     function renderChatContactsList() {
-      const container = document.getElementById('contactsList');
+      const container = document.getElementById('contactsList') || document.getElementById('chatContactsList');
       if (!container) return;
 
       const q = (document.getElementById('chatSearchInput')?.value || '').toLowerCase().trim();
@@ -58627,16 +59255,39 @@ function renderHtml(
         filteredDirectList.unshift(noteToSelfObj);
       }
 
+      const primaryDirectList = filteredDirectList.filter(function(p) {
+        return p.isNoteToSelf || p.isFriend || p.role === 'Mutual Friend';
+      });
+      const requestsDirectList = filteredDirectList.filter(function(p) {
+        return !p.isNoteToSelf && !p.isFriend && p.role !== 'Mutual Friend';
+      });
+
+      // Update badge counters
+      const reqBadge = document.getElementById('chatRequestsBadge');
+      if (reqBadge) {
+        reqBadge.innerText = requestsDirectList.length;
+        reqBadge.style.display = requestsDirectList.length > 0 ? 'inline-block' : 'none';
+      }
+      const primBadge = document.getElementById('chatPrimaryBadge');
+      if (primBadge) {
+        const unreadPrimary = primaryDirectList.filter(function(p) { return p.unreadCount > 0; }).length;
+        primBadge.innerText = unreadPrimary;
+        primBadge.style.display = unreadPrimary > 0 ? 'inline-block' : 'none';
+      }
+
+      const activeList = (activeChatInboxTab === 'requests') ? requestsDirectList : primaryDirectList;
+
       let html = '';
 
-      // Section 1: WhatsApp-Style Direct Messages
-      if (filteredDirectList.length > 0) {
+      // Section 1: WhatsApp/Instagram-Style Direct Messages
+      if (activeList.length > 0) {
+        const sectionTitle = activeChatInboxTab === 'requests' ? 'Message Requests (' + activeList.length + ')' : 'Chats (' + activeList.length + ')';
         html += '<div class="bitchat-section-title" style="display:flex; justify-content:space-between; align-items:center; padding: 6px 14px 4px 14px; font-size: 0.72rem; color: #8696a0; text-transform: uppercase; letter-spacing: 0.5px;">' +
-          '<span>Chats (' + filteredDirectList.length + ')</span>' +
+          '<span>' + sectionTitle + '</span>' +
           '<span style="font-size:0.65rem; color:#22c55e; text-transform:none; font-weight:600;">🔒 E2EE Active</span>' +
         '</div>';
 
-        for (const p of filteredDirectList) {
+        for (const p of activeList) {
           const isActive = p.did === activeContactDid;
 
           let timeDisplay = p.isOnline ? 'Online' : (p.lastSeen || 'Offline');
@@ -58681,6 +59332,7 @@ function renderHtml(
                   p.name +
                   (p.isNoteToSelf ? '<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.65rem; padding: 1px 5px; border-radius: 6px; margin-left: 5px; font-weight: 600;">Personal Vault</span>' : '') +
                   ((!p.isNoteToSelf && (p.isFriend || p.role === 'Mutual Friend')) ? '<span class="badge" style="background: rgba(37, 211, 102, 0.15); color: #25d366; border: 1px solid rgba(37, 211, 102, 0.3); font-size: 0.65rem; padding: 1px 5px; border-radius: 6px; margin-left: 5px; font-weight: 600;">Friend</span>' : '') +
+                  ((!p.isNoteToSelf && !p.isFriend && p.role !== 'Mutual Friend') ? '<span class="badge" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); font-size: 0.65rem; padding: 1px 5px; border-radius: 6px; margin-left: 5px; font-weight: 600;">Request</span>' : '') +
                   (p.isVerified ? '<span class="verified-shield-icon" title="Safety Numbers Verified" style="margin-left: 4px;">🛡️</span>' : '') +
                 '</span>' +
                 '<span class="contact-time" style="' + (p.unreadCount > 0 ? 'color: #25d366; font-weight: 700;' : (p.isOnline ? 'color: #25d366; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;' : 'color: #8696a0;')) + '">' +
@@ -58695,18 +59347,28 @@ function renderHtml(
           '</div>';
         }
       } else {
-        html += '<div style="background: rgba(15,23,42,0.4); border: 1px dashed rgba(255,255,255,0.1); border-radius: 14px; padding: 2rem 1rem; text-align: center; margin: 0.75rem 0.5rem;">' +
-          '<div style="font-size: 2.2rem; margin-bottom: 0.35rem;">💬</div>' +
-          '<div style="font-weight: 700; color: #e9edef; font-size: 0.98rem; margin-bottom: 0.25rem;">No chats yet</div>' +
-          '<div style="color: #8696a0; font-size: 0.8rem; margin-bottom: 0.85rem; max-width: 260px; margin-left: auto; margin-right: auto; line-height: 1.4;">' +
-            'Connect with friends or start an end-to-end encrypted direct chat.' +
-          '</div>' +
-          '<button type="button" class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1.15rem; font-size: 0.82rem; background: #25d366; border-color: #25d366; color: #111b21; font-weight: 700;" onclick="openNewChatPickerModal()">+ Start Chat</button>' +
-        '</div>';
+        if (activeChatInboxTab === 'requests') {
+          html += '<div style="background: rgba(15,23,42,0.4); border: 1px dashed rgba(255,255,255,0.1); border-radius: 14px; padding: 2.2rem 1rem; text-align: center; margin: 0.75rem 0.5rem;">' +
+            '<div style="font-size: 2.2rem; margin-bottom: 0.35rem;">📩</div>' +
+            '<div style="font-weight: 700; color: #e9edef; font-size: 0.98rem; margin-bottom: 0.25rem;">No Message Requests</div>' +
+            '<div style="color: #8696a0; font-size: 0.78rem; max-width: 260px; margin: 0 auto; line-height: 1.4;">' +
+              'Incoming messages from people who are not in your friends list will appear here.' +
+            '</div>' +
+          '</div>';
+        } else {
+          html += '<div style="background: rgba(15,23,42,0.4); border: 1px dashed rgba(255,255,255,0.1); border-radius: 14px; padding: 2rem 1rem; text-align: center; margin: 0.75rem 0.5rem;">' +
+            '<div style="font-size: 2.2rem; margin-bottom: 0.35rem;">💬</div>' +
+            '<div style="font-weight: 700; color: #e9edef; font-size: 0.98rem; margin-bottom: 0.25rem;">No chats yet</div>' +
+            '<div style="color: #8696a0; font-size: 0.8rem; margin-bottom: 0.85rem; max-width: 260px; margin-left: auto; margin-right: auto; line-height: 1.4;">' +
+              'Connect with friends or start an end-to-end encrypted direct chat.' +
+            '</div>' +
+            '<button type="button" class="action-pill-btn action-pill-primary" style="padding: 0.45rem 1.15rem; font-size: 0.82rem; background: #25d366; border-color: #25d366; color: #111b21; font-weight: 700;" onclick="openNewChatPickerModal()">+ Start Chat</button>' +
+          '</div>';
+        }
       }
 
-      // Section 2: Channels & Mesh Swarm (Subtle section below direct chats)
-      if (channels.length > 0) {
+      // Section 2: Channels & Mesh Swarm (Only visible in Primary inbox)
+      if (channels.length > 0 && activeChatInboxTab === 'primary') {
         html += '<div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06);">' +
           '<div class="bitchat-section-title" style="display:flex; justify-content:space-between; align-items:center; padding: 4px 14px; color: #64748b; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;">' +
             '<span>📡 Mesh Channels</span>' +
@@ -59156,6 +59818,14 @@ function renderHtml(
         }
         if (routeEl) routeEl.style.display = 'none';
         updateHeaderTimerDisplay(contact.disappearingDurationSec || 0);
+
+        const reqBar = document.getElementById('chatRequestActionBar');
+        const reqSender = document.getElementById('chatRequestSenderName');
+        const isRequestThread = Boolean(contact && !contact.isNoteToSelf && !contact.isFriend && contact.role !== 'Mutual Friend' && !did.startsWith('channel:'));
+        if (reqBar) {
+          reqBar.style.display = isRequestThread ? 'flex' : 'none';
+          if (reqSender && contact) reqSender.innerText = contact.name || 'Peer';
+        }
       }
 
       document.querySelectorAll('.contact-item').forEach(function(el) {
@@ -59213,6 +59883,54 @@ function renderHtml(
       if (wCont) wCont.classList.remove('show-chat');
       document.body.classList.remove('chat-open');
     }
+
+    async function acceptCurrentChatRequest() {
+      if (!activeContactDid) return;
+      try {
+        const res = await fetch('/api/chat/request/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contactDid: activeContactDid })
+        });
+        const data = await res.json();
+        if (data && data.ok) {
+          const reqBar = document.getElementById('chatRequestActionBar');
+          if (reqBar) reqBar.style.display = 'none';
+          const c = (contactsData || []).find(function(x) { return x.did === activeContactDid; });
+          if (c) {
+            c.isFriend = true;
+            c.role = 'Mutual Friend';
+          }
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('✓ Message request accepted! Moved to Primary.');
+          }
+          switchChatInboxTab('primary');
+        }
+      } catch (err) {}
+    }
+    window.acceptCurrentChatRequest = acceptCurrentChatRequest;
+
+    async function declineCurrentChatRequest() {
+      if (!activeContactDid) return;
+      if (!confirm('Decline this message request?')) return;
+      try {
+        const res = await fetch('/api/chat/request/decline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contactDid: activeContactDid })
+        });
+        const data = await res.json();
+        if (data && data.ok) {
+          const reqBar = document.getElementById('chatRequestActionBar');
+          if (reqBar) reqBar.style.display = 'none';
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('Message request declined.');
+          }
+          renderChatContactsList();
+        }
+      } catch (err) {}
+    }
+    window.declineCurrentChatRequest = declineCurrentChatRequest;
 
     function updateHeaderTimerDisplay(sec) {
       const btn = document.getElementById('headerTimerText');
@@ -65616,6 +66334,11 @@ function renderHtml(
         statusText.innerText = ytAutoplay ? 'ON' : 'OFF';
         statusText.style.color = ytAutoplay ? '#34d399' : '#9ca3af';
       }
+      const sideAuto = document.getElementById('ytSidebarAutoplayStatus');
+      if (sideAuto) {
+        sideAuto.innerText = ytAutoplay ? 'ON' : 'OFF';
+        sideAuto.style.color = ytAutoplay ? '#34d399' : '#9ca3af';
+      }
       const sheetAuto = document.getElementById('sheetAutoplayText');
       if (sheetAuto) {
         sheetAuto.innerText = ytAutoplay ? 'ON' : 'OFF';
@@ -65980,36 +66703,99 @@ function renderHtml(
       }
     }
 
-    function openChannelProfile() {
-      const v = ytVideosCatalog[activeYtVideoIndex];
-      if (!v) return;
-      const chHandle = (v.channelHandle || 'creator').replace('@', '');
-      const chName = v.channelName || 'Verified Channel';
-      const chAvatar = v.channelAvatar || '🎬';
-      const chAvatarBg = v.channelAvatarBg || '#6366f1';
+    let currentPublicChannelData = null;
 
-      const avatarEl = document.getElementById('modalChannelAvatar');
+    async function openPublicChannelView(channelIdOrHandle) {
+      const surface = document.getElementById('publicChannelSurface') || document.getElementById('channelProfileModal');
+      if (surface) {
+        surface.style.display = 'flex';
+      }
+      const v = (typeof ytVideosCatalog !== 'undefined' && ytVideosCatalog[activeYtVideoIndex]) ? ytVideosCatalog[activeYtVideoIndex] : null;
+      let handle = (channelIdOrHandle || (v ? v.channelHandle : 'sovralab') || 'sovralab').replace(/^@/, '');
+      let chName = v ? v.channelName : 'Sovra Protocol Lab';
+      let chAvatar = v ? v.channelAvatar : '🎬';
+      let chAvatarBg = v ? v.channelAvatarBg : '#6366f1';
+
+      try {
+        const res = await fetch('/api/social/channels/get?handle=' + encodeURIComponent(handle));
+        const data = await res.json();
+        if (data && data.ok && data.channel) {
+          currentPublicChannelData = data;
+          const ch = data.channel;
+          chName = ch.name || chName;
+          chAvatar = ch.avatar || chAvatar;
+          chAvatarBg = ch.avatarBg || chAvatarBg;
+        }
+      } catch (err) {}
+
+      const avatarEl = document.getElementById('publicChannelAvatar') || document.getElementById('modalChannelAvatar');
       if (avatarEl) {
         avatarEl.innerText = chAvatar;
         avatarEl.style.background = chAvatarBg;
       }
-      const nameEl = document.getElementById('modalChannelName');
+      const nameEl = document.getElementById('publicChannelName') || document.getElementById('modalChannelName');
       if (nameEl) nameEl.innerText = chName;
 
-      const chVideos = ytVideosCatalog.filter(vid => {
-        const vh = (vid.channelHandle || '').replace('@', '').toLowerCase();
-        return vh === chHandle.toLowerCase() || vid.channelName === chName;
-      });
-
-      const subEl = document.getElementById('modalChannelSubscribers');
+      const subEl = document.getElementById('publicChannelSubscribers') || document.getElementById('modalChannelSubscribers');
       if (subEl) {
-        const count = v.channelSubscribersText || (chVideos.length + ' videos');
-        subEl.innerHTML = '@' + chHandle + ' &bull; ' + count + ' &bull; ' + chVideos.length + ' video' + (chVideos.length === 1 ? '' : 's');
+        const count = (v && v.channelSubscribersText) ? v.channelSubscribersText : '142.8K subscribers';
+        subEl.innerHTML = '@' + handle + ' &bull; ' + count + ' &bull; 4 videos';
       }
+      const hText = document.getElementById('publicChannelHandleText');
+      if (hText) hText.innerText = '@' + handle;
+      const scText = document.getElementById('publicChannelSubCountText');
+      if (scText) scText.innerText = (v && v.channelSubscribersText) ? v.channelSubscribersText : '142.8K subscribers';
 
-      openYtModal('channelProfileModal');
-      switchChannelModalTab('videos');
+      switchPublicChannelTab('videos');
     }
+    window.openPublicChannelView = openPublicChannelView;
+
+    function closePublicChannelView() {
+      const surface = document.getElementById('publicChannelSurface');
+      if (surface) surface.style.display = 'none';
+      const m = document.getElementById('channelProfileModal');
+      if (m && m.parentElement === document.body) m.style.display = 'none';
+    }
+    window.closePublicChannelView = closePublicChannelView;
+
+    function openChannelProfile() {
+      return openPublicChannelView();
+    }
+    window.openChannelProfile = openChannelProfile;
+
+    function togglePublicChannelSubscription() {
+      const btn = document.getElementById('publicChannelSubscribeBtn') || document.getElementById('modalSubscribeBtn');
+      if (btn) {
+        const isSub = btn.innerText.includes('Subscribed');
+        btn.innerText = isSub ? 'Subscribe' : 'Subscribed ✓';
+        btn.style.background = isSub ? '#ef4444' : 'rgba(255,255,255,0.15)';
+      }
+      if (typeof toggleYtSubscribe === 'function') toggleYtSubscribe();
+    }
+    window.togglePublicChannelSubscription = togglePublicChannelSubscription;
+
+    function switchPublicChannelTab(tab) {
+      ['videos', 'shorts', 'playlists', 'about'].forEach(function(t) {
+        const btn = document.getElementById('publicChannelTab' + t.charAt(0).toUpperCase() + t.slice(1)) ||
+                    document.getElementById('chTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (btn) {
+          if (t === tab) {
+            btn.classList.add('active');
+            btn.style.color = '#38bdf8';
+          } else {
+            btn.classList.remove('active');
+            btn.style.color = '#94a3b8';
+          }
+        }
+      });
+      switchChannelModalTab(tab);
+      const mainContent = document.getElementById('chTabContent');
+      const publicContent = document.getElementById('publicChannelTabContent');
+      if (mainContent && publicContent && mainContent !== publicContent) {
+        publicContent.innerHTML = mainContent.innerHTML;
+      }
+    }
+    window.switchPublicChannelTab = switchPublicChannelTab;
 
     function switchChannelModalTab(tab) {
       const tabs = ['videos', 'playlists', 'community', 'about'];
@@ -66281,10 +67067,73 @@ function renderHtml(
       } catch (err) {}
     }
 
+    let currentYtCategoryFilter = 'all';
+
+    function filterYtCategory(cat, el) {
+      currentYtCategoryFilter = cat;
+      const chips = document.querySelectorAll('.yt-cat-chip');
+      chips.forEach(c => {
+        c.classList.remove('active');
+        c.style.background = 'rgba(255,255,255,0.06)';
+        c.style.color = '#cbd5e1';
+      });
+      if (el) {
+        el.classList.add('active');
+        el.style.background = '#38bdf8';
+        el.style.color = '#000';
+      }
+      renderYtRecommendations();
+    }
+    window.filterYtCategory = filterYtCategory;
+
+    function toggleLiveSwarmChat() {
+      const body = document.getElementById('ytLiveSwarmChatBody');
+      const btn = document.getElementById('ytLiveSwarmChatToggleBtn');
+      if (!body) return;
+      if (body.style.display === 'none') {
+        body.style.display = 'flex';
+        if (btn) btn.innerText = 'Hide';
+      } else {
+        body.style.display = 'none';
+        if (btn) btn.innerText = 'Show';
+      }
+    }
+    window.toggleLiveSwarmChat = toggleLiveSwarmChat;
+
+    function sendLiveSwarmChatMessage() {
+      const input = document.getElementById('ytLiveSwarmChatInput');
+      if (!input) return;
+      const val = input.value.trim();
+      if (!val) return;
+      input.value = '';
+      const list = document.getElementById('ytLiveSwarmChatMessages');
+      if (list) {
+        const item = document.createElement('div');
+        item.style.color = '#cbd5e1';
+        item.innerHTML = '<span style="color: #38bdf8; font-weight: 700;">You:</span> ' + val.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        list.appendChild(item);
+        list.scrollTop = list.scrollHeight;
+      }
+    }
+    window.sendLiveSwarmChatMessage = sendLiveSwarmChatMessage;
+
     function renderYtRecommendations() {
       const container = document.getElementById('ytRecommendationsList');
       if (!container) return;
-      container.innerHTML = ytVideosCatalog.map((vid, idx) => {
+      let list = ytVideosCatalog.map((vid, idx) => ({ vid, idx }));
+      if (currentYtCategoryFilter === 'protocol') {
+        list = list.filter(item => (item.idx % 2 === 0) || (item.vid.tags && item.vid.tags.some(t => t.toLowerCase().includes('p2p') || t.toLowerCase().includes('protocol'))));
+      } else if (currentYtCategoryFilter === '4k') {
+        list = list.filter(item => (item.idx % 2 === 1) || (item.vid.title && item.vid.title.includes('4K')));
+      } else if (currentYtCategoryFilter === 'cyber') {
+        list = list.filter(item => (item.vid.title && (item.vid.title.includes('Cyber') || item.vid.title.includes('Security') || item.vid.title.includes('Identity'))) || item.idx === 1);
+      } else if (currentYtCategoryFilter === 'seeders') {
+        list = list.filter(item => (item.vid.title && (item.vid.title.includes('BitSwap') || item.vid.title.includes('Swarm'))) || item.idx === 0);
+      }
+      if (list.length === 0) {
+        list = ytVideosCatalog.map((vid, idx) => ({ vid, idx }));
+      }
+      container.innerHTML = list.map(({ vid, idx }) => {
         const isActive = idx === activeYtVideoIndex;
         const activeClass = isActive ? ' active-video' : '';
         const badge = isActive ? '<span class="yt-p2p-badge" style="background:#6366f1; color:#fff;">▶ PLAYING</span>' : '<span class="yt-p2p-badge">P2P 4K</span>';
@@ -69240,34 +70089,47 @@ function renderHtml(
     // ========================================================
     // 🌟 UNIVERSAL SINGLE-DOOR CREATE ENGINE & NON-BLOCKING UPLOAD
     // ========================================================
-    function openUniversalCreateModal() {
-      const modal = document.getElementById('universalCreateModal');
-      if (modal) {
-        modal.style.display = 'flex';
-        modal.style.pointerEvents = 'auto';
-        setTimeout(function() {
-          if (modal) {
-            modal.style.opacity = '1';
-            modal.classList.add('is-open');
-          }
-        }, 10);
-        document.body.style.overflow = 'hidden';
-      }
+    window.openUniversalCreateModal = function(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
+      // Zero-Popup: Eradicate modal popups & route directly in-line to feed composer
+      if (typeof closeUniversalCreateModal === 'function') closeUniversalCreateModal();
+      if (typeof switchTab === 'function') switchTab('feed');
+      setTimeout(function() {
+        const composer = document.querySelector('.feed-composer-card') || document.getElementById('feedPostComposerCard');
+        if (composer) {
+          composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        const caption = document.getElementById('dynamicPostCaption');
+        if (caption) caption.focus();
+        const postBtn = document.getElementById('dynamicPostPublishBtn');
+        if (postBtn) {
+          postBtn.style.setProperty('display', 'inline-flex', 'important');
+          postBtn.style.setProperty('visibility', 'visible', 'important');
+        }
+      }, 80);
+    };
+    function openUniversalCreateModal(e) {
+      window.openUniversalCreateModal(e);
     }
 
-    function closeUniversalCreateModal() {
+    window.closeUniversalCreateModal = function(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
       const modal = document.getElementById('universalCreateModal');
       if (modal) {
-        modal.style.opacity = '0';
-        modal.style.pointerEvents = 'none';
         modal.classList.remove('is-open');
+        modal.style.setProperty('opacity', '0', 'important');
+        modal.style.setProperty('pointer-events', 'none', 'important');
         setTimeout(function() {
-          if (modal && modal.style.opacity === '0') {
-            modal.style.display = 'none';
+          if (modal && !modal.classList.contains('is-open')) {
+            modal.style.setProperty('display', 'none', 'important');
           }
-        }, 220);
+        }, 180);
       }
-      document.body.style.overflow = 'auto';
+      document.body.style.overflow = '';
+    };
+    function closeUniversalCreateModal(e) {
+      window.closeUniversalCreateModal(e);
     }
 
     function triggerUniversalVideoPick() {
@@ -69288,17 +70150,20 @@ function renderHtml(
 
     function triggerUniversalWritePost() {
       closeUniversalCreateModal();
-      if (typeof window.openSpatialPostCreatorSurface === 'function') {
-        window.openSpatialPostCreatorSurface(document.getElementById('navTabCreate') || document.body);
-        return;
-      }
       switchTab('feed');
-      const composer = document.querySelector('.feed-container .card') || document.getElementById('postComposerInput');
-      if (composer) {
-        composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const input = composer.querySelector('textarea') || composer.querySelector('input');
-        if (input) input.focus();
-      }
+      setTimeout(function() {
+        const composer = document.querySelector('.feed-composer-card') || document.querySelector('.card.feed-composer-card');
+        if (composer) {
+          composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        const caption = document.getElementById('dynamicPostCaption');
+        if (caption) caption.focus();
+        const postBtn = document.getElementById('dynamicPostPublishBtn');
+        if (postBtn) {
+          postBtn.style.setProperty('display', 'inline-flex', 'important');
+          postBtn.style.setProperty('visibility', 'visible', 'important');
+        }
+      }, 100);
       if (typeof showAccountToast === 'function') {
         showAccountToast('✍️ Ready to write your post!');
       }
@@ -69320,8 +70185,23 @@ function renderHtml(
       if (!file) return;
       closeUniversalCreateModal();
       switchTab('feed');
+      if (typeof handleFeedPhotoSelected === 'function') {
+        handleFeedPhotoSelected(e);
+      }
+      setTimeout(function() {
+        const composer = document.querySelector('.feed-composer-card') || document.querySelector('.card.feed-composer-card');
+        if (composer) {
+          composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        const postBtn = document.getElementById('dynamicPostPublishBtn');
+        if (postBtn) {
+          postBtn.style.setProperty('display', 'inline-flex', 'important');
+          postBtn.style.setProperty('visibility', 'visible', 'important');
+          postBtn.focus();
+        }
+      }, 120);
       if (typeof showAccountToast === 'function') {
-        showAccountToast('📸 Photo selected: ' + file.name + ' - ready to publish!');
+        showAccountToast('📸 Photo loaded into composer — ready to Post!');
       }
     }
 
@@ -69329,27 +70209,25 @@ function renderHtml(
       const file = e.target && e.target.files && e.target.files[0];
       if (!file) return;
       closeUniversalCreateModal();
-
-      const tempVideo = document.createElement('video');
-      tempVideo.preload = 'metadata';
-      const objectUrl = URL.createObjectURL(file);
-      tempVideo.src = objectUrl;
-
-      tempVideo.onloadedmetadata = function() {
-        URL.revokeObjectURL(objectUrl);
-        const width = tempVideo.videoWidth || 1920;
-        const height = tempVideo.videoHeight || 1080;
-        const duration = tempVideo.duration || 60;
-        // Auto-detect: vertical (height > width) and duration < 180s => Short/Reel, else 16:9 Long Video
-        const isShort = (height > width) && (duration < 180);
-        startBackgroundVideoUpload(file, isShort, duration, width, height);
-      };
-
-      tempVideo.onerror = function() {
-        URL.revokeObjectURL(objectUrl);
-        // Fallback default to long video
-        startBackgroundVideoUpload(file, false, 120, 1920, 1080);
-      };
+      switchTab('feed');
+      if (typeof handleFeedVideoSelected === 'function') {
+        handleFeedVideoSelected(e);
+      }
+      setTimeout(function() {
+        const composer = document.querySelector('.feed-composer-card') || document.querySelector('.card.feed-composer-card');
+        if (composer) {
+          composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        const postBtn = document.getElementById('dynamicPostPublishBtn');
+        if (postBtn) {
+          postBtn.style.setProperty('display', 'inline-flex', 'important');
+          postBtn.style.setProperty('visibility', 'visible', 'important');
+          postBtn.focus();
+        }
+      }, 120);
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('🎬 Video loaded into composer — ready to Post!');
+      }
     }
 
     let activeFloatingUploadAbortController = null;
@@ -75135,6 +76013,52 @@ async function startDevServer() {
       return;
     }
 
+    // API: BitSwap P2P Seeder Mining Yield Claim
+    if (url.pathname === '/api/wallet/claim-seeder-rewards' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const principal = resolvePrincipal(req, parsed);
+        const targetDid = parsed.did || (principal ? principal.did : masterKey.did);
+        const amount = Number(parsed.amount || 5.25);
+
+        const result = sovraDb.depositFunds({
+          did: targetDid,
+          amount,
+          sourceTx: 'seeder_mining_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'),
+        });
+
+        if (result.ok) {
+          sovraDb.logAudit({
+            type: 'WALLET_SEEDER_CLAIM',
+            action: 'BITSWAP_SEEDER_YIELD',
+            actorDid: targetDid,
+            actorHandle: parsed.handle || (principal?.handle || 'user'),
+            details: `Claimed ${amount} SOV BitSwap P2P seeder mining yield (Relayed blocks)`,
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: true,
+            claimed: amount,
+            amount,
+            newBalance: result.newBalance,
+            currency: 'SOV',
+            txHash: '0x' + crypto.randomBytes(16).toString('hex'),
+            message: `⚡ ${amount.toFixed(2)} SOV BitSwap Seeder Mining Rewards claimed to your wallet!`,
+          }));
+        } else {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: result.error || 'Claim failed' }));
+        }
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Server error' }));
+      }
+      return;
+    }
+
     // API: Layer-1 Native Blockchain Transfer (CometBFT Consensus)
     if (url.pathname === '/api/wallet/chain-send' && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
@@ -77474,6 +78398,63 @@ async function startDevServer() {
     if (url.pathname === '/api/social/channels' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, channels: dynamicSocialStore.channels }));
+      return;
+    }
+
+    // API: Get Public Channel Profile & Broadcast Videos (YouTube Channel Parity)
+    if (url.pathname === '/api/social/channels/get' && req.method === 'GET') {
+      const channelId = url.searchParams.get('id') || '';
+      const handle = (url.searchParams.get('handle') || '').toLowerCase().replace(/^@/, '');
+      const principal = resolvePrincipal(req);
+      const userDid = principal?.did || '';
+
+      let ch = (dynamicSocialStore.channels || []).find(c =>
+        (channelId && c.id === channelId) ||
+        (handle && (c.handle || '').toLowerCase().replace(/^@/, '') === handle)
+      );
+
+      // Fallback: If not explicitly created yet, resolve channel from sovereign video catalog or protocol defaults
+      if (!ch && (handle || channelId)) {
+        const vid = (sovraDb.db.videos || []).find(v => 
+          (channelId && v.channelId === channelId) ||
+          ((v.channelHandle || '').toLowerCase().replace(/^@/, '') === handle)
+        );
+        ch = {
+          id: vid?.channelId || ('ch_' + (handle || 'unknown')),
+          name: vid?.channelName || (handle === 'sovralab' ? 'Sovra Protocol Lab' : (handle ? '@' + handle : 'Channel')),
+          handle: vid?.channelHandle || (handle ? '@' + handle : '@channel'),
+          description: vid?.description || 'Official sovereign research laboratory for the Sovra decentralized social protocol. Publishing 4K master architectural deep dives, cellular NAT benchmarks, and BitSwap swarm implementations.',
+          avatar: vid?.channelAvatar || '🎬',
+          avatarBg: '#6366f1',
+          banner: 'linear-gradient(135deg, #4f46e5, #9333ea)',
+          subscribers: [],
+          count: 142800,
+          ownerDid: vid?.ownerDid || 'did:sovra:channel_lab_4k_master_stream'
+        };
+      }
+
+      if (ch) {
+        const allVideos = sovraDb.db.videos || [];
+        const chVideos = allVideos.filter(v =>
+          v.channelId === ch.id ||
+          (ch.ownerDid && v.ownerDid === ch.ownerDid) ||
+          ((v.channelHandle || '').toLowerCase().replace(/^@/, '') === (ch.handle || '').toLowerCase().replace(/^@/, ''))
+        );
+        const isSubbed = Array.isArray((ch as any).subscribers) ? (ch as any).subscribers.includes(userDid) : Boolean(ch.isSubbed);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          channel: ch,
+          subscribersCount: (ch as any).subscribers ? (ch as any).subscribers.length : (ch.count || 0),
+          isSubscribed: isSubbed,
+          videos: chVideos,
+          playlists: (sovraDb.db.playlists || []).filter(p => p.channelId === ch.id),
+        }));
+      } else {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Channel not found' }));
+      }
       return;
     }
 
