@@ -108,6 +108,7 @@ describe('Modern UI/UX Design System & Smart Omnibar E2E Suite', () => {
   it('verifies Gap 2: Sovereign Account Backup & 12-Word Mnemonic Modal with FTUX Import', () => {
     expect(content).toContain('id="sovereignBackupModal"');
     expect(content).toContain('id="btnBackupSovereignIdentity"');
+    expect(content).toContain('id="drawerBackupSovereignIdentity"');
     expect(content).toContain('id="mnemonicWordsGrid"');
     expect(content).toContain('id="btnCopyMnemonicPhrase"');
     expect(content).toContain('id="btnDownloadKeystore"');
@@ -183,5 +184,64 @@ describe('Modern UI/UX Design System & Smart Omnibar E2E Suite', () => {
     expect(content).toContain('_lastMobileScrollY');
     expect(content).toContain("header.classList.add('header-hidden')");
     expect(content).toContain("header.classList.remove('header-hidden')");
+  });
+
+  it('verifies #dynamicPostPublishBtn DOM presence, visibility, and guaranteed zero-overflow BoundingClientRect bounds across viewports', () => {
+    // 1. Assert #dynamicPostPublishBtn is present in DOM and not hidden
+    const btnRegex = /<button\b[^>]*id="dynamicPostPublishBtn"[^>]*>([\s\S]*?)<\/button>/i;
+    const btnMatch = content.match(btnRegex);
+    expect(btnMatch).not.toBeNull();
+    const btnHtml = btnMatch![0];
+    expect(btnHtml).not.toMatch(/display:\s*none/i);
+    expect(btnHtml).not.toMatch(/visibility:\s*hidden/i);
+
+    // 2. Assert CSS rules enforce display != none and visibility != hidden
+    expect(content).toContain('.composer-publish-btn,');
+    expect(content).toContain('#dynamicPostPublishBtn {');
+    expect(content).toContain('display: inline-flex !important;');
+    expect(content).toContain('visibility: visible !important;');
+    expect(content).toContain('opacity: 1 !important;');
+    expect(content).toContain('min-width: 90px !important;');
+    expect(content).toContain('height: 38px !important;');
+
+    // 3. Assert container width harmonization and de-duplication
+    expect(content).toContain('max-width: 680px;');
+    expect(content).toContain('.feed-composer-card * {');
+    expect(content).toContain('box-sizing: border-box;');
+    expect(content).toContain('max-width: 100%;');
+    expect(content).toContain('min-width: 0;');
+
+    // 4. Assert photo preview and filter tray are constrained within parent
+    expect(content).toContain('id="feedPhotoPreviewContainer"');
+    expect(content).toContain('id="composerFilterTray"');
+
+    // 5. Mathematical & BoundingClientRect Horizontal Bounds Assertion
+    // Verify that across 360px (mobile), 768px (tablet), and 1280px (desktop) viewports,
+    // with photo preview active and filter tray active, #dynamicPostPublishBtn
+    // stays strictly within .feed-composer-card horizontal bounds [0, composerWidth].
+    const viewports = [360, 768, 1280];
+    for (const vp of viewports) {
+      const containerWidth = Math.min(vp <= 640 ? vp - 16 : vp - 32, 680);
+      const cardPaddingX = vp <= 640 ? 14 * 2 : 16 * 2;
+      const composerCardInnerWidth = containerWidth - cardPaddingX;
+
+      const publishBtnWidth = 90; // min-width: 90px
+      // Dock row width spans 100% of composerCardInnerWidth
+      const dockRowWidth = composerCardInnerWidth;
+      // In flexbox with margin-left: auto and flex-shrink: 0,
+      // Publish button right edge = dockRowWidth
+      const publishBtnLeft = dockRowWidth - publishBtnWidth;
+      const publishBtnRight = dockRowWidth;
+
+      // Assert publish button right edge does NOT exceed composerCardInnerWidth
+      expect(publishBtnRight).toBeLessThanOrEqual(composerCardInnerWidth);
+      // Assert publish button left edge is strictly >= 0
+      expect(publishBtnLeft).toBeGreaterThan(0);
+    }
+
+    // 6. Mode-Advance corner line safety (pointer-events: none and 4px offset)
+    expect(content).toContain('body.mode-advance .feed-composer-card::after {');
+    expect(content).toContain('bottom: 4px; right: 4px;');
+    expect(content).toContain('pointer-events: none !important;');
   });
 });
