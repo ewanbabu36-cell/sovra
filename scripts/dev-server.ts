@@ -12126,6 +12126,145 @@ function renderHtml(
       border: 1.5px solid #0f172a;
     }
 
+    /* ========================================================
+       📱 DUAL ADAPTIVE SMARTPHONE MOBILE OS THEME SYSTEM
+       ======================================================== */
+    /* 1. APPLE iOS 18 (CUPERTINO FROSTED GLASS & LIQUID DOCK) */
+    body.theme-ios {
+      --ios-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif;
+      font-family: var(--ios-font);
+      letter-spacing: -0.015em;
+    }
+    body.theme-ios .app-top-header {
+      padding-top: calc(env(safe-area-inset-top, 0px) + 4px) !important;
+      height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+      background: rgba(15, 23, 42, 0.78) !important;
+      backdrop-filter: blur(28px) saturate(180%) !important;
+      -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+      border-bottom: 0.5px solid rgba(255, 255, 255, 0.14) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+    }
+    body.theme-ios .mobile-bottom-nav {
+      background: rgba(15, 23, 42, 0.78) !important;
+      backdrop-filter: blur(28px) saturate(190%) !important;
+      -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+      border: 1px solid rgba(255, 255, 255, 0.16) !important;
+      border-radius: 28px !important;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+    }
+    body.theme-ios .card,
+    body.theme-ios .feed-composer-card,
+    body.theme-ios .insta-post-card {
+      border-radius: 22px !important;
+      background: rgba(30, 41, 59, 0.65) !important;
+      backdrop-filter: blur(20px) saturate(160%) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+    }
+    body.theme-ios .omni-modal-card {
+      border-radius: 32px 32px 24px 24px !important;
+      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    }
+    body.theme-ios .story-item-circle {
+      border-radius: 50% !important;
+      padding: 2.5px !important;
+      background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888) !important;
+    }
+
+    /* 2. ANDROID 15 (MATERIAL YOU 3.0 & SQUIRCLE TONES) */
+    body.theme-android {
+      --android-font: "Roboto Flex", Roboto, "Google Sans", system-ui, sans-serif;
+      font-family: var(--android-font);
+      background-color: #141218 !important;
+    }
+    body.theme-android .app-top-header {
+      background: #1d1b20 !important;
+      border-bottom: 1px solid #2b2930 !important;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4) !important;
+    }
+    body.theme-android .mobile-bottom-nav {
+      background: #1d1b20 !important;
+      border: 1px solid #36343b !important;
+      border-radius: 20px !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8) !important;
+    }
+    body.theme-android .bottom-nav-item.active {
+      background: rgba(52, 211, 153, 0.18) !important;
+      color: #34d399 !important;
+      border-radius: 16px !important;
+    }
+    body.theme-android .bottom-nav-item.active::after {
+      display: none !important;
+    }
+    body.theme-android .card,
+    body.theme-android .feed-composer-card,
+    body.theme-android .insta-post-card {
+      border-radius: 24px !important;
+      background: #211f26 !important;
+      border: 1px solid #36343b !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.theme-android .omni-modal-card {
+      border-radius: 28px !important;
+      background: #1d1b20 !important;
+      border: 1px solid #36343b !important;
+    }
+
+    /* 3. ANDROID FLOATING ACTION BUTTON (FAB) */
+    .android-fab,
+    #mobileFloatingActionBtn {
+      display: none;
+    }
+    @media (max-width: 860px) {
+      body.theme-android #mobileFloatingActionBtn {
+        display: flex !important;
+        position: fixed !important;
+        bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+        right: 18px !important;
+        width: 56px !important;
+        height: 56px !important;
+        border-radius: 18px !important;
+        background: #34d399 !important;
+        color: #0f172a !important;
+        font-size: 1.8rem !important;
+        font-weight: 800 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 8px 24px rgba(52, 211, 153, 0.45) !important;
+        border: none !important;
+        z-index: 998 !important;
+        cursor: pointer !important;
+        transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease !important;
+      }
+      body.theme-android #mobileFloatingActionBtn:active {
+        transform: scale(0.92) !important;
+      }
+    }
+
+    /* 4. SMART HEADER SCROLL-HIDE TRANSITION */
+    .app-top-header {
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s ease !important;
+    }
+    .app-top-header.header-hidden {
+      transform: translateY(-100%) !important;
+    }
+
+    /* 5. ENGAGEMENT SPRING PHYSICS & MICRO-INTERACTIONS */
+    .feed-action-btn,
+    .insta-action-btn,
+    .post-action-btn,
+    .composer-media-btn,
+    .btn-card-action {
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease !important;
+    }
+    .feed-action-btn:active,
+    .insta-action-btn:active,
+    .post-action-btn:active,
+    .composer-media-btn:active {
+      transform: scale(1.22) !important;
+    }
+
     /* Tab 1: Instagram Feed Styles */
     .feed-container {
       max-width: 680px;
@@ -20064,6 +20203,28 @@ function renderHtml(
                   <div style="font-size: 0.72rem; color: #94a3b8; line-height: 1.3;">Live telemetry graphs, orbital HUD &amp; war rooms.</div>
                 </div>
               </div>
+
+              <!-- Adaptive Smartphone Mobile OS Theme Switcher -->
+              <div class="mobile-os-switcher-card" style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px dashed rgba(255,255,255,0.08);">
+                <div style="font-weight: 700; font-size: 0.82rem; color: #f8fafc; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+                  <span>📱 Smartphone Operating System Theme</span>
+                  <span id="currentMobileOsBadge" class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.68rem; padding: 2px 8px; border-radius: 8px;">Auto-Detected</span>
+                </div>
+                <div style="font-size: 0.74rem; color: #94a3b8; margin-bottom: 8px;">
+                  Switch between Apple iOS 18 Cupertino Frosted Glass and Android 15 Material You 3.0 aesthetics.
+                </div>
+                <div class="mobile-os-switcher-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                  <button type="button" id="btnThemeIos" onclick="switchMobileOSTheme('ios')" class="btn-theme-pill" style="padding: 8px 10px; border-radius: 10px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                    <span>🍎</span> <span>Apple iOS</span>
+                  </button>
+                  <button type="button" id="btnThemeAndroid" onclick="switchMobileOSTheme('android')" class="btn-theme-pill" style="padding: 8px 10px; border-radius: 10px; background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.35); color: #34d399; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                    <span>🤖</span> <span>Android</span>
+                  </button>
+                  <button type="button" id="btnThemeCyber" onclick="switchMobileOSTheme('cyber')" class="btn-theme-pill" style="padding: 8px 10px; border-radius: 10px; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); color: #c084fc; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                    <span>⚡</span> <span>Cyber Pro</span>
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="card-footer-actions">
               <button type="button" class="btn-card-action" id="devProfileModeSwitchBtn" onclick="toggleDevServerUiMode()" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;">
@@ -23278,6 +23439,11 @@ function renderHtml(
       <span class="bnav-label">Studio</span>
     </button>
   </nav>
+
+  <!-- Android Material You Floating Action Button (FAB) -->
+  <button id="mobileFloatingActionBtn" class="android-fab" onclick="openUniversalCreateModal(this)" aria-label="Create Post or Dispatch" title="Create Dispatch">
+    <span>+</span>
+  </button>
 
   <!-- Multi-Segment Instagram & WhatsApp Story Viewer Modal Overlay -->
   <div class="story-modal-overlay" id="sovereignStoryViewerModal" data-legacy-id="storyModalOverlay" style="display: none;" onclick="closeStory(event)">
@@ -41830,6 +41996,7 @@ function renderHtml(
     // Call on startup
     window.addEventListener('DOMContentLoaded', function() {
       updateDevServerUiModeVisuals();
+      initAdaptiveMobileTheme();
       const navCreateBtn = document.getElementById('navTabCreate');
       if (navCreateBtn) {
         navCreateBtn.addEventListener('click', function(ev) {
@@ -41839,6 +42006,85 @@ function renderHtml(
         });
       }
     });
+
+    // ========================================================
+    // 📱 ADAPTIVE SMARTPHONE MOBILE OS THEME ENGINE (iOS vs Android)
+    // ========================================================
+    var _currentMobileOsTheme = 'ios';
+
+    function initAdaptiveMobileTheme() {
+      var saved = localStorage.getItem('sovra_mobile_os_theme');
+      if (saved === 'ios' || saved === 'android' || saved === 'cyber') {
+        applyMobileOSTheme(saved, false);
+      } else {
+        var ua = (navigator && navigator.userAgent) || '';
+        var isAndroid = /Android/.test(ua);
+        if (isAndroid) {
+          applyMobileOSTheme('android', false);
+        } else {
+          applyMobileOSTheme('ios', false);
+        }
+      }
+    }
+
+    function switchMobileOSTheme(theme) {
+      if (theme !== 'ios' && theme !== 'android' && theme !== 'cyber') theme = 'ios';
+      try { localStorage.setItem('sovra_mobile_os_theme', theme); } catch (_) {}
+      applyMobileOSTheme(theme, true);
+    }
+
+    function applyMobileOSTheme(theme, showToast) {
+      _currentMobileOsTheme = theme;
+      var body = document.body;
+      if (!body) return;
+      body.classList.remove('theme-ios', 'theme-android', 'theme-cyber');
+      body.classList.add('theme-' + theme);
+
+      var badge = document.getElementById('currentMobileOsBadge');
+      if (badge) {
+        badge.innerText = theme === 'ios' ? '🍎 Apple iOS' : (theme === 'android' ? '🤖 Android' : '⚡ Cyber Pro');
+      }
+
+      var btnIos = document.getElementById('btnThemeIos');
+      var btnAndroid = document.getElementById('btnThemeAndroid');
+      var btnCyber = document.getElementById('btnThemeCyber');
+
+      if (btnIos) {
+        btnIos.style.background = theme === 'ios' ? 'rgba(56, 189, 248, 0.28)' : 'rgba(56, 189, 248, 0.08)';
+        btnIos.style.borderColor = theme === 'ios' ? '#38bdf8' : 'rgba(56, 189, 248, 0.25)';
+      }
+      if (btnAndroid) {
+        btnAndroid.style.background = theme === 'android' ? 'rgba(52, 211, 153, 0.28)' : 'rgba(52, 211, 153, 0.08)';
+        btnAndroid.style.borderColor = theme === 'android' ? '#34d399' : 'rgba(52, 211, 153, 0.25)';
+      }
+      if (btnCyber) {
+        btnCyber.style.background = theme === 'cyber' ? 'rgba(168, 85, 247, 0.28)' : 'rgba(168, 85, 247, 0.08)';
+        btnCyber.style.borderColor = theme === 'cyber' ? '#c084fc' : 'rgba(168, 85, 247, 0.25)';
+      }
+
+      if (showToast && typeof showAccountToast === 'function') {
+        showAccountToast(theme === 'ios' ? '🍎 Apple iOS 18 Cupertino theme applied' : (theme === 'android' ? '🤖 Android Material You theme applied' : '⚡ Cyber Pro HUD applied'));
+      }
+    }
+
+    // Smart Mobile Header Auto-Tuck on Scroll Down / Reveal on Scroll Up
+    var _lastMobileScrollY = window.scrollY || 0;
+    window.addEventListener('scroll', function() {
+      var currentY = window.scrollY || 0;
+      var header = document.querySelector('.app-top-header');
+      if (!header || window.innerWidth > 860) {
+        if (header && header.classList.contains('header-hidden')) {
+          header.classList.remove('header-hidden');
+        }
+        return;
+      }
+      if (currentY > 70 && currentY > _lastMobileScrollY + 8) {
+        header.classList.add('header-hidden');
+      } else if (currentY < _lastMobileScrollY - 8 || currentY <= 30) {
+        header.classList.remove('header-hidden');
+      }
+      _lastMobileScrollY = currentY;
+    }, { passive: true });
 
     // ========================================================
     // ❄️ TAB FREEZE & STATE PRESERVATION ENGINE (Zero Media/Scroll Loss)

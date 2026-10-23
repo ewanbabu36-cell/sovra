@@ -149,4 +149,39 @@ describe('Modern UI/UX Design System & Smart Omnibar E2E Suite', () => {
     expect(content).toContain("'/api/social/block'");
     expect(content).toContain('id="safetyReportModal"');
   });
+
+  it('verifies Adaptive Apple iOS 18 Cupertino Frosted Glass Theme Tokens', () => {
+    expect(content).toContain('body.theme-ios');
+    expect(content).toContain('env(safe-area-inset-top');
+    expect(content).toContain('backdrop-filter: blur(28px)');
+    expect(content).toContain('border-radius: 28px !important;');
+    expect(content).toContain('body.theme-ios .card');
+    expect(content).toContain('body.theme-ios .story-item-circle');
+  });
+
+  it('verifies Android 15 Material You 3.0 Squircle Cards, FAB and Indicator Pills', () => {
+    expect(content).toContain('body.theme-android');
+    expect(content).toContain('border-radius: 24px !important;');
+    expect(content).toContain('id="mobileFloatingActionBtn"');
+    expect(content).toContain('.android-fab');
+    expect(content).toContain('rgba(52, 211, 153, 0.18)');
+  });
+
+  it('verifies 1-Tap Smartphone Theme Switcher & Device Auto-Detection Engine', () => {
+    expect(content).toContain('id="btnThemeIos"');
+    expect(content).toContain('id="btnThemeAndroid"');
+    expect(content).toContain('id="btnThemeCyber"');
+    expect(content).toContain('id="currentMobileOsBadge"');
+    expect(content).toContain('initAdaptiveMobileTheme');
+    expect(content).toContain('switchMobileOSTheme');
+    expect(content).toContain('applyMobileOSTheme');
+  });
+
+  it('verifies Smart Header Auto-Tuck on Scroll Down & Reveal on Scroll Up', () => {
+    expect(content).toContain('.app-top-header.header-hidden');
+    expect(content).toContain('transform: translateY(-100%) !important;');
+    expect(content).toContain('_lastMobileScrollY');
+    expect(content).toContain("header.classList.add('header-hidden')");
+    expect(content).toContain("header.classList.remove('header-hidden')");
+  });
 });
