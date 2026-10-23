@@ -2015,7 +2015,7 @@ function renderHtml(
   socialGraph: DefaultSocialGraphEngine,
   localFeed: DefaultLocalFeedEngine,
 ): string {
-  const livePosts = sovraDb.getAllPosts().slice(0, 20);
+  const livePosts = sovraDb.getAllPosts().slice().reverse().slice(0, 50);
   const livePeers = sovraDb.getAllPeers().slice(0, 30);
   const liveUsers = sovraDb.getAllUsers().slice(0, 30);
   const liveReels = sovraDb.getAllReels().slice(0, 15);
@@ -5479,6 +5479,9 @@ function renderHtml(
       padding: 16px;
       box-sizing: border-box;
       user-select: auto;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      touch-action: pan-y !important;
       animation: sovraPostModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     @keyframes sovraPostModalFadeIn {
@@ -5507,7 +5510,8 @@ function renderHtml(
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 16px;
       box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.85);
-      overflow: hidden;
+      overflow-y: auto !important;
+      touch-action: pan-y !important;
       animation: sovraPostCardScale 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     @keyframes sovraPostCardScale {
@@ -5932,10 +5936,10 @@ function renderHtml(
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      overflow: hidden;
+      overflow-y: auto !important;
       user-select: none;
       -webkit-user-select: none;
-      touch-action: none;
+      touch-action: pan-y pinch-zoom !important;
       animation: photoLightboxFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     @keyframes photoLightboxFadeIn {
@@ -12067,20 +12071,31 @@ function renderHtml(
       overflow: hidden;
       cursor: pointer;
       user-select: none;
+      -webkit-user-select: none;
+      -webkit-user-drag: none !important;
+      touch-action: pan-y pinch-zoom !important;
       background: #000000;
     }
     .insta-media-box.has-image {
       height: auto;
       max-height: min(580px, 72vh);
       background: #000000;
+      touch-action: pan-y pinch-zoom !important;
     }
-    .insta-media-box.has-image img {
+    .insta-media-box.has-image img,
+    .insta-carousel-slide img,
+    .feed-post-media img {
       width: 100%;
       height: auto;
       max-height: min(580px, 72vh);
       object-fit: contain;
       display: block;
       margin: 0 auto;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      -webkit-user-drag: none !important;
+      touch-action: pan-y pinch-zoom !important;
+      pointer-events: auto;
     }
     .insta-media-box.has-video {
       height: auto;
@@ -16459,7 +16474,7 @@ function renderHtml(
                       <div class="insta-carousel-track" id="carousel-track-${post.id}">
                         ${carImages.map((imgSrc) => `
                           <div class="insta-carousel-slide">
-                            <img src="${imgSrc}" class="${fPreset}" style="${fCss} width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto; cursor: zoom-in;" onclick="openPhotoLightboxById('${post.id}')" ondblclick="handleFeedDoubleTap('${post.id}', event)" />
+                            <img src="${imgSrc}" class="${fPreset}" draggable="false" style="${fCss} width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto; user-select: none; -webkit-user-drag: none; touch-action: pan-y pinch-zoom;" onpointerdown="handleMediaPointerDown(event)" onpointermove="handleMediaPointerMove(event)" onclick="handleMediaClick(event, '${post.id}')" ondblclick="handleFeedDoubleTap('${post.id}', event)" />
                           </div>
                         `).join('')}
                       </div>
@@ -16489,11 +16504,13 @@ function renderHtml(
                     </div>
                     ` : ''}
                     <div class="insta-media-box has-image" id="media-${post.id}" 
-                         style="position: relative; overflow: hidden; height: auto; max-height: min(580px, 72vh); background: #000000; display: flex; align-items: center; justify-content: center; cursor: zoom-in;"
-                         onclick="openPhotoLightboxById('${post.id}')"
+                         style="position: relative; overflow: hidden; height: auto; max-height: min(580px, 72vh); background: #000000; display: flex; align-items: center; justify-content: center; touch-action: pan-y pinch-zoom;"
+                         onpointerdown="handleMediaPointerDown(event)"
+                         onpointermove="handleMediaPointerMove(event)"
+                         onclick="handleMediaClick(event, '${post.id}')"
                          ondblclick="handleFeedDoubleTap('${post.id}', event)">
-                      <img src="${post.mediaImage}" class="${fPreset}" alt="Feed photo" style="${fCss} width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto; cursor: zoom-in;" onerror="handleMediaError(this, '${post.id}')" />
-                      <div class="photo-zoom-hint-badge" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; pointer-events: none; z-index: 4;">
+                      <img src="${post.mediaImage}" class="${fPreset}" alt="Feed photo" draggable="false" style="${fCss} width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto; user-select: none; -webkit-user-drag: none; touch-action: pan-y pinch-zoom;" onerror="handleMediaError(this, '${post.id}')" />
+                      <div class="photo-zoom-hint-badge" onclick="event.stopPropagation(); openPhotoLightboxById('${post.id}')" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; z-index: 4;">
                         <span>🔍</span> <span>Click to Zoom</span>
                       </div>
                       <div class="dev-cid-badge ipfs-cid-tag" style="position: absolute; bottom: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; font-family: monospace; color: #38bdf8; z-index: 5;">
@@ -44032,7 +44049,7 @@ function renderHtml(
 
       modal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.overflow = '';
 
       // Push history state so browser Back button closes the lightbox seamlessly
       try {
@@ -44179,7 +44196,7 @@ function renderHtml(
       }
 
       document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.overflow = '';
 
       try {
         if (!window.history.state || window.history.state.sovraPostModal !== postId) {
@@ -44533,6 +44550,35 @@ function renderHtml(
       });
     }
 
+    let _mediaPointerStartX = 0;
+    let _mediaPointerStartY = 0;
+    let _mediaPointerDidDrag = false;
+
+    function handleMediaPointerDown(e) {
+      _mediaPointerStartX = e.clientX || 0;
+      _mediaPointerStartY = e.clientY || 0;
+      _mediaPointerDidDrag = false;
+    }
+    window.handleMediaPointerDown = handleMediaPointerDown;
+
+    function handleMediaPointerMove(e) {
+      const dx = Math.abs((e.clientX || 0) - _mediaPointerStartX);
+      const dy = Math.abs((e.clientY || 0) - _mediaPointerStartY);
+      if (dx > 8 || dy > 8) {
+        _mediaPointerDidDrag = true;
+      }
+    }
+    window.handleMediaPointerMove = handleMediaPointerMove;
+
+    function handleMediaClick(e, postId) {
+      if (_mediaPointerDidDrag) {
+        // User was dragging or scrolling up/down on the photo - allow page scroll
+        return;
+      }
+      openPhotoLightboxById(postId);
+    }
+    window.handleMediaClick = handleMediaClick;
+
     function openPhotoLightboxById(postId) {
       if (!postId) return;
       openPostDetailModal(postId);
@@ -44585,6 +44631,19 @@ function renderHtml(
         closePhotoLightbox(null, true);
       }
     });
+
+    // Wheel scroll listener: Allow user to scroll up and down or dismiss smoothly without getting trapped
+    const postDetailOverlayEl = document.getElementById('sovraPostDetailModal');
+    if (postDetailOverlayEl) {
+      postDetailOverlayEl.addEventListener('wheel', function(e) {
+        const scrollArea = postDetailOverlayEl.querySelector('.sovra-post-modal-scroll-area');
+        if (!scrollArea || !scrollArea.contains(e.target)) {
+          if (Math.abs(e.deltaY) > 50) {
+            closePostDetailModal(e);
+          }
+        }
+      }, { passive: true });
+    }
 
     function applyLightboxTransform(animate) {
       const target = document.getElementById('photoLightboxTransformTarget');
@@ -46993,7 +47052,7 @@ function renderHtml(
             '<div class="insta-carousel-track" id="carousel-track-' + post.id + '">' +
               carImages.map(function(imgSrc) {
                 return '<div class="insta-carousel-slide">' +
-                  '<img src="' + imgSrc + '" class="' + fPresetCar + '" style="' + fCssCar + ' width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto; cursor: zoom-in;" onclick="openPhotoLightboxById(&quot;' + post.id + '&quot;)" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)" />' +
+                  '<img src="' + imgSrc + '" class="' + fPresetCar + '" draggable="false" style="' + fCssCar + ' width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto; user-select: none; -webkit-user-drag: none; touch-action: pan-y pinch-zoom;" onpointerdown="handleMediaPointerDown(event)" onpointermove="handleMediaPointerMove(event)" onclick="handleMediaClick(event, &quot;' + post.id + '&quot;)" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)" />' +
                 '</div>';
               }).join('') +
             '</div>' +
@@ -47017,9 +47076,9 @@ function renderHtml(
         postBodyHtml =
           (post.caption && post.caption !== 'Photo update from sovereign peer' ?
             '<div class="feed-post-text-body" style="font-size: 1.05rem; padding: 0.2rem 1.15rem 0.65rem 1.15rem;">' + post.caption + '</div>' : '') +
-          '<div class="insta-media-box has-image" id="media-' + post.id + '" style="position: relative; overflow: hidden; height: auto; max-height: min(580px, 72vh); background: #000000; display: flex; align-items: center; justify-content: center; cursor: zoom-in;" onclick="openPhotoLightboxById(&quot;' + post.id + '&quot;)" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)">' +
-            '<img src="' + post.mediaImage + '" class="' + fPresetSingle + '" alt="Feed photo" style="' + fCssSingle + ' width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto; cursor: zoom-in;" onerror="handleMediaError(this, &quot;' + post.id + '&quot;)" />' +
-            '<div class="photo-zoom-hint-badge" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; pointer-events: none; z-index: 4;">' +
+          '<div class="insta-media-box has-image" id="media-' + post.id + '" style="position: relative; overflow: hidden; height: auto; max-height: min(580px, 72vh); background: #000000; display: flex; align-items: center; justify-content: center; touch-action: pan-y pinch-zoom;" onpointerdown="handleMediaPointerDown(event)" onpointermove="handleMediaPointerMove(event)" onclick="handleMediaClick(event, &quot;' + post.id + '&quot;)" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)">' +
+            '<img src="' + post.mediaImage + '" class="' + fPresetSingle + '" alt="Feed photo" draggable="false" style="' + fCssSingle + ' width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto; user-select: none; -webkit-user-drag: none; touch-action: pan-y pinch-zoom;" onerror="handleMediaError(this, &quot;' + post.id + '&quot;)" />' +
+            '<div class="photo-zoom-hint-badge" onclick="event.stopPropagation(); openPhotoLightboxById(&quot;' + post.id + '&quot;)" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; z-index: 4;">' +
               '<span>🔍</span> <span>Click to Zoom</span>' +
             '</div>' +
             '<div id="heart-pop-' + post.id + '"></div>' +
@@ -76480,6 +76539,9 @@ async function startDevServer() {
     // 📰 FEED & CONTENT DISCOVERY API (MODULAR CONTROLLER)
     // ==========================================
     if (handleFeedDiscoveryRoutes({ req, res, url, resolvePrincipal })) {
+      if (req.method !== 'GET') {
+        _cachedHtmlResponse = null;
+      }
       return;
     }
 
@@ -77088,6 +77150,7 @@ async function startDevServer() {
         indexPostInSearch(newPost);
 
         dynamicSocialStore.posts = sovraDb.getAllPosts();
+        _cachedHtmlResponse = null;
 
         localFeed.appendEvent({
           id: newPost.id,
