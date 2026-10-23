@@ -94,4 +94,59 @@ describe('Modern UI/UX Design System & Smart Omnibar E2E Suite', () => {
     expect(content).toContain('heart-bounce-pop');
     expect(content).toContain('storyHolographicGlow');
   });
+
+  it('verifies Gap 1: Media Storage Offloading & CAS Blob Pipeline', () => {
+    expect(content).toContain('LocalDiskMediaDriver');
+    expect(content).toContain("url.pathname.startsWith('/api/media/')");
+    expect(content).toContain('localMediaDriver.read');
+    expect(content).toContain('localMediaDriver.save');
+    expect(content).toContain("'/api/media/'");
+    expect(content).toContain('Content-Range');
+    expect(content).toContain('Accept-Ranges');
+  });
+
+  it('verifies Gap 2: Sovereign Account Backup & 12-Word Mnemonic Modal with FTUX Import', () => {
+    expect(content).toContain('id="sovereignBackupModal"');
+    expect(content).toContain('id="btnBackupSovereignIdentity"');
+    expect(content).toContain('id="mnemonicWordsGrid"');
+    expect(content).toContain('id="btnCopyMnemonicPhrase"');
+    expect(content).toContain('id="btnDownloadKeystore"');
+    expect(content).toContain('id="btnImport12Words"');
+    expect(content).toContain('id="mnemonicImportDrawer"');
+    expect(content).toContain('openSovereignBackupModal');
+    expect(content).toContain('executeMnemonicImport');
+    expect(content).toContain("'/api/user/restore-mnemonic'");
+  });
+
+  it('verifies Gap 3: Carrier-Grade NAT WebRTC Calling & ICE Servers Route', () => {
+    expect(content).toContain("url.pathname === '/api/webrtc/ice-servers'");
+    expect(content).toContain('getIceServers');
+    expect(content).toContain('SOVRA_TURN_SERVERS');
+    expect(content).toContain('stun:stun.l.google.com:19302');
+  });
+
+  it('verifies Gap 4: Background WebPush & VAPID Key Route', () => {
+    const pushRoutesPath = path.resolve(__dirname, '../../scripts/routes/push.routes.ts');
+    const pushContent = fs.readFileSync(pushRoutesPath, 'utf8');
+    expect(pushContent).toContain("url.pathname === '/api/push/vapid-key'");
+    expect(pushContent).toContain('VAPID_PUBLIC_KEY');
+    expect(pushContent).toContain('/api/push/register');
+    expect(pushContent).toContain('/api/push/dispatch');
+  });
+
+  it('verifies Gap 5: Automated Background Database Snapshot Cron & Backup APIs', () => {
+    expect(content).toContain('SovraBackupManager');
+    expect(content).toContain('startup_snapshot');
+    expect(content).toContain('auto_cron');
+    expect(content).toContain("'/api/admin/backup/status'");
+    expect(content).toContain("'/api/admin/backup/create'");
+  });
+
+  it('verifies Gap 6: Trust, Safety & Direct Chat Moderation Pipeline', () => {
+    expect(content).toContain('reportCurrentChatContact');
+    expect(content).toContain('blockCurrentChatContact');
+    expect(content).toContain('triggerBlockFromModal');
+    expect(content).toContain("'/api/social/block'");
+    expect(content).toContain('id="safetyReportModal"');
+  });
 });

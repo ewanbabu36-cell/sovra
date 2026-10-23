@@ -383,4 +383,32 @@ export class SovraBackupManager {
       };
     }
   }
+
+  /**
+   * Lists all available backups with their manifests in reverse chronological order.
+   */
+  public listBackups(destRoot?: string): Array<{ backupId: string; backupDir: string; manifest?: BackupManifest }> {
+    const root = path.resolve(destRoot || this.defaultBackupRoot);
+    if (!fs.existsSync(root)) return [];
+    try {
+      const entries = fs.readdirSync(root, { withFileTypes: true });
+      const results: Array<{ backupId: string; backupDir: string; manifest?: BackupManifest }> = [];
+      for (const ent of entries) {
+        if (ent.isDirectory() && ent.name.startsWith('sovra_backup_')) {
+          const bDir = path.join(root, ent.name);
+          const manifestPath = path.join(bDir, 'backup-manifest.json');
+          let manifest: BackupManifest | undefined;
+          if (fs.existsSync(manifestPath)) {
+            try {
+              manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+            } catch (_) {}
+          }
+          results.push({ backupId: ent.name, backupDir: bDir, manifest });
+        }
+      }
+      return results.sort((a, b) => b.backupId.localeCompare(a.backupId));
+    } catch (_) {
+      return [];
+    }
+  }
 }

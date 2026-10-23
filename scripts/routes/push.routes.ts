@@ -95,5 +95,13 @@ export async function handlePushRoutes(ctx: PushRouteContext): Promise<boolean> 
     return true;
   }
 
+  // WebPush VAPID Public Key for Client PushManager Subscriptions
+  if (url.pathname === '/api/push/vapid-key' && req.method === 'GET') {
+    const vapidKey = process.env.VAPID_PUBLIC_KEY || process.env.SOVRA_VAPID_PUBLIC_KEY || 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDZKrxZElO7jPOYNtTQTLvPW290S533EQE2r6Y6_q508';
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, publicKey: vapidKey }));
+    return true;
+  }
+
   return false;
 }
