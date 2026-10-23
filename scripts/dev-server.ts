@@ -2015,7 +2015,10 @@ function renderHtml(
   socialGraph: DefaultSocialGraphEngine,
   localFeed: DefaultLocalFeedEngine,
 ): string {
-  const livePosts = sovraDb.getAllPosts().slice().reverse().slice(0, 50);
+  const livePosts = sovraDb.getAllPosts()
+    .slice()
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    .slice(0, 50);
   const livePeers = sovraDb.getAllPeers().slice(0, 30);
   const liveUsers = sovraDb.getAllUsers().slice(0, 30);
   const liveReels = sovraDb.getAllReels().slice(0, 15);
@@ -2376,7 +2379,7 @@ function renderHtml(
       border-right: 2.5px solid #00f0ff;
       border-bottom-right-radius: 16px;
       pointer-events: none;
-      z-index: 2;
+      z-index: 1;
     }
     @keyframes typingDotBounce {
       0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
@@ -2613,18 +2616,26 @@ function renderHtml(
       color: #e0e7ff;
     }
 
-    /* Facebook Parity: Iconic Post Composer Card */
+    /* Permanent Two-Tier Iconic Post Composer Card (Twitter/Threads & Meta Parity) */
     .feed-composer-card {
       margin-bottom: 16px;
-      padding: 12px 16px 10px 16px;
-      border-radius: 8px;
+      padding: 14px 16px 12px 16px;
+      border-radius: 16px;
       border: 1px solid rgba(255, 255, 255, 0.08);
-      background: #242526 !important;
+      background: #242526;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-      transition: box-shadow 0.2s ease;
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+      box-sizing: border-box !important;
+      position: relative;
+      width: 100%;
+    }
+    .feed-composer-card * {
+      box-sizing: border-box;
+      max-width: 100%;
     }
     .feed-composer-card:focus-within {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+      border-color: rgba(56, 189, 248, 0.4);
     }
     .composer-avatar {
       width: 40px;
@@ -2643,10 +2654,10 @@ function renderHtml(
     }
     .composer-textarea {
       width: 100%;
-      min-height: 40px;
+      min-height: 44px;
       max-height: 240px;
       background: #3a3b3c !important;
-      border: none !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
       border-radius: 20px !important;
       color: #e4e6eb !important;
       padding: 10px 16px !important;
@@ -2656,111 +2667,167 @@ function renderHtml(
       outline: none;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
       box-sizing: border-box;
-      transition: background 0.15s ease;
+      transition: background 0.15s ease, border-color 0.15s ease;
       cursor: pointer;
     }
     .composer-textarea:hover {
       background: #4e4f50 !important;
+      border-color: rgba(255, 255, 255, 0.15) !important;
     }
     .composer-textarea:focus {
       background: #3a3b3c !important;
+      border-color: rgba(56, 189, 248, 0.5) !important;
       cursor: text;
     }
     .composer-textarea::placeholder {
       color: #b0b3b8 !important;
       font-size: 15px;
     }
+
+    /* Universal Two-Tier Action Architecture */
     .composer-actions-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 4px;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      width: 100% !important;
       margin-top: 12px;
       padding-top: 8px;
       border-top: 1px solid rgba(255, 255, 255, 0.1);
-      width: 100%;
+      box-sizing: border-box !important;
+      gap: 10px;
     }
+
+    /* Tier 1: Horizontal Media Attachment Tray */
+    .composer-media-row,
     .composer-media-tray {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 4px;
-      flex: 1;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      gap: 8px !important;
+      width: 100% !important;
+      overflow-x: auto !important;
+      scrollbar-width: none !important;
+      -webkit-overflow-scrolling: touch;
+      flex-wrap: nowrap !important;
+      padding-bottom: 2px;
     }
-    .composer-right-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-left: 8px;
-      flex-shrink: 0;
+    .composer-media-row::-webkit-scrollbar,
+    .composer-media-tray::-webkit-scrollbar {
+      display: none !important;
     }
     .composer-media-btn {
-      flex: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background: transparent !important;
-      border: none !important;
-      color: #b0b3b8 !important;
-      height: 40px;
-      padding: 0 8px;
-      border-radius: 8px !important;
-      font-size: 14px !important;
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.05) !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      color: #cbd5e1 !important;
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 10px !important;
+      font-size: 13px !important;
       font-weight: 600 !important;
       cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
+      transition: all 0.15s ease;
       box-sizing: border-box;
       white-space: nowrap;
     }
     .composer-media-btn:hover {
-      background: rgba(255, 255, 255, 0.08) !important;
-      color: #e4e6eb !important;
+      background: rgba(255, 255, 255, 0.12) !important;
+      border-color: rgba(56, 189, 248, 0.35) !important;
+      color: #38bdf8 !important;
       transform: none !important;
     }
     .composer-media-btn svg {
       flex-shrink: 0;
-      width: 22px;
-      height: 22px;
+      width: 18px;
+      height: 18px;
     }
     .media-btn-label {
       display: inline !important;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
-      color: #b0b3b8;
+      color: inherit;
+    }
+
+    /* Tier 2: Dedicated Action & Publish Dock (Guaranteed Zero-Overflow) */
+    .composer-dock-row,
+    .composer-right-actions {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 10px !important;
+      width: 100% !important;
+      margin-top: 2px !important;
+      margin-left: 0 !important;
+      padding-top: 8px !important;
+      border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+      box-sizing: border-box !important;
+      flex-wrap: nowrap !important;
+    }
+    .composer-dock-left {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .composer-dock-left::-webkit-scrollbar {
+      display: none;
+    }
+    .composer-theme-select {
+      flex: 0 0 auto !important;
+      max-width: 140px !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      padding: 6px 10px !important;
+      border-radius: 10px !important;
+      background: rgba(15, 23, 42, 0.85) !important;
+      color: #e2e8f0 !important;
+      border: 1px solid rgba(56, 189, 248, 0.3) !important;
+      outline: none;
+      cursor: pointer;
     }
     .composer-publish-btn,
     #dynamicPostPublishBtn {
+      margin-left: auto !important;
+      flex-shrink: 0 !important;
+      min-width: 96px !important;
+      height: 38px !important;
       background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
       color: #ffffff !important;
       font-size: 14px !important;
       font-weight: 700 !important;
-      border: 1px solid rgba(56, 189, 248, 0.6) !important;
-      border-radius: 20px !important;
+      border: 1px solid rgba(56, 189, 248, 0.75) !important;
+      border-radius: 12px !important;
       padding: 6px 18px !important;
-      height: 36px;
-      cursor: pointer;
+      cursor: pointer !important;
       display: inline-flex !important;
       visibility: visible !important;
-      align-items: center;
-      gap: 6px;
+      opacity: 1 !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 6px !important;
       box-shadow: 0 0 16px rgba(56, 189, 248, 0.45) !important;
-      transition: all 0.2s ease;
+      transition: all 0.2s ease !important;
+      z-index: 5 !important;
     }
     .composer-publish-btn:hover,
     #dynamicPostPublishBtn:hover {
       background: linear-gradient(135deg, #0369a1, #0284c7) !important;
-      box-shadow: 0 0 22px rgba(56, 189, 248, 0.7) !important;
+      box-shadow: 0 0 24px rgba(56, 189, 248, 0.75) !important;
       transform: translateY(-1px);
     }
     body.mode-advance .composer-publish-btn,
     body.mode-advance #dynamicPostPublishBtn {
       background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
       color: #ffffff !important;
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.45) !important;
-      border: 1px solid rgba(56, 189, 248, 0.6) !important;
-      border-radius: 20px !important;
-      font-weight: 700 !important;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.55) !important;
+      border: 1px solid rgba(0, 240, 255, 0.8) !important;
       display: inline-flex !important;
       visibility: visible !important;
     }
@@ -2870,23 +2937,25 @@ function renderHtml(
       color: #fff;
     }
     .composer-publish-btn {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      border: none;
-      color: #fff;
-      font-weight: 700;
-      font-size: 0.82rem;
-      padding: 6px 18px;
-      border-radius: 20px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
-      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
+      border: 1px solid rgba(56, 189, 248, 0.75) !important;
+      color: #fff !important;
+      font-weight: 700 !important;
+      font-size: 14px !important;
+      padding: 6px 18px !important;
+      border-radius: 12px !important;
+      cursor: pointer !important;
+      display: inline-flex !important;
+      visibility: visible !important;
+      align-items: center !important;
+      gap: 6px !important;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.45) !important;
+      transition: all 0.2s ease !important;
     }
     .composer-publish-btn:hover {
+      background: linear-gradient(135deg, #0369a1, #0284c7) !important;
       transform: translateY(-1px) scale(1.02);
-      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.5);
+      box-shadow: 0 0 24px rgba(56, 189, 248, 0.75) !important;
     }
 
     .composer-top-header {
@@ -2915,16 +2984,16 @@ function renderHtml(
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        background: #1877f2 !important;
+        background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
         color: #ffffff !important;
         font-size: 14px !important;
         font-weight: 700 !important;
-        border: none !important;
+        border: 1px solid rgba(56, 189, 248, 0.75) !important;
         border-radius: 20px !important;
         padding: 5px 18px !important;
         height: 32px !important;
         cursor: pointer !important;
-        box-shadow: 0 2px 8px rgba(24, 119, 242, 0.4) !important;
+        box-shadow: 0 2px 10px rgba(56, 189, 248, 0.45) !important;
       }
       .media-btn-label {
         display: none !important;
@@ -2967,6 +3036,7 @@ function renderHtml(
         width: 20px !important;
         height: 20px !important;
       }
+      .composer-dock-row,
       .composer-right-actions {
         display: flex !important;
         align-items: center !important;
@@ -2990,18 +3060,20 @@ function renderHtml(
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
       }
       .composer-publish-btn {
-        flex: 1 !important;
-        height: 42px !important;
-        font-size: 15px !important;
+        flex: 0 0 auto !important;
+        min-width: 90px !important;
+        height: 40px !important;
+        font-size: 14px !important;
         font-weight: 700 !important;
-        border-radius: 10px !important;
-        background: #1877f2 !important;
+        border-radius: 12px !important;
+        background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
         color: #ffffff !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         gap: 8px !important;
-        box-shadow: 0 4px 14px rgba(24, 119, 242, 0.45) !important;
+        box-shadow: 0 4px 14px rgba(56, 189, 248, 0.45) !important;
+        border: 1px solid rgba(56, 189, 248, 0.75) !important;
         cursor: pointer !important;
       }
       #composerFilterTray {
@@ -7290,7 +7362,7 @@ function renderHtml(
       box-sizing: border-box;
     }
     .feed-container {
-      max-width: 650px;
+      max-width: 680px;
       width: 100%;
       margin: 0 auto;
       display: flex;
@@ -12016,12 +12088,12 @@ function renderHtml(
 
     /* Tab 1: Instagram Feed Styles */
     .feed-container {
-      max-width: 640px;
+      max-width: 680px;
+      width: 100%;
       margin: 0 auto 5rem auto;
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
-      width: 100%;
     }
     .insta-post-card {
       background: rgba(17, 24, 39, 0.78);
@@ -16114,23 +16186,24 @@ function renderHtml(
                 <button type="button" class="action-pill-btn action-pill-primary" style="padding: 4px 10px; font-size: 0.78rem;" onclick="submitComposerLocation()">Add</button>
               </div>
 
-              <!-- Bottom Attachment Bar & Actions (Facebook Parity: Live video, Photo/video, Feeling/activity) -->
+              <!-- Bottom Attachment Bar & Actions: Permanent Two-Tier Architecture (Twitter/Threads & Meta Parity) -->
               <div class="composer-actions-bar">
-                <div class="composer-media-tray">
+                <!-- Tier 1: Horizontal Attachment Media Tray -->
+                <div class="composer-media-tray composer-media-row">
                   <!-- 1. Live video -->
                   <button type="button" class="composer-media-btn" id="composerAddVideoBtn" title="Live Video" onclick="switchTab('live');">
                     <svg viewBox="0 0 24 24" fill="#f3425f"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
-                    <span class="media-btn-label">Live video</span>
+                    <span class="media-btn-label">Live</span>
                   </button>
                   <!-- 2. Photo/video -->
                   <button type="button" class="composer-media-btn" id="composerAddPhotoBtn" title="Photo/video" onclick="document.getElementById('realFeedFileInput').click();">
                     <svg viewBox="0 0 24 24" fill="#45bd62"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 16H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h12c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1zm-4.5-5.5l-2.5 3.01L9.5 14l-3 4h11l-3.5-4.5z"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>
-                    <span class="media-btn-label">Photo/video</span>
+                    <span class="media-btn-label">Photo/Video</span>
                   </button>
                   <!-- 3. Feeling/activity -->
                   <button type="button" class="composer-media-btn" id="composerFeelingBtn" title="Feeling / Activity" onclick="toggleComposerFeelingTray()">
                     <svg viewBox="0 0 24 24" fill="#f7b125"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
-                    <span class="media-btn-label">Feeling/activity</span>
+                    <span class="media-btn-label">Feeling</span>
                   </button>
                   <!-- 4. Location (more actions) -->
                   <button type="button" class="composer-media-btn" id="composerLocationBtn" title="Check in / Location" onclick="toggleComposerLocationTray()" style="display: none;">
@@ -16170,29 +16243,36 @@ function renderHtml(
                   </div>
                 </div>
 
-                <div class="composer-right-actions" style="display: flex; align-items: center; gap: 8px;">
-                  <!-- Twitter Character Progress Ring -->
-                  <div class="tweet-char-ring-container" id="tweetCharRingContainer" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; position: relative;" title="280 Character Limit Indicator">
-                    <svg class="tweet-char-svg" viewBox="0 0 32 32" style="width: 26px; height: 26px; transform: rotate(-90deg);">
-                      <circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2.5" />
-                      <circle id="tweetCharProgress" cx="16" cy="16" r="12" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="75.4" stroke-dashoffset="75.4" stroke-linecap="round" style="transition: stroke-dashoffset 0.15s ease, stroke 0.2s ease;" />
-                    </svg>
-                    <span id="tweetCharCount" style="position: absolute; font-size: 0.65rem; font-weight: 700; color: #94a3b8; pointer-events: none;"></span>
+                <!-- Tier 2: Dedicated Action & Publish Dock (Guaranteed Zero-Overflow) -->
+                <div class="composer-dock-row composer-right-actions">
+                  <div class="composer-dock-left" style="display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0;">
+                    <!-- Audience Selector Dropdown -->
+                    <select id="dynamicPostTheme" class="composer-theme-select" title="Target Audience">
+                      <option value="mesh">Public Feed</option>
+                      <option value="dag">Friends Circle</option>
+                      <option value="creator">Creator Exclusive</option>
+                    </select>
+
+                    <!-- Twitter Character Progress Ring -->
+                    <div class="tweet-char-ring-container" id="tweetCharRingContainer" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; position: relative; flex-shrink: 0;" title="280 Character Limit Indicator">
+                      <svg class="tweet-char-svg" viewBox="0 0 32 32" style="width: 26px; height: 26px; transform: rotate(-90deg);">
+                        <circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2.5" />
+                        <circle id="tweetCharProgress" cx="16" cy="16" r="12" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="75.4" stroke-dashoffset="75.4" stroke-linecap="round" style="transition: stroke-dashoffset 0.15s ease, stroke 0.2s ease;" />
+                      </svg>
+                      <span id="tweetCharCount" style="position: absolute; font-size: 0.65rem; font-weight: 700; color: #94a3b8; pointer-events: none;"></span>
+                    </div>
+
+                    <!-- Twitter Thread "+" Button -->
+                    <button type="button" class="composer-media-btn" id="composerAddThreadBtn" onclick="toggleComposerThreadInput()" title="Add to Thread (Twitter Chained Post)" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; display: inline-flex; align-items: center; gap: 4px; height: 32px; flex: 0 0 auto;">
+                      <span style="font-weight: 800; font-size: 0.9rem;">+</span> <span>Thread</span>
+                    </button>
                   </div>
 
-                  <!-- Twitter Thread "+" Button -->
-                  <button type="button" class="composer-media-btn" id="composerAddThreadBtn" onclick="toggleComposerThreadInput()" title="Add to Thread (Twitter Chained Post)" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; display: inline-flex; align-items: center; gap: 4px;">
-                    <span style="font-weight: 800; font-size: 0.9rem;">+</span> <span>Thread</span>
-                  </button>
-
-                  <select id="dynamicPostTheme" class="composer-theme-select" title="Target Audience">
-                    <option value="mesh">Public Feed</option>
-                    <option value="dag">Friends Circle</option>
-                    <option value="creator">Creator Exclusive</option>
-                  </select>
                   <input id="dynamicPostTags" type="hidden" value="#sovra #community" />
-                  <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" class="composer-publish-btn">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+
+                  <!-- Permanent Pinned Publish Button -->
+                  <button id="dynamicPostPublishBtn" onclick="submitDynamicPost()" class="composer-publish-btn" style="margin-left: auto; flex-shrink: 0 !important;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     <span>Post</span>
                   </button>
                 </div>
