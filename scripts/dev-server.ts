@@ -11954,6 +11954,13 @@ function renderHtml(
       padding: 0 4px;
       padding-bottom: env(safe-area-inset-bottom, 0px);
       box-sizing: border-box;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    }
+
+    .mobile-bottom-nav.keyboard-hidden {
+      transform: translateX(-50%) translateY(140%) !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
     }
 
     /* Smart Navigation Modes: Auto / Dock / Top */
@@ -23416,7 +23423,8 @@ function renderHtml(
   <!-- Multi-Segment Instagram & WhatsApp Story Viewer Modal Overlay -->
   <div class="story-modal-overlay" id="sovereignStoryViewerModal" data-legacy-id="storyModalOverlay" style="display: none;" onclick="closeStory(event)">
     <div class="story-card-modal" id="storyCardModal" onclick="event.stopPropagation()"
-         onpointerdown="pauseStoryTimer()" onpointerup="resumeStoryTimer()">
+         onpointerdown="pauseStoryTimer(event)" onpointerup="resumeStoryTimer(event)"
+         ontouchstart="pauseStoryTimer(event)" ontouchend="resumeStoryTimer(event)" ontouchcancel="resumeStoryTimer(event)">
       
       <!-- Multi-segment Header Bars (dynamically rendered) -->
       <div class="story-segments-header" id="storySegmentsHeader"></div>
@@ -27715,6 +27723,36 @@ function renderHtml(
         <span>•</span>
         <span>Click outside or Esc to exit</span>
       </div>
+    </div>
+  </div>
+
+  <!-- 📹 YouTube Studio Multi-Stage Video Upload Progress HUD -->
+  <div id="videoUploadProgressHUD" class="wa-modal-overlay" style="display: none; z-index: 999999; background: rgba(5, 8, 16, 0.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
+    <div class="video-upload-hud-card" style="background: linear-gradient(145deg, #0f172a, #0b1120); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 20px; width: 90%; max-width: 440px; padding: 1.75rem 1.5rem; box-shadow: 0 25px 60px rgba(0,0,0,0.7), 0 0 30px rgba(56, 189, 248, 0.15); text-align: center; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;" onclick="event.stopPropagation()">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.4rem;">🎬</span>
+          <span style="font-size: 0.95rem; font-weight: 700; color: #f1f5f9;">YouTube Studio Ingestion</span>
+        </div>
+        <span id="videoUploadHUDStageBadge" style="font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 9999px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Stage 1/3</span>
+      </div>
+
+      <div id="videoUploadHUDStatus" style="font-size: 0.95rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.75rem; min-height: 1.5rem;">
+        📡 Uploading to Sovereign Node... (0%)
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 9999px; height: 12px; overflow: hidden; margin-bottom: 1rem; position: relative; padding: 2px;">
+        <div id="videoUploadHUDProgressBar" style="width: 0%; height: 100%; border-radius: 9999px; background: linear-gradient(90deg, #06b6d4, #3b82f6); box-shadow: 0 0 12px rgba(6, 182, 212, 0.6); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: #94a3b8; margin-bottom: 1.25rem;">
+        <span id="videoUploadHUDDetails">CAS Chunking &amp; Verifying</span>
+        <span id="videoUploadHUDPct" style="font-weight: 700; color: #38bdf8;">0%</span>
+      </div>
+
+      <button type="button" id="videoUploadHUDDismissBtn" onclick="hideVideoUploadProgressHUD()" style="display: none; width: 100%; padding: 0.65rem 1rem; border-radius: 12px; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; color: #fff; font-weight: 700; font-size: 0.88rem; cursor: pointer; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);">
+        Done • View in Watch
+      </button>
     </div>
   </div>
 
@@ -45635,6 +45673,54 @@ function renderHtml(
       }
     });
 
+    // Mobile Virtual Keyboard Viewport Auto-Adaptation
+    function initMobileKeyboardViewportAdapter() {
+      const bottomNav = document.querySelector('.mobile-bottom-nav');
+      if (!bottomNav) return;
+
+      function hideBottomNav() {
+        if (window.innerWidth <= 860 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+          bottomNav.classList.add('keyboard-hidden');
+          bottomNav.style.transform = 'translateX(-50%) translateY(140%)';
+        }
+      }
+
+      function restoreBottomNav() {
+        bottomNav.classList.remove('keyboard-hidden');
+        bottomNav.style.transform = '';
+      }
+
+      if (window.visualViewport) {
+        let initialHeight = window.visualViewport.height;
+        window.visualViewport.addEventListener('resize', function() {
+          if (!window.visualViewport) return;
+          const currentHeight = window.visualViewport.height;
+          if (initialHeight - currentHeight > 140) {
+            hideBottomNav();
+          } else if (currentHeight >= initialHeight - 40) {
+            restoreBottomNav();
+          }
+        });
+      }
+
+      ['chatInputText', 'dynamicPostCaption'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('focus', hideBottomNav);
+          el.addEventListener('blur', function() {
+            setTimeout(restoreBottomNav, 150);
+          });
+        }
+      });
+    }
+    window.initMobileKeyboardViewportAdapter = initMobileKeyboardViewportAdapter;
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initMobileKeyboardViewportAdapter);
+    } else {
+      initMobileKeyboardViewportAdapter();
+    }
+
     // ==========================================
     // 0. INSTAGRAM FEED & PROFILE SCRIPT ENGINE
     // ==========================================
@@ -55200,6 +55286,12 @@ function renderHtml(
         if (progressBar) progressBar.style.width = "25%";
         if (uploadBtn) uploadBtn.disabled = true;
         if (pillsContainer) pillsContainer.innerHTML = "";
+        if (typeof showVideoUploadProgressHUD === "function") {
+          showVideoUploadProgressHUD(1, 40, "Ingesting video into creator studio node");
+          setTimeout(function() {
+            showVideoUploadProgressHUD(2, 80, "Transcoding adaptive bitrate HLS");
+          }, 350);
+        }
 
         const payload = {
           title: title,
@@ -55218,6 +55310,9 @@ function renderHtml(
           .then(res => res.json())
           .then(data => {
             if (data && data.ok) {
+              if (typeof showVideoUploadProgressHUD === "function") {
+                showVideoUploadProgressHUD(3, 100, "Published to catalog");
+              }
               if (monitorStatus) {
                 monitorStatus.textContent = publishImmediately
                   ? "✅ Transcoded & Published to Catalog!"
@@ -57303,10 +57398,17 @@ function renderHtml(
           creatorDid: myDid
         };
 
+        if (typeof showVideoUploadProgressHUD === 'function') {
+          showVideoUploadProgressHUD(1, 45, 'Ingesting workspace upload');
+        }
+
         setTimeout(function() {
           if (pBar) pBar.style.width = '60%';
           if (pctText) pctText.textContent = '60%';
           if (statusText) statusText.textContent = 'Stage 2/4: Transcoding/Processing (1080p, 720p, 480p, 360p ABR)...';
+          if (typeof showVideoUploadProgressHUD === 'function') {
+            showVideoUploadProgressHUD(2, 85, 'Transcoding multi-resolution HLS');
+          }
         }, 200);
 
         setTimeout(function() {
@@ -57326,6 +57428,9 @@ function renderHtml(
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data && data.ok) {
+            if (typeof showVideoUploadProgressHUD === 'function') {
+              showVideoUploadProgressHUD(3, 100, 'Published to catalog');
+            }
             if (pBar) pBar.style.width = '100%';
             if (pctText) pctText.textContent = '100%';
             if (statusText) statusText.textContent = isScheduled ? 'Stage 4/4: 📅 Transcoded & Scheduled!' : 'Stage 4/4: ✅ Published to Watch & Reels Catalog!';
@@ -59371,13 +59476,45 @@ function renderHtml(
       }
     }
 
-    function pauseStoryTimer() {
+    function pauseStoryTimer(e) {
       isStoryPaused = true;
+      const textOverlay = document.getElementById('storyCreatorTextOverlay');
+      const stickerPill = document.getElementById('storyStickerPill');
+      const authorEl = document.getElementById('storyModalAuthor');
+      const modalText = document.getElementById('storyModalText');
+      const pollBox = document.getElementById('storyPollBox');
+      const qBox = document.getElementById('storyQuestionBox');
+      const musicBox = document.getElementById('storyMusicBox');
+      if (textOverlay) textOverlay.style.opacity = '0.15';
+      if (stickerPill) stickerPill.style.opacity = '0.15';
+      if (authorEl) authorEl.style.opacity = '0.15';
+      if (modalText) modalText.style.opacity = '0.15';
+      if (pollBox) pollBox.style.opacity = '0.15';
+      if (qBox) qBox.style.opacity = '0.15';
+      if (musicBox) musicBox.style.opacity = '0.15';
     }
+    window.pauseStoryTimer = pauseStoryTimer;
+    window.pauseStoryViewer = pauseStoryTimer;
 
-    function resumeStoryTimer() {
+    function resumeStoryTimer(e) {
       isStoryPaused = false;
+      const textOverlay = document.getElementById('storyCreatorTextOverlay');
+      const stickerPill = document.getElementById('storyStickerPill');
+      const authorEl = document.getElementById('storyModalAuthor');
+      const modalText = document.getElementById('storyModalText');
+      const pollBox = document.getElementById('storyPollBox');
+      const qBox = document.getElementById('storyQuestionBox');
+      const musicBox = document.getElementById('storyMusicBox');
+      if (textOverlay) textOverlay.style.opacity = '1';
+      if (stickerPill) stickerPill.style.opacity = '1';
+      if (authorEl) authorEl.style.opacity = '1';
+      if (modalText) modalText.style.opacity = '1';
+      if (pollBox) pollBox.style.opacity = '1';
+      if (qBox) qBox.style.opacity = '1';
+      if (musicBox) musicBox.style.opacity = '1';
     }
+    window.resumeStoryTimer = resumeStoryTimer;
+    window.resumeStoryViewer = resumeStoryTimer;
 
     function sendStoryReaction(emoji) {
       const modal = document.getElementById('storyCardModal');
@@ -61965,13 +62102,26 @@ function renderHtml(
     function updateChatTypingState(peerDid) {
       if (activeContactDid === peerDid) {
         const headerStatusEl = document.getElementById('activePeerStatus') || document.getElementById('chatHeaderStatus');
+        const typingNoticeEl = document.getElementById('activePeerTypingNotice');
         const peerState = _activeTypingPeers[peerDid];
-        if (headerStatusEl) {
-          if (peerState && peerState.isRecording) {
-            headerStatusEl.innerHTML = '<span class="typing-header-text">🎙️ recording voice memo...</span>';
-          } else if (peerState && peerState.isTyping) {
-            headerStatusEl.innerHTML = '<span class="typing-header-text">typing...</span>';
-          } else {
+        if (peerState && peerState.isRecording) {
+          if (typingNoticeEl) {
+            typingNoticeEl.innerHTML = '<span class="typing-dots-wave"><span>•</span><span>•</span><span>•</span></span> <span>🎙️ recording voice memo...</span>';
+            typingNoticeEl.style.display = 'flex';
+          }
+          if (headerStatusEl) headerStatusEl.style.display = 'none';
+        } else if (peerState && peerState.isTyping) {
+          if (typingNoticeEl) {
+            typingNoticeEl.innerHTML = '<span class="typing-dots-wave"><span>•</span><span>•</span><span>•</span></span> <span>typing...</span>';
+            typingNoticeEl.style.display = 'flex';
+          }
+          if (headerStatusEl) headerStatusEl.style.display = 'none';
+        } else {
+          if (typingNoticeEl) {
+            typingNoticeEl.style.display = 'none';
+          }
+          if (headerStatusEl) {
+            headerStatusEl.style.display = '';
             const contact = contactsData.find(function(c) { return c.did === peerDid; });
             const isOnline = contact ? contact.isOnline : false;
             headerStatusEl.innerHTML = (isOnline ? '<span style="color: #10b981; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span class="status-pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block;"></span> Online</span>' : '<span style="color: #8696a0;">Last seen recently</span>');
@@ -63376,40 +63526,77 @@ function renderHtml(
     }
     window.getCallDiagnostics = getCallDiagnostics;
 
+    let _activeRingOscs = [];
+    let _activeRingGain = null;
+
     function playCallAudioRinging(type) {
       stopCallAudioRinging();
       try {
         if (!_callAudioCtx) _callAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (_callAudioCtx.state === 'suspended') _callAudioCtx.resume();
 
-        const freq1 = type === 'incoming' ? 520 : 440;
-        const freq2 = type === 'incoming' ? 660 : 480;
+        const freq1 = 440;
+        const freq2 = 480;
 
-        _callRingInterval = setInterval(function() {
+        function emitRingPulse() {
           try {
             if (!_callAudioCtx || _callAudioCtx.state === 'closed') return;
-            const osc = _callAudioCtx.createOscillator();
+            const now = _callAudioCtx.currentTime;
+            const osc1 = _callAudioCtx.createOscillator();
+            const osc2 = _callAudioCtx.createOscillator();
             const gain = _callAudioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq1, _callAudioCtx.currentTime);
-            osc.frequency.setValueAtTime(freq2, _callAudioCtx.currentTime + 0.15);
-            gain.gain.setValueAtTime(0.08, _callAudioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, _callAudioCtx.currentTime + 0.9);
-            osc.connect(gain);
+
+            osc1.type = 'sine';
+            osc2.type = 'sine';
+            osc1.frequency.setValueAtTime(freq1, now);
+            osc2.frequency.setValueAtTime(freq2, now);
+
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(0.12, now + 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+            osc1.connect(gain);
+            osc2.connect(gain);
             gain.connect(_callAudioCtx.destination);
-            osc.start();
-            osc.stop(_callAudioCtx.currentTime + 0.95);
+
+            osc1.start(now);
+            osc2.start(now);
+            osc1.stop(now + 1.25);
+            osc2.stop(now + 1.25);
+
+            _activeRingOscs = [osc1, osc2];
+            _activeRingGain = gain;
           } catch (_) {}
-        }, 2200);
+        }
+
+        emitRingPulse();
+        _callRingInterval = setInterval(emitRingPulse, 2000);
       } catch (_) {}
     }
+    window.playCallAudioRinging = playCallAudioRinging;
+    window.startCallAudioRinging = playCallAudioRinging;
 
     function stopCallAudioRinging() {
       if (_callRingInterval) {
         clearInterval(_callRingInterval);
         _callRingInterval = null;
       }
+      if (_activeRingGain && _callAudioCtx && _callAudioCtx.state !== 'closed') {
+        try {
+          const now = _callAudioCtx.currentTime;
+          _activeRingGain.gain.setValueAtTime(_activeRingGain.gain.value, now);
+          _activeRingGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+        } catch (_) {}
+      }
+      if (Array.isArray(_activeRingOscs)) {
+        _activeRingOscs.forEach(function(osc) {
+          try { osc.stop(); } catch (_) {}
+        });
+      }
+      _activeRingOscs = [];
+      _activeRingGain = null;
     }
+    window.stopCallAudioRinging = stopCallAudioRinging;
 
     function playCallDisconnectTone() {
       try {
@@ -71229,11 +71416,100 @@ function renderHtml(
       }
     }
 
+    function showVideoUploadProgressHUD(stage, pct, details) {
+      const hud = document.getElementById('videoUploadProgressHUD');
+      if (!hud) return;
+      hud.style.display = 'flex';
+      const badge = document.getElementById('videoUploadHUDStageBadge');
+      const status = document.getElementById('videoUploadHUDStatus');
+      const bar = document.getElementById('videoUploadHUDProgressBar');
+      const pctEl = document.getElementById('videoUploadHUDPct');
+      const det = document.getElementById('videoUploadHUDDetails');
+      const dismissBtn = document.getElementById('videoUploadHUDDismissBtn');
+
+      if (dismissBtn) dismissBtn.style.display = (stage >= 3) ? 'block' : 'none';
+
+      if (stage === 1) {
+        if (badge) badge.innerText = 'Stage 1/3';
+        const percent = Math.min(100, Math.max(0, Math.round(pct || 0)));
+        if (status) status.innerText = '📡 Uploading to Sovereign Node... (' + percent + '%)';
+        if (bar) bar.style.width = percent + '%';
+        if (pctEl) pctEl.innerText = percent + '%';
+        if (det) det.innerText = details || 'Streaming byte chunks to node storage';
+      } else if (stage === 2) {
+        if (badge) badge.innerText = 'Stage 2/3';
+        if (status) status.innerText = '⚡ HLS Transcoding & CAS Chunk Verification...';
+        const percent = Math.max(50, Math.min(95, Math.round(pct || 75)));
+        if (bar) bar.style.width = percent + '%';
+        if (pctEl) pctEl.innerText = percent + '%';
+        if (det) det.innerText = details || 'Generating adaptive bitrate streams (1080p, 720p, 480p, 360p)';
+      } else if (stage >= 3) {
+        if (badge) badge.innerText = 'Stage 3/3';
+        if (status) status.innerText = '🚀 Published to Sovereign Mesh!';
+        if (bar) bar.style.width = '100%';
+        if (pctEl) pctEl.innerText = '100%';
+        if (det) det.innerText = details || 'Available immediately on Watch and Reels';
+      }
+    }
+    window.showVideoUploadProgressHUD = showVideoUploadProgressHUD;
+
+    function hideVideoUploadProgressHUD() {
+      const hud = document.getElementById('videoUploadProgressHUD');
+      if (hud) hud.style.display = 'none';
+    }
+    window.hideVideoUploadProgressHUD = hideVideoUploadProgressHUD;
+
+    function uploadStudioVideo(payload) {
+      showVideoUploadProgressHUD(1, 25, 'Reading video chunks & validating header');
+      setTimeout(function() { showVideoUploadProgressHUD(1, 75, 'Streaming byte chunks to node storage'); }, 200);
+      setTimeout(function() { showVideoUploadProgressHUD(2, 90, 'HLS multi-variant transcode active'); }, 500);
+
+      const did = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
+      return fetch('/api/studio/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-sovereign-did': did
+        },
+        body: JSON.stringify(payload || {})
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          showVideoUploadProgressHUD(3, 100, 'Published to catalog');
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('🚀 Published to Sovereign Mesh!');
+          }
+        } else {
+          hideVideoUploadProgressHUD();
+          if (typeof showToast === 'function') {
+            showToast('Transcode error: ' + ((data && data.error) || 'Failed'), 'error');
+          }
+        }
+        return data;
+      })
+      .catch(function(err) {
+        hideVideoUploadProgressHUD();
+        throw err;
+      });
+    }
+    window.uploadStudioVideo = uploadStudioVideo;
+
     function handleUniversalVideoSelected(e) {
       const file = e.target && e.target.files && e.target.files[0];
       if (!file) return;
       closeUniversalCreateModal();
       switchTab('feed');
+
+      // Trigger YouTube Studio Multi-Stage Video Upload Progress HUD
+      showVideoUploadProgressHUD(1, 35, 'Allocating CAS storage slot & validating frame rate');
+      setTimeout(function() {
+        showVideoUploadProgressHUD(1, 100, 'Video frame payload loaded into buffer');
+        setTimeout(function() {
+          hideVideoUploadProgressHUD();
+        }, 800);
+      }, 350);
+
       if (typeof handleFeedVideoSelected === 'function') {
         handleFeedVideoSelected(e);
       }
@@ -71253,6 +71529,7 @@ function renderHtml(
         showAccountToast('🎬 Video loaded into composer — ready to Post!');
       }
     }
+    window.handleUniversalVideoSelected = handleUniversalVideoSelected;
 
     let activeFloatingUploadAbortController = null;
 
