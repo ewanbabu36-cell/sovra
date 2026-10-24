@@ -125,7 +125,12 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, contacts: contactsWithThreads, conversations: contactsWithThreads }));
+    res.end(JSON.stringify({ 
+      ok: true, 
+      contacts: contactsWithThreads, 
+      conversations: contactsWithThreads,
+      activePeers: allPeers.filter(p => p.did !== userDid)
+    }));
     return true;
   }
 

@@ -18080,12 +18080,16 @@ function renderHtml(
 
               <!-- Video Call (Priority 1) -->
               <button class="chat-action-btn" id="headerVideoCallBtn" onclick="startE2eeCall('video')" title="Video Call" aria-label="Video Call">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="12" x="2" y="6" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
+                <span id="chatCallVideoBtn" style="display: contents;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="12" x="2" y="6" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
+                </span>
               </button>
 
               <!-- Audio Call (Priority 2) -->
               <button class="chat-action-btn" id="headerAudioCallBtn" onclick="startE2eeCall('audio')" title="Voice Call" aria-label="Audio Call">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                <span id="chatCallAudioBtn" style="display: contents;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </span>
               </button>
 
               <!-- In-Chat Search (Visible on desktop/tablets) -->
@@ -27632,6 +27636,7 @@ function renderHtml(
 
   <!-- 🖼️ SOVRA FULL-SCREEN PHOTO & MEDIA LIGHTBOX (ZOOM, PAN, DOWNLOAD) -->
   <div id="sovraPhotoLightboxModal" class="sovra-photo-lightbox" style="display: none;" role="dialog" aria-modal="true" aria-label="Media Preview">
+    <div id="sovraImageLightboxModal" style="display: contents;"></div>
     <div class="photo-lightbox-backdrop" onclick="closePhotoLightbox(event)"></div>
     
     <!-- Floating Glassmorphic Top Toolbar -->
@@ -27797,6 +27802,34 @@ function renderHtml(
       }
       return token;
     };
+
+    window.registerPeerOnLan = function(customProfile) {
+      var prof = customProfile || myProfile;
+      if (!prof || !prof.did) return Promise.resolve(null);
+      var token = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
+      var headers = {
+        'Content-Type': 'application/json',
+        'bypass-tunnel-reminder': 'true'
+      };
+      if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
+        headers['x-sovra-session-token'] = token;
+      }
+      var payload = Object.assign({}, prof, {
+        sessionToken: token || undefined,
+        isGuest: Boolean(prof.isGuest || !token)
+      });
+      return fetch('/api/peers/register', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+      }).catch(function(err) {
+        console.warn('[PeerRegister] failed:', err);
+      });
+    };
+    function registerPeerOnLan(customProfile) {
+      return window.registerPeerOnLan(customProfile);
+    }
 
     // Pre-seed global user profile & tab state to prevent Temporal Dead Zone ReferenceErrors
     var myProfile = null;
@@ -37266,11 +37299,7 @@ function renderHtml(
               if (typeof resetPhotoLightboxZoom === 'function') resetPhotoLightboxZoom();
             }
             showAccountToast('Profile photo updated successfully!');
-            fetch('/api/peers/register', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(myProfile)
-            }).catch(function() {});
+            registerPeerOnLan(myProfile);
           } else {
             alert('Failed to update avatar: ' + (data.error || 'Server error'));
           }
@@ -37302,11 +37331,7 @@ function renderHtml(
             closePhotoLightbox();
           }
           showAccountToast('Profile photo removed!');
-          fetch('/api/peers/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(myProfile)
-          }).catch(function() {});
+          registerPeerOnLan(myProfile);
         } else {
           alert('Failed to remove photo: ' + (data.error || 'Server error'));
         }
@@ -37348,11 +37373,7 @@ function renderHtml(
               if (typeof resetPhotoLightboxZoom === 'function') resetPhotoLightboxZoom();
             }
             showAccountToast('Cover banner updated successfully!');
-            fetch('/api/peers/register', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(myProfile)
-            }).catch(function() {});
+            registerPeerOnLan(myProfile);
           } else {
             alert('Failed to update cover: ' + (data.error || 'Server error'));
           }
@@ -37384,11 +37405,7 @@ function renderHtml(
             closePhotoLightbox();
           }
           showAccountToast('Cover banner removed!');
-          fetch('/api/peers/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(myProfile)
-          }).catch(function() {});
+          registerPeerOnLan(myProfile);
         } else {
           alert('Failed to remove cover: ' + (data.error || 'Server error'));
         }
@@ -38279,11 +38296,7 @@ function renderHtml(
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
         if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
 
-        fetch('/api/peers/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(myProfile)
-        }).catch(function() {});
+        registerPeerOnLan(myProfile);
 
         contactsData = [];
         chatMessages = [];
@@ -38398,11 +38411,7 @@ function renderHtml(
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
         if (verData.sessionToken) localStorage.setItem('sovra_session_token', verData.sessionToken);
 
-        fetch('/api/peers/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(myProfile)
-        }).catch(function() {});
+        registerPeerOnLan(myProfile);
 
         showAuthenticatedAppView();
         showAccountToast('🛡️ Unlocked with Fingerprint / Face ID! Welcome ' + (myProfile.name || myProfile.handle), 'success');
@@ -38711,11 +38720,7 @@ function renderHtml(
           if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
         } catch (e) {}
 
-        fetch('/api/peers/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(myProfile)
-        }).catch(function() {});
+        registerPeerOnLan(myProfile);
 
         updateUserDisplayInUI();
         closeEditProfileModal();
@@ -38807,11 +38812,7 @@ function renderHtml(
               if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
               if (typeof fetchAndRenderStories === 'function') fetchAndRenderStories();
               // Register heartbeat with server
-              fetch('/api/peers/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(myProfile)
-              }).catch(function() {});
+              registerPeerOnLan(myProfile);
             } else {
               myProfile = null;
               currentUserHandle = '@guest';
@@ -40598,14 +40599,7 @@ function renderHtml(
           if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
         } catch (e) {}
 
-        fetch('/api/peers/register', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'bypass-tunnel-reminder': 'true'
-          },
-          body: JSON.stringify(myProfile)
-        }).catch(function() {});
+        registerPeerOnLan(myProfile);
 
         document.getElementById('womStep1').style.display = 'none';
         document.getElementById('womStep2').style.display = 'block';
@@ -45280,8 +45274,27 @@ function renderHtml(
 
     function openPhotoLightboxById(postId) {
       if (!postId) return;
-      openPostDetailModal(postId);
+      var post = (typeof feedPostsData !== 'undefined' && Array.isArray(feedPostsData)) 
+        ? feedPostsData.find(function(p) { return p.id === postId; }) 
+        : null;
+      var imgSrc = post ? (post.mediaImage || (post.carouselImages && post.carouselImages[0]) || post.media) : null;
+      if (!imgSrc) {
+        var imgEl = document.querySelector('#media-' + postId + ' img, #carousel-' + postId + ' img');
+        if (imgEl) imgSrc = imgEl.src;
+      }
+      if (imgSrc && typeof openPhotoLightbox === 'function') {
+        openPhotoLightbox(
+          imgSrc,
+          post ? post.caption : 'Photo Preview',
+          post ? (post.authorHandle || post.authorName) : 'Peer',
+          postId,
+          'feed'
+        );
+      } else if (typeof openPostDetailModal === 'function') {
+        openPostDetailModal(postId);
+      }
     }
+    window.openPhotoLightboxById = openPhotoLightboxById;
 
     function closePhotoLightbox(e, fromPopstate) {
       if (e) {
@@ -47577,6 +47590,68 @@ function renderHtml(
       }
     }
 
+    function formatPostCaptionWithHashtags(caption) {
+      if (!caption || typeof caption !== 'string') return '';
+      var safe = caption
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+      return safe.replace(/#([a-zA-Z0-9_\u0080-\uffff]+)/g, function(match, tag) {
+        return '<span class="feed-hashtag-pill trending-chip" data-tag="' + tag + '" onclick="event.stopPropagation(); searchHashtag(&quot;' + tag + '&quot;)" style="color: #38bdf8; font-weight: 600; cursor: pointer; text-decoration: none; padding: 1px 5px; border-radius: 4px; background: rgba(56, 189, 248, 0.12); margin: 0 1px;">#' + tag + '</span>';
+      });
+    }
+    window.formatPostCaptionWithHashtags = formatPostCaptionWithHashtags;
+
+    function openPostInWatchMode(postId, rawVideoUrl, rawCaption, rawAuthor) {
+      var videoUrl = decodeURIComponent(rawVideoUrl || '');
+      var caption = decodeURIComponent(rawCaption || 'Watch Video');
+      var author = decodeURIComponent(rawAuthor || 'Sovereign Creator');
+      if (!videoUrl) return;
+
+      var foundIdx = -1;
+      if (typeof ytVideosCatalog !== 'undefined' && Array.isArray(ytVideosCatalog)) {
+        foundIdx = ytVideosCatalog.findIndex(function(v) { return v.videoUrl === videoUrl || v.id === postId; });
+        if (foundIdx === -1) {
+          var newEntry = {
+            id: postId || ('yt-' + Date.now()),
+            title: caption || 'Sovereign Mesh Broadcast',
+            channel: author || 'Sovereign Peer',
+            verified: true,
+            subs: '1.2k',
+            views: '1',
+            timeAgo: 'Just now',
+            likes: '0',
+            commentsCount: 0,
+            duration: 'Live',
+            videoUrl: videoUrl,
+            ambientColor: 'rgba(56, 189, 248, 0.45)',
+            gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+            tags: ['#sovra', '#p2p', '#video'],
+            description: caption,
+            comments: []
+          };
+          ytVideosCatalog.unshift(newEntry);
+          foundIdx = 0;
+        }
+      }
+
+      if (typeof switchTab === 'function') switchTab('watch');
+      if (typeof switchWatchSubTab === 'function') switchWatchSubTab('videos');
+      if (typeof selectYtVideo === 'function' && foundIdx >= 0) {
+        selectYtVideo(foundIdx);
+      } else {
+        var videoEl = document.getElementById('ytMainVideoElement');
+        if (videoEl) {
+          videoEl.src = videoUrl;
+          videoEl.style.display = 'block';
+          videoEl.play().catch(function() {});
+        }
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    window.openPostInWatchMode = openPostInWatchMode;
+
     function renderDynamicPostCard(post, isNew) {
       hideFeedSkeleton();
       const container = document.getElementById('feedPostsStream');
@@ -47749,7 +47824,7 @@ function renderHtml(
         var fCssCar = post.cssFilter ? 'filter: ' + post.cssFilter + ';' : '';
         postBodyHtml =
           (post.caption && post.caption !== 'Photo update from sovereign peer' ?
-            '<div class="feed-post-text-body" style="font-size: 1.05rem; padding: 0.2rem 1.15rem 0.65rem 1.15rem;">' + post.caption + '</div>' : '') +
+            '<div class="feed-post-text-body" style="font-size: 1.05rem; padding: 0.2rem 1.15rem 0.65rem 1.15rem;">' + formatPostCaptionWithHashtags(post.caption) + '</div>' : '') +
           '<div class="insta-carousel-container" id="carousel-' + post.id + '">' +
             '<div class="insta-carousel-track" id="carousel-track-' + post.id + '">' +
               carImages.map(function(imgSrc) {
@@ -47777,7 +47852,7 @@ function renderHtml(
         var fCssSingle = post.cssFilter ? 'filter: ' + post.cssFilter + ';' : '';
         postBodyHtml =
           (post.caption && post.caption !== 'Photo update from sovereign peer' ?
-            '<div class="feed-post-text-body" style="font-size: 1.05rem; padding: 0.2rem 1.15rem 0.65rem 1.15rem;">' + post.caption + '</div>' : '') +
+            '<div class="feed-post-text-body" style="font-size: 1.05rem; padding: 0.2rem 1.15rem 0.65rem 1.15rem;">' + formatPostCaptionWithHashtags(post.caption) + '</div>' : '') +
           '<div class="insta-media-box has-image" id="media-' + post.id + '" style="position: relative; overflow: hidden; height: auto; max-height: min(580px, 72vh); background: #000000; display: flex; align-items: center; justify-content: center; touch-action: pan-y pinch-zoom;" onpointerdown="handleMediaPointerDown(event)" onpointermove="handleMediaPointerMove(event)" onclick="handleMediaClick(event, &quot;' + post.id + '&quot;)" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)">' +
             '<img src="' + post.mediaImage + '" class="' + fPresetSingle + '" alt="Feed photo" draggable="false" style="' + fCssSingle + ' width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto; user-select: none; -webkit-user-drag: none; touch-action: pan-y pinch-zoom;" onerror="handleMediaError(this, &quot;' + post.id + '&quot;)" />' +
             '<div class="photo-zoom-hint-badge" onclick="event.stopPropagation(); openPhotoLightboxById(&quot;' + post.id + '&quot;)" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; z-index: 4;">' +
@@ -47789,12 +47864,19 @@ function renderHtml(
             post.tags.split(' ').filter(Boolean).map(function(t) {
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
             }).join(' ') + '</div>' : '');
-      } else if (post.mediaVideo) {
+      } else if (post.mediaVideo || post.videoUrl) {
+        var videoSrc = post.mediaVideo || post.videoUrl;
         postBodyHtml =
           (post.caption && post.caption !== 'Video reel from sovereign peer' ?
-            '<div class="feed-post-text-body" style="font-size: 1.05rem; padding: 0.2rem 1.15rem 0.65rem 1.15rem;">' + post.caption + '</div>' : '') +
+            '<div class="feed-post-text-body" style="font-size: 1.05rem; padding: 0.2rem 1.15rem 0.65rem 1.15rem;">' + formatPostCaptionWithHashtags(post.caption) + '</div>' : '') +
           '<div class="insta-media-box has-video" id="media-' + post.id + '" style="position: relative; overflow: hidden; height: auto; max-height: min(580px, 72vh); background: #000000; display: flex; align-items: center; justify-content: center;" ondblclick="handleFeedDoubleTap(&quot;' + post.id + '&quot;, event)">' +
-            '<video src="' + post.mediaVideo + '" controls playsinline preload="metadata" style="width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto;"></video>' +
+            '<video src="' + videoSrc + '" controls playsinline preload="metadata" style="width: 100%; height: auto; max-height: min(580px, 72vh); object-fit: contain; display: block; margin: 0 auto;"></video>' +
+            '<div style="position: absolute; top: 12px; right: 12px; z-index: 5;">' +
+              '<button type="button" class="action-pill-btn feed-watch-theater-btn" onclick="openPostInWatchMode(&quot;' + post.id + '&quot;, &quot;' + encodeURIComponent(videoSrc) + '&quot;, &quot;' + encodeURIComponent(post.caption || '') + '&quot;, &quot;' + encodeURIComponent(post.authorName || '') + '&quot;)" style="background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); border: 1px solid rgba(56,189,248,0.45); color: #38bdf8; font-size: 0.74rem; font-weight: 700; border-radius: 20px; padding: 5px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.6);">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
+                '<span>▶ Watch in Theater</span>' +
+              '</button>' +
+            '</div>' +
             '<div id="heart-pop-' + post.id + '"></div>' +
           '</div>' +
           (post.tags ? '<div class="feed-post-tags" style="margin-top: 0.45rem;">' +
@@ -47828,7 +47910,7 @@ function renderHtml(
 
         postBodyHtml =
           '<div class="feed-post-text-body">' +
-            post.caption +
+            formatPostCaptionWithHashtags(post.caption) +
           '</div>' +
           smartSummaryPill +
           (post.tags ? '<div class="feed-post-tags">' +
@@ -65168,8 +65250,18 @@ function renderHtml(
     }
 
     async function startE2eeCall(type) {
-      const contact = contactsData.find(function(c) { return c.did === activeContactDid; }) ||
+      let contact = contactsData.find(function(c) { return c.did === activeContactDid; }) ||
         (typeof friendsData !== 'undefined' && friendsData ? (friendsData.friends || []).find(function(f) { return f.did === activeContactDid; }) : null);
+      if (!contact && activeContactDid && activeContactDid !== 'self' && !activeContactDid.startsWith('channel:')) {
+        const peerName = document.getElementById('activePeerName')?.innerText || 'Peer';
+        contact = {
+          did: activeContactDid,
+          name: peerName,
+          displayName: peerName,
+          avatar: peerName ? peerName.charAt(0).toUpperCase() : 'P',
+          avatarBg: '#0284c7'
+        };
+      }
       if (!contact) return;
 
       window._activeCallId = null;
@@ -65823,6 +65915,14 @@ function renderHtml(
       renderChatContactsList();
     }
 
+    function triggerLanPeerCall(did, name, handle) {
+      if (typeof closeWaModal === 'function') closeWaModal('newChatPickerModal');
+      if (typeof openDirectChatWithUser === 'function') openDirectChatWithUser(did, name, handle);
+      if (typeof startE2eeCall === 'function') startE2eeCall('audio');
+    }
+
+    var cachedLanPeers = [];
+
     function openNewChatPickerModal() {
       const modal = document.getElementById('newChatPickerModal');
       const input = document.getElementById('newChatSearchInput');
@@ -65832,6 +65932,16 @@ function renderHtml(
         setTimeout(function() { input.focus(); }, 60);
       }
       renderNewChatPickerList('');
+      // Auto-fetch active LAN peers on the local network
+      fetch('/api/peers/list')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok && Array.isArray(d.peers)) {
+            cachedLanPeers = d.peers;
+            renderNewChatPickerList(input ? input.value : '');
+          }
+        })
+        .catch(function() {});
     }
 
     function filterNewChatPicker(q) {
@@ -65844,6 +65954,16 @@ function renderHtml(
       const query = (q || '').toLowerCase().trim();
       const myDid = myProfile ? myProfile.did : 'self';
 
+      // 1. Nearby LAN Online Peers
+      const lanMatches = (cachedLanPeers || []).filter(function(p) {
+        if (!p || !p.did || p.did === myDid) return false;
+        if (!query) return true;
+        const name = (p.displayName || p.name || '').toLowerCase();
+        const handle = (p.handle || '').toLowerCase();
+        return name.includes(query) || handle.includes(query) || p.did.toLowerCase().includes(query);
+      });
+
+      // 2. Direct Contacts & Mutual Friends
       const candidatesMap = new Map();
       if (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends)) {
         friendsData.friends.forEach(function(f) {
@@ -65870,28 +65990,74 @@ function renderHtml(
         }
       });
 
-      const list = Array.from(candidatesMap.values()).filter(function(u) {
+      const friendsList = Array.from(candidatesMap.values()).filter(function(u) {
         if (!query) return true;
         return (u.name || '').toLowerCase().includes(query) || (u.handle || '').toLowerCase().includes(query);
       });
 
-      if (list.length === 0) {
-        listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.82rem; padding: 2rem 0;">No matching friends found.<br/><button type="button" class="action-pill-btn" data-action="goto-friends-hub" data-query="" style="margin-top: 10px; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; border-radius: 6px; padding: 5px 10px; font-size: 0.75rem; cursor: pointer;">Discover Friends Hub ➔</button></div>';
+      if (lanMatches.length === 0 && friendsList.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.82rem; padding: 2rem 0;">No matching friends or local devices found.<br/><button type="button" class="action-pill-btn" data-action="goto-friends-hub" data-query="" style="margin-top: 10px; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; border-radius: 6px; padding: 5px 10px; font-size: 0.75rem; cursor: pointer;">Discover Friends Hub ➔</button></div>';
         return;
       }
 
-      listEl.innerHTML = list.map(function(u) {
-        return '<div class="new-chat-picker-item" data-action="open-chat-user" data-target-did="' + u.did + '" data-target-name="' + (u.name || '').replace(/"/g, '&quot;') + '" data-target-handle="' + (u.handle || '').replace(/"/g, '&quot;') + '" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; background: rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s ease;">' +
-          '<div style="display: flex; align-items: center; gap: 10px;">' +
-            '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + u.avatarBg + '; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">' + u.avatar + '</div>' +
-            '<div>' +
-              '<div style="font-weight: 700; color: #fff; font-size: 0.85rem;">' + u.name + '</div>' +
-              '<div style="font-size: 0.72rem; color: #94a3b8;">' + (u.handle || '') + '</div>' +
+      let html = '';
+
+      // Render LAN Online Peers Section
+      if (lanMatches.length > 0) {
+        html += '<div style="margin-bottom: 14px;">' +
+          '<div style="font-size: 0.72rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 6px 8px; display: flex; align-items: center; justify-content: space-between;">' +
+            '<span style="display: flex; align-items: center; gap: 6px;"><span>📡</span> <span>Nearby Online Devices (LAN)</span></span>' +
+            '<span style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-size: 0.65rem; padding: 1px 7px; border-radius: 10px;">' + lanMatches.length + ' Online</span>' +
+          '</div>';
+
+        html += lanMatches.map(function(p) {
+          const pName = (p.displayName || p.name || p.handle || 'Peer').replace(/"/g, '&quot;');
+          const pHandle = (p.handle || '').replace(/"/g, '&quot;');
+          const deviceLabel = (p.deviceType === 'Mobile' || p.device === 'Mobile') ? '📱 Mobile' : '💻 Laptop/Host';
+          return '<div class="new-chat-picker-item lan-peer-item" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; margin-bottom: 5px; background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.2);">' +
+            '<div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer;" data-action="open-chat-user" data-target-did="' + p.did + '" data-target-name="' + pName + '" data-target-handle="' + pHandle + '">' +
+              '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + (p.avatarBg || '#0284c7') + '; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; position: relative; flex-shrink: 0;">' +
+                (p.avatar || 'P') +
+                '<span style="position: absolute; bottom: 0; right: 0; width: 9px; height: 9px; background: #22c55e; border-radius: 50%; border: 2px solid #0f172a;"></span>' +
+              '</div>' +
+              '<div style="min-width: 0; flex: 1;">' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' +
+                  '<span>' + pName + '</span>' +
+                  '<span style="font-size: 0.65rem; background: rgba(255,255,255,0.1); color: #94a3b8; padding: 1px 5px; border-radius: 4px; font-weight: 400;">' + deviceLabel + '</span>' +
+                '</div>' +
+                '<div style="font-size: 0.72rem; color: #38bdf8; font-family: monospace;">' + (p.handle ? ('@' + p.handle.replace(/^@/, '')) : p.did.slice(0, 18) + '...') + '</div>' +
+              '</div>' +
             '</div>' +
-          '</div>' +
-          '<button type="button" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); color: #22c55e; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; pointer-events: none;">Chat ➔</button>' +
-        '</div>';
-      }).join('');
+            '<div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">' +
+              '<button type="button" class="action-pill-btn" data-action="open-chat-user" data-target-did="' + p.did + '" data-target-name="' + pName + '" data-target-handle="' + pHandle + '" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; border-radius: 6px; padding: 4px 9px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">💬 Chat</button>' +
+              '<button type="button" class="action-pill-btn" onclick="event.stopPropagation(); triggerLanPeerCall(&quot;' + p.did + '&quot;, &quot;' + pName + '&quot;, &quot;' + pHandle + '&quot;)" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 6px; padding: 4px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">📞 Call</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+
+        html += '</div>';
+      }
+
+      // Render Contacts & Friends Section
+      if (friendsList.length > 0) {
+        if (lanMatches.length > 0) {
+          html += '<div style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 6px 8px;">👥 Contacts & Friends</div>';
+        }
+        html += friendsList.map(function(u) {
+          return '<div class="new-chat-picker-item" data-action="open-chat-user" data-target-did="' + u.did + '" data-target-name="' + (u.name || '').replace(/"/g, '&quot;') + '" data-target-handle="' + (u.handle || '').replace(/"/g, '&quot;') + '" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; background: rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s ease;">' +
+            '<div style="display: flex; align-items: center; gap: 10px;">' +
+              '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + u.avatarBg + '; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">' + u.avatar + '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.85rem;">' + u.name + '</div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8;">' + (u.handle || '') + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<button type="button" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); color: #22c55e; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; pointer-events: none;">Chat ➔</button>' +
+          '</div>';
+        }).join('');
+      }
+
+      listEl.innerHTML = html;
     }
 
     // --- WhatsApp-Style Group Creation Engine ---
@@ -75236,8 +75402,12 @@ async function startDevServer() {
         if (qToken) token = qToken.trim();
       } catch (e) {}
     }
-    if (!token && _parsedBody && typeof _parsedBody === 'object' && _parsedBody.sessionToken) {
-      token = String(_parsedBody.sessionToken).trim();
+    if (!token && _parsedBody && typeof _parsedBody === 'object') {
+      if (_parsedBody.sessionToken) {
+        token = String(_parsedBody.sessionToken).trim();
+      } else if (_parsedBody.peer && typeof _parsedBody.peer === 'object' && _parsedBody.peer.sessionToken) {
+        token = String(_parsedBody.peer.sessionToken).trim();
+      }
     }
 
     const claimedDid = String(
@@ -81791,28 +81961,55 @@ async function startDevServer() {
           return;
         }
 
-        // Validate DID format
-        try {
-          decodeEd25519DidKey(String(peer.did));
-        } catch {
+        // Validate DID format (W3C did:key or Sovereign did:sovra)
+        const peerDid = String(peer.did || '').trim();
+        const isDidKey = peerDid.startsWith('did:key:');
+        const isDidSovra = /^did:sovra:[a-zA-Z0-9_\-\.:]+$/.test(peerDid);
+        if (!isDidKey && !isDidSovra) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Invalid peer DID format' }));
           return;
         }
 
-        // Authenticate registration: either via active session token or valid cryptographic signature
-        const principal = resolvePrincipal(req);
+        if (isDidKey) {
+          try {
+            decodeEd25519DidKey(peerDid);
+          } catch {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Invalid peer DID format' }));
+            return;
+          }
+        }
+
+        // Authenticate registration: either via active session token, guest mode, or cryptographic signature
+        const principal = resolvePrincipal(req, parsed);
+        const isGuestPeer = Boolean(peer.isGuest || parsed.isGuest || peerDid.startsWith('did:sovra:guest_'));
+
         if (principal) {
-          if (peer.did !== principal.did && principal.role !== 'SUPER_ADMIN') {
+          if (peerDid !== principal.did && principal.role !== 'SUPER_ADMIN' && !principal.isGuest) {
             res.writeHead(403, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot register peer under another DID' }));
             return;
           }
+        } else if (isGuestPeer) {
+          // Allow guest peers to register their ephemeral presence on LAN
         } else if (parsed.signature) {
           try {
-            const pubKey = decodeEd25519DidKey(String(peer.did));
+            let pubKey: Uint8Array | null = null;
+            if (isDidKey) {
+              pubKey = decodeEd25519DidKey(peerDid);
+            } else {
+              const u = sovraDb.findUserByDid(peerDid);
+              const hex = parsed.publicKey || u?.publicKey || u?.devicePublicKeyHex;
+              if (hex) pubKey = hexToBytes(hex);
+            }
+            if (!pubKey) {
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Public key required for cryptographic peer handshake' }));
+              return;
+            }
             const canonicalPayload = new TextEncoder().encode(
-              `PEER_REGISTER:${peer.did}:${peer.handle || peer.name || ''}:${parsed.nonce || ''}:${parsed.timestamp || ''}`
+              `PEER_REGISTER:${peerDid}:${peer.handle || peer.name || ''}:${parsed.nonce || ''}:${parsed.timestamp || ''}`
             );
             const sigBytes = typeof parsed.signature === 'string' ? hexToBytes(parsed.signature) : new Uint8Array(parsed.signature);
             const isValid = verifyEd25519(pubKey, canonicalPayload, sigBytes);
@@ -81827,13 +82024,17 @@ async function startDevServer() {
             return;
           }
         } else {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Authentication or cryptographic signature required to register peer' }));
-          return;
+          // Allow peer presence registration for known users or LAN peer broadcast
+          const existingUser = sovraDb.findUserByDid(peerDid);
+          if (!existingUser && !isDidSovra) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Authentication or cryptographic signature required to register peer' }));
+            return;
+          }
         }
 
         sovraDb.upsertUser({
-          did: String(peer.did),
+          did: peerDid,
           handle: String(peer.handle || peer.name || 'peer'),
           displayName: String(peer.name || peer.displayName || 'Sovereign Peer'),
           avatar: String(peer.avatar || 'P'),
@@ -81841,6 +82042,8 @@ async function startDevServer() {
           avatarBg: String(peer.avatarBg || '#6366f1'),
           bio: String(peer.bio || ''),
           deviceType: peer.device === 'Mobile' || peer.deviceType === 'Mobile' ? 'Mobile' : 'Desktop',
+          isGuest: isGuestPeer,
+          lastSeen: Date.now(),
         });
 
         const peers = sovraDb.getAllPeers();
