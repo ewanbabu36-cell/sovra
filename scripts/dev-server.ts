@@ -18578,6 +18578,7 @@ function renderHtml(
                 <div class="call-avatar-ripple" id="remoteFallbackAvatarIcon" style="background: #6366f1; width: 90px; height: 90px; font-size: 2.2rem;">E</div>
                 <div style="font-size: 1.25rem; font-weight: 800; color: #fff; margin-top: 14px;" id="remoteFallbackPeerName">ewan</div>
                 <div style="font-size: 0.78rem; color: #38bdf8; margin-top: 4px; font-family: monospace;" id="remoteFallbackStatusText">🔒 NOISE_XX E2EE • VIDEO CONNECTING...</div>
+                <div id="remoteCameraMutedNotice" style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; font-size: 0.75rem; font-weight: 700; border-radius: 12px; padding: 4px 10px; margin-top: 8px;">📷 Peer turned off camera</div>
                 <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 8px;">Tap anywhere to resume stream</div>
               </div>
 
@@ -29441,12 +29442,57 @@ function renderHtml(
         return hash;
       }
 
+      function urlBase64ToUint8Array(base64String) {
+        try {
+          const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+          const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+          const rawData = window.atob(base64);
+          const outputArray = new Uint8Array(rawData.length);
+          for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+          }
+          return outputArray;
+        } catch (_) {
+          return new Uint8Array(0);
+        }
+      }
+
       async function registerDeviceToken(myDid) {
         if (_isRegistered) return { ok: true, cached: true };
         const devId = getOrCreateDeviceId();
         const mDid = myDid || (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:self');
         const blindChanId = await deriveBlindChannelId(mDid, mDid);
-        const opaquePushToken = 'fcm_tok_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+        let livePushToken = 'fcm_tok_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+        let liveSubscription = null;
+
+        if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof window !== 'undefined' && 'PushManager' in window) {
+          try {
+            const reg = await navigator.serviceWorker.ready;
+            let sub = await reg.pushManager.getSubscription();
+            if (!sub) {
+              try {
+                const vapidRes = await fetch('/api/push/vapid-key').then(function(r) { return r.json(); });
+                if (vapidRes && vapidRes.ok && vapidRes.publicKey) {
+                  const keyArr = urlBase64ToUint8Array(vapidRes.publicKey);
+                  if (keyArr && keyArr.length > 0 && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                    sub = await reg.pushManager.subscribe({
+                      userVisibleOnly: true,
+                      applicationServerKey: keyArr
+                    });
+                  }
+                }
+              } catch (subErr) {
+                console.warn('[SovraBlindPush] Real pushManager subscription notice:', subErr);
+              }
+            }
+            if (sub) {
+              liveSubscription = JSON.parse(JSON.stringify(sub));
+              livePushToken = sub.endpoint || livePushToken;
+            }
+          } catch (swErr) {
+            console.warn('[SovraBlindPush] PushManager inspection notice:', swErr);
+          }
+        }
 
         try {
           const resp = await fetch('/api/push/register', {
@@ -29456,14 +29502,15 @@ function renderHtml(
               deviceId: devId,
               deviceDid: mDid,
               platform: 'web',
-              pushToken: opaquePushToken,
+              pushToken: livePushToken,
+              subscription: liveSubscription || undefined,
               blindChannelId: blindChanId
             })
           });
           const res = await resp.json();
           if (res && res.ok) {
             _isRegistered = true;
-            console.log('🛡️ [SovraBlindPush] Device registered anonymously with zero-knowledge push gateway:', devId);
+            console.log('🛡️ [SovraBlindPush] Device registered anonymously with zero-knowledge push gateway:', devId, 'isRealPush:', Boolean(liveSubscription));
           }
           return res;
         } catch(e) {
@@ -64770,8 +64817,22 @@ function renderHtml(
       if (event.track.kind === 'video') {
         const streamToBind = (event.streams && event.streams[0]) ? event.streams[0] : event.track;
         bindRemoteVideoFeed(streamToBind);
+
+        event.track.addEventListener('mute', function() {
+          console.log('[WebRTC] Remote video track muted (peer disabled camera)');
+          if (fallback) fallback.style.display = 'flex';
+          const notice = document.getElementById('remoteCameraMutedNotice');
+          if (notice) notice.style.display = 'block';
+          const statusText = document.getElementById('remoteFallbackStatusText');
+          if (statusText) statusText.innerText = '📷 Peer turned off camera';
+        });
+
         event.track.addEventListener('unmute', function() {
-          console.log('[WebRTC] Remote video track unmuted');
+          console.log('[WebRTC] Remote video track unmuted (peer enabled camera)');
+          const notice = document.getElementById('remoteCameraMutedNotice');
+          if (notice) notice.style.display = 'none';
+          const statusText = document.getElementById('remoteFallbackStatusText');
+          if (statusText) statusText.innerText = '🔒 NOISE_XX E2EE • VIDEO CONNECTED';
           bindRemoteVideoFeed(streamToBind);
         });
       }
@@ -66092,7 +66153,14 @@ function renderHtml(
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission().then(function(perm) {
           console.log('[Notification] User call permission status:', perm);
+          if (perm === 'granted' && window.SovraBlindPush && typeof window.SovraBlindPush.registerDeviceToken === 'function') {
+            window.SovraBlindPush.registerDeviceToken(myProfile ? myProfile.did : null);
+          }
         }).catch(function() {});
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        if (window.SovraBlindPush && typeof window.SovraBlindPush.registerDeviceToken === 'function') {
+          window.SovraBlindPush.registerDeviceToken(myProfile ? myProfile.did : null);
+        }
       }
     }
 

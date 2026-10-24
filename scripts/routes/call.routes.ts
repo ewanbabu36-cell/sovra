@@ -9,6 +9,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { sovraDb } from '../database-engine.ts';
+import { dispatchCallWebPush } from './push.routes.ts';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
 import type { BlindPushRelayServer } from '../../packages/messaging/dist/index.js';
 
@@ -40,7 +41,7 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
   const { req, res, url, blindPushRelay, getIceServers, readBoundedBody, resolvePrincipal, enforceAuth, broadcastChatEvent } = ctx;
 
   // 1. ICE Servers configuration with Privacy Relay Mode (IP Leakage Shielding)
-  if ((url.pathname === '/api/call/ice-servers' || url.pathname === '/api/webrtc/ice-servers') && req.method === 'GET') {
+  if ((url.pathname === '/api/call/ice-servers' || url.pathname === '/api/webrtc/ice-servers' || url.pathname === '/api/rtc/ice-servers') && req.method === 'GET') {
     const principal = resolvePrincipal(req);
     const privacyParam = url.searchParams.get('privacy') || req.headers['x-sovra-privacy-mode'];
     const privacyRelay = privacyParam === 'relay' || privacyParam === 'shielded';
@@ -128,6 +129,12 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
             opaqueWakeupHint: crypto.randomBytes(16).toString('hex'),
             priority: 'high',
             timestamp: Date.now(),
+          });
+          void dispatchCallWebPush(recipientDid, {
+            callId: session.callId,
+            callType,
+            callerDid: principal.did,
+            callerName: senderUser?.displayName || senderUser?.handle || 'Peer',
           });
         } catch (_) {}
 

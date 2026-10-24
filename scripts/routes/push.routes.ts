@@ -122,6 +122,73 @@ export async function sendWebPush(
   });
 }
 
+const pushTokensByDid = new Map<string, Set<string>>();
+const pushTokensByChannel = new Map<string, Set<string>>();
+
+export function recordPushSubscription(deviceDid?: string, blindChannelId?: string, pushToken?: string) {
+  if (!pushToken) return;
+  if (deviceDid && deviceDid !== 'did:sovra:anonymous') {
+    let set = pushTokensByDid.get(deviceDid);
+    if (!set) {
+      set = new Set<string>();
+      pushTokensByDid.set(deviceDid, set);
+    }
+    set.add(pushToken);
+  }
+  if (blindChannelId) {
+    let set = pushTokensByChannel.get(blindChannelId);
+    if (!set) {
+      set = new Set<string>();
+      pushTokensByChannel.set(blindChannelId, set);
+    }
+    set.add(pushToken);
+  }
+}
+
+export function getPushTokensForDid(did: string): string[] {
+  const set = new Set<string>();
+  const byDid = pushTokensByDid.get(did);
+  if (byDid) {
+    byDid.forEach(t => set.add(t));
+  }
+  const blindChannel = crypto.createHash('sha256').update(did).digest('hex');
+  const byChannel = pushTokensByChannel.get(blindChannel);
+  if (byChannel) {
+    byChannel.forEach(t => set.add(t));
+  }
+  return Array.from(set);
+}
+
+export async function dispatchCallWebPush(recipientDid: string, callData: {
+  callId: string;
+  callType: string;
+  callerDid: string;
+  callerName: string;
+}): Promise<number> {
+  const tokens = getPushTokensForDid(recipientDid);
+  let dispatched = 0;
+  for (const token of tokens) {
+    if (token && token.startsWith('http')) {
+      try {
+        await sendWebPush(token, {
+          type: 'call',
+          title: `📞 Incoming ${callData.callType === 'video' ? 'Video' : 'Voice'} Call`,
+          body: `${callData.callerName} is calling you on Sovra E2EE`,
+          callId: callData.callId,
+          callType: callData.callType,
+          callerDid: callData.callerDid,
+          callerName: callData.callerName,
+          timestamp: Date.now(),
+        });
+        dispatched++;
+      } catch (err) {
+        console.warn('[WebPush] Error dispatching call push to token:', err);
+      }
+    }
+  }
+  return dispatched;
+}
+
 export async function handlePushRoutes(ctx: PushRouteContext): Promise<boolean> {
   const { req, res, url, blindPushRelay, readBoundedBody } = ctx;
 
@@ -156,6 +223,10 @@ export async function handlePushRoutes(ctx: PushRouteContext): Promise<boolean> 
             updatedAt: Date.now(),
           });
         }
+      }
+      recordPushSubscription(parsed.deviceDid, parsed.blindChannelId, parsed.pushToken);
+      if (parsed.subscription && parsed.subscription.endpoint) {
+        recordPushSubscription(parsed.deviceDid, parsed.blindChannelId, parsed.subscription.endpoint);
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, registered: true, totalDevices: blindPushRelay.getRegisteredDeviceCount() }));
