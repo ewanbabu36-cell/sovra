@@ -15882,7 +15882,7 @@ function renderHtml(
         <!-- Creator & Spaces Section (Consolidated: Zero Duplication) -->
         <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 6px 14px; padding-top: 6px;">
           <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 4px 6px;">Creator &amp; Spaces</div>
-          <div class="dev-drawer-item" onclick="openCreatorStudioModal(); switchTab('studio'); toggleDevMainMenu(false);">
+          <div class="dev-drawer-item" onclick="switchTab('studio'); toggleDevMainMenu(false);">
             <span>🎬</span> <span style="color: #fb7185; font-weight: 600;">Creator Studio Pro</span>
           </div>
           <div class="dev-drawer-item" onclick="if(typeof openSpatialChannelsPagesSurface==='function')openSpatialChannelsPagesSurface(this);else switchTab('me'); toggleDevMainMenu(false);">
@@ -42728,6 +42728,10 @@ function renderHtml(
           window.SovraBleMeshRadar.refreshScan();
         }
       } else if (tab === 'studio') {
+        var sm = document.getElementById('sovraCreatorStudioModal');
+        if (sm) sm.style.display = 'none';
+        var wom = document.getElementById('welcomeOnboardingModal');
+        if (wom) wom.style.display = 'none';
         if (window.SovraCreatorStudioEngine && typeof window.SovraCreatorStudioEngine.init === 'function') {
           window.SovraCreatorStudioEngine.init();
         }
@@ -55223,23 +55227,51 @@ function renderHtml(
             self.channelsList = myChannels;
 
             if (!myChannels.length) {
-              // 🎬 STATE 1: No channel created yet -> Show Onboarding Gateway
-              if (onboardingView) onboardingView.style.display = 'block';
-              if (dashboardShell) dashboardShell.style.display = 'none';
+              if (window.__forceStudioOnboardingTest) {
+                // 🎬 Test Harness Enforced State
+                if (onboardingView) onboardingView.style.display = 'block';
+                if (dashboardShell) dashboardShell.style.display = 'none';
 
-              var cancelTopText = document.getElementById('studioOnboardingCancelBtnText');
-              var cancelBottomText = document.getElementById('studioOnboardingNotNowBtnText');
-              if (cancelTopText) cancelTopText.textContent = 'Exit to Feed';
-              if (cancelBottomText) cancelBottomText.textContent = 'Not Now, Return to Feed';
+                var cancelTopText = document.getElementById('studioOnboardingCancelBtnText');
+                var cancelBottomText = document.getElementById('studioOnboardingNotNowBtnText');
+                if (cancelTopText) cancelTopText.textContent = 'Exit to Feed';
+                if (cancelBottomText) cancelBottomText.textContent = 'Not Now, Return to Feed';
 
-              // Pre-fill profile name and handle suggestions if available
-              var nameIn = document.getElementById('studioNewChanNameInput');
-              var profName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.name || myProfile.handle)) ? (myProfile.name || myProfile.handle) : '';
-              if (nameIn && !nameIn.value && profName) {
-                nameIn.value = profName.replace(/^@/, '');
-                self.handleOnboardingNameChange(nameIn.value);
+                var nameIn = document.getElementById('studioNewChanNameInput');
+                var profName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.name || myProfile.handle)) ? (myProfile.name || myProfile.handle) : '';
+                if (nameIn && !nameIn.value && profName) {
+                  nameIn.value = profName.replace(/^@/, '');
+                  self.handleOnboardingNameChange(nameIn.value);
+                }
+                return;
               }
-              return;
+
+              // Real-World YouTube Studio Parity: Auto-link personal channel so creator enters Dashboard directly
+              var profName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Channel';
+              var profHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : '@creator';
+              var profAvatar = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : '🎬';
+              var effectiveDid = myDid || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || 'did:sovra:creator_primary';
+
+              var defaultChan = {
+                id: 'ch-personal-' + (effectiveDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8) || 'primary'),
+                name: profName,
+                handle: profHandle.startsWith('@') ? profHandle : '@' + profHandle,
+                channelType: 'video',
+                avatar: profAvatar,
+                category: 'tech',
+                desc: profName + ' Sovereign Video Channel',
+                ownerDid: effectiveDid,
+                count: 0,
+                isSubbed: true,
+                createdAt: Date.now()
+              };
+              myChannels = [defaultChan];
+              self.channelsList = myChannels;
+              fetch('/api/social/channels', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(defaultChan)
+              }).catch(function() {});
             }
 
             // 🎬 STATE 2: Channel exists -> Show Full Creator Studio Dashboard
@@ -77959,7 +77991,7 @@ async function startDevServer() {
     // ==========================================
     // 📦 UNIFIED CONTENT-ADDRESSED STORAGE (CAS) MEDIA STREAMING (/api/media/:cid)
     // ==========================================
-    if (url.pathname.startsWith('/api/media/') && req.method === 'GET' && !url.pathname.startsWith('/api/media/save') && !url.pathname.startsWith('/api/media/unsave') && !url.pathname.startsWith('/api/media/saved') && !url.pathname.startsWith('/api/media/delete')) {
+    if (url.pathname.startsWith('/api/media/') && req.method === 'GET' && !url.pathname.startsWith('/api/media/stream') && !url.pathname.startsWith('/api/media/token-gate') && !url.pathname.startsWith('/api/media/hls') && !url.pathname.startsWith('/api/media/save') && !url.pathname.startsWith('/api/media/unsave') && !url.pathname.startsWith('/api/media/saved') && !url.pathname.startsWith('/api/media/delete')) {
       const rawCid = path.basename(url.pathname);
       const cid = rawCid.includes('.') ? rawCid.split('.')[0]! : rawCid;
 
@@ -81012,6 +81044,28 @@ async function startDevServer() {
         user = sovraDb.findUserByHandle(handle);
       } else if (!user && principal) {
         user = sovraDb.findUserByDid(principal.did);
+      }
+      if (!user && (did || handle || sessionTokenQuery)) {
+        if (handle === '@laptop_host' || did === 'did:sovra:laptop_host') {
+          user = sovraDb.getAllUsers().find(u => u.handle === '@laptop_host' || u.did === 'did:sovra:laptop_host') || null;
+        }
+        if (!user) {
+          const rawHandle = handle || (did ? '@peer_' + did.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8) : '@creator_node');
+          const cleanHandle = rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle;
+          const cleanName = cleanHandle.replace(/^@/, '');
+          const newDid = did || principal?.did || ('did:sovra:' + cleanName);
+          user = sovraDb.createUser({
+            did: newDid,
+            handle: cleanHandle,
+            name: cleanName,
+            displayName: cleanName,
+            bio: 'Sovereign Social & Creator Node',
+            avatar: '💻',
+            avatarBg: '#0284c7',
+            role: 'creator',
+            sessionToken: sessionTokenQuery || ('stk_' + Date.now()),
+          });
+        }
       }
       if (!user && !did && !handle && !sessionTokenQuery) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
