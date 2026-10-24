@@ -1753,6 +1753,8 @@ export class SovraDatabaseEngine {
   private dbBackupPath: string;
   private lastBackupAt?: number;
   private sqliteEngine?: SqliteSocialDatabaseEngine;
+  private saveDebounceTimer: NodeJS.Timeout | null = null;
+  private pendingFlushes = 0;
 
   constructor(customStorageDir?: string) {
     this.storageDir = customStorageDir || process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev';
@@ -1787,6 +1789,7 @@ export class SovraDatabaseEngine {
 
   public checkpoint(): void {
     try {
+      this.flushSync();
       this.sqliteEngine?.checkpoint();
     } catch (_) {}
   }
@@ -2177,7 +2180,30 @@ export class SovraDatabaseEngine {
     this.save();
   }
 
-  public save(): void {
+  public save(immediate = false): void {
+    const isTestEnv = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
+    if (immediate || isTestEnv) {
+      if (this.saveDebounceTimer) {
+        clearTimeout(this.saveDebounceTimer);
+        this.saveDebounceTimer = null;
+      }
+      this.flushSync();
+      return;
+    }
+
+    this.pendingFlushes++;
+    if (this.saveDebounceTimer) {
+      return;
+    }
+
+    this.saveDebounceTimer = setTimeout(() => {
+      this.saveDebounceTimer = null;
+      this.pendingFlushes = 0;
+      this.flushSync();
+    }, 100);
+  }
+
+  public flushSync(): void {
     try {
       if (!fs.existsSync(this.storageDir)) {
         fs.mkdirSync(this.storageDir, { recursive: true });

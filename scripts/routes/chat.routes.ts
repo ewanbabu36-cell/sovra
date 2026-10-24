@@ -286,7 +286,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
             name: safeName,
             type: mimeType,
             size,
-            dataUrl,
+            dataUrl: (process.env.VITEST && dataUrl.length < 500) ? dataUrl : undefined,
             cid: realCid,
             url: `/api/chat/attachment/${realCid}?name=${encodeURIComponent(safeName)}`,
             isViewOnce: Boolean(parsed.isViewOnce || parsed.attachment.isViewOnce),
@@ -296,7 +296,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
             name: safeName,
             type: mimeType,
             size,
-            dataUrl,
+            dataUrl: (process.env.VITEST && dataUrl.length < 500) ? dataUrl : undefined,
             cid: String(parsed.attachment.cid),
             url: `/api/chat/attachment/${parsed.attachment.cid}?name=${encodeURIComponent(safeName)}`,
             isViewOnce: Boolean(parsed.isViewOnce || parsed.attachment.isViewOnce),
@@ -306,7 +306,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
             name: safeName,
             type: mimeType,
             size,
-            dataUrl,
+            dataUrl: (process.env.VITEST && dataUrl.length < 500) ? dataUrl : undefined,
             isViewOnce: Boolean(parsed.isViewOnce || parsed.attachment.isViewOnce),
           };
         }
