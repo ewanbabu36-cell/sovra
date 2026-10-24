@@ -49,7 +49,15 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     const qDid = url.searchParams.get('creatorDid') || url.searchParams.get('did');
     const creatorDid = (principal && principal.did) || (qDid && qDid.trim()) || '';
     const allChannels = sovraDb.getAllChannels();
-    const myChannels = creatorDid ? allChannels.filter(c => c && c.ownerDid === creatorDid) : [];
+    let myChannels = creatorDid ? allChannels.filter(c => c && c.ownerDid === creatorDid) : [];
+
+    // If requesting user is the host/seed user or system creator, provide seed channels
+    if (creatorDid && (creatorDid === 'did:sovra:creator_primary' || creatorDid === 'did:sovra:system' || creatorDid === 'did:sovra:laptop_host')) {
+      if (myChannels.length === 0) {
+        myChannels = allChannels.filter(c => c && (c.ownerDid === 'did:sovra:system' || c.ownerDid === creatorDid));
+      }
+    }
+
     const hasChannel = myChannels.length > 0;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -709,8 +717,15 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
         });
 
         // Auto-publish if requested or not scheduled for future
+        let publishedVideo: any = null;
         if (parsed.publishImmediately || (!scheduledPublishAt && parsed.autoPublish !== false)) {
-          sovraDb.publishStudioJob(job.jobId);
+          publishedVideo = sovraDb.publishStudioJob(job.jobId);
+          const gSocial = (globalThis as any).dynamicSocialStore;
+          if (publishedVideo && gSocial && Array.isArray(gSocial.videos)) {
+            if (!gSocial.videos.some((v: any) => v.id === publishedVideo.id)) {
+              gSocial.videos.unshift(publishedVideo);
+            }
+          }
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -839,10 +854,11 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
 
   // 7. GET /api/studio/analytics - Detailed 7-day trajectories & retention curve
   if (url.pathname === '/api/studio/analytics' && req.method === 'GET') {
-    const creatorDid = resolveCreatorDid(ctx);
-    const analytics = sovraDb.getCreatorStudioAnalytics(creatorDid);
+    const creatorDid = url.searchParams.get('creatorAddress') || url.searchParams.get('creator') || url.searchParams.get('creatorDid') || resolveCreatorDid(ctx);
+    const channelId = url.searchParams.get('channelId') || undefined;
+    const analytics = sovraDb.getCreatorStudioAnalytics(creatorDid, channelId);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, creatorDid, analytics }));
+    res.end(JSON.stringify({ ok: true, creatorDid, channelId, analytics }));
     return true;
   }
 
@@ -896,10 +912,11 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
 
   // 8. GET /api/studio/content - All creator library content (videos, reels, scheduled)
   if (url.pathname === '/api/studio/content' && req.method === 'GET') {
-    const creatorDid = resolveCreatorDid(ctx);
-    const content = sovraDb.getCreatorStudioContent(creatorDid);
+    const creatorDid = url.searchParams.get('creatorAddress') || url.searchParams.get('creator') || url.searchParams.get('creatorDid') || resolveCreatorDid(ctx);
+    const channelId = url.searchParams.get('channelId') || undefined;
+    const content = sovraDb.getCreatorStudioContent(creatorDid, channelId);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, creatorDid, count: content.count, items: content.items }));
+    res.end(JSON.stringify({ ok: true, creatorDid, channelId, count: content.count, items: content.items }));
     return true;
   }
 
@@ -1274,11 +1291,12 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
 
   // 13. GET /api/studio/comments - Community Comments & Moderation Studio
   if (url.pathname === '/api/studio/comments' && req.method === 'GET') {
-    const creatorDid = resolveCreatorDid(ctx);
+    const creatorDid = url.searchParams.get('creatorAddress') || url.searchParams.get('creator') || url.searchParams.get('creatorDid') || resolveCreatorDid(ctx);
     const filter = url.searchParams.get('filter') || undefined;
-    const comments = sovraDb.getCreatorStudioComments(creatorDid, filter);
+    const channelId = url.searchParams.get('channelId') || undefined;
+    const comments = sovraDb.getCreatorStudioComments(creatorDid, filter, channelId);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, count: comments.length, comments }));
+    res.end(JSON.stringify({ ok: true, channelId, count: comments.length, comments }));
     return true;
   }
 
@@ -1405,6 +1423,20 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
       const parsed = JSON.parse(body);
       const creatorDid = resolveCreatorDid(ctx);
       const resData = sovraDb.saveCreatorChannelCustomization(creatorDid, parsed);
+      const gSocial = (globalThis as any).dynamicSocialStore;
+      if (gSocial && Array.isArray(gSocial.channels) && (parsed.channelId || parsed.channelHandle)) {
+        const cleanHandle = parsed.channelHandle ? ('@' + parsed.channelHandle.replace(/^@+/, '')).toLowerCase() : '';
+        const match = gSocial.channels.find((c: any) =>
+          (parsed.channelId && c.id === parsed.channelId) ||
+          (cleanHandle && c.handle && c.handle.toLowerCase() === cleanHandle) ||
+          c.ownerDid === creatorDid
+        );
+        if (match) {
+          if (parsed.channelName) match.name = parsed.channelName;
+          if (parsed.channelBio) match.desc = parsed.channelBio;
+          if (cleanHandle) match.handle = cleanHandle;
+        }
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, customization: resData.customization }));
     } catch (err: any) {
