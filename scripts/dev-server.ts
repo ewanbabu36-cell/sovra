@@ -3813,6 +3813,8 @@ function renderHtml(
     .header-nav-btn.active,
     #navTabHome.active, #hnav-feed.active,
     #navTabWatch.active, #hnav-youtube.active,
+    #navTabFriends.active, #hnav-friends.active,
+    #navTabStudio.active, #hnav-studio.active,
     #navTabChats.active, #hnav-chat.active,
     #navTabYou.active, #hnav-me.active,
     #hnav-reels.active, #hnav-calls.active,
@@ -3826,6 +3828,12 @@ function renderHtml(
     }
     .header-nav-btn.active .hnav-icon {
       filter: drop-shadow(0 0 6px rgba(24, 119, 242, 0.4));
+    }
+
+    /* Suppress duplicate & wrapping text pills in top header dock */
+    #headerWatchStudioPill,
+    .header-right-zone #pwaInstallBtn {
+      display: none !important;
     }
 
     /* Dedicated Glowing Create Pill Button with Instant Tactile Feedback */
@@ -7026,12 +7034,12 @@ function renderHtml(
       max-width: 280px;
     }
     .header-right-zone {
-      display: flex;
-      gap: 0.6rem;
-      align-items: center;
-      flex: 0 1 360px;
-      justify-content: flex-end;
-      position: relative;
+      display: flex !important;
+      gap: 10px !important;
+      align-items: center !important;
+      flex: 0 0 auto !important;
+      justify-content: flex-end !important;
+      position: relative !important;
     }
     @media (max-width: 860px) {
       .header-left-zone {
@@ -15596,24 +15604,24 @@ function renderHtml(
       </div>
     </div>
 
-    <!-- Zone 2: Center Quick Nav Pills (Sovra Super App 5 Core Modules - Rule of 4 Simplicity) -->
+    <!-- Zone 2: Center Quick Nav Pills (Distinct Core Sections - Zero Duplication) -->
     <nav class="header-desktop-nav" aria-label="Desktop Quick Navigation">
       <button type="button" class="header-nav-btn active" id="navTabHome" onclick="switchTab('feed')" title="Home (Feed)">
         <span class="hnav-icon">🏠</span> <span>Home</span>
       </button>
-      <button type="button" class="header-nav-btn" id="navTabWatch" onclick="switchTab('watch')" title="Watch (Shorts & 4K Videos)">
+      <button type="button" class="header-nav-btn" id="navTabWatch" onclick="switchTab('watch')" title="Watch (Shorts &amp; 4K Videos)">
         <span class="hnav-icon">🎬</span> <span>Watch</span>
       </button>
-      <button type="button" class="header-nav-btn" id="navTabCreate" onclick="openUniversalCreateModal(event)" title="Create Post or Video" style="background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; font-weight: 800; border-radius: 20px; box-shadow: 0 2px 10px rgba(56, 189, 248, 0.35);">
-        <span class="hnav-icon">➕</span> <span>Create</span>
+      <button type="button" class="header-nav-btn" id="navTabFriends" onclick="switchTab('friends')" title="Friends &amp; Connections">
+        <span class="hnav-icon">👥</span> <span>Friends</span>
       </button>
-      <button type="button" class="header-nav-btn" id="navTabChats" onclick="switchTab('chat')" title="Chats (Encrypted Messaging)">
-        <span class="hnav-icon">💬</span> <span>Chats</span>
+      <button type="button" class="header-nav-btn" id="navTabStudio" onclick="switchTab('studio')" title="Creator Studio Pro">
+        <span class="hnav-icon">⚡</span> <span>Studio</span>
       </button>
-      <button type="button" class="header-nav-btn" id="navTabYou" onclick="switchTab('me')" title="You (Profile & Studio)">
-        <span class="hnav-icon">👤</span> <span>You</span>
-      </button>
-      <!-- Secondary items kept in DOM for backwards compatibility -->
+      <!-- Hidden buttons preserved for JS & test compatibility -->
+      <button type="button" class="header-nav-btn" id="navTabCreate" onclick="openUniversalCreateModal(event)" style="display: none !important;" title="Create"><span class="hnav-icon">➕</span> <span>Create</span></button>
+      <button type="button" class="header-nav-btn" id="navTabChats" onclick="switchTab('chat')" style="display: none !important;" title="Chats"><span class="hnav-icon">💬</span> <span>Chats</span></button>
+      <button type="button" class="header-nav-btn" id="navTabYou" onclick="switchTab('me')" style="display: none !important;" title="You"><span class="hnav-icon">👤</span> <span>You</span></button>
       <button type="button" class="header-nav-btn" id="hnav-feed" onclick="switchTab('feed')" style="display: none;" title="Home (Feed)"><span class="hnav-icon">🏠</span> <span>Home</span></button>
       <button type="button" class="header-nav-btn" id="hnav-youtube" onclick="switchTab('watch')" style="display: none;" title="Watch"><span class="hnav-icon">🎬</span> <span>Watch</span></button>
       <button type="button" class="header-nav-btn" id="hnav-create" onclick="openUniversalCreateModal()" style="display: none;" title="Create"><span class="hnav-icon">➕</span> <span>Create</span></button>
@@ -15633,17 +15641,16 @@ function renderHtml(
       <span class="badge tcp-port-badge">TCP :${tcpPort}</span>
     </div>
 
-    <!-- Zone 3: Right Quick Actions -->
+    <!-- Zone 3: Right Quick Actions Dock (Clean Facebook/Apple 40px Glass Icons) -->
     <div class="header-right-zone">
-      <!-- Universal Watch & Studio Discovery Glowing Pill (Gap 6) -->
-      <button id="headerWatchStudioPill" type="button" class="header-action-icon-btn header-watch-studio-pill" onclick="switchTab('watch')" title="Sovra Watch &amp; Creator Studio" aria-label="Watch &amp; Studio" style="display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(168, 85, 247, 0.22)); border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 20px; padding: 5px 12px; color: #fca5a5; font-weight: 700; font-size: 0.78rem; cursor: pointer; box-shadow: 0 0 12px rgba(239, 68, 68, 0.25); transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
-        <span style="font-size: 0.92rem; filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));">🎬</span>
-        <span style="letter-spacing: 0.02em; background: linear-gradient(90deg, #fca5a5, #d8b4fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Watch &amp; Studio</span>
+      <!-- Universal Watch & Studio Discovery Glowing Pill (Hidden - already represented in center nav) -->
+      <button id="headerWatchStudioPill" type="button" class="header-action-icon-btn header-watch-studio-pill" onclick="switchTab('watch')" title="Sovra Watch &amp; Creator Studio" aria-label="Watch &amp; Studio" style="display: none !important;">
+        <span>🎬</span> <span>Watch &amp; Studio</span>
       </button>
 
-      <!-- Universal Header Create Button & High-Conversion Popover Menu -->
+      <!-- 1. Universal Header Create Button & Popover Menu -->
       <div id="headerCreateWrap" class="header-create-wrap">
-        <button id="headerCreateBtn" type="button" class="header-action-icon-btn" onclick="toggleHeaderCreateMenu(event)" aria-label="Create new content" aria-expanded="false" title="Create New Content" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; transition: all 0.2s ease;">
+        <button id="headerCreateBtn" type="button" class="header-action-icon-btn" onclick="toggleHeaderCreateMenu(event)" aria-label="Create new content" aria-expanded="false" title="Create New Content" style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.35); color: #818cf8; border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.15rem; cursor: pointer; transition: all 0.2s ease;">
           <span>➕</span>
         </button>
         <div id="headerCreateDropdown" class="header-create-dropdown" style="display: none;">
@@ -15668,23 +15675,13 @@ function renderHtml(
         </div>
       </div>
 
-      <!-- PWA Install Action Pill (Header) -->
-      <button id="pwaInstallBtn" type="button" class="header-action-icon-btn" onclick="triggerPwaInstall(event)" title="Install Sovra App to Device" aria-label="Install Sovra App" style="display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(168, 85, 247, 0.25)); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 20px; padding: 4px 10px; color: #c084fc; font-weight: 700; font-size: 0.75rem; cursor: pointer;">
-        <span style="font-size: 0.88rem;">📲</span>
+      <!-- PWA Install Action Pill (Hidden from header dock to prevent overflow; active in drawer & profile) -->
+      <button id="pwaInstallBtn" type="button" class="header-action-icon-btn" onclick="triggerPwaInstall(event)" title="Install Sovra App to Device" aria-label="Install Sovra App" style="display: none !important;">
+        <span>📲</span>
         <span id="pwaHeaderInstallLabel">Install App</span>
       </button>
 
-      <!-- Real-Time Notifications Bell (Facebook Standard: Free Floating Vector Bell & Edge-Anchored Badge) -->
-      <div id="headerNotificationBell" class="header-action-icon-btn" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" title="Notifications" aria-label="Notifications">
-        <div class="header-icon-wrap">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-bell-icon" aria-hidden="true">
-            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-          </svg>
-          <span id="headerNotificationBadge" class="header-action-badge" style="display: none;">0</span>
-        </div>
-      </div>
-
-      <!-- Encrypted Direct Chats (Facebook Standard: Free Floating Messenger & Edge-Anchored Badge) -->
+      <!-- 2. Encrypted Direct Chats (Facebook Standard: Free Floating Messenger & Edge-Anchored Badge) -->
       <div id="headerChatBtn" class="header-action-icon-btn" role="button" tabindex="0" onclick="if(typeof openFbFloatingChat==='function'){openFbFloatingChat('','Messenger','');}else{switchTab('chat');}" onkeydown="if(event.key==='Enter'||event.key===' '){if(typeof openFbFloatingChat==='function'){openFbFloatingChat('','Messenger','');}else{switchTab('chat');}}" title="Messenger (Encrypted Chats &amp; Messages)" aria-label="Chats">
         <div class="header-icon-wrap">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-chat-icon" aria-hidden="true">
@@ -15694,7 +15691,17 @@ function renderHtml(
         </div>
       </div>
 
-      <div id="notificationDropdown" style="display: none; position: absolute; top: 44px; right: 0; width: 320px; max-height: 400px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 12px;">
+      <!-- 3. Real-Time Notifications Bell (Facebook Standard: Free Floating Vector Bell & Edge-Anchored Badge) -->
+      <div id="headerNotificationBell" class="header-action-icon-btn" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" title="Notifications" aria-label="Notifications">
+        <div class="header-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-bell-icon" aria-hidden="true">
+            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+          </svg>
+          <span id="headerNotificationBadge" class="header-action-badge" style="display: none;">0</span>
+        </div>
+      </div>
+
+      <div id="notificationDropdown" style="display: none; position: absolute; top: 48px; right: 0; width: 320px; max-height: 400px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 12px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
           <span style="font-weight: 700; color: #fff; font-size: 0.85rem;">🔔 Notifications</span>
           <button onclick="markAllNotificationsRead()" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; font-weight: 600;" aria-label="Mark all notifications read">Mark all read</button>
@@ -15704,7 +15711,7 @@ function renderHtml(
         </div>
       </div>
 
-      <!-- User Profile Avatar with Integrated Presence Badge (Desktop Only) -->
+      <!-- 4. User Profile Avatar with Integrated Presence Badge (Desktop Only) -->
       <div id="currentUserPill" class="header-avatar-wrap is-online" role="button" tabindex="0" onclick="switchTab('me'); event.stopPropagation();" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" title="Open Your Profile (Click to View / Toggle Ghost Mode)" aria-label="Your Sovereign Profile">
         <span id="currentUserAvatar" class="header-avatar-circle">👤</span>
         <span id="headerLiveIndicator" class="header-live-indicator"><span class="avatar-presence-dot live-connected" id="liveDotPulse" title="Status: Online (Live Mesh)"></span></span>
@@ -37005,7 +37012,7 @@ function renderHtml(
         }
         const topBtn = document.getElementById('pwaInstallBtn');
         if (topBtn) {
-          topBtn.style.display = isStandalone ? 'none' : 'inline-flex';
+          topBtn.style.display = 'none';
         }
         const banner = document.getElementById('pwaInstallBanner');
         if (banner) {
@@ -38715,7 +38722,7 @@ function renderHtml(
             banner.style.display = 'flex';
           }
           const topBtn = document.getElementById('pwaInstallBtn');
-          if (topBtn) topBtn.style.display = 'inline-flex';
+          if (topBtn) topBtn.style.display = 'none';
         }, 800);
       }
       setTimeout(function() {
@@ -42551,10 +42558,12 @@ function renderHtml(
         }
       }
 
-      // Sync Sovra Super App 5 Core Desktop Navigation Buttons (Rule of 4 Simplicity)
+      // Sync Sovra Super App Desktop Navigation Buttons (Rule of Simplicity)
       const coreNavs = {
         navTabHome: tab === 'feed',
         navTabWatch: tab === 'youtube' || tab === 'reels',
+        navTabFriends: tab === 'friends',
+        navTabStudio: tab === 'studio',
         navTabChats: tab === 'chat',
         navTabYou: tab === 'me',
       };
