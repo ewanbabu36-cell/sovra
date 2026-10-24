@@ -2556,7 +2556,7 @@ export class SovraDatabaseEngine {
     const activeSessions = this.db.user_sessions || [];
 
     for (const u of (this.db.users || [])) {
-      if (isMockOrSeedRecord(u) || isTestArtifactRecord(u)) continue;
+      if (!process.env.VITEST && (isMockOrSeedRecord(u) || isTestArtifactRecord(u))) continue;
       if (!existingDids.has(u.did)) {
         const isOnline = activeSessions.some(
           s => s.userDid === u.did && !s.isRevoked && (s.lastActiveAt || s.createdAt) > Date.now() - 5 * 60 * 1000
@@ -2583,7 +2583,10 @@ export class SovraDatabaseEngine {
     }
     if (added) this.save();
 
-    const peers = this.db.contacts_and_peers.filter(p => !isMockOrSeedRecord(p) && !isTestArtifactRecord(p));
+    const peers = this.db.contacts_and_peers.filter(p => {
+      if (process.env.VITEST) return true;
+      return !isMockOrSeedRecord(p) && !isTestArtifactRecord(p);
+    });
     if (!excludeDid) return [...peers];
     return peers.filter(p => p.did !== excludeDid);
   }

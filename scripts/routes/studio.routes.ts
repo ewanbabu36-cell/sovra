@@ -52,7 +52,7 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     let myChannels = creatorDid ? allChannels.filter(c => c && c.ownerDid === creatorDid) : [];
 
     // If requesting user is the host/seed user or system creator, provide seed channels
-    if (creatorDid && (creatorDid === 'did:sovra:creator_primary' || creatorDid === 'did:sovra:system' || creatorDid === 'did:sovra:laptop_host')) {
+    if (creatorDid && (creatorDid === 'did:sovra:creator_primary' || creatorDid === 'did:sovra:system' || creatorDid === 'did:sovra:laptop_host' || creatorDid.includes('laptop') || creatorDid.includes('host') || creatorDid === 'did:sovra:primary_user')) {
       if (myChannels.length === 0) {
         myChannels = allChannels.filter(c => c && (c.ownerDid === 'did:sovra:system' || c.ownerDid === creatorDid));
       }
