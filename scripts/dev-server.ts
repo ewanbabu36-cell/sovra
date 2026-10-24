@@ -1943,6 +1943,20 @@ function formatMetricCount(num?: number): string {
   return String(num);
 }
 
+export function getLanIpAddress(): string {
+  try {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      for (const net of interfaces[name] || []) {
+        if (net.family === 'IPv4' && !net.internal && !net.address.startsWith('169.254')) {
+          return net.address;
+        }
+      }
+    }
+  } catch (_) {}
+  return '127.0.0.1';
+}
+
 export interface RTCIceServerConfig {
   urls: string | string[];
   username?: string;
@@ -15541,14 +15555,14 @@ function renderHtml(
   </div>
 
   <!-- 🌐 FLOATING GUEST EXPLORATION MODE RIBBON (YouTube / Instagram Web Benchmark) -->
-  <div id="guestModeRibbon" style="display: none; background: linear-gradient(90deg, #1e1b4b 0%, #312e81 60%, #1e1b4b 100%); border-bottom: 1px solid rgba(99, 102, 241, 0.45); padding: 8px 18px; font-size: 0.82rem; color: #e0e7ff; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 99999; box-shadow: 0 4px 16px rgba(0,0,0,0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(99, 102, 241, 0.3); border: 1px solid rgba(99, 102, 241, 0.6); font-size: 0.72rem;">🌐</span>
-      <span>You are browsing in <b>Guest Mode</b> &bull; Ephemeral decentralized session &bull; Zero activity logging</span>
+  <div id="guestModeRibbon" style="display: none; background: linear-gradient(90deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.35); padding: 7px 18px; font-size: 0.82rem; color: #e2e8f0; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 99999; box-shadow: 0 4px 16px rgba(0,0,0,0.5); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.5); font-size: 0.75rem;">👁️</span>
+      <span>Browsing in <strong>Guest Mode</strong> • Read-only mesh preview</span>
     </div>
     <div style="display: flex; align-items: center; gap: 8px;">
-      <button type="button" onclick="openSovereignOnboardingWizard()" style="background: linear-gradient(135deg, #38bdf8, #6366f1); border: none; border-radius: 9px; color: #fff; font-size: 0.76rem; font-weight: 700; padding: 5px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(56, 189, 248, 0.35); transition: transform 0.15s ease;">
-        <span>Claim Handle / Complete Setup</span> <span>➔</span>
+      <button type="button" id="btnGuestRibbonSignIn" onclick="promptClaimPermanentHandle()" style="background: linear-gradient(135deg, #38bdf8, #6366f1); border: none; border-radius: 9px; color: #fff; font-size: 0.78rem; font-weight: 700; padding: 5px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(56, 189, 248, 0.35); transition: transform 0.15s ease;">
+        <span>🔑 Sign In / Create Account</span>
       </button>
     </div>
   </div>
@@ -15895,6 +15909,9 @@ function renderHtml(
           <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 4px 6px;">Security &amp; Account</div>
           <div class="dev-drawer-item" id="drawerBackupSovereignIdentity" onclick="openSovereignBackupModal(); toggleDevMainMenu(false);" style="color: #a5b4fc; font-weight: 700;">
             <span>🔑</span> <span>Backup Sovereign Identity</span>
+          </div>
+          <div class="dev-drawer-item" id="drawerMobileDeviceSetup" onclick="openMobileDeviceSetupModal(); toggleDevMainMenu(false);" style="color: #38bdf8; font-weight: 700;">
+            <span>📱</span> <span>Connect Phone (SSL Guide)</span>
           </div>
           <div class="dev-drawer-item" onclick="openWellbeingModal(); toggleDevMainMenu(false);">
             <span>🌱</span> <span style="color: #34d399; font-weight: 600;">Digital Wellbeing &amp; Limits</span>
@@ -25548,11 +25565,15 @@ function renderHtml(
           <!-- 🚀 1-TAP INSTANT GUEST EXPLORATION (Zero Friction Onboarding) -->
           <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.85rem; margin-top: 1rem;">
             <button type="button" id="womGuestExploreBtn" onclick="enterAsGuest()" style="width: 100%; padding: 0.8rem; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; color: #38bdf8; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease;">
-              <span>🚀 1-Tap Instant Guest Explore (No Setup Required)</span>
+              <span>👁️ Explore as Guest</span>
             </button>
             <div style="display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 0.75rem;">
               <button type="button" onclick="autoFindForgotUserIdDemo()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.78rem; font-weight: 600; padding: 0; display: inline-flex; align-items: center; gap: 4px;">
                 <span>🔑</span> <span>Auto-Find with Passkey</span>
+              </button>
+              <span style="color: rgba(255,255,255,0.2); font-size: 0.8rem;">•</span>
+              <button type="button" onclick="openMobileDeviceSetupModal()" style="background: none; border: none; color: #38bdf8; cursor: pointer; font-size: 0.78rem; font-weight: 600; padding: 0; display: inline-flex; align-items: center; gap: 4px;">
+                <span>📱</span> <span>Connect Phone (SSL Guide)</span>
               </button>
               <span style="color: rgba(255,255,255,0.2); font-size: 0.8rem;">•</span>
               <button type="button" onclick="skipOnboardingAsHost()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.78rem; font-weight: 500; padding: 0; display: inline-flex; align-items: center; gap: 4px;">
@@ -27172,6 +27193,53 @@ function renderHtml(
 
         <button type="button" onclick="closeSovereignBackupModal()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.92rem; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
           ✓ I Have Saved My Seed Phrase Safely
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📱 MOBILE DEVICE SETUP & SSL CERTIFICATE ASSISTANT MODAL -->
+  <div id="mobileDeviceSetupModal" class="omni-modal-overlay" style="display: none; z-index: 999999;">
+    <div class="omni-modal-card" style="max-width: 520px; width: 94%;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 800; font-size: 1.05rem; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+          <span>📱</span> <span>Connect Phone (Mobile SSL Guide)</span>
+        </div>
+        <button onclick="closeMobileDeviceSetupModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <div style="padding: 1.5rem; max-height: 80vh; overflow-y: auto;">
+        <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 1.25rem; font-size: 0.82rem; color: #bae6fd; line-height: 1.45;">
+          <strong>Why HTTPS?</strong> Mobile browsers (iOS Safari &amp; Android Chrome) strictly require a Secure Context (HTTPS) for WebRTC Camera/Microphone calls and Passkeys.
+        </div>
+
+        <!-- 2-Step Guide -->
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 1.5rem;">
+          <div style="display: flex; gap: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+            <div style="width: 28px; height: 28px; border-radius: 50%; background: #38bdf8; color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem;">1</div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">Open Secure URL on Your Phone</div>
+              <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 6px;">Connect your phone to the same Wi-Fi and open:</div>
+              <div id="mobileSetupHttpsUrl" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 6px 10px; font-family: monospace; font-size: 0.85rem; color: #38bdf8; word-break: break-all;">
+                https://localhost:3443
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+            <div style="width: 28px; height: 28px; border-radius: 50%; background: #10b981; color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem;">2</div>
+            <div>
+              <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">Accept Local Certificate (2 Taps)</div>
+              <div style="font-size: 0.78rem; color: #cbd5e1; line-height: 1.45;">
+                • <strong>Android Chrome:</strong> Tap <span style="color: #38bdf8; font-weight: 700;">'Advanced'</span> ➔ <span style="color: #38bdf8; font-weight: 700;">'Proceed to (unsafe)'</span>.<br>
+                • <strong>iOS Safari:</strong> Tap <span style="color: #38bdf8; font-weight: 700;">'Show Details'</span> ➔ <span style="color: #38bdf8; font-weight: 700;">'visit this website'</span>.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" onclick="closeMobileDeviceSetupModal()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #38bdf8, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.92rem; cursor: pointer; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);">
+          Got It, Ready to Test! 🚀
         </button>
       </div>
     </div>
@@ -34225,8 +34293,10 @@ function renderHtml(
     };
 
     window.openSpatialCallSurface = function(peerDid, callType, originEl, peerNameEncoded) {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('start audio/video calls')) return;
       const peerName = peerNameEncoded ? decodeURIComponent(peerNameEncoded) : (peerDid || 'Peer');
       const isVideo = (callType === 'video');
+      const isPlainHttpOnMobile = (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
 
       window.SovraSurfaceManager.pushSurface({
         id: 'call-' + peerDid,
@@ -34239,6 +34309,15 @@ function renderHtml(
           let isCamOff = false;
 
           let html = '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 20px 10px; text-align: center;">';
+
+          if (isPlainHttpOnMobile) {
+            html += '<div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 10px; padding: 10px 14px; color: #fca5a5; font-size: 0.78rem; max-width: 320px; line-height: 1.4;">' +
+              '⚠️ Camera &amp; Mic require HTTPS on mobile browsers.<br>' +
+              '<button type="button" onclick="openMobileDeviceSetupModal()" style="margin-top: 6px; background: #38bdf8; color: #000; border: none; border-radius: 6px; padding: 4px 10px; font-weight: 700; font-size: 0.75rem; cursor: pointer;">' +
+                '📱 Open Mobile SSL Setup Guide' +
+              '</button>' +
+            '</div>';
+          }
 
           // Call Stage Visual
           if (isVideo) {
@@ -37985,7 +38064,7 @@ function renderHtml(
         if (s3) s3.style.display = 'none';
 
         const closeBtn = document.getElementById('womCloseBtn');
-        if (closeBtn) closeBtn.style.display = (myProfile && myProfile.sessionToken) ? 'flex' : 'none';
+        if (closeBtn) closeBtn.style.display = 'flex';
         switchWomAuthTab('login');
       }
     }
@@ -38011,7 +38090,7 @@ function renderHtml(
 
     function closeOnboardingModal() {
       if (!myProfile || !myProfile.sessionToken) {
-        showAccountToast('⚠️ Please create an account or sign in to enter Sovra.');
+        enterAsGuest();
         return;
       }
       showAuthenticatedAppView();
@@ -38048,6 +38127,29 @@ function renderHtml(
     }
     window.enterAsGuest = enterAsGuest;
 
+    function openMobileDeviceSetupModal() {
+      const modal = document.getElementById('mobileDeviceSetupModal');
+      if (!modal) return;
+      fetch('/api/status').then(r => r.json()).then(data => {
+        const urlElem = document.getElementById('mobileSetupHttpsUrl');
+        if (urlElem) {
+          const httpsUrl = data.httpsUrl || ('https://' + (data.lanIp || window.location.hostname) + ':3443');
+          urlElem.textContent = httpsUrl;
+        }
+      }).catch(() => {
+        const urlElem = document.getElementById('mobileSetupHttpsUrl');
+        if (urlElem) urlElem.textContent = 'https://' + window.location.hostname + ':3443';
+      });
+      modal.style.display = 'flex';
+    }
+    window.openMobileDeviceSetupModal = openMobileDeviceSetupModal;
+
+    function closeMobileDeviceSetupModal() {
+      const modal = document.getElementById('mobileDeviceSetupModal');
+      if (modal) modal.style.display = 'none';
+    }
+    window.closeMobileDeviceSetupModal = closeMobileDeviceSetupModal;
+
     function promptClaimPermanentHandle() {
       const wom = document.getElementById('welcomeOnboardingModal');
       if (wom) {
@@ -38065,6 +38167,16 @@ function renderHtml(
       }
     }
     window.promptClaimPermanentHandle = promptClaimPermanentHandle;
+
+    function checkGuestWriteAction(actionName) {
+      if (myProfile && (myProfile.isGuest || myProfile.role === 'Guest Explorer' || localStorage.getItem('sovra_is_guest') === 'true')) {
+        promptClaimPermanentHandle();
+        showAccountToast('🔒 Please Sign In or Create an Account to ' + (actionName || 'interact with the mesh') + '.');
+        return true;
+      }
+      return false;
+    }
+    window.checkGuestWriteAction = checkGuestWriteAction;
 
     function switchWomAuthTab(tab) {
       const regTab = document.getElementById('womTabRegisterBtn');
@@ -38670,6 +38782,10 @@ function renderHtml(
       const savedProfile = localStorage.getItem('sovra_user_profile');
 
       if (isExplicitlyLoggedOut || !sessionToken || !savedProfile) {
+        if (!isExplicitlyLoggedOut) {
+          enterAsGuest();
+          return;
+        }
         updateUserDisplayInUI();
         showAuthLandingGate();
         return;
@@ -38702,11 +38818,13 @@ function renderHtml(
               localStorage.removeItem('sovra_user_profile');
               localStorage.removeItem('sovra_session_token');
               updateUserDisplayInUI();
-              showAuthLandingGate();
+              if (!isExplicitlyLoggedOut) enterAsGuest();
+              else showAuthLandingGate();
             }
           })
           .catch(() => {
             if (myProfile) updateUserDisplayInUI();
+            else if (!isExplicitlyLoggedOut) enterAsGuest();
             else showAuthLandingGate();
           });
       } else {
@@ -45030,6 +45148,7 @@ function renderHtml(
     }
 
     function submitPostModalComment(postId) {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('comment on dispatches')) return;
       const input = document.getElementById('postModalCommentInput');
       if (!input || !input.value.trim()) return;
       const text = input.value.trim();
@@ -45636,6 +45755,7 @@ function renderHtml(
     }
 
     function triggerPostEmotion(postId, emoji) {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('react to dispatches')) return;
       const post = feedPostsData.find(function(p) { return p.id === postId; });
       if (!post) return;
       if (!post.reactions) post.reactions = {};
@@ -45874,6 +45994,7 @@ function renderHtml(
     }
 
     function submitFeedComment(postId) {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('comment on dispatches')) return;
       const input = document.getElementById('input-comment-' + postId);
       if (!input || !input.value.trim()) return;
       const text = input.value.trim();
@@ -46493,6 +46614,7 @@ function renderHtml(
     }
 
     function submitDynamicPost() {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('publish posts')) return;
       if (!myProfile) {
         const guestSeed = Math.random().toString(36).substring(2, 8);
         myProfile = {
@@ -61924,6 +62046,7 @@ function renderHtml(
     window.handleBubbleTouchEnd = handleBubbleTouchEnd;
 
     async function sendChatMessage() {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('send direct messages')) return;
       const input = document.getElementById('chatInputText');
       const text = input ? input.value.trim() : '';
       if (!text && !_pendingChatAttachment) return;
@@ -75663,6 +75786,7 @@ async function startDevServer() {
 
     // API: Node Status
     if (url.pathname === '/api/status' && req.method === 'GET') {
+      const currentLanIp = getLanIpAddress();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
@@ -75679,6 +75803,11 @@ async function startDevServer() {
           nodeUptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
           zeroAdminDependency: true,
           database: sovraDb.getDbInfo(),
+          lanIp: currentLanIp,
+          httpsPort: HTTPS_PORT,
+          httpPort: HTTP_PORT,
+          httpsUrl: `https://${currentLanIp}:${HTTPS_PORT}`,
+          httpUrl: `http://${currentLanIp}:${HTTP_PORT}`,
         }),
       );
       return;
@@ -77303,14 +77432,51 @@ async function startDevServer() {
         const avatar = user?.avatar || name.charAt(0).toUpperCase();
         const isClose = Boolean(parsed.isCloseFriends);
 
+        let finalImageUrl = parsed.imageUrl ? String(parsed.imageUrl) : undefined;
+        let finalVideoUrl = parsed.videoUrl ? String(parsed.videoUrl) : undefined;
+
+        if (finalImageUrl && finalImageUrl.startsWith('data:')) {
+          try {
+            const commaIdx = finalImageUrl.indexOf(',');
+            const base64Data = commaIdx >= 0 ? finalImageUrl.slice(commaIdx + 1) : finalImageUrl;
+            const imgBuffer = Buffer.from(base64Data, 'base64');
+            const cidObj = CID.create('raw', imgBuffer, false, 'sha2-256');
+            const cid = cidObj.toString('base32');
+            await localMediaDriver.save(cid, imgBuffer, 'image/jpeg');
+            if (storageDaemon && storageDaemon.blockstore) {
+              try { await storageDaemon.blockstore.put(cidObj, imgBuffer); } catch (_) {}
+            }
+            finalImageUrl = `/api/media/${cid}`;
+          } catch (imgErr) {
+            console.warn('[Stories] Image offload warning:', imgErr);
+          }
+        }
+
+        if (finalVideoUrl && finalVideoUrl.startsWith('data:')) {
+          try {
+            const commaIdx = finalVideoUrl.indexOf(',');
+            const base64Data = commaIdx >= 0 ? finalVideoUrl.slice(commaIdx + 1) : finalVideoUrl;
+            const vidBuffer = Buffer.from(base64Data, 'base64');
+            const cidObj = CID.create('raw', vidBuffer, false, 'sha2-256');
+            const cid = cidObj.toString('base32');
+            await localMediaDriver.save(cid, vidBuffer, 'video/mp4');
+            if (storageDaemon && storageDaemon.blockstore) {
+              try { await storageDaemon.blockstore.put(cidObj, vidBuffer); } catch (_) {}
+            }
+            finalVideoUrl = `/api/media/${cid}`;
+          } catch (vidErr) {
+            console.warn('[Stories] Video offload warning:', vidErr);
+          }
+        }
+
         const newSeg = {
           id: `story-seg-${Date.now()}`,
           caption: String(parsed.caption || '').trim(),
           stickerText: String(parsed.stickerText || (parsed.poll ? '📊 Poll' : (parsed.questionSticker ? '❓ Q&A' : (parsed.musicSticker ? '🎵 Music' : '⚡ P2P Mesh Story')))),
           stickerType: String(parsed.stickerType || (parsed.poll ? 'poll' : (parsed.questionSticker ? 'question' : (parsed.musicSticker ? 'music' : 'location')))),
           gradient: String(parsed.gradient || (isClose ? 'linear-gradient(135deg, #065f46, #10b981)' : 'linear-gradient(135deg, #4f46e5, #06b6d4)')),
-          imageUrl: parsed.imageUrl ? String(parsed.imageUrl) : undefined,
-          videoUrl: parsed.videoUrl ? String(parsed.videoUrl) : undefined,
+          imageUrl: finalImageUrl,
+          videoUrl: finalVideoUrl,
           isCloseFriends: isClose,
           poll: parsed.poll ? {
             question: String(parsed.poll.question || 'Live Poll'),
@@ -77801,6 +77967,31 @@ async function startDevServer() {
           mediaGradient = parsed.mediaGradient || 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)';
         }
 
+        let finalCarouselImages: string[] | undefined = undefined;
+        if (Array.isArray(parsed.carouselImages)) {
+          finalCarouselImages = [];
+          for (const item of parsed.carouselImages) {
+            if (typeof item === 'string' && item.startsWith('data:')) {
+              try {
+                const commaIdx = item.indexOf(',');
+                const b64 = commaIdx >= 0 ? item.slice(commaIdx + 1) : item;
+                const buf = Buffer.from(b64, 'base64');
+                const cidObj = CID.create('raw', buf, false, 'sha2-256');
+                const cId = cidObj.toString('base32');
+                await localMediaDriver.save(cId, buf, 'image/jpeg');
+                if (storageDaemon && storageDaemon.blockstore) {
+                  try { await storageDaemon.blockstore.put(cidObj, buf); } catch (_) {}
+                }
+                finalCarouselImages.push(`/api/media/${cId}`);
+              } catch (_) {
+                finalCarouselImages.push(item);
+              }
+            } else if (typeof item === 'string') {
+              finalCarouselImages.push(item);
+            }
+          }
+        }
+
         const postVisibility: PostVisibility = (parsed.visibility === 'only_me' || parsed.visibility === 'friends') ? parsed.visibility : 'public';
         const newPost = sovraDb.createPost({
           id: newPostId,
@@ -77842,7 +78033,7 @@ async function startDevServer() {
           feeling: parsed.feeling,
           location: parsed.location ? String(parsed.location) : undefined,
           quotedPost: parsed.quotedPost,
-          carouselImages: Array.isArray(parsed.carouselImages) ? parsed.carouselImages : undefined,
+          carouselImages: finalCarouselImages,
           filterPreset: parsed.filterPreset ? String(parsed.filterPreset) : undefined,
           cssFilter: parsed.cssFilter ? String(parsed.cssFilter) : undefined,
           taggedUsers: Array.isArray(parsed.taggedUsers) ? parsed.taggedUsers : undefined,
@@ -78194,10 +78385,51 @@ async function startDevServer() {
         path.join(POSTS_DIR, `${cid}.webm`),
         path.join(REELS_DIR, `${cid}.mp4`),
         path.join(REELS_DIR, `${cid}.webm`),
+        path.join(MEDIA_DIR, `${cid}.mp4`),
+        path.join(MEDIA_DIR, `${cid}.webm`),
+        path.join(MEDIA_DIR, cid),
       ];
       let filePath = possibleFiles.find(p => fs.existsSync(p));
 
       if (!filePath) {
+        try {
+          const driverRes = await localMediaDriver.read(cid);
+          if (driverRes) {
+            const fileSize = driverRes.buffer.length;
+            const range = req.headers.range;
+            const mime = driverRes.mimeType || 'video/mp4';
+            if (range) {
+              const parts = range.replace(/bytes=/, '').split('-');
+              const start = parseInt(parts[0], 10);
+              const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+              if (start >= fileSize) {
+                res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
+                res.end();
+                return;
+              }
+              const chunk = driverRes.buffer.subarray(start, end + 1);
+              res.writeHead(206, {
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunk.length,
+                'Content-Type': mime,
+                'Cache-Control': 'public, max-age=86400',
+              });
+              res.end(chunk);
+              return;
+            } else {
+              res.writeHead(200, {
+                'Content-Length': fileSize,
+                'Accept-Ranges': 'bytes',
+                'Content-Type': mime,
+                'Cache-Control': 'public, max-age=86400',
+              });
+              res.end(driverRes.buffer);
+              return;
+            }
+          }
+        } catch (_) {}
+
         try {
           const blk = await storageDaemon.getBlock(cid);
           if (blk) {
@@ -84957,16 +85189,7 @@ async function startDevServer() {
 
   server.listen(HTTP_PORT, '0.0.0.0', () => {
     console.log('[2/2] HTTP Server Bound!');
-    const interfaces = os.networkInterfaces();
-    let lanIp = '10.96.44.224';
-    for (const name of Object.keys(interfaces)) {
-      for (const net of interfaces[name] || []) {
-        if (net.family === 'IPv4' && !net.internal && !net.address.startsWith('169.254')) {
-          lanIp = net.address;
-          break;
-        }
-      }
-    }
+    const lanIp = getLanIpAddress();
 
     if (httpsServer) {
       httpsServer.on('error', (err: any) => {

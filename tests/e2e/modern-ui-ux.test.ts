@@ -244,4 +244,53 @@ describe('Modern UI/UX Design System & Smart Omnibar E2E Suite', () => {
     expect(content).toContain('bottom: 4px; right: 4px;');
     expect(content).toContain('pointer-events: none !important;');
   });
+
+  it('verifies Production Hardening Gap 1: Frictionless Guest Mode & Contextual Write Interception', () => {
+    expect(content).toContain('id="womGuestExploreBtn"');
+    expect(content).toContain('enterAsGuest');
+    expect(content).toContain('id="guestModeRibbon"');
+    expect(content).toContain('Browsing in <strong>Guest Mode</strong>');
+    expect(content).toContain('checkGuestWriteAction');
+    expect(content).toContain('promptClaimPermanentHandle');
+  });
+
+  it('verifies Production Hardening Gap 2: CAS Disk Offloading for Stories & Carousel Images', () => {
+    expect(content).toContain('finalImageUrl');
+    expect(content).toContain('finalVideoUrl');
+    expect(content).toContain('finalCarouselImages');
+    expect(content).toContain("await localMediaDriver.save(cid, imgBuffer, 'image/jpeg')");
+    expect(content).toContain("await localMediaDriver.save(cId, buf, 'image/jpeg')");
+  });
+
+  it('verifies Production Hardening Gap 3: Debounced Atomic I/O & Zero-Block Database Pipeline', () => {
+    const dbEnginePath = path.resolve(__dirname, '../../scripts/database-engine.ts');
+    const dbContent = fs.readFileSync(dbEnginePath, 'utf8');
+    expect(dbContent).toContain('saveDebounceTimer');
+    expect(dbContent).toContain('flushSync');
+    expect(dbContent).toContain('public save(immediate = false)');
+  });
+
+  it('verifies Production Hardening Gap 4: Unified Video Streaming CAS Resolver', () => {
+    expect(content).toContain('path.join(MEDIA_DIR, `${cid}.mp4`)');
+    expect(content).toContain('path.join(MEDIA_DIR, `${cid}.webm`)');
+    expect(content).toContain('path.join(MEDIA_DIR, cid)');
+    expect(content).toContain('localMediaDriver.read(cid)');
+  });
+
+  it('verifies Production Hardening Gap 5: RFC 8292 VAPID WebPush Notification Dispatcher', () => {
+    const pushRoutesPath = path.resolve(__dirname, '../../scripts/routes/push.routes.ts');
+    const pushContent = fs.readFileSync(pushRoutesPath, 'utf8');
+    expect(pushContent).toContain('generateVapidJwt');
+    expect(pushContent).toContain('getOrCreateVapidKeys');
+    expect(pushContent).toContain('sendWebPush');
+    expect(pushContent).toContain('Authorization\': `vapid t=${jwt}, k=${keys.publicKey}`');
+  });
+
+  it('verifies Production Hardening Gap 6: Mobile SSL & LAN Connectivity Assistant', () => {
+    expect(content).toContain('id="mobileDeviceSetupModal"');
+    expect(content).toContain('openMobileDeviceSetupModal');
+    expect(content).toContain('closeMobileDeviceSetupModal');
+    expect(content).toContain('id="drawerMobileDeviceSetup"');
+    expect(content).toContain('getLanIpAddress');
+  });
 });
