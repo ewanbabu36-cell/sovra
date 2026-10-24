@@ -16002,7 +16002,14 @@ function renderHtml(
       <div class="container">
     <!-- Tab 1: Instagram Main Feed (Stories, Photo Stream, Double-Tap Hearts) -->
     <main class="main-content" id="feed-view" style="display: flex;">
-      <div class="feed-container">
+      <div class="feed-container" id="feedStreamContainer">
+        <!-- Native Mobile Pull-to-Refresh Spring Indicator -->
+        <div id="feedPullToRefreshIndicator" style="display: flex; align-items: center; justify-content: center; height: 0px; max-height: 70px; overflow: hidden; transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; opacity: 0; pointer-events: none; margin-bottom: 4px;">
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 9999px; padding: 6px 14px; box-shadow: 0 4px 18px rgba(0,0,0,0.4);">
+            <svg id="pullRefreshSpinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.1s linear;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            <span id="pullRefreshText" style="font-size: 0.76rem; font-weight: 700; color: #38bdf8;">Pull to refresh...</span>
+          </div>
+        </div>
         <!-- Advance Mode: Holographic Node Telemetry HUD (Ref Image 2) -->
         <div id="devAdvanceTelemetryHud" class="circuit-glass-card" style="display: none; margin-bottom: 16px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -16092,6 +16099,15 @@ function renderHtml(
               .join('')}
             </div>
           </div>
+        </div>
+
+        <!-- Ambient In-Feed LAN Peers Discovery Pill -->
+        <div id="ambientLanPeerPill" style="display: none; align-items: center; justify-content: space-between; background: linear-gradient(135deg, rgba(2, 132, 199, 0.18), rgba(99, 102, 241, 0.2)); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 8px 14px; margin: 0 0 14px 0; box-shadow: 0 4px 16px rgba(0,0,0,0.25);">
+          <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+            <span style="font-size: 1.05rem;">📡</span>
+            <span id="ambientLanPeerPillLabel" style="font-size: 0.78rem; font-weight: 700; color: #e0f2fe; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">1 Device Active Nearby</span>
+          </div>
+          <button type="button" id="ambientLanPeerActionBtn" style="background: linear-gradient(135deg, #0284c7, #2563eb); border: none; border-radius: 8px; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 4px 12px; cursor: pointer; flex-shrink: 0; box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4);">💬 Chat</button>
         </div>
 
         <!-- ✍️ DYNAMIC FEED POST COMPOSER (MULTI-FORMAT: TWEET / REDDIT / PHOTO / VIDEO / POLL / SURVEY / QA) -->
@@ -30044,6 +30060,62 @@ function renderHtml(
         if (currentTab === 'peer-profile') {
           if (typeof returnFromPeerProfile === 'function') returnFromPeerProfile(true);
           else if (typeof switchTab === 'function') switchTab('feed');
+          return true;
+        }
+
+        // 0E. YouTube Studio Video Upload Progress HUD
+        const uploadHud = document.getElementById('videoUploadProgressHUD');
+        if (uploadHud && (uploadHud.style.display === 'flex' || uploadHud.style.display === 'block')) {
+          if (typeof hideVideoUploadProgressHUD === 'function') hideVideoUploadProgressHUD();
+          else uploadHud.style.display = 'none';
+          return true;
+        }
+
+        // 0F. WebRTC Incoming Call Ringing Modal
+        const incomingCall = document.getElementById('incomingCallModal');
+        if (incomingCall && (incomingCall.style.display === 'flex' || incomingCall.style.display === 'block')) {
+          if (typeof declineIncomingCall === 'function') declineIncomingCall();
+          else incomingCall.style.display = 'none';
+          return true;
+        }
+
+        // 0G. WebRTC Active Call Modal / Spatial Call Overlay
+        const e2eeModal = document.getElementById('e2eeCallModal');
+        const spatialCall = document.getElementById('spatialCallOverlay');
+        if ((e2eeModal && (e2eeModal.style.display === 'flex' || e2eeModal.style.display === 'block')) ||
+            (spatialCall && (spatialCall.style.display === 'flex' || spatialCall.style.display === 'block'))) {
+          if (typeof minimizeSpatialCallToPip === 'function') {
+            minimizeSpatialCallToPip();
+          } else if (typeof endE2eeCall === 'function') {
+            endE2eeCall();
+          } else {
+            if (e2eeModal) e2eeModal.style.display = 'none';
+            if (spatialCall) spatialCall.style.display = 'none';
+          }
+          return true;
+        }
+
+        // 0H. Ephemeral View-Once Media Modal
+        const viewOnce = document.getElementById('viewOnceModal');
+        if (viewOnce && (viewOnce.style.display === 'flex' || viewOnce.style.display === 'block')) {
+          if (typeof closeViewOnceModal === 'function') closeViewOnceModal();
+          else viewOnce.style.display = 'none';
+          return true;
+        }
+
+        // 0I. Studio Membership Tier Modal
+        const tierModal = document.getElementById('studioTierModal');
+        if (tierModal && (tierModal.style.display === 'flex' || tierModal.style.display === 'block')) {
+          if (typeof closeTierModal === 'function') closeTierModal();
+          else tierModal.style.display = 'none';
+          return true;
+        }
+
+        // 0J. Welcome Onboarding Modal
+        const womModal = document.getElementById('welcomeOnboardingModal');
+        if (womModal && (womModal.style.display === 'flex' || womModal.style.display === 'block')) {
+          if (typeof closeOnboardingModal === 'function') closeOnboardingModal();
+          else womModal.style.display = 'none';
           return true;
         }
 
@@ -45301,12 +45373,41 @@ function renderHtml(
     }
     window.handleMediaPointerMove = handleMediaPointerMove;
 
+    let _lastMediaTapTime = 0;
+    let _lastMediaTapPostId = null;
+    let _mediaSingleTapTimeout = null;
+
     function handleMediaClick(e, postId) {
       if (_mediaPointerDidDrag) {
         // User was dragging or scrolling up/down on the photo - allow page scroll
         return;
       }
-      openPhotoLightboxById(postId);
+      const now = Date.now();
+      if (_lastMediaTapPostId === postId && (now - _lastMediaTapTime < 220)) {
+        // Double-tap detected within 220ms window!
+        if (_mediaSingleTapTimeout) {
+          clearTimeout(_mediaSingleTapTimeout);
+          _mediaSingleTapTimeout = null;
+        }
+        _lastMediaTapTime = 0;
+        _lastMediaTapPostId = null;
+        if (typeof handleFeedDoubleTap === 'function') {
+          handleFeedDoubleTap(postId, e);
+        }
+        return;
+      }
+
+      _lastMediaTapTime = now;
+      _lastMediaTapPostId = postId;
+      if (_mediaSingleTapTimeout) {
+        clearTimeout(_mediaSingleTapTimeout);
+      }
+      _mediaSingleTapTimeout = setTimeout(function() {
+        _mediaSingleTapTimeout = null;
+        _lastMediaTapTime = 0;
+        _lastMediaTapPostId = null;
+        openPhotoLightboxById(postId);
+      }, 220);
     }
     window.handleMediaClick = handleMediaClick;
 
@@ -45719,6 +45820,128 @@ function renderHtml(
       document.addEventListener('DOMContentLoaded', initMobileKeyboardViewportAdapter);
     } else {
       initMobileKeyboardViewportAdapter();
+    }
+
+    // Native Mobile Pull-to-Refresh Spring Gesture
+    function initFeedPullToRefresh() {
+      const indicator = document.getElementById('feedPullToRefreshIndicator');
+      const spinner = document.getElementById('pullRefreshSpinner');
+      const text = document.getElementById('pullRefreshText');
+      if (!indicator) return;
+
+      let startY = 0;
+      let isPulling = false;
+      let isRefreshing = false;
+
+      window.addEventListener('touchstart', function(e) {
+        if (isRefreshing) return;
+        const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        if (scrollY <= 0 && e.touches.length === 1) {
+          startY = e.touches[0].clientY;
+          isPulling = true;
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchmove', function(e) {
+        if (!isPulling || isRefreshing) return;
+        const currentY = e.touches[0].clientY;
+        const diff = currentY - startY;
+        if (diff > 0) {
+          const pullHeight = Math.min(65, Math.pow(diff, 0.85));
+          indicator.style.height = pullHeight + 'px';
+          indicator.style.opacity = String(Math.min(1, pullHeight / 40));
+          if (spinner) {
+            spinner.style.transform = 'rotate(' + (diff * 2.5) + 'deg)';
+          }
+          if (text) {
+            text.innerText = (diff > 65) ? 'Release to refresh...' : 'Pull to refresh...';
+          }
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchend', function(e) {
+        if (!isPulling || isRefreshing) return;
+        isPulling = false;
+        const currentHeight = parseInt(indicator.style.height || '0', 10);
+        if (currentHeight >= 50) {
+          isRefreshing = true;
+          indicator.style.height = '50px';
+          if (spinner) spinner.style.animation = 'spinVinyl 0.8s linear infinite';
+          if (text) text.innerText = 'Refreshing mesh feed...';
+          if ('vibrate' in navigator) {
+            try { navigator.vibrate(15); } catch (_) {}
+          }
+          if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
+          if (typeof updateFeedTimestamps === 'function') updateFeedTimestamps();
+          if (typeof fetchAndUpdateAmbientLanPeers === 'function') fetchAndUpdateAmbientLanPeers();
+          
+          setTimeout(function() {
+            indicator.style.height = '0px';
+            indicator.style.opacity = '0';
+            setTimeout(function() {
+              if (spinner) {
+                spinner.style.animation = '';
+                spinner.style.transform = 'rotate(0deg)';
+              }
+              isRefreshing = false;
+            }, 250);
+          }, 600);
+        } else {
+          indicator.style.height = '0px';
+          indicator.style.opacity = '0';
+        }
+      });
+    }
+    window.initFeedPullToRefresh = initFeedPullToRefresh;
+
+    // Ambient In-Feed LAN Peers Discovery Pill
+    function fetchAndUpdateAmbientLanPeers() {
+      const pill = document.getElementById('ambientLanPeerPill');
+      const label = document.getElementById('ambientLanPeerPillLabel');
+      const btn = document.getElementById('ambientLanPeerActionBtn');
+      if (!pill) return;
+
+      fetch('/api/peers/list')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.ok || !Array.isArray(data.peers)) return;
+          const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
+          const foreignPeers = data.peers.filter(function(p) {
+            return p.did && p.did !== myDid && p.did !== 'self';
+          });
+          if (foreignPeers.length > 0) {
+            pill.style.display = 'flex';
+            const count = foreignPeers.length;
+            const first = foreignPeers[0];
+            const pName = first.name || first.displayName || 'Peer';
+            if (label) {
+              label.innerText = '📡 ' + count + (count === 1 ? ' Device Active Nearby (' + pName + ')' : ' Devices Active Nearby (LAN)');
+            }
+            if (btn) {
+              btn.onclick = function() {
+                if (typeof openDirectChatWithUser === 'function') {
+                  openDirectChatWithUser(first.did, first.name, first.handle);
+                }
+              };
+            }
+          } else {
+            pill.style.display = 'none';
+          }
+        })
+        .catch(function() {});
+    }
+    window.fetchAndUpdateAmbientLanPeers = fetchAndUpdateAmbientLanPeers;
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        initFeedPullToRefresh();
+        fetchAndUpdateAmbientLanPeers();
+        setInterval(fetchAndUpdateAmbientLanPeers, 10000);
+      });
+    } else {
+      initFeedPullToRefresh();
+      fetchAndUpdateAmbientLanPeers();
+      setInterval(fetchAndUpdateAmbientLanPeers, 10000);
     }
 
     // ==========================================
@@ -54713,6 +54936,7 @@ function renderHtml(
       },
 
       submitTip: async function() {
+        if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('tip creators with SOV')) return;
         const self = this;
         const input = document.getElementById('tipCustomAmountInput');
         const amount = Math.max(1, parseFloat(input ? input.value : '5') || 5);
@@ -54807,8 +55031,11 @@ function renderHtml(
     };
 
     window.openCreatorSovTipModal = function(targetType, targetId, customMeta) {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('tip creators with SOV')) return;
       window.SovraCreatorTippingEngine.openModal(targetType, targetId, customMeta);
     };
+    window.tipCreator = window.openCreatorSovTipModal;
+    window.tipPost = window.openCreatorSovTipModal;
     window.closeCreatorSovTipModal = function() {
       window.SovraCreatorTippingEngine.closeModal();
     };
@@ -55266,6 +55493,7 @@ function renderHtml(
       },
 
       submitUpload: function(publishImmediately, scheduledPublishAt) {
+        if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('publish video releases')) return;
         if (typeof publishImmediately !== "boolean") publishImmediately = true;
         const titleInput = document.getElementById("studioInputTitle");
         const tagsInput = document.getElementById("studioInputTags");
@@ -57335,6 +57563,7 @@ function renderHtml(
       },
 
       submitWorkspaceUpload: function(isScheduled, scheduledPublishAt) {
+        if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('publish video releases')) return;
         var self = this;
         var titleInput = document.getElementById('studioWsInputTitle');
         var tagsInput = document.getElementById('studioWsInputTags');
@@ -58805,6 +59034,7 @@ function renderHtml(
     window.selectStoryGradient = selectStoryGradient;
 
     function openStoryCreatorModal(dataUrl, isVideo, defaultCaption, defaultGradient) {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('create stories')) return;
       storyCreatorState.dataUrl = dataUrl || "";
       storyCreatorState.isVideo = !!isVideo;
       storyCreatorState.filter = "normal";
@@ -59447,7 +59677,14 @@ function renderHtml(
       }, 50);
     }
 
-    function nextStorySegment() {
+    let _storyPressStartTime = 0;
+
+    function nextStorySegment(e) {
+      if (_storyPressStartTime && (Date.now() - _storyPressStartTime > 220)) {
+        _storyPressStartTime = 0;
+        return;
+      }
+      _storyPressStartTime = 0;
       const curCreator = storiesData[activeStoryCreatorIdx];
       if (!curCreator) { closeStory(); return; }
 
@@ -59463,8 +59700,14 @@ function renderHtml(
         closeStory();
       }
     }
+    window.nextStorySegment = nextStorySegment;
 
-    function prevStorySegment() {
+    function prevStorySegment(e) {
+      if (_storyPressStartTime && (Date.now() - _storyPressStartTime > 220)) {
+        _storyPressStartTime = 0;
+        return;
+      }
+      _storyPressStartTime = 0;
       if (activeStorySegmentIdx > 0) {
         activeStorySegmentIdx--;
         renderStorySegment();
@@ -59475,8 +59718,10 @@ function renderHtml(
         renderStorySegment();
       }
     }
+    window.prevStorySegment = prevStorySegment;
 
     function pauseStoryTimer(e) {
+      _storyPressStartTime = Date.now();
       isStoryPaused = true;
       const textOverlay = document.getElementById('storyCreatorTextOverlay');
       const stickerPill = document.getElementById('storyStickerPill');
@@ -59517,6 +59762,7 @@ function renderHtml(
     window.resumeStoryViewer = resumeStoryTimer;
 
     function sendStoryReaction(emoji) {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('react to stories')) return;
       const modal = document.getElementById('storyCardModal');
       if (modal) {
         const pop = document.createElement('div');
@@ -71056,6 +71302,7 @@ function renderHtml(
 
     // --- Channel Creation Handlers ---
     function openCreateChannelModal(type) {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('launch video channels')) return;
       const m = document.getElementById('createChannelModal');
       if (m) {
         m.style.display = 'flex';
@@ -71156,6 +71403,7 @@ function renderHtml(
 
     // --- Page Creation Handlers ---
     function openCreatePageModal() {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('launch organization pages')) return;
       const m = document.getElementById('createPageModal');
       if (m) m.style.display = 'flex';
     }
