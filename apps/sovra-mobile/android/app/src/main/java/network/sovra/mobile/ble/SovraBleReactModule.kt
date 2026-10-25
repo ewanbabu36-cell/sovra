@@ -27,10 +27,22 @@ class SovraBleReactModule(private val reactContext: ReactApplicationContext) :
 
     init {
         // Forward native BLE callbacks to React Native JavaScript event emitter
+        bleModule.onDeviceDiscoveredWithTxPower = { address, rssi, txPower, serviceData, name ->
+            val params = Arguments.createMap().apply {
+                putString("address", address)
+                putInt("rssi", rssi)
+                putInt("txPower", txPower)
+                putString("serviceData", Base64.encodeToString(serviceData, Base64.NO_WRAP))
+                putString("name", name ?: "")
+            }
+            sendEvent("onDeviceDiscovered", params)
+        }
+
         bleModule.onDeviceDiscovered = { address, rssi, serviceData, name ->
             val params = Arguments.createMap().apply {
                 putString("address", address)
                 putInt("rssi", rssi)
+                putInt("txPower", -59)
                 putString("serviceData", Base64.encodeToString(serviceData, Base64.NO_WRAP))
                 putString("name", name ?: "")
             }

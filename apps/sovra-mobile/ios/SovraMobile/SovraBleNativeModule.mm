@@ -16,6 +16,20 @@ RCT_EXPORT_MODULE(SovraBleNative);
         SovraBleBridge *bridge = [SovraBleBridge sharedInstance];
         __weak typeof(self) weakSelf = self;
 
+        bridge.onDeviceDiscoveredWithTxPower = ^(NSString *identifier, NSInteger rssi, NSInteger txPower, NSData *serviceData, NSString * _Nullable name) {
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (strongSelf && strongSelf->hasListeners) {
+                NSString *serviceDataB64 = [serviceData base64EncodedStringWithOptions:0];
+                [strongSelf sendEventWithName:@"onDeviceDiscovered" body:@{
+                    @"address": identifier,
+                    @"rssi": @(rssi),
+                    @"txPower": @(txPower),
+                    @"serviceData": serviceDataB64 ?: @"",
+                    @"name": name ?: @""
+                }];
+            }
+        };
+
         bridge.onDeviceDiscovered = ^(NSString *identifier, NSInteger rssi, NSData *serviceData, NSString * _Nullable name) {
             __strong typeof(weakSelf) strongSelf = weakSelf;
             if (strongSelf && strongSelf->hasListeners) {
@@ -23,6 +37,7 @@ RCT_EXPORT_MODULE(SovraBleNative);
                 [strongSelf sendEventWithName:@"onDeviceDiscovered" body:@{
                     @"address": identifier,
                     @"rssi": @(rssi),
+                    @"txPower": @(-59),
                     @"serviceData": serviceDataB64 ?: @"",
                     @"name": name ?: @""
                 }];

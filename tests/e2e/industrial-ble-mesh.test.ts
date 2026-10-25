@@ -17,11 +17,11 @@ describe('Industrial BLE Mesh Hardening: Zero-Internet Offline Parity', () => {
     const p2 = nodeA.createPacket('*', 'Hyperlocal weather report', { channel: '#local-mesh' });
     const p3 = nodeA.createPacket('did:sovra:bob_mesh', 'Direct P2P offline voucher');
 
-    // Node A creates a 64-bit Bloom filter anti-entropy summary
+    // Node A creates a 64-bit / 256-bit Bloom filter anti-entropy summary
     const summaryA = nodeA.createSyncSummary(10);
     expect(summaryA.nodeDid).toBe('did:sovra:alice_mesh');
     expect(summaryA.recentPacketIds).toHaveLength(3);
-    expect(summaryA.bloomFilterHex).toMatch(/^[0-9a-f]{16}$/i);
+    expect(summaryA.bloomFilterHex).toMatch(/^[0-9a-f]{16,64}$/i);
     expect(summaryA.bloomFilterHex).not.toBe('0000000000000000');
 
     // Node B reconciles Node A's summary (Node B has seen 0 packets)

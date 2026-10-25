@@ -50,6 +50,7 @@ export class BleConnectionTimeoutError extends Error {
 export interface BleDiscoveredDevice {
   readonly address: string;
   readonly rssi: number;
+  readonly txPower?: number | undefined;
   readonly serviceData: Uint8Array;
   readonly name?: string | undefined;
 }

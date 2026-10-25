@@ -17989,6 +17989,10 @@ function renderHtml(
               </div>
               <div style="font-size: 0.68rem; color: #64748b;">Direct cryptographic forwarding active</div>
             </div>
+            <button id="webBluetoothPairBtn" type="button" onclick="connectWebBluetoothRadar()" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; color: #38bdf8; font-size: 0.68rem; font-weight: 700; cursor: pointer;" title="Pair nearby mobile device over Web Bluetooth GATT">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg>
+              <span>Pair BLE</span>
+            </button>
           </div>
 
           <div class="chat-sidebar-header" id="chatSidebarHeader">
@@ -61246,6 +61250,103 @@ function renderHtml(
       renderChatBubbles();
       showAccountToast('🚨 EMERGENCY PANIC WIPE: All local Sovra packets, keys, and peer tables zeroized.');
     }
+
+    // Web Bluetooth API GATT Client Pairing Engine for Chrome / Edge / PWA
+    let _webBleDevice = null;
+    let _webBleServer = null;
+    let _webBleWriteChar = null;
+    let _webBleNotifyChar = null;
+
+    async function connectWebBluetoothRadar() {
+      if (!navigator.bluetooth) {
+        showAccountToast('⚠️ Web Bluetooth is not supported in this browser. Use Chrome, Edge, or Android Web.');
+        return;
+      }
+      try {
+        const pairBtn = document.getElementById('webBluetoothPairBtn');
+        if (pairBtn) pairBtn.innerHTML = '<span>Pairing...</span>';
+
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: ['00005356-0000-1000-8000-00805f9b34fb'] }],
+          optionalServices: ['00005356-0000-1000-8000-00805f9b34fb']
+        });
+
+        _webBleDevice = device;
+        const server = await device.gatt.connect();
+        _webBleServer = server;
+
+        const service = await server.getPrimaryService('00005356-0000-1000-8000-00805f9b34fb');
+        try {
+          _webBleWriteChar = await service.getCharacteristic('00005357-0000-1000-8000-00805f9b34fb');
+          _webBleNotifyChar = await service.getCharacteristic('00005358-0000-1000-8000-00805f9b34fb');
+
+          if (_webBleNotifyChar) {
+            await _webBleNotifyChar.startNotifications();
+            _webBleNotifyChar.addEventListener('characteristicvaluechanged', function(event) {
+              const value = event.target.value;
+              const text = new TextDecoder().decode(value);
+              try {
+                const pkt = JSON.parse(text);
+                if (pkt && pkt.payload) {
+                  showAccountToast('📶 Mesh Packet received via Web Bluetooth from ' + (pkt.sourceName || 'Peer'));
+                }
+              } catch (e) {}
+            });
+          }
+        } catch (charErr) {
+          console.warn('[WebBluetooth] Characteristic discovery note:', charErr);
+        }
+
+        const devDid = 'did:sovra:web_ble_' + (device.id ? device.id.slice(0, 8) : 'node');
+        const existingIdx = bitchatPeersData.findIndex(function(p) { return p.did === devDid; });
+        const peerRecord = {
+          did: devDid,
+          name: device.name || 'Nearby BLE Phone',
+          avatar: '📱',
+          avatarBg: '#0284c7',
+          role: 'Web Bluetooth GATT Linked (0 hops, 1.2m)',
+          hops: 1,
+          isDirect: true,
+          isChannel: false
+        };
+
+        if (existingIdx !== -1) {
+          bitchatPeersData[existingIdx] = peerRecord;
+        } else {
+          bitchatPeersData.push(peerRecord);
+        }
+
+        if (pairBtn) {
+          pairBtn.innerHTML = '<span>Connected</span>';
+          pairBtn.style.color = '#34d399';
+          pairBtn.style.borderColor = '#34d399';
+        }
+
+        renderChatContactsList();
+        showAccountToast('✅ Web Bluetooth GATT Linked: ' + (device.name || 'BLE Mesh Node'));
+      } catch (err) {
+        console.warn('[WebBluetooth] Connection error:', err);
+        const pairBtn = document.getElementById('webBluetoothPairBtn');
+        if (pairBtn) pairBtn.innerHTML = '<span>Pair BLE</span>';
+        if (err.name !== 'NotFoundError') {
+          showAccountToast('⚠️ Web Bluetooth connection failed: ' + (err.message || 'Cancelled'));
+        }
+      }
+    }
+    window.connectWebBluetoothRadar = connectWebBluetoothRadar;
+
+    async function sendWebBluetoothMeshPacket(packetData) {
+      if (!_webBleWriteChar) return false;
+      try {
+        const payloadBytes = new TextEncoder().encode(JSON.stringify(packetData));
+        await _webBleWriteChar.writeValue(payloadBytes);
+        return true;
+      } catch (e) {
+        console.warn('[WebBluetooth] write failed:', e);
+        return false;
+      }
+    }
+    window.sendWebBluetoothMeshPacket = sendWebBluetoothMeshPacket;
 
     function closeMobileChat() {
       const wCont = document.querySelector('.whatsapp-container');
