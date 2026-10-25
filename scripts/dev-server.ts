@@ -1901,6 +1901,18 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sovra-outbox-sync' || event.tag === 'sovra-background-sync') {
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          client.postMessage({ type: 'SOVRA_TRIGGER_OUTBOX_SYNC', timestamp: Date.now() });
+        }
+      })
+    );
+  }
+});
 `;
 
 function safeJsonForScript(data: any): string {
