@@ -17,6 +17,11 @@ import {
   createFeedPost,
   fetchStories,
   markStorySeen,
+  fetchFeedComments,
+  addFeedComment,
+  likeFeedComment,
+  repostFeedPost,
+  saveFeedPost,
 } from '../services/api.js';
 import { localDb } from '../services/local-database.js';
 import { syncEngine } from '../services/sync-engine.js';
@@ -109,6 +114,17 @@ export function FeedScreen(): React.JSX.Element {
 
   // Toast notification for errors / feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Feed Comments Modal State
+  const [activePostCommentsId, setActivePostCommentsId] = useState<string | null>(null);
+  const [commentsList, setCommentsList] = useState<any[]>([]);
+  const [isCommentsLoading, setIsCommentsLoading] = useState<boolean>(false);
+  const [commentInputText, setCommentInputText] = useState<string>('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
+
+  // Post Actions State
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set());
+  const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -360,6 +376,138 @@ export function FeedScreen(): React.JSX.Element {
       showToast('✓ Post saved offline. Queued for auto-sync!');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const openComments = async (postId: string) => {
+    setActivePostCommentsId(postId);
+    setIsCommentsLoading(true);
+    setCommentInputText('');
+    try {
+      const comments = await fetchFeedComments(postId);
+      setCommentsList(comments);
+    } catch {
+      setCommentsList([]);
+    } finally {
+      setIsCommentsLoading(false);
+    }
+  };
+
+  const handleSendComment = async () => {
+    const text = commentInputText.trim();
+    if (!text || !activePostCommentsId) return;
+
+    setIsSubmittingComment(true);
+    try {
+      const res = await addFeedComment(activePostCommentsId, text);
+      if (res.ok && res.comment) {
+        setCommentsList(prev => [...prev, res.comment]);
+      } else {
+        setCommentsList(prev => [
+          ...prev,
+          {
+            id: `c_${Date.now()}`,
+            postId: activePostCommentsId,
+            author: 'You',
+            text,
+            createdAt: new Date().toISOString(),
+            likes: 0,
+          },
+        ]);
+      }
+
+      setPosts(prev =>
+        prev.map(p =>
+          p.id === activePostCommentsId
+            ? { ...p, commentsCount: (p.commentsCount || 0) + 1 }
+            : p,
+        ),
+      );
+      setCommentInputText('');
+      showToast('✓ Comment published!');
+    } catch {
+      await localDb.enqueueOperation('ADD_COMMENT', 'you', {
+        postId: activePostCommentsId,
+        text,
+      });
+      syncEngine.triggerSync().catch(() => {});
+      setCommentsList(prev => [
+        ...prev,
+        {
+          id: `c_off_${Date.now()}`,
+          postId: activePostCommentsId,
+          author: 'You (Offline)',
+          text: `${text} [Sync Pending]`,
+          createdAt: new Date().toISOString(),
+          likes: 0,
+        },
+      ]);
+      setPosts(prev =>
+        prev.map(p =>
+          p.id === activePostCommentsId
+            ? { ...p, commentsCount: (p.commentsCount || 0) + 1 }
+            : p,
+        ),
+      );
+      setCommentInputText('');
+      showToast('✓ Comment saved offline. Queued for auto-sync!');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    setCommentsList(prev =>
+      prev.map(c =>
+        c.id === commentId
+          ? {
+              ...c,
+              isLiked: !c.isLiked,
+              likes: (c.likes || 0) + (c.isLiked ? -1 : 1),
+            }
+          : c,
+      ),
+    );
+    await likeFeedComment(commentId);
+  };
+
+  const handleRepost = async (postId: string) => {
+    const isAlreadyReposted = repostedPosts.has(postId);
+    setRepostedPosts(prev => {
+      const next = new Set(prev);
+      if (isAlreadyReposted) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      return next;
+    });
+
+    if (!isAlreadyReposted) {
+      await repostFeedPost(postId);
+      showToast('🚀 Reposted to your sovereign profile feed!');
+    } else {
+      showToast('Repost removed');
+    }
+  };
+
+  const handleSavePost = async (postId: string) => {
+    const isAlreadySaved = bookmarkedPosts.has(postId);
+    setBookmarkedPosts(prev => {
+      const next = new Set(prev);
+      if (isAlreadySaved) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      return next;
+    });
+
+    await saveFeedPost(postId);
+    if (!isAlreadySaved) {
+      showToast('🔖 Saved post to sovereign bookmarks!');
+    } else {
+      showToast('Post removed from bookmarks');
     }
   };
 
@@ -1073,10 +1221,55 @@ export function FeedScreen(): React.JSX.Element {
                   >
                     {post.isLiked ? '❤️' : '🤍'}
                   </button>
-                  <span style={{ cursor: 'pointer' }}>💬</span>
-                  <span style={{ cursor: 'pointer' }}>↗️</span>
+                  <button
+                    onClick={() => openComments(post.id)}
+                    aria-label="Comments"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '1.2rem',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      color: '#fff',
+                    }}
+                  >
+                    <span>💬</span>
+                    {typeof post.commentsCount === 'number' && post.commentsCount > 0 && (
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>{post.commentsCount}</span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleRepost(post.id)}
+                    aria-label="Repost"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '1.2rem',
+                      padding: 0,
+                      color: repostedPosts.has(post.id) ? '#10b981' : '#fff',
+                    }}
+                  >
+                    🚀
+                  </button>
                 </div>
-                <span style={{ cursor: 'pointer' }}>🔖</span>
+                <button
+                  onClick={() => handleSavePost(post.id)}
+                  aria-label="Bookmark"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '1.2rem',
+                    padding: 0,
+                    color: bookmarkedPosts.has(post.id) ? '#f59e0b' : '#fff',
+                  }}
+                >
+                  {bookmarkedPosts.has(post.id) ? '🔖' : '🏷️'}
+                </button>
               </div>
 
               {/* Post Likes & Caption */}
@@ -1093,6 +1286,189 @@ export function FeedScreen(): React.JSX.Element {
             </article>
           ))}
       </section>
+
+      {/* Feed Comments Bottom-Sheet Modal */}
+      {activePostCommentsId && (
+        <div
+          role="dialog"
+          aria-label="Post Comments"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 110,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+          }}
+          onClick={() => setActivePostCommentsId(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: '#111827',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              borderTop: '1px solid rgba(255,255,255,0.1)',
+              maxHeight: '75vh',
+              minHeight: '40vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 -10px 25px rgba(0,0,0,0.5)',
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '14px 18px',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 700 }}>Comments</span>
+                <span style={{ fontSize: 11, color: '#94a3b8', backgroundColor: '#1f2937', padding: '2px 8px', borderRadius: 10 }}>
+                  {commentsList.length}
+                </span>
+              </div>
+              <button
+                onClick={() => setActivePostCommentsId(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: 18,
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Comments List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 18px' }}>
+              {isCommentsLoading ? (
+                <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8', fontSize: 13 }}>
+                  Loading peer comments...
+                </div>
+              ) : commentsList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '36px 0', color: '#64748b', fontSize: 13 }}>
+                  No comments yet. Start the sovereign discussion!
+                </div>
+              ) : (
+                commentsList.map(comment => (
+                  <div
+                    key={comment.id || Math.random().toString()}
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      alignItems: 'flex-start',
+                      marginBottom: 14,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        backgroundColor: '#1e293b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 14,
+                      }}
+                    >
+                      {comment.authorAvatar || '⚡'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9' }}>
+                          {comment.author || comment.userDid?.slice(0, 12) || 'Peer'}
+                        </span>
+                        <span style={{ fontSize: 10, color: '#64748b' }}>
+                          {comment.createdAt ? new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 2, wordBreak: 'break-word' }}>
+                        {comment.text}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleLikeComment(comment.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        color: comment.isLiked ? '#ef4444' : '#64748b',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span>{comment.isLiked ? '❤️' : '🤍'}</span>
+                      {comment.likes ? <span style={{ fontSize: 9 }}>{comment.likes}</span> : null}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Comment Input */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                padding: '12px 16px',
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+                backgroundColor: '#0f172a',
+              }}
+            >
+              <input
+                type="text"
+                value={commentInputText}
+                onChange={e => setCommentInputText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendComment();
+                  }
+                }}
+                placeholder="Add a sovereign comment..."
+                disabled={isSubmittingComment}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#1e293b',
+                  border: '1px solid #334155',
+                  borderRadius: 20,
+                  color: '#fff',
+                  padding: '8px 14px',
+                  fontSize: 13,
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={handleSendComment}
+                disabled={isSubmittingComment || !commentInputText.trim()}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: isSubmittingComment || !commentInputText.trim() ? '#334155' : '#00a884',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 20,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: isSubmittingComment || !commentInputText.trim() ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {isSubmittingComment ? '...' : 'Post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

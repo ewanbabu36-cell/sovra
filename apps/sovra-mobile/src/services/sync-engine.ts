@@ -281,7 +281,7 @@ export class MobileSyncEngine {
       }
 
       case 'ADD_COMMENT': {
-        const res = await fetch(`${API_BASE_URL}/api/feed/comments`, {
+        const res = await fetch(`${API_BASE_URL}/api/feed/comment`, {
           method: 'POST',
           headers,
           body: JSON.stringify(op.payload),
