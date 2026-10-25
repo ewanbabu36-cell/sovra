@@ -94,16 +94,30 @@ export interface CachedMessage {
   text: string;
   timestamp: number;
   status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
-  isBitChat?: boolean;
-  hopCount?: number;
+  isBitChat?: boolean | undefined;
+  hopCount?: number | undefined;
+  disappearingDurationSec?: number | undefined;
+  expiresAt?: number | undefined;
+  isDisappeared?: boolean | undefined;
   mediaAttachment?: {
     name: string;
     cid: string;
     mimeType: string;
     sizeBytes: number;
-    dataUrl?: string;
-  };
+    dataUrl?: string | undefined;
+  } | undefined;
   syncStatus: 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
+}
+
+export interface CachedWalletTransaction {
+  txHash: string;
+  type: 'tip_sent' | 'tip_received' | 'swap' | 'transfer';
+  amount: string;
+  tokenSymbol: string;
+  timestamp: number;
+  peerDid?: string;
+  status: 'confirmed' | 'pending' | 'failed';
+  fee?: string;
 }
 
 export interface ConversationSummary {
@@ -180,6 +194,7 @@ export interface LocalDatabaseSchema {
   outbox: Record<string, QueuedOperation>;
   inbox: Record<string, { id: string; envelopeId: string; receivedAt: number; senderDid: string }>;
   media_staging: Record<string, MediaStagingEntry>;
+  wallet_ledger: Record<string, CachedWalletTransaction>;
   sync_state: ClientSyncState;
 }
 
@@ -269,7 +284,7 @@ export class NodeStorageDriver implements IStorageDriver {
     this.diskBackupPath = this.diskFilePath + '.bak';
   }
 
-  public getItem(key: string): string | null {
+  public getItem(_key: string): string | null {
     try {
       if (fs.existsSync(this.diskFilePath)) {
         const raw = fs.readFileSync(this.diskFilePath, 'utf-8');
@@ -285,7 +300,7 @@ export class NodeStorageDriver implements IStorageDriver {
     return null;
   }
 
-  public setItem(key: string, value: string): void {
+  public setItem(_key: string, value: string): void {
     try {
       const dir = path.dirname(this.diskFilePath);
       if (!fs.existsSync(dir)) {
@@ -302,7 +317,7 @@ export class NodeStorageDriver implements IStorageDriver {
     }
   }
 
-  public removeItem(key: string): void {
+  public removeItem(_key: string): void {
     try {
       if (fs.existsSync(this.diskFilePath)) fs.unlinkSync(this.diskFilePath);
       if (fs.existsSync(this.diskBackupPath)) fs.unlinkSync(this.diskBackupPath);
@@ -341,7 +356,7 @@ export function resolveStorageDriver(customDriver?: IStorageDriver): IStorageDri
 export class LocalSchemaMigrator {
   public static migrate(raw: any): LocalDatabaseSchema {
     const defaultSchema: LocalDatabaseSchema = {
-      version: 2,
+      version: 3,
       users: {},
       profiles: {},
       posts: {},
@@ -352,6 +367,7 @@ export class LocalSchemaMigrator {
       outbox: {},
       inbox: {},
       media_staging: {},
+      wallet_ledger: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
@@ -377,14 +393,18 @@ export class LocalSchemaMigrator {
       outbox: raw.outbox || {},
       inbox: raw.inbox || {},
       media_staging: raw.media_staging || {},
+      wallet_ledger: raw.wallet_ledger || {},
       sync_state: {
         ...defaultSchema.sync_state,
         ...(raw.sync_state || {}),
       },
     };
 
-    if (currentVersion < 2) {
-      migrated.version = 2;
+    if (currentVersion < 3) {
+      migrated.version = 3;
+      if (!migrated.wallet_ledger) {
+        migrated.wallet_ledger = {};
+      }
     }
 
     return migrated;
@@ -403,6 +423,7 @@ export class SovraLocalDatabase {
     this.deviceId = this.resolveDeviceId();
     this.driver = driver || resolveStorageDriver();
     this.state = this.loadInitialState();
+    this.purgeExpiredDisappearingMessages();
   }
 
   public static getInstance(driver?: IStorageDriver): SovraLocalDatabase {
@@ -698,12 +719,30 @@ export class SovraLocalDatabase {
   // CHAT MESSAGES PERSISTENCE & CACHING
   // ==========================================
 
+  public purgeExpiredDisappearingMessages(now: number = Date.now()): number {
+    let purgedCount = 0;
+    for (const [msgId, msg] of Object.entries(this.state.messages)) {
+      if (msg.expiresAt && msg.expiresAt <= now) {
+        delete this.state.messages[msgId];
+        purgedCount++;
+      }
+    }
+    if (purgedCount > 0) {
+      this.persist().catch(e => console.warn('[SovraLocalDB] Persist error after purge:', e));
+    }
+    return purgedCount;
+  }
+
   public async saveMessage(msg: CachedMessage): Promise<void> {
+    if (msg.disappearingDurationSec && msg.disappearingDurationSec > 0 && !msg.expiresAt) {
+      msg.expiresAt = (msg.timestamp || Date.now()) + msg.disappearingDurationSec * 1000;
+    }
     this.state.messages[msg.id] = msg;
     await this.persist();
   }
 
   public getThreadMessages(threadOrPeerDid: string): CachedMessage[] {
+    this.purgeExpiredDisappearingMessages();
     return Object.values(this.state.messages)
       .filter(
         m =>
@@ -716,6 +755,7 @@ export class SovraLocalDatabase {
   }
 
   public getConversationsList(myDid?: string): ConversationSummary[] {
+    this.purgeExpiredDisappearingMessages();
     const threadMap = new Map<string, CachedMessage[]>();
 
     for (const msg of Object.values(this.state.messages)) {
@@ -898,12 +938,29 @@ export class SovraLocalDatabase {
   }
 
   // ==========================================
+  // WALLET LEDGER & AMM TRANSACTIONS
+  // ==========================================
+
+  public async recordWalletTransaction(tx: CachedWalletTransaction): Promise<void> {
+    this.state.wallet_ledger[tx.txHash] = tx;
+    await this.persist();
+  }
+
+  public getWalletTransactions(): CachedWalletTransaction[] {
+    return Object.values(this.state.wallet_ledger || {}).sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  public getWalletTransaction(txHash: string): CachedWalletTransaction | undefined {
+    return (this.state.wallet_ledger || {})[txHash];
+  }
+
+  // ==========================================
   // EMERGENCY DATA WIPE (PANIC)
   // ==========================================
 
   public async emergencyPanicWipe(): Promise<void> {
     this.state = {
-      version: 2,
+      version: 3,
       users: {},
       profiles: {},
       posts: {},
@@ -914,6 +971,7 @@ export class SovraLocalDatabase {
       outbox: {},
       inbox: {},
       media_staging: {},
+      wallet_ledger: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',

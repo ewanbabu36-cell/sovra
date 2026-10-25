@@ -251,67 +251,96 @@ export class MultiRelayManager {
     this.notifyListeners();
   }
 
+  public static readonly FAST_TIMEOUT_MS = 1500;
+
+  private async tryFetchRelay(
+    relay: RelayEndpoint,
+    cleanPath: string,
+    init?: RequestInit,
+    timeoutMs: number = MultiRelayManager.FAST_TIMEOUT_MS,
+  ): Promise<Response> {
+    const fullUrl = `${relay.url}${cleanPath}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const mergedInit: RequestInit = {
+      ...init,
+      signal: controller.signal,
+    };
+
+    try {
+      const res = await fetch(fullUrl, mergedInit);
+      clearTimeout(timeoutId);
+
+      if (res.status === 502 || res.status === 503 || res.status === 504 || res.status === 530) {
+        throw new Error(`HTTP ${res.status} Bad Gateway on ${relay.name}`);
+      }
+      return res;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+  }
+
   /**
-   * Resilient Fetch with automated multi-relay failover.
-   * If the active relay is offline, blocked, or slow, automatically switches to the next relay and retries.
+   * Resilient Fetch with fast 1.5s timeout and concurrent multi-relay failover race.
+   * If the active relay is offline, blocked, or slow (>1.5s), concurrently races candidate relays.
    */
-  public async fetchWithFallback(path: string, init?: RequestInit, maxAttempts?: number): Promise<Response> {
+  public async fetchWithFallback(path: string, init?: RequestInit, _maxAttempts?: number): Promise<Response> {
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    let lastError: any = null;
+    const activeRelay = this.getActiveRelay();
 
-    const startIdx = this.activeRelayIndex;
-    const totalRelays = this.relays.length;
-    const attempts = maxAttempts ?? totalRelays;
+    // 1. Fast attempt on active relay (1.5s timeout)
+    try {
+      const res = await this.tryFetchRelay(activeRelay, cleanPath, init, MultiRelayManager.FAST_TIMEOUT_MS);
+      activeRelay.status = 'connected';
+      return res;
+    } catch (activeErr) {
+      activeRelay.status = 'offline';
+      console.warn(`[MultiRelayManager] Active relay (${activeRelay.name}) failed or timed out:`, (activeErr as Error).message);
+    }
 
-    for (let attempt = 0; attempt < Math.min(attempts, totalRelays); attempt++) {
-      const currentIdx = (startIdx + attempt) % totalRelays;
-      const relay = this.relays[currentIdx]!;
-      const fullUrl = `${relay.url}${cleanPath}`;
+    // 2. Fast non-blocking concurrent fallback race across remaining candidate relays
+    const fallbackCandidates = this.relays
+      .map((r, idx) => ({ relay: r, index: idx }))
+      .filter(item => item.relay.id !== activeRelay.id);
 
+    if (fallbackCandidates.length === 0) {
+      throw new Error(`Active relay ${activeRelay.name} failed and no fallback relays available.`);
+    }
+
+    const candidatePromises = fallbackCandidates.map(async ({ relay, index }) => {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout per relay
-
-        const mergedInit: RequestInit = {
-          ...init,
-          signal: controller.signal,
-        };
-
-        const res = await fetch(fullUrl, mergedInit);
-        clearTimeout(timeoutId);
-
-        // If gateway error or cloudflare origin error, trigger failover
-        if (res.status === 502 || res.status === 503 || res.status === 504 || res.status === 530) {
-          throw new Error(`HTTP ${res.status} Bad Gateway on ${relay.name}`);
-        }
-
-        // Success: update status and active index
+        const res = await this.tryFetchRelay(relay, cleanPath, init, MultiRelayManager.FAST_TIMEOUT_MS);
         relay.status = 'connected';
-        if (currentIdx !== this.activeRelayIndex) {
-          this.activeRelayIndex = currentIdx;
+        if (index !== this.activeRelayIndex) {
+          this.activeRelayIndex = index;
           this.setStorageItem(ACTIVE_RELAY_STORAGE_KEY, relay.url);
           this.notifyListeners();
         }
         return res;
       } catch (err) {
-        lastError = err;
         relay.status = 'offline';
-        console.warn(`[MultiRelayManager] Relay failed (${relay.name}):`, (err as Error).message);
-        // Continue to next relay in loop
+        throw err;
       }
-    }
+    });
 
-    throw lastError || new Error('All bootstrap and community relays unreachable. Check network connectivity.');
+    try {
+      // Promise.any fulfills with the first candidate that succeeds
+      return await Promise.any(candidatePromises);
+    } catch {
+      throw new Error('All bootstrap and community relays unreachable within 1.5s timeout. Check network connectivity.');
+    }
   }
 
   /**
-   * Pings a specific relay to measure latency and health.
+   * Pings a specific relay to measure latency and health with fast 1.5s timeout.
    */
   public async pingRelay(relay: RelayEndpoint): Promise<{ ok: boolean; latencyMs: number }> {
     const start = Date.now();
     try {
       const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 4000);
+      const tid = setTimeout(() => controller.abort(), MultiRelayManager.FAST_TIMEOUT_MS);
 
       const res = await fetch(`${relay.url}/api/status`, {
         method: 'GET',

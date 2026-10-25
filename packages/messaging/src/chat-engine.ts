@@ -1,4 +1,12 @@
-import { sha256, hkdfDerive, bytesToHex, hexToBytes } from '@sovra/crypto';
+import {
+  sha256,
+  hkdfDerive,
+  bytesToHex,
+  hexToBytes,
+  encryptChaCha20Poly1305,
+  decryptChaCha20Poly1305,
+  secureRandomBytes,
+} from '@sovra/crypto';
 import { MessageDeliveryState, RatchetState } from './types.js';
 
 export interface VoiceNoteMetadata {
@@ -122,10 +130,14 @@ export class DoubleRatchetChatEngine {
     const existing = this.ratchetSessions.get(peerDid);
     if (existing) return existing;
 
-    const seed = sharedRootSecret ?? sha256(new TextEncoder().encode(`${this.localDid}:${peerDid}:genesis`));
+    const isFirst = this.localDid < peerDid;
+    const sorted = [this.localDid, peerDid].sort();
+    const seed = sharedRootSecret ?? sha256(new TextEncoder().encode(`${sorted[0]}:${sorted[1]}:genesis`));
     const rootKeyHex = bytesToHex(seed);
-    const senderChainKeyHex = bytesToHex(sha256(new TextEncoder().encode(`${rootKeyHex}:sender`)));
-    const receiverChainKeyHex = bytesToHex(sha256(new TextEncoder().encode(`${rootKeyHex}:receiver`)));
+    const chain1 = bytesToHex(sha256(new TextEncoder().encode(`${rootKeyHex}:chain1`)));
+    const chain2 = bytesToHex(sha256(new TextEncoder().encode(`${rootKeyHex}:chain2`)));
+    const senderChainKeyHex = isFirst ? chain1 : chain2;
+    const receiverChainKeyHex = isFirst ? chain2 : chain1;
 
     const state: RatchetState = {
       rootKeyHex,
@@ -172,6 +184,67 @@ export class DoubleRatchetChatEngine {
       messageKeyHex: bytesToHex(messageKey),
       nextSequence: nextSeq,
     };
+  }
+
+  /**
+   * Advances the symmetric ratchet receiver chain to derive the decryption key.
+   */
+  public advanceReceiverRatchet(peerDid: string): { messageKeyHex: string; nextSequence: number } {
+    const state = this.getOrCreateRatchetSession(peerDid);
+    const chainKeyBytes = hexToBytes(state.receiverChainKeyHex);
+    const salt = new Uint8Array(32);
+
+    const messageKey = hkdfDerive(chainKeyBytes, salt, new TextEncoder().encode('sovra:msg:key'), 32);
+    const nextChainKey = hkdfDerive(chainKeyBytes, salt, new TextEncoder().encode('sovra:chain:key'), 32);
+
+    const nextSeq = state.receiverMessageNumber + 1;
+    const updatedState: RatchetState = {
+      ...state,
+      receiverChainKeyHex: bytesToHex(nextChainKey),
+      receiverMessageNumber: nextSeq,
+    };
+    this.ratchetSessions.set(peerDid, updatedState);
+
+    return {
+      messageKeyHex: bytesToHex(messageKey),
+      nextSequence: nextSeq,
+    };
+  }
+
+  /**
+   * Encrypts message plaintext into ChaCha20-Poly1305 AEAD ciphertext with ratchet key advancement.
+   */
+  public encryptPayload(
+    peerDid: string,
+    plaintext: string,
+  ): { ciphertextHex: string; nonceHex: string; sequenceNumber: number } {
+    const { messageKeyHex, nextSequence } = this.advanceSenderRatchet(peerDid);
+    const key = hexToBytes(messageKeyHex);
+    const nonce = secureRandomBytes(12);
+    const plaintextBytes = new TextEncoder().encode(plaintext);
+    const ciphertext = encryptChaCha20Poly1305(key, nonce, plaintextBytes);
+
+    return {
+      ciphertextHex: bytesToHex(ciphertext),
+      nonceHex: bytesToHex(nonce),
+      sequenceNumber: nextSequence,
+    };
+  }
+
+  /**
+   * Decrypts ChaCha20-Poly1305 AEAD ciphertext using the peer's receiver ratchet key.
+   */
+  public decryptPayload(
+    peerDid: string,
+    ciphertextHex: string,
+    nonceHex: string,
+  ): string {
+    const { messageKeyHex } = this.advanceReceiverRatchet(peerDid);
+    const key = hexToBytes(messageKeyHex);
+    const nonce = hexToBytes(nonceHex);
+    const ciphertext = hexToBytes(ciphertextHex);
+    const decryptedBytes = decryptChaCha20Poly1305(key, nonce, ciphertext);
+    return new TextDecoder().decode(decryptedBytes);
   }
 
   /**

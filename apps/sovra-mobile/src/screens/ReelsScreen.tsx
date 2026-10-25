@@ -65,6 +65,21 @@ export function ReelsScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [heartAnim, setHeartAnim] = useState<{ x: number; y: number; id: number } | null>(null);
 
+  // Audio / Sound HUD state (Autoplay compliant: default muted)
+  const [isMuted, setIsMuted] = useState(true);
+  const [showSoundHud, setShowSoundHud] = useState(false);
+  const soundHudTimeoutRef = useRef<any>(null);
+
+  const toggleSound = useCallback((e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setIsMuted(prev => !prev);
+    setShowSoundHud(true);
+    if (soundHudTimeoutRef.current) clearTimeout(soundHudTimeoutRef.current);
+    soundHudTimeoutRef.current = setTimeout(() => {
+      setShowSoundHud(false);
+    }, 2000);
+  }, []);
+
   // Comments sheet state
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [activeReelComments, setActiveReelComments] = useState<any[]>([]);
@@ -306,8 +321,9 @@ export function ReelsScreen(): React.JSX.Element {
                 src={reel.videoUrl}
                 autoPlay={idx === activeIdx}
                 loop
-                muted
+                muted={isMuted}
                 playsInline
+                onClick={toggleSound}
                 style={{
                   position: 'absolute',
                   inset: 0,
@@ -315,9 +331,39 @@ export function ReelsScreen(): React.JSX.Element {
                   height: '100%',
                   objectFit: 'cover',
                   zIndex: 0,
+                  cursor: 'pointer',
                 }}
               />
             ) : null}
+
+            {/* Floating Sound HUD Feedback Pill */}
+            {showSoundHud && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                  backdropFilter: 'blur(10px)',
+                  padding: '12px 20px',
+                  borderRadius: 24,
+                  color: '#fff',
+                  fontSize: 15,
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  zIndex: 10,
+                  pointerEvents: 'none',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{isMuted ? '🔇' : '🔊'}</span>
+                <span>{isMuted ? 'Muted' : 'Sound On'}</span>
+              </div>
+            )}
 
             {/* Dark gradient overlay for readability */}
             <div
@@ -330,7 +376,7 @@ export function ReelsScreen(): React.JSX.Element {
               }}
             />
 
-            {/* Header SLA Pill */}
+            {/* Header SLA Pill & Audio Toggle */}
             <div
               style={{
                 display: 'flex',
@@ -354,7 +400,29 @@ export function ReelsScreen(): React.JSX.Element {
               >
                 ⚡ Pre-Warmed (&lt;250ms decode SLA)
               </span>
-              <span style={{ fontSize: 18 }}>📸</span>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  onClick={toggleSound}
+                  aria-label={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+                  style={{
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(8px)',
+                    padding: '4px 10px',
+                    borderRadius: 9999,
+                    fontSize: 11,
+                    color: isMuted ? '#94a3b8' : '#38bdf8',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <span>{isMuted ? '🔇' : '🔊'}</span>
+                  <span>{isMuted ? 'Muted' : 'Sound On'}</span>
+                </button>
+                <span style={{ fontSize: 18 }}>📸</span>
+              </div>
             </div>
 
             {/* Floating Heart Burst */}
@@ -595,6 +663,16 @@ export function ReelsScreen(): React.JSX.Element {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Dual-Buffer Pre-Warmer for Next Reel in Background */}
+        {reels[activeIdx + 1]?.videoUrl && (
+          <video
+            src={reels[activeIdx + 1]?.videoUrl}
+            preload="auto"
+            muted
+            style={{ display: 'none' }}
+          />
         )}
       </div>
     );

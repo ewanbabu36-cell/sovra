@@ -136,7 +136,8 @@ export function FeedScreen(): React.JSX.Element {
       if (prev < stories.length - 1) {
         const nextIdx = prev + 1;
         setStoryProgress(0);
-        toggleStorySeen(stories[nextIdx].id);
+        const storyItem = stories[nextIdx];
+        if (storyItem) toggleStorySeen(storyItem.id);
         return nextIdx;
       }
       return null;

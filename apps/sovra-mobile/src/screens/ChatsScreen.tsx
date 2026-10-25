@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { MobileChatMessage } from '../types.js';
 import type { CallMediaType } from '@sovra/messaging';
+import { computeSafetyNumbers } from '@sovra/messaging';
 import type { MeshDiscoveredPeer } from '@sovra/p2p';
 import { CallScreen } from './CallScreen.js';
 import {
@@ -92,6 +93,15 @@ export function ChatsScreen(): React.JSX.Element {
   const [isPanicConfirming, setIsPanicConfirming] = useState(false);
   const [panicToast, setPanicToast] = useState<string | null>(null);
 
+  // Safety Numbers Modal & Disappearing Messages states
+  const [showSafetyNumbers, setShowSafetyNumbers] = useState(false);
+  const [disappearingSec, setDisappearingSec] = useState<number>(0);
+  const [showDisappearingMenu, setShowDisappearingMenu] = useState(false);
+  const [copiedSafety, setCopiedSafety] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [peerTyping] = useState(false);
+  const typingTimeoutRef = useRef<any>(null);
+
   // Outbox live reactive updates & online/offline listener
   const [pendingOutboxCount, setPendingOutboxCount] = useState<number>(() => localDb.getPendingOutbox().length);
   const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
@@ -107,6 +117,7 @@ export function ChatsScreen(): React.JSX.Element {
         window.removeEventListener('offline', handleOffline);
       };
     }
+    return undefined;
   }, []);
 
   useEffect(() => {
@@ -390,6 +401,7 @@ export function ChatsScreen(): React.JSX.Element {
       timestamp: Date.now(),
       status: 'pending',
       syncStatus: 'LOCAL',
+      ...(disappearingSec > 0 ? { disappearingDurationSec: disappearingSec } : {}),
     });
 
     // Phase 3: Smart Transport Selection: Prefer direct BLE link / offline mesh if connected or offline
@@ -445,6 +457,7 @@ export function ChatsScreen(): React.JSX.Element {
         recipientDid: targetDid,
         text,
         senderName: 'You',
+        ...(disappearingSec > 0 ? { disappearingDurationSec: disappearingSec } : {}),
       });
 
       if (res.ok && res.message) {
@@ -687,9 +700,80 @@ export function ChatsScreen(): React.JSX.Element {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 14, fontSize: 16, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, fontSize: 16, alignItems: 'center' }}>
             {!activeRecipient.isChannel && (
               <>
+                <button
+                  onClick={() => setShowSafetyNumbers(true)}
+                  aria-label="View Safety Numbers"
+                  title="60-Digit Safety Numbers"
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, padding: 0 }}
+                >
+                  🛡️
+                </button>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShowDisappearingMenu(prev => !prev)}
+                    aria-label="Disappearing Messages Timer"
+                    title={`Disappearing Messages: ${disappearingSec === 0 ? 'Off' : disappearingSec === 86400 ? '24h' : disappearingSec === 604800 ? '7d' : '90d'}`}
+                    style={{
+                      background: disappearingSec > 0 ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                      border: disappearingSec > 0 ? '1px solid #38bdf8' : 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontSize: 16,
+                      padding: disappearingSec > 0 ? '1px 4px' : 0,
+                    }}
+                  >
+                    ⏱️
+                  </button>
+                  {showDisappearingMenu && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: 6,
+                        backgroundColor: '#1f2c34',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 8,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                        zIndex: 100,
+                        minWidth: 140,
+                        padding: '4px 0',
+                      }}
+                    >
+                      {[
+                        { label: 'Off', sec: 0 },
+                        { label: '24 Hours', sec: 86400 },
+                        { label: '7 Days', sec: 604800 },
+                        { label: '90 Days', sec: 7776000 },
+                      ].map(opt => (
+                        <div
+                          key={opt.sec}
+                          onClick={() => {
+                            setDisappearingSec(opt.sec);
+                            setShowDisappearingMenu(false);
+                          }}
+                          style={{
+                            padding: '8px 14px',
+                            fontSize: 12,
+                            color: disappearingSec === opt.sec ? '#00a884' : '#e9edef',
+                            fontWeight: disappearingSec === opt.sec ? 700 : 400,
+                            backgroundColor: disappearingSec === opt.sec ? 'rgba(0,168,132,0.15)' : 'transparent',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <span>{opt.label}</span>
+                          {disappearingSec === opt.sec && <span>✓</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => setActiveCall('video')}
                   aria-label="Start Video Call"
@@ -818,6 +902,30 @@ export function ChatsScreen(): React.JSX.Element {
               : '🔒 End-to-End Encrypted via ChaCha20-Poly1305 & Noise_XX. Zero central logs.'}
           </div>
 
+          {disappearingSec > 0 && !activeRecipient.isChannel && (
+            <div
+              style={{
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                color: '#38bdf8',
+                padding: '3px 10px',
+                borderRadius: 6,
+                fontSize: 10,
+                textAlign: 'center',
+                maxWidth: 380,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              <span>⏱️</span>
+              <span>
+                Disappearing messages active ({disappearingSec === 86400 ? '24h' : disappearingSec === 604800 ? '7d' : '90d'}).
+              </span>
+            </div>
+          )}
+
           {error && (
             <div
               style={{
@@ -944,6 +1052,24 @@ export function ChatsScreen(): React.JSX.Element {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Typing indicator */}
+        {(peerTyping || isTyping) && (
+          <div
+            style={{
+              padding: '2px 14px 4px',
+              fontSize: 11,
+              color: '#34d399',
+              fontStyle: 'italic',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span>💬</span>
+            <span>{isTyping ? 'Typing...' : `${activeRecipient.name} is typing...`}</span>
+          </div>
+        )}
+
         {/* Input Bar */}
         <footer
           style={{
@@ -977,7 +1103,14 @@ export function ChatsScreen(): React.JSX.Element {
               }
               value={inputText}
               disabled={isRecordingVoice || isSending}
-              onChange={e => setInputText(e.target.value)}
+              onChange={e => {
+                setInputText(e.target.value);
+                setIsTyping(true);
+                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                typingTimeoutRef.current = setTimeout(() => {
+                  setIsTyping(false);
+                }, 1000);
+              }}
               onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
               style={{
                 flex: 1,
@@ -1012,6 +1145,138 @@ export function ChatsScreen(): React.JSX.Element {
             {inputText.trim() ? '➤' : isRecordingVoice ? '⏹' : '🎤'}
           </button>
         </footer>
+
+        {/* Safety Numbers 60-Digit Verification Modal */}
+        {showSafetyNumbers && activeRecipient && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0,0,0,0.82)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#182229',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 16,
+                maxWidth: 420,
+                width: '100%',
+                padding: 24,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+                color: '#e9edef',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>🛡️</span>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Verify Safety Numbers</h3>
+                </div>
+                <button
+                  onClick={() => setShowSafetyNumbers(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#8696a0', fontSize: 18, cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p style={{ margin: 0, fontSize: 12, color: '#8696a0', lineHeight: 1.5 }}>
+                To verify that end-to-end encryption with <strong style={{ color: '#fff' }}>{activeRecipient.name}</strong> is intact and free from MITM interception, compare these 60 digits with their device.
+              </p>
+
+              {/* 60 Digits Display (12 blocks of 5 digits) */}
+              <div
+                style={{
+                  backgroundColor: '#111b21',
+                  padding: 16,
+                  borderRadius: 12,
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  letterSpacing: 2,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: 8,
+                  textAlign: 'center',
+                  color: '#34d399',
+                  border: '1px solid rgba(52, 211, 153, 0.2)',
+                }}
+              >
+                {computeSafetyNumbers(getActiveUserDid(), activeRecipient.did, 'genesis_root_key_sovra').formattedNumbers.split(' ').map((block, idx) => (
+                  <div key={idx} style={{ backgroundColor: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: 6 }}>
+                    {block}
+                  </div>
+                ))}
+              </div>
+
+              {/* QR Payload */}
+              <div
+                style={{
+                  backgroundColor: '#111b21',
+                  padding: 10,
+                  borderRadius: 8,
+                  fontSize: 10,
+                  color: '#64748b',
+                  wordBreak: 'break-all',
+                  fontFamily: 'monospace',
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontWeight: 600 }}>Payload: </span>
+                {computeSafetyNumbers(getActiveUserDid(), activeRecipient.did, 'genesis_root_key_sovra').qrPayload}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <button
+                  onClick={() => {
+                    const sn = computeSafetyNumbers(getActiveUserDid(), activeRecipient.did, 'genesis_root_key_sovra').formattedNumbers;
+                    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                      navigator.clipboard.writeText(sn);
+                      setCopiedSafety(true);
+                      setTimeout(() => setCopiedSafety(false), 2000);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    border: 'none',
+                    color: '#fff',
+                    borderRadius: 8,
+                    padding: '10px 0',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {copiedSafety ? '✓ Copied!' : '📋 Copy Numbers'}
+                </button>
+                <button
+                  onClick={() => setShowSafetyNumbers(false)}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#00a884',
+                    border: 'none',
+                    color: '#fff',
+                    borderRadius: 8,
+                    padding: '10px 0',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Mark Verified ✓
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
