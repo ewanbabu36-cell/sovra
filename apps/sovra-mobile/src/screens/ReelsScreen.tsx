@@ -29,6 +29,7 @@ export const INITIAL_REELS: MobileReelItem[] = [
     likesCount: 2489,
     commentsCount: 142,
     bgGradient: 'linear-gradient(180deg, #1e1b4b 0%, #312e81 40%, #0f172a 100%)',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     manifestCid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
     segment0Cid: 'bafkreic7r6z5g3k7r4o6z5m4r6koviema7g3gxyt6la7vd5ho32wuq5z2m',
   },
@@ -41,6 +42,7 @@ export const INITIAL_REELS: MobileReelItem[] = [
     likesCount: 1845,
     commentsCount: 97,
     bgGradient: 'linear-gradient(180deg, #3b0764 0%, #1e1b4b 50%, #030712 100%)',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
     manifestCid: 'bafybeihkoviema7g3gxyt6la7vd5ho32wuq5z2m4r6z5g3k7r4o6z5m4r6',
     segment0Cid: 'bafkreic8r6z5g3k7r4o6z5m4r6koviema7g3gxyt6la7vd5ho32wuq5z2m',
   },
@@ -53,6 +55,7 @@ export const INITIAL_REELS: MobileReelItem[] = [
     likesCount: 3912,
     commentsCount: 231,
     bgGradient: 'linear-gradient(180deg, #064e3b 0%, #0f172a 60%, #022c22 100%)',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     manifestCid: 'bafybeig7r6z5g3k7r4o6z5m4r6koviema7g3gxyt6la7vd5ho32wuq5z2m',
     segment0Cid: 'bafkreic9r6z5g3k7r4o6z5m4r6koviema7g3gxyt6la7vd5ho32wuq5z2m',
   },
@@ -64,20 +67,69 @@ export function ReelsScreen(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [heartAnim, setHeartAnim] = useState<{ x: number; y: number; id: number } | null>(null);
+  const [shareToast, setShareToast] = useState<string | null>(null);
 
-  // Audio / Sound HUD state (Autoplay compliant: default muted)
-  const [isMuted, setIsMuted] = useState(true);
+  // Audio / Sound HUD state (Autoplay compliant: default muted, persisted in localStorage)
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = window.localStorage.getItem('sovra_reels_muted');
+        if (stored !== null) return stored === 'true';
+      }
+    } catch {}
+    return true;
+  });
   const [showSoundHud, setShowSoundHud] = useState(false);
   const soundHudTimeoutRef = useRef<any>(null);
 
   const toggleSound = useCallback((e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setIsMuted(prev => !prev);
+    setIsMuted(prev => {
+      const next = !prev;
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem('sovra_reels_muted', String(next));
+        }
+      } catch {}
+      return next;
+    });
     setShowSoundHud(true);
     if (soundHudTimeoutRef.current) clearTimeout(soundHudTimeoutRef.current);
     soundHudTimeoutRef.current = setTimeout(() => {
       setShowSoundHud(false);
     }, 2000);
+  }, []);
+
+  const handleShareReel = useCallback(async (reel: MobileReelItem) => {
+    const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/reel/${reel.id}` : `https://sovra.network/reel/${reel.id}`;
+    const shareData = {
+      title: `${reel.creatorName} on Sovra`,
+      text: reel.caption,
+      url: shareUrl,
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareToast('Reel link copied to clipboard!');
+        setTimeout(() => setShareToast(null), 2500);
+      } catch {
+        setShareToast('Could not copy link.');
+        setTimeout(() => setShareToast(null), 2500);
+      }
+    } else {
+      setShareToast(`Link: ${shareUrl}`);
+      setTimeout(() => setShareToast(null), 2500);
+    }
   }, []);
 
   // Comments sheet state
@@ -197,6 +249,30 @@ export function ReelsScreen(): React.JSX.Element {
         }
       }}
     >
+      {/* Share Toast */}
+      {shareToast && (
+        <div
+          role="status"
+          style={{
+            position: 'absolute',
+            top: 14,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 70,
+            backgroundColor: '#059669',
+            color: '#fff',
+            padding: '6px 14px',
+            borderRadius: 20,
+            fontSize: 12,
+            fontWeight: 700,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {shareToast}
+        </div>
+      )}
+
       {/* Network Alert */}
       {error && (
         <div
@@ -518,6 +594,40 @@ export function ReelsScreen(): React.JSX.Element {
                   💬
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{reel.commentsCount}</span>
+              </div>
+
+              {/* Share Button */}
+              <div
+                onClick={e => {
+                  e.stopPropagation();
+                  handleShareReel(reel);
+                }}
+                role="button"
+                aria-label={`Share ${reel.creatorName}'s reel`}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 2,
+                  cursor: 'pointer',
+                }}
+              >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                  }}
+                >
+                  🚀
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Share</span>
               </div>
 
               {/* Music Vinyl */}

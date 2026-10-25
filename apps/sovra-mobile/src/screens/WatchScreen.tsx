@@ -42,6 +42,7 @@ export function WatchScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [resolution, setResolution] = useState<'4K' | '1080p' | '720p' | '480p' | '360p'>('720p');
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [confettiActive, setConfettiActive] = useState(false);
   const [tipsSent, setTipsSent] = useState(0);
@@ -77,6 +78,45 @@ export function WatchScreen(): React.JSX.Element {
     } else {
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
+    }
+  };
+
+  const handleToggleFullscreen = async () => {
+    try {
+      if (typeof document !== 'undefined') {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        } else if (videoRef.current) {
+          if (videoRef.current.requestFullscreen) {
+            await videoRef.current.requestFullscreen().catch(() => {});
+          } else if ((videoRef.current as any).webkitRequestFullscreen) {
+            (videoRef.current as any).webkitRequestFullscreen();
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[WatchScreen] Fullscreen toggle failed:', e);
+    }
+  };
+
+  const handleTogglePiP = async () => {
+    try {
+      if (typeof document !== 'undefined' && videoRef.current) {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture().catch(() => {});
+        } else if (videoRef.current.requestPictureInPicture) {
+          await videoRef.current.requestPictureInPicture().catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn('[WatchScreen] PiP toggle failed:', e);
+    }
+  };
+
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackSpeed(speed);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = speed;
     }
   };
 
@@ -391,8 +431,34 @@ export function WatchScreen(): React.JSX.Element {
               </span>
             </div>
 
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {/* Playback Speed */}
               <select
+                aria-label="Playback speed"
+                value={playbackSpeed}
+                onChange={e => handleSpeedChange(Number(e.target.value))}
+                style={{
+                  backgroundColor: '#1f2937',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: 4,
+                  fontSize: 10,
+                  padding: '2px 4px',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value={0.5}>0.5x</option>
+                <option value={0.75}>0.75x</option>
+                <option value={1}>1.0x</option>
+                <option value={1.25}>1.25x</option>
+                <option value={1.5}>1.5x</option>
+                <option value={2}>2.0x</option>
+              </select>
+
+              {/* Resolution */}
+              <select
+                aria-label="Video resolution"
                 value={resolution}
                 onChange={e => setResolution(e.target.value as any)}
                 style={{
@@ -403,6 +469,7 @@ export function WatchScreen(): React.JSX.Element {
                   fontSize: 10,
                   padding: '2px 4px',
                   outline: 'none',
+                  cursor: 'pointer',
                 }}
               >
                 <option value="4K">4K UHD</option>
@@ -411,7 +478,28 @@ export function WatchScreen(): React.JSX.Element {
                 <option value="480p">480p</option>
                 <option value="360p">360p</option>
               </select>
-              <span style={{ cursor: 'pointer' }}>⛶</span>
+
+              {/* Picture-in-Picture */}
+              <span
+                onClick={handleTogglePiP}
+                role="button"
+                aria-label="Toggle Picture in Picture"
+                style={{ cursor: 'pointer', fontSize: 13, padding: '2px 4px' }}
+                title="Picture-in-Picture"
+              >
+                ⧉
+              </span>
+
+              {/* Fullscreen */}
+              <span
+                onClick={handleToggleFullscreen}
+                role="button"
+                aria-label="Toggle Fullscreen"
+                style={{ cursor: 'pointer', fontSize: 13, padding: '2px 4px' }}
+                title="Fullscreen"
+              >
+                ⛶
+              </span>
             </div>
           </div>
         </div>

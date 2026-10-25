@@ -71,6 +71,7 @@ export interface CachedPost {
   likedByDids: string[];
   isLiked: boolean;
   commentsCount: number;
+  isSaved?: boolean | undefined;
   syncStatus: 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
 }
 
@@ -126,6 +127,17 @@ export interface CachedGuardian {
   status: 'pending' | 'active' | 'confirmed';
   addedAt: number;
   threshold?: number | undefined;
+}
+
+export interface CachedBookmark {
+  postId: string;
+  savedAt: number;
+}
+
+export interface CachedFollow {
+  did: string;
+  handle: string;
+  followedAt: number;
 }
 
 export interface ConversationSummary {
@@ -204,6 +216,8 @@ export interface LocalDatabaseSchema {
   media_staging: Record<string, MediaStagingEntry>;
   wallet_ledger: Record<string, CachedWalletTransaction>;
   guardians: Record<string, CachedGuardian>;
+  bookmarks: Record<string, CachedBookmark>;
+  follows: Record<string, CachedFollow>;
   sync_state: ClientSyncState;
 }
 
@@ -365,7 +379,7 @@ export function resolveStorageDriver(customDriver?: IStorageDriver): IStorageDri
 export class LocalSchemaMigrator {
   public static migrate(raw: any): LocalDatabaseSchema {
     const defaultSchema: LocalDatabaseSchema = {
-      version: 4,
+      version: 5,
       users: {},
       profiles: {},
       posts: {},
@@ -378,6 +392,8 @@ export class LocalSchemaMigrator {
       media_staging: {},
       wallet_ledger: {},
       guardians: {},
+      bookmarks: {},
+      follows: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
@@ -405,19 +421,27 @@ export class LocalSchemaMigrator {
       media_staging: raw.media_staging || {},
       wallet_ledger: raw.wallet_ledger || {},
       guardians: raw.guardians || {},
+      bookmarks: raw.bookmarks || {},
+      follows: raw.follows || {},
       sync_state: {
         ...defaultSchema.sync_state,
         ...(raw.sync_state || {}),
       },
     };
 
-    if (currentVersion < 4) {
-      migrated.version = 4;
+    if (currentVersion < 5) {
+      migrated.version = 5;
       if (!migrated.wallet_ledger) {
         migrated.wallet_ledger = {};
       }
       if (!migrated.guardians) {
         migrated.guardians = {};
+      }
+      if (!migrated.bookmarks) {
+        migrated.bookmarks = {};
+      }
+      if (!migrated.follows) {
+        migrated.follows = {};
       }
     }
 
@@ -990,12 +1014,76 @@ export class SovraLocalDatabase {
   }
 
   // ==========================================
+  // BOOKMARKS PERSISTENCE
+  // ==========================================
+
+  public async saveBookmark(postId: string): Promise<void> {
+    if (!this.state.bookmarks) this.state.bookmarks = {};
+    this.state.bookmarks[postId] = {
+      postId,
+      savedAt: Date.now(),
+    };
+    if (this.state.posts[postId]) {
+      this.state.posts[postId].isSaved = true;
+    }
+    await this.persist();
+  }
+
+  public async removeBookmark(postId: string): Promise<void> {
+    if (this.state.bookmarks) {
+      delete this.state.bookmarks[postId];
+    }
+    if (this.state.posts[postId]) {
+      this.state.posts[postId].isSaved = false;
+    }
+    await this.persist();
+  }
+
+  public getBookmarks(): CachedBookmark[] {
+    return Object.values(this.state.bookmarks || {}).sort((a, b) => b.savedAt - a.savedAt);
+  }
+
+  public getBookmarkedPosts(): CachedPost[] {
+    const bookmarkedIds = new Set(Object.keys(this.state.bookmarks || {}));
+    return Object.values(this.state.posts).filter(p => bookmarkedIds.has(p.id) || p.isSaved);
+  }
+
+  // ==========================================
+  // FOLLOWS PERSISTENCE
+  // ==========================================
+
+  public async saveFollow(did: string, handle: string): Promise<void> {
+    if (!this.state.follows) this.state.follows = {};
+    this.state.follows[did] = {
+      did,
+      handle,
+      followedAt: Date.now(),
+    };
+    await this.persist();
+  }
+
+  public async removeFollow(did: string): Promise<void> {
+    if (this.state.follows) {
+      delete this.state.follows[did];
+      await this.persist();
+    }
+  }
+
+  public getFollows(): CachedFollow[] {
+    return Object.values(this.state.follows || {}).sort((a, b) => b.followedAt - a.followedAt);
+  }
+
+  public isFollowing(did: string): boolean {
+    return Boolean(this.state.follows && this.state.follows[did]);
+  }
+
+  // ==========================================
   // EMERGENCY DATA WIPE (PANIC)
   // ==========================================
 
   public async emergencyPanicWipe(): Promise<void> {
     this.state = {
-      version: 4,
+      version: 5,
       users: {},
       profiles: {},
       posts: {},
@@ -1008,6 +1096,8 @@ export class SovraLocalDatabase {
       media_staging: {},
       wallet_ledger: {},
       guardians: {},
+      bookmarks: {},
+      follows: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
