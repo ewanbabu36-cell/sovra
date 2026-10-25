@@ -10,8 +10,9 @@
  * 5. Dynamic nested comment discussions with live posting and upvoting.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
+  fetchWatchVideos,
   fetchWatchVideo,
   sendWatchTip,
   postWatchComment,
@@ -31,6 +32,12 @@ export interface WatchVideoComment {
 
 export function WatchScreen(): React.JSX.Element {
   const [video, setVideo] = useState<any | null>(null);
+  const [videoCatalog, setVideoCatalog] = useState<any[]>([]);
+  const [selectedVideoId, setSelectedVideoId] = useState<string>('yt-video-1');
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(252);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -53,15 +60,51 @@ export function WatchScreen(): React.JSX.Element {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const loadVideo = useCallback(async () => {
+  const formatSeconds = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const togglePlay = () => {
+    if (!videoRef.current) {
+      setIsPlaying(!isPlaying);
+      return;
+    }
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      videoRef.current.play().catch(() => {});
+      setIsPlaying(true);
+    }
+  };
+
+  const loadVideo = useCallback(async (idToLoad?: string) => {
+    const id = idToLoad || selectedVideoId;
     try {
       setIsLoading(true);
       setError(null);
-      const data = await fetchWatchVideo('yt-video-1');
+      const [data, catalog] = await Promise.all([
+        fetchWatchVideo(id).catch(() => null),
+        fetchWatchVideos().catch(() => []),
+      ]);
+
+      if (catalog && catalog.length > 0) {
+        setVideoCatalog(catalog);
+      }
+
       if (data) {
         setVideo(data);
+        setSelectedVideoId(data.id || id);
         setIsSubscribed(!!data.isSubscribed);
         setComments(data.comments || []);
+      } else if (catalog && catalog.length > 0) {
+        const found = catalog.find((v: any) => v.id === id) || catalog[0];
+        setVideo(found);
+        setSelectedVideoId(found.id);
+        setIsSubscribed(!!found.isSubscribed);
+        setComments(found.comments || []);
       } else {
         throw new Error('Video not found on sovereign storage nodes');
       }
@@ -71,7 +114,7 @@ export function WatchScreen(): React.JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedVideoId]);
 
   useEffect(() => {
     loadVideo();
@@ -236,26 +279,47 @@ export function WatchScreen(): React.JSX.Element {
           </div>
         ) : (
           <div
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={togglePlay}
             style={{
               width: '100%',
               height: '100%',
+              position: 'relative',
+              backgroundColor: '#000',
+              cursor: 'pointer',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              background: video?.gradient || 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)',
-              cursor: 'pointer',
-              userSelect: 'none',
             }}
           >
-            <span style={{ fontSize: '3rem', marginBottom: 6 }}>{isPlaying ? '⏸' : '🎬'}</span>
-            <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'center', padding: '0 16px' }}>
-              {video?.title || 'Understanding P2P Distributed Hash Tables'}
-            </div>
-            <div style={{ fontSize: 10, color: '#34d399', marginTop: 4, fontFamily: 'monospace' }}>
-              ● Buffer: 6.4s &bull; Quality: {resolution} (Auto ABR)
-            </div>
+            <video
+              ref={videoRef}
+              src={video?.videoUrl || `/api/videos/hls/${encodeURIComponent(video?.id || selectedVideoId)}/master.m3u8`}
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              playsInline
+              onTimeUpdate={e => {
+                const v = e.currentTarget;
+                setCurrentTime(v.currentTime);
+                if (v.duration && !isNaN(v.duration)) setDuration(v.duration);
+              }}
+              onEnded={() => setIsPlaying(false)}
+            />
+
+            {!isPlaying && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.4)',
+                  fontSize: '3rem',
+                  color: '#fff',
+                }}
+              >
+                ▶
+              </div>
+            )}
           </div>
         )}
 
@@ -282,52 +346,73 @@ export function WatchScreen(): React.JSX.Element {
           </div>
         )}
 
-        {/* Controls Bar */}
+        {/* Controls Bar with Live Time Scrubber */}
         <div
           style={{
             position: 'absolute',
             bottom: 0,
             left: 0,
             right: 0,
-            padding: '8px 12px',
-            backgroundColor: 'rgba(0,0,0,0.75)',
+            padding: '8px 12px 6px 12px',
+            backgroundColor: 'rgba(0,0,0,0.85)',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            flexDirection: 'column',
+            gap: 6,
             fontSize: 12,
             zIndex: 20,
           }}
         >
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span onClick={() => setIsPlaying(!isPlaying)} style={{ cursor: 'pointer' }}>
-              {isPlaying ? '⏸' : '▶'}
-            </span>
-            <span style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace' }}>
-              04:12 / {video?.duration || '18:40'}
-            </span>
-          </div>
+          {/* Interactive Seek Bar */}
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            value={currentTime}
+            onChange={e => {
+              const val = Number(e.target.value);
+              setCurrentTime(val);
+              if (videoRef.current) videoRef.current.currentTime = val;
+            }}
+            style={{
+              width: '100%',
+              accentColor: '#38bdf8',
+              height: 4,
+              cursor: 'pointer',
+            }}
+          />
 
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <select
-              value={resolution}
-              onChange={e => setResolution(e.target.value as any)}
-              style={{
-                backgroundColor: '#1f2937',
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.2)',
-                borderRadius: 4,
-                fontSize: 10,
-                padding: '2px 4px',
-                outline: 'none',
-              }}
-            >
-              <option value="4K">4K UHD</option>
-              <option value="1080p">1080p</option>
-              <option value="720p">720p</option>
-              <option value="480p">480p</option>
-              <option value="360p">360p</option>
-            </select>
-            <span style={{ cursor: 'pointer' }}>⛶</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <span onClick={togglePlay} style={{ cursor: 'pointer', fontSize: 14 }}>
+                {isPlaying ? '⏸' : '▶'}
+              </span>
+              <span style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace' }}>
+                {formatSeconds(currentTime)} / {formatSeconds(duration)}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <select
+                value={resolution}
+                onChange={e => setResolution(e.target.value as any)}
+                style={{
+                  backgroundColor: '#1f2937',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: 4,
+                  fontSize: 10,
+                  padding: '2px 4px',
+                  outline: 'none',
+                }}
+              >
+                <option value="4K">4K UHD</option>
+                <option value="1080p">1080p</option>
+                <option value="720p">720p</option>
+                <option value="480p">480p</option>
+                <option value="360p">360p</option>
+              </select>
+              <span style={{ cursor: 'pointer' }}>⛶</span>
+            </div>
           </div>
         </div>
       </div>
@@ -470,6 +555,90 @@ export function WatchScreen(): React.JSX.Element {
             ⬇️ Download
           </button>
         </div>
+
+        {/* Dynamic Video Catalog Shelf */}
+        {videoCatalog.length > 0 && (
+          <section
+            aria-label="Dynamic Video Catalog"
+            style={{
+              marginBottom: 16,
+              padding: '10px 12px',
+              backgroundColor: '#111827',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#f1f5f9',
+                marginBottom: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <span>🎬</span>
+              <span>Explore Sovereign Swarm Broadcasts ({videoCatalog.length})</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
+              {videoCatalog.map((item: any) => {
+                const isSelected = item.id === (video?.id || selectedVideoId);
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setSelectedVideoId(item.id);
+                      loadVideo(item.id);
+                    }}
+                    style={{
+                      minWidth: 140,
+                      maxWidth: 160,
+                      cursor: 'pointer',
+                      backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.15)' : '#1e293b',
+                      border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 8,
+                      padding: 8,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '100%',
+                        height: 64,
+                        backgroundColor: '#0f172a',
+                        borderRadius: 6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 22,
+                        marginBottom: 6,
+                      }}
+                    >
+                      {item.emoji || '📹'}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: '#fff',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {item.title}
+                    </div>
+                    <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>
+                      {item.channelName || 'Peer'} &bull; {item.viewsText || '12K views'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Comments Section */}
         <section

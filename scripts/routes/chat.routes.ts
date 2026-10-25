@@ -69,26 +69,49 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       m => m.senderDid === userDid || m.recipientDid === userDid || m.recipientDid.startsWith('channel:')
     );
 
+    // O(1) Pre-Indexed Incremental Stats Map per peer
+    interface PeerThreadStats {
+      lastMsg: any;
+      unreadCount: number;
+      messageCount: number;
+    }
+    const peerStatsMap = new Map<string, PeerThreadStats>();
+
+    for (let i = 0; i < allMessages.length; i++) {
+      const m = allMessages[i];
+      let peerDid: string | null = null;
+      if (m.senderDid === userDid) {
+        peerDid = m.recipientDid;
+      } else if (m.recipientDid === userDid || m.recipientDid === 'self') {
+        peerDid = m.senderDid;
+      }
+      if (!peerDid) continue;
+
+      let stats = peerStatsMap.get(peerDid);
+      if (!stats) {
+        stats = { lastMsg: m, unreadCount: 0, messageCount: 0 };
+        peerStatsMap.set(peerDid, stats);
+      } else {
+        stats.lastMsg = m;
+      }
+      stats.messageCount++;
+      if (m.senderDid === peerDid && (m.recipientDid === userDid || m.recipientDid === 'self') && m.status !== 'read') {
+        stats.unreadCount++;
+      }
+    }
+
     const contactsWithThreads = allPeers
       .filter(peer => {
         if (!peer || !peer.did || peer.did === userDid) return false;
         if (friendDids.has(peer.did)) return true;
-        const threadId = sovraDb.getThreadId(userDid, peer.did);
-        return allMessages.some(
-          m => m.threadId === threadId || (m.senderDid === peer.did && m.recipientDid === userDid) || (m.senderDid === userDid && m.recipientDid === peer.did)
-        );
+        const stats = peerStatsMap.get(peer.did);
+        return Boolean(stats && stats.messageCount > 0);
       })
       .map(peer => {
         const isFriend = friendDids.has(peer.did);
-        const threadId = sovraDb.getThreadId(userDid, peer.did);
-        const threadMessages = allMessages.filter(
-          m => m.threadId === threadId || (m.senderDid === peer.did && m.recipientDid === userDid) || (m.senderDid === userDid && m.recipientDid === peer.did)
-        );
-
-        const lastMsg = threadMessages.length > 0 ? threadMessages[threadMessages.length - 1] : null;
-        const unreadCount = threadMessages.filter(
-          m => m.senderDid === peer.did && (m.recipientDid === userDid || m.recipientDid === 'self') && m.status !== 'read'
-        ).length;
+        const stats = peerStatsMap.get(peer.did);
+        const lastMsg = stats ? stats.lastMsg : null;
+        const unreadCount = stats ? stats.unreadCount : 0;
 
         let lastMessageText = '';
         if (lastMsg) {

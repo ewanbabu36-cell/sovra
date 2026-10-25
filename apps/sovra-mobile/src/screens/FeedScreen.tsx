@@ -96,6 +96,11 @@ export function FeedScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
+  // Full-screen Story Viewer state
+  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [storyProgress, setStoryProgress] = useState<number>(0);
+  const [isStoryPaused, setIsStoryPaused] = useState<boolean>(false);
+
   // New post modal state
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
   const [newCaption, setNewCaption] = useState<string>('');
@@ -109,6 +114,57 @@ export function FeedScreen(): React.JSX.Element {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  const openStoryViewer = (storyId: string) => {
+    const idx = stories.findIndex(s => s.id === storyId);
+    if (idx !== -1) {
+      setActiveStoryIndex(idx);
+      setStoryProgress(0);
+      setIsStoryPaused(false);
+      toggleStorySeen(storyId);
+    }
+  };
+
+  const closeStoryViewer = () => {
+    setActiveStoryIndex(null);
+    setStoryProgress(0);
+  };
+
+  const nextStory = useCallback(() => {
+    setActiveStoryIndex(prev => {
+      if (prev === null) return null;
+      if (prev < stories.length - 1) {
+        const nextIdx = prev + 1;
+        setStoryProgress(0);
+        toggleStorySeen(stories[nextIdx].id);
+        return nextIdx;
+      }
+      return null;
+    });
+  }, [stories]);
+
+  const prevStory = useCallback(() => {
+    setActiveStoryIndex(prev => {
+      if (prev === null || prev === 0) return prev;
+      setStoryProgress(0);
+      return prev - 1;
+    });
+  }, []);
+
+  // 5-second automatic progression timer for stories
+  useEffect(() => {
+    if (activeStoryIndex === null || isStoryPaused) return;
+    const interval = setInterval(() => {
+      setStoryProgress(prev => {
+        if (prev >= 100) {
+          nextStory();
+          return 0;
+        }
+        return prev + 2; // 50 ticks of 100ms = 5000ms
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [activeStoryIndex, isStoryPaused, nextStory]);
 
   const loadData = useCallback(async () => {
     try {
@@ -480,8 +536,8 @@ export function FeedScreen(): React.JSX.Element {
             key={story.id}
             role="button"
             tabIndex={0}
-            onClick={() => toggleStorySeen(story.id)}
-            onKeyDown={e => e.key === 'Enter' && toggleStorySeen(story.id)}
+            onClick={() => openStoryViewer(story.id)}
+            onKeyDown={e => e.key === 'Enter' && openStoryViewer(story.id)}
             style={{
               display: 'flex',
               flexDirection: 'column',
@@ -528,6 +584,175 @@ export function FeedScreen(): React.JSX.Element {
           </div>
         ))}
       </section>
+
+      {/* Full-Screen Instagram-Style Story Viewer Modal */}
+      {activeStoryIndex !== null && stories[activeStoryIndex] && (
+        <div
+          role="dialog"
+          aria-label="Story Viewer"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            backgroundColor: '#000',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Progress Bar Header */}
+          <div style={{ display: 'flex', gap: 4, padding: '12px 16px 8px 16px' }}>
+            {stories.map((s, idx) => (
+              <div
+                key={s.id}
+                style={{
+                  flex: 1,
+                  height: 3,
+                  backgroundColor: 'rgba(255,255,255,0.25)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width:
+                      idx < activeStoryIndex
+                        ? '100%'
+                        : idx === activeStoryIndex
+                        ? `${storyProgress}%`
+                        : '0%',
+                    backgroundColor: '#fff',
+                    transition: idx === activeStoryIndex ? 'width 0.1s linear' : 'none',
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* User Header */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '6px 16px 12px 16px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  backgroundColor: stories[activeStoryIndex].avatarBg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                }}
+              >
+                {stories[activeStoryIndex].avatarEmoji}
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                  {stories[activeStoryIndex].creatorName}
+                </div>
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>
+                  Sovereign Story &bull; E2EE Ephemeral
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={closeStoryViewer}
+              aria-label="Close Story"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#fff',
+                fontSize: 22,
+                cursor: 'pointer',
+                padding: 4,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Story Content & Tap Zones */}
+          <div
+            style={{
+              flex: 1,
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'radial-gradient(circle at center, #1e293b 0%, #030712 100%)',
+              userSelect: 'none',
+            }}
+          >
+            {/* Left Tap Zone (Previous Story) */}
+            <div
+              onClick={prevStory}
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: '35%',
+                zIndex: 10,
+                cursor: 'pointer',
+              }}
+            />
+
+            {/* Center Pause/Resume Zone */}
+            <div
+              onClick={() => setIsStoryPaused(!isStoryPaused)}
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: '35%',
+                width: '30%',
+                zIndex: 10,
+                cursor: 'pointer',
+              }}
+            />
+
+            {/* Right Tap Zone (Next Story) */}
+            <div
+              onClick={nextStory}
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                right: 0,
+                width: '35%',
+                zIndex: 10,
+                cursor: 'pointer',
+              }}
+            />
+
+            {/* Big Visual Graphic */}
+            <div style={{ textAlign: 'center', padding: 24 }}>
+              <div style={{ fontSize: 72, marginBottom: 16 }}>
+                {stories[activeStoryIndex].avatarEmoji}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
+                {stories[activeStoryIndex].creatorName}
+              </div>
+              <div style={{ fontSize: 12, color: '#38bdf8', maxWidth: 280, margin: '0 auto' }}>
+                Broadcasting sovereign ephemeral moment directly across the local 2.4GHz mesh swarm.
+              </div>
+              {isStoryPaused && (
+                <div style={{ marginTop: 12, fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>
+                  ⏸ Paused (Tap to resume)
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Inline Progressive Post Composer (Zero-Popup Industry Standard) */}
       {isCreateOpen ? (

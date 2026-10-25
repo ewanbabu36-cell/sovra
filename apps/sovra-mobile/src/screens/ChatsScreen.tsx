@@ -92,6 +92,57 @@ export function ChatsScreen(): React.JSX.Element {
   const [isPanicConfirming, setIsPanicConfirming] = useState(false);
   const [panicToast, setPanicToast] = useState<string | null>(null);
 
+  // Outbox live reactive updates & online/offline listener
+  const [pendingOutboxCount, setPendingOutboxCount] = useState<number>(() => localDb.getPendingOutbox().length);
+  const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubOutbox = localDb.subscribeToOutbox(op => {
+      setPendingOutboxCount(localDb.getPendingOutbox().length);
+
+      // If op corresponds to a SEND_CHAT operation, update the message's tickState in real time!
+      if (op.type === 'SEND_CHAT' && op.payload) {
+        const msgId = op.payload.messageId || op.payload.id || op.operationId;
+        const newStatus =
+          op.status === 'ACKNOWLEDGED'
+            ? 'read'
+            : op.status === 'DELIVERED'
+            ? 'delivered'
+            : op.status === 'SENT'
+            ? 'sent'
+            : op.status === 'FAILED'
+            ? 'failed'
+            : 'pending';
+
+        setMessages(prev =>
+          prev.map(m => {
+            if (m.id === msgId || (op.payload.text && m.text === op.payload.text && m.isOutgoing)) {
+              return { ...m, tickState: newStatus as any };
+            }
+            return m;
+          }),
+        );
+      }
+    });
+
+    return () => {
+      unsubOutbox();
+    };
+  }, []);
+
   // Mesh & Discovery state
   const [discoveredPeers, setDiscoveredPeers] = useState<MeshDiscoveredPeer[]>([]);
   const [meshRuntimeState, setMeshRuntimeState] = useState<MobileMeshRuntimeState>(
@@ -1396,6 +1447,63 @@ export function ChatsScreen(): React.JSX.Element {
         height: '100%',
       }}
     >
+      {/* Persistent Network & BLE Mesh Status Bar */}
+      <div
+        role="status"
+        aria-label="Network Status Bar"
+        style={{
+          padding: '6px 14px',
+          backgroundColor: isOnline
+            ? '#064e3b'
+            : discoveredPeers.length > 0 || meshRuntimeState.status === 'BLUETOOTH_MESH'
+            ? '#1e1b4b'
+            : '#451a03',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          fontSize: 11,
+          fontWeight: 600,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          color: isOnline
+            ? '#6ee7b7'
+            : discoveredPeers.length > 0 || meshRuntimeState.status === 'BLUETOOTH_MESH'
+            ? '#a5b4fc'
+            : '#fde047',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>
+            {isOnline
+              ? '🟢'
+              : discoveredPeers.length > 0 || meshRuntimeState.status === 'BLUETOOTH_MESH'
+              ? '🔵'
+              : '🟡'}
+          </span>
+          <span>
+            {isOnline
+              ? 'Online Swarm Connected (P2P + Cloud)'
+              : discoveredPeers.length > 0 || meshRuntimeState.status === 'BLUETOOTH_MESH'
+              ? `BitChat BLE Mesh Active (${discoveredPeers.length} Peers)`
+              : 'Offline Mode (Local Storage Encrypted)'}
+          </span>
+        </div>
+
+        {pendingOutboxCount > 0 && (
+          <span
+            style={{
+              backgroundColor: 'rgba(234, 179, 8, 0.25)',
+              color: '#fef08a',
+              padding: '1px 6px',
+              borderRadius: 4,
+              fontSize: 10,
+              fontWeight: 700,
+            }}
+          >
+            ⏳ {pendingOutboxCount} Outbox Queued
+          </span>
+        )}
+      </div>
+
       {activeRecipient ? renderThreadView() : renderListView()}
     </div>
   );

@@ -10411,7 +10411,7 @@ export class SovraDatabaseEngine {
     const call = this.db.call_sessions.find(c => c.callId === callId);
     if (!call) return null;
 
-    if (requesterDid && call.callerDid !== requesterDid && call.recipientDid !== requesterDid) {
+    if (requesterDid && requesterDid !== 'system' && call.callerDid !== requesterDid && call.recipientDid !== requesterDid) {
       throw new Error('Forbidden: Unauthorized call termination');
     }
 
