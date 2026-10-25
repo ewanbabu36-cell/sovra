@@ -52,7 +52,7 @@ export class ConcreteBleChannel implements TransportChannel {
   public readonly id: string;
   public readonly peerAddress: string;
   public readonly transportType: TransportType = 'ble';
-  public readonly mtu: number;
+  public mtu: number;
 
   private readonly rawChannel: BleConnectionChannel;
   private session: AuthenticatedBleSession | null = null;
@@ -83,6 +83,10 @@ export class ConcreteBleChannel implements TransportChannel {
         } catch {}
       }
     });
+  }
+
+  public updateMtu(newMtu: number): void {
+    this.mtu = Math.max(23, newMtu);
   }
 
   public setSession(session: AuthenticatedBleSession): void {

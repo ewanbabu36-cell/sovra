@@ -46,6 +46,12 @@ class SovraBleModule(private val context: Context) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    data class PendingWrite(
+        val chunk: ByteArray,
+        val callback: (Boolean, String?) -> Unit,
+        var retryCount: Int = 0
+    )
+
     // Active GATT Connections: gattId -> ActiveConnection
     data class ActiveConnection(
         val gattId: String,
@@ -56,7 +62,10 @@ class SovraBleModule(private val context: Context) {
         var notifyCharacteristic: BluetoothGattCharacteristic? = null,
         var isConnected: Boolean = false,
         var onDisconnected: (() -> Unit)? = null,
-        var pendingWriteCallback: ((Boolean) -> Unit)? = null
+        val writeQueue: java.util.concurrent.ConcurrentLinkedQueue<PendingWrite> = java.util.concurrent.ConcurrentLinkedQueue(),
+        @Volatile var isWriteInFlight: Boolean = false,
+        var currentWrite: PendingWrite? = null,
+        var watchdogRunnable: Runnable? = null
     )
 
     private val activeConnections = ConcurrentHashMap<String, ActiveConnection>()
@@ -579,11 +588,33 @@ class SovraBleModule(private val context: Context) {
                 status: Int
             ) {
                 Log.i(TAG, "GATT Client onCharacteristicWrite: status=$status")
-                val conn = activeConnections[gattId]
-                val cb = conn?.pendingWriteCallback
-                conn?.pendingWriteCallback = null
-                val ok = (status == BluetoothGatt.GATT_SUCCESS)
-                cb?.invoke(ok)
+                val conn = activeConnections[gattId] ?: return
+                synchronized(conn) {
+                    conn.watchdogRunnable?.let { mainHandler.removeCallbacks(it) }
+                    conn.watchdogRunnable = null
+
+                    val current = conn.currentWrite
+                    conn.currentWrite = null
+                    conn.isWriteInFlight = false
+
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        current?.callback?.invoke(true, null)
+                        processWriteQueue(conn)
+                    } else if ((status == 133 || status == 143 || status == 257) && current != null && current.retryCount < 3) {
+                        current.retryCount++
+                        val delay = when (current.retryCount) {
+                            1 -> 50L
+                            2 -> 150L
+                            else -> 350L
+                        }
+                        Log.w(TAG, "GATT Write status=$status (busy/timeout). Backoff retry in ${delay}ms (attempt ${current.retryCount}/3)...")
+                        conn.writeQueue.add(current)
+                        mainHandler.postDelayed({ processWriteQueue(conn) }, delay)
+                    } else {
+                        current?.callback?.invoke(false, "GATT write failed with status $status")
+                        processWriteQueue(conn)
+                    }
+                }
             }
 
             override fun onCharacteristicChanged(
@@ -613,7 +644,7 @@ class SovraBleModule(private val context: Context) {
     }
 
     // ==========================================
-    // 5. GATT WRITE WITH RESPONSE
+    // 5. GATT WRITE WITH RESPONSE (FIFO QUEUE & MTU CHUNKING GUARD)
     // ==========================================
 
     fun writeCharacteristic(
@@ -633,27 +664,103 @@ class SovraBleModule(private val context: Context) {
             return
         }
 
-        val cbWrapper: (Boolean) -> Unit = { ok ->
-            conn.pendingWriteCallback = null
-            callback(ok, if (ok) null else "GATT write returned non-zero status")
-        }
-        conn.pendingWriteCallback = cbWrapper
-
-        // 3.5s Watchdog timer to ensure pendingWriteCallback is never locked permanently
-        mainHandler.postDelayed({
-            if (conn.pendingWriteCallback === cbWrapper) {
-                conn.pendingWriteCallback = null
-                callback(false, "GATT write timed out")
+        // Native MTU Boundary Chunking Guard (Effective payload size = MTU - 3 ATT bytes)
+        val maxPayload = Math.max(20, conn.mtu - 3)
+        if (data.size <= maxPayload) {
+            conn.writeQueue.add(PendingWrite(data, callback))
+        } else {
+            val chunkPayloadSize = Math.max(18, maxPayload - 2)
+            val totalChunks = Math.ceil(data.size.toDouble() / chunkPayloadSize.toDouble()).toInt()
+            var offset = 0
+            val chunks = ArrayList<ByteArray>()
+            for (seq in 0 until totalChunks) {
+                val len = Math.min(chunkPayloadSize, data.size - offset)
+                val slice = ByteArray(len + 2)
+                slice[0] = seq.toByte()
+                slice[1] = totalChunks.toByte()
+                System.arraycopy(data, offset, slice, 2, len)
+                offset += len
+                chunks.add(slice)
             }
-        }, 3500)
 
-        writeChar.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        writeChar.value = data
+            var chunkIndex = 0
+            fun enqueueNextChunk() {
+                if (chunkIndex >= chunks.size) return
+                val isLast = (chunkIndex == chunks.size - 1)
+                val chunkData = chunks[chunkIndex]
+                chunkIndex++
+                conn.writeQueue.add(PendingWrite(chunkData, { success, err ->
+                    if (!success) {
+                        callback(false, err ?: "Chunk write failed")
+                    } else if (isLast) {
+                        callback(true, null)
+                    } else {
+                        enqueueNextChunk()
+                        processWriteQueue(conn)
+                    }
+                }))
+            }
+            enqueueNextChunk()
+        }
 
-        val initiated = conn.gatt.writeCharacteristic(writeChar)
-        if (!initiated) {
-            conn.pendingWriteCallback = null
-            callback(false, "Failed to initiate GATT write on native Bluetooth stack")
+        processWriteQueue(conn)
+    }
+
+    private fun processWriteQueue(conn: ActiveConnection) {
+        synchronized(conn) {
+            if (!conn.isConnected || conn.isWriteInFlight || conn.writeQueue.isEmpty()) {
+                return
+            }
+
+            val next = conn.writeQueue.poll() ?: return
+            val writeChar = conn.writeCharacteristic ?: run {
+                next.callback(false, "Write characteristic unavailable")
+                return
+            }
+
+            conn.isWriteInFlight = true
+            conn.currentWrite = next
+
+            // 3.5s Watchdog timer for pending write
+            val watchdog = Runnable {
+                synchronized(conn) {
+                    if (conn.currentWrite === next && conn.isWriteInFlight) {
+                        Log.w(TAG, "GATT write watchdog timeout on ${conn.gattId}")
+                        conn.isWriteInFlight = false
+                        conn.currentWrite = null
+                        next.callback(false, "GATT write timed out")
+                        processWriteQueue(conn)
+                    }
+                }
+            }
+            conn.watchdogRunnable = watchdog
+            mainHandler.postDelayed(watchdog, 3500)
+
+            writeChar.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            writeChar.value = next.chunk
+
+            val initiated = conn.gatt.writeCharacteristic(writeChar)
+            if (!initiated) {
+                conn.watchdogRunnable?.let { mainHandler.removeCallbacks(it) }
+                conn.watchdogRunnable = null
+                conn.isWriteInFlight = false
+                conn.currentWrite = null
+
+                if (next.retryCount < 3) {
+                    next.retryCount++
+                    val delay = when (next.retryCount) {
+                        1 -> 50L
+                        2 -> 150L
+                        else -> 350L
+                    }
+                    Log.w(TAG, "GATT write not initiated. Retrying in ${delay}ms (attempt ${next.retryCount}/3)...")
+                    conn.writeQueue.add(next)
+                    mainHandler.postDelayed({ processWriteQueue(conn) }, delay)
+                } else {
+                    next.callback(false, "Failed to initiate GATT write on native Bluetooth stack")
+                    processWriteQueue(conn)
+                }
+            }
         }
     }
 
