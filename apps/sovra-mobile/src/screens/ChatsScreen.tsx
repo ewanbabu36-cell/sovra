@@ -71,6 +71,7 @@ export interface ActiveRecipient {
   avatar?: string | undefined;
   isChannel?: boolean | undefined;
   isEmergency?: boolean | undefined;
+  isBitChat?: boolean | undefined;
 }
 
 export function ChatsScreen(): React.JSX.Element {
@@ -467,7 +468,8 @@ export function ChatsScreen(): React.JSX.Element {
     setMessages(prev => [...prev, optimisticVoice]);
 
     try {
-      const isMeshMode = activeTab === 'mesh' || isMeshActive || Boolean(activeRecipient?.isBitChat);
+      const isMeshActive = meshRuntimeState.status === 'BLUETOOTH_MESH' || discoveredPeers.length > 0;
+      const isMeshMode = subTab === 'radar' || isMeshActive || Boolean(activeRecipient?.isBitChat);
       const res = await sendChatMessage({
         recipientDid: targetDid,
         text: `Voice note (${duration}s)`,

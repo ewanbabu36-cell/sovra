@@ -126,14 +126,28 @@ class SovraBleModule(private val context: Context) {
     }
 
     private fun registerBluetoothStateReceiver() {
-        val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        val filter = IntentFilter().apply {
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+        }
         context.registerReceiver(object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
-                if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
-                    val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
-                    if (state == BluetoothAdapter.STATE_OFF || state == BluetoothAdapter.STATE_TURNING_OFF) {
-                        Log.w(TAG, "Android Bluetooth radio disabled; tearing down all active GATT connections")
-                        cleanupAllConnections()
+                when (intent?.action) {
+                    BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                        val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                        if (state == BluetoothAdapter.STATE_OFF || state == BluetoothAdapter.STATE_TURNING_OFF) {
+                            Log.w(TAG, "Android Bluetooth radio disabled; tearing down all active GATT connections")
+                            cleanupAllConnections()
+                        }
+                    }
+                    Intent.ACTION_SCREEN_OFF -> {
+                        Log.i(TAG, "Screen OFF detected: adapting BLE scan duty cycle to BACKGROUND_LOW_POWER")
+                        setScanDutyCycle("BACKGROUND_LOW_POWER")
+                    }
+                    Intent.ACTION_SCREEN_ON -> {
+                        Log.i(TAG, "Screen ON detected: restoring BLE scan duty cycle to ACTIVE")
+                        setScanDutyCycle("ACTIVE")
                     }
                 }
             }
@@ -298,31 +312,111 @@ class SovraBleModule(private val context: Context) {
     }
 
     // ==========================================
-    // 3. BLE SCANNING (CENTRAL ROLE)
+    // 3. BLE SCANNING & ADAPTIVE DUTY-CYCLING (CENTRAL ROLE)
     // ==========================================
+
+    var scanDutyMode: String = "ACTIVE"
+        private set
+    private var scanDutyRunnable: Runnable? = null
+    private var savedServiceUuidStr: String = SOVRA_SERVICE_UUID.toString()
+    private var isUserScanActive = false
+
+    @Synchronized
+    fun setScanDutyCycle(mode: String, callback: ((Boolean, String?) -> Unit)? = null) {
+        val normalized = mode.uppercase(Locale.ROOT)
+        if (normalized != "ACTIVE" && normalized != "BACKGROUND_LOW_POWER") {
+            callback?.invoke(false, "Unsupported scan duty mode: $mode")
+            return
+        }
+
+        scanDutyMode = normalized
+        Log.i(TAG, "Scan duty cycle adapted to: $scanDutyMode")
+
+        scanDutyRunnable?.let { mainHandler.removeCallbacks(it) }
+        scanDutyRunnable = null
+
+        if (!isUserScanActive) {
+            callback?.invoke(true, null)
+            return
+        }
+
+        if (normalized == "ACTIVE") {
+            // Revert to continuous LOW_LATENCY scanning
+            stopRawScan()
+            startRawScan(savedServiceUuidStr, ScanSettings.SCAN_MODE_LOW_LATENCY) { success, err ->
+                callback?.invoke(success, err)
+            }
+        } else {
+            // BACKGROUND_LOW_POWER: 5s scan window every 45s interval
+            scheduleDutyCycleScanWindow()
+            callback?.invoke(true, null)
+        }
+    }
+
+    private fun scheduleDutyCycleScanWindow() {
+        if (!isUserScanActive || scanDutyMode != "BACKGROUND_LOW_POWER") return
+
+        // 1. Run 5s scan window in SCAN_MODE_LOW_POWER
+        startRawScan(savedServiceUuidStr, ScanSettings.SCAN_MODE_LOW_POWER) { success, _ ->
+            if (success) {
+                Log.d(TAG, "Duty Cycle: Started 5s low-power scan window")
+            }
+        }
+
+        // 2. Schedule pause after 5 seconds
+        val pauseRunnable = Runnable {
+            if (!isUserScanActive || scanDutyMode != "BACKGROUND_LOW_POWER") return@Runnable
+            Log.d(TAG, "Duty Cycle: Pausing scan window for 40s")
+            stopRawScan()
+
+            // 3. Re-schedule next 5s window after 40 seconds (total 45s cycle)
+            val nextCycleRunnable = Runnable {
+                scheduleDutyCycleScanWindow()
+            }
+            scanDutyRunnable = nextCycleRunnable
+            mainHandler.postDelayed(nextCycleRunnable, 40000L)
+        }
+
+        scanDutyRunnable = pauseRunnable
+        mainHandler.postDelayed(pauseRunnable, 5000L)
+    }
 
     @Synchronized
     fun startScanning(serviceUuidStr: String, callback: (Boolean, String?) -> Unit) {
+        savedServiceUuidStr = serviceUuidStr
+        isUserScanActive = true
+
+        if (scanDutyMode == "BACKGROUND_LOW_POWER") {
+            scheduleDutyCycleScanWindow()
+            callback(true, null)
+        } else {
+            startRawScan(serviceUuidStr, ScanSettings.SCAN_MODE_LOW_LATENCY, callback)
+        }
+    }
+
+    @Synchronized
+    private fun startRawScan(
+        serviceUuidStr: String,
+        scanMode: Int,
+        callback: ((Boolean, String?) -> Unit)? = null
+    ) {
         if (!hasPermissions()) {
-            callback(false, "Bluetooth scan permissions not granted")
+            callback?.invoke(false, "Bluetooth scan permissions not granted")
             return
         }
         val adapter = bluetoothAdapter
         if (adapter == null || !adapter.isEnabled) {
-            callback(false, "Bluetooth adapter is disabled or unavailable")
+            callback?.invoke(false, "Bluetooth adapter is disabled or unavailable")
             return
         }
         val scanner = adapter.bluetoothLeScanner
         if (scanner == null) {
-            callback(false, "BluetoothLeScanner unavailable")
+            callback?.invoke(false, "BluetoothLeScanner unavailable")
             return
         }
 
-        // Anti-throttling guard: If already scanning, keep scanner running!
-        // Android throttles apps that restart scanning more than 5 times in 30 seconds.
         if (isScanning && scanCallback != null) {
-            Log.d(TAG, "BLE Scanner already running; keeping active scan alive")
-            callback(true, null)
+            callback?.invoke(true, null)
             return
         }
 
@@ -332,16 +426,13 @@ class SovraBleModule(private val context: Context) {
             SOVRA_SERVICE_UUID
         }
 
-        // Broad multi-filter approach:
-        // Hardware filters with 128-bit UUIDs often drop packets on MediaTek/Qualcomm chips.
-        // We include both specific filters and a general filter, then validate accurately in software.
         val filters = mutableListOf<ScanFilter>()
         filters.add(ScanFilter.Builder().setServiceUuid(ParcelUuid(serviceUuid)).build())
         filters.add(ScanFilter.Builder().setManufacturerData(0x5356, byteArrayOf()).build())
         filters.add(ScanFilter.Builder().build())
 
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setScanMode(scanMode)
             .setReportDelay(0)
             .build()
 
@@ -353,7 +444,6 @@ class SovraBleModule(private val context: Context) {
                 val rssi = result.rssi
                 val scanRecord = result.scanRecord ?: return
 
-                // Software validation: verify if this is a Sovra mesh node
                 val serviceUuids = scanRecord.serviceUuids
                 val hasSovraUuid = serviceUuids?.any {
                     it.uuid == serviceUuid ||
@@ -368,14 +458,12 @@ class SovraBleModule(private val context: Context) {
                 val hasSovraName = rawName.contains("Sovra", ignoreCase = true) ||
                                    rawName.contains("Peer", ignoreCase = true)
 
-                // Skip unrelated Bluetooth devices (headphones, TVs, fitness bands)
                 if (!hasSovraUuid && !hasSovraMfg && !hasSovraName) {
                     return
                 }
 
                 val serviceData = scanRecord.getServiceData(ParcelUuid(serviceUuid)) ?: ByteArray(0)
 
-                // Extract custom username from 0x5356 Manufacturer Data if present
                 val customName = if (mfgData != null && mfgData.isNotEmpty()) {
                     try {
                         String(mfgData, Charsets.UTF_8).trim()
@@ -392,8 +480,6 @@ class SovraBleModule(private val context: Context) {
                     "Peer " + address.take(8)
                 }
 
-                // Smart duplicate throttling:
-                // Only throttle if reported within last 1500ms AND the name has not improved
                 val now = System.currentTimeMillis()
                 val lastSeen = discoveredDevices[address] ?: 0L
                 val previousName = discoveredNames[address]
@@ -418,26 +504,34 @@ class SovraBleModule(private val context: Context) {
         this.isScanning = true
         try {
             scanner.startScan(filters, settings, cb)
-            callback(true, null)
+            callback?.invoke(true, null)
         } catch (e: Exception) {
             Log.e(TAG, "scanner.startScan exception: ${e.message}")
             isScanning = false
             scanCallback = null
-            callback(false, e.message)
+            callback?.invoke(false, e.message)
         }
     }
 
     @Synchronized
-    fun stopScanning() {
+    private fun stopRawScan() {
         if (isScanning && scanCallback != null) {
             try {
                 bluetoothAdapter?.bluetoothLeScanner?.stopScan(scanCallback)
             } catch (e: Exception) {
-                Log.w(TAG, "Error stopping BLE scan: ${e.message}")
+                Log.w(TAG, "Error stopping BLE raw scan: ${e.message}")
             }
         }
         isScanning = false
         scanCallback = null
+    }
+
+    @Synchronized
+    fun stopScanning() {
+        isUserScanActive = false
+        scanDutyRunnable?.let { mainHandler.removeCallbacks(it) }
+        scanDutyRunnable = null
+        stopRawScan()
     }
 
     // ==========================================

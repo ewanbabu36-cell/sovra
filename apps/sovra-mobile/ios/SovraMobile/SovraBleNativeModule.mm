@@ -108,6 +108,16 @@ RCT_EXPORT_METHOD(stopScanning:(RCTPromiseResolveBlock)resolve rejecter:(RCTProm
     resolve(@YES);
 }
 
+RCT_EXPORT_METHOD(setScanDutyCycle:(NSString *)mode resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
+    [[SovraBleBridge sharedInstance] setScanDutyCycle:mode completion:^(BOOL success, NSString * _Nullable error) {
+        if (success) {
+            resolve(@YES);
+        } else {
+            reject(@"DUTY_CYCLE_FAILED", error ?: @"Failed to set scan duty cycle", nil);
+        }
+    }];
+}
+
 RCT_EXPORT_METHOD(connectGatt:(NSString *)address resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
     [[SovraBleBridge sharedInstance] connectPeripheral:address completion:^(BOOL success, NSString * _Nullable peripheralId, NSInteger maxWriteLength, NSString * _Nullable error) {
         if (success && peripheralId) {

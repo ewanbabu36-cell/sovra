@@ -161,6 +161,18 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
     } catch {}
   }
 
+  public async setScanDutyCycle(mode: 'ACTIVE' | 'BACKGROUND_LOW_POWER' | string): Promise<boolean> {
+    if (!this.nativeModule || typeof this.nativeModule.setScanDutyCycle !== 'function') {
+      return false;
+    }
+    try {
+      await this.nativeModule.setScanDutyCycle(mode);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public async connect(targetAddress: string): Promise<BleConnectionChannel> {
     if (!this.nativeModule) {
       throw new BleHardwareUnavailableError(

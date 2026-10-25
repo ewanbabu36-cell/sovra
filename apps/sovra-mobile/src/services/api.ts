@@ -369,6 +369,9 @@ export async function sendChatMessage(params: {
   senderName?: string;
   isAudio?: boolean;
   audioDurationSec?: number;
+  isBitChat?: boolean;
+  audioBitrateKbps?: number;
+  audioBitsPerSecond?: number;
 }): Promise<{ ok: boolean; message?: any; error?: string }> {
   const res = await apiFetch('/api/chat/send', {
     method: 'POST',

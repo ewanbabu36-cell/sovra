@@ -143,6 +143,21 @@ class SovraBleReactModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun setScanDutyCycle(mode: String, promise: Promise) {
+        try {
+            bleModule.setScanDutyCycle(mode) { success, errorMsg ->
+                if (success) {
+                    promise.resolve(true)
+                } else {
+                    promise.reject("DUTY_CYCLE_FAILED", errorMsg ?: "Failed to set scan duty cycle")
+                }
+            }
+        } catch (e: Exception) {
+            promise.reject("BLE_EXCEPTION", e.message, e)
+        }
+    }
+
+    @ReactMethod
     fun connectGatt(address: String, promise: Promise) {
         try {
             bleModule.connectGatt(address) { success, gattId, mtu, errorMsg ->
