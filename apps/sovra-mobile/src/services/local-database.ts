@@ -183,43 +183,163 @@ export interface LocalDatabaseSchema {
   sync_state: ClientSyncState;
 }
 
-const STORAGE_KEY = 'sovra_mobile_durable_db_v1';
-const DEFAULT_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days TTL
+export const STORAGE_KEY = 'sovra_mobile_durable_db_v1';
+export const DEFAULT_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days TTL
+export const MAX_MEDIA_STAGING_ITEMS = 50;
+export const MAX_MEDIA_STAGING_BYTES = 50 * 1024 * 1024; // 50MB
 
-export class SovraLocalDatabase {
-  private static instance: SovraLocalDatabase | null = null;
-  private state: LocalDatabaseSchema;
-  private writeLock: Promise<void> = Promise.resolve();
-  private readonly deviceId: string;
+// ==========================================
+// 0. CROSS-PLATFORM STORAGE DRIVER ABSTRACTION
+// ==========================================
+
+export interface IStorageDriver {
+  readonly name: string;
+  getItem(key: string): Promise<string | null> | string | null;
+  setItem(key: string, value: string): Promise<void> | void;
+  removeItem(key: string): Promise<void> | void;
+  clear(): Promise<void> | void;
+}
+
+export class MemoryStorageDriver implements IStorageDriver {
+  public readonly name = 'memory';
+  private store = new Map<string, string>();
+
+  public getItem(key: string): string | null {
+    return this.store.get(key) ?? null;
+  }
+
+  public setItem(key: string, value: string): void {
+    this.store.set(key, value);
+  }
+
+  public removeItem(key: string): void {
+    this.store.delete(key);
+  }
+
+  public clear(): void {
+    this.store.clear();
+  }
+}
+
+export class LocalStorageDriver implements IStorageDriver {
+  public readonly name = 'local-storage';
+
+  public getItem(key: string): string | null {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        return localStorage.getItem(key);
+      }
+    } catch {}
+    return null;
+  }
+
+  public setItem(key: string, value: string): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, value);
+      }
+    } catch {}
+  }
+
+  public removeItem(key: string): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(key);
+      }
+    } catch {}
+  }
+
+  public clear(): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {}
+  }
+}
+
+export class NodeStorageDriver implements IStorageDriver {
+  public readonly name = 'node-disk';
   private readonly diskFilePath: string;
   private readonly diskBackupPath: string;
 
-  private constructor() {
-    this.deviceId = this.resolveDeviceId();
-    this.diskFilePath = path.resolve(process.cwd(), '.sovra-storage-dev', 'mobile-client-local-state.json');
-    this.diskBackupPath = path.resolve(process.cwd(), '.sovra-storage-dev', 'mobile-client-local-state.json.bak');
-    this.state = this.loadInitialState();
+  constructor(customPath?: string) {
+    const cwd = typeof process !== 'undefined' && typeof process.cwd === 'function' ? process.cwd() : '.';
+    this.diskFilePath = customPath || path.resolve(cwd, '.sovra-storage-dev', 'mobile-client-local-state.json');
+    this.diskBackupPath = this.diskFilePath + '.bak';
   }
 
-  public static getInstance(): SovraLocalDatabase {
-    if (!SovraLocalDatabase.instance) {
-      SovraLocalDatabase.instance = new SovraLocalDatabase();
+  public getItem(key: string): string | null {
+    try {
+      if (fs.existsSync(this.diskFilePath)) {
+        const raw = fs.readFileSync(this.diskFilePath, 'utf-8');
+        if (raw && raw.trim()) return raw;
+      }
+    } catch {}
+    try {
+      if (fs.existsSync(this.diskBackupPath)) {
+        const rawBak = fs.readFileSync(this.diskBackupPath, 'utf-8');
+        if (rawBak && rawBak.trim()) return rawBak;
+      }
+    } catch {}
+    return null;
+  }
+
+  public setItem(key: string, value: string): void {
+    try {
+      const dir = path.dirname(this.diskFilePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      if (fs.existsSync(this.diskFilePath)) {
+        fs.copyFileSync(this.diskFilePath, this.diskBackupPath);
+      }
+      const tmpPath = this.diskFilePath + '.tmp';
+      fs.writeFileSync(tmpPath, value, 'utf-8');
+      fs.renameSync(tmpPath, this.diskFilePath);
+    } catch (e) {
+      // Graceful fallback if disk permissions fail
     }
-    return SovraLocalDatabase.instance;
   }
 
-  private resolveDeviceId(): string {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('sovra_device_fingerprint');
-      if (stored) return stored;
-      const created = 'dev_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
-      localStorage.setItem('sovra_device_fingerprint', created);
-      return created;
-    }
-    return 'dev_node_' + process.pid + '_' + Date.now();
+  public removeItem(key: string): void {
+    try {
+      if (fs.existsSync(this.diskFilePath)) fs.unlinkSync(this.diskFilePath);
+      if (fs.existsSync(this.diskBackupPath)) fs.unlinkSync(this.diskBackupPath);
+    } catch {}
   }
 
-  private loadInitialState(): LocalDatabaseSchema {
+  public clear(): void {
+    this.removeItem(STORAGE_KEY);
+  }
+}
+
+export function resolveStorageDriver(customDriver?: IStorageDriver): IStorageDriver {
+  if (customDriver) return customDriver;
+  // Node.js with native fs available
+  if (
+    typeof process !== 'undefined' &&
+    process.versions &&
+    process.versions.node &&
+    typeof fs !== 'undefined' &&
+    typeof fs.readFileSync === 'function'
+  ) {
+    return new NodeStorageDriver();
+  }
+  // Browser or React Native WebView with localStorage
+  if (typeof localStorage !== 'undefined') {
+    return new LocalStorageDriver();
+  }
+  // Safe in-memory fallback
+  return new MemoryStorageDriver();
+}
+
+// ==========================================
+// LOCAL SCHEMA MIGRATOR (VERSIONING)
+// ==========================================
+
+export class LocalSchemaMigrator {
+  public static migrate(raw: any): LocalDatabaseSchema {
     const defaultSchema: LocalDatabaseSchema = {
       version: 2,
       users: {},
@@ -239,73 +359,141 @@ export class SovraLocalDatabase {
       },
     };
 
-    // 1. Try persistent disk storage file first
-    try {
-      if (fs.existsSync(this.diskFilePath)) {
-        const raw = fs.readFileSync(this.diskFilePath, 'utf-8');
-        if (raw && raw.trim()) {
-          const parsed = JSON.parse(raw);
-          return { ...defaultSchema, ...parsed };
-        }
-      }
-    } catch (e) {
-      // If primary disk file is corrupted, attempt rolling backup restoration
-      try {
-        if (fs.existsSync(this.diskBackupPath)) {
-          const rawBak = fs.readFileSync(this.diskBackupPath, 'utf-8');
-          if (rawBak && rawBak.trim()) {
-            const parsed = JSON.parse(rawBak);
-            return { ...defaultSchema, ...parsed };
-          }
-        }
-      } catch {}
+    if (!raw || typeof raw !== 'object') {
+      return defaultSchema;
     }
 
-    // 2. Try localStorage (browser / webview)
+    const currentVersion = Number(raw.version || 1);
+    const migrated: LocalDatabaseSchema = {
+      ...defaultSchema,
+      ...raw,
+      users: raw.users || {},
+      profiles: raw.profiles || {},
+      posts: raw.posts || {},
+      comments: raw.comments || {},
+      messages: raw.messages || {},
+      channels: raw.channels || {},
+      operations: raw.operations || {},
+      outbox: raw.outbox || {},
+      inbox: raw.inbox || {},
+      media_staging: raw.media_staging || {},
+      sync_state: {
+        ...defaultSchema.sync_state,
+        ...(raw.sync_state || {}),
+      },
+    };
+
+    if (currentVersion < 2) {
+      migrated.version = 2;
+    }
+
+    return migrated;
+  }
+}
+
+export class SovraLocalDatabase {
+  private static instance: SovraLocalDatabase | null = null;
+  private state: LocalDatabaseSchema;
+  private writeLock: Promise<void> = Promise.resolve();
+  private readonly deviceId: string;
+  private driver: IStorageDriver;
+  private outboxListeners: Array<(op: QueuedOperation) => void> = [];
+
+  private constructor(driver?: IStorageDriver) {
+    this.deviceId = this.resolveDeviceId();
+    this.driver = driver || resolveStorageDriver();
+    this.state = this.loadInitialState();
+  }
+
+  public static getInstance(driver?: IStorageDriver): SovraLocalDatabase {
+    if (!SovraLocalDatabase.instance) {
+      SovraLocalDatabase.instance = new SovraLocalDatabase(driver);
+    } else if (driver) {
+      SovraLocalDatabase.instance.setStorageDriver(driver);
+    }
+    return SovraLocalDatabase.instance;
+  }
+
+  public setStorageDriver(driver: IStorageDriver): void {
+    this.driver = driver;
+    this.state = this.loadInitialState();
+  }
+
+  public getStorageDriver(): IStorageDriver {
+    return this.driver;
+  }
+
+  public subscribeToOutbox(callback: (op: QueuedOperation) => void): () => void {
+    this.outboxListeners.push(callback);
+    return () => {
+      this.outboxListeners = this.outboxListeners.filter(l => l !== callback);
+    };
+  }
+
+  private notifyOutboxListeners(op: QueuedOperation): void {
+    for (const listener of this.outboxListeners) {
+      try {
+        listener(op);
+      } catch (e) {
+        console.warn('[SovraLocalDB] Outbox listener notification error:', e);
+      }
+    }
+  }
+
+  private resolveDeviceId(): string {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('sovra_device_fingerprint');
+      if (stored) return stored;
+      const created = 'dev_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+      localStorage.setItem('sovra_device_fingerprint', created);
+      return created;
+    }
+    return 'dev_node_' + (typeof process !== 'undefined' ? process.pid : '1') + '_' + Date.now();
+  }
+
+  private loadInitialState(): LocalDatabaseSchema {
+    // 1. Try active storage driver
     try {
-      if (typeof localStorage !== 'undefined') {
+      const raw = this.driver.getItem(STORAGE_KEY);
+      if (raw && typeof raw === 'string' && raw.trim()) {
+        const parsed = JSON.parse(raw);
+        return LocalSchemaMigrator.migrate(parsed);
+      }
+    } catch (e) {
+      // Driver read fallback
+    }
+
+    // 2. Try browser localStorage fallback if driver was not localStorage
+    try {
+      if (typeof localStorage !== 'undefined' && this.driver.name !== 'local-storage') {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          return { ...defaultSchema, ...parsed };
+          return LocalSchemaMigrator.migrate(parsed);
         }
       }
     } catch {}
 
-    return defaultSchema;
+    return LocalSchemaMigrator.migrate(null);
   }
 
   private async persist(): Promise<void> {
     this.writeLock = this.writeLock.then(() => {
       const serialized = JSON.stringify(this.state, null, 2);
 
-      // 1. Persist to browser/webview localStorage
+      // Persist to primary driver
       try {
-        if (typeof localStorage !== 'undefined') {
+        this.driver.setItem(STORAGE_KEY, serialized);
+      } catch (e) {
+        console.warn('[SovraLocalDB] Driver persist error:', e);
+      }
+
+      // Also mirror to localStorage in browser environments for instant PWA recovery
+      try {
+        if (typeof localStorage !== 'undefined' && this.driver.name !== 'local-storage') {
           localStorage.setItem(STORAGE_KEY, serialized);
         }
-      } catch (e) {
-        console.warn('[SovraLocalDB] localStorage write error:', e);
-      }
-
-      // 2. Persist to atomic crash-safe file on disk
-      try {
-        const dir = path.dirname(this.diskFilePath);
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
-        }
-
-        // Rolling backup
-        if (fs.existsSync(this.diskFilePath)) {
-          fs.copyFileSync(this.diskFilePath, this.diskBackupPath);
-        }
-
-        const tmpPath = this.diskFilePath + '.tmp';
-        fs.writeFileSync(tmpPath, serialized, 'utf-8');
-        fs.renameSync(tmpPath, this.diskFilePath);
-      } catch (e) {
-        // Disk write fallback for environments without fs permissions
-      }
+      } catch {}
     });
     return this.writeLock;
   }
@@ -354,6 +542,7 @@ export class SovraLocalDatabase {
     this.state.outbox[operationId] = op;
     this.state.operations[operationId] = op;
     await this.persist();
+    this.notifyOutboxListeners(op);
     return op;
   }
 
@@ -391,6 +580,7 @@ export class SovraLocalDatabase {
     op.attemptCount += 1;
     op.lastAttemptAt = Date.now();
     await this.persist();
+    this.notifyOutboxListeners(op);
   }
 
   public async markOperationSent(operationId: string): Promise<void> {
@@ -398,6 +588,7 @@ export class SovraLocalDatabase {
     if (!op) return;
     op.status = 'SENT';
     await this.persist();
+    this.notifyOutboxListeners(op);
   }
 
   public async markOperationDelivered(operationId: string): Promise<void> {
@@ -405,6 +596,7 @@ export class SovraLocalDatabase {
     if (!op) return;
     op.status = 'DELIVERED';
     await this.persist();
+    this.notifyOutboxListeners(op);
   }
 
   public async markOperationSuccess(operationId: string): Promise<void> {
@@ -413,6 +605,7 @@ export class SovraLocalDatabase {
     op.status = 'ACKNOWLEDGED';
     op.acknowledgedAt = Date.now();
     await this.persist();
+    this.notifyOutboxListeners(op);
   }
 
   public async markOperationRetryable(operationId: string, errorReason: string, maxAttempts = 5): Promise<void> {
@@ -428,6 +621,7 @@ export class SovraLocalDatabase {
       op.nextRetryAt = Date.now() + backoffSec * 1000;
     }
     await this.persist();
+    this.notifyOutboxListeners(op);
   }
 
   // ==========================================
@@ -639,6 +833,22 @@ export class SovraLocalDatabase {
       transferredBytes: 0,
       isComplete: false,
     };
+
+    // LRU Cache Eviction Policy (Max 50 items or 50MB ceiling)
+    const existing = Object.values(this.state.media_staging);
+    let totalBytes = existing.reduce((sum, item) => sum + (item.sizeBytes || item.dataBase64?.length || 0), 0);
+    const incomingBytes = entry.sizeBytes || entry.dataBase64?.length || 0;
+
+    if (existing.length >= MAX_MEDIA_STAGING_ITEMS || (totalBytes + incomingBytes) > MAX_MEDIA_STAGING_BYTES) {
+      // Sort oldest first
+      const sorted = [...existing].sort((a, b) => a.createdAt - b.createdAt);
+      while (sorted.length > 0 && (sorted.length >= MAX_MEDIA_STAGING_ITEMS || (totalBytes + incomingBytes) > MAX_MEDIA_STAGING_BYTES)) {
+        const oldest = sorted.shift()!;
+        delete this.state.media_staging[oldest.stagingId];
+        totalBytes -= (oldest.sizeBytes || oldest.dataBase64?.length || 0);
+      }
+    }
+
     this.state.media_staging[entry.stagingId] = fullEntry;
     await this.persist();
     return fullEntry;
@@ -710,13 +920,12 @@ export class SovraLocalDatabase {
         activeVectorClock: {},
       },
     };
+    try {
+      this.driver.clear();
+    } catch {}
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY);
     }
-    try {
-      if (fs.existsSync(this.diskFilePath)) fs.unlinkSync(this.diskFilePath);
-      if (fs.existsSync(this.diskBackupPath)) fs.unlinkSync(this.diskBackupPath);
-    } catch {}
     await this.persist();
   }
 }

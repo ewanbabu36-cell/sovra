@@ -37,6 +37,75 @@ interface RelayedAudioChunk {
 const callAudioChunkStore = new Map<string, RelayedAudioChunk[]>();
 let callAudioSeqCounter = 0;
 
+interface CallSseClient {
+  res: http.ServerResponse;
+  userDid: string;
+}
+
+const callSseClients = new Map<string, Set<CallSseClient>>();
+const callHeartbeatMap = new Map<string, { callerLastSeen: number; calleeLastSeen: number; lastChecked: number }>();
+
+export function broadcastCallSse(callId: string, eventName: string, data: any): void {
+  const clients = callSseClients.get(callId);
+  if (!clients || clients.size === 0) return;
+  const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of clients) {
+    try {
+      client.res.write(payload);
+    } catch {
+      clients.delete(client);
+    }
+  }
+}
+
+export function recordCallHeartbeat(callId: string, userDid: string, role?: 'caller' | 'callee'): void {
+  const now = Date.now();
+  let entry = callHeartbeatMap.get(callId);
+  if (!entry) {
+    entry = { callerLastSeen: now, calleeLastSeen: now, lastChecked: now };
+    callHeartbeatMap.set(callId, entry);
+  }
+  if (role === 'caller') {
+    entry.callerLastSeen = now;
+  } else if (role === 'callee') {
+    entry.calleeLastSeen = now;
+  } else {
+    entry.callerLastSeen = now;
+  }
+}
+
+export function checkAndPruneCallHeartbeats(): void {
+  const now = Date.now();
+  const allCalls = sovraDb.getState().call_sessions || [];
+  for (const session of allCalls) {
+    if (
+      session.status === 'offering' ||
+      session.status === 'ringing' ||
+      session.status === 'answered' ||
+      session.status === 'connected'
+    ) {
+      const hb = callHeartbeatMap.get(session.callId);
+      const callerAge = hb ? now - hb.callerLastSeen : now - session.createdAt;
+      const calleeAge = hb ? now - hb.calleeLastSeen : now - session.createdAt;
+      const isConnected = session.status === 'connected' || session.status === 'answered';
+      const timeoutThreshold = isConnected ? 12000 : 15000;
+
+      if (callerAge > timeoutThreshold && calleeAge > timeoutThreshold) {
+        try {
+          sovraDb.endCall(session.callId, session.callerDid, 'ended_timeout');
+          broadcastCallSse(session.callId, 'call_timeout', {
+            callId: session.callId,
+            reason: 'ended_timeout',
+            message: 'Call timed out due to heartbeat inactivity (>12s)',
+          });
+          callHeartbeatMap.delete(session.callId);
+          callAudioChunkStore.delete(session.callId);
+        } catch {}
+      }
+    }
+  }
+}
+
 export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<boolean> {
   const { req, res, url, blindPushRelay, getIceServers, readBoundedBody, resolvePrincipal, enforceAuth, broadcastChatEvent } = ctx;
 
@@ -138,6 +207,15 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
           });
         } catch (_) {}
 
+        recordCallHeartbeat(session.callId, principal.did, 'caller');
+        broadcastCallSse(session.callId, 'call_offer', {
+          callId: session.callId,
+          callerDid: principal.did,
+          recipientDid,
+          callType,
+          sdpOffer: session.sdpOffer,
+        });
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, session, sessionId: session.callId }));
       } catch (callErr: any) {
@@ -206,6 +284,86 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
     return true;
   }
 
+  // 3.5 Real-Time Call Signaling Stream (Server-Sent Events)
+  if ((url.pathname === '/api/call/stream' || url.pathname === '/api/webrtc/stream') && req.method === 'GET') {
+    const principal = resolvePrincipal(req);
+    if (!principal) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+      return true;
+    }
+    const callId = url.searchParams.get('callId') || '';
+    if (!callId) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'callId required' }));
+      return true;
+    }
+    const allCalls = sovraDb.getState().call_sessions || [];
+    const anyCall = allCalls.find(c => c.callId === callId);
+    if (anyCall && anyCall.callerDid !== principal.did && anyCall.recipientDid !== principal.did) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized access to call stream' }));
+      return true;
+    }
+
+    recordCallHeartbeat(callId, principal.did, anyCall?.callerDid === principal.did ? 'caller' : 'callee');
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.write(`: sse connected\nevent: ready\ndata: ${JSON.stringify({ ok: true, callId, status: anyCall?.status || 'active' })}\n\n`);
+
+    if (!callSseClients.has(callId)) {
+      callSseClients.set(callId, new Set());
+    }
+    const clientObj: CallSseClient = { res, userDid: principal.did };
+    callSseClients.get(callId)!.add(clientObj);
+
+    req.on('close', () => {
+      const set = callSseClients.get(callId);
+      if (set) {
+        set.delete(clientObj);
+        if (set.size === 0) callSseClients.delete(callId);
+      }
+    });
+
+    return true;
+  }
+
+  // 3.6 Call Heartbeat Beacon & Timeout Pruner
+  if ((url.pathname === '/api/call/heartbeat' || url.pathname === '/api/webrtc/heartbeat') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = body ? JSON.parse(body) : {};
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+
+      const callId = String(parsed.callId || url.searchParams.get('callId') || '');
+      if (!callId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'callId required' }));
+        return true;
+      }
+
+      const allCalls = sovraDb.getState().call_sessions || [];
+      const session = allCalls.find(c => c.callId === callId);
+      const role = session?.callerDid === principal.did ? 'caller' : 'callee';
+      recordCallHeartbeat(callId, principal.did, role);
+      checkAndPruneCallHeartbeats();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, callId, status: session?.status || 'unknown' }));
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+    }
+    return true;
+  }
+
   // 4. Poll Call
   if (url.pathname === '/api/call/poll' && req.method === 'GET') {
     const principal = resolvePrincipal(req);
@@ -227,6 +385,10 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
       res.end(JSON.stringify({ ok: false, error: 'Forbidden: Unauthorized access to call session' }));
       return true;
     }
+
+    recordCallHeartbeat(callId, principal.did, anyCall?.callerDid === principal.did ? 'caller' : 'callee');
+    checkAndPruneCallHeartbeats();
+
     const session = sovraDb.pollCall(callId, principal.did);
     if (!session) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -299,6 +461,12 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
             }, 'call_signal');
           } catch (_) {}
         }
+        recordCallHeartbeat(callId, principal.did, 'callee');
+        broadcastCallSse(callId, 'call_answer', {
+          callId,
+          answerSdp,
+          status: 'answered',
+        });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, session }));
       } catch (ansErr: any) {
@@ -381,6 +549,12 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
             }, 'call_signal');
           } catch (_) {}
         }
+        recordCallHeartbeat(callId, principal.did, existingCall?.callerDid === principal.did ? 'caller' : 'callee');
+        broadcastCallSse(callId, 'ice_candidate', {
+          callId,
+          senderDid: principal.did,
+          candidate,
+        });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: !!session, session }));
       } catch (candErr: any) {
@@ -431,6 +605,13 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
 
       const session = sovraDb.endCall(callId, principal.did, reason);
       callAudioChunkStore.delete(callId);
+      broadcastCallSse(callId, 'call_ended', {
+        callId,
+        reason,
+        status: 'ended',
+      });
+      callHeartbeatMap.delete(callId);
+      callSseClients.delete(callId);
 
       // WhatsApp-Grade: Auto-insert Missed Call / Call Summary bubble in chat log
       try {
