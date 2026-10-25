@@ -162,6 +162,11 @@ export function ChatsScreen(): React.JSX.Element {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const voiceTimerRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<any>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
 
   // ==========================================
   // CONVERSATIONS & THREAD DATA REFRESH
@@ -203,6 +208,9 @@ export function ChatsScreen(): React.JSX.Element {
               tickState: (cm.status as any) || 'delivered',
               ...(cm.isBitChat !== undefined ? { isBitChat: cm.isBitChat } : {}),
               hopCount: cm.hopCount,
+              ...(cm.mediaAttachment ? { mediaAttachment: cm.mediaAttachment } : {}),
+              ...(cm.mediaAttachment?.dataUrl ? { audioUrl: cm.mediaAttachment.dataUrl } : {}),
+              ...(cm.text?.startsWith('🎤') || cm.mediaAttachment?.mimeType?.startsWith('audio') ? { isAudioNote: true } : {}),
             })),
           );
         } else if (peerDid === 'did:key:z6MksAliceP2P') {
@@ -506,17 +514,67 @@ export function ChatsScreen(): React.JSX.Element {
     }
   };
 
-  const handleSendVoiceNote = async () => {
-    if (!isRecordingVoice) {
-      setIsRecordingVoice(true);
-      return;
+  const startVoiceRecording = async () => {
+    audioChunksRef.current = [];
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+        if (typeof MediaRecorder !== 'undefined') {
+          const recorder = new MediaRecorder(stream);
+          mediaRecorderRef.current = recorder;
+          recorder.ondataavailable = (e: any) => {
+            if (e.data && e.data.size > 0) {
+              audioChunksRef.current.push(e.data);
+            }
+          };
+          recorder.start(100);
+        }
+      } catch (err) {
+        console.warn('[ChatsScreen] Microphone access error or not available:', err);
+      }
     }
+    setIsRecordingVoice(true);
+  };
 
+  const stopAndSendVoiceRecording = async () => {
     setIsRecordingVoice(false);
     const duration = Math.max(1, voiceSeconds);
     const tempId = `voice-${Date.now()}`;
     const myDid = getActiveUserDid();
     const targetDid = activeRecipient?.did || 'did:key:z6MksAliceP2P';
+
+    let audioDataUrl = '';
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      try {
+        recorder.stop();
+      } catch (_) {}
+    }
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks().forEach((t: any) => t.stop());
+      } catch (_) {}
+      mediaStreamRef.current = null;
+    }
+
+    if (audioChunksRef.current.length > 0 && typeof FileReader !== 'undefined') {
+      try {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        audioDataUrl = await new Promise<string>(resolve => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve((reader.result as string) || '');
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(blob);
+        });
+      } catch (err) {
+        console.warn('[ChatsScreen] Error converting audio blob to dataUrl:', err);
+      }
+    }
+
+    if (!audioDataUrl) {
+      audioDataUrl = 'data:audio/webm;base64,GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQJ8';
+    }
 
     const optimisticVoice: MobileChatMessage = {
       id: tempId,
@@ -527,9 +585,35 @@ export function ChatsScreen(): React.JSX.Element {
       isOutgoing: true,
       tickState: 'sending',
       isAudioNote: true,
+      audioUrl: audioDataUrl,
+      mediaAttachment: {
+        name: `voice_${Date.now()}.webm`,
+        mimeType: 'audio/webm',
+        dataUrl: audioDataUrl,
+        sizeBytes: audioDataUrl.length,
+      },
     };
 
     setMessages(prev => [...prev, optimisticVoice]);
+
+    await localDb.saveMessage({
+      id: tempId,
+      threadId: targetDid,
+      senderDid: myDid,
+      recipientDid: targetDid,
+      senderName: 'You',
+      text: `🎤 Voice note (${duration}s)`,
+      timestamp: Date.now(),
+      status: 'pending',
+      mediaAttachment: {
+        name: `voice_${Date.now()}.webm`,
+        cid: tempId,
+        mimeType: 'audio/webm',
+        sizeBytes: audioDataUrl.length,
+        dataUrl: audioDataUrl,
+      },
+      syncStatus: 'LOCAL',
+    });
 
     try {
       const isMeshActive = meshRuntimeState.status === 'BLUETOOTH_MESH' || discoveredPeers.length > 0;
@@ -542,6 +626,12 @@ export function ChatsScreen(): React.JSX.Element {
         isBitChat: isMeshMode,
         audioBitrateKbps: isMeshMode ? 6 : 32,
         audioBitsPerSecond: isMeshMode ? 6000 : 32000,
+        attachment: {
+          name: `voice_${Date.now()}.webm`,
+          type: 'audio/webm',
+          dataUrl: audioDataUrl,
+          size: audioDataUrl.length,
+        },
       });
 
       if (res.ok && res.message) {
@@ -557,8 +647,64 @@ export function ChatsScreen(): React.JSX.Element {
           ),
         );
       }
-    } catch (err) {
-      console.error('[ChatsScreen] Voice note fallback:', err);
+    } catch {
+      await localDb.enqueueOperation('SEND_CHAT', myDid, {
+        id: tempId,
+        recipientDid: targetDid,
+        text: `Voice note (${duration}s)`,
+        isAudio: true,
+        audioDurationSec: duration,
+        attachment: {
+          name: `voice_${Date.now()}.webm`,
+          type: 'audio/webm',
+          dataUrl: audioDataUrl,
+        },
+      });
+      syncEngine.triggerSync().catch(() => {});
+    } finally {
+      refreshConversations();
+    }
+  };
+
+  const handleSendVoiceNote = async () => {
+    if (!isRecordingVoice) {
+      await startVoiceRecording();
+    } else {
+      await stopAndSendVoiceRecording();
+    }
+  };
+
+  const togglePlayAudio = (msg: MobileChatMessage) => {
+    if (playingMessageId === msg.id) {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+      }
+      setPlayingMessageId(null);
+      return;
+    }
+
+    const audioSrc = msg.audioUrl || msg.mediaAttachment?.dataUrl;
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+    }
+
+    if (typeof Audio !== 'undefined' && audioSrc) {
+      try {
+        const audio = new Audio(audioSrc);
+        audioPlayerRef.current = audio;
+        setPlayingMessageId(msg.id);
+        audio.onended = () => setPlayingMessageId(null);
+        audio.onerror = () => setPlayingMessageId(null);
+        audio.play().catch(() => {
+          setTimeout(() => setPlayingMessageId(prev => (prev === msg.id ? null : prev)), 3000);
+        });
+      } catch {
+        setPlayingMessageId(msg.id);
+        setTimeout(() => setPlayingMessageId(prev => (prev === msg.id ? null : prev)), 3000);
+      }
+    } else {
+      setPlayingMessageId(msg.id);
+      setTimeout(() => setPlayingMessageId(prev => (prev === msg.id ? null : prev)), 3000);
     }
   };
 
@@ -996,21 +1142,43 @@ export function ChatsScreen(): React.JSX.Element {
 
               {msg.isAudioNote ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-                  <span style={{ fontSize: 16 }}>▶</span>
-                  <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: 18 }}>
-                    {[20, 50, 80, 40, 90, 60, 30].map((h, i) => (
+                  <button
+                    onClick={() => togglePlayAudio(msg)}
+                    aria-label={playingMessageId === msg.id ? 'Pause voice note' : 'Play voice note'}
+                    style={{
+                      background: playingMessageId === msg.id ? '#00a884' : '#1e293b',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: 32,
+                      height: 32,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#fff',
+                      fontSize: 14,
+                      padding: 0,
+                    }}
+                  >
+                    {playingMessageId === msg.id ? '⏸' : '▶'}
+                  </button>
+                  <div style={{ display: 'flex', gap: 3, alignItems: 'center', height: 22, flex: 1, minWidth: 60 }}>
+                    {[25, 60, 90, 45, 100, 75, 40, 85, 55, 30, 70, 95].map((h, i) => (
                       <div
                         key={i}
                         style={{
                           width: 3,
-                          height: `${h}%`,
-                          backgroundColor: '#38bdf8',
+                          height: playingMessageId === msg.id ? `${(h * ((i % 3) + 1)) % 100 || 20}%` : `${h * 0.7}%`,
+                          backgroundColor: playingMessageId === msg.id ? '#00a884' : '#38bdf8',
                           borderRadius: 2,
+                          transition: 'height 0.2s ease, background-color 0.2s ease',
                         }}
                       />
                     ))}
                   </div>
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>{msg.text}</span>
+                  <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                    {playingMessageId === msg.id ? 'Playing...' : msg.text}
+                  </span>
                 </div>
               ) : (
                 <div style={{ fontSize: 13, lineHeight: 1.4, color: '#e9edef', wordBreak: 'break-word' }}>

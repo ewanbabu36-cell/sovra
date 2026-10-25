@@ -148,6 +148,91 @@ export async function createFeedPost(caption: string, mediaImage?: string): Prom
   return await res.json();
 }
 
+export async function fetchFeedComments(postId: string): Promise<any[]> {
+  try {
+    const res = await apiFetch(`/api/feed/comments?postId=${encodeURIComponent(postId)}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.comments || [];
+  } catch (err) {
+    console.warn('[API] fetchFeedComments error:', err);
+    return [];
+  }
+}
+
+export async function addFeedComment(postId: string, text: string): Promise<{ ok: boolean; comment?: any; error?: string }> {
+  const res = await apiFetch('/api/feed/comment', {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({
+      postId,
+      text,
+      userDid: activeUserDid,
+      author: activeUserDid.includes('did:') ? 'You' : activeUserDid,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `Comment failed: ${res.status}`);
+  }
+  return await res.json();
+}
+
+export async function likeFeedComment(commentId: string, postId?: string): Promise<{ ok: boolean; likesCount?: number }> {
+  try {
+    const res = await apiFetch('/api/feed/comment/like', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        commentId,
+        postId: postId || 'post-1',
+        userDid: activeUserDid,
+      }),
+    });
+    if (!res.ok) return { ok: false };
+    return await res.json();
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function repostFeedPost(postId: string): Promise<{ ok: boolean; repostsCount?: number }> {
+  try {
+    const res = await apiFetch('/api/feed/repost', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        postId,
+        userDid: activeUserDid,
+      }),
+    });
+    if (!res.ok) return { ok: false };
+    return await res.json();
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function saveFeedPost(postId: string): Promise<{ ok: boolean; isSaved?: boolean }> {
+  try {
+    const res = await apiFetch('/api/feed/save', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        postId,
+        userDid: activeUserDid,
+      }),
+    });
+    if (!res.ok) return { ok: false };
+    return await res.json();
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function fetchStories(): Promise<MobileStoryItem[]> {
   try {
     const res = await apiFetch('/api/stories/list', {
@@ -400,6 +485,12 @@ export async function sendChatMessage(params: {
   audioBitsPerSecond?: number;
   disappearingDurationSec?: number;
   encrypt?: boolean;
+  attachment?: {
+    name: string;
+    type: string;
+    dataUrl?: string;
+    size?: number;
+  };
 }): Promise<{ ok: boolean; message?: any; error?: string }> {
   let isE2EE = false;
   let ciphertextHex: string | undefined;
@@ -436,6 +527,7 @@ export async function sendChatMessage(params: {
       ciphertextHex,
       ivHex,
       sequenceNumber,
+      ...(params.attachment ? { attachment: params.attachment } : {}),
     }),
   });
   if (!res.ok) {

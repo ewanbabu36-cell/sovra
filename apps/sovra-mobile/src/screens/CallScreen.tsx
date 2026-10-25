@@ -9,8 +9,9 @@
  * 4. P2P DTLS-SRTP security indicator.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { CallMediaType } from '@sovra/messaging';
+import { API_BASE_URL, getActiveSessionToken, getActiveUserDid } from '../services/api.js';
 
 export interface CallScreenProps {
   peerName: string;
@@ -37,12 +38,188 @@ export function CallScreen({
   const [inCallInputText, setInCallInputText] = useState('');
   const [isPipMinimized, setIsPipMinimized] = useState(false);
 
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const heartbeatIntervalRef = useRef<any>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
+
+  // Call duration counter
   useEffect(() => {
     const timer = setInterval(() => {
       setDuration(prev => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Live WebRTC getUserMedia, SSE stream signaling, and 3s heartbeat
+  useEffect(() => {
+    let isCancelled = false;
+
+    const initCallMediaAndSignaling = async () => {
+      // 1. getUserMedia
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: !isAudioMuted,
+            video: mediaType === 'video' && !isVideoMuted ? { facingMode: cameraFacing } : false,
+          });
+          if (isCancelled) {
+            stream.getTracks().forEach(t => t.stop());
+            return;
+          }
+          localStreamRef.current = stream;
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+        } catch (err) {
+          console.warn('[CallScreen] getUserMedia error or unavailable:', err);
+        }
+      }
+
+      // 2. Offer & Signaling
+      const token = getActiveSessionToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        'x-sovra-did': getActiveUserDid(),
+      };
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/call/offer`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            recipientDid: peerDid,
+            offerSdp: 'v=0\r\no=- 42 2 IN IP4 127.0.0.1\r\ns=SovraCall\r\nt=0 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 0.0.0.0',
+            callType: mediaType,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const sessionId = data.sessionId || data.session?.callId;
+          if (sessionId && !isCancelled) {
+            activeSessionIdRef.current = sessionId;
+
+            // Connect to SSE stream
+            if (typeof EventSource !== 'undefined') {
+              try {
+                const es = new EventSource(`${API_BASE_URL}/api/call/stream?callId=${sessionId}`);
+                eventSourceRef.current = es;
+                es.addEventListener('call_answer', (ev: any) => {
+                  console.log('[CallScreen] Call answered:', ev.data);
+                });
+                es.addEventListener('call_ended', () => {
+                  handleEndCall();
+                });
+              } catch (esErr) {
+                console.warn('[CallScreen] SSE stream error:', esErr);
+              }
+            }
+
+            // Start 3s heartbeat loop
+            heartbeatIntervalRef.current = setInterval(async () => {
+              try {
+                await fetch(`${API_BASE_URL}/api/call/heartbeat`, {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({ callId: sessionId }),
+                });
+              } catch (_) {}
+            }, 3000);
+          }
+        }
+      } catch (signalingErr) {
+        console.warn('[CallScreen] Signaling error:', signalingErr);
+      }
+    };
+
+    void initCallMediaAndSignaling();
+
+    return () => {
+      isCancelled = true;
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t: any) => t.stop());
+        localStreamRef.current = null;
+      }
+      if (activeSessionIdRef.current) {
+        const token = getActiveSessionToken();
+        fetch(`${API_BASE_URL}/api/call/end`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            'x-sovra-did': getActiveUserDid(),
+          },
+          body: JSON.stringify({ callId: activeSessionIdRef.current, reason: 'hangup' }),
+        }).catch(() => {});
+        activeSessionIdRef.current = null;
+      }
+    };
+  }, [peerDid, mediaType]);
+
+  const handleToggleAudio = () => {
+    setIsAudioMuted(prev => {
+      const next = !prev;
+      if (localStreamRef.current) {
+        localStreamRef.current.getAudioTracks().forEach((t: any) => {
+          t.enabled = !next;
+        });
+      }
+      return next;
+    });
+  };
+
+  const handleToggleVideo = () => {
+    setIsVideoMuted(prev => {
+      const next = !prev;
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach((t: any) => {
+          t.enabled = !next;
+        });
+      }
+      return next;
+    });
+  };
+
+  const handleEndCall = () => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t: any) => t.stop());
+      localStreamRef.current = null;
+    }
+    if (activeSessionIdRef.current) {
+      const token = getActiveSessionToken();
+      fetch(`${API_BASE_URL}/api/call/end`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'x-sovra-did': getActiveUserDid(),
+        },
+        body: JSON.stringify({ callId: activeSessionIdRef.current, reason: 'hangup' }),
+      }).catch(() => {});
+      activeSessionIdRef.current = null;
+    }
+    onEndCall();
+  };
 
   const formatTimer = (sec: number) => {
     const mins = Math.floor(sec / 60);
@@ -142,17 +319,33 @@ export function CallScreen({
       {/* Main Viewport */}
       {mediaType === 'video' ? (
         <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {/* Remote Video Stream Simulation */}
-          <div
+          {/* Remote Video Stream Viewport */}
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
             style={{
+              position: 'absolute',
+              inset: 0,
               width: '100%',
               height: '100%',
+              objectFit: 'cover',
               backgroundColor: '#111827',
+            }}
+          />
+
+          {/* Remote Stream Overlay HUD */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 12,
+              pointerEvents: 'none',
+              background: 'radial-gradient(circle at center, rgba(17, 24, 39, 0.4) 0%, rgba(11, 20, 26, 0.8) 100%)',
             }}
           >
             <span style={{ fontSize: '5rem' }}>📹</span>
@@ -178,32 +371,24 @@ export function CallScreen({
               fontSize: 11,
               color: '#94a3b8',
               overflow: 'hidden',
+              zIndex: 20,
             }}
           >
             {isVideoMuted ? (
               <span>Camera Off</span>
             ) : (
-              <div
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
                   transform: cameraFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)',
-                  transition: 'transform 0.3s ease',
                 }}
-              >
-                <span style={{ fontSize: '1.8rem' }}>{cameraFacing === 'user' ? '👤' : '📷'}</span>
-                <span
-                  style={{
-                    marginTop: 4,
-                    fontSize: 10,
-                    color: '#38bdf8',
-                    transform: cameraFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)',
-                  }}
-                >
-                  {cameraFacing === 'user' ? 'Front Lens' : 'Rear Lens'}
-                </span>
-              </div>
+              />
             )}
           </div>
         </div>
@@ -418,7 +603,7 @@ export function CallScreen({
       >
         {/* Mute Mic */}
         <button
-          onClick={() => setIsAudioMuted(!isAudioMuted)}
+          onClick={handleToggleAudio}
           style={{
             width: 52,
             height: 52,
@@ -440,7 +625,7 @@ export function CallScreen({
         {mediaType === 'video' && (
           <>
             <button
-              onClick={() => setIsVideoMuted(!isVideoMuted)}
+              onClick={handleToggleVideo}
               style={{
                 width: 52,
                 height: 52,
@@ -536,7 +721,7 @@ export function CallScreen({
 
         {/* End Call Button */}
         <button
-          onClick={onEndCall}
+          onClick={handleEndCall}
           style={{
             width: 56,
             height: 56,

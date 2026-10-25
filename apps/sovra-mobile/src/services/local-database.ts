@@ -115,9 +115,17 @@ export interface CachedWalletTransaction {
   amount: string;
   tokenSymbol: string;
   timestamp: number;
-  peerDid?: string;
+  peerDid?: string | undefined;
   status: 'confirmed' | 'pending' | 'failed';
-  fee?: string;
+  fee?: string | undefined;
+}
+
+export interface CachedGuardian {
+  did: string;
+  name: string;
+  status: 'pending' | 'active' | 'confirmed';
+  addedAt: number;
+  threshold?: number | undefined;
 }
 
 export interface ConversationSummary {
@@ -195,6 +203,7 @@ export interface LocalDatabaseSchema {
   inbox: Record<string, { id: string; envelopeId: string; receivedAt: number; senderDid: string }>;
   media_staging: Record<string, MediaStagingEntry>;
   wallet_ledger: Record<string, CachedWalletTransaction>;
+  guardians: Record<string, CachedGuardian>;
   sync_state: ClientSyncState;
 }
 
@@ -356,7 +365,7 @@ export function resolveStorageDriver(customDriver?: IStorageDriver): IStorageDri
 export class LocalSchemaMigrator {
   public static migrate(raw: any): LocalDatabaseSchema {
     const defaultSchema: LocalDatabaseSchema = {
-      version: 3,
+      version: 4,
       users: {},
       profiles: {},
       posts: {},
@@ -368,6 +377,7 @@ export class LocalSchemaMigrator {
       inbox: {},
       media_staging: {},
       wallet_ledger: {},
+      guardians: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
@@ -394,16 +404,20 @@ export class LocalSchemaMigrator {
       inbox: raw.inbox || {},
       media_staging: raw.media_staging || {},
       wallet_ledger: raw.wallet_ledger || {},
+      guardians: raw.guardians || {},
       sync_state: {
         ...defaultSchema.sync_state,
         ...(raw.sync_state || {}),
       },
     };
 
-    if (currentVersion < 3) {
-      migrated.version = 3;
+    if (currentVersion < 4) {
+      migrated.version = 4;
       if (!migrated.wallet_ledger) {
         migrated.wallet_ledger = {};
+      }
+      if (!migrated.guardians) {
+        migrated.guardians = {};
       }
     }
 
@@ -955,12 +969,33 @@ export class SovraLocalDatabase {
   }
 
   // ==========================================
+  // SOCIAL GUARDIANS PERSISTENCE
+  // ==========================================
+
+  public async saveGuardian(guardian: CachedGuardian): Promise<void> {
+    if (!this.state.guardians) this.state.guardians = {};
+    this.state.guardians[guardian.did] = guardian;
+    await this.persist();
+  }
+
+  public getGuardians(): CachedGuardian[] {
+    return Object.values(this.state.guardians || {}).sort((a, b) => b.addedAt - a.addedAt);
+  }
+
+  public async removeGuardian(did: string): Promise<void> {
+    if (this.state.guardians) {
+      delete this.state.guardians[did];
+      await this.persist();
+    }
+  }
+
+  // ==========================================
   // EMERGENCY DATA WIPE (PANIC)
   // ==========================================
 
   public async emergencyPanicWipe(): Promise<void> {
     this.state = {
-      version: 3,
+      version: 4,
       users: {},
       profiles: {},
       posts: {},
@@ -972,6 +1007,7 @@ export class SovraLocalDatabase {
       inbox: {},
       media_staging: {},
       wallet_ledger: {},
+      guardians: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
