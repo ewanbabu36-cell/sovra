@@ -112,7 +112,7 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
 
     try {
       const parsed = JSON.parse(body);
-      const sessionId = String(parsed.sessionId || '');
+      const sessionId = String(parsed.sessionId || parsed.streamId || '');
       if (!sessionId) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'sessionId is required' }));
@@ -150,7 +150,7 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
 
     try {
       const parsed = JSON.parse(body);
-      const sessionId = String(parsed.sessionId || '');
+      const sessionId = String(parsed.sessionId || parsed.streamId || '');
       const viewerDid = resolveUserDid(ctx, parsed);
       const leaveRes = sovraDb.leaveLiveStream(sessionId, viewerDid);
 
@@ -540,9 +540,10 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
 
     try {
       const parsed = JSON.parse(body);
-      const sessionId = String(parsed.sessionId || '');
-      const type = parsed.type as 'offer' | 'answer' | 'candidate';
-      const payload = parsed.payload;
+      const sessionId = String(parsed.sessionId || parsed.streamId || '');
+      const rawType = parsed.type || parsed.signal?.type || 'offer';
+      const type = (rawType === 'answer' ? 'answer' : rawType === 'candidate' ? 'candidate' : 'offer') as 'offer' | 'answer' | 'candidate';
+      const payload = parsed.payload !== undefined ? parsed.payload : (parsed.signal !== undefined ? parsed.signal : parsed);
 
       if (!sessionId || !type || !payload) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -551,7 +552,7 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
       }
 
       const fromDid = resolveUserDid(ctx, parsed);
-      const toDid = parsed.toDid ? String(parsed.toDid) : undefined;
+      const toDid = parsed.toDid || parsed.targetDid ? String(parsed.toDid || parsed.targetDid) : undefined;
 
       const sigRes = sovraDb.sendLiveStreamSignal({
         sessionId,
@@ -572,14 +573,14 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
 
   // 7. GET /api/live/stream/signals - Retrieve WebRTC mesh signals
   if (url.pathname === '/api/live/stream/signals' && req.method === 'GET') {
-    const sessionId = url.searchParams.get('sessionId');
+    const sessionId = url.searchParams.get('sessionId') || url.searchParams.get('streamId');
     if (!sessionId) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'sessionId is required' }));
       return true;
     }
 
-    const peerDid = url.searchParams.get('peerDid') || undefined;
+    const peerDid = url.searchParams.get('peerDid') || url.searchParams.get('userDid') || undefined;
     const since = url.searchParams.get('since') ? Number(url.searchParams.get('since')) : undefined;
 
     const signals = sovraDb.getLiveStreamSignals(sessionId, peerDid, since);
@@ -631,7 +632,7 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
 
     try {
       const parsed = JSON.parse(body);
-      const sessionId = String(parsed.sessionId || '');
+      const sessionId = String(parsed.sessionId || parsed.streamId || '');
       if (!sessionId) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'sessionId is required' }));

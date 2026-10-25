@@ -22,6 +22,11 @@ import {
   fetchLiveStreams,
   endLiveStream,
   sendLiveComment,
+  joinLiveStream,
+  sendLiveStreamSignal,
+  pollLiveStreamSignals,
+  leaveLiveStream,
+  sendLiveStreamTip,
 } from '../services/api.js';
 
 export interface WatchVideoComment {
@@ -453,6 +458,550 @@ export function LiveBroadcasterModal({
   );
 }
 
+export function LiveStreamViewerModal({
+  isOpen,
+  onClose,
+  stream,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  stream: any | null;
+}): React.JSX.Element | null {
+  if (!isOpen || !stream) return null;
+
+  const [viewerCount, setViewerCount] = useState<number>(stream.viewerCount || stream.viewersCount || 1);
+  const [webrtcConnected, setWebrtcConnected] = useState(false);
+  const [webrtcStatus, setWebrtcStatus] = useState<'connecting' | 'connected' | 'offline_stream'>('connecting');
+  const [liveComments, setLiveComments] = useState<Array<{ id: string; author: string; text: string; isSuperChat?: boolean; tipAmount?: number }>>([
+    { id: '1', author: 'Swarm_Relay', text: '📡 Joined WebRTC live broadcast downlink.' },
+    { id: '2', author: stream.hostName || stream.authorName || 'Creator', text: `Welcome to ${stream.title}! 🔥` },
+  ]);
+  const [commentText, setCommentText] = useState('');
+  const [isPostingComment, setIsPostingComment] = useState(false);
+  const [showTipModal, setShowTipModal] = useState(false);
+  const [tipAmount, setTipAmount] = useState<number>(10);
+  const [tipNote, setTipNote] = useState('');
+  const [isTipping, setIsTipping] = useState(false);
+  const [flyingCoinAnim, setFlyingCoinAnim] = useState(false);
+
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    let pc: RTCPeerConnection | null = null;
+    let pollInterval: any = null;
+
+    const initViewer = async () => {
+      try {
+        const joinRes = await joinLiveStream(stream.id);
+        if (isMounted && joinRes.ok) {
+          if (typeof joinRes.viewerCount === 'number') {
+            setViewerCount(joinRes.viewerCount);
+          }
+          const incomingComments = joinRes.recentComments;
+          if (incomingComments && incomingComments.length > 0) {
+            setLiveComments(prev => [
+              ...incomingComments.map((rc: any) => ({
+                id: rc.id || Math.random().toString(),
+                author: rc.author || rc.senderName || 'Peer',
+                text: rc.text || rc.message || '',
+                isSuperChat: Boolean(rc.isSuperChat || rc.isSuperThanks),
+                tipAmount: rc.tipAmount || rc.amountSov,
+              })),
+              ...prev,
+            ]);
+          }
+        }
+      } catch (err) {
+        console.warn('[LiveViewer] joinLiveStream error:', err);
+      }
+
+      if (typeof RTCPeerConnection !== 'undefined') {
+        try {
+          pc = new RTCPeerConnection({
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+            ],
+          });
+          pcRef.current = pc;
+
+          pc.ontrack = (event) => {
+            if (remoteVideoRef.current && event.streams[0]) {
+              remoteVideoRef.current.srcObject = event.streams[0];
+              remoteVideoRef.current.play().catch(() => {});
+              if (isMounted) {
+                setWebrtcConnected(true);
+                setWebrtcStatus('connected');
+              }
+            }
+          };
+
+          pc.onicecandidate = (event) => {
+            if (event.candidate && isMounted) {
+              sendLiveStreamSignal(stream.id, {
+                type: 'candidate',
+                candidate: event.candidate,
+              }, stream.creatorDid || stream.hostDid).catch(() => {});
+            }
+          };
+
+          const offer = await pc.createOffer({
+            offerToReceiveVideo: true,
+            offerToReceiveAudio: true,
+          });
+          await pc.setLocalDescription(offer);
+
+          await sendLiveStreamSignal(stream.id, {
+            type: 'offer',
+            sdp: offer.sdp,
+          }, stream.creatorDid || stream.hostDid);
+
+          pollInterval = setInterval(async () => {
+            if (!isMounted || !pc) return;
+            try {
+              const signals = await pollLiveStreamSignals(stream.id);
+              for (const sig of signals) {
+                if (sig.type === 'answer' && pc.signalingState === 'have-local-offer') {
+                  await pc.setRemoteDescription(new RTCSessionDescription(sig.payload || sig));
+                  if (isMounted) {
+                    setWebrtcConnected(true);
+                    setWebrtcStatus('connected');
+                  }
+                } else if (sig.type === 'candidate' && pc.remoteDescription) {
+                  await pc.addIceCandidate(new RTCIceCandidate(sig.payload || sig.candidate));
+                }
+              }
+            } catch (sigErr) {
+              console.warn('[LiveViewer] pollLiveStreamSignals warning:', sigErr);
+            }
+          }, 3000);
+        } catch (webrtcErr) {
+          console.warn('[LiveViewer] WebRTC init warning:', webrtcErr);
+          if (isMounted) setWebrtcStatus('offline_stream');
+        }
+      } else {
+        if (isMounted) setWebrtcStatus('offline_stream');
+      }
+    };
+
+    initViewer();
+
+    return () => {
+      isMounted = false;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      if (pc) {
+        pc.close();
+      }
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = null;
+      }
+      leaveLiveStream(stream.id).catch(() => {});
+    };
+  }, [isOpen, stream]);
+
+  const handleSendComment = async () => {
+    const text = commentText.trim();
+    if (!text || isPostingComment) return;
+    setIsPostingComment(true);
+    try {
+      await sendLiveComment(stream.id, text);
+      setLiveComments(prev => [...prev, { id: Date.now().toString(), author: 'You', text }]);
+      setCommentText('');
+    } catch {
+      setLiveComments(prev => [...prev, { id: Date.now().toString(), author: 'You', text }]);
+      setCommentText('');
+    } finally {
+      setIsPostingComment(false);
+    }
+  };
+
+  const handleSendSuperChatTip = async () => {
+    if (isTipping) return;
+    setIsTipping(true);
+    try {
+      await sendLiveStreamTip({
+        streamId: stream.id,
+        amountSov: tipAmount,
+        note: tipNote || 'Super-Chat live stream tip',
+      });
+      setFlyingCoinAnim(true);
+      setTimeout(() => setFlyingCoinAnim(false), 2500);
+
+      const creatorShare = (tipAmount * 0.95).toFixed(2);
+      const seederShare = (tipAmount * 0.05).toFixed(2);
+      setLiveComments(prev => [
+        ...prev,
+        {
+          id: 'sc_' + Date.now(),
+          author: 'You',
+          text: tipNote ? `⚡ Super-Chat (${tipAmount} SOV): ${tipNote} [95/5 Split: ${creatorShare} SOV creator / ${seederShare} SOV seeder swarm]` : `⚡ Super-Chat: Sent ${tipAmount} SOV [95/5: ${creatorShare} creator / ${seederShare} seeder swarm]`,
+          isSuperChat: true,
+          tipAmount,
+        },
+      ]);
+      setShowTipModal(false);
+      setTipNote('');
+    } catch (tipErr) {
+      console.warn('[LiveViewer] SuperChat tip error:', tipErr);
+    } finally {
+      setIsTipping(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        backgroundColor: '#000',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Top Header */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          padding: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)',
+          zIndex: 30,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              backgroundColor: '#dc2626',
+              color: '#fff',
+              fontSize: 10,
+              fontWeight: 800,
+              padding: '4px 8px',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              letterSpacing: 0.5,
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: '#fff',
+                display: 'inline-block',
+              }}
+            />
+            LIVE
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+              {stream.title || 'Live Broadcast Swarm'}
+            </span>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+              {stream.hostName || stream.authorName || 'Peer Creator'} &bull; {stream.category || 'Tech'}
+            </span>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(8px)',
+              color: '#38bdf8',
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '4px 10px',
+              borderRadius: 20,
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              marginLeft: 4,
+            }}
+          >
+            👥 {viewerCount}
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 20,
+            padding: '6px 14px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          ✕ Close
+        </button>
+      </div>
+
+      {/* Main Video Area */}
+      <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        />
+
+        {!webrtcConnected && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: '#090d16',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+              textAlign: 'center',
+              backgroundImage: 'radial-gradient(ellipse at center, rgba(0, 168, 132, 0.15) 0%, rgba(9, 13, 22, 0.95) 70%)',
+            }}
+          >
+            <div style={{ fontSize: 44, marginBottom: 12 }}>📡</div>
+            <div style={{ color: '#00a884', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+              WebRTC P2P Swarm Broadcast
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: 12, maxWidth: 320 }}>
+              {webrtcStatus === 'connected' ? 'Connected to peer relay 1080p stream.' : 'Subscribed to decentralized live media stream...'}
+            </div>
+          </div>
+        )}
+
+        {/* Flying Coins Animation */}
+        {flyingCoinAnim && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 35,
+              fontSize: 48,
+              animation: 'bounce 0.8s ease-in-out infinite',
+            }}
+          >
+            🪙 ✨ ⚡ 🪙
+          </div>
+        )}
+
+        {/* Floating Comments Overlay */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 80,
+            left: 16,
+            right: 16,
+            maxHeight: 200,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            zIndex: 15,
+            pointerEvents: 'none',
+          }}
+        >
+          {liveComments.map(c => (
+            <div
+              key={c.id}
+              style={{
+                backgroundColor: c.isSuperChat ? 'rgba(245, 158, 11, 0.85)' : 'rgba(0,0,0,0.65)',
+                border: c.isSuperChat ? '1px solid #fbbf24' : 'none',
+                backdropFilter: 'blur(6px)',
+                borderRadius: 8,
+                padding: '6px 12px',
+                maxWidth: '85%',
+                alignSelf: 'flex-start',
+                color: c.isSuperChat ? '#000' : '#fff',
+              }}
+            >
+              <span style={{ color: c.isSuperChat ? '#78350f' : '#38bdf8', fontSize: 11, fontWeight: 800, marginRight: 6 }}>
+                {c.isSuperChat ? `⚡ [Super-Chat ${c.tipAmount || 10} SOV] ` : ''}{c.author}:
+              </span>
+              <span style={{ fontSize: 11, fontWeight: c.isSuperChat ? 700 : 400 }}>{c.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Super-Chat Modal Drawer */}
+      {showTipModal && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 64,
+            left: 0,
+            right: 0,
+            backgroundColor: '#0b141a',
+            borderTop: '1px solid #f59e0b',
+            padding: 16,
+            zIndex: 40,
+            boxShadow: '0 -4px 20px rgba(245, 158, 11, 0.2)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ color: '#f59e0b', fontSize: 13, fontWeight: 800 }}>⚡ 95/5 Super-Chat Tip</span>
+            <button
+              onClick={() => setShowTipModal(false)}
+              style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 16, cursor: 'pointer' }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {[5, 10, 25, 50, 100].map(amt => (
+              <button
+                key={amt}
+                onClick={() => setTipAmount(amt)}
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  backgroundColor: tipAmount === amt ? '#f59e0b' : '#182229',
+                  color: tipAmount === amt ? '#000' : '#fff',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                {amt} SOV
+              </button>
+            ))}
+          </div>
+
+          <input
+            type="text"
+            placeholder="Add a highlighted Super-Chat note..."
+            value={tipNote}
+            onChange={e => setTipNote(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              backgroundColor: '#182229',
+              border: '1px solid #334155',
+              borderRadius: 8,
+              color: '#fff',
+              fontSize: 12,
+              marginBottom: 12,
+              boxSizing: 'border-box',
+              outline: 'none',
+            }}
+          />
+
+          <button
+            onClick={handleSendSuperChatTip}
+            disabled={isTipping}
+            style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: '#f59e0b',
+              color: '#000',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            {isTipping ? 'Sending...' : `Send ${tipAmount} SOV Super-Chat (95% Creator / 5% Swarm)`}
+          </button>
+        </div>
+      )}
+
+      {/* Bottom Action Bar */}
+      <div
+        style={{
+          padding: '12px 16px',
+          backgroundColor: '#0b141a',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          zIndex: 20,
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+        }}
+      >
+        <button
+          onClick={() => setShowTipModal(prev => !prev)}
+          style={{
+            backgroundColor: '#f59e0b',
+            color: '#000',
+            border: 'none',
+            borderRadius: 20,
+            padding: '10px 14px',
+            fontSize: 12,
+            fontWeight: 800,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          ⚡ Tip
+        </button>
+
+        <input
+          type="text"
+          placeholder="Send a message to live stream..."
+          value={commentText}
+          onChange={e => setCommentText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSendComment()}
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            backgroundColor: '#182229',
+            border: '1px solid #334155',
+            borderRadius: 20,
+            color: '#fff',
+            fontSize: 12,
+            outline: 'none',
+          }}
+        />
+
+        <button
+          onClick={handleSendComment}
+          disabled={isPostingComment || !commentText.trim()}
+          style={{
+            backgroundColor: '#00a884',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 20,
+            padding: '10px 18px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Send
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function WatchScreen(): React.JSX.Element {
   const [video, setVideo] = useState<any | null>(null);
   const [videoCatalog, setVideoCatalog] = useState<any[]>([]);
@@ -481,6 +1030,8 @@ export function WatchScreen(): React.JSX.Element {
   const [isBroadcasterOpen, setIsBroadcasterOpen] = useState(false);
   const [watchTab, setWatchTab] = useState<'videos' | 'live'>('videos');
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
+  const [selectedLiveStream, setSelectedLiveStream] = useState<any | null>(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   const loadLiveStreams = useCallback(async () => {
     try {
@@ -687,6 +1238,17 @@ export function WatchScreen(): React.JSX.Element {
           setIsBroadcasterOpen(false);
           loadLiveStreams();
         }}
+      />
+
+      {/* Live Stream Viewer Modal */}
+      <LiveStreamViewerModal
+        isOpen={isViewerOpen}
+        onClose={() => {
+          setIsViewerOpen(false);
+          setSelectedLiveStream(null);
+          loadLiveStreams();
+        }}
+        stream={selectedLiveStream}
       />
 
       {/* Top Header with Go Live CTA */}
@@ -948,8 +1510,8 @@ export function WatchScreen(): React.JSX.Element {
 
                   <button
                     onClick={() => {
-                      showToast(`Connecting to ${s.title} live swarm...`);
-                      setIsBroadcasterOpen(true);
+                      setSelectedLiveStream(s);
+                      setIsViewerOpen(true);
                     }}
                     style={{
                       width: '100%',
