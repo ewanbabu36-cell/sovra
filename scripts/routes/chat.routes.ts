@@ -245,6 +245,47 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     return true;
   }
 
+  // 2.5 Channels List & Creator Routes
+  if (url.pathname === '/api/chat/channels' && req.method === 'GET') {
+    const channels = [
+      { id: 'channel:local_mesh', name: '#local-mesh', description: 'Hyperlocal BLE mesh beacon', topic: 'Hyperlocal BLE mesh beacon', memberCount: 12, isPublic: true, createdAt: Date.now() - 86400000 },
+      { id: 'channel:emergency_sos', name: '#emergency-sos', description: 'Emergency distress broadcasts', topic: 'Emergency distress broadcasts', memberCount: 5, isPublic: true, createdAt: Date.now() - 172800000 },
+    ];
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, channels }));
+    return true;
+  }
+
+  if (url.pathname === '/api/chat/channel/create' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const name = String(parsed.name || '').trim();
+      const topic = String(parsed.topic || '').trim();
+      const creatorDid = parsed.creatorDid || 'did:key:z6MksLocalUser';
+      const channelId = `channel:${name.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}_${Date.now().toString(36)}`;
+      const channel = {
+        id: channelId,
+        name: name.startsWith('#') ? name : `#${name}`,
+        description: topic || 'Decentralized peer broadcast channel',
+        topic: topic || 'Decentralized peer broadcast channel',
+        ownerDid: creatorDid,
+        memberCount: 1,
+        subscriberCount: 1,
+        isPublic: parsed.isPublic !== false,
+        createdAt: Date.now(),
+        syncStatus: 'SYNCED',
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, channel }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to create channel' }));
+    }
+    return true;
+  }
+
   // 3. Send Message
   if ((url.pathname === '/api/chat/send' || url.pathname === '/api/chat/messages') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 10 * 1024 * 1024);

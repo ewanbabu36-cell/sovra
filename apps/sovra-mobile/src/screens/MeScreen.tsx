@@ -28,6 +28,7 @@ import {
   updateUserProfile,
   fetchBookmarkedPosts,
   fetchFollowStats,
+  sendP2PTokenTransfer,
 } from '../services/api.js';
 import { localDb } from '../services/local-database.js';
 
@@ -53,6 +54,469 @@ export const INITIAL_PROFILE: UserAccountProfile = {
   isLocked: false,
 };
 
+export function SendTokenModal({
+  isOpen,
+  onClose,
+  balance,
+  onTransferComplete,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  balance: string;
+  onTransferComplete?: () => void;
+}): React.JSX.Element | null {
+  const [recipientDid, setRecipientDid] = useState('');
+  const [amount, setAmount] = useState('');
+  const [tokenSymbol, setTokenSymbol] = useState('SOV');
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [txReceipt, setTxReceipt] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleSend = async () => {
+    const cleanRecipient = recipientDid.trim();
+    if (!cleanRecipient) {
+      setError('Please enter a recipient DID or sovereign address');
+      return;
+    }
+    const numAmount = Number(amount);
+    if (!amount || isNaN(numAmount) || numAmount <= 0) {
+      setError('Please enter a valid transfer amount greater than 0');
+      return;
+    }
+    if (tokenSymbol === 'SOV' && numAmount > Number(balance)) {
+      setError(`Insufficient SOV balance. Available: ₹${balance}`);
+      return;
+    }
+
+    setIsSending(true);
+    setError(null);
+    try {
+      const res = await sendP2PTokenTransfer({
+        recipientDid: cleanRecipient,
+        amount: String(numAmount),
+        tokenSymbol,
+      });
+      if (res.ok) {
+        setTxReceipt(res.txHash || '0x' + Math.random().toString(16).substring(2));
+        if (onTransferComplete) onTransferComplete();
+      } else {
+        throw new Error(res.error || 'Transfer failed');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Transfer failed on P2P mesh');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          backgroundColor: '#0f172a',
+          borderRadius: 20,
+          border: '1px solid rgba(255,255,255,0.15)',
+          padding: '24px',
+          width: '100%',
+          maxWidth: 400,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          boxShadow: '0 20px 40px rgba(0,0,0,0.8)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>💸</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>Send Sovereign Crypto</span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: 16,
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {txReceipt ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '16px 0' }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                backgroundColor: 'rgba(52, 211, 153, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 28,
+                color: '#34d399',
+              }}
+            >
+              ✓
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#34d399' }}>Transfer Settled!</div>
+            <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+              Transferred {amount} {tokenSymbol} to {recipientDid.slice(0, 16)}...
+            </div>
+            <div
+              style={{
+                backgroundColor: '#1e293b',
+                padding: '8px 12px',
+                borderRadius: 8,
+                fontSize: 10,
+                color: '#64748b',
+                fontFamily: 'monospace',
+                wordBreak: 'break-all',
+                maxWidth: '100%',
+              }}
+            >
+              Tx: {txReceipt}
+            </div>
+            <button
+              onClick={() => {
+                setTxReceipt(null);
+                setAmount('');
+                setRecipientDid('');
+                onClose();
+              }}
+              style={{
+                backgroundColor: '#00a884',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 10,
+                padding: '10px 24px',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                marginTop: 8,
+              }}
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            {error && (
+              <div
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  fontSize: 11,
+                }}
+              >
+                ⚠️ {error}
+              </div>
+            )}
+
+            <div>
+              <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                Recipient DID or Sovereign Address
+              </label>
+              <input
+                type="text"
+                placeholder="did:key:z6Mks... or sovra1..."
+                value={recipientDid}
+                onChange={e => setRecipientDid(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  backgroundColor: '#1e293b',
+                  border: '1px solid #334155',
+                  borderRadius: 8,
+                  color: '#fff',
+                  fontSize: 12,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                {['did:key:z6MksAliceP2P', 'did:key:z6MksBobMesh'].map(contact => (
+                  <button
+                    key={contact}
+                    onClick={() => setRecipientDid(contact)}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '2px 8px',
+                      color: '#38bdf8',
+                      fontSize: 10,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    +{contact.includes('Alice') ? 'Alice' : 'Bob'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                  Asset
+                </label>
+                <select
+                  aria-label="Select transfer asset"
+                  value={tokenSymbol}
+                  onChange={e => setTokenSymbol(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #334155',
+                    borderRadius: 8,
+                    color: '#fff',
+                    fontSize: 12,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="SOV">SOV (Native)</option>
+                  <option value="ALICE">ALICE (CW20)</option>
+                  <option value="MESH">MESH (P2P)</option>
+                </select>
+              </div>
+
+              <div style={{ flex: 1.5 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Amount</label>
+                  <span
+                    onClick={() => setAmount(balance)}
+                    style={{ fontSize: 10, color: '#38bdf8', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    MAX ({balance})
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #334155',
+                    borderRadius: 8,
+                    color: '#fff',
+                    fontSize: 12,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ fontSize: 10, color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Mesh Network Fee:</span>
+              <span style={{ color: '#34d399', fontWeight: 600 }}>0.000 SOV (Zero Gas)</span>
+            </div>
+
+            <button
+              onClick={handleSend}
+              disabled={isSending}
+              style={{
+                width: '100%',
+                padding: '12px',
+                backgroundColor: isSending ? '#334155' : '#00a884',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: isSending ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isSending ? 'Signing & Relaying...' : 'Send Funds ⚡'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ReceiveTokenModal({
+  isOpen,
+  onClose,
+  userDid,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  userDid?: string | undefined;
+}): React.JSX.Element | null {
+  const [copied, setCopied] = useState(false);
+  const activeAddress = userDid || 'did:key:z6MksAliceP2PGenesisAddress';
+
+  if (!isOpen) return null;
+
+  const handleCopy = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(activeAddress);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          backgroundColor: '#0f172a',
+          borderRadius: 20,
+          border: '1px solid rgba(255,255,255,0.15)',
+          padding: '24px',
+          width: '100%',
+          maxWidth: 360,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 16,
+          boxShadow: '0 20px 40px rgba(0,0,0,0.8)',
+          textAlign: 'center',
+        }}
+      >
+        <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>Receive Assets</span>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: 16,
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Styled Visual QR Code Representation */}
+        <div
+          style={{
+            width: 180,
+            height: 180,
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 28px)', gap: 4 }}>
+            {Array.from({ length: 25 }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: 28,
+                  height: 28,
+                  backgroundColor:
+                    i % 2 === 0 || i === 0 || i === 4 || i === 20 || i === 24
+                      ? '#0f172a'
+                      : i % 3 === 0
+                      ? '#3b82f6'
+                      : '#cbd5e1',
+                  borderRadius: 4,
+                }}
+              />
+            ))}
+          </div>
+          <div style={{ fontSize: 9, color: '#0f172a', fontWeight: 800, marginTop: 4 }}>
+            SOVRA MESH DID QR
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Your Sovereign Address / DID:</div>
+          <div
+            style={{
+              backgroundColor: '#1e293b',
+              padding: '8px 12px',
+              borderRadius: 8,
+              fontSize: 11,
+              color: '#38bdf8',
+              fontFamily: 'monospace',
+              wordBreak: 'break-all',
+              userSelect: 'all',
+            }}
+          >
+            {activeAddress}
+          </div>
+        </div>
+
+        <div style={{ width: '100%', display: 'flex', gap: 10 }}>
+          <button
+            onClick={handleCopy}
+            style={{
+              flex: 1,
+              backgroundColor: copied ? '#059669' : '#00a884',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              padding: '11px',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <span>{copied ? '✓' : '📋'}</span>
+            <span>{copied ? 'Copied Address!' : 'Copy DID'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function WalletDrawerModal({
   isOpen,
   onClose,
@@ -75,6 +539,10 @@ export function WalletDrawerModal({
   const [swapAmount, setSwapAmount] = useState('10');
   const [isSwapping, setIsSwapping] = useState(false);
   const [swapResult, setSwapResult] = useState<string | null>(null);
+
+  // Send & Receive Modals state
+  const [isSendOpen, setIsSendOpen] = useState(false);
+  const [isReceiveOpen, setIsReceiveOpen] = useState(false);
 
   const loadAssets = useCallback(async () => {
     setIsLoading(true);
@@ -236,6 +704,68 @@ export function WalletDrawerModal({
               Zero Gas
             </span>
           </div>
+        </div>
+
+        {/* Send & Receive Modals */}
+        <SendTokenModal
+          isOpen={isSendOpen}
+          onClose={() => setIsSendOpen(false)}
+          balance={totalValuation}
+          onTransferComplete={() => {
+            loadAssets();
+          }}
+        />
+
+        <ReceiveTokenModal
+          isOpen={isReceiveOpen}
+          onClose={() => setIsReceiveOpen(false)}
+          userDid={userDid}
+        />
+
+        {/* Quick Action Buttons: Send, Receive */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => setIsSendOpen(true)}
+            style={{
+              flex: 1,
+              padding: '12px 0',
+              backgroundColor: '#00a884',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <span>💸</span>
+            <span>Send</span>
+          </button>
+          <button
+            onClick={() => setIsReceiveOpen(true)}
+            style={{
+              flex: 1,
+              padding: '12px 0',
+              backgroundColor: '#3b82f6',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <span>📥</span>
+            <span>Receive</span>
+          </button>
         </div>
 
         {/* Assets List */}

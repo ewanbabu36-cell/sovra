@@ -23,6 +23,8 @@ import {
   markChatReceipt,
   reactToChatMessage,
   getActiveUserDid,
+  createMeshChannel,
+  fetchMeshChannels,
 } from '../services/api.js';
 import { localDb, type ConversationSummary } from '../services/local-database.js';
 import { syncEngine } from '../services/sync-engine.js';
@@ -66,6 +68,224 @@ export const INITIAL_MESSAGES: MobileChatMessage[] = [
     tickState: 'delivered', // Grey double tick
   },
 ];
+
+export function CreateChannelModal({
+  isOpen,
+  onClose,
+  onChannelCreated,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onChannelCreated: (channel: any) => void;
+}): React.JSX.Element | null {
+  const [channelName, setChannelName] = useState('');
+  const [topic, setTopic] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleCreate = async () => {
+    const raw = channelName.trim();
+    if (!raw) {
+      setError('Please provide a channel name (e.g. #dev-mesh)');
+      return;
+    }
+    const cleanName = raw.startsWith('#') ? raw : `#${raw}`;
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await createMeshChannel({
+        name: cleanName,
+        topic: topic.trim() || 'Sovereign Community Broadcast',
+        isPublic,
+      });
+      if (res.ok && res.channel) {
+        onChannelCreated(res.channel);
+        setChannelName('');
+        setTopic('');
+        onClose();
+      } else {
+        throw new Error(res.error || 'Failed to create channel');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Channel creation error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          backgroundColor: '#0f172a',
+          borderRadius: 20,
+          border: '1px solid rgba(255,255,255,0.15)',
+          padding: '24px',
+          width: '100%',
+          maxWidth: 380,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          boxShadow: '0 20px 40px rgba(0,0,0,0.8)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>📶</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>New Broadcast Channel</span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: 16,
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <div
+            style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#f87171',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: 11,
+            }}
+          >
+            ⚠️ {error}
+          </div>
+        )}
+
+        <div>
+          <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+            Channel Name
+          </label>
+          <input
+            type="text"
+            placeholder="#channel-name"
+            value={channelName}
+            onChange={e => setChannelName(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 8,
+              color: '#fff',
+              fontSize: 13,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+            Topic or Description
+          </label>
+          <input
+            type="text"
+            placeholder="What is this channel for?"
+            value={topic}
+            onChange={e => setTopic(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 8,
+              color: '#fff',
+              fontSize: 12,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setIsPublic(true)}
+            style={{
+              flex: 1,
+              padding: '8px',
+              backgroundColor: isPublic ? '#0284c7' : '#1e293b',
+              color: isPublic ? '#fff' : '#94a3b8',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 8,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            🌐 Public Mesh
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsPublic(false)}
+            style={{
+              flex: 1,
+              padding: '8px',
+              backgroundColor: !isPublic ? '#0284c7' : '#1e293b',
+              color: !isPublic ? '#fff' : '#94a3b8',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 8,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            🔒 Private Group
+          </button>
+        </div>
+
+        <button
+          onClick={handleCreate}
+          disabled={isSubmitting}
+          style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: isSubmitting ? '#334155' : '#00a884',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            marginTop: 4,
+          }}
+        >
+          {isSubmitting ? 'Registering Channel...' : 'Create Channel 🚀'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export interface ActiveRecipient {
   did: string;
@@ -112,6 +332,29 @@ export function ChatsScreen(): React.JSX.Element {
   } | null>(null);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Custom channels state
+  const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+  const [customChannels, setCustomChannels] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadChannels = async () => {
+      try {
+        const list = await fetchMeshChannels();
+        if (mounted && Array.isArray(list)) {
+          const filtered = list.filter(
+            c => c.id !== 'channel:local_mesh' && c.id !== 'channel:emergency_sos',
+          );
+          setCustomChannels(filtered);
+        }
+      } catch {}
+    };
+    loadChannels();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleAttachmentPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1778,7 +2021,7 @@ export function ChatsScreen(): React.JSX.Element {
               cursor: 'pointer',
             }}
           >
-            Channels (2)
+            Channels ({2 + customChannels.length})
           </button>
         </div>
 
@@ -2000,6 +2243,33 @@ export function ChatsScreen(): React.JSX.Element {
 
           {subTab === 'channels' && (
             <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Channel Action Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                  Decentralized Swarms ({2 + customChannels.length})
+                </span>
+                <button
+                  onClick={() => setIsCreateChannelOpen(true)}
+                  style={{
+                    backgroundColor: '#00a884',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '6px 12px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <span>+</span>
+                  <span>New Channel</span>
+                </button>
+              </div>
+
+              {/* Default Hyperlocal Beacon */}
               <div
                 onClick={() =>
                   setActiveRecipient({
@@ -2037,6 +2307,7 @@ export function ChatsScreen(): React.JSX.Element {
                 </div>
               </div>
 
+              {/* Default Emergency SOS Beacon */}
               <div
                 onClick={() =>
                   setActiveRecipient({
@@ -2074,6 +2345,47 @@ export function ChatsScreen(): React.JSX.Element {
                   Emergency distress beacon. Multi-hop relayed to all devices within reach without pairing.
                 </div>
               </div>
+
+              {/* Dynamic Custom Channels */}
+              {customChannels.map(ch => (
+                <div
+                  key={ch.id}
+                  onClick={() =>
+                    setActiveRecipient({
+                      did: ch.id,
+                      name: ch.name,
+                      isChannel: true,
+                    })
+                  }
+                  style={{
+                    backgroundColor: '#182229',
+                    borderRadius: 10,
+                    padding: '14px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 18 }}>💬</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: '#34d399' }}>{ch.name}</span>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                        color: '#34d399',
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {ch.isPublic !== false ? 'Public Swarm' : 'Private'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                    {ch.topic || ch.description || 'Custom decentralized peer broadcast community.'}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -2092,6 +2404,11 @@ export function ChatsScreen(): React.JSX.Element {
         height: '100%',
       }}
     >
+      <CreateChannelModal
+        isOpen={isCreateChannelOpen}
+        onClose={() => setIsCreateChannelOpen(false)}
+        onChannelCreated={ch => setCustomChannels(prev => [ch, ...prev])}
+      />
       {/* Persistent Network & BLE Mesh Status Bar */}
       <div
         role="status"
