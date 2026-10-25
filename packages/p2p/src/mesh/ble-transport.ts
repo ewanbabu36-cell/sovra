@@ -401,6 +401,19 @@ export class BluetoothLETransport implements SovraTransport {
     return Array.from(this.activeChannels.keys());
   }
 
+  public async sendToPeer(peerAddress: string, data: Uint8Array): Promise<boolean> {
+    let channel = this.activeChannels.get(peerAddress);
+    if (!channel) {
+      const connResult = await this.connect(peerAddress);
+      if (connResult.ok) {
+        channel = this.activeChannels.get(peerAddress);
+      }
+    }
+    if (!channel) return false;
+    const res = await channel.send(data);
+    return res.ok;
+  }
+
   public onChannel(handler: (channel: TransportChannel) => void): () => void {
     this.channelHandlers.push(handler);
     return () => {

@@ -15,6 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 // Central Operations
 - (void)startScanningWithServiceUuid:(NSString *)serviceUuid completion:(void (^)(BOOL success, NSString * _Nullable error))completion;
 - (void)stopScanning;
+- (void)setScanDutyCycle:(NSString *)mode completion:(void (^)(BOOL success, NSString * _Nullable error))completion;
 - (void)connectPeripheral:(NSString *)identifier completion:(void (^)(BOOL success, NSString * _Nullable peripheralId, NSInteger maxWriteLength, NSString * _Nullable error))completion;
 - (void)disconnectPeripheral:(NSString *)identifier;
 
