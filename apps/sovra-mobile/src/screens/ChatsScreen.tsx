@@ -21,6 +21,7 @@ import {
   fetchChatMessages,
   sendChatMessage,
   markChatReceipt,
+  reactToChatMessage,
   getActiveUserDid,
 } from '../services/api.js';
 import { localDb, type ConversationSummary } from '../services/local-database.js';
@@ -101,6 +102,59 @@ export function ChatsScreen(): React.JSX.Element {
   const [isTyping, setIsTyping] = useState(false);
   const [peerTyping] = useState(false);
   const typingTimeoutRef = useRef<any>(null);
+
+  // Attachments and Reactions states
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    name: string;
+    mimeType: string;
+    dataUrl: string;
+    sizeBytes: number;
+  } | null>(null);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAttachmentPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPendingAttachment({
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        dataUrl: reader.result as string,
+        sizeBytes: file.size,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleEmojiReaction = async (msgId: string, emoji: string) => {
+    setActiveReactionMsgId(null);
+    setMessages(prev =>
+      prev.map(m => {
+        if (m.id !== msgId) return m;
+        const current = m.reactions ? [...m.reactions] : [];
+        const idx = current.findIndex(r => r.senderDid === getActiveUserDid());
+        if (idx >= 0 && current[idx]) {
+          const target = current[idx]!;
+          if (target.emoji === emoji) {
+            current.splice(idx, 1);
+          } else {
+            target.emoji = emoji;
+          }
+        } else {
+          current.push({ emoji, senderDid: getActiveUserDid() });
+        }
+        return { ...m, reactions: current };
+      }),
+    );
+
+    try {
+      await reactToChatMessage(msgId, emoji);
+    } catch (err) {
+      console.warn('[ChatsScreen] Reaction error:', err);
+    }
+  };
 
   // Outbox live reactive updates & online/offline listener
   const [pendingOutboxCount, setPendingOutboxCount] = useState<number>(() => localDb.getPendingOutbox().length);
@@ -358,7 +412,8 @@ export function ChatsScreen(): React.JSX.Element {
 
   const handleSendMessage = async () => {
     const text = inputText.trim();
-    if (!text || isSending || !activeRecipient) return;
+    const currentAttachment = pendingAttachment;
+    if ((!text && !currentAttachment) || isSending || !activeRecipient) return;
 
     const targetDid = activeRecipient.did;
     const isChannel = activeRecipient.isChannel || targetDid.startsWith('channel:');
@@ -369,16 +424,18 @@ export function ChatsScreen(): React.JSX.Element {
       id: tempId,
       senderDid: myDid,
       senderName: 'You',
-      text,
+      text: text || (currentAttachment ? `[Attachment: ${currentAttachment.name}]` : ''),
       timestamp: Date.now(),
       isOutgoing: true,
       tickState: 'sending',
       isBitChat: isChannel || meshRuntimeState.status === 'BLUETOOTH_MESH',
       hopCount: 1,
+      ...(currentAttachment ? { mediaAttachment: currentAttachment } : {}),
     };
 
     setMessages(prev => [...prev, optimisticMsg]);
     setInputText('');
+    setPendingAttachment(null);
     setIsSending(true);
 
     if (isChannel) {
@@ -405,11 +462,22 @@ export function ChatsScreen(): React.JSX.Element {
       senderDid: myDid,
       recipientDid: targetDid,
       senderName: 'You',
-      text,
+      text: text || (currentAttachment ? `[Attachment: ${currentAttachment.name}]` : ''),
       timestamp: Date.now(),
       status: 'pending',
       syncStatus: 'LOCAL',
       ...(disappearingSec > 0 ? { disappearingDurationSec: disappearingSec } : {}),
+      ...(currentAttachment
+        ? {
+            mediaAttachment: {
+              name: currentAttachment.name,
+              cid: 'bafkrei' + Math.random().toString(36).substring(2, 10),
+              mimeType: currentAttachment.mimeType,
+              sizeBytes: currentAttachment.sizeBytes,
+              dataUrl: currentAttachment.dataUrl,
+            },
+          }
+        : {}),
     });
 
     // Phase 3: Smart Transport Selection: Prefer direct BLE link / offline mesh if connected or offline
@@ -463,9 +531,19 @@ export function ChatsScreen(): React.JSX.Element {
     try {
       const res = await sendChatMessage({
         recipientDid: targetDid,
-        text,
+        text: text || (currentAttachment ? `[Attachment: ${currentAttachment.name}]` : ''),
         senderName: 'You',
         ...(disappearingSec > 0 ? { disappearingDurationSec: disappearingSec } : {}),
+        ...(currentAttachment
+          ? {
+              attachment: {
+                name: currentAttachment.name,
+                type: currentAttachment.mimeType,
+                dataUrl: currentAttachment.dataUrl,
+                size: currentAttachment.sizeBytes,
+              },
+            }
+          : {}),
       });
 
       if (res.ok && res.message) {
@@ -1125,6 +1203,7 @@ export function ChatsScreen(): React.JSX.Element {
           {messages.map(msg => (
             <div
               key={msg.id}
+              onClick={() => setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id)}
               style={{
                 alignSelf: msg.isOutgoing ? 'flex-end' : 'flex-start',
                 backgroundColor: msg.isOutgoing ? '#005c4b' : '#202c33',
@@ -1132,18 +1211,71 @@ export function ChatsScreen(): React.JSX.Element {
                 borderRadius: 10,
                 maxWidth: '82%',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                position: 'relative',
+                cursor: 'pointer',
               }}
             >
+              {/* Floating Emoji Reaction Bar */}
+              {activeReactionMsgId === msg.id && (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    top: -38,
+                    right: msg.isOutgoing ? 0 : 'auto',
+                    left: msg.isOutgoing ? 'auto' : 0,
+                    backgroundColor: '#1f2c34',
+                    borderRadius: 24,
+                    padding: '4px 8px',
+                    display: 'flex',
+                    gap: 6,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+                    zIndex: 30,
+                    border: '1px solid rgba(255,255,255,0.15)',
+                  }}
+                >
+                  {['❤️', '😂', '👍', '🔥', '😮', '😢'].map(em => (
+                    <span
+                      key={em}
+                      role="button"
+                      onClick={() => handleEmojiReaction(msg.id, em)}
+                      style={{
+                        fontSize: 16,
+                        cursor: 'pointer',
+                        padding: '2px 4px',
+                        transition: 'transform 0.15s ease',
+                      }}
+                    >
+                      {em}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {activeRecipient.isChannel && !msg.isOutgoing && (
                 <div style={{ fontSize: 10, color: '#38bdf8', fontWeight: 700, marginBottom: 2 }}>
                   {msg.senderName}
                 </div>
               )}
 
+              {/* Media Attachment in message bubble */}
+              {msg.mediaAttachment && msg.mediaAttachment.dataUrl && (
+                <div style={{ marginBottom: 6, borderRadius: 8, overflow: 'hidden', maxHeight: 220 }}>
+                  <img
+                    src={msg.mediaAttachment.dataUrl}
+                    alt={msg.mediaAttachment.name || 'Attachment'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+              )}
+
               {msg.isAudioNote ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                   <button
-                    onClick={() => togglePlayAudio(msg)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePlayAudio(msg);
+                    }}
                     aria-label={playingMessageId === msg.id ? 'Pause voice note' : 'Play voice note'}
                     style={{
                       background: playingMessageId === msg.id ? '#00a884' : '#1e293b',
@@ -1183,6 +1315,39 @@ export function ChatsScreen(): React.JSX.Element {
               ) : (
                 <div style={{ fontSize: 13, lineHeight: 1.4, color: '#e9edef', wordBreak: 'break-word' }}>
                   {msg.text}
+                </div>
+              )}
+
+              {/* Reactions Chips */}
+              {msg.reactions && msg.reactions.length > 0 && (
+                <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                  {Object.entries(
+                    msg.reactions.reduce((acc, r) => {
+                      acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                      return acc;
+                    }, {} as Record<string, number>),
+                  ).map(([em, cnt]) => (
+                    <span
+                      key={em}
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleEmojiReaction(msg.id, em);
+                      }}
+                      style={{
+                        fontSize: 11,
+                        backgroundColor: 'rgba(255,255,255,0.12)',
+                        padding: '2px 6px',
+                        borderRadius: 12,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 2,
+                      }}
+                    >
+                      <span>{em}</span>
+                      <span style={{ fontSize: 10, color: '#94a3b8' }}>{cnt}</span>
+                    </span>
+                  ))}
                 </div>
               )}
 
@@ -1238,6 +1403,39 @@ export function ChatsScreen(): React.JSX.Element {
           </div>
         )}
 
+        {/* Attachment preview chip */}
+        {pendingAttachment && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '6px 14px',
+              backgroundColor: '#182229',
+              borderTop: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            {pendingAttachment.mimeType.startsWith('image/') ? (
+              <img
+                src={pendingAttachment.dataUrl}
+                alt="Attachment preview"
+                style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }}
+              />
+            ) : (
+              <span style={{ fontSize: 20 }}>📁</span>
+            )}
+            <div style={{ flex: 1, fontSize: 12, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {pendingAttachment.name}
+            </div>
+            <button
+              onClick={() => setPendingAttachment(null)}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', fontSize: 14 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Input Bar */}
         <footer
           style={{
@@ -1289,7 +1487,21 @@ export function ChatsScreen(): React.JSX.Element {
                 outline: 'none',
               }}
             />
-            <span>📎</span>
+            <span
+              role="button"
+              aria-label="Attach Media"
+              onClick={() => attachmentInputRef.current?.click()}
+              style={{ cursor: 'pointer', padding: '2px 4px' }}
+            >
+              📎
+            </span>
+            <input
+              type="file"
+              ref={attachmentInputRef}
+              accept="image/*,video/*"
+              onChange={handleAttachmentPicked}
+              style={{ display: 'none' }}
+            />
           </div>
 
           <button

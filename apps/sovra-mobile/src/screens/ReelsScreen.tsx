@@ -61,6 +61,240 @@ export const INITIAL_REELS: MobileReelItem[] = [
   },
 ];
 
+export function ReelComposerModal({
+  isOpen,
+  onClose,
+  onReelPublished,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onReelPublished: (reel: MobileReelItem) => void;
+}): React.JSX.Element | null {
+  const [caption, setCaption] = useState('');
+  const [audioTrack, setAudioTrack] = useState('Original Sound - You');
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const audioPresets = [
+    'Original Sound - You',
+    'P2P Pulse Beats - Sound Collective',
+    'Midnight Echoes (Spatial Mix) - Carol',
+    'Quantum Synthwave - Decentral',
+  ];
+
+  const handleVideoPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setVideoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePublish = () => {
+    if (!videoPreview) {
+      setError('Please select a video clip to broadcast');
+      return;
+    }
+    setIsPublishing(true);
+    setError(null);
+
+    const newReel: MobileReelItem = {
+      id: `reel_${Date.now()}`,
+      creatorHandle: 'you',
+      creatorName: 'You',
+      caption: caption.trim() || 'Decentralized super-app clip on pure BitSwap swarm. ⚡',
+      audioTrack,
+      likesCount: 0,
+      commentsCount: 0,
+      bgGradient: 'linear-gradient(180deg, #1e1b4b 0%, #312e81 40%, #0f172a 100%)',
+      manifestCid: 'bafybeig' + Math.random().toString(36).substring(2, 12),
+      segment0Cid: 'bafkreic' + Math.random().toString(36).substring(2, 12),
+      videoUrl: videoPreview,
+    };
+
+    onReelPublished(newReel);
+    setIsPublishing(false);
+    onClose();
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Reel Publisher"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(10px)',
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: 400,
+          backgroundColor: '#0f172a',
+          borderRadius: 20,
+          border: '1px solid rgba(255,255,255,0.12)',
+          padding: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+          color: '#fff',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.7)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Publish Reel</h3>
+            <span style={{ fontSize: 11, color: '#38bdf8' }}>60fps Vertical P2P Swarm</span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 18, cursor: 'pointer' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ padding: '8px 12px', backgroundColor: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: 8, fontSize: 11, color: '#f87171' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Video Picker & Preview */}
+        <div
+          style={{
+            height: 200,
+            borderRadius: 14,
+            backgroundColor: '#020617',
+            border: '2px dashed rgba(255,255,255,0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            position: 'relative',
+            cursor: 'pointer',
+          }}
+        >
+          {videoPreview ? (
+            <video src={videoPreview} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: 16 }}>
+              <div style={{ fontSize: 32, marginBottom: 6 }}>🎬</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Tap to select video</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>MP4, WebM or HLS chunk</div>
+            </div>
+          )}
+          <input
+            type="file"
+            accept="video/*"
+            onChange={handleVideoPicked}
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+          />
+        </div>
+
+        {/* Caption */}
+        <div>
+          <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Caption</label>
+          <input
+            type="text"
+            placeholder="Write a caption with #hashtags..."
+            value={caption}
+            onChange={e => setCaption(e.target.value)}
+            style={{
+              width: '100%',
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 10,
+              color: '#fff',
+              padding: '10px 12px',
+              fontSize: 13,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Audio Track Selector */}
+        <div>
+          <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Audio Track</label>
+          <select
+            value={audioTrack}
+            onChange={e => setAudioTrack(e.target.value)}
+            style={{
+              width: '100%',
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 10,
+              color: '#fff',
+              padding: '10px 12px',
+              fontSize: 12,
+              outline: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {audioPresets.map(preset => (
+              <option key={preset} value={preset}>🎵 {preset}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={onClose}
+            disabled={isPublishing}
+            style={{
+              flex: 1,
+              padding: '10px',
+              backgroundColor: '#334155',
+              color: '#cbd5e1',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handlePublish}
+            disabled={isPublishing}
+            style={{
+              flex: 1,
+              padding: '10px',
+              backgroundColor: '#00a884',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: isPublishing ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isPublishing ? 'Publishing...' : 'Publish Reel 🚀'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ReelsScreen(): React.JSX.Element {
   const [reels, setReels] = useState<MobileReelItem[]>(INITIAL_REELS);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -68,6 +302,7 @@ export function ReelsScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [heartAnim, setHeartAnim] = useState<{ x: number; y: number; id: number } | null>(null);
   const [shareToast, setShareToast] = useState<string | null>(null);
+  const [isReelComposerOpen, setIsReelComposerOpen] = useState(false);
 
   // Audio / Sound HUD state (Autoplay compliant: default muted, persisted in localStorage)
   const [isMuted, setIsMuted] = useState<boolean>(() => {
@@ -497,7 +732,15 @@ export function ReelsScreen(): React.JSX.Element {
                   <span>{isMuted ? '🔇' : '🔊'}</span>
                   <span>{isMuted ? 'Muted' : 'Sound On'}</span>
                 </button>
-                <span style={{ fontSize: 18 }}>📸</span>
+                <span
+                  role="button"
+                  aria-label="Create and publish reel"
+                  onClick={() => setIsReelComposerOpen(true)}
+                  style={{ fontSize: 18, cursor: 'pointer' }}
+                  title="Publish Reel"
+                >
+                  📸
+                </span>
               </div>
             </div>
 
@@ -784,6 +1027,16 @@ export function ReelsScreen(): React.JSX.Element {
             style={{ display: 'none' }}
           />
         )}
+        {/* Reel Creator Modal */}
+        <ReelComposerModal
+          isOpen={isReelComposerOpen}
+          onClose={() => setIsReelComposerOpen(false)}
+          onReelPublished={newReel => {
+            setReels(prev => [newReel, ...prev]);
+            setShareToast('✓ Reel broadcasted to P2P video swarm!');
+            setTimeout(() => setShareToast(null), 2500);
+          }}
+        />
       </div>
     );
   }

@@ -16,6 +16,8 @@ import {
   likeFeedPost,
   createFeedPost,
   fetchStories,
+  fetchStoriesSwarm,
+  publishStory,
   markStorySeen,
   fetchFeedComments,
   addFeedComment,
@@ -94,21 +96,258 @@ export const INITIAL_POSTS: FeedPost[] = [
   },
 ];
 
+export function StoryComposerModal({
+  isOpen,
+  onClose,
+  onStoryPublished,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onStoryPublished: (newStory: MobileStoryItem) => void;
+}): React.JSX.Element | null {
+  const [caption, setCaption] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedBg, setSelectedBg] = useState('#312e81');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const bgPresets = ['#312e81', '#065f46', '#831843', '#7c2d12', '#1e293b'];
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBroadcast = async () => {
+    setIsPublishing(true);
+    setError(null);
+    try {
+      const res = await publishStory({
+        ...(caption.trim() ? { caption: caption.trim() } : {}),
+        ...(imagePreview ? { mediaDataUrl: imagePreview } : {}),
+        avatarBg: selectedBg,
+        avatarEmoji: '⚡',
+      });
+      if (res.ok) {
+        onStoryPublished({
+          id: res.story?.id || `s_${Date.now()}`,
+          creatorHandle: 'you',
+          creatorName: 'You',
+          avatarEmoji: '⚡',
+          avatarBg: selectedBg,
+          isSeen: false,
+          hoursRemaining: 24,
+        });
+        setCaption('');
+        setImagePreview(null);
+        onClose();
+      } else {
+        throw new Error(res.error || 'Failed to publish story');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Publish error');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Story Composer"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(10px)',
+        zIndex: 110,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: 380,
+          backgroundColor: '#0f172a',
+          borderRadius: 20,
+          border: '1px solid rgba(255,255,255,0.12)',
+          padding: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+          color: '#fff',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.7)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Add to Your Story</h3>
+            <span style={{ fontSize: 11, color: '#38bdf8' }}>⏳ 24h P2P Ephemeral Moment</span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 18, cursor: 'pointer' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ padding: '8px 12px', backgroundColor: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: 8, fontSize: 11, color: '#f87171' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Media Preview / Picker */}
+        <div
+          style={{
+            height: 180,
+            borderRadius: 14,
+            background: imagePreview ? '#000' : selectedBg,
+            border: '2px dashed rgba(255,255,255,0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            position: 'relative',
+            cursor: 'pointer',
+          }}
+        >
+          {imagePreview ? (
+            <img src={imagePreview} alt="Story preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: 16 }}>
+              <div style={{ fontSize: 32, marginBottom: 6 }}>📷</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>Tap to select photo</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>Zero server storage. Broadcast directly to peer swarm.</div>
+            </div>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+          />
+        </div>
+
+        {/* Color Presets */}
+        <div>
+          <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Background Aura</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {bgPresets.map(bg => (
+              <div
+                key={bg}
+                onClick={() => setSelectedBg(bg)}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  backgroundColor: bg,
+                  cursor: 'pointer',
+                  border: selectedBg === bg ? '2px solid #fff' : '1px solid rgba(255,255,255,0.1)',
+                  transform: selectedBg === bg ? 'scale(1.15)' : 'none',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Caption */}
+        <div>
+          <input
+            type="text"
+            placeholder="Add a moment caption..."
+            value={caption}
+            onChange={e => setCaption(e.target.value)}
+            style={{
+              width: '100%',
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 10,
+              color: '#fff',
+              padding: '10px 12px',
+              fontSize: 13,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={onClose}
+            disabled={isPublishing}
+            style={{
+              flex: 1,
+              padding: '10px',
+              backgroundColor: '#334155',
+              color: '#cbd5e1',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleBroadcast}
+            disabled={isPublishing}
+            style={{
+              flex: 1,
+              padding: '10px',
+              backgroundColor: '#00a884',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: isPublishing ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isPublishing ? 'Broadcasting...' : 'Broadcast ⚡'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FeedScreen(): React.JSX.Element {
   const [stories, setStories] = useState<MobileStoryItem[]>(INITIAL_STORIES);
   const [posts, setPosts] = useState<FeedPost[]>(INITIAL_POSTS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [feedFilter, setFeedFilter] = useState<'for-you' | 'trending'>('for-you');
 
   // Full-screen Story Viewer state
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [storyProgress, setStoryProgress] = useState<number>(0);
   const [isStoryPaused, setIsStoryPaused] = useState<boolean>(false);
 
+  // Story composer modal state
+  const [isStoryComposerOpen, setIsStoryComposerOpen] = useState<boolean>(false);
+
   // New post modal state
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
   const [newCaption, setNewCaption] = useState<string>('');
+  const [postMediaImage, setPostMediaImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -183,12 +422,21 @@ export function FeedScreen(): React.JSX.Element {
     return () => clearInterval(interval);
   }, [activeStoryIndex, isStoryPaused, nextStory]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (customFilter?: 'for-you' | 'trending') => {
+    const activeFilter = customFilter || feedFilter;
     try {
       setError(null);
+      const postsPromise =
+        activeFilter === 'trending'
+          ? fetch('/api/feed/trending')
+              .then(r => (r.ok ? r.json() : null))
+              .then(d => (d && d.ok && Array.isArray(d.posts) ? d.posts : fetchFeedPosts()))
+              .catch(() => fetchFeedPosts())
+          : fetchFeedPosts();
+
       const [storiesData, postsData] = await Promise.allSettled([
-        fetchStories(),
-        fetchFeedPosts(),
+        fetchStoriesSwarm().catch(() => fetchStories()),
+        postsPromise,
       ]);
 
       if (storiesData.status === 'fulfilled' && storiesData.value.length > 0) {
@@ -242,7 +490,7 @@ export function FeedScreen(): React.JSX.Element {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [feedFilter]);
 
   useEffect(() => {
     loadData();
@@ -251,6 +499,16 @@ export function FeedScreen(): React.JSX.Element {
   const handleRefresh = () => {
     setIsRefreshing(true);
     loadData();
+  };
+
+  const handlePostImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPostMediaImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const toggleStorySeen = async (id: string) => {
@@ -316,7 +574,7 @@ export function FeedScreen(): React.JSX.Element {
     setCreateError(null);
 
     try {
-      const res = await createFeedPost(caption);
+      const res = await createFeedPost(caption, postMediaImage || undefined);
       if (res.ok && res.post) {
         const newPost: FeedPost = {
           id: res.post.id,
@@ -326,7 +584,7 @@ export function FeedScreen(): React.JSX.Element {
           creatorName: res.post.authorName || 'You',
           avatarEmoji: res.post.authorAvatar || '⚡',
           imageEmoji: res.post.mediaEmoji || '🌌',
-          mediaImage: res.post.mediaImage,
+          mediaImage: res.post.mediaImage || postMediaImage || undefined,
           caption: res.post.caption,
           likes: 0,
           timeAgo: 'Just now',
@@ -334,6 +592,7 @@ export function FeedScreen(): React.JSX.Element {
         };
         setPosts(prev => [newPost, ...prev]);
         setNewCaption('');
+        setPostMediaImage(null);
         setIsCreateOpen(false);
         showToast('✓ Post published to sovereign peer swarm!');
       } else {
@@ -586,6 +845,54 @@ export function FeedScreen(): React.JSX.Element {
         </div>
       </header>
 
+      {/* For You vs Trending Filter Tabs */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          padding: '8px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          backgroundColor: '#090d16',
+        }}
+      >
+        <button
+          onClick={() => {
+            setFeedFilter('for-you');
+            loadData('for-you');
+          }}
+          style={{
+            padding: '5px 14px',
+            borderRadius: 20,
+            border: 'none',
+            backgroundColor: feedFilter === 'for-you' ? '#38bdf8' : 'rgba(255,255,255,0.08)',
+            color: feedFilter === 'for-you' ? '#000' : '#cbd5e1',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          For You
+        </button>
+        <button
+          onClick={() => {
+            setFeedFilter('trending');
+            loadData('trending');
+          }}
+          style={{
+            padding: '5px 14px',
+            borderRadius: 20,
+            border: 'none',
+            backgroundColor: feedFilter === 'trending' ? '#f59e0b' : 'rgba(255,255,255,0.08)',
+            color: feedFilter === 'trending' ? '#000' : '#cbd5e1',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          🔥 Trending
+        </button>
+      </div>
+
       {/* Toast Alert */}
       {toastMessage && (
         <div
@@ -623,7 +930,7 @@ export function FeedScreen(): React.JSX.Element {
         >
           <span>⚠️ {error}</span>
           <button
-            onClick={loadData}
+            onClick={() => { loadData(); }}
             style={{
               padding: '4px 10px',
               backgroundColor: '#ef4444',
@@ -653,7 +960,7 @@ export function FeedScreen(): React.JSX.Element {
       >
         {/* Your Story Button */}
         <div
-          onClick={() => setIsCreateOpen(true)}
+          onClick={() => setIsStoryComposerOpen(true)}
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -955,6 +1262,31 @@ export function FeedScreen(): React.JSX.Element {
             </div>
           )}
 
+          {/* Media Attachment Preview */}
+          {postMediaImage && (
+            <div style={{ position: 'relative', marginBottom: 12, borderRadius: 8, overflow: 'hidden', maxHeight: 140 }}>
+              <img src={postMediaImage} alt="Post attachment preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <button
+                onClick={() => setPostMediaImage(null)}
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 6,
+                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 24,
+                  height: 24,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <textarea
             value={newCaption}
             onChange={e => setNewCaption(e.target.value)}
@@ -976,45 +1308,71 @@ export function FeedScreen(): React.JSX.Element {
             }}
           />
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
-            <button
-              onClick={() => {
-                setIsCreateOpen(false);
-                setCreateError(null);
-              }}
-              disabled={isSubmitting}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center' }}>
+            <label
               style={{
-                padding: '8px 14px',
-                backgroundColor: '#374151',
-                color: '#cbd5e1',
-                border: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: postMediaImage ? '#0369a1' : 'rgba(255,255,255,0.08)',
+                color: '#fff',
+                padding: '6px 12px',
                 borderRadius: 8,
                 fontSize: 12,
-                fontWeight: 600,
                 cursor: 'pointer',
               }}
             >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreatePost}
-              disabled={isSubmitting || !newCaption.trim()}
-              style={{
-                padding: '8px 18px',
-                backgroundColor: isSubmitting || !newCaption.trim() ? '#475569' : '#00a884',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: isSubmitting || !newCaption.trim() ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              {isSubmitting ? 'Relaying...' : '🚀 Broadcast Post'}
-            </button>
+              <span>📷</span>
+              <span>{postMediaImage ? 'Photo Added' : 'Add Photo'}</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePostImageChange}
+                style={{ display: 'none' }}
+              />
+            </label>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setPostMediaImage(null);
+                  setCreateError(null);
+                }}
+                disabled={isSubmitting}
+                style={{
+                  padding: '8px 14px',
+                  backgroundColor: '#374151',
+                  color: '#cbd5e1',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreatePost}
+                disabled={isSubmitting || (!newCaption.trim() && !postMediaImage)}
+                style={{
+                  padding: '8px 18px',
+                  backgroundColor: isSubmitting || (!newCaption.trim() && !postMediaImage) ? '#475569' : '#00a884',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: isSubmitting || (!newCaption.trim() && !postMediaImage) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                {isSubmitting ? 'Relaying...' : '🚀 Broadcast Post'}
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -1469,6 +1827,16 @@ export function FeedScreen(): React.JSX.Element {
           </div>
         </div>
       )}
+
+      {/* Story Composer Modal */}
+      <StoryComposerModal
+        isOpen={isStoryComposerOpen}
+        onClose={() => setIsStoryComposerOpen(false)}
+        onStoryPublished={newStory => {
+          setStories(prev => [newStory, ...prev]);
+          showToast('✓ 24h Story broadcasted to peer swarm!');
+        }}
+      />
     </div>
   );
 }

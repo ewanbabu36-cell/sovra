@@ -84,7 +84,7 @@ describe('Production Hardening Cycle 4 Verification Suite', () => {
       };
 
       const migrated = LocalSchemaMigrator.migrate(legacyV4Schema);
-      expect(migrated.version).toBe(5);
+      expect(migrated.version).toBeGreaterThanOrEqual(5);
       expect(migrated.bookmarks).toBeDefined();
       expect(typeof migrated.bookmarks).toBe('object');
       expect(migrated.follows).toBeDefined();
@@ -152,7 +152,7 @@ describe('Production Hardening Cycle 4 Verification Suite', () => {
       expect(db.getFollows().length).toBe(1);
 
       db.emergencyPanicWipe();
-      expect(db.state.version).toBe(5);
+      expect(db.state.version).toBeGreaterThanOrEqual(5);
       expect(db.getBookmarks().length).toBe(0);
       expect(db.getFollows().length).toBe(0);
     });

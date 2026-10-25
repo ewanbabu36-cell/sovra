@@ -140,6 +140,26 @@ export interface CachedFollow {
   followedAt: number;
 }
 
+export interface CachedStory {
+  id: string;
+  authorDid: string;
+  authorName: string;
+  authorAvatar: string;
+  avatarBg?: string | undefined;
+  mediaImage?: string | undefined;
+  caption?: string | undefined;
+  createdAt: number;
+  expiresAt: number;
+  isSeen?: boolean | undefined;
+}
+
+export interface CachedReaction {
+  messageId: string;
+  emoji: string;
+  senderDid: string;
+  timestamp: number;
+}
+
 export interface ConversationSummary {
   threadId: string;
   peerDid: string;
@@ -218,6 +238,8 @@ export interface LocalDatabaseSchema {
   guardians: Record<string, CachedGuardian>;
   bookmarks: Record<string, CachedBookmark>;
   follows: Record<string, CachedFollow>;
+  stories: Record<string, CachedStory>;
+  reactions: Record<string, CachedReaction[]>;
   sync_state: ClientSyncState;
 }
 
@@ -379,7 +401,7 @@ export function resolveStorageDriver(customDriver?: IStorageDriver): IStorageDri
 export class LocalSchemaMigrator {
   public static migrate(raw: any): LocalDatabaseSchema {
     const defaultSchema: LocalDatabaseSchema = {
-      version: 5,
+      version: 6,
       users: {},
       profiles: {},
       posts: {},
@@ -394,6 +416,8 @@ export class LocalSchemaMigrator {
       guardians: {},
       bookmarks: {},
       follows: {},
+      stories: {},
+      reactions: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
@@ -423,14 +447,16 @@ export class LocalSchemaMigrator {
       guardians: raw.guardians || {},
       bookmarks: raw.bookmarks || {},
       follows: raw.follows || {},
+      stories: raw.stories || {},
+      reactions: raw.reactions || {},
       sync_state: {
         ...defaultSchema.sync_state,
         ...(raw.sync_state || {}),
       },
     };
 
-    if (currentVersion < 5) {
-      migrated.version = 5;
+    if (currentVersion < 6) {
+      migrated.version = 6;
       if (!migrated.wallet_ledger) {
         migrated.wallet_ledger = {};
       }
@@ -442,6 +468,12 @@ export class LocalSchemaMigrator {
       }
       if (!migrated.follows) {
         migrated.follows = {};
+      }
+      if (!migrated.stories) {
+        migrated.stories = {};
+      }
+      if (!migrated.reactions) {
+        migrated.reactions = {};
       }
     }
 
@@ -1078,12 +1110,95 @@ export class SovraLocalDatabase {
   }
 
   // ==========================================
+  // STORIES & EPHEMERAL TTL PERSISTENCE
+  // ==========================================
+
+  public async saveStory(story: CachedStory): Promise<void> {
+    if (!this.state.stories) this.state.stories = {};
+    this.state.stories[story.id] = story;
+    await this.persist();
+  }
+
+  public getStories(): CachedStory[] {
+    const now = Date.now();
+    return Object.values(this.state.stories || {})
+      .filter(s => s.expiresAt > now)
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  public getAllStories(): CachedStory[] {
+    return Object.values(this.state.stories || {}).sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  public purgeExpiredStories(now?: number): number {
+    const currentTime = now ?? Date.now();
+    let purgedCount = 0;
+    if (this.state.stories) {
+      for (const [id, s] of Object.entries(this.state.stories)) {
+        if (currentTime > s.expiresAt) {
+          delete this.state.stories[id];
+          purgedCount++;
+        }
+      }
+    }
+    if (purgedCount > 0) {
+      this.persist().catch(() => {});
+    }
+    return purgedCount;
+  }
+
+  // ==========================================
+  // CHAT REACTIONS PERSISTENCE & TOGGLING
+  // ==========================================
+
+  public async saveReaction(
+    messageId: string,
+    emoji: string,
+    senderDid: string,
+  ): Promise<{ reactions: CachedReaction[]; toggled: boolean }> {
+    if (!this.state.reactions) this.state.reactions = {};
+    if (!this.state.reactions[messageId]) this.state.reactions[messageId] = [];
+
+    const existingList = this.state.reactions[messageId] || [];
+    this.state.reactions[messageId] = existingList;
+    const existingIdx = existingList.findIndex(r => r.senderDid === senderDid);
+    let toggled = false;
+
+    if (existingIdx >= 0 && existingList[existingIdx]) {
+      const item = existingList[existingIdx]!;
+      if (item.emoji === emoji) {
+        // Same emoji -> toggle off / remove
+        existingList.splice(existingIdx, 1);
+        toggled = true;
+      } else {
+        // Different emoji -> update
+        item.emoji = emoji;
+        item.timestamp = Date.now();
+      }
+    } else {
+      existingList.push({
+        messageId,
+        emoji,
+        senderDid,
+        timestamp: Date.now(),
+      });
+    }
+
+    await this.persist();
+    return { reactions: [...existingList], toggled };
+  }
+
+  public getReactions(messageId: string): CachedReaction[] {
+    return this.state.reactions?.[messageId] || [];
+  }
+
+  // ==========================================
   // EMERGENCY DATA WIPE (PANIC)
   // ==========================================
 
   public async emergencyPanicWipe(): Promise<void> {
     this.state = {
-      version: 5,
+      version: 6,
       users: {},
       profiles: {},
       posts: {},
@@ -1098,6 +1213,8 @@ export class SovraLocalDatabase {
       guardians: {},
       bookmarks: {},
       follows: {},
+      stories: {},
+      reactions: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
