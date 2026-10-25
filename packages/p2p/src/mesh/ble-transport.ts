@@ -344,7 +344,7 @@ export class BluetoothLETransport implements SovraTransport {
 
       let distanceMeters: number | undefined;
       if (dev.rssi !== undefined) {
-        const measuredPower = -59;
+        const measuredPower = dev.txPower ?? -59;
         const n = 2.2;
         distanceMeters = Math.round(Math.pow(10, (measuredPower - dev.rssi) / (10 * n)) * 10) / 10;
       }

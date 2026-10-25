@@ -132,11 +132,12 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
         const emitter = new EventEmitter(this.nativeModule);
         emitter.addListener(
           'onDeviceDiscovered',
-          (event: { address: string; rssi: number; serviceData: string; name?: string }) => {
+          (event: { address: string; rssi: number; txPower?: number; serviceData: string; name?: string }) => {
             const serviceBytes = this.base64ToBytes(event.serviceData || '');
             onDiscovered({
               address: event.address,
               rssi: event.rssi,
+              txPower: event.txPower,
               serviceData: serviceBytes,
               name: event.name,
             });

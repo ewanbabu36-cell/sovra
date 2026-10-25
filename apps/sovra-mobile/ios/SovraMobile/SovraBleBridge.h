@@ -12,6 +12,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSString *)getAuthorizationStatus;
 - (NSString *)getBluetoothState;
 
+// Background State Restoration
+- (void)centralManager:(CBCentralManager *)central willRestoreState:(NSDictionary<NSString *, id> *)dict;
+- (void)peripheralManager:(CBPeripheralManager *)peripheral willRestoreState:(NSDictionary<NSString *, id> *)dict;
+
 // Central Operations
 - (void)startScanningWithServiceUuid:(NSString *)serviceUuid completion:(void (^)(BOOL success, NSString * _Nullable error))completion;
 - (void)stopScanning;
@@ -29,6 +33,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 // Callbacks for JS Runtime Bridge
 @property (nonatomic, copy, nullable) void (^onDeviceDiscovered)(NSString *identifier, NSInteger rssi, NSData *serviceData, NSString * _Nullable name);
+@property (nonatomic, copy, nullable) void (^onDeviceDiscoveredWithTxPower)(NSString *identifier, NSInteger rssi, NSInteger txPower, NSData *serviceData, NSString * _Nullable name);
 @property (nonatomic, copy, nullable) void (^onDataReceived)(NSString *peripheralId, NSData *data);
 @property (nonatomic, copy, nullable) void (^onPeripheralDisconnected)(NSString *peripheralId);
 

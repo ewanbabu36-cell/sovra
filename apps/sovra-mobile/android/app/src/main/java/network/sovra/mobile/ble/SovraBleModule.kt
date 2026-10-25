@@ -71,6 +71,7 @@ class SovraBleModule(private val context: Context) {
     private val activeConnections = ConcurrentHashMap<String, ActiveConnection>()
     private val discoveredDevices = ConcurrentHashMap<String, Long>()
     private val discoveredNames = ConcurrentHashMap<String, String>()
+    private val smoothedRssiMap = ConcurrentHashMap<String, Double>()
 
     private var activeAdvertiser: BluetoothLeAdvertiser? = null
     private var advertiseCallback: AdvertiseCallback? = null
@@ -81,6 +82,7 @@ class SovraBleModule(private val context: Context) {
 
     // Event callbacks to JavaScript bridge
     var onDeviceDiscovered: ((address: String, rssi: Int, serviceData: ByteArray, name: String?) -> Unit)? = null
+    var onDeviceDiscoveredWithTxPower: ((address: String, rssi: Int, txPower: Int, serviceData: ByteArray, name: String?) -> Unit)? = null
     var onIncomingDataReceived: ((gattId: String, data: ByteArray) -> Unit)? = null
     var onPeerDisconnected: ((gattId: String) -> Unit)? = null
 
@@ -480,6 +482,19 @@ class SovraBleModule(private val context: Context) {
                     "Peer " + address.take(8)
                 }
 
+                val rawTxPower = scanRecord.txPowerLevel
+                val txPower = if (rawTxPower != Integer.MIN_VALUE && rawTxPower != 0) rawTxPower else -59
+
+                // Exponential Moving Average (EMA) smoothing: smoothedRssi = (0.25 * currentRssi) + (0.75 * previousRssi)
+                val prevSmoothed = smoothedRssiMap[address]
+                val smoothed = if (prevSmoothed != null) {
+                    (0.25 * rssi.toDouble()) + (0.75 * prevSmoothed)
+                } else {
+                    rssi.toDouble()
+                }
+                smoothedRssiMap[address] = smoothed
+                val smoothedRssi = Math.round(smoothed).toInt()
+
                 val now = System.currentTimeMillis()
                 val lastSeen = discoveredDevices[address] ?: 0L
                 val previousName = discoveredNames[address]
@@ -489,8 +504,9 @@ class SovraBleModule(private val context: Context) {
                 discoveredDevices[address] = now
                 discoveredNames[address] = resolvedName
 
-                Log.d(TAG, "Discovered Sovra Peer: $address (name='$resolvedName', rssi=$rssi)")
-                onDeviceDiscovered?.invoke(address, rssi, serviceData, resolvedName)
+                Log.d(TAG, "Discovered Sovra Peer: $address (name='$resolvedName', rssi=$smoothedRssi, rawRssi=$rssi, txPower=$txPower)")
+                onDeviceDiscoveredWithTxPower?.invoke(address, smoothedRssi, txPower, serviceData, resolvedName)
+                onDeviceDiscovered?.invoke(address, smoothedRssi, serviceData, resolvedName)
             }
 
             override fun onScanFailed(errorCode: Int) {

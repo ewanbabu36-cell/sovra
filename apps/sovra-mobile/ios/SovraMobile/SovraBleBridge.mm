@@ -25,6 +25,7 @@ static NSString * const kSovraNotifyCharUUID    = @"00005358-0000-1000-8000-0080
 @property (nonatomic, strong) NSMutableDictionary<NSString *, void (^)(BOOL, NSString *, NSInteger, NSString *)> *pendingConnectCallbacks;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray<SovraBlePendingWrite *> *> *writeQueues;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, SovraBlePendingWrite *> *currentInFlightWrites;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *smoothedRssiMap;
 
 @property (nonatomic, copy, nullable) void (^pendingAdvertiseCallback)(BOOL, NSString *);
 @property (nonatomic, assign) BOOL isAdvertising;
@@ -47,8 +48,18 @@ static NSString * const kSovraNotifyCharUUID    = @"00005358-0000-1000-8000-0080
     self = [super init];
     if (self) {
         dispatch_queue_t bleQueue = dispatch_queue_create("network.sovra.ble", DISPATCH_QUEUE_SERIAL);
-        _centralManager = [[CBCentralManager alloc] initWithDelegate:self queue:bleQueue];
-        _peripheralManager = [[CBPeripheralManager alloc] initWithDelegate:self queue:bleQueue];
+        NSDictionary *centralOptions = @{
+            CBCentralManagerOptionRestoreIdentifierKey: @"SovraBleCentralRestore",
+            CBCentralManagerOptionShowPowerAlertKey: @YES
+        };
+        _centralManager = [[CBCentralManager alloc] initWithDelegate:self queue:bleQueue options:centralOptions];
+
+        NSDictionary *peripheralOptions = @{
+            CBPeripheralManagerOptionRestoreIdentifierKey: @"SovraBlePeripheralRestore",
+            CBPeripheralManagerOptionShowPowerAlertKey: @YES
+        };
+        _peripheralManager = [[CBPeripheralManager alloc] initWithDelegate:self queue:bleQueue options:peripheralOptions];
+
         _discoveredPeripherals = [NSMutableDictionary dictionary];
         _writeCharacteristics = [NSMutableDictionary dictionary];
         _notifyCharacteristics = [NSMutableDictionary dictionary];
@@ -56,6 +67,7 @@ static NSString * const kSovraNotifyCharUUID    = @"00005358-0000-1000-8000-0080
         _pendingConnectCallbacks = [NSMutableDictionary dictionary];
         _writeQueues = [NSMutableDictionary dictionary];
         _currentInFlightWrites = [NSMutableDictionary dictionary];
+        _smoothedRssiMap = [NSMutableDictionary dictionary];
     }
     return self;
 }
@@ -91,7 +103,16 @@ static NSString * const kSovraNotifyCharUUID    = @"00005358-0000-1000-8000-0080
     }
 }
 
-#pragma mark - CBCentralManagerDelegate
+#pragma mark - CBCentralManagerDelegate & Background State Restoration
+
+- (void)centralManager:(CBCentralManager *)central willRestoreState:(NSDictionary<NSString *, id> *)dict {
+    NSArray<CBPeripheral *> *peripherals = dict[CBCentralManagerRestoredStatePeripheralsKey];
+    for (CBPeripheral *p in peripherals) {
+        NSString *uuidStr = p.identifier.UUIDString;
+        self.discoveredPeripherals[uuidStr] = p;
+        p.delegate = self;
+    }
+}
 
 - (void)centralManagerDidUpdateState:(CBCentralManager *)central {
     if (central.state != CBManagerStatePoweredOn) {
@@ -146,6 +167,15 @@ static NSString * const kSovraNotifyCharUUID    = @"00005358-0000-1000-8000-0080
     NSString *uuidStr = peripheral.identifier.UUIDString;
     self.discoveredPeripherals[uuidStr] = peripheral;
 
+    NSNumber *txPowerNum = advertisementData[CBAdvertisementDataTxPowerLevelKey];
+    NSInteger txPower = txPowerNum ? [txPowerNum integerValue] : -59;
+
+    // Exponential Moving Average (EMA) smoothing: smoothed = 0.25 * current + 0.75 * prev
+    NSNumber *prevRssi = self.smoothedRssiMap[uuidStr];
+    double smoothed = prevRssi ? ((0.25 * [RSSI doubleValue]) + (0.75 * [prevRssi doubleValue])) : [RSSI doubleValue];
+    self.smoothedRssiMap[uuidStr] = @(smoothed);
+    NSInteger finalRssi = (NSInteger)round(smoothed);
+
     NSData *svcData = nil;
     NSDictionary *serviceDataDict = advertisementData[CBAdvertisementDataServiceDataKey];
     if (serviceDataDict && serviceDataDict.count > 0) {
@@ -157,8 +187,11 @@ static NSString * const kSovraNotifyCharUUID    = @"00005358-0000-1000-8000-0080
 
     NSString *name = advertisementData[CBAdvertisementDataLocalNameKey] ?: peripheral.name;
 
+    if (self.onDeviceDiscoveredWithTxPower) {
+        self.onDeviceDiscoveredWithTxPower(uuidStr, finalRssi, txPower, svcData, name);
+    }
     if (self.onDeviceDiscovered) {
-        self.onDeviceDiscovered(uuidStr, [RSSI integerValue], svcData, name);
+        self.onDeviceDiscovered(uuidStr, finalRssi, svcData, name);
     }
 }
 
@@ -359,17 +392,58 @@ static NSString * const kSovraNotifyCharUUID    = @"00005358-0000-1000-8000-0080
         return;
     }
 
-    SovraBlePendingWrite *pending = [[SovraBlePendingWrite alloc] init];
-    pending.data = data;
-    pending.completion = completion;
+    NSInteger maxWrite = [peripheral maximumWriteValueLengthForType:CBCharacteristicWriteWithResponse];
+    if (maxWrite <= 0) maxWrite = 182;
+    NSInteger maxPayload = MAX(20, maxWrite - 3);
 
-    @synchronized (self.writeQueues) {
-        NSMutableArray<SovraBlePendingWrite *> *queue = self.writeQueues[peripheralId];
-        if (!queue) {
-            queue = [NSMutableArray array];
-            self.writeQueues[peripheralId] = queue;
+    if (data.length <= maxPayload) {
+        SovraBlePendingWrite *pending = [[SovraBlePendingWrite alloc] init];
+        pending.data = data;
+        pending.completion = completion;
+
+        @synchronized (self.writeQueues) {
+            NSMutableArray<SovraBlePendingWrite *> *queue = self.writeQueues[peripheralId];
+            if (!queue) {
+                queue = [NSMutableArray array];
+                self.writeQueues[peripheralId] = queue;
+            }
+            [queue addObject:pending];
         }
-        [queue addObject:pending];
+    } else {
+        // Native MTU boundary chunking guard matching Android Kotlin parity:
+        // Slice into sequential frames with 2-byte header [seq, total]
+        NSInteger chunkPayloadSize = MAX(18, maxPayload - 2);
+        NSInteger totalChunks = (NSInteger)ceil((double)data.length / (double)chunkPayloadSize);
+        NSInteger offset = 0;
+
+        for (NSInteger seq = 0; seq < totalChunks; seq++) {
+            NSInteger len = MIN(chunkPayloadSize, (NSInteger)data.length - offset);
+            NSMutableData *slice = [NSMutableData dataWithCapacity:len + 2];
+            uint8_t header[2] = { (uint8_t)seq, (uint8_t)totalChunks };
+            [slice appendBytes:header length:2];
+            [slice appendBytes:(const uint8_t *)data.bytes + offset length:len];
+            offset += len;
+
+            BOOL isLast = (seq == totalChunks - 1);
+            SovraBlePendingWrite *pending = [[SovraBlePendingWrite alloc] init];
+            pending.data = slice;
+            pending.completion = ^(BOOL success, NSString * _Nullable error) {
+                if (!success) {
+                    if (completion) completion(NO, error ?: @"Chunk write failed");
+                } else if (isLast) {
+                    if (completion) completion(YES, nil);
+                }
+            };
+
+            @synchronized (self.writeQueues) {
+                NSMutableArray<SovraBlePendingWrite *> *queue = self.writeQueues[peripheralId];
+                if (!queue) {
+                    queue = [NSMutableArray array];
+                    self.writeQueues[peripheralId] = queue;
+                }
+                [queue addObject:pending];
+            }
+        }
     }
 
     [self processNextWriteInQueueForPeripheralId:peripheralId];
@@ -388,7 +462,14 @@ static NSString * const kSovraNotifyCharUUID    = @"00005358-0000-1000-8000-0080
     completion(YES, nil);
 }
 
-#pragma mark - CBPeripheralManagerDelegate (Peripheral Role)
+#pragma mark - CBPeripheralManagerDelegate (Peripheral Role & Restoration)
+
+- (void)peripheralManager:(CBPeripheralManager *)peripheral willRestoreState:(NSDictionary<NSString *, id> *)dict {
+    NSArray<CBMutableService *> *services = dict[CBPeripheralManagerRestoredStateServicesKey];
+    if (services.count > 0) {
+        self.isAdvertising = YES;
+    }
+}
 
 - (void)peripheralManagerDidUpdateState:(CBPeripheralManager *)peripheral {
     // Monitored
