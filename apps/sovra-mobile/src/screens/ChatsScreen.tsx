@@ -467,11 +467,15 @@ export function ChatsScreen(): React.JSX.Element {
     setMessages(prev => [...prev, optimisticVoice]);
 
     try {
+      const isMeshMode = activeTab === 'mesh' || isMeshActive || Boolean(activeRecipient?.isBitChat);
       const res = await sendChatMessage({
         recipientDid: targetDid,
         text: `Voice note (${duration}s)`,
         isAudio: true,
         audioDurationSec: duration,
+        isBitChat: isMeshMode,
+        audioBitrateKbps: isMeshMode ? 6 : 32,
+        audioBitsPerSecond: isMeshMode ? 6000 : 32000,
       });
 
       if (res.ok && res.message) {

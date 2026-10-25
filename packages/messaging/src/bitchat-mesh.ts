@@ -41,6 +41,42 @@ export interface BitChatChannel {
   readonly memberCount: number;
 }
 
+export interface AntiEntropySyncSummary {
+  readonly nodeDid: string;
+  readonly timestamp: number;
+  readonly bloomFilterHex: string; // 64-bit Bloom filter as 16-character hex
+  readonly recentPacketIds: string[]; // Up to 100 most recent seen packet IDs
+}
+
+export interface AntiEntropyReconciliation {
+  readonly missingFromLocal: string[]; // Packet IDs peer has that local node needs
+  readonly availableToOffer: string[]; // Packet IDs local node has that peer needs
+  readonly packetsToPush: BitChatPacket[]; // Stored packets local node can immediately push to peer
+}
+
+export interface PeerRegistrationResult {
+  readonly peer: BitChatPeer;
+  readonly isCloseProximity: boolean; // Direct link with RSSI > -75 dBm
+  readonly syncNeeded: boolean; // First discovery or stale (> 30s) close peer requiring anti-entropy exchange
+}
+
+function computeBloomFilter64(packetIds: string[]): string {
+  let bloom = 0n;
+  for (const id of packetIds) {
+    let h1 = 0x811c9dc5n;
+    let h2 = 0x5bd1e995n;
+    for (let i = 0; i < id.length; i++) {
+      const code = BigInt(id.charCodeAt(i));
+      h1 = ((h1 ^ code) * 0x01000193n) & 0xffffffffffffffffn;
+      h2 = ((h2 ^ (code << 3n)) * 0x00000100000001b3n) & 0xffffffffffffffffn;
+    }
+    const bit1 = Number(h1 % 64n);
+    const bit2 = Number(h2 % 64n);
+    bloom |= (1n << BigInt(bit1)) | (1n << BigInt(bit2));
+  }
+  return bloom.toString(16).padStart(16, '0');
+}
+
 export interface PacketRoutingResult {
   readonly action: 'deliver' | 'forward' | 'deliver_and_forward' | 'drop';
   readonly reason?: string;
@@ -56,6 +92,7 @@ export class BitChatMeshRouter {
   private peers: Map<string, BitChatPeer> = new Map();
   private seenPackets: Set<string> = new Set();
   private seenPacketsOrder: string[] = [];
+  private storedPackets: Map<string, BitChatPacket> = new Map();
   private readonly maxSeenCacheSize = 2000;
 
   private deliveredPackets: BitChatPacket[] = [];
@@ -68,10 +105,57 @@ export class BitChatMeshRouter {
   }
 
   /**
-   * Registers or updates a discovered BLE / ad-hoc mesh peer
+   * Registers or updates a discovered BLE / ad-hoc mesh peer.
+   * Returns proximity and sync recommendations.
    */
-  public registerPeer(peer: BitChatPeer): void {
+  public registerPeer(peer: BitChatPeer): PeerRegistrationResult {
+    const previous = this.peers.get(peer.did);
     this.peers.set(peer.did, peer);
+    const isCloseProximity = Boolean(peer.isDirect && peer.rssi > -75);
+    const syncNeeded = isCloseProximity && (!previous || Date.now() - previous.lastSeen > 30000);
+    return {
+      peer,
+      isCloseProximity,
+      syncNeeded,
+    };
+  }
+
+  /**
+   * Generates a compact anti-entropy sync summary (64-bit Bloom filter + recent packet IDs)
+   * to exchange with in-range peers for store-and-forward reconciliation.
+   */
+  public createSyncSummary(limit: number = 100): AntiEntropySyncSummary {
+    const recentPacketIds = this.seenPacketsOrder.slice(-limit);
+    const bloomFilterHex = computeBloomFilter64(recentPacketIds);
+    return {
+      nodeDid: this.localDid,
+      timestamp: Date.now(),
+      bloomFilterHex,
+      recentPacketIds,
+    };
+  }
+
+  /**
+   * Reconciles a peer's anti-entropy sync summary against local mesh cache.
+   * Identifies packets to request and packets to immediately push.
+   */
+  public reconcileSyncSummary(peerSummary: AntiEntropySyncSummary): AntiEntropyReconciliation {
+    const peerIds = new Set(peerSummary.recentPacketIds);
+    const myIds = new Set(this.seenPacketsOrder);
+
+    const missingFromLocal = peerSummary.recentPacketIds.filter(id => !myIds.has(id));
+    const availableToOffer = this.seenPacketsOrder.filter(id => !peerIds.has(id));
+
+    // Stored broadcast packets or direct packets targeted to peer that peer has not seen
+    const packetsToPush = Array.from(this.storedPackets.values()).filter(
+      p => !peerIds.has(p.packetId) && (p.destDid === '*' || p.destDid === peerSummary.nodeDid)
+    );
+
+    return {
+      missingFromLocal,
+      availableToOffer,
+      packetsToPush,
+    };
   }
 
   public getPeer(did: string): BitChatPeer | undefined {
@@ -119,6 +203,7 @@ export class BitChatMeshRouter {
 
     // Mark our own packet as seen so we don't bounce it back
     this.markPacketSeen(packetId);
+    this.storedPackets.set(packetId, packet);
     return packet;
   }
 
@@ -150,6 +235,7 @@ export class BitChatMeshRouter {
     // 3. Packet Delivery for Local Node
     if (isForMe) {
       this.deliveredPackets.push(packet);
+      this.storedPackets.set(packet.packetId, packet);
       this.notifyListeners(packet);
       return {
         action: 'deliver',
@@ -160,6 +246,7 @@ export class BitChatMeshRouter {
     // 4. Hyperlocal Channel Broadcast: Deliver locally AND forward to neighboring peers
     if (isBroadcast) {
       this.deliveredPackets.push(packet);
+      this.storedPackets.set(packet.packetId, packet);
       this.notifyListeners(packet);
 
       if (packet.hopCount + 1 < packet.maxHops) {
@@ -223,6 +310,7 @@ export class BitChatMeshRouter {
     this.peers.clear();
     this.seenPackets.clear();
     this.seenPacketsOrder = [];
+    this.storedPackets.clear();
     this.deliveredPackets = [];
     this.onMessageCallbacks = [];
 

@@ -63177,7 +63177,18 @@ function renderHtml(
               break;
             }
           }
-          _voiceMediaRecorder = chosenMime ? new MediaRecorder(_voiceMediaStream, { mimeType: chosenMime }) : new MediaRecorder(_voiceMediaStream);
+          const isBitChatVoice = Boolean(bitchatModeActive || (bitchatPeersData && bitchatPeersData.some(function(p) { return p.did === activeContactDid; })));
+          const recOpts = chosenMime ? { mimeType: chosenMime } : {};
+          if (isBitChatVoice) {
+            recOpts.audioBitsPerSecond = 6000;
+          }
+          _voiceMediaRecorder = Object.keys(recOpts).length > 0
+            ? new MediaRecorder(_voiceMediaStream, recOpts)
+            : new MediaRecorder(_voiceMediaStream);
+          if (isBitChatVoice) {
+            const timerEl = document.getElementById('chatVoiceTimer');
+            if (timerEl) timerEl.setAttribute('data-mesh-bitrate', '6kbps');
+          }
           _voiceMediaRecorder.ondataavailable = function(e) {
             if (e.data && e.data.size > 0) {
               _voiceAudioChunks.push(e.data);
