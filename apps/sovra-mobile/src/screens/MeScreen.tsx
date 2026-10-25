@@ -24,6 +24,10 @@ import {
   fetchWalletAssets,
   executeWalletSwap,
   type WalletAssetItem,
+  uploadUserAvatar,
+  updateUserProfile,
+  fetchBookmarkedPosts,
+  fetchFollowStats,
 } from '../services/api.js';
 import { localDb } from '../services/local-database.js';
 
@@ -417,6 +421,254 @@ export function WalletDrawerModal({
   );
 }
 
+export function EditProfileModal({
+  isOpen,
+  profile,
+  onClose,
+  onProfileUpdated,
+}: {
+  isOpen: boolean;
+  profile: UserAccountProfile | null;
+  onClose: () => void;
+  onProfileUpdated: (updated: { displayName: string; bio: string; avatarUrl?: string }) => void;
+}): React.JSX.Element | null {
+  const [displayName, setDisplayName] = useState(profile?.displayName || '');
+  const [bio, setBio] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (profile) {
+      setDisplayName(profile.displayName || '');
+    }
+  }, [profile]);
+
+  if (!isOpen || !profile) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async () => {
+    if (!displayName.trim()) {
+      setError('Display name is required');
+      return;
+    }
+    setIsSaving(true);
+    setError(null);
+    try {
+      let uploadedUrl: string | undefined = undefined;
+      if (avatarPreview) {
+        const uploadRes = await uploadUserAvatar(avatarPreview);
+        if (uploadRes.ok && uploadRes.avatarUrl) {
+          uploadedUrl = uploadRes.avatarUrl;
+        }
+      }
+      const finalAvatar = uploadedUrl || avatarPreview || undefined;
+      const updatePayload: { displayName: string; bio: string; avatar?: string } = {
+        displayName: displayName.trim(),
+        bio: bio.trim(),
+      };
+      if (finalAvatar) {
+        updatePayload.avatar = finalAvatar;
+      }
+      await updateUserProfile(updatePayload);
+
+      const callbackPayload: { displayName: string; bio: string; avatarUrl?: string } = {
+        displayName: displayName.trim(),
+        bio: bio.trim(),
+      };
+      if (finalAvatar) {
+        callbackPayload.avatarUrl = finalAvatar;
+      }
+      onProfileUpdated(callbackPayload);
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Edit Profile"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        zIndex: 110,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: 400,
+          backgroundColor: '#111827',
+          borderRadius: 20,
+          border: '1px solid rgba(255,255,255,0.1)',
+          padding: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>Edit Profile</h3>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 18, cursor: 'pointer' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ padding: '8px 12px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 8, fontSize: 12, color: '#f87171' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Avatar Picker */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              backgroundColor: '#1e293b',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 32,
+              border: '2px dashed #38bdf8',
+              cursor: 'pointer',
+              position: 'relative',
+            }}
+          >
+            {avatarPreview ? (
+              <img src={avatarPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span>📷</span>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                opacity: 0,
+                cursor: 'pointer',
+              }}
+            />
+          </div>
+          <span style={{ fontSize: 11, color: '#38bdf8' }}>Tap avatar to change photo</span>
+        </div>
+
+        {/* Inputs */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Display Name</label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              placeholder="Your display name"
+              style={{
+                width: '100%',
+                backgroundColor: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: 10,
+                color: '#fff',
+                padding: '10px 12px',
+                fontSize: 13,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Bio</label>
+            <textarea
+              value={bio}
+              onChange={e => setBio(e.target.value)}
+              placeholder="What are you building on the mesh?"
+              rows={3}
+              style={{
+                width: '100%',
+                backgroundColor: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: 10,
+                color: '#fff',
+                padding: '10px 12px',
+                fontSize: 13,
+                outline: 'none',
+                resize: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <button
+            onClick={onClose}
+            disabled={isSaving}
+            style={{
+              flex: 1,
+              padding: '10px',
+              backgroundColor: '#334155',
+              color: '#cbd5e1',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            style={{
+              flex: 1,
+              padding: '10px',
+              backgroundColor: '#00a884',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: isSaving ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isSaving ? 'Saving...' : 'Save Profile'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MeScreen(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'saved'>('posts');
   const [walletBalance, setWalletBalance] = useState('0.00');
@@ -426,15 +678,25 @@ export function MeScreen(): React.JSX.Element {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isReferralOpen, setIsReferralOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [customAvatar, setCustomAvatar] = useState<string | null>(null);
+  const [customBio, setCustomBio] = useState<string>('');
+  const [followStats, setFollowStats] = useState<{ followersCount: number; followingCount: number }>({
+    followersCount: 142,
+    followingCount: 38,
+  });
   const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [savedPosts, setSavedPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const loadUserData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [serverProfile, feedPosts] = await Promise.allSettled([
+      const [serverProfile, feedPosts, bookmarked, stats] = await Promise.allSettled([
         fetchUserProfile(profile?.did),
         fetchFeedPosts(),
+        fetchBookmarkedPosts(),
+        fetchFollowStats(profile?.did),
       ]);
 
       if (serverProfile.status === 'fulfilled' && serverProfile.value) {
@@ -449,6 +711,12 @@ export function MeScreen(): React.JSX.Element {
           createdAt: sp.createdAt || prev?.createdAt || INITIAL_PROFILE.createdAt,
           isLocked: false,
         }));
+        if (sp.avatar) {
+          setCustomAvatar(sp.avatar);
+        }
+        if (sp.bio) {
+          setCustomBio(sp.bio);
+        }
         if (sp.balanceSov !== undefined) {
           setWalletBalance(Number(sp.balanceSov).toFixed(2));
         }
@@ -457,12 +725,22 @@ export function MeScreen(): React.JSX.Element {
       if (feedPosts.status === 'fulfilled') {
         const posts = feedPosts.value;
         const myHandle = (profile?.handle || '').replace('@', '').toLowerCase();
-        const filtered = myHandle ? posts.filter(
-          p =>
-            p.creatorHandle.toLowerCase() === myHandle ||
-            p.creatorName.toLowerCase().includes(myHandle),
-        ) : [];
+        const filtered = myHandle
+          ? posts.filter(
+              p =>
+                p.creatorHandle.toLowerCase() === myHandle ||
+                p.creatorName.toLowerCase().includes(myHandle),
+            )
+          : [];
         setUserPosts(filtered.length > 0 ? filtered : posts);
+      }
+
+      if (bookmarked.status === 'fulfilled') {
+        setSavedPosts(bookmarked.value);
+      }
+
+      if (stats.status === 'fulfilled') {
+        setFollowStats(stats.value);
       }
     } catch (err) {
       console.warn('[MeScreen] Load user data error:', err);
@@ -639,33 +917,46 @@ export function MeScreen(): React.JSX.Element {
         {/* Avatar & Follower Stats */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div
+            onClick={() => setIsEditProfileOpen(true)}
             style={{
               width: 76,
               height: 76,
               borderRadius: '50%',
-              background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)',
+              background: customAvatar ? 'transparent' : 'linear-gradient(45deg, #3b82f6, #8b5cf6)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 32,
               fontWeight: 700,
               border: '3px solid #1e293b',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              position: 'relative',
             }}
+            title="Tap to edit profile"
           >
-            {profile.displayName.charAt(0) || 'U'}
+            {customAvatar ? (
+              <img
+                src={customAvatar}
+                alt={profile.displayName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              profile.displayName.charAt(0) || 'U'
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 24, textAlign: 'center' }}>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>{userPosts.length || 18}</div>
+              <div style={{ fontSize: 16, fontWeight: 800 }}>{userPosts.length || 0}</div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>Posts</div>
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>4.2K</div>
+              <div style={{ fontSize: 16, fontWeight: 800 }}>{followStats.followersCount}</div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>Followers</div>
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>312</div>
+              <div style={{ fontSize: 16, fontWeight: 800 }}>{followStats.followingCount}</div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>Following</div>
             </div>
           </div>
@@ -673,9 +964,26 @@ export function MeScreen(): React.JSX.Element {
 
         {/* Bio & Verified DID Badge */}
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700 }}>{profile.displayName}</div>
-          <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 2 }}>
-            Building decentralized super-apps on Noise_XX &amp; UnixFS Merkle DAGs. Zero algorithms.
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{profile.displayName}</div>
+            <button
+              onClick={() => setIsEditProfileOpen(true)}
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: '#e2e8f0',
+                padding: '4px 10px',
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              ✏️ Edit Profile
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>
+            {customBio || 'Building decentralized super-apps on Noise_XX & UnixFS Merkle DAGs. Zero algorithms.'}
           </div>
           <div
             style={{
@@ -827,37 +1135,116 @@ export function MeScreen(): React.JSX.Element {
       </div>
 
       {/* 3-Column Dynamic Portfolio Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2, padding: 2 }}>
-        {(userPosts.length > 0 ? userPosts.slice(0, 9) : Array.from({ length: 9 })).map((item, idx) => (
-          <div
-            key={item?.id || idx}
-            style={{
-              aspectRatio: '1/1',
-              backgroundColor: '#1e293b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.8rem',
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
-            {item?.mediaImage ? (
-              <img
-                src={item.mediaImage}
-                alt="Portfolio thumbnail"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : item?.imageEmoji ? (
-              <span>{item.imageEmoji}</span>
-            ) : (
-              <span>{['⚡', '🚀', '🎬', '🌌', '🎧', '🔒', '📱', '💎', '🔥'][idx % 9]}</span>
-            )}
+      {activeTab === 'saved' && savedPosts.length === 0 ? (
+        <div
+          style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            color: '#94a3b8',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 36 }}>🔖</span>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>No Saved Posts Yet</div>
+          <div style={{ fontSize: 12, color: '#64748b', maxWidth: 260 }}>
+            Bookmark interesting posts and media across the decentralized feed to view them offline anytime.
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2, padding: 2 }}>
+          {(() => {
+            const currentList =
+              activeTab === 'saved'
+                ? savedPosts
+                : activeTab === 'reels'
+                ? userPosts.filter(p => p.tags?.includes('reels') || p.mediaType === 'video').length > 0
+                  ? userPosts.filter(p => p.tags?.includes('reels') || p.mediaType === 'video')
+                  : userPosts.slice(0, 6)
+                : userPosts;
+
+            const itemsToRender = currentList.length > 0 ? currentList.slice(0, 12) : Array.from({ length: 9 });
+
+            return itemsToRender.map((item: any, idx: number) => (
+              <div
+                key={item?.id || idx}
+                style={{
+                  aspectRatio: '1/1',
+                  backgroundColor: '#1e293b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.8rem',
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}
+              >
+                {item?.mediaImage ? (
+                  <img
+                    src={item.mediaImage}
+                    alt="Portfolio thumbnail"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : item?.imageEmoji ? (
+                  <span>{item.imageEmoji}</span>
+                ) : (
+                  <span>{['⚡', '🚀', '🎬', '🌌', '🎧', '🔒', '📱', '💎', '🔥'][idx % 9]}</span>
+                )}
+
+                {activeTab === 'reels' && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      fontSize: 12,
+                      backgroundColor: 'rgba(0,0,0,0.6)',
+                      borderRadius: 4,
+                      padding: '2px 4px',
+                    }}
+                  >
+                    🎬
+                  </span>
+                )}
+
+                {activeTab === 'saved' && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      bottom: 4,
+                      right: 4,
+                      fontSize: 12,
+                      backgroundColor: 'rgba(0,0,0,0.6)',
+                      borderRadius: 4,
+                      padding: '2px 4px',
+                    }}
+                  >
+                    🔖
+                  </span>
+                )}
+              </div>
+            ));
+          })()}
+        </div>
+      )}
 
       {/* Modals */}
+      <EditProfileModal
+        isOpen={isEditProfileOpen}
+        profile={profile}
+        onClose={() => setIsEditProfileOpen(false)}
+        onProfileUpdated={(updated) => {
+          setProfile(p => p ? { ...p, displayName: updated.displayName } : null);
+          if (updated.avatarUrl) {
+            setCustomAvatar(updated.avatarUrl);
+          }
+          if (updated.bio) {
+            setCustomBio(updated.bio);
+          }
+        }}
+      />
       <OnboardingModal
         isOpen={isOnboardingOpen}
         onClose={() => setIsOnboardingOpen(false)}
