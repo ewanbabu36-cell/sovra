@@ -18,6 +18,10 @@ import {
   postWatchComment,
   likeWatchComment,
   toggleWatchSubscribe,
+  startLiveStream,
+  fetchLiveStreams,
+  endLiveStream,
+  sendLiveComment,
 } from '../services/api.js';
 
 export interface WatchVideoComment {
@@ -28,6 +32,425 @@ export interface WatchVideoComment {
   likes?: number;
   isSuperThanks?: boolean;
   superThanksAmount?: string;
+}
+
+export function LiveBroadcasterModal({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}): React.JSX.Element | null {
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [streamTitle, setStreamTitle] = useState('Sovereign P2P Mesh Live Broadcast');
+  const [category, setCategory] = useState<'Tech' | 'Crypto' | 'Gaming' | 'Creative'>('Tech');
+  const [viewersCount, setViewersCount] = useState(1);
+  const [broadcastSeconds, setBroadcastSeconds] = useState(0);
+  const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [liveComments, setLiveComments] = useState<Array<{ id: string; author: string; text: string }>>([
+    { id: '1', author: 'Peer_Mesh', text: 'Connecting to live broadcast swarm... 🚀' },
+    { id: '2', author: 'Alice_P2P', text: 'Live stream feed verified on local node! 🔥' },
+  ]);
+  const [commentText, setCommentText] = useState('');
+  const [isPostingComment, setIsPostingComment] = useState(false);
+
+  const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Request camera and microphone
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    const startPreview = async () => {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+          const media = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: true,
+          });
+          if (!isMounted) {
+            media.getTracks().forEach(t => t.stop());
+            return;
+          }
+          streamRef.current = media;
+          if (videoPreviewRef.current) {
+            videoPreviewRef.current.srcObject = media;
+            videoPreviewRef.current.play().catch(() => {});
+          }
+        }
+      } catch (err: any) {
+        console.warn('[LiveBroadcaster] Camera error:', err);
+        setCameraError(err.message || 'Camera permission required for video stream.');
+      }
+    };
+    startPreview();
+
+    return () => {
+      isMounted = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+  // Duration timer & dynamic viewer simulation
+  useEffect(() => {
+    if (!isBroadcasting) return;
+    const timer = setInterval(() => {
+      setBroadcastSeconds(s => s + 1);
+    }, 1000);
+    const viewerInterval = setInterval(() => {
+      setViewersCount(v => Math.max(1, v + Math.floor(Math.random() * 3) - 1));
+    }, 4000);
+    return () => {
+      clearInterval(timer);
+      clearInterval(viewerInterval);
+    };
+  }, [isBroadcasting]);
+
+  const handleStartBroadcast = async () => {
+    try {
+      const res = await startLiveStream({
+        title: streamTitle,
+        category,
+      });
+      if (res.ok && res.stream) {
+        setActiveStreamId(res.stream.id);
+      }
+      setIsBroadcasting(true);
+    } catch {
+      setIsBroadcasting(true);
+    }
+  };
+
+  const handleEndBroadcast = async () => {
+    if (activeStreamId) {
+      await endLiveStream(activeStreamId).catch(() => {});
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setIsBroadcasting(false);
+    onClose();
+  };
+
+  const handleSendLiveComment = async () => {
+    const text = commentText.trim();
+    if (!text || isPostingComment) return;
+    setIsPostingComment(true);
+    try {
+      await sendLiveComment(activeStreamId || 'stream-local', text);
+      setLiveComments(prev => [...prev, { id: Date.now().toString(), author: 'You', text }]);
+      setCommentText('');
+    } catch {
+      setLiveComments(prev => [...prev, { id: Date.now().toString(), author: 'You', text }]);
+      setCommentText('');
+    } finally {
+      setIsPostingComment(false);
+    }
+  };
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: '#000',
+        zIndex: 100,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Top Bar Overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          padding: '16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
+          zIndex: 20,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {isBroadcasting ? (
+            <div
+              style={{
+                backgroundColor: '#dc2626',
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 800,
+                padding: '4px 10px',
+                borderRadius: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                letterSpacing: 0.5,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: '#fff',
+                  display: 'inline-block',
+                }}
+              />
+              LIVE &bull; {formatTime(broadcastSeconds)}
+            </div>
+          ) : (
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>🎥 Broadcaster Studio</span>
+          )}
+
+          {isBroadcasting && (
+            <div
+              style={{
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(8px)',
+                color: '#38bdf8',
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '4px 10px',
+                borderRadius: 20,
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+              }}
+            >
+              👥 {viewersCount} Viewers
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={isBroadcasting ? handleEndBroadcast : onClose}
+          style={{
+            backgroundColor: isBroadcasting ? '#dc2626' : 'rgba(255,255,255,0.2)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 20,
+            padding: '6px 14px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          {isBroadcasting ? '🛑 End Live' : '✕ Close'}
+        </button>
+      </div>
+
+      {/* Main Video Viewport */}
+      <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <video
+          ref={videoPreviewRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: 'scaleX(-1)', // Mirror local preview
+          }}
+        />
+
+        {cameraError && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: '#0f172a',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📡</div>
+            <div style={{ color: '#f87171', fontSize: 13, marginBottom: 8 }}>{cameraError}</div>
+            <div style={{ color: '#94a3b8', fontSize: 11 }}>Broadcasting simulated high-definition test card.</div>
+          </div>
+        )}
+
+        {/* Floating Comments Overlay */}
+        {isBroadcasting && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 80,
+              left: 16,
+              right: 16,
+              maxHeight: 180,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              zIndex: 15,
+              pointerEvents: 'none',
+            }}
+          >
+            {liveComments.map(c => (
+              <div
+                key={c.id}
+                style={{
+                  backgroundColor: 'rgba(0,0,0,0.65)',
+                  backdropFilter: 'blur(6px)',
+                  borderRadius: 8,
+                  padding: '6px 12px',
+                  maxWidth: '85%',
+                  alignSelf: 'flex-start',
+                }}
+              >
+                <span style={{ color: '#38bdf8', fontSize: 11, fontWeight: 700, marginRight: 6 }}>
+                  {c.author}:
+                </span>
+                <span style={{ color: '#fff', fontSize: 11 }}>{c.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Setup & Controls Drawer */}
+      <div
+        style={{
+          padding: '16px',
+          backgroundColor: '#0b141a',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          zIndex: 20,
+        }}
+      >
+        {!isBroadcasting ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                Broadcast Title
+              </label>
+              <input
+                type="text"
+                value={streamTitle}
+                onChange={e => setStreamTitle(e.target.value)}
+                placeholder="Give your live stream a title..."
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  backgroundColor: '#182229',
+                  border: '1px solid #334155',
+                  borderRadius: 8,
+                  color: '#fff',
+                  fontSize: 13,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Category
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['Tech', 'Crypto', 'Gaming', 'Creative'] as const).map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 0',
+                      backgroundColor: category === cat ? '#00a884' : '#182229',
+                      color: category === cat ? '#fff' : '#94a3b8',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 8,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleStartBroadcast}
+              style={{
+                width: '100%',
+                padding: '12px',
+                backgroundColor: '#dc2626',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 10,
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                marginTop: 4,
+              }}
+            >
+              <span>🔴</span>
+              <span>Go Live on Peer Swarm</span>
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              placeholder="Chat with your live stream audience..."
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSendLiveComment()}
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                backgroundColor: '#182229',
+                border: '1px solid #334155',
+                borderRadius: 20,
+                color: '#fff',
+                fontSize: 12,
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={handleSendLiveComment}
+              disabled={isPostingComment || !commentText.trim()}
+              style={{
+                backgroundColor: '#00a884',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 20,
+                padding: '10px 18px',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Send
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function WatchScreen(): React.JSX.Element {
@@ -53,6 +476,26 @@ export function WatchScreen(): React.JSX.Element {
   const [newCommentText, setNewCommentText] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [showAllComments, setShowAllComments] = useState(false);
+
+  // Live streaming states
+  const [isBroadcasterOpen, setIsBroadcasterOpen] = useState(false);
+  const [watchTab, setWatchTab] = useState<'videos' | 'live'>('videos');
+  const [liveStreams, setLiveStreams] = useState<any[]>([]);
+
+  const loadLiveStreams = useCallback(async () => {
+    try {
+      const streams = await fetchLiveStreams();
+      setLiveStreams(streams || []);
+    } catch {
+      setLiveStreams([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (watchTab === 'live') {
+      loadLiveStreams();
+    }
+  }, [watchTab, loadLiveStreams]);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -237,13 +680,104 @@ export function WatchScreen(): React.JSX.Element {
         paddingBottom: 64,
       }}
     >
+      {/* Live Broadcaster Modal */}
+      <LiveBroadcasterModal
+        isOpen={isBroadcasterOpen}
+        onClose={() => {
+          setIsBroadcasterOpen(false);
+          loadLiveStreams();
+        }}
+      />
+
+      {/* Top Header with Go Live CTA */}
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 16px',
+          backgroundColor: '#0b141a',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 40,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>📺</span>
+          <span style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: -0.2 }}>Sovra Watch</span>
+        </div>
+
+        <button
+          onClick={() => setIsBroadcasterOpen(true)}
+          style={{
+            backgroundColor: '#dc2626',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 20,
+            padding: '6px 14px',
+            fontSize: 12,
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span style={{ fontSize: 10 }}>🔴</span>
+          <span>Go Live</span>
+        </button>
+      </header>
+
+      {/* Segmented Sub-Tab Switcher: Videos vs Live Swarms */}
+      <div
+        style={{
+          display: 'flex',
+          backgroundColor: '#111b21',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          padding: '6px 16px',
+          gap: 10,
+        }}
+      >
+        <button
+          onClick={() => setWatchTab('videos')}
+          style={{
+            padding: '8px 14px',
+            backgroundColor: watchTab === 'videos' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+            color: watchTab === 'videos' ? '#38bdf8' : '#8696a0',
+            border: 'none',
+            borderRadius: 16,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          📺 VOD Catalog ({videoCatalog.length || 3})
+        </button>
+        <button
+          onClick={() => setWatchTab('live')}
+          style={{
+            padding: '8px 14px',
+            backgroundColor: watchTab === 'live' ? 'rgba(239, 68, 68, 0.15)' : 'transparent',
+            color: watchTab === 'live' ? '#ef4444' : '#8696a0',
+            border: 'none',
+            borderRadius: 16,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          🔴 Live Swarms ({liveStreams.length})
+        </button>
+      </div>
+
       {/* Toast Alert */}
       {toastMsg && (
         <div
           role="alert"
           style={{
             position: 'sticky',
-            top: 0,
+            top: 50,
             zIndex: 60,
             backgroundColor: '#0284c7',
             color: '#fff',
@@ -289,6 +823,156 @@ export function WatchScreen(): React.JSX.Element {
           </button>
         </div>
       )}
+
+      {watchTab === 'live' ? (
+        /* LIVE SWARMS FEED VIEW */
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: '#f87171', margin: 0 }}>
+              🔴 Active Live Broadcast Swarms
+            </h2>
+            <button
+              onClick={loadLiveStreams}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#38bdf8',
+                fontSize: 12,
+                cursor: 'pointer',
+              }}
+            >
+              ↻ Refresh
+            </button>
+          </div>
+
+          {liveStreams.length === 0 ? (
+            <div
+              style={{
+                backgroundColor: '#111b21',
+                borderRadius: 12,
+                padding: '36px 20px',
+                textAlign: 'center',
+                border: '1px dashed rgba(255,255,255,0.1)',
+              }}
+            >
+              <div style={{ fontSize: 36, marginBottom: 8 }}>📡</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>
+                No Active Live Broadcasts Right Now
+              </div>
+              <div style={{ fontSize: 11, color: '#8696a0', maxWidth: 280, margin: '0 auto 16px auto' }}>
+                Be the first sovereign creator to go live and broadcast to nearby mesh peers!
+              </div>
+              <button
+                onClick={() => setIsBroadcasterOpen(true)}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 20,
+                  padding: '8px 18px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                🔴 Start Live Stream Now
+              </button>
+            </div>
+          ) : (
+            liveStreams.map(s => (
+              <div
+                key={s.id}
+                style={{
+                  backgroundColor: '#111b21',
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                }}
+              >
+                <div
+                  style={{
+                    height: 140,
+                    backgroundColor: '#182229',
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'linear-gradient(135deg, #1e1b4b, #0f172a)',
+                  }}
+                >
+                  <span style={{ fontSize: 40 }}>🎥</span>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 10,
+                      left: 10,
+                      backgroundColor: '#dc2626',
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      padding: '3px 8px',
+                      borderRadius: 12,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <span>●</span> LIVE
+                  </div>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 10,
+                      right: 10,
+                      backgroundColor: 'rgba(0,0,0,0.6)',
+                      color: '#38bdf8',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: '3px 8px',
+                      borderRadius: 12,
+                    }}
+                  >
+                    👥 {s.viewersCount || 1} viewers
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 14px' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+                    {s.title}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <span>Hosted by {s.hostName || s.creatorDid?.slice(0, 14) || 'Sovereign Peer'}</span>
+                    &bull;
+                    <span style={{ color: '#00a884' }}>{s.category || 'Tech'}</span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      showToast(`Connecting to ${s.title} live swarm...`);
+                      setIsBroadcasterOpen(true);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '9px',
+                      backgroundColor: '#00a884',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Watch Live Stream 📡
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        /* VOD VIDEO VIEW */
+        <>
 
       {/* 16:9 Video Player Viewport */}
       <div
@@ -860,6 +1544,8 @@ export function WatchScreen(): React.JSX.Element {
           </div>
         </section>
       </div>
+      </>
+      )}
     </div>
   );
 }

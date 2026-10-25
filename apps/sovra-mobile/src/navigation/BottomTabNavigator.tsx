@@ -36,6 +36,14 @@ export const TABS: readonly TabItem[] = [
   { key: 'me', label: 'Me', icon: '👤' },
 ];
 
+export function triggerHapticFeedback(pattern: number[] = [50, 30, 50]): void {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(pattern);
+    }
+  } catch {}
+}
+
 export function BottomTabNavigator(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabKey>('feed');
   const [meshStatus, setMeshStatus] = useState<MobileMeshStatus | null>(null);
@@ -47,6 +55,36 @@ export function BottomTabNavigator(): React.JSX.Element {
     peerDid: string;
     mediaType: 'audio' | 'video';
   } | null>(null);
+
+  // PWA Install prompt state
+  const [installPromptEvent, setInstallPromptEvent] = useState<any | null>(null);
+  const [isInstallDismissed, setIsInstallDismissed] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setInstallPromptEvent(e);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      }
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (installPromptEvent) {
+      triggerHapticFeedback([100]);
+      installPromptEvent.prompt();
+      const choice = await installPromptEvent.userChoice;
+      if (choice?.outcome === 'accepted') {
+        setInstallPromptEvent(null);
+      }
+    }
+  };
 
   // Background incoming call polling - maintains active listening even when screen is locked
   useEffect(() => {
@@ -490,6 +528,66 @@ export function BottomTabNavigator(): React.JSX.Element {
                 {meshStatus?.controls.batteryProfile ?? 'BALANCED'} ↻
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PWA Install Banner */}
+      {installPromptEvent && !isInstallDismissed && (
+        <div
+          role="region"
+          aria-label="PWA Install Banner"
+          style={{
+            position: 'absolute',
+            bottom: 60,
+            left: 0,
+            right: 0,
+            backgroundColor: '#1e293b',
+            borderTop: '1px solid rgba(56, 189, 248, 0.3)',
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            zIndex: 45,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 18 }}>📲</span>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>Install Sovra App</div>
+              <div style={{ fontSize: 10, color: '#94a3b8' }}>Fast, offline mesh and zero-server calling</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={handleInstallApp}
+              style={{
+                backgroundColor: '#00a884',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 16,
+                padding: '5px 12px',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Install
+            </button>
+            <button
+              onClick={() => setIsInstallDismissed(true)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#64748b',
+                fontSize: 14,
+                cursor: 'pointer',
+                padding: '2px 4px',
+              }}
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

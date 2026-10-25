@@ -160,6 +160,18 @@ export interface CachedReaction {
   timestamp: number;
 }
 
+export interface CachedLiveStream {
+  id: string;
+  hostDid: string;
+  hostName: string;
+  title: string;
+  category?: string | undefined;
+  viewersCount: number;
+  isLive: boolean;
+  startedAt: number;
+  endedAt?: number | undefined;
+}
+
 export interface ConversationSummary {
   threadId: string;
   peerDid: string;
@@ -200,6 +212,9 @@ export interface CachedChannel {
   description: string;
   ownerDid: string;
   memberCount: number;
+  subscriberCount?: number | undefined;
+  topic?: string | undefined;
+  isPublic?: boolean | undefined;
   createdAt: number;
   syncStatus: 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
 }
@@ -230,6 +245,7 @@ export interface LocalDatabaseSchema {
   comments: Record<string, CachedComment>;
   messages: Record<string, CachedMessage>;
   channels: Record<string, CachedChannel>;
+  custom_channels: Record<string, CachedChannel>;
   operations: Record<string, QueuedOperation>;
   outbox: Record<string, QueuedOperation>;
   inbox: Record<string, { id: string; envelopeId: string; receivedAt: number; senderDid: string }>;
@@ -240,6 +256,7 @@ export interface LocalDatabaseSchema {
   follows: Record<string, CachedFollow>;
   stories: Record<string, CachedStory>;
   reactions: Record<string, CachedReaction[]>;
+  live_streams: Record<string, CachedLiveStream>;
   sync_state: ClientSyncState;
 }
 
@@ -401,13 +418,14 @@ export function resolveStorageDriver(customDriver?: IStorageDriver): IStorageDri
 export class LocalSchemaMigrator {
   public static migrate(raw: any): LocalDatabaseSchema {
     const defaultSchema: LocalDatabaseSchema = {
-      version: 6,
+      version: 7,
       users: {},
       profiles: {},
       posts: {},
       comments: {},
       messages: {},
       channels: {},
+      custom_channels: {},
       operations: {},
       outbox: {},
       inbox: {},
@@ -418,6 +436,7 @@ export class LocalSchemaMigrator {
       follows: {},
       stories: {},
       reactions: {},
+      live_streams: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
@@ -439,6 +458,7 @@ export class LocalSchemaMigrator {
       comments: raw.comments || {},
       messages: raw.messages || {},
       channels: raw.channels || {},
+      custom_channels: raw.custom_channels || {},
       operations: raw.operations || {},
       outbox: raw.outbox || {},
       inbox: raw.inbox || {},
@@ -449,32 +469,23 @@ export class LocalSchemaMigrator {
       follows: raw.follows || {},
       stories: raw.stories || {},
       reactions: raw.reactions || {},
+      live_streams: raw.live_streams || {},
       sync_state: {
         ...defaultSchema.sync_state,
         ...(raw.sync_state || {}),
       },
     };
 
-    if (currentVersion < 6) {
-      migrated.version = 6;
-      if (!migrated.wallet_ledger) {
-        migrated.wallet_ledger = {};
-      }
-      if (!migrated.guardians) {
-        migrated.guardians = {};
-      }
-      if (!migrated.bookmarks) {
-        migrated.bookmarks = {};
-      }
-      if (!migrated.follows) {
-        migrated.follows = {};
-      }
-      if (!migrated.stories) {
-        migrated.stories = {};
-      }
-      if (!migrated.reactions) {
-        migrated.reactions = {};
-      }
+    if (currentVersion < 7) {
+      migrated.version = 7;
+      if (!migrated.wallet_ledger) migrated.wallet_ledger = {};
+      if (!migrated.guardians) migrated.guardians = {};
+      if (!migrated.bookmarks) migrated.bookmarks = {};
+      if (!migrated.follows) migrated.follows = {};
+      if (!migrated.stories) migrated.stories = {};
+      if (!migrated.reactions) migrated.reactions = {};
+      if (!migrated.live_streams) migrated.live_streams = {};
+      if (!migrated.custom_channels) migrated.custom_channels = {};
     }
 
     return migrated;
@@ -924,12 +935,44 @@ export class SovraLocalDatabase {
   // ==========================================
 
   public async saveChannel(channel: CachedChannel): Promise<void> {
+    if (!this.state.channels) this.state.channels = {};
+    if (!this.state.custom_channels) this.state.custom_channels = {};
     this.state.channels[channel.id] = channel;
+    this.state.custom_channels[channel.id] = channel;
     await this.persist();
   }
 
   public getChannels(): CachedChannel[] {
-    return Object.values(this.state.channels).sort((a, b) => b.createdAt - a.createdAt);
+    const listA = Object.values(this.state.channels || {});
+    const listB = Object.values(this.state.custom_channels || {});
+    const map = new Map<string, CachedChannel>();
+    for (const c of [...listA, ...listB]) {
+      map.set(c.id, c);
+    }
+    return Array.from(map.values()).sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  // ==========================================
+  // LIVE STREAMS PERSISTENCE
+  // ==========================================
+
+  public async saveLiveStream(stream: CachedLiveStream): Promise<void> {
+    if (!this.state.live_streams) this.state.live_streams = {};
+    this.state.live_streams[stream.id] = stream;
+    await this.persist();
+  }
+
+  public getLiveStreams(): CachedLiveStream[] {
+    if (!this.state.live_streams) return [];
+    return Object.values(this.state.live_streams).sort((a, b) => b.startedAt - a.startedAt);
+  }
+
+  public async endLiveStream(id: string): Promise<void> {
+    if (this.state.live_streams && this.state.live_streams[id]) {
+      this.state.live_streams[id]!.isLive = false;
+      this.state.live_streams[id]!.endedAt = Date.now();
+      await this.persist();
+    }
   }
 
   // ==========================================
@@ -1014,6 +1057,10 @@ export class SovraLocalDatabase {
   public async recordWalletTransaction(tx: CachedWalletTransaction): Promise<void> {
     this.state.wallet_ledger[tx.txHash] = tx;
     await this.persist();
+  }
+
+  public async saveWalletTx(tx: CachedWalletTransaction): Promise<void> {
+    return this.recordWalletTransaction(tx);
   }
 
   public getWalletTransactions(): CachedWalletTransaction[] {
@@ -1198,13 +1245,14 @@ export class SovraLocalDatabase {
 
   public async emergencyPanicWipe(): Promise<void> {
     this.state = {
-      version: 6,
+      version: 7,
       users: {},
       profiles: {},
       posts: {},
       comments: {},
       messages: {},
       channels: {},
+      custom_channels: {},
       operations: {},
       outbox: {},
       inbox: {},
@@ -1215,6 +1263,7 @@ export class SovraLocalDatabase {
       follows: {},
       stories: {},
       reactions: {},
+      live_streams: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
