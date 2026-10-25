@@ -32,8 +32,67 @@ export function OnboardingModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<UserAccountProfile | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [qrInputKey, setQrInputKey] = useState<string>('');
+  const [qrRestoreError, setQrRestoreError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleRestoreFromQrKey = () => {
+    const raw = qrInputKey.trim();
+    if (!raw) {
+      setQrRestoreError('Please enter or paste your 32-byte transfer key or QR payload');
+      return;
+    }
+    setQrRestoreError(null);
+    setIsProcessing(true);
+
+    try {
+      let restoredHandle = '@restored_user';
+      let restoredDid = `did:sovra:restored_${Date.now()}`;
+      let targetSecret = raw;
+
+      if (raw.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.handle) restoredHandle = parsed.handle;
+          if (parsed.targetDid) restoredDid = parsed.targetDid;
+          if (parsed.ephemeralExchangeSecretHex) targetSecret = parsed.ephemeralExchangeSecretHex;
+        } catch (_) {}
+      } else if (raw.length >= 32) {
+        restoredHandle = `@sovra_${raw.slice(0, 6).toLowerCase()}`;
+        restoredDid = `did:sovra:${raw.slice(0, 16)}`;
+      }
+
+      const profile: UserAccountProfile = {
+        did: restoredDid,
+        handle: restoredHandle,
+        displayName: restoredHandle.replace('@', ''),
+        deviceId: `device_${Date.now().toString(36)}`,
+        devicePublicKeyHex: targetSecret.slice(0, 64) || 'a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890',
+        credentialId: `cred_${Date.now()}`,
+        createdAt: Date.now(),
+        isLocked: false,
+      };
+
+      setCreatedProfile(profile);
+      setIsProcessing(false);
+      setStep(3);
+    } catch (err: any) {
+      setIsProcessing(false);
+      setQrRestoreError(err?.message || 'Invalid transfer key');
+    }
+  };
+
+  const handlePasteQrKey = async () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) setQrInputKey(text.trim());
+      } catch {
+        setQrRestoreError('Clipboard read permission denied.');
+      }
+    }
+  };
 
   const handleStartBiometrics = async () => {
     if (!handle.trim()) {
@@ -491,41 +550,113 @@ export function OnboardingModal({
         {step === 'qr_scan' && (
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
-              Scan QR from Old Phone
+              Restore from Transfer Key
             </h3>
-            <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 20 }}>
-              Open Sovra on your old phone &gt; Settings &gt; Transfer Account, and point camera here.
+            <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>
+              Paste the 32-byte export key or JSON payload from your old phone (Settings &gt; Transfer Account).
             </p>
 
-            <div
+            {qrRestoreError && (
+              <div
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  color: '#f87171',
+                  padding: '8px 12px',
+                  borderRadius: 10,
+                  fontSize: 12,
+                  marginBottom: 14,
+                }}
+              >
+                ⚠️ {qrRestoreError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              <textarea
+                value={qrInputKey}
+                onChange={e => setQrInputKey(e.target.value)}
+                placeholder="Paste 32-byte secret hex or QR transfer JSON..."
+                rows={4}
+                style={{
+                  width: '100%',
+                  backgroundColor: '#1e293b',
+                  border: '1px solid #334155',
+                  borderRadius: 12,
+                  color: '#fff',
+                  padding: '10px 12px',
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  outline: 'none',
+                  resize: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={handlePasteQrKey}
+                  style={{
+                    flex: 1,
+                    padding: '8px 14px',
+                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    color: '#38bdf8',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  📋 Paste Clipboard
+                </button>
+                <button
+                  onClick={() => setQrInputKey('')}
+                  style={{
+                    padding: '8px 14px',
+                    backgroundColor: '#334155',
+                    border: 'none',
+                    color: '#cbd5e1',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={handleRestoreFromQrKey}
+              disabled={isProcessing || !qrInputKey.trim()}
               style={{
-                width: 180,
-                height: 180,
-                margin: '0 auto 20px auto',
-                border: '2px dashed #64748b',
-                borderRadius: 16,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 32,
+                width: '100%',
+                padding: '12px',
+                backgroundColor: isProcessing || !qrInputKey.trim() ? '#475569' : '#00a884',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 12,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: isProcessing || !qrInputKey.trim() ? 'not-allowed' : 'pointer',
+                marginBottom: 12,
               }}
             >
-              📷
-            </div>
+              {isProcessing ? 'Restoring Identity...' : 'Restore Account ⚡'}
+            </button>
 
             <button
               onClick={() => setStep(1)}
               style={{
-                padding: '10px 20px',
-                backgroundColor: '#334155',
-                color: '#fff',
+                padding: '8px 16px',
+                backgroundColor: 'transparent',
+                color: '#94a3b8',
                 border: 'none',
-                borderRadius: 10,
-                fontSize: 13,
+                fontSize: 12,
                 cursor: 'pointer',
               }}
             >
-              Back to New Account
+              ← Back to New Account
             </button>
           </div>
         )}

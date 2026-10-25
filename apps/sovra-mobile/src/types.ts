@@ -55,4 +55,5 @@ export interface MobileChatMessage {
   isBitChat?: boolean | undefined;
   hopCount?: number | undefined;
   transportUsed?: 'ble_direct' | 'mesh_relay' | 'internet' | 'outbox_queued' | undefined;
+  reactions?: Array<{ emoji: string; senderDid: string }> | undefined;
 }
