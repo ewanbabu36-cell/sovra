@@ -21,7 +21,22 @@ import {
   fetchFeedPosts,
   registerUserProfile,
   setActiveSession,
+  fetchWalletAssets,
+  executeWalletSwap,
+  type WalletAssetItem,
 } from '../services/api.js';
+import { localDb } from '../services/local-database.js';
+
+function getDynamicDeviceId(): string {
+  if (typeof localStorage !== 'undefined') {
+    const existing = localStorage.getItem('sovra_device_fingerprint');
+    if (existing) return existing;
+    const created = 'dev_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
+    localStorage.setItem('sovra_device_fingerprint', created);
+    return created;
+  }
+  return 'dev_' + Math.random().toString(36).substring(2, 9);
+}
 
 export const INITIAL_PROFILE: UserAccountProfile = {
   did: '',
@@ -34,9 +49,378 @@ export const INITIAL_PROFILE: UserAccountProfile = {
   isLocked: false,
 };
 
+export function WalletDrawerModal({
+  isOpen,
+  onClose,
+  userDid,
+  onBalanceUpdated,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  userDid?: string;
+  onBalanceUpdated?: (newBal: number) => void;
+}): React.JSX.Element | null {
+  const [assets, setAssets] = useState<WalletAssetItem[]>([]);
+  const [totalValuation, setTotalValuation] = useState('0.00');
+  const [_isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // AMM Swap state
+  const [swapDirection, setSwapDirection] = useState<'buy' | 'sell'>('buy');
+  const [selectedToken, _setSelectedToken] = useState<string>('sovra1wasmcreator_token_alice');
+  const [swapAmount, setSwapAmount] = useState('10');
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [swapResult, setSwapResult] = useState<string | null>(null);
+
+  const loadAssets = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchWalletAssets(undefined, userDid);
+      if (data && Array.isArray(data.assets)) {
+        setAssets(data.assets);
+        const native = data.assets.find(a => a.type === 'native' || a.symbol === 'SOV');
+        if (native) {
+          const numBal = Number(native.balance) / 1_000_000;
+          setTotalValuation(numBal.toFixed(2));
+          if (onBalanceUpdated) onBalanceUpdated(numBal);
+        }
+      }
+    } catch (e: any) {
+      console.warn('[WalletDrawer] Load assets error:', e);
+      setError('Could not load wallet assets from L1 node.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userDid, onBalanceUpdated]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadAssets();
+    }
+  }, [isOpen, loadAssets]);
+
+  const handleExecuteSwap = async () => {
+    if (!swapAmount || Number(swapAmount) <= 0) return;
+    setIsSwapping(true);
+    setSwapResult(null);
+    setError(null);
+
+    try {
+      // In L1 micro-denominations (1 SOV = 1,000,000 micro-SOV)
+      const numericAmt = Math.floor(Number(swapAmount) * 1_000_000).toString();
+      const res = await executeWalletSwap({
+        tokenAddress: selectedToken,
+        direction: swapDirection,
+        amount: numericAmt,
+      });
+
+      if (res.ok) {
+        // Record into local SQLite / localDb wallet ledger
+        await localDb.recordWalletTransaction({
+          txHash: res.txHash,
+          type: 'swap',
+          amount: swapAmount,
+          tokenSymbol: swapDirection === 'buy' ? 'CW20' : 'SOV',
+          timestamp: Date.now(),
+          status: 'confirmed',
+          fee: res.royaltyFee,
+        });
+
+        const outUnits = (Number(res.outputAmount) / 1_000_000).toFixed(2);
+        setSwapResult(`✓ Swap confirmed! Received ~${outUnits} ${swapDirection === 'buy' ? 'Tokens' : 'SOV'}`);
+        await loadAssets();
+      }
+    } catch (e: any) {
+      setError(e.message || 'Swap transaction failed');
+    } finally {
+      setIsSwapping(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        backdropFilter: 'blur(10px)',
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-end',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          backgroundColor: '#0f172a',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          padding: '24px 20px',
+          maxHeight: '85vh',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          color: '#e2e8f0',
+          boxShadow: '0 -10px 40px rgba(0,0,0,0.8)',
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#f8fafc' }}>
+              Multi-Asset Portfolio
+            </h3>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+              Layer-1 Sovereign Native Assets &amp; Creator CW20 Tokens
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              border: 'none',
+              borderRadius: '50%',
+              width: 32,
+              height: 32,
+              color: '#94a3b8',
+              cursor: 'pointer',
+              fontSize: 16,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Valuation Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+            padding: '16px 20px',
+            borderRadius: 16,
+            border: '1px solid rgba(99, 102, 241, 0.3)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 600, letterSpacing: 0.5 }}>
+              TOTAL VALUATION (SOV)
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', marginTop: 4 }}>
+              ₹{totalValuation}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span
+              style={{
+                backgroundColor: 'rgba(52, 211, 153, 0.2)',
+                color: '#34d399',
+                padding: '4px 8px',
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              Zero Gas
+            </span>
+          </div>
+        </div>
+
+        {/* Assets List */}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase' }}>
+            Holdings ({assets.length || 1})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {assets.length === 0 ? (
+              <div
+                style={{
+                  backgroundColor: '#1e293b',
+                  padding: '12px 16px',
+                  borderRadius: 12,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#eab308', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>
+                    ⚡
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>Sovra Native</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>SOV</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{totalValuation}</div>
+                  <div style={{ fontSize: 11, color: '#34d399' }}>Native</div>
+                </div>
+              </div>
+            ) : (
+              assets.map((asset, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    backgroundColor: '#1e293b',
+                    padding: '12px 16px',
+                    borderRadius: 12,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '50%',
+                        backgroundColor: asset.type === 'native' ? '#eab308' : '#6366f1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 900,
+                      }}
+                    >
+                      {asset.type === 'native' ? '⚡' : '🪙'}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{asset.name}</div>
+                      <div style={{ fontSize: 11, color: '#94a3b8' }}>{asset.symbol}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{asset.displayBalance}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{asset.type}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* 1-Click In-App AMM Swap Card */}
+        <div
+          style={{
+            backgroundColor: '#1e293b',
+            padding: 16,
+            borderRadius: 16,
+            border: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#f8fafc' }}>
+              ⚡ 1-Click AMM Token Swap
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => setSwapDirection('buy')}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  backgroundColor: swapDirection === 'buy' ? '#3b82f6' : 'rgba(255,255,255,0.08)',
+                  color: '#fff',
+                }}
+              >
+                Buy CW20
+              </button>
+              <button
+                onClick={() => setSwapDirection('sell')}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  backgroundColor: swapDirection === 'sell' ? '#3b82f6' : 'rgba(255,255,255,0.08)',
+                  color: '#fff',
+                }}
+              >
+                Sell CW20
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="number"
+              value={swapAmount}
+              onChange={e => setSwapAmount(e.target.value)}
+              placeholder="Amount"
+              style={{
+                flex: 1,
+                backgroundColor: '#0f172a',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8,
+                padding: '8px 12px',
+                color: '#fff',
+                fontSize: 13,
+                outline: 'none',
+              }}
+            />
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8' }}>
+              {swapDirection === 'buy' ? 'SOV' : 'Token'}
+            </span>
+          </div>
+
+          {swapResult && (
+            <div style={{ fontSize: 12, color: '#34d399', fontWeight: 600 }}>
+              {swapResult}
+            </div>
+          )}
+          {error && (
+            <div style={{ fontSize: 12, color: '#f87171' }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            onClick={handleExecuteSwap}
+            disabled={isSwapping}
+            style={{
+              backgroundColor: '#00a884',
+              border: 'none',
+              borderRadius: 10,
+              padding: '10px 0',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: isSwapping ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            {isSwapping ? 'Swapping on L1...' : `Swap ${swapDirection === 'buy' ? 'SOV ➔ CW20' : 'CW20 ➔ SOV'}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MeScreen(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'saved'>('posts');
   const [walletBalance, setWalletBalance] = useState('0.00');
+  const [isWalletOpen, setIsWalletOpen] = useState(false);
   const [profile, setProfile] = useState<UserAccountProfile | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -59,7 +443,7 @@ export function MeScreen(): React.JSX.Element {
           did: sp.did || prev?.did || INITIAL_PROFILE.did,
           handle: sp.handle || prev?.handle || INITIAL_PROFILE.handle,
           displayName: sp.displayName || sp.name || prev?.displayName || INITIAL_PROFILE.displayName,
-          deviceId: prev?.deviceId || 'dev_m1_android',
+          deviceId: prev?.deviceId || getDynamicDeviceId(),
           devicePublicKeyHex: sp.devicePublicKeyHex || prev?.devicePublicKeyHex || INITIAL_PROFILE.devicePublicKeyHex,
           credentialId: prev?.credentialId || 'cred_titan_bio_01',
           createdAt: sp.createdAt || prev?.createdAt || INITIAL_PROFILE.createdAt,
@@ -331,12 +715,14 @@ export function MeScreen(): React.JSX.Element {
           </div>
 
           <div
+            onClick={() => setIsWalletOpen(true)}
             style={{
               flex: 1,
               backgroundColor: '#1e293b',
               padding: '10px 12px',
               borderRadius: 10,
               border: '1px solid rgba(255,255,255,0.06)',
+              cursor: 'pointer',
             }}
           >
             <div style={{ fontSize: 10, color: '#94a3b8' }}>Micro-Tip Wallet</div>
@@ -493,6 +879,13 @@ export function MeScreen(): React.JSX.Element {
       <ReferralModal
         isOpen={isReferralOpen}
         onClose={() => setIsReferralOpen(false)}
+        userDid={profile?.did}
+        onBalanceUpdated={(newBal) => setWalletBalance(newBal.toFixed(2))}
+      />
+
+      <WalletDrawerModal
+        isOpen={isWalletOpen}
+        onClose={() => setIsWalletOpen(false)}
         userDid={profile?.did}
         onBalanceUpdated={(newBal) => setWalletBalance(newBal.toFixed(2))}
       />

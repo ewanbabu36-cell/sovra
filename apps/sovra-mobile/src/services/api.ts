@@ -11,6 +11,7 @@
 import type { MobileStoryItem, MobileReelItem, MobileChatMessage } from '../types.js';
 import type { FeedPost } from '../screens/FeedScreen.js';
 import { multiRelayManager } from './multi-relay-manager.js';
+import { DoubleRatchetChatEngine } from '@sovra/messaging';
 
 export function getApiBaseUrl(): string {
   return multiRelayManager.getActiveBaseUrl();
@@ -21,6 +22,14 @@ export const API_BASE_URL = multiRelayManager.getActiveBaseUrl();
 // Active in-memory session token & DID for the mobile runtime
 let activeSessionToken: string | null = null;
 let activeUserDid: string = 'did:key:z6MksLocalUser';
+let activeChatEngine: DoubleRatchetChatEngine | null = null;
+
+export function getMobileChatEngine(): DoubleRatchetChatEngine {
+  if (!activeChatEngine || activeChatEngine.localDid !== activeUserDid) {
+    activeChatEngine = new DoubleRatchetChatEngine(activeUserDid);
+  }
+  return activeChatEngine;
+}
 
 export function setActiveSession(token: string | null, did?: string): void {
   activeSessionToken = token;
@@ -347,16 +356,33 @@ export async function fetchChatMessages(userDid = activeUserDid, since = 0): Pro
     const data = await res.json();
     if (!data.ok || !Array.isArray(data.messages)) return [];
 
-    return data.messages.map((m: any) => ({
-      id: m.id,
-      senderDid: m.senderDid,
-      senderName: m.senderName || (m.senderDid === userDid ? 'You' : 'Alice'),
-      text: m.text,
-      timestamp: m.timestamp || m.sentAt || Date.now(),
-      isOutgoing: m.senderDid === userDid,
-      tickState: m.readAt ? 'read' : m.deliveredAt ? 'delivered' : m.status || 'sent',
-      isAudioNote: !!m.isAudio,
-    }));
+    return data.messages.map((m: any) => {
+      let displayText = m.text;
+      // If message is encrypted with ChaCha20-Poly1305, attempt to decrypt with receiver ratchet
+      if (m.isE2EE && m.ciphertextHex && m.ivHex && m.senderDid !== userDid) {
+        try {
+          const engine = getMobileChatEngine();
+          displayText = engine.decryptPayload(m.senderDid, m.ciphertextHex, m.ivHex);
+        } catch {
+          if (!displayText || displayText === '🔒 [End-to-End Encrypted: AES-GCM-256]') {
+            displayText = '🔒 [End-to-End Encrypted]';
+          }
+        }
+      }
+
+      return {
+        id: m.id,
+        senderDid: m.senderDid,
+        senderName: m.senderName || (m.senderDid === userDid ? 'You' : 'Alice'),
+        text: displayText,
+        timestamp: m.timestamp || m.sentAt || Date.now(),
+        isOutgoing: m.senderDid === userDid,
+        tickState: m.readAt ? 'read' : m.deliveredAt ? 'delivered' : m.status || 'sent',
+        isAudioNote: !!m.isAudio,
+        disappearingDurationSec: m.disappearingDurationSec,
+        expiresAt: m.expiresAt,
+      };
+    });
   } catch (err) {
     console.warn('[API] fetchChatMessages error:', err);
     throw err;
@@ -372,7 +398,28 @@ export async function sendChatMessage(params: {
   isBitChat?: boolean;
   audioBitrateKbps?: number;
   audioBitsPerSecond?: number;
+  disappearingDurationSec?: number;
+  encrypt?: boolean;
 }): Promise<{ ok: boolean; message?: any; error?: string }> {
+  let isE2EE = false;
+  let ciphertextHex: string | undefined;
+  let ivHex: string | undefined;
+  let sequenceNumber: number | undefined;
+
+  // Perform Double Ratchet ChaCha20-Poly1305 wire encryption for direct peer messages
+  if (params.encrypt !== false && params.recipientDid && !params.recipientDid.startsWith('channel:')) {
+    try {
+      const engine = getMobileChatEngine();
+      const enc = engine.encryptPayload(params.recipientDid, params.text);
+      isE2EE = true;
+      ciphertextHex = enc.ciphertextHex;
+      ivHex = enc.nonceHex;
+      sequenceNumber = enc.sequenceNumber;
+    } catch (e) {
+      console.warn('[API] E2EE client encryption error, sending plaintext fallback:', e);
+    }
+  }
+
   const res = await apiFetch('/api/chat/send', {
     method: 'POST',
     headers: getHeaders(),
@@ -384,6 +431,11 @@ export async function sendChatMessage(params: {
       isAudio: !!params.isAudio,
       audioDurationSec: params.audioDurationSec || 0,
       timestamp: Date.now(),
+      disappearingDurationSec: params.disappearingDurationSec,
+      isE2EE,
+      ciphertextHex,
+      ivHex,
+      sequenceNumber,
     }),
   });
   if (!res.ok) {
@@ -860,6 +912,77 @@ export async function depositSandboxFiat(amountInr: number | string): Promise<an
   if (!data.ok) throw new Error(data.error || 'Failed to deposit sandbox fiat');
   return data;
 }
+
+// ==========================================
+// 8. WALLET & AMM SWAP API
+// ==========================================
+
+export interface WalletAssetItem {
+  type: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  balance: string;
+  displayBalance: string;
+  sovValue: string;
+  icon?: string;
+  contractAddress?: string;
+}
+
+export async function fetchWalletAssets(
+  address?: string,
+  did = activeUserDid,
+): Promise<{ ok: boolean; address: string; assets: WalletAssetItem[]; totalValuationSov: string }> {
+  try {
+    const query = new URLSearchParams();
+    if (address) query.set('address', address);
+    if (did) query.set('did', did);
+
+    const res = await apiFetch(`/api/wallet/assets?${query.toString()}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Wallet assets failed: HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[API] fetchWalletAssets error:', err);
+    throw err;
+  }
+}
+
+export async function executeWalletSwap(params: {
+  address?: string;
+  tokenAddress: string;
+  direction: 'buy' | 'sell';
+  amount: string;
+  minOutput?: string;
+}): Promise<{
+  ok: boolean;
+  txHash: string;
+  direction: string;
+  inputAmount: string;
+  outputAmount: string;
+  royaltyFee: string;
+  error?: string;
+}> {
+  const res = await apiFetch('/api/wallet/swap', {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({
+      address: params.address,
+      tokenAddress: params.tokenAddress,
+      direction: params.direction,
+      amount: params.amount,
+      minOutput: params.minOutput || '0',
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `Swap failed: HTTP ${res.status}`);
+  }
+  return await res.json();
+}
+
 
 
 

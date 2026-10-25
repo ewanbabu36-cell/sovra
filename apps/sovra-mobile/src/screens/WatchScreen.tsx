@@ -233,7 +233,7 @@ export function WatchScreen(): React.JSX.Element {
         >
           <span>⚠️ {error}</span>
           <button
-            onClick={loadVideo}
+            onClick={() => { loadVideo(); }}
             style={{
               padding: '4px 10px',
               backgroundColor: '#ef4444',

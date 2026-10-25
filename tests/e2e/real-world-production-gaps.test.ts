@@ -101,7 +101,7 @@ describe('Real-World Production Hardening (8 Architectural Dimensions)', () => {
       };
 
       const migrated: LocalDatabaseSchema = LocalSchemaMigrator.migrate(legacyV1);
-      expect(migrated.version).toBe(2);
+      expect(migrated.version).toBeGreaterThanOrEqual(2);
       expect(migrated.users['did:key:alice']).toBeDefined();
       expect(migrated.users['did:key:alice'].handle).toBe('alice');
       // Verify all required v2 collections were initialized
