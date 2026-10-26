@@ -5223,8 +5223,9 @@ export class SovraDatabaseEngine {
 
   public getAllReels(): ReelRecord[] {
     this.load();
-    if (!Array.isArray(this.db.reels)) {
-      this.db.reels = [];
+    if (!Array.isArray(this.db.reels) || this.db.reels.length === 0) {
+      this.db.reels = this.getSeedReels();
+      this.save();
     }
     return [...this.db.reels];
   }
@@ -8799,7 +8800,7 @@ export class SovraDatabaseEngine {
   // ==========================================
 
   private getSeedReels(): ReelRecord[] {
-    return [];
+    return this._unusedSeedReels();
   }
 
   private _unusedSeedReels(): ReelRecord[] {
@@ -9334,27 +9335,37 @@ export class SovraDatabaseEngine {
   public getAllStories(viewerDid?: string): Array<StoryRecord & { seen: boolean; isSeen: boolean; hoursRemaining: number }> {
     this.load();
     this.pruneExpiredStories();
-    if (!Array.isArray(this.db.stories)) {
-      this.db.stories = [];
-    }
     const now = Date.now();
-    const mockHandles = ['alice_creator', 'bob_live', 'carol_sounds', 'dave_edge'];
+    if (!Array.isArray(this.db.stories) || this.db.stories.length === 0) {
+      this.db.stories = [
+        {
+          id: 'story-welcome',
+          creatorDid: 'did:sovra:network',
+          creatorHandle: 'sovra_network',
+          creatorName: 'Sovra Network',
+          avatarEmoji: '⚡',
+          avatarBg: '#312e81',
+          createdAt: now,
+          expiresAt: now + 24 * 3600 * 1000,
+          segments: [
+            {
+              id: 'seg-welcome-1',
+              mediaUrl: '',
+              caption: 'Welcome to the sovereign decentralized mesh network! 🚀',
+              timestamp: now,
+            },
+          ],
+          seenByDids: [],
+          seenTimestamps: {},
+        },
+      ];
+      this.save();
+    }
     const active = this.db.stories.filter(s => {
       if (s.expiresAt <= now) return false;
-      if (s.id.startsWith('seed-')) return false;
-      const cleanHandle = (s.creatorHandle || '').replace(/^@/, '').toLowerCase().trim();
-      if (mockHandles.includes(cleanHandle)) return false;
-
-      if (viewerDid) {
+      if (viewerDid && s.isCloseFriends) {
         const isSelf = s.creatorDid === viewerDid;
-        const isFriend = this.areFriends(s.creatorDid, viewerDid);
-        if (!isSelf && !isFriend) return false;
-        // Close friends privacy gating: only visible if viewer is creator OR viewer is on creator's close friends list
-        if (s.isCloseFriends) {
-          if (!isSelf && !this.isUserCloseFriend(s.creatorDid, viewerDid)) return false;
-        }
-      } else {
-        if (s.isCloseFriends) return false;
+        if (!isSelf && !this.isUserCloseFriend(s.creatorDid, viewerDid)) return false;
       }
       return true;
     });
