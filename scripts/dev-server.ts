@@ -2320,6 +2320,7 @@ function renderHtml(
       color: #050505 !important;
     }
     body.theme-normal .fb-header-dropdown,
+    body.theme-normal .header-create-dropdown,
     body.theme-normal #messengerDropdown,
     body.theme-normal #notificationDropdown,
     body.theme-normal #headerSearchDropdown,
@@ -2329,6 +2330,19 @@ function renderHtml(
       border: 1px solid #ced0d4 !important;
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15) !important;
       color: #050505 !important;
+    }
+    body.theme-normal .header-create-item {
+      color: #050505 !important;
+      background: transparent !important;
+    }
+    body.theme-normal .header-create-item:hover {
+      background: #f0f2f5 !important;
+    }
+    body.theme-normal .create-item-title {
+      color: #050505 !important;
+    }
+    body.theme-normal .create-item-subtitle {
+      color: #65676b !important;
     }
     body.theme-normal .dev-drawer-item {
       color: #050505 !important;
@@ -2464,6 +2478,7 @@ function renderHtml(
       color: #ffffff !important;
     }
     body.theme-black .fb-header-dropdown,
+    body.theme-black .header-create-dropdown,
     body.theme-black #messengerDropdown,
     body.theme-black #notificationDropdown,
     body.theme-black #headerSearchDropdown,
@@ -2473,6 +2488,19 @@ function renderHtml(
       border: 1px solid rgba(255, 255, 255, 0.15) !important;
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75) !important;
       color: #e4e6eb !important;
+    }
+    body.theme-black .header-create-item {
+      color: #e4e6eb !important;
+      background: transparent !important;
+    }
+    body.theme-black .header-create-item:hover {
+      background: rgba(255, 255, 255, 0.08) !important;
+    }
+    body.theme-black .create-item-title {
+      color: #e4e6eb !important;
+    }
+    body.theme-black .create-item-subtitle {
+      color: #94a3b8 !important;
     }
     body.theme-black .dev-drawer-item {
       color: #e4e6eb !important;
@@ -14501,35 +14529,106 @@ function renderHtml(
     }
     .header-create-dropdown {
       position: absolute;
-      top: calc(100% + 6px);
+      top: calc(100% + 8px);
       right: 0;
-      background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 12px;
-      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
-      z-index: 1000;
-      min-width: 190px;
-      padding: 6px;
+      background: var(--surface) !important;
+      border: 1px solid var(--surface-border) !important;
+      border-radius: 16px !important;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22), 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+      z-index: 10002;
+      width: 290px;
+      max-width: calc(100vw - 20px);
+      padding: 8px !important;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-sizing: border-box;
+      transform-origin: top right;
+      animation: appleSpringModalEntrance 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .header-create-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 9px 12px;
-      border-radius: 8px;
-      color: #e2e8f0;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s ease;
-      text-align: left;
+      display: flex !important;
+      align-items: center !important;
+      gap: 12px !important;
+      padding: 9px 12px !important;
+      border-radius: 12px !important;
+      background: transparent !important;
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      color: var(--text) !important;
+      cursor: pointer !important;
+      transition: background 0.16s ease, transform 0.12s ease !important;
+      text-align: left !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      -webkit-tap-highlight-color: transparent !important;
+      user-select: none !important;
     }
     .header-create-item:hover {
-      background: rgba(99, 102, 241, 0.2);
-      color: #fff;
+      background: var(--hover-bg) !important;
+      color: var(--text) !important;
+      transform: none !important;
+    }
+    .header-create-item:active {
+      transform: scale(0.98) !important;
+      background: var(--hover-bg) !important;
+    }
+    .header-create-item:focus-visible {
+      outline: 2px solid #1877f2 !important;
+      outline-offset: -2px !important;
+    }
+    .create-item-icon-badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+      flex-shrink: 0;
+      transition: transform 0.15s ease;
+    }
+    .header-create-item:hover .create-item-icon-badge {
+      transform: scale(1.08);
+    }
+    .create-item-text-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1px;
+      min-width: 0;
+      flex: 1;
+    }
+    .create-item-title {
+      font-size: 0.9rem !important;
+      font-weight: 700 !important;
+      color: var(--text) !important;
+      line-height: 1.3 !important;
+    }
+    .create-item-subtitle {
+      font-size: 0.72rem !important;
+      color: var(--text-muted) !important;
+      line-height: 1.2 !important;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 190px;
+    }
+
+    @media (max-width: 520px) {
+      .header-create-dropdown {
+        position: fixed !important;
+        top: 60px !important;
+        right: 12px !important;
+        left: auto !important;
+        width: calc(100vw - 24px) !important;
+        max-width: 320px !important;
+        border-radius: 18px !important;
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4) !important;
+      }
     }
 
     /* WCAG 2.1 AA Monospace Contrast & Accessible Focus Indicators */
@@ -16133,23 +16232,47 @@ function renderHtml(
           <span>➕</span>
         </button>
         <div id="headerCreateDropdown" class="header-create-dropdown" style="display: none;">
-          <button type="button" class="header-create-item" data-action="create-post" onclick="hideHeaderCreateMenu(); if(typeof openCreateModal==='function'){openCreateModal('post');}else{switchTab('feed');}">
-            <span>📝</span> <span>Create Post</span>
+          <button type="button" class="header-create-item" data-action="create-post" onclick="triggerHeaderCreatePost(event)">
+            <div class="create-item-icon-badge" style="background: rgba(24, 119, 242, 0.12); color: #1877f2;">📝</div>
+            <div class="create-item-text-wrap">
+              <span class="create-item-title">Create Post</span>
+              <span class="create-item-subtitle">Share what's on your mind</span>
+            </div>
           </button>
-          <button type="button" class="header-create-item" data-action="create-story" onclick="hideHeaderCreateMenu(); if(typeof openStoryCreator==='function'){openStoryCreator();}else{openCreateModal('story');}">
-            <span>⚡</span> <span>Add Story</span>
+          <button type="button" class="header-create-item" data-action="create-story" onclick="triggerHeaderAddStory(event)">
+            <div class="create-item-icon-badge" style="background: rgba(236, 72, 153, 0.12); color: #ec4899;">⚡</div>
+            <div class="create-item-text-wrap">
+              <span class="create-item-title">Add Story</span>
+              <span class="create-item-subtitle">Share ephemeral photo or video</span>
+            </div>
           </button>
-          <button type="button" class="header-create-item" data-action="create-reel" onclick="hideHeaderCreateMenu(); if(typeof openCreateModal==='function'){openCreateModal('reel');}else{switchTab('reels');}">
-            <span>🎬</span> <span>Create Reel</span>
+          <button type="button" class="header-create-item" data-action="create-reel" onclick="triggerHeaderCreateReel(event)">
+            <div class="create-item-icon-badge" style="background: rgba(168, 85, 247, 0.12); color: #a855f7;">🎬</div>
+            <div class="create-item-text-wrap">
+              <span class="create-item-title">Create Reel</span>
+              <span class="create-item-subtitle">Upload short vertical video</span>
+            </div>
           </button>
-          <button type="button" class="header-create-item" data-action="upload-video" onclick="hideHeaderCreateMenu(); if(typeof openVideoUploadModal==='function'){openVideoUploadModal();}else{switchTab('studio');}">
-            <span>📹</span> <span>Upload Video</span>
+          <button type="button" class="header-create-item" data-action="upload-video" onclick="triggerHeaderUploadVideo(event)">
+            <div class="create-item-icon-badge" style="background: rgba(239, 68, 68, 0.12); color: #ef4444;">📹</div>
+            <div class="create-item-text-wrap">
+              <span class="create-item-title">Upload Video</span>
+              <span class="create-item-subtitle">Publish HD/4K long-form video</span>
+            </div>
           </button>
-          <button type="button" class="header-create-item" data-action="go-live" onclick="hideHeaderCreateMenu(); switchWatchSubTab('live'); switchTab('watch');">
-            <span>🔴</span> <span>Go Live</span>
+          <button type="button" class="header-create-item" data-action="go-live" onclick="triggerHeaderGoLive(event)">
+            <div class="create-item-icon-badge" style="background: rgba(239, 68, 68, 0.16); color: #dc2626;">🔴</div>
+            <div class="create-item-text-wrap">
+              <span class="create-item-title">Go Live</span>
+              <span class="create-item-subtitle">Start P2P live stream swarm</span>
+            </div>
           </button>
-          <button type="button" class="header-create-item" data-action="create-channel" onclick="hideHeaderCreateMenu(); switchTab('studio');">
-            <span>📺</span> <span>Create Channel</span>
+          <button type="button" class="header-create-item" data-action="create-channel" onclick="triggerHeaderCreateChannel(event)">
+            <div class="create-item-icon-badge" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b;">📺</div>
+            <div class="create-item-text-wrap">
+              <span class="create-item-title">Create Channel</span>
+              <span class="create-item-subtitle">Launch your creator channel</span>
+            </div>
           </button>
         </div>
       </div>
@@ -71853,6 +71976,17 @@ function renderHtml(
       const btn = document.getElementById('headerCreateBtn');
       if (!dd) return;
       const willOpen = dd.style.display === 'none';
+      if (willOpen) {
+        // Close conflicting popovers
+        const notif = document.getElementById('notificationDropdown');
+        if (notif) notif.style.display = 'none';
+        const msg = document.getElementById('messengerDropdown');
+        if (msg) msg.style.display = 'none';
+        const chanPop = document.getElementById('studioHeaderChanPopover');
+        if (chanPop) chanPop.style.display = 'none';
+        const searchDrop = document.getElementById('headerSearchDropdown');
+        if (searchDrop) searchDrop.style.display = 'none';
+      }
       dd.style.display = willOpen ? 'flex' : 'none';
       if (btn) btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       if (willOpen) {
@@ -71867,6 +72001,96 @@ function renderHtml(
       if (dd) dd.style.display = 'none';
       if (btn) btn.setAttribute('aria-expanded', 'false');
     }
+
+    function triggerHeaderCreatePost(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      hideHeaderCreateMenu();
+      if (typeof switchTab === 'function') switchTab('feed');
+      setTimeout(function() {
+        const composer = document.querySelector('.feed-composer-card');
+        const caption = document.getElementById('dynamicPostCaption');
+        if (composer) {
+          composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (caption) {
+          caption.focus();
+          caption.style.boxShadow = '0 0 0 3px rgba(24, 119, 242, 0.45)';
+          setTimeout(function() { caption.style.boxShadow = ''; }, 1600);
+        }
+      }, 100);
+    }
+
+    function triggerHeaderAddStory(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      hideHeaderCreateMenu();
+      if (typeof openStoryCreatorModal === 'function') {
+        openStoryCreatorModal();
+      } else {
+        const fileInput = document.getElementById('realStoryFileInput');
+        if (fileInput) fileInput.click();
+      }
+    }
+
+    function triggerHeaderCreateReel(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      hideHeaderCreateMenu();
+      if (typeof openVideoUploadModal === 'function') {
+        openVideoUploadModal('short');
+        const reelRadio = document.getElementById('videoFormatShort');
+        if (reelRadio) reelRadio.checked = true;
+      } else {
+        if (typeof switchTab === 'function') switchTab('reels');
+      }
+    }
+
+    function triggerHeaderUploadVideo(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      hideHeaderCreateMenu();
+      if (typeof openVideoUploadModal === 'function') {
+        openVideoUploadModal('video');
+      } else {
+        if (typeof switchTab === 'function') switchTab('studio');
+      }
+    }
+
+    function triggerHeaderGoLive(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      hideHeaderCreateMenu();
+      if (typeof switchWatchSubTab === 'function') switchWatchSubTab('live');
+      if (typeof switchTab === 'function') switchTab('watch');
+      if (typeof showAccountToast === 'function') showAccountToast('🔴 Sovereign Live Swarm active');
+    }
+
+    function triggerHeaderCreateChannel(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      hideHeaderCreateMenu();
+      if (typeof openCreateChannelModal === 'function') {
+        openCreateChannelModal('creator');
+      } else {
+        if (typeof switchTab === 'function') switchTab('studio');
+      }
+    }
+
+    // Graceful aliases for test suite & legacy caller compatibility
+    function openCreateModal(type) {
+      if (type === 'story') triggerHeaderAddStory();
+      else if (type === 'reel') triggerHeaderCreateReel();
+      else triggerHeaderCreatePost();
+    }
+    function openStoryCreator() {
+      triggerHeaderAddStory();
+    }
+
+    window.toggleHeaderCreateMenu = toggleHeaderCreateMenu;
+    window.hideHeaderCreateMenu = hideHeaderCreateMenu;
+    window.triggerHeaderCreatePost = triggerHeaderCreatePost;
+    window.triggerHeaderAddStory = triggerHeaderAddStory;
+    window.triggerHeaderCreateReel = triggerHeaderCreateReel;
+    window.triggerHeaderUploadVideo = triggerHeaderUploadVideo;
+    window.triggerHeaderGoLive = triggerHeaderGoLive;
+    window.triggerHeaderCreateChannel = triggerHeaderCreateChannel;
+    window.openCreateModal = openCreateModal;
+    window.openStoryCreator = openStoryCreator;
 
     document.addEventListener('click', function(e) {
       const chatBtn = e.target && e.target.closest ? e.target.closest('[data-action="open-chat-user"]') : null;
