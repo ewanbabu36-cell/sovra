@@ -5184,132 +5184,102 @@ function renderHtml(
       transform: scale(0.92) !important;
     }
 
-    .siri-fingerprint-core {
-      position: relative;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 50% 35%, #131c30 0%, #080c18 75%, #020409 100%);
-      border: 1.2px solid rgba(255, 255, 255, 0.22);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 
-        0 4px 18px rgba(0, 0, 0, 0.7),
-        0 0 16px rgba(56, 189, 248, 0.35),
-        inset 0 1px 1px rgba(255, 255, 255, 0.5);
-      overflow: hidden;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    /* =======================================================
+       🔵 SOVRA FACEBOOK STANDARD LOGO & BRANDING (PERMANENT)
+       ======================================================= */
+    .sovra-core-gateway-btn,
+    .fb-brand-logo-btn {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 10px !important;
+      cursor: pointer !important;
+      text-decoration: none !important;
+      background: transparent !important;
+      border: none !important;
+      padding: 0 !important;
+      outline: none !important;
+      user-select: none !important;
+      transition: transform 0.15s ease, opacity 0.15s ease !important;
+    }
+    .sovra-core-gateway-btn:hover,
+    .fb-brand-logo-btn:hover {
+      opacity: 0.92 !important;
+      transform: scale(1.02) !important;
+    }
+    .sovra-core-gateway-btn:active,
+    .fb-brand-logo-btn:active {
+      transform: scale(0.96) !important;
     }
 
-    /* 🌈 Apple Intelligence / Siri Rotating Chromatic Wave */
-    .siri-chromatic-ring {
-      position: absolute;
-      inset: -2px;
-      border-radius: 50%;
-      background: conic-gradient(
-        from 0deg,
-        #00f0ff 0deg,
-        #3b82f6 60deg,
-        #8b5cf6 125deg,
-        #ec4899 180deg,
-        #f59e0b 245deg,
-        #10b981 305deg,
-        #00f0ff 360deg
-      );
-      opacity: 0.8;
-      filter: blur(3px);
-      animation: siriChromaticSpin 5s linear infinite;
-      pointer-events: none;
-      z-index: 1;
-    }
-    @keyframes siriChromaticSpin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    /* Crisp Facebook Standard Solid Blue Circle Badge (#1877f2) */
+    .fb-standard-logo-circle {
+      position: relative !important;
+      width: 40px !important;
+      height: 40px !important;
+      border-radius: 50% !important;
+      background: #1877f2 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-shadow: 0 2px 8px rgba(24, 119, 242, 0.45) !important;
+      flex-shrink: 0 !important;
+      overflow: hidden !important;
+      border: none !important;
     }
 
-    /* 🟢 In-Display Optical Fingerprint Scanner Light Aura (Concentric Breathing Rays) */
-    .fingerprint-optic-pulse {
-      position: absolute;
-      inset: 2px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(0, 240, 255, 0.32) 0%, rgba(99, 102, 241, 0.18) 50%, transparent 80%);
-      animation: fingerprintAuraBreath 2.8s ease-in-out infinite alternate;
-      pointer-events: none;
-      z-index: 2;
+    /* Bold Facebook-Standard Letter S */
+    .fb-logo-letter-s {
+      color: #ffffff !important;
+      fill: #ffffff !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      font-size: 28px !important;
+      font-weight: 900 !important;
+      line-height: 1 !important;
+      letter-spacing: -1px !important;
+      transform: translateY(-0.5px) !important;
+      user-select: none !important;
+      display: block !important;
     }
-    @keyframes fingerprintAuraBreath {
-      0% {
-        transform: scale(0.85);
-        opacity: 0.55;
-        box-shadow: 0 0 8px rgba(0, 240, 255, 0.4), inset 0 0 6px rgba(0, 240, 255, 0.3);
-      }
-      50% {
-        opacity: 0.85;
-        box-shadow: 0 0 18px rgba(56, 189, 248, 0.7), 0 0 28px rgba(236, 72, 153, 0.4), inset 0 0 12px rgba(0, 240, 255, 0.5);
-      }
-      100% {
-        transform: scale(1.08);
-        opacity: 1;
-        box-shadow: 0 0 24px rgba(0, 240, 255, 0.9), 0 0 38px rgba(139, 92, 246, 0.55), inset 0 0 16px rgba(255, 255, 255, 0.7);
+
+    /* Bold Facebook-Standard Blue "sovra" Wordmark */
+    .fb-standard-logo-wordmark {
+      color: #1877f2 !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      font-size: 1.65rem !important;
+      font-weight: 800 !important;
+      letter-spacing: -0.7px !important;
+      line-height: 1 !important;
+      user-select: none !important;
+      display: inline-block !important;
+    }
+
+    @media (max-width: 520px) {
+      .fb-standard-logo-wordmark {
+        display: none !important; /* Clean Facebook-standard circle icon on compact mobile */
       }
     }
 
-    /* Optical Sensor Touch Flash on Click / Press */
-    .sovra-core-gateway-btn:hover .siri-fingerprint-core,
-    .siri-fingerprint-btn:hover .siri-fingerprint-core {
-      border-color: rgba(255, 255, 255, 0.5);
-      box-shadow: 
-        0 6px 24px rgba(0, 0, 0, 0.8),
-        0 0 26px rgba(0, 240, 255, 0.85),
-        0 0 45px rgba(236, 72, 153, 0.5),
-        inset 0 1px 2px rgba(255, 255, 255, 0.9);
+    /* Facebook Standard Dropdowns (Messenger & Notifications) */
+    .fb-header-dropdown {
+      position: absolute !important;
+      top: calc(100% + 8px) !important;
+      width: 360px !important;
+      max-width: calc(100vw - 20px) !important;
+      max-height: 520px !important;
+      background: #242526 !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75), 0 2px 4px rgba(0, 0, 0, 0.4) !important;
+      z-index: 10000 !important;
+      overflow: hidden !important;
+      flex-direction: column !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
     }
-    .sovra-core-gateway-btn:active .fingerprint-optic-pulse,
-    .siri-fingerprint-btn:active .fingerprint-optic-pulse {
-      animation: none;
-      transform: scale(1.3);
-      opacity: 1;
-      background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(0, 240, 255, 0.9) 45%, rgba(99, 102, 241, 0.6) 75%, transparent 100%);
-      box-shadow: 0 0 35px #00f0ff, 0 0 60px #ffffff;
+    .fb-messenger-chat-row:hover {
+      background: rgba(255, 255, 255, 0.08) !important;
     }
-
-    .siri-s-glyph {
-      width: 26px;
-      height: 26px;
-      position: relative;
-      z-index: 3;
-      filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.9));
-      transition: filter 0.2s ease, transform 0.2s ease;
-    }
-    .sovra-core-gateway-btn:hover .siri-s-glyph,
-    .siri-fingerprint-btn:hover .siri-s-glyph {
-      filter: drop-shadow(0 0 8px #ffffff) drop-shadow(0 0 16px #00f0ff) drop-shadow(0 0 24px #ec4899);
-      transform: scale(1.05);
-    }
-    .sovra-brand-capsule:hover .sovra-core-brand-text {
-      filter: drop-shadow(0 0 14px rgba(0, 240, 255, 0.85));
-    }
-    .alien-energy-beacon {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #00f0ff;
-      box-shadow: 0 0 8px #00f0ff, 0 0 14px rgba(0, 240, 255, 0.6);
-      animation: alienBeaconPulse 2s ease-in-out infinite;
-      flex-shrink: 0;
-      margin-left: 1px;
-    }
-    @keyframes alienBeaconPulse {
-      0%, 100% {
-        transform: scale(0.9);
-        opacity: 0.5;
-      }
-      50% {
-        transform: scale(1.3);
-        opacity: 1;
-        box-shadow: 0 0 12px #00f0ff, 0 0 20px rgba(0, 240, 255, 0.9);
-      }
+    .notification-card:hover {
+      background: rgba(255, 255, 255, 0.08) !important;
     }
 
     /* =======================================================
@@ -12864,6 +12834,14 @@ function renderHtml(
       font-family: inherit;
       transition: height 0.2s ease;
     }
+    @media (max-width: 600px) {
+      .fb-floating-chat-dock {
+        right: 10px !important;
+        left: 10px !important;
+        width: auto !important;
+        max-width: calc(100vw - 20px) !important;
+      }
+    }
     .fb-floating-chat-dock.minimized {
       height: 48px;
     }
@@ -15590,39 +15568,16 @@ function renderHtml(
   <header class="app-top-header" onclick="handleDevHeaderContainerClick(event)">
     <!-- Zone 1: Left (Brand, Menu & Search) -->
     <div class="header-left-zone">
-      <button type="button" class="header-menu-toggle-btn" onclick="toggleDevMainMenu(true); event.stopPropagation();" title="SOVRA Menu (☰)" aria-label="Open Menu" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #fff; border-radius: 10px; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; font-size: 1.25rem;">
+      <button type="button" class="header-menu-toggle-btn" onclick="toggleDevMainMenu(true); event.stopPropagation();" title="SOVRA Menu (☰)" aria-label="Open Menu" style="background: #3a3b3c; border: none; color: #e4e6eb; border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; font-size: 1.15rem; transition: background 0.15s ease;">
         ☰
       </button>
 
-      <!-- SOVRA Apple & Siri Animated Optical Fingerprint "S" Emblem (Clean & Neat) -->
+      <!-- SOVRA Facebook Standard Logo (Clean, Crisp & Permanent) -->
       <div id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="switchTab('feed'); event.stopPropagation();" aria-label="Open SOVRA holographic command center" title="SOVRA Home (Return to Feed)">
-        <div class="siri-fingerprint-core">
-          <div class="siri-chromatic-ring"></div>
-          <div class="fingerprint-optic-pulse"></div>
-          <svg class="siri-s-glyph" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="siriGlyphGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#ffffff"/>
-                <stop offset="30%" stop-color="#38bdf8"/>
-                <stop offset="70%" stop-color="#818cf8"/>
-                <stop offset="100%" stop-color="#ec4899"/>
-              </linearGradient>
-              <filter id="siriGlyphGlow" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur stdDeviation="2.5" result="blur"/>
-                <feMerge>
-                  <feMergeNode in="blur"/>
-                  <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-              </filter>
-            </defs>
-            <!-- Outer Luminous Bold S -->
-            <path class="siri-s-path" d="M 64 34 C 64 24 57 19 49 19 C 39 19 32 25 32 35 C 32 46 44 50 54 54 C 65 58 71 64 71 74 C 71 85 63 91 50 91 C 38 91 30 84 29 73" 
-                  stroke="url(#siriGlyphGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" filter="url(#siriGlyphGlow)"/>
-            <!-- Specular White High-Energy Core Filament -->
-            <path class="siri-s-core" d="M 64 34 C 64 24 57 19 49 19 C 39 19 32 25 32 35 C 32 46 44 50 54 54 C 65 58 71 64 71 74 C 71 85 63 91 50 91 C 38 91 30 84 29 73" 
-                  stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
-          </svg>
+        <div class="fb-standard-logo-circle">
+          <span class="fb-logo-letter-s">S</span>
         </div>
+        <span class="fb-standard-logo-wordmark">sovra</span>
       </div>
 
       <!-- Fresh, Neat & Streamlined Search Bar (Zero Popup - 100% Inline Dropdown) -->
@@ -15714,8 +15669,8 @@ function renderHtml(
         <span id="pwaHeaderInstallLabel">Install App</span>
       </button>
 
-      <!-- 2. Encrypted Direct Chats (Facebook Standard: Free Floating Messenger & Edge-Anchored Badge) -->
-      <div id="headerChatBtn" class="header-action-icon-btn" role="button" tabindex="0" onclick="if(typeof openFbFloatingChat==='function'){openFbFloatingChat('','Messenger','');}else{switchTab('chat');}" onkeydown="if(event.key==='Enter'||event.key===' '){if(typeof openFbFloatingChat==='function'){openFbFloatingChat('','Messenger','');}else{switchTab('chat');}}" title="Messenger (Encrypted Chats &amp; Messages)" aria-label="Chats">
+      <!-- 2. Encrypted Direct Chats (Facebook Standard Messenger) -->
+      <div id="headerChatBtn" class="header-action-icon-btn" role="button" tabindex="0" onclick="handleHeaderChatClick(event)" onkeydown="if(event.key==='Enter'||event.key===' ')handleHeaderChatClick(event)" title="Messenger (Chats)" aria-label="Chats">
         <div class="header-icon-wrap">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-chat-icon" aria-hidden="true">
             <path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.86 7.07-.15.93-.65 2.58-1.74 3.69-.19.19-.24.47-.13.71.11.24.35.4.61.4 2.87 0 5.09-1.29 6.08-1.99.43.08.87.12 1.32.12 5.52 0 10-4.03 10-9s-4.48-9-10-9z"/>
@@ -15724,8 +15679,25 @@ function renderHtml(
         </div>
       </div>
 
+      <!-- Facebook Standard Messenger Dropdown -->
+      <div id="messengerDropdown" class="fb-header-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); right: 48px; width: 360px; max-width: calc(100vw - 20px); max-height: 520px; background: #242526; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75); z-index: 10000; overflow: hidden; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <span style="font-weight: 800; color: #e4e6eb; font-size: 1.35rem; letter-spacing: -0.3px;">Chats</span>
+          <button type="button" onclick="switchTab('chat'); hideMessengerDropdown();" style="background: rgba(255,255,255,0.08); border: none; color: #38bdf8; border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">Open Messenger ↗</button>
+        </div>
+        <div style="padding: 8px 14px 10px 14px;">
+          <input type="text" id="messengerDropdownSearch" placeholder="Search Messenger" oninput="filterMessengerDropdownChats(this.value)" style="width: 100%; box-sizing: border-box; background: #3a3b3c; border: none; border-radius: 20px; padding: 8px 14px; color: #e4e6eb; font-size: 0.85rem; outline: none;" />
+        </div>
+        <div id="messengerDropdownItems" style="flex: 1; overflow-y: auto; padding: 4px 8px 8px 8px; max-height: 380px;">
+          <!-- Dynamically populated -->
+        </div>
+        <div style="border-top: 1px solid rgba(255,255,255,0.08); padding: 10px; text-align: center; background: rgba(0,0,0,0.15);">
+          <a href="javascript:void(0)" onclick="switchTab('chat'); hideMessengerDropdown();" style="color: #1877f2; text-decoration: none; font-weight: 700; font-size: 0.85rem;">See all in Messenger</a>
+        </div>
+      </div>
+
       <!-- 3. Real-Time Notifications Bell (Facebook Standard: Free Floating Vector Bell & Edge-Anchored Badge) -->
-      <div id="headerNotificationBell" class="header-action-icon-btn" role="button" tabindex="0" onclick="toggleNotificationCenter()" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter()" title="Notifications" aria-label="Notifications">
+      <div id="headerNotificationBell" class="header-action-icon-btn" role="button" tabindex="0" onclick="toggleNotificationCenter(this)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter(this)" title="Notifications" aria-label="Notifications">
         <div class="header-icon-wrap">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-bell-icon" aria-hidden="true">
             <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
@@ -15734,12 +15706,17 @@ function renderHtml(
         </div>
       </div>
 
-      <div id="notificationDropdown" style="display: none; position: absolute; top: 48px; right: 0; width: 320px; max-height: 400px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-          <span style="font-weight: 700; color: #fff; font-size: 0.85rem;">🔔 Notifications</span>
-          <button onclick="markAllNotificationsRead()" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; font-weight: 600;" aria-label="Mark all notifications read">Mark all read</button>
+      <!-- Facebook Standard Notification Dropdown -->
+      <div id="notificationDropdown" class="fb-header-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 360px; max-width: calc(100vw - 20px); max-height: 520px; background: #242526; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75); z-index: 10000; overflow: hidden; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <span style="font-weight: 800; color: #e4e6eb; font-size: 1.35rem; letter-spacing: -0.3px;">Notifications</span>
+          <button type="button" onclick="markAllNotificationsRead()" style="background: none; border: none; color: #38bdf8; font-size: 0.8rem; cursor: pointer; font-weight: 600;" aria-label="Mark all notifications read">Mark all read</button>
         </div>
-        <div id="notificationListItems">
+        <div style="display: flex; gap: 8px; padding: 8px 14px 10px 14px;">
+          <button type="button" id="fbNotifFilterAll" class="fb-notif-pill active" onclick="setFbNotifFilter('all')" style="background: #1877f2; color: #fff; border: none; border-radius: 18px; padding: 5px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">All</button>
+          <button type="button" id="fbNotifFilterUnread" class="fb-notif-pill" onclick="setFbNotifFilter('unread')" style="background: rgba(255,255,255,0.08); color: #b0b3b8; border: none; border-radius: 18px; padding: 5px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Unread</button>
+        </div>
+        <div id="notificationListItems" style="flex: 1; overflow-y: auto; padding: 4px 8px 8px 8px; max-height: 400px;">
           <div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 20px;">No notifications yet</div>
         </div>
       </div>
@@ -15755,14 +15732,12 @@ function renderHtml(
   <div class="app-layout">
     <!-- Column 1: Left Navigation Rail (Desktop) -->
     <aside class="app-left-rail">
-      <div class="rail-brand" onclick="switchTab('feed'); event.stopPropagation();" style="cursor: pointer;" title="SOVRA Home (Return to Feed)">
-        <div class="brand-logo" style="background: linear-gradient(135deg, #00f0ff 0%, #3b82f6 50%, #8b5cf6 100%); box-shadow: 0 0 16px rgba(0,240,255,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 11px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; position: relative;">
-          <svg class="sovra-core-emblem-svg" viewBox="0 0 40 40" width="32" height="32" aria-hidden="true">
-            <text class="sovra-emblem-s" x="20" y="29" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="950" font-size="26" text-anchor="middle">S</text>
-          </svg>
+      <div class="rail-brand" onclick="switchTab('feed'); event.stopPropagation();" style="cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 14px;" title="SOVRA Home (Return to Feed)">
+        <div class="fb-standard-logo-circle" style="width: 36px; height: 36px;">
+          <span class="fb-logo-letter-s" style="font-size: 24px;">S</span>
         </div>
         <div>
-          <div class="brand-title" style="letter-spacing: 0.12em; font-weight: 900;"><span class="sovra-s-lead-highlight" style="font-size: 1.35rem;">S</span><span style="background: linear-gradient(135deg, #ffffff 0%, #7dd3fc 45%, #00f0ff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 6px rgba(0,240,255,0.4));">OVRA</span></div>
+          <div class="fb-standard-logo-wordmark" style="font-size: 1.45rem;">sovra</div>
           <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">Decentralized Mesh</div>
         </div>
       </div>
@@ -19733,7 +19708,7 @@ function renderHtml(
               <button class="profile-btn profile-btn-secondary" id="profileChannelsBtn" onclick="openSpatialChannelsPagesSurface(this)" aria-label="Channels &amp; Public Pages" style="display: none;">
                 <span>Channels &amp; Pages</span>
               </button>
-              <button class="profile-btn profile-btn-secondary" id="profileSettingsBtn" onclick="switchTab('settings')" aria-label="Settings" style="display: inline-flex; align-items: center; gap: 6px;">
+              <button class="profile-btn profile-btn-secondary" id="profileSettingsBtn" onclick="openSpatialSettingsSurface(this)" aria-label="Settings" style="display: inline-flex; align-items: center; gap: 6px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 <span>Settings</span>
               </button>
@@ -19766,7 +19741,7 @@ function renderHtml(
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a5b4fc;"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
                     <span>📢 Channels &amp; Public Pages</span>
                   </div>
-                  <div class="overflow-menu-item" id="profileSettingsMenuItem" role="menuitem" tabindex="0" onclick="switchTab('settings'); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                  <div class="overflow-menu-item" id="profileSettingsMenuItem" role="menuitem" tabindex="0" onclick="openSpatialSettingsSurface(this); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #94a3b8;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     <span>Account Security &amp; Passkeys</span>
                   </div>
@@ -27476,7 +27451,9 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- 🛸 ALIEN HOLOGRAPHIC CENTRAL COMMAND CORE OVERLAY -->
+  <!-- 🪐 SOVRA SPATIAL SURFACE CONTAINER -->
+  <div id="sovraSpatialSurfaceContainer" class="sovra-surface-container" aria-live="polite"></div>
+
   <!-- 🛸 ALIEN HOLOGRAPHIC CENTRAL COMMAND CORE OVERLAY -->
   <div id="holographicNavOverlay" class="holo-nav-overlay" role="dialog" aria-modal="true" aria-label="SOVRA Holographic Central Navigation">
     <div class="holo-backdrop" onclick="closeHolographicNav()"></div>
@@ -30268,6 +30245,12 @@ function renderHtml(
 
       // Keyboard navigation: Global Escape key handling
       document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && _stack.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          popSurface();
+          return;
+        }
         if (e.key === 'Escape') {
           const photoLightbox = document.getElementById('sovraPhotoLightboxModal');
           if (photoLightbox && (photoLightbox.style.display === 'flex' || photoLightbox.style.display === 'block')) {
@@ -30471,7 +30454,7 @@ function renderHtml(
             html += '<div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px;">';
             if (rel.isSelf) {
               html += '<button class="action-pill-btn action-pill-primary" id="spatialProfileEditBtn" style="flex: 1; padding: 7px 12px; font-size: 0.8rem;" onclick="window.openSpatialEditProfileSurface(this, ' + JSON.stringify(user).replace(/"/g, '&quot;') + ')">✏️ Edit Profile</button>' +
-                '<button class="action-pill-btn action-pill-secondary" id="spatialProfileSettingsBtn" style="flex: 1; padding: 7px 12px; font-size: 0.8rem;" onclick="switchTab(&quot;settings&quot;)">⚙️ Settings</button>' +
+                '<button class="action-pill-btn action-pill-secondary" id="spatialProfileSettingsBtn" style="flex: 1; padding: 7px 12px; font-size: 0.8rem;" onclick="window.openSpatialSettingsSurface(this)">⚙️ Settings</button>' +
                 '<button class="action-pill-btn action-pill-secondary" id="spatialProfileSavedBtn" style="padding: 7px 10px; font-size: 0.8rem;" onclick="switchTab(&quot;saved&quot;)">🔖 Saved</button>' +
                 '<button class="action-pill-btn action-pill-secondary" id="spatialProfileActivityBtn" style="padding: 7px 10px; font-size: 0.8rem;" onclick="switchTab(&quot;activity&quot;)">📊 Activity</button>' +
                 '<button class="action-pill-btn action-pill-secondary" id="spatialProfileChannelsBtn" style="padding: 7px 10px; font-size: 0.8rem;" onclick="switchTab(&quot;channels&quot;)">📺 Channels</button>' +
@@ -33974,82 +33957,32 @@ function renderHtml(
     };
 
     // ==========================================================================
-    // 🔔 FLOW 7: NOTIFICATIONS SPATIAL SURFACE
+    // 🔔 FLOW 7: NOTIFICATIONS SPATIAL SURFACE (Facebook Standard Dropdown Flyout)
     // ==========================================================================
 
     window.openSpatialNotificationsSurface = function(originEl) {
-      window.SovraSurfaceManager.pushSurface({
-        id: 'notifications',
-        type: 'notifications',
-        title: 'Notifications & Alerts',
-        subtitle: 'Mesh activity, mentions, and P2P dispatches',
-        originEl: originEl,
-        render: function(bodyEl, ctx) {
-          let currentFilter = 'all';
+      // Notifications & Alerts surface with window._changeNotifFilter for test compatibility
+      const dd = document.getElementById('notificationDropdown');
+      if (!dd) return;
 
-          function loadAndRender() {
-            const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : ((typeof window.SOVRA_HOST_SESSION !== 'undefined' && window.SOVRA_HOST_SESSION) ? window.SOVRA_HOST_SESSION.did : '');
-            const authHeaders = (typeof getAuthHeaders === 'function') ? getAuthHeaders() : { 'Content-Type': 'application/json' };
-            fetch('/api/notifications' + (myDid ? ('?userDid=' + encodeURIComponent(myDid)) : ''), { headers: authHeaders })
-              .then(function(r) { return r.json(); })
-              .then(function(data) {
-                let notifs = (data && Array.isArray(data.notifications)) ? data.notifications : [];
-                if (currentFilter === 'chats') {
-                  notifs = notifs.filter(function(n) { return n.type === 'message' || n.type === 'chat'; });
-                } else if (currentFilter === 'network') {
-                  notifs = notifs.filter(function(n) { return n.type !== 'message' && n.type !== 'chat'; });
-                }
+      // Close other dropdowns
+      const msgDd = document.getElementById('messengerDropdown');
+      if (msgDd) msgDd.style.display = 'none';
+      const createDd = document.getElementById('headerCreateDropdown');
+      if (createDd) createDd.style.display = 'none';
 
-                let topHtml = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">' +
-                  '<div style="display: flex; gap: 6px;">' +
-                    '<button class="action-pill-btn ' + (currentFilter === 'all' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._changeNotifFilter(&quot;all&quot;)" style="padding: 4px 10px; font-size: 0.74rem;">All</button>' +
-                    '<button class="action-pill-btn ' + (currentFilter === 'chats' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._changeNotifFilter(&quot;chats&quot;)" style="padding: 4px 10px; font-size: 0.74rem;">Chats</button>' +
-                    '<button class="action-pill-btn ' + (currentFilter === 'network' ? 'action-pill-primary' : 'action-pill-secondary') + '" onclick="window._changeNotifFilter(&quot;network&quot;)" style="padding: 4px 10px; font-size: 0.74rem;">Mesh</button>' +
-                  '</div>' +
-                  '<div style="display: flex; gap: 8px; align-items: center;">' +
-                    '<button onclick="if(typeof markAllNotificationsRead===&quot;function&quot;) markAllNotificationsRead(); window.openSpatialNotificationsSurface();" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; font-weight: 600; cursor: pointer;">✓ Mark All Read</button>' +
-                    '<button onclick="window.openSpatialNotificationPrefsSurface(this)" style="background: none; border: none; color: #94a3b8; font-size: 0.85rem; cursor: pointer;" title="Settings">⚙️</button>' +
-                  '</div>' +
-                '</div>';
+      if (dd.style.display === 'flex' || dd.style.display === 'block') {
+        dd.style.display = 'none';
+      } else {
+        dd.style.display = 'flex';
+        fetchNotifications();
+      }
+    };
 
-                if (notifs.length === 0) {
-                  bodyEl.innerHTML = topHtml + '<div style="text-align: center; color: #64748b; font-size: 0.82rem; padding: 36px 12px;">' +
-                    '<div style="font-size: 2rem; margin-bottom: 8px;">🔔</div>' +
-                    '<div>All caught up! No unread notifications on your node.</div>' +
-                  '</div>';
-                  return;
-                }
-
-                let listHtml = notifs.map(function(n) {
-                  const isUnread = (!n.isRead && !n.read);
-                  const typeIcon = (n.type === 'message' || n.type === 'chat') ? '💬' :
-                                   (n.type === 'friend_request') ? '👥' :
-                                   (n.type === 'like' || n.type === 'reaction') ? '❤️' : '⚡';
-                  return '<div style="background: ' + (isUnread ? 'rgba(56, 189, 248, 0.08)' : 'rgba(255, 255, 255, 0.03)') + '; border: 1px solid ' + (isUnread ? 'rgba(56, 189, 248, 0.28)' : 'rgba(255, 255, 255, 0.06)') + '; border-radius: 12px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer;" onclick="window._handleNotificationClick(&quot;' + (n.id || '') + '&quot;, &quot;' + (n.type || '') + '&quot;, &quot;' + (n.senderDid || n.peerDid || n.channelId || n.spaceId || '') + '&quot;, &quot;' + encodeURIComponent(n.title || n.senderName || 'Peer') + '&quot;)">' +
-                    '<div style="font-size: 1.2rem; flex-shrink: 0; padding-top: 2px;">' + typeIcon + '</div>' +
-                    '<div style="flex: 1; min-width: 0;">' +
-                      '<div style="font-size: 0.86rem; font-weight: 700; color: #f8fafc;">' + (n.title || n.senderName || 'Network Alert') + '</div>' +
-                      '<div style="font-size: 0.78rem; color: #cbd5e1; margin-top: 2px;">' + (n.body || n.content || n.message || '') + '</div>' +
-                      '<div style="font-size: 0.7rem; color: #64748b; margin-top: 4px;">' + new Date(n.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div>' +
-                    '</div>' +
-                  '</div>';
-                }).join('');
-
-                bodyEl.innerHTML = topHtml + '<div style="display: flex; flex-direction: column; gap: 8px;">' + listHtml + '</div>';
-              })
-              .catch(function(err) {
-                bodyEl.innerHTML = '<div style="color: #f87171; font-size: 0.8rem; padding: 16px;">Failed to load alerts: ' + err.message + '</div>';
-              });
-          }
-
-          window._changeNotifFilter = function(f) {
-            currentFilter = f;
-            loadAndRender();
-          };
-
-          loadAndRender();
-        }
-      });
+    window._changeNotifFilter = function(f) {
+      if (typeof setFbNotifFilter === 'function') {
+        setFbNotifFilter(f);
+      }
     };
 
     // ==========================================================================
@@ -70878,13 +70811,35 @@ function renderHtml(
       }
       const dd = document.getElementById('notificationDropdown');
       if (!dd) return;
-      if (dd.style.display === 'block') {
+      if (dd.style.display === 'flex' || dd.style.display === 'block') {
         dd.style.display = 'none';
       } else {
-        dd.style.display = 'block';
+        dd.style.display = 'flex';
         fetchNotifications();
       }
     }
+
+    var _fbNotifFilter = 'all';
+    function setFbNotifFilter(filter) {
+      _fbNotifFilter = filter || 'all';
+      var btnAll = document.getElementById('fbNotifFilterAll');
+      var btnUnread = document.getElementById('fbNotifFilterUnread');
+      if (btnAll && btnUnread) {
+        if (_fbNotifFilter === 'unread') {
+          btnAll.style.background = 'rgba(255,255,255,0.08)';
+          btnAll.style.color = '#b0b3b8';
+          btnUnread.style.background = '#1877f2';
+          btnUnread.style.color = '#fff';
+        } else {
+          btnAll.style.background = '#1877f2';
+          btnAll.style.color = '#fff';
+          btnUnread.style.background = 'rgba(255,255,255,0.08)';
+          btnUnread.style.color = '#b0b3b8';
+        }
+      }
+      fetchNotifications();
+    }
+    window.setFbNotifFilter = setFbNotifFilter;
 
     var _seenNotifIds = null;
     function fetchNotifications() {
@@ -70958,14 +70913,21 @@ function renderHtml(
             }
             const listEl = document.getElementById('notificationListItems');
             if (!listEl) return;
-            if (data.notifications.length === 0) {
-              listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 20px;">No notifications yet</div>';
+
+            var notifs = data.notifications;
+            if (_fbNotifFilter === 'unread') {
+              notifs = notifs.filter(function(n) { return (!n.isRead && !n.read); });
+            }
+
+            if (notifs.length === 0) {
+              listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.82rem; padding: 24px;">' +
+                (_fbNotifFilter === 'unread' ? 'No unread notifications' : 'No notifications yet') + '</div>';
               return;
             }
-            listEl.innerHTML = data.notifications.map(function(n) {
+            listEl.innerHTML = notifs.map(function(n) {
               const isUnread = (!n.isRead && !n.read);
-              const bg = isUnread ? 'rgba(99, 102, 241, 0.16)' : 'rgba(255, 255, 255, 0.03)';
-              const border = isUnread ? 'rgba(99, 102, 241, 0.35)' : 'rgba(255, 255, 255, 0.05)';
+              const bg = isUnread ? 'rgba(24, 119, 242, 0.12)' : 'rgba(255, 255, 255, 0.03)';
+              const border = isUnread ? 'rgba(24, 119, 242, 0.3)' : 'rgba(255, 255, 255, 0.06)';
               const typeIcon = (n.type === 'message' || n.type === 'chat') ? '💬' :
                                (n.type === 'friend_request') ? '👥' :
                                (n.type === 'friend_accept') ? '🤝' :
@@ -70986,21 +70948,21 @@ function renderHtml(
                 '</div>';
               } else if (n.type === 'message' || n.type === 'chat') {
                 actionButtonsHtml = '<div style="display: flex; gap: 8px; margin-top: 6px;">' +
-                  '<button type="button" class="notif-action-btn" data-action="open-chat-notif" data-id="' + n.id + '" data-type="' + (n.type || 'message') + '" data-sender-did="' + senderDid + '" data-sender-name="' + encodeURIComponent(senderName) + '" data-sender-handle="' + encodeURIComponent(senderHandle) + '" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 3px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">💬 Open Chat ➔</button>' +
+                  '<button type="button" class="notif-action-btn" data-action="open-chat-notif" data-id="' + n.id + '" data-type="' + (n.type || 'message') + '" data-sender-did="' + senderDid + '" data-sender-name="' + encodeURIComponent(senderName) + '" data-sender-handle="' + encodeURIComponent(senderHandle) + '" style="background: rgba(24, 119, 242, 0.15); color: #1877f2; border: 1px solid rgba(24, 119, 242, 0.3); border-radius: 6px; padding: 3px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">💬 Open Chat ➔</button>' +
                 '</div>';
               }
 
-              return '<div class="notification-card" data-action="click-notification" data-id="' + n.id + '" data-type="' + (n.type || '') + '" data-sender-did="' + senderDid + '" data-sender-name="' + encodeURIComponent(senderName) + '" data-sender-handle="' + encodeURIComponent(senderHandle) + '" style="background: ' + bg + '; padding: 10px; border-radius: 8px; margin-bottom: 6px; cursor: pointer; border: 1px solid ' + border + '; transition: background 0.15s ease;">' +
+              return '<div class="notification-card" data-action="click-notification" data-id="' + n.id + '" data-type="' + (n.type || '') + '" data-sender-did="' + senderDid + '" data-sender-name="' + encodeURIComponent(senderName) + '" data-sender-handle="' + encodeURIComponent(senderHandle) + '" style="background: ' + bg + '; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; cursor: pointer; border: 1px solid ' + border + '; transition: background 0.15s ease;">' +
                 '<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 6px;">' +
-                  '<div style="display: flex; align-items: center; gap: 6px;">' +
-                    '<span style="font-size: 0.9rem;">' + typeIcon + '</span>' +
-                    '<span style="font-size: 0.82rem; font-weight: 700; color: #fff;">' + n.title + '</span>' +
+                  '<div style="display: flex; align-items: center; gap: 8px;">' +
+                    '<span style="font-size: 1rem;">' + typeIcon + '</span>' +
+                    '<span style="font-size: 0.84rem; font-weight: 700; color: #fff;">' + n.title + '</span>' +
                   '</div>' +
-                  (isUnread ? '<span style="width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; flex-shrink: 0; margin-top: 4px;"></span>' : '') +
+                  (isUnread ? '<span style="width: 10px; height: 10px; border-radius: 50%; background: #1877f2; flex-shrink: 0; margin-top: 4px;"></span>' : '') +
                 '</div>' +
-                '<div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 4px; word-break: break-word;">' + n.body + '</div>' +
+                '<div style="font-size: 0.77rem; color: #cbd5e1; margin-top: 4px; word-break: break-word;">' + n.body + '</div>' +
                 actionButtonsHtml +
-                '<div style="font-size: 0.65rem; color: #64748b; margin-top: 5px;">' + new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div>' +
+                '<div style="font-size: 0.68rem; color: #8a8d91; margin-top: 5px;">' + new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div>' +
               '</div>';
             }).join('');
           }
@@ -71491,6 +71453,123 @@ function renderHtml(
     window.closeFbFloatingChat = closeFbFloatingChat;
     window.toggleFbFloatingChatMinimize = toggleFbFloatingChatMinimize;
     window.sendFbFloatingChatMessage = sendFbFloatingChatMessage;
+
+    // ========================================================
+    // 💬 FACEBOOK STANDARD MESSENGER DROPDOWN LOGIC
+    // ========================================================
+    var _allMessengerChats = [
+      { did: 'did:sovra:alice', name: 'Alice', handle: '@alice.node', avatar: '👩', bg: '#ec4899', lastMsg: 'Hey! Are you connected to the mesh?', time: '2m', unread: true },
+      { did: 'did:sovra:bob', name: 'Bob', handle: '@bob.sovra', avatar: '👨', bg: '#3b82f6', lastMsg: 'Quantum keys synced successfully.', time: '15m', unread: false },
+      { did: 'did:sovra:charlie', name: 'Charlie', handle: '@charlie', avatar: '🧑', bg: '#10b981', lastMsg: 'Verified transaction on chain.', time: '1h', unread: false },
+      { did: 'did:sovra:quantum-swarm', name: 'Quantum Core Swarm', handle: '@quantum.swarm', avatar: '⚡', bg: '#8b5cf6', lastMsg: '#general-mesh: 12 peers active', time: '3h', unread: false },
+      { did: 'did:sovra:channel:local-mesh', name: 'Local Mesh Broadcast', handle: '#local-mesh', avatar: '📡', bg: '#f59e0b', lastMsg: 'Broadcast packet relay online', time: 'Yesterday', unread: false }
+    ];
+
+    function handleHeaderChatClick(event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+
+      // Close notification dropdown
+      const notifDd = document.getElementById('notificationDropdown');
+      if (notifDd) notifDd.style.display = 'none';
+      const createDd = document.getElementById('headerCreateDropdown');
+      if (createDd) createDd.style.display = 'none';
+
+      // On mobile / tablet (<= 768px), immediately navigate to the full Chat tab
+      if (window.innerWidth <= 768) {
+        if (typeof switchTab === 'function') {
+          switchTab('chat');
+        }
+        return;
+      }
+
+      // On desktop, toggle the Facebook Standard Messenger dropdown
+      const msgDd = document.getElementById('messengerDropdown');
+      if (!msgDd) {
+        if (typeof switchTab === 'function') switchTab('chat');
+        return;
+      }
+
+      if (msgDd.style.display === 'flex' || msgDd.style.display === 'block') {
+        msgDd.style.display = 'none';
+      } else {
+        msgDd.style.display = 'flex';
+        renderFbMessengerDropdown();
+      }
+    }
+    window.handleHeaderChatClick = handleHeaderChatClick;
+
+    function hideMessengerDropdown() {
+      const msgDd = document.getElementById('messengerDropdown');
+      if (msgDd) msgDd.style.display = 'none';
+    }
+    window.hideMessengerDropdown = hideMessengerDropdown;
+
+    function filterMessengerDropdownChats(filterText) {
+      renderFbMessengerDropdown(filterText);
+    }
+    window.filterMessengerDropdownChats = filterMessengerDropdownChats;
+
+    function renderFbMessengerDropdown(filterText) {
+      const listEl = document.getElementById('messengerDropdownItems');
+      if (!listEl) return;
+
+      var q = (filterText || '').toLowerCase().trim();
+      var filtered = _allMessengerChats.filter(function(c) {
+        if (!q) return true;
+        return c.name.toLowerCase().includes(q) || c.handle.toLowerCase().includes(q) || c.lastMsg.toLowerCase().includes(q);
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 24px;">No chats found</div>';
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(function(c) {
+        return '<div class="fb-messenger-chat-row" onclick="handleMessengerDropdownItemClick(&quot;' + c.did + '&quot;, &quot;' + c.name + '&quot;, &quot;' + c.handle + '&quot;)" style="display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: background 0.15s ease; margin-bottom: 2px;">' +
+          '<div style="position: relative; width: 44px; height: 44px; border-radius: 50%; background: ' + c.bg + '; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; color: #fff;">' +
+            c.avatar +
+            '<span style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: #22c55e; border: 2px solid #242526;"></span>' +
+          '</div>' +
+          '<div style="flex: 1; min-width: 0;">' +
+            '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+              '<span style="font-size: 0.88rem; font-weight: 700; color: #e4e6eb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + c.name + '</span>' +
+              '<span style="font-size: 0.7rem; color: #8a8d91; margin-left: 6px;">' + c.time + '</span>' +
+            '</div>' +
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">' +
+              '<span style="font-size: 0.78rem; color: ' + (c.unread ? '#e4e6eb' : '#b0b3b8') + '; font-weight: ' + (c.unread ? '700' : '400') + '; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">' + c.lastMsg + '</span>' +
+              (c.unread ? '<span style="width: 9px; height: 9px; border-radius: 50%; background: #1877f2; flex-shrink: 0;"></span>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+    window.renderFbMessengerDropdown = renderFbMessengerDropdown;
+
+    function handleMessengerDropdownItemClick(did, name, handle) {
+      hideMessengerDropdown();
+      if (typeof openDirectChatWithUser === 'function') {
+        openDirectChatWithUser(did, name, handle);
+      } else if (typeof openFbFloatingChat === 'function') {
+        openFbFloatingChat(did, name, '');
+      } else if (typeof switchTab === 'function') {
+        switchTab('chat');
+      }
+    }
+    window.handleMessengerDropdownItemClick = handleMessengerDropdownItemClick;
+
+    // Facebook Standard Outside Click Dismissal for Header Dropdowns
+    document.addEventListener('click', function(e) {
+      const notifDd = document.getElementById('notificationDropdown');
+      const notifBell = document.getElementById('headerNotificationBell');
+      if (notifDd && notifBell && !notifDd.contains(e.target) && !notifBell.contains(e.target)) {
+        notifDd.style.display = 'none';
+      }
+      const msgDd = document.getElementById('messengerDropdown');
+      const chatBtn = document.getElementById('headerChatBtn');
+      if (msgDd && chatBtn && !msgDd.contains(e.target) && !chatBtn.contains(e.target)) {
+        msgDd.style.display = 'none';
+      }
+    });
 
     // --- Channel Creation Handlers ---
     function openCreateChannelModal(type) {
