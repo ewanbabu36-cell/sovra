@@ -5089,7 +5089,7 @@ function renderHtml(
     /* =======================================================
        🛸 ALIEN GLASS-MORPHO BRAND LOGO & GATEWAY STYLES
        ======================================================= */
-    .sovra-brand-capsule, .sovra-core-gateway-btn {
+    .sovra-brand-capsule {
       display: inline-flex;
       align-items: center;
       gap: 10px;
@@ -5107,18 +5107,18 @@ function renderHtml(
       transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       overflow: hidden;
     }
-    .sovra-brand-capsule:hover, .sovra-core-gateway-btn:hover {
+    .sovra-brand-capsule:hover {
       border-color: #00f0ff;
       background: rgba(15, 28, 50, 0.85);
       box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 24px rgba(0, 240, 255, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.5);
       transform: translateY(-1px);
     }
-    .sovra-brand-capsule:active, .sovra-core-gateway-btn:active {
+    .sovra-brand-capsule:active {
       transform: scale(0.97);
     }
 
     /* 🌟 Alien Glassmorphic Light Shimmer Sweep (Smooth & High-Tech) */
-    .sovra-brand-capsule::after, .sovra-core-gateway-btn::after {
+    .sovra-brand-capsule::after {
       content: "";
       position: absolute;
       top: -60%;
@@ -5158,7 +5158,6 @@ function renderHtml(
     /* ======================================================== */
     /* 🍏 APPLE / SIRI & OPTICAL FINGERPRINT SCANNER "S" LOGO   */
     /* ======================================================== */
-    .sovra-core-gateway-btn,
     .siri-fingerprint-btn {
       display: inline-flex !important;
       align-items: center !important;
@@ -5175,11 +5174,9 @@ function renderHtml(
       border-radius: 50% !important;
       transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
-    .sovra-core-gateway-btn:hover,
     .siri-fingerprint-btn:hover {
       transform: scale(1.08) !important;
     }
-    .sovra-core-gateway-btn:active,
     .siri-fingerprint-btn:active {
       transform: scale(0.92) !important;
     }
@@ -5191,11 +5188,11 @@ function renderHtml(
     .fb-brand-logo-btn {
       display: inline-flex !important;
       align-items: center !important;
-      gap: 10px !important;
       cursor: pointer !important;
       text-decoration: none !important;
       background: transparent !important;
       border: none !important;
+      box-shadow: none !important;
       padding: 0 !important;
       outline: none !important;
       user-select: none !important;
@@ -5203,7 +5200,7 @@ function renderHtml(
     }
     .sovra-core-gateway-btn:hover,
     .fb-brand-logo-btn:hover {
-      opacity: 0.92 !important;
+      opacity: 0.94 !important;
       transform: scale(1.02) !important;
     }
     .sovra-core-gateway-btn:active,
@@ -5211,7 +5208,7 @@ function renderHtml(
       transform: scale(0.96) !important;
     }
 
-    /* Crisp Facebook Standard Solid Blue Circle Badge (#1877f2) */
+    /* Mobile / Small Screen: Solid Blue Circle Badge (#1877f2) with White 'S' */
     .fb-standard-logo-circle {
       position: relative !important;
       width: 40px !important;
@@ -5227,7 +5224,6 @@ function renderHtml(
       border: none !important;
     }
 
-    /* Bold Facebook-Standard Letter S */
     .fb-logo-letter-s {
       color: #ffffff !important;
       fill: #ffffff !important;
@@ -5241,21 +5237,54 @@ function renderHtml(
       display: block !important;
     }
 
-    /* Bold Facebook-Standard Blue "sovra" Wordmark */
-    .fb-standard-logo-wordmark {
-      color: #1877f2 !important;
+    /* Big Screen: Solid Blue Badge (#1877f2) with Bold White "SOVRA" (in the exact same style as S) */
+    .fb-standard-logo-badge {
+      height: 38px !important;
+      padding: 0 16px !important;
+      background: #1877f2 !important;
+      border-radius: 20px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-shadow: 0 2px 10px rgba(24, 119, 242, 0.45) !important;
+      flex-shrink: 0 !important;
+      border: none !important;
+      user-select: none !important;
+    }
+
+    .fb-logo-wordmark-bold {
+      color: #ffffff !important;
+      fill: #ffffff !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-      font-size: 1.65rem !important;
-      font-weight: 800 !important;
-      letter-spacing: -0.7px !important;
+      font-size: 1.45rem !important;
+      font-weight: 900 !important;
+      letter-spacing: 0.5px !important;
       line-height: 1 !important;
       user-select: none !important;
       display: inline-block !important;
+      text-transform: uppercase !important;
+    }
+
+    .fb-standard-logo-wordmark {
+      display: none !important;
+    }
+
+    /* Responsive visibility: Big Screen removes single S circle, shows full bold white SOVRA badge */
+    @media (min-width: 521px) {
+      .fb-standard-logo-circle {
+        display: none !important;
+      }
+      .fb-standard-logo-badge {
+        display: inline-flex !important;
+      }
     }
 
     @media (max-width: 520px) {
-      .fb-standard-logo-wordmark {
-        display: none !important; /* Clean Facebook-standard circle icon on compact mobile */
+      .fb-standard-logo-badge {
+        display: none !important;
+      }
+      .fb-standard-logo-circle {
+        display: flex !important;
       }
     }
 
@@ -6887,7 +6916,7 @@ function renderHtml(
         width: 260px;
         height: 260px;
       }
-      .sovra-brand-capsule, .sovra-core-gateway-btn {
+      .sovra-brand-capsule {
         padding: 3px 10px 3px 4px;
         gap: 6px;
       }
@@ -15629,10 +15658,15 @@ function renderHtml(
 
       <!-- SOVRA Facebook Standard Logo (Clean, Crisp & Permanent) -->
       <div id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="switchTab('feed'); event.stopPropagation();" aria-label="Open SOVRA holographic command center" title="SOVRA Home (Return to Feed)">
+        <!-- Mobile View (<=520px): Single "S" Circle Badge -->
         <div class="fb-standard-logo-circle">
           <span class="fb-logo-letter-s">S</span>
         </div>
-        <span class="fb-standard-logo-wordmark">sovra</span>
+        <!-- Big Screen (>520px): Solid Blue Badge with Bold White "SOVRA" (in the exact same style as S) -->
+        <div class="fb-standard-logo-badge">
+          <span class="fb-logo-wordmark-bold">SOVRA</span>
+        </div>
+        <span class="fb-standard-logo-wordmark" style="display: none;">sovra</span>
       </div>
 
       <!-- Fresh, Neat & Streamlined Search Bar (Zero Popup - 100% Inline Dropdown) -->
