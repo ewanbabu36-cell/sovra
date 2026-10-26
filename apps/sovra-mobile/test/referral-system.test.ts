@@ -20,6 +20,7 @@ describe('Viral Referral & Invite System (Invite & Earn SOV)', () => {
   const charlieDid = 'did:key:z6MkuCharlieReferralTest3333333333333';
 
   beforeEach(() => {
+    sovraDb.load();
     // Reset/ensure test users in database
     const dbAny = sovraDb as any;
     if (dbAny && dbAny.db) {

@@ -182,6 +182,7 @@ export interface ConversationSummary {
   status: CachedMessage['status'];
   isBitChat?: boolean | undefined;
   isChannel?: boolean | undefined;
+  isGroup?: boolean | undefined;
 }
 
 export interface CachedUser {
@@ -237,6 +238,27 @@ export interface ClientSyncState {
   activeVectorClock: Record<string, number>;
 }
 
+export interface CachedGroup {
+  id: string;
+  name: string;
+  description?: string | undefined;
+  avatarEmoji?: string | undefined;
+  creatorDid: string;
+  memberDids: string[];
+  createdAt: number;
+  lastMessageText?: string | undefined;
+  lastMessageTimestamp?: number | undefined;
+}
+
+export interface CachedSavedVideo {
+  videoId: string;
+  title: string;
+  channelName: string;
+  duration: number;
+  thumbnail?: string | undefined;
+  savedAt: number;
+}
+
 export interface LocalDatabaseSchema {
   version: number;
   users: Record<string, CachedUser>;
@@ -246,6 +268,8 @@ export interface LocalDatabaseSchema {
   messages: Record<string, CachedMessage>;
   channels: Record<string, CachedChannel>;
   custom_channels: Record<string, CachedChannel>;
+  groups: Record<string, CachedGroup>;
+  saved_videos: Record<string, CachedSavedVideo>;
   operations: Record<string, QueuedOperation>;
   outbox: Record<string, QueuedOperation>;
   inbox: Record<string, { id: string; envelopeId: string; receivedAt: number; senderDid: string }>;
@@ -418,7 +442,7 @@ export function resolveStorageDriver(customDriver?: IStorageDriver): IStorageDri
 export class LocalSchemaMigrator {
   public static migrate(raw: any): LocalDatabaseSchema {
     const defaultSchema: LocalDatabaseSchema = {
-      version: 7,
+      version: 8,
       users: {},
       profiles: {},
       posts: {},
@@ -426,6 +450,8 @@ export class LocalSchemaMigrator {
       messages: {},
       channels: {},
       custom_channels: {},
+      groups: {},
+      saved_videos: {},
       operations: {},
       outbox: {},
       inbox: {},
@@ -459,6 +485,8 @@ export class LocalSchemaMigrator {
       messages: raw.messages || {},
       channels: raw.channels || {},
       custom_channels: raw.custom_channels || {},
+      groups: raw.groups || {},
+      saved_videos: raw.saved_videos || {},
       operations: raw.operations || {},
       outbox: raw.outbox || {},
       inbox: raw.inbox || {},
@@ -476,8 +504,8 @@ export class LocalSchemaMigrator {
       },
     };
 
-    if (currentVersion < 7) {
-      migrated.version = 7;
+    if (currentVersion < 8) {
+      migrated.version = 8;
       if (!migrated.wallet_ledger) migrated.wallet_ledger = {};
       if (!migrated.guardians) migrated.guardians = {};
       if (!migrated.bookmarks) migrated.bookmarks = {};
@@ -486,6 +514,8 @@ export class LocalSchemaMigrator {
       if (!migrated.reactions) migrated.reactions = {};
       if (!migrated.live_streams) migrated.live_streams = {};
       if (!migrated.custom_channels) migrated.custom_channels = {};
+      if (!migrated.groups) migrated.groups = {};
+      if (!migrated.saved_videos) migrated.saved_videos = {};
     }
 
     return migrated;
@@ -915,6 +945,24 @@ export class SovraLocalDatabase {
       }
     }
 
+    // Include E2EE Multi-Party Groups
+    for (const group of Object.values(this.state.groups || {})) {
+      if (!summaries.find(s => s.threadId === group.id)) {
+        summaries.push({
+          threadId: group.id,
+          peerDid: group.id,
+          peerName: `${group.avatarEmoji || '👥'} ${group.name}`,
+          lastMessageText: group.lastMessageText || 'Group created',
+          lastMessageTimestamp: group.lastMessageTimestamp || group.createdAt,
+          unreadCount: 0,
+          status: 'delivered',
+          isBitChat: true,
+          isChannel: false,
+          isGroup: true,
+        });
+      }
+    }
+
     return summaries.sort((a, b) => b.lastMessageTimestamp - a.lastMessageTimestamp);
   }
 
@@ -1240,12 +1288,59 @@ export class SovraLocalDatabase {
   }
 
   // ==========================================
+  // E2EE MULTI-PARTY GROUPS (CYCLE 9)
+  // ==========================================
+
+  public async saveGroup(group: CachedGroup): Promise<void> {
+    if (!this.state.groups) {
+      this.state.groups = {};
+    }
+    this.state.groups[group.id] = group;
+    await this.persist();
+  }
+
+  public getGroups(): CachedGroup[] {
+    return Object.values(this.state.groups || {}).sort((a, b) => (b.lastMessageTimestamp || b.createdAt) - (a.lastMessageTimestamp || a.createdAt));
+  }
+
+  public getGroup(id: string): CachedGroup | null {
+    return this.state.groups?.[id] || null;
+  }
+
+  // ==========================================
+  // SOVEREIGN WATCH LATER / PLAYLISTS (CYCLE 9)
+  // ==========================================
+
+  public async saveVideoToWatchLater(video: CachedSavedVideo): Promise<void> {
+    if (!this.state.saved_videos) {
+      this.state.saved_videos = {};
+    }
+    this.state.saved_videos[video.videoId] = video;
+    await this.persist();
+  }
+
+  public getSavedVideos(): CachedSavedVideo[] {
+    return Object.values(this.state.saved_videos || {}).sort((a, b) => b.savedAt - a.savedAt);
+  }
+
+  public async removeSavedVideo(videoId: string): Promise<void> {
+    if (this.state.saved_videos && this.state.saved_videos[videoId]) {
+      delete this.state.saved_videos[videoId];
+      await this.persist();
+    }
+  }
+
+  public isSavedVideo(videoId: string): boolean {
+    return Boolean(this.state.saved_videos?.[videoId]);
+  }
+
+  // ==========================================
   // EMERGENCY DATA WIPE (PANIC)
   // ==========================================
 
   public async emergencyPanicWipe(): Promise<void> {
     this.state = {
-      version: 7,
+      version: 8,
       users: {},
       profiles: {},
       posts: {},
@@ -1253,6 +1348,8 @@ export class SovraLocalDatabase {
       messages: {},
       channels: {},
       custom_channels: {},
+      groups: {},
+      saved_videos: {},
       operations: {},
       outbox: {},
       inbox: {},

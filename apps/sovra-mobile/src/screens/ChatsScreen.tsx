@@ -25,6 +25,8 @@ import {
   getActiveUserDid,
   createMeshChannel,
   fetchMeshChannels,
+  createGroupChat,
+  fetchGroupChats,
 } from '../services/api.js';
 import { localDb, type ConversationSummary } from '../services/local-database.js';
 import { syncEngine } from '../services/sync-engine.js';
@@ -287,6 +289,225 @@ export function CreateChannelModal({
   );
 }
 
+export function CreateGroupModal({
+  isOpen,
+  onClose,
+  onGroupCreated,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onGroupCreated: (group: any) => void;
+}): React.JSX.Element | null {
+  const [groupName, setGroupName] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedEmoji, setSelectedEmoji] = useState('👥');
+  const [selectedMembers, setSelectedMembers] = useState<string[]>(['did:key:z6MksAliceP2P']);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const emojiList = ['👥', '🚀', '⚡', '🛡️', '🌐', '💬', '🔥', '💎'];
+  const availableContacts = [
+    { did: 'did:key:z6MksAliceP2P', name: 'Alice (P2P Architect)' },
+    { did: 'did:key:z6MksBobValidator', name: 'Bob (Sovereign Validator)' },
+    { did: 'did:key:z6MksCharlieRelay', name: 'Charlie (Mesh Relay)' },
+  ];
+
+  if (!isOpen) return null;
+
+  const toggleMember = (did: string) => {
+    setSelectedMembers(prev =>
+      prev.includes(did) ? prev.filter(d => d !== did) : [...prev, did]
+    );
+  };
+
+  const handleCreate = async () => {
+    const cleanName = groupName.trim();
+    if (!cleanName) {
+      setError('Please provide a group name');
+      return;
+    }
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await createGroupChat({
+        name: cleanName,
+        memberDids: selectedMembers,
+        description: description.trim() || undefined,
+        avatarEmoji: selectedEmoji,
+      });
+      if (res.ok && res.group) {
+        onGroupCreated(res.group);
+        setGroupName('');
+        setDescription('');
+        onClose();
+      } else {
+        throw new Error(res.error || 'Failed to create group');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Group creation error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          backgroundColor: '#0f172a',
+          borderRadius: 20,
+          border: '1px solid rgba(255,255,255,0.15)',
+          padding: 20,
+          width: '100%',
+          maxWidth: 380,
+          color: '#fff',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+          boxShadow: '0 20px 40px rgba(0,0,0,0.8)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>New E2EE Group</h3>
+            <span style={{ fontSize: 11, color: '#38bdf8' }}>🔐 Multi-Party Sovereign Room</span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 18, cursor: 'pointer' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ padding: '8px 12px', backgroundColor: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: 8, fontSize: 11, color: '#f87171' }}>
+            {error}
+          </div>
+        )}
+
+        <div>
+          <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+            Group Icon
+          </label>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+            {emojiList.map(em => (
+              <button
+                key={em}
+                type="button"
+                onClick={() => setSelectedEmoji(em)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  backgroundColor: selectedEmoji === em ? '#0284c7' : '#1e293b',
+                  border: selectedEmoji === em ? '2px solid #38bdf8' : '1px solid #334155',
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {em}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+            Group Name
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Dev Swarm, Cosmos Core"
+            value={groupName}
+            onChange={e => setGroupName(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 8,
+              color: '#fff',
+              fontSize: 13,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+            Select Members
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 120, overflowY: 'auto' }}>
+            {availableContacts.map(c => {
+              const isSelected = selectedMembers.includes(c.did);
+              return (
+                <div
+                  key={c.did}
+                  onClick={() => toggleMember(c.did)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.15)' : '#1e293b',
+                    border: isSelected ? '1px solid #38bdf8' : '1px solid #334155',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: '#e2e8f0' }}>{c.name}</span>
+                  <span style={{ fontSize: 12, color: isSelected ? '#38bdf8' : '#64748b' }}>
+                    {isSelected ? '✓' : '+'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <button
+          onClick={handleCreate}
+          disabled={isSubmitting}
+          style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: isSubmitting ? '#334155' : '#00a884',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            marginTop: 4,
+          }}
+        >
+          {isSubmitting ? 'Creating Group...' : 'Create Sovereign Group 👥'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export interface ActiveRecipient {
   did: string;
   name: string;
@@ -333,8 +554,9 @@ export function ChatsScreen(): React.JSX.Element {
   const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Custom channels state
+  // Custom channels & groups state
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [customChannels, setCustomChannels] = useState<any[]>([]);
 
   useEffect(() => {
@@ -348,6 +570,8 @@ export function ChatsScreen(): React.JSX.Element {
           );
           setCustomChannels(filtered);
         }
+        await fetchGroupChats();
+        if (mounted) refreshConversations();
       } catch {}
     };
     loadChannels();
@@ -2029,6 +2253,39 @@ export function ChatsScreen(): React.JSX.Element {
         <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#0b141a' }}>
           {subTab === 'chats' && (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '10px 16px',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  backgroundColor: '#111b21',
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                  Conversations ({conversations.length})
+                </span>
+                <button
+                  onClick={() => setIsCreateGroupOpen(true)}
+                  style={{
+                    backgroundColor: '#00a884',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 16,
+                    padding: '4px 12px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <span>👥</span>
+                  <span>New Group</span>
+                </button>
+              </div>
               {conversations.map(conv => (
                 <div
                   key={conv.threadId}
@@ -2408,6 +2665,19 @@ export function ChatsScreen(): React.JSX.Element {
         isOpen={isCreateChannelOpen}
         onClose={() => setIsCreateChannelOpen(false)}
         onChannelCreated={ch => setCustomChannels(prev => [ch, ...prev])}
+      />
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onGroupCreated={group => {
+          refreshConversations();
+          setActiveRecipient({
+            did: group.id,
+            name: `${group.avatarEmoji || '👥'} ${group.name}`,
+            isBitChat: true,
+            isEmergency: false,
+          });
+        }}
       />
       {/* Persistent Network & BLE Mesh Status Bar */}
       <div

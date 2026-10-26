@@ -24,6 +24,11 @@ import {
   likeFeedComment,
   repostFeedPost,
   saveFeedPost,
+  searchGlobal,
+  followUser,
+  unfollowUser,
+  type GlobalSearchResult,
+  type GlobalSearchUser,
 } from '../services/api.js';
 import { localDb } from '../services/local-database.js';
 import { syncEngine } from '../services/sync-engine.js';
@@ -328,6 +333,369 @@ export function StoryComposerModal({
   );
 }
 
+export function ExploreSearchModal({
+  isOpen,
+  onClose,
+  onSelectPost,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectPost?: (postId: string) => void;
+}): React.JSX.Element | null {
+  if (!isOpen) return null;
+
+  const [query, setQuery] = useState('');
+  const [scope, setScope] = useState<'all' | 'people' | 'posts' | 'channels' | 'tags'>('all');
+  const [isSearching, setIsSearching] = useState(false);
+  const [results, setResults] = useState<GlobalSearchResult>({ users: [], posts: [], topics: [], channels: [] });
+  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+
+  const trendingTags = ['#sovra', '#p2p_mesh', '#webrtc', '#privacy', '#cosmwasm', '#zk_identity'];
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setResults({ users: [], posts: [], topics: [], channels: [] });
+      setIsSearching(false);
+      return;
+    }
+
+    let active = true;
+    setIsSearching(true);
+    const debounceTimer = setTimeout(async () => {
+      try {
+        const res = await searchGlobal(q, scope);
+        if (active) {
+          setResults(res);
+        }
+      } catch (err) {
+        console.warn('[ExploreSearch] Search error:', err);
+      } finally {
+        if (active) setIsSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(debounceTimer);
+    };
+  }, [query, scope]);
+
+  const handleToggleFollow = async (user: GlobalSearchUser) => {
+    const currentlyFollowing = !!followingMap[user.did];
+    setFollowingMap(prev => ({ ...prev, [user.did]: !currentlyFollowing }));
+
+    try {
+      if (currentlyFollowing) {
+        await unfollowUser(user.did);
+      } else {
+        await followUser(user.did);
+      }
+    } catch {
+      setFollowingMap(prev => ({ ...prev, [user.did]: currentlyFollowing }));
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        backgroundColor: '#090d16',
+        color: '#fff',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Search Header */}
+      <div
+        style={{
+          padding: '12px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          backgroundColor: '#0b141a',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: '#182229',
+            borderRadius: 24,
+            padding: '8px 14px',
+            gap: 8,
+            border: '1px solid #334155',
+          }}
+        >
+          <span style={{ fontSize: 14, color: '#94a3b8' }}>🔍</span>
+          <input
+            type="text"
+            placeholder="Search @handles, #tags, posts, channels..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            autoFocus
+            style={{
+              flex: 1,
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: '#fff',
+              fontSize: 13,
+              outline: 'none',
+            }}
+          />
+          {query.length > 0 && (
+            <button
+              onClick={() => setQuery('')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#38bdf8',
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: 'pointer',
+            padding: '6px 4px',
+          }}
+        >
+          Done
+        </button>
+      </div>
+
+      {/* Scope Filter Tabs */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 6,
+          padding: '8px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          backgroundColor: '#090d16',
+          overflowX: 'auto',
+        }}
+      >
+        {(['all', 'people', 'posts', 'channels', 'tags'] as const).map(sc => (
+          <button
+            key={sc}
+            onClick={() => setScope(sc)}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 16,
+              border: 'none',
+              backgroundColor: scope === sc ? '#38bdf8' : 'rgba(255,255,255,0.08)',
+              color: scope === sc ? '#000' : '#cbd5e1',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              textTransform: 'capitalize',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {sc}
+          </button>
+        ))}
+      </div>
+
+      {/* Results Viewport */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        {/* Trending Tags (Shown when no search query) */}
+        {!query.trim() && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', marginBottom: 10, letterSpacing: 0.5 }}>
+              🔥 TRENDING SWARM TOPICS
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+              {trendingTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setQuery(tag)}
+                  style={{
+                    padding: '8px 14px',
+                    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                    border: '1px solid rgba(56, 189, 248, 0.25)',
+                    borderRadius: 20,
+                    color: '#38bdf8',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ textAlign: 'center', padding: '32px 16px', color: '#64748b' }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>📡</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8' }}>Decentralized P2P Explorer</div>
+              <div style={{ fontSize: 11, marginTop: 4 }}>
+                Discover sovereign peers, community broadcast channels, and trending posts across the mesh network.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Searching Loader */}
+        {isSearching && (
+          <div style={{ textAlign: 'center', padding: 24, color: '#38bdf8', fontSize: 12 }}>
+            Searching swarm index... ⚡
+          </div>
+        )}
+
+        {/* Users / People Results */}
+        {(scope === 'all' || scope === 'people') && results.users.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', marginBottom: 8 }}>
+              PEOPLE ({results.users.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {results.users.map(u => {
+                const isFoll = followingMap[u.did] ?? u.isFollowing;
+                return (
+                  <div
+                    key={u.did}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      backgroundColor: '#182229',
+                      borderRadius: 12,
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: '50%',
+                          backgroundColor: '#0284c7',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 16,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {u.avatar || u.displayName.slice(0, 1)}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{u.displayName}</div>
+                        <div style={{ fontSize: 11, color: '#38bdf8' }}>@{u.handle.replace(/^@/, '')}</div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleToggleFollow(u)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: 18,
+                        border: 'none',
+                        backgroundColor: isFoll ? '#334155' : '#38bdf8',
+                        color: isFoll ? '#cbd5e1' : '#000',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {isFoll ? 'Following' : 'Follow'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Channels Results */}
+        {(scope === 'all' || scope === 'channels') && results.channels.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', marginBottom: 8 }}>
+              CHANNELS ({results.channels.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {results.channels.map(c => (
+                <div
+                  key={c.id}
+                  style={{
+                    padding: '10px 12px',
+                    backgroundColor: '#182229',
+                    borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{c.name}</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                    {c.topic || 'Decentralized Peer Mesh Community'} &bull; 👥 {c.subscriberCount || 1}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Posts Results */}
+        {(scope === 'all' || scope === 'posts') && results.posts.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', marginBottom: 8 }}>
+              POSTS ({results.posts.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {results.posts.map(p => (
+                <div
+                  key={p.id}
+                  onClick={() => onSelectPost?.(p.id)}
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#182229',
+                    borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    cursor: onSelectPost ? 'pointer' : 'default',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#38bdf8' }}>{p.authorName}</span>
+                    <span style={{ fontSize: 10, color: '#64748b' }}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'Recent'}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.4 }}>{p.caption}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {query.trim() && !isSearching && results.users.length === 0 && results.posts.length === 0 && results.channels.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>No matches found for &ldquo;{query}&rdquo;</div>
+            <div style={{ fontSize: 11, marginTop: 4, color: '#64748b' }}>
+              Try searching by a different keyword or checking one of the trending tags above.
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function FeedScreen(): React.JSX.Element {
   const [stories, setStories] = useState<MobileStoryItem[]>(INITIAL_STORIES);
   const [posts, setPosts] = useState<FeedPost[]>(INITIAL_POSTS);
@@ -335,6 +703,7 @@ export function FeedScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [feedFilter, setFeedFilter] = useState<'for-you' | 'trending'>('for-you');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Full-screen Story Viewer state
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
@@ -812,6 +1181,20 @@ export function FeedScreen(): React.JSX.Element {
         </div>
 
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            aria-label="Search & Explore"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#38bdf8',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            🔍
+          </button>
           <button
             onClick={() => setIsCreateOpen(true)}
             aria-label="Create Post"
@@ -1835,6 +2218,16 @@ export function FeedScreen(): React.JSX.Element {
         onStoryPublished={newStory => {
           setStories(prev => [newStory, ...prev]);
           showToast('✓ 24h Story broadcasted to peer swarm!');
+        }}
+      />
+
+      {/* Explore & Search Modal */}
+      <ExploreSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSelectPost={(postId) => {
+          setIsSearchOpen(false);
+          openComments(postId);
         }}
       />
     </div>

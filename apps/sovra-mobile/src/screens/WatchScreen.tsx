@@ -27,6 +27,10 @@ import {
   pollLiveStreamSignals,
   leaveLiveStream,
   sendLiveStreamTip,
+  saveVideoToWatchLater,
+  fetchSavedVideos,
+  removeSavedVideo,
+  checkIsVideoSaved,
 } from '../services/api.js';
 
 export interface WatchVideoComment {
@@ -1028,10 +1032,23 @@ export function WatchScreen(): React.JSX.Element {
 
   // Live streaming states
   const [isBroadcasterOpen, setIsBroadcasterOpen] = useState(false);
-  const [watchTab, setWatchTab] = useState<'videos' | 'live'>('videos');
+  const [watchTab, setWatchTab] = useState<'videos' | 'live' | 'saved'>('videos');
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
   const [selectedLiveStream, setSelectedLiveStream] = useState<any | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
+
+  // Saved / Watch Later states
+  const [savedVideos, setSavedVideos] = useState<any[]>([]);
+  const [isVideoSaved, setIsVideoSaved] = useState(false);
+
+  const loadSavedVideos = useCallback(async () => {
+    try {
+      const list = await fetchSavedVideos();
+      setSavedVideos(list || []);
+    } catch {
+      setSavedVideos([]);
+    }
+  }, []);
 
   const loadLiveStreams = useCallback(async () => {
     try {
@@ -1045,8 +1062,37 @@ export function WatchScreen(): React.JSX.Element {
   useEffect(() => {
     if (watchTab === 'live') {
       loadLiveStreams();
+    } else if (watchTab === 'saved') {
+      loadSavedVideos();
     }
-  }, [watchTab, loadLiveStreams]);
+  }, [watchTab, loadLiveStreams, loadSavedVideos]);
+
+  useEffect(() => {
+    if (video?.id) {
+      setIsVideoSaved(checkIsVideoSaved(video.id));
+    }
+  }, [video?.id]);
+
+  const handleToggleSaveVideo = async () => {
+    if (!video) return;
+    const vId = video.id || selectedVideoId;
+    if (isVideoSaved) {
+      await removeSavedVideo(vId);
+      setIsVideoSaved(false);
+      showToast('Removed from Watch Later');
+    } else {
+      await saveVideoToWatchLater({
+        videoId: vId,
+        title: video.title || 'Untitled Sovereign Video',
+        channelName: video.channelName || 'Sovereign Peer',
+        duration: duration || 180,
+        thumbnail: video.thumbnail,
+      });
+      setIsVideoSaved(true);
+      showToast('✓ Saved to Watch Later');
+    }
+    loadSavedVideos();
+  };
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -1331,6 +1377,21 @@ export function WatchScreen(): React.JSX.Element {
         >
           🔴 Live Swarms ({liveStreams.length})
         </button>
+        <button
+          onClick={() => setWatchTab('saved')}
+          style={{
+            padding: '8px 14px',
+            backgroundColor: watchTab === 'saved' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+            color: watchTab === 'saved' ? '#10b981' : '#8696a0',
+            border: 'none',
+            borderRadius: 16,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          🔖 Saved ({savedVideos.length})
+        </button>
       </div>
 
       {/* Toast Alert */}
@@ -1530,6 +1591,147 @@ export function WatchScreen(): React.JSX.Element {
                 </div>
               </div>
             ))
+          )}
+        </div>
+      ) : watchTab === 'saved' ? (
+        /* SAVED / WATCH LATER VIEW */
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: '#10b981', margin: 0 }}>
+              🔖 Watch Later & Saved Playlists
+            </h2>
+            <span style={{ fontSize: 11, color: '#8696a0' }}>{savedVideos.length} Saved</span>
+          </div>
+
+          {savedVideos.length === 0 ? (
+            <div
+              style={{
+                backgroundColor: '#111b21',
+                borderRadius: 12,
+                padding: '36px 20px',
+                textAlign: 'center',
+                border: '1px dashed rgba(255,255,255,0.1)',
+              }}
+            >
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🔖</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>
+                No Saved Videos Yet
+              </div>
+              <div style={{ fontSize: 11, color: '#8696a0', maxWidth: 280, margin: '0 auto 16px auto' }}>
+                Tap 'Save' on any video to add it to your sovereign offline Watch Later playlist.
+              </div>
+              <button
+                onClick={() => setWatchTab('videos')}
+                style={{
+                  backgroundColor: '#0284c7',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 20,
+                  padding: '8px 18px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Explore Video Catalog 📺
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {savedVideos.map(sv => (
+                <div
+                  key={sv.videoId}
+                  style={{
+                    display: 'flex',
+                    gap: 12,
+                    backgroundColor: '#111b21',
+                    borderRadius: 12,
+                    padding: 10,
+                    alignItems: 'center',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div
+                    onClick={() => {
+                      setSelectedVideoId(sv.videoId);
+                      setWatchTab('videos');
+                    }}
+                    style={{
+                      width: 90,
+                      height: 54,
+                      backgroundColor: '#1e293b',
+                      borderRadius: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      position: 'relative',
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>▶</span>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        bottom: 2,
+                        right: 4,
+                        fontSize: 9,
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        color: '#fff',
+                        padding: '1px 3px',
+                        borderRadius: 2,
+                      }}
+                    >
+                      {formatSeconds(sv.duration || 180)}
+                    </span>
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      onClick={() => {
+                        setSelectedVideoId(sv.videoId);
+                        setWatchTab('videos');
+                      }}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#f1f5f9',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {sv.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{sv.channelName}</div>
+                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
+                      Saved {new Date(sv.savedAt).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      await removeSavedVideo(sv.videoId);
+                      loadSavedVideos();
+                      if (video?.id === sv.videoId) setIsVideoSaved(false);
+                      showToast('Removed from Watch Later');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#ef4444',
+                      fontSize: 14,
+                      cursor: 'pointer',
+                      padding: 6,
+                    }}
+                    title="Remove"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       ) : (
@@ -1887,6 +2089,27 @@ export function WatchScreen(): React.JSX.Element {
             }}
           >
             ⬇️ Download
+          </button>
+
+          {/* Watch Later / Save Button */}
+          <button
+            onClick={handleToggleSaveVideo}
+            style={{
+              backgroundColor: isVideoSaved ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.08)',
+              color: isVideoSaved ? '#10b981' : '#cbd5e1',
+              border: isVideoSaved ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 9999,
+              padding: '6px 12px',
+              fontSize: 11,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span>{isVideoSaved ? '✓ Saved' : '🔖 Save'}</span>
           </button>
         </div>
 
