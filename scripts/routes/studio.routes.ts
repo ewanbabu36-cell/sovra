@@ -1724,6 +1724,152 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
+  // 16. GET /api/channel/hub - Standalone YouTube-Style Full Channel Hub Data
+  if (url.pathname === '/api/channel/hub' && req.method === 'GET') {
+    const channelId = url.searchParams.get('id') || url.searchParams.get('channelId') || '';
+    const handle = url.searchParams.get('handle') || '';
+    const query = channelId || handle;
+    let ch = (sovraDb as any).getChannelByHandleOrId ? (sovraDb as any).getChannelByHandleOrId(query) : sovraDb.getChannelById(channelId);
+    
+    if (!ch && (handle || channelId)) {
+      const cleanH = (handle || '').toLowerCase().replace(/^@/, '');
+      const vid = ((sovraDb as any).db?.videos || []).find((v: any) =>
+        (channelId && v.channelId === channelId) ||
+        (cleanH && (v.channelHandle || '').toLowerCase().replace(/^@/, '') === cleanH)
+      );
+      if (vid || cleanH === 'sovralab') {
+        ch = {
+          id: vid?.channelId || ('ch_' + (cleanH || 'unknown')),
+          name: vid?.channelName || (cleanH === 'sovralab' ? 'Sovra Protocol Lab' : ('@' + cleanH)),
+          handle: vid?.channelHandle || ('@' + cleanH),
+          desc: vid?.description || 'Official sovereign video hub for decentralized streaming and creator economies.',
+          avatar: vid?.channelAvatar || '🎬',
+          bg: '#6366f1',
+          bannerUrl: 'linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899)',
+          verified: true,
+          count: 142000,
+          channelType: 'video',
+          ownerDid: vid?.ownerDid || 'did:sovra:channel_lab_4k_master_stream'
+        };
+      }
+    }
+    
+    if (!ch) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Channel not found' }));
+      return true;
+    }
+
+    const allVideos = (sovraDb as any).db?.videos || [];
+    const cleanHandle = ch.handle ? ch.handle.replace(/^@/, '') : '';
+    const channelVideos = allVideos.filter((v: any) => 
+      v.channelId === ch.id || 
+      (cleanHandle && v.channelHandle && v.channelHandle.replace(/^@/, '').toLowerCase() === cleanHandle.toLowerCase()) ||
+      (v.channelName && v.channelName.toLowerCase() === ch.name.toLowerCase())
+    );
+
+    const fullVideos = channelVideos.filter((v: any) => !v.isReel && !v.isShort);
+    const shorts = channelVideos.filter((v: any) => v.isReel || v.isShort);
+    const totalViews = channelVideos.reduce((acc: number, v: any) => acc + (v.viewsCount || v.views || 0), 0);
+
+    const allPosts = (sovraDb as any).db?.posts || [];
+    const communityPosts = allPosts.filter((p: any) => 
+      p.channelId === ch.id || (p.authorDid && ch.ownerDid && p.authorDid === ch.ownerDid)
+    ).slice(0, 20);
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      channel: ch,
+      videos: fullVideos,
+      shorts: shorts,
+      community: communityPosts,
+      stats: {
+        subscriberCount: ch.count || 0,
+        videoCount: channelVideos.length,
+        viewsCount: totalViews,
+        viewsFormatted: totalViews >= 1000 ? (totalViews / 1000).toFixed(1) + 'K' : String(totalViews),
+        subscribersFormatted: (ch.count || 0) >= 1000 ? ((ch.count || 0) / 1000).toFixed(1) + 'K' : String(ch.count || 0)
+      }
+    }));
+    return true;
+  }
+
+  // 17. POST /api/studio/customization - Live Channel Branding, Banner & Description Update
+  if ((url.pathname === '/api/studio/customization' || url.pathname === '/api/channel/customization') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const channelId = parsed.channelId || parsed.id || '';
+      if (!channelId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'channelId is required' }));
+        return true;
+      }
+      const updates: any = {};
+      if (parsed.name) updates.name = String(parsed.name).trim();
+      if (parsed.desc !== undefined) updates.desc = String(parsed.desc).trim();
+      if (parsed.category) updates.category = String(parsed.category).trim();
+      if (parsed.avatar) updates.avatar = String(parsed.avatar).trim();
+      if (parsed.bg) updates.bg = String(parsed.bg).trim();
+      if (parsed.bannerUrl) updates.bannerUrl = String(parsed.bannerUrl).trim();
+      if (Array.isArray(parsed.socialLinks)) updates.socialLinks = parsed.socialLinks;
+      if (parsed.featuredVideoId) updates.featuredVideoId = parsed.featuredVideoId;
+
+      const updated = sovraDb.updateChannel(channelId, updates);
+      if (!updated) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Channel not found to update' }));
+        return true;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, channel: updated }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid payload: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 18. POST /api/channel/community/post - Publish P2P Mesh Channel Community Announcement
+  if (url.pathname === '/api/channel/community/post' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const channelId = parsed.channelId || '';
+      const content = String(parsed.content || '').trim();
+      if (!channelId || !content) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'channelId and content are required' }));
+        return true;
+      }
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const post = {
+        id: 'cpost-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        channelId: channelId,
+        authorDid: (principal && principal.did) || parsed.authorDid || 'did:sovra:creator',
+        content: content,
+        poll: parsed.poll || null,
+        likesCount: 0,
+        commentsCount: 0,
+        createdAt: Date.now()
+      };
+      const dbAny = sovraDb as any;
+      if (dbAny.db && Array.isArray(dbAny.db.posts)) {
+        dbAny.db.posts.unshift(post);
+        dbAny.save();
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, post }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid payload: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
   return false;
 }
 

@@ -216,6 +216,14 @@ export interface CachedChannel {
   subscriberCount?: number | undefined;
   topic?: string | undefined;
   isPublic?: boolean | undefined;
+  handle?: string | undefined;
+  avatar?: string | undefined;
+  avatarBg?: string | undefined;
+  bannerUrl?: string | undefined;
+  verified?: boolean | undefined;
+  channelType?: string | undefined;
+  isSubscribed?: boolean | undefined;
+  communityUpdates?: Array<{ id: string; content: string; createdAt: number }> | undefined;
   createdAt: number;
   syncStatus: 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
 }
@@ -1000,6 +1008,36 @@ export class SovraLocalDatabase {
     return Array.from(map.values()).sort((a, b) => b.createdAt - a.createdAt);
   }
 
+  public async syncChannelSubscription(channelId: string, isSubscribed: boolean): Promise<void> {
+    if (!this.state.channels) this.state.channels = {};
+    if (!this.state.custom_channels) this.state.custom_channels = {};
+    const ch = this.state.custom_channels[channelId] || this.state.channels[channelId];
+    if (ch) {
+      ch.isSubscribed = isSubscribed;
+      if (isSubscribed) {
+        ch.subscriberCount = (ch.subscriberCount || ch.memberCount || 0) + 1;
+      } else {
+        ch.subscriberCount = Math.max(0, (ch.subscriberCount || ch.memberCount || 1) - 1);
+      }
+      this.state.channels[channelId] = ch;
+      this.state.custom_channels[channelId] = ch;
+      await this.persist();
+    }
+  }
+
+  public async addChannelCommunityUpdate(channelId: string, post: { id: string; content: string; createdAt: number }): Promise<void> {
+    if (!this.state.channels) this.state.channels = {};
+    if (!this.state.custom_channels) this.state.custom_channels = {};
+    const ch = this.state.custom_channels[channelId] || this.state.channels[channelId];
+    if (ch) {
+      if (!ch.communityUpdates) ch.communityUpdates = [];
+      ch.communityUpdates.unshift(post);
+      this.state.channels[channelId] = ch;
+      this.state.custom_channels[channelId] = ch;
+      await this.persist();
+    }
+  }
+
   // ==========================================
   // LIVE STREAMS PERSISTENCE
   // ==========================================
@@ -1378,3 +1416,4 @@ export class SovraLocalDatabase {
 }
 
 export const localDb = SovraLocalDatabase.getInstance();
+export { SovraLocalDatabase as LocalDatabase };

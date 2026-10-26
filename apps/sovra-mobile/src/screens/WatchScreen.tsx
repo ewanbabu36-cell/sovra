@@ -1040,6 +1040,7 @@ export function WatchScreen(): React.JSX.Element {
   // Saved / Watch Later states
   const [savedVideos, setSavedVideos] = useState<any[]>([]);
   const [isVideoSaved, setIsVideoSaved] = useState(false);
+  const [channelProfileModal, setChannelProfileModal] = useState<any | null>(null);
 
   const loadSavedVideos = useCallback(async () => {
     try {
@@ -1975,7 +1976,24 @@ export function WatchScreen(): React.JSX.Element {
             marginBottom: 12,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            onClick={() => {
+              setChannelProfileModal({
+                id: video?.channelId || 'ch_primary',
+                name: video?.channelName || 'Alice P2P Architect',
+                handle: video?.channelHandle || '@alice_p2p',
+                avatar: video?.channelAvatar || 'S',
+                avatarBg: video?.channelAvatarBg || '#3b82f6',
+                subscribers: video?.channelSubscribersText || '8.4K subscribers',
+                bannerUrl: video?.channelBanner || 'linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899)',
+                verified: true,
+                bio: video?.channelDescription || 'Official sovereign video broadcast channel on Sovra decentralized mesh.',
+              });
+            }}
+            role="button"
+            tabIndex={0}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+          >
             <div
               style={{
                 width: 36,
@@ -2330,6 +2348,149 @@ export function WatchScreen(): React.JSX.Element {
         </section>
       </div>
       </>
+      )}
+
+      {channelProfileModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => setChannelProfileModal(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: '#0f172a',
+              borderRadius: 20,
+              border: '1px solid rgba(255,255,255,0.15)',
+              width: '100%',
+              maxWidth: 440,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.8)',
+            }}
+          >
+            {/* Wide Hero Banner */}
+            <div
+              style={{
+                width: '100%',
+                height: 120,
+                background: channelProfileModal.bannerUrl,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                position: 'relative',
+                borderRadius: '20px 20px 0 0',
+              }}
+            >
+              <button
+                onClick={() => setChannelProfileModal(null)}
+                aria-label="Close Channel Profile"
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  right: 10,
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  border: 'none',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: 14,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Profile Content */}
+            <div style={{ padding: '0 16px 20px', marginTop: -32 }}>
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: '50%',
+                  backgroundColor: channelProfileModal.avatarBg || '#3b82f6',
+                  border: '3px solid #0f172a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: 24,
+                  color: '#fff',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                }}
+              >
+                {channelProfileModal.avatar}
+              </div>
+
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#fff' }}>
+                    {channelProfileModal.name}
+                  </h3>
+                  <span style={{ color: '#38bdf8', fontSize: 14 }}>✓</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+                  {channelProfileModal.handle} • {channelProfileModal.subscribers}
+                </div>
+                <p style={{ fontSize: 12, color: '#cbd5e1', lineHeight: 1.5, margin: '10px 0 16px' }}>
+                  {channelProfileModal.bio}
+                </p>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleSubscribeToggle}
+                    style={{
+                      flex: 1,
+                      padding: '10px 0',
+                      borderRadius: 9999,
+                      backgroundColor: isSubscribed ? 'rgba(255,255,255,0.1)' : '#f43f5e',
+                      color: '#fff',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isSubscribed ? 'Subscribed ✓' : 'Subscribe 🔔'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setChannelProfileModal(null);
+                      handleSuperTip();
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px 0',
+                      borderRadius: 9999,
+                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      color: '#fff',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ⚡ Super-Tip SOV
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

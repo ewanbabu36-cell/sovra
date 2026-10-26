@@ -629,6 +629,12 @@ export interface ChannelRecord {
   isSubbed: boolean;
   ownerDid?: string;
   createdAt: number;
+  channelType?: string;
+  bannerUrl?: string;
+  verified?: boolean;
+  featuredVideoId?: string;
+  socialLinks?: Array<{ title: string; url: string }>;
+  totalViews?: number;
   moderationState?: ModerationState;
   moderationReason?: string;
   pinnedAnnouncement?: PinnedAnnouncement | null;
@@ -3586,6 +3592,8 @@ export class SovraDatabaseEngine {
     category?: string;
     avatar?: string;
     bg?: string;
+    bannerUrl?: string;
+    verified?: boolean;
     ownerDid: string;
     channelType?: string;
   }): ChannelRecord {
@@ -3597,6 +3605,8 @@ export class SovraDatabaseEngine {
       if (params.name) existing.name = params.name;
       if (params.desc) existing.desc = params.desc;
       if (params.avatar) existing.avatar = params.avatar;
+      if (params.bannerUrl) existing.bannerUrl = params.bannerUrl;
+      if (params.category) existing.category = params.category;
       if (params.ownerDid && !existing.ownerDid) existing.ownerDid = params.ownerDid;
       this.save();
       return existing;
@@ -3610,6 +3620,8 @@ export class SovraDatabaseEngine {
       count: 1,
       avatar: params.avatar || '🎬',
       bg: params.bg || '#f43f5e',
+      bannerUrl: params.bannerUrl || 'linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899)',
+      verified: params.verified !== false,
       channelType: params.channelType || 'video',
       isSubbed: true,
       ownerDid: params.ownerDid,
@@ -3618,6 +3630,19 @@ export class SovraDatabaseEngine {
     this.db.channels.unshift(newChan);
     this.save();
     return newChan;
+  }
+
+  public getChannelByHandleOrId(identifier: string): ChannelRecord | null {
+    this.load();
+    if (!identifier || !Array.isArray(this.db.channels)) return null;
+    const clean = identifier.trim().toLowerCase();
+    const withAt = clean.startsWith('@') ? clean : '@' + clean;
+    const withoutAt = clean.startsWith('@') ? clean.slice(1) : clean;
+    return this.db.channels.find(c => 
+      c.id === identifier || 
+      (c.handle && (c.handle.toLowerCase() === withAt || c.handle.toLowerCase() === withoutAt || c.handle.toLowerCase().replace('@', '') === withoutAt)) ||
+      (c.name && c.name.toLowerCase() === clean)
+    ) || null;
   }
 
   public updateChannel(channelId: string, updates: Partial<ChannelRecord>): ChannelRecord | null {
