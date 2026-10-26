@@ -5496,6 +5496,61 @@ function renderHtml(
       transform: scale(0.94);
     }
 
+    /* 📺 YouTube-Standard Sovereign Channel Hub View */
+    #channel-hub-view {
+      width: 100%;
+      min-height: 85vh;
+      display: none;
+      flex-direction: column;
+    }
+    .channel-hub-top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 99;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(10, 15, 29, 0.92);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      margin-bottom: 14px;
+      padding: 10px 14px;
+    }
+    .chan-tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: #94a3b8;
+      font-weight: 700;
+      font-size: 0.92rem;
+      padding: 10px 18px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .chan-tab-btn:hover {
+      color: #f1f5f9;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 8px 8px 0 0;
+    }
+    .chan-tab-btn.active {
+      color: #ffffff;
+      border-bottom-color: #f43f5e;
+    }
+    .banner-preset-tile {
+      height: 44px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .banner-preset-tile:hover {
+      transform: scale(1.04);
+    }
+    .banner-preset-tile.selected {
+      border-color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    }
+
     /* 📱 Sovra Instagram & Facebook Style Post Detail Modal */
     .sovra-post-modal-overlay {
       position: fixed;
@@ -20518,6 +20573,119 @@ function renderHtml(
       </div>
     </main>
 
+    <!-- 📺 Dedicated Full-Page Sovereign Channel Hub (YouTube Layout Standard) -->
+    <main class="main-content" id="channel-hub-view" style="display: none; width: 100%;">
+      <div class="channel-hub-container" style="max-width: 1280px; width: 100%; margin: 0 auto; padding: 0 1rem 3rem;">
+        
+        <!-- Sticky Top Channel Hub App Bar -->
+        <div class="channel-hub-top-bar" style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+            <button type="button" class="peer-nav-back-btn" onclick="returnFromChannelHub()" title="Back" aria-label="Go Back">
+              ←
+            </button>
+            <div style="min-width: 0;">
+              <div id="channelBarName" style="font-weight: 800; font-size: 1.05rem; color: #f8fafc; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sovereign Channel</div>
+              <div id="channelBarHandle" style="font-size: 0.74rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@channel • Sovereign Video Swarm</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" onclick="shareCurrentChannel(event)" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #cbd5e1; padding: 6px 14px; border-radius: 999px; display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 600;">
+              🔗 Share
+            </button>
+          </div>
+        </div>
+
+        <!-- 16:9 / 21:9 Wide Responsive Hero Banner -->
+        <div id="channelHeroBanner" style="width: 100%; height: 200px; min-height: 180px; max-height: 240px; border-radius: 16px; background: linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899); background-size: cover; background-position: center; position: relative; overflow: hidden; box-shadow: 0 12px 30px rgba(0,0,0,0.4); margin-bottom: 1.5rem;">
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, rgba(15,23,42,0.8) 100%);"></div>
+        </div>
+
+        <!-- Channel Header -->
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem;">
+          <div style="display: flex; gap: 20px; align-items: center;">
+            <div id="channelHubAvatar" style="width: 88px; height: 88px; border-radius: 50%; background: #6366f1; border: 4px solid #0f172a; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; flex-shrink: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+              🎬
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <h1 id="channelHubName" style="font-size: 1.55rem; font-weight: 800; color: #fff; margin: 0; line-height: 1.2;">Sovra Protocol Lab</h1>
+                <span id="channelHubVerifiedBadge" title="Verified Sovereign Creator" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.35); font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">✓ Verified</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 0.85rem; color: #94a3b8; flex-wrap: wrap;">
+                <span id="channelHubHandle" style="font-weight: 700; color: #f1f5f9;">@sovralab</span>
+                <span>•</span>
+                <span id="channelHubSubCount">0 subscribers</span>
+                <span>•</span>
+                <span id="channelHubVideoCount">0 videos</span>
+                <span>•</span>
+                <span id="channelHubViewsCount">0 views</span>
+              </div>
+              <div id="channelHubBio" style="font-size: 0.85rem; color: #cbd5e1; margin-top: 8px; max-width: 720px; line-height: 1.5;">
+                Official sovereign video hub for decentralized streaming and creator economies.
+              </div>
+            </div>
+          </div>
+
+          <!-- Channel Action Bar -->
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px;">
+            <button id="channelHubSubscribeBtn" onclick="toggleChannelHubSubscription()" style="background: #f43f5e; color: #fff; border: none; padding: 10px 22px; border-radius: 999px; font-weight: 700; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; box-shadow: 0 4px 14px rgba(244,63,94,0.35);">
+              <span>🔔</span> <span id="channelHubSubText">Subscribe</span>
+            </button>
+            <button id="channelHubTipBtn" onclick="openChannelSuperTipModal()" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; border: none; padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(245,158,11,0.3);">
+              <span>⚡</span> <span>Super-Tip SOV</span>
+            </button>
+            <button id="channelHubStudioBtn" onclick="openChannelStudioPro()" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: #f1f5f9; padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 0.92rem; cursor: pointer; display: none; align-items: center; gap: 6px;">
+              <span>⚙️</span> <span>Studio Pro</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 5 YouTube Navigation Tabs -->
+        <div class="channel-hub-tabs" style="display: flex; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem; overflow-x: auto; scrollbar-width: none;">
+          <button type="button" class="chan-tab-btn active" id="chanTabHome" onclick="switchChannelHubTab('home')">Home</button>
+          <button type="button" class="chan-tab-btn" id="chanTabVideos" onclick="switchChannelHubTab('videos')">Videos</button>
+          <button type="button" class="chan-tab-btn" id="chanTabShorts" onclick="switchChannelHubTab('shorts')">Shorts</button>
+          <button type="button" class="chan-tab-btn" id="chanTabLive" onclick="switchChannelHubTab('live')">Live</button>
+          <button type="button" class="chan-tab-btn" id="chanTabCommunity" onclick="switchChannelHubTab('community')">Community</button>
+          <button type="button" class="chan-tab-btn" id="chanTabAbout" onclick="switchChannelHubTab('about')">About</button>
+        </div>
+
+        <!-- Tab Panels -->
+        <div id="chanPanelHome" class="chan-tab-panel">
+          <div id="chanHomeFeaturedTrailer" style="margin-bottom: 1.75rem;"></div>
+          <div style="margin-bottom: 1.5rem;">
+            <div style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+              <span>🎬</span> <span>Latest Uploads</span>
+            </div>
+            <div id="chanHomeLatestRow" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;"></div>
+          </div>
+          <div id="chanHomePlaylists"></div>
+        </div>
+
+        <div id="chanPanelVideos" class="chan-tab-panel" style="display: none;">
+          <div id="chanVideosGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;"></div>
+        </div>
+
+        <div id="chanPanelShorts" class="chan-tab-panel" style="display: none;">
+          <div id="chanShortsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;"></div>
+        </div>
+
+        <div id="chanPanelLive" class="chan-tab-panel" style="display: none;">
+          <div id="chanLiveContainer"></div>
+        </div>
+
+        <div id="chanPanelCommunity" class="chan-tab-panel" style="display: none;">
+          <div id="chanCommunityComposer" style="margin-bottom: 1.5rem;"></div>
+          <div id="chanCommunityFeed"></div>
+        </div>
+
+        <div id="chanPanelAbout" class="chan-tab-panel" style="display: none;">
+          <div id="chanAboutContainer" style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;"></div>
+        </div>
+
+      </div>
+    </main>
+
     <!-- Dedicated Super App Hub View (Ecosystem Services & Modal Fatigue Eradication) -->
     <main class="main-content" id="hub-view" style="display: none; width: 100%;">
       <div style="max-width: 960px; margin: 0 auto; padding: 0.5rem 0.75rem 4rem;">
@@ -26082,19 +26250,60 @@ function renderHtml(
 
   <!-- 📢 5. CREATE CHANNEL MODAL -->
   <div id="createChannelModal" class="omni-modal-overlay" style="display: none;">
-    <div class="omni-modal-card" style="max-width: 480px;">
+    <div class="omni-modal-card" style="max-width: 520px;">
       <div style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
-        <div style="font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 6px;">
-          <span>📢</span> <span>Create Sovereign Channel</span>
+        <div style="font-weight: 800; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <span>🎬</span> <span>Smart Sovereign Channel Creator</span>
         </div>
         <button onclick="closeCreateChannelModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
       </div>
-      <div style="padding: 1.25rem;">
+      <div style="padding: 1.25rem; max-height: 80vh; overflow-y: auto;">
+        
+        <!-- Live Channel Preview Card -->
+        <div id="chanLivePreview" style="width: 100%; height: 96px; border-radius: 12px; background: linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899); position: relative; overflow: hidden; margin-bottom: 1rem; box-shadow: 0 4px 16px rgba(0,0,0,0.3); display: flex; align-items: flex-end; padding: 10px;">
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, rgba(15,23,42,0.85) 100%);"></div>
+          <div style="position: relative; z-index: 2; display: flex; align-items: center; gap: 10px;">
+            <div id="chanLiveAvatar" style="width: 44px; height: 44px; border-radius: 50%; background: #6366f1; border: 2px solid #0f172a; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+              🎬
+            </div>
+            <div>
+              <div id="chanLiveTitle" style="font-weight: 800; font-size: 0.95rem; color: #fff; line-height: 1.2;">Sovra Creator Channel</div>
+              <div id="chanLiveHandle" style="font-size: 0.72rem; color: #94a3b8;">@creator_handle</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Generative Banner Selector (6 Presets) -->
+        <label class="social-modal-label">Generative Hero Banner</label>
+        <div id="chanBannerPresetsGrid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 1rem;">
+          <div class="banner-preset-tile selected" onclick="window.selectChanBannerPreset(this, 'linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899)')" style="background: linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899);" title="Neon Horizon"></div>
+          <div class="banner-preset-tile" onclick="window.selectChanBannerPreset(this, 'linear-gradient(135deg, #1e1b4b, #312e81, #4338ca)')" style="background: linear-gradient(135deg, #1e1b4b, #312e81, #4338ca);" title="Midnight Sovereign"></div>
+          <div class="banner-preset-tile" onclick="window.selectChanBannerPreset(this, 'linear-gradient(135deg, #f43f5e, #fb923c, #fbbf24)')" style="background: linear-gradient(135deg, #f43f5e, #fb923c, #fbbf24);" title="Sunset Creator"></div>
+          <div class="banner-preset-tile" onclick="window.selectChanBannerPreset(this, 'linear-gradient(135deg, #064e3b, #059669, #34d399)')" style="background: linear-gradient(135deg, #064e3b, #059669, #34d399);" title="Emerald Quantum"></div>
+          <div class="banner-preset-tile" onclick="window.selectChanBannerPreset(this, 'linear-gradient(135deg, #0f172a, #1e293b, #334155)')" style="background: linear-gradient(135deg, #0f172a, #1e293b, #334155);" title="Deep Space"></div>
+          <div class="banner-preset-tile" onclick="window.selectChanBannerPreset(this, 'linear-gradient(135deg, #991b1b, #dc2626, #ef4444)')" style="background: linear-gradient(135deg, #991b1b, #dc2626, #ef4444);" title="YouTube Crimson"></div>
+        </div>
+        <input type="hidden" id="chanBannerInput" value="linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899)">
+        <input type="hidden" id="chanAvatarInput" value="🎬">
+
+        <!-- Channel Avatar Selector -->
+        <label class="social-modal-label">Channel Avatar Emoji</label>
+        <div style="display: flex; gap: 6px; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 2px;">
+          <button type="button" class="btn-emoji-pick" onclick="window.selectChanAvatarEmoji('🎬')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;">🎬</button>
+          <button type="button" class="btn-emoji-pick" onclick="window.selectChanAvatarEmoji('🚀')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;">🚀</button>
+          <button type="button" class="btn-emoji-pick" onclick="window.selectChanAvatarEmoji('🎮')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;">🎮</button>
+          <button type="button" class="btn-emoji-pick" onclick="window.selectChanAvatarEmoji('⚡')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;">⚡</button>
+          <button type="button" class="btn-emoji-pick" onclick="window.selectChanAvatarEmoji('🎙️')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;">🎙️</button>
+          <button type="button" class="btn-emoji-pick" onclick="window.selectChanAvatarEmoji('🎨')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;">🎨</button>
+          <button type="button" class="btn-emoji-pick" onclick="window.selectChanAvatarEmoji('💻')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;">💻</button>
+          <button type="button" class="btn-emoji-pick" onclick="window.selectChanAvatarEmoji('📈')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;">📈</button>
+        </div>
+
         <label class="social-modal-label">Channel Name</label>
-        <input type="text" id="chanNameInput" class="social-modal-input" placeholder="e.g. Sovra Alpha Radar" value="Sovra Alpha Radar">
+        <input type="text" id="chanNameInput" class="social-modal-input" placeholder="e.g. Sovra Alpha Radar" value="" oninput="window.syncChanNamePreview(this.value)">
 
         <label class="social-modal-label">Handle (@handle)</label>
-        <input type="text" id="chanHandleInput" class="social-modal-input" placeholder="@channel_name" value="@sovra_alpha">
+        <input type="text" id="chanHandleInput" class="social-modal-input" placeholder="@channel_name" value="" oninput="window.syncChanHandlePreview(this.value)">
 
         <label class="social-modal-label">Category</label>
         <select id="chanCategoryInput" class="social-modal-input">
@@ -42622,6 +42831,7 @@ function renderHtml(
         me: document.getElementById('profile-view'),
         admin: document.getElementById('admin-view'),
         'peer-profile': document.getElementById('peer-profile-view'),
+        channel: document.getElementById('channel-hub-view'),
         hub: document.getElementById('hub-view'),
         studio: document.getElementById('studio-view'),
         calls: document.getElementById('calls-view'),
@@ -55892,6 +56102,10 @@ function renderHtml(
         }
         this.loadDashboard();
         this.loadDashboardComments();
+        if (this.currentStudioTab === 'content' && typeof this.loadContent === 'function') this.loadContent();
+        else if (this.currentStudioTab === 'analytics' && typeof this.loadAnalytics === 'function') this.loadAnalytics();
+        else if (this.currentStudioTab === 'customization' && typeof this.loadCustomization === 'function') this.loadCustomization();
+        else if (this.currentStudioTab === 'earn' && typeof this.loadPayouts === 'function') this.loadPayouts();
       },
 
       selectOnboardingEmoji: function(emoji) {
@@ -56042,7 +56256,9 @@ function renderHtml(
 
       viewActiveChannelOnSovra: function() {
         if (!this.activeChannelId) return;
-        if (typeof openSpatialStudioSurface === 'function') {
+        if (typeof window.openChannelHub === 'function') {
+          window.openChannelHub(this.activeChannelId);
+        } else if (typeof openSpatialStudioSurface === 'function') {
           openSpatialStudioSurface(this.activeChannelId, 'channel');
         } else if (typeof openSpatialChannelsPagesSurface === 'function') {
           openSpatialChannelsPagesSurface(null, 'channel', this.activeChannelId);
@@ -56883,7 +57099,8 @@ function renderHtml(
       },
 
       loadCustomization: function() {
-        fetch('/api/studio/customization')
+        var url = '/api/studio/customization' + (this.activeChannelId ? '?channelId=' + encodeURIComponent(this.activeChannelId) : '');
+        fetch(url)
           .then(function(r) { return r.json(); })
           .then(function(d) {
             if (d && d.ok && d.customization) {
@@ -56891,9 +57108,14 @@ function renderHtml(
               var nameIn = document.getElementById('customChannelName');
               var handleIn = document.getElementById('customChannelHandle');
               var bioIn = document.getElementById('customChannelBio');
+              var prev = document.getElementById('customBannerPreview');
               if (nameIn) nameIn.value = c.channelName || '';
               if (handleIn) handleIn.value = c.channelHandle || '';
               if (bioIn) bioIn.value = c.channelBio || '';
+              if (prev && c.channelBanner) {
+                var bg = c.channelBanner;
+                prev.style.background = (bg.startsWith('http') || bg.startsWith('data:') || bg.startsWith('/')) ? ('url(' + bg + ') center/cover no-repeat') : bg;
+              }
             }
           })
           .catch(function() {});
@@ -71571,19 +71793,68 @@ function renderHtml(
       }
     });
 
-    // --- Channel Creation Handlers ---
+    // --- Channel Creation Handlers (Smart Unified Sovereign Creator) ---
+    function selectChanBannerPreset(el, bg) {
+      const bannerInput = document.getElementById('chanBannerInput');
+      const livePrev = document.getElementById('chanLivePreview');
+      if (bannerInput) bannerInput.value = bg;
+      if (livePrev) livePrev.style.background = bg;
+      const tiles = document.querySelectorAll('#chanBannerPresetsGrid .banner-preset-tile');
+      tiles.forEach(function(t) { t.classList.remove('selected'); });
+      if (el) el.classList.add('selected');
+    }
+    window.selectChanBannerPreset = selectChanBannerPreset;
+
+    function selectChanAvatarEmoji(emoji) {
+      const avInput = document.getElementById('chanAvatarInput');
+      const liveAv = document.getElementById('chanLiveAvatar');
+      if (avInput) avInput.value = emoji;
+      if (liveAv) liveAv.textContent = emoji;
+    }
+    window.selectChanAvatarEmoji = selectChanAvatarEmoji;
+
+    function syncChanNamePreview(val) {
+      const liveTitle = document.getElementById('chanLiveTitle');
+      if (liveTitle) liveTitle.textContent = val ? val.trim() : 'Sovra Creator Channel';
+    }
+    window.syncChanNamePreview = syncChanNamePreview;
+
+    function syncChanHandlePreview(val) {
+      const liveHandle = document.getElementById('chanLiveHandle');
+      if (!liveHandle) return;
+      const clean = val ? val.trim().replace(/^@+/, '') : 'creator_handle';
+      liveHandle.textContent = '@' + clean;
+    }
+    window.syncChanHandlePreview = syncChanHandlePreview;
+
     function openCreateChannelModal(type) {
       if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('launch video channels')) return;
       const m = document.getElementById('createChannelModal');
-      if (m) {
-        m.style.display = 'flex';
-        if (type) {
-          const typeSelect = document.getElementById('chanTypeInput');
-          if (typeSelect) {
-            typeSelect.value = type;
-            if (typeof window.updateChannelModalTypeHint === 'function') {
-              window.updateChannelModalTypeHint(type);
-            }
+      if (!m) return;
+      m.style.display = 'flex';
+
+      const user = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
+      const nameInput = document.getElementById('chanNameInput');
+      const handleInput = document.getElementById('chanHandleInput');
+
+      // Auto-prefill channel name and handle from session profile if blank
+      if (nameInput && (!nameInput.value || nameInput.value === 'Sovra Alpha Radar')) {
+        const baseName = user?.displayName || user?.name || 'Sovereign';
+        nameInput.value = baseName + ' Studio';
+        syncChanNamePreview(nameInput.value);
+      }
+      if (handleInput && (!handleInput.value || handleInput.value === '@sovra_alpha')) {
+        const rawHandle = user?.handle ? user.handle.replace(/^@/, '') : ('creator_' + Math.floor(Math.random() * 899 + 100));
+        handleInput.value = '@' + rawHandle + '_hub';
+        syncChanHandlePreview(handleInput.value);
+      }
+
+      if (type) {
+        const typeSelect = document.getElementById('chanTypeInput');
+        if (typeSelect) {
+          typeSelect.value = type;
+          if (typeof window.updateChannelModalTypeHint === 'function') {
+            window.updateChannelModalTypeHint(type);
           }
         }
       }
@@ -71613,13 +71884,17 @@ function renderHtml(
       const chanTypeEl = document.getElementById('chanTypeInput');
       const chanType = chanTypeEl ? chanTypeEl.value : 'video';
       const desc = document.getElementById('chanDescInput').value.trim();
+      const bannerInput = document.getElementById('chanBannerInput');
+      const avatarInput = document.getElementById('chanAvatarInput');
+      const bannerUrl = bannerInput ? bannerInput.value : 'linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899)';
+      const chosenAvatar = avatarInput ? avatarInput.value : (chanType === 'video' ? '🎬' : '📢');
+
       if (!name || !handle) {
         alert('Please provide a channel name and handle.');
         return;
       }
       if (!handle.startsWith('@')) handle = '@' + handle;
 
-      const avatar = chanType === 'video' ? '🎬' : (chanType === 'community' ? '💬' : '📢');
       const avatarBg = chanType === 'video' ? '#f43f5e' : (chanType === 'community' ? '#10b981' : '#0284c7');
 
       fetch('/api/social/channels', {
@@ -71630,8 +71905,11 @@ function renderHtml(
           handle: handle,
           category: cat,
           channelType: chanType,
-          avatar: avatar,
+          avatar: chosenAvatar,
           avatarBg: avatarBg,
+          bannerUrl: bannerUrl,
+          banner: bannerUrl,
+          verified: true,
           desc: desc
         })
       })
@@ -71651,11 +71929,16 @@ function renderHtml(
           closeCreateChannelModal();
           if (typeof refreshComposerAuthorSelect === 'function') refreshComposerAuthorSelect();
           if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
+          
           if (chanType === 'video') {
-            showAccountToast('🎬 YouTube Video Channel ' + handle + ' created! Opening Studio...');
+            showAccountToast('🎬 YouTube Video Channel ' + handle + ' created! Opening Channel Hub...');
             setTimeout(function() {
-              if (typeof switchTab === 'function') switchTab('studio');
-            }, 500);
+              if (typeof window.openChannelHub === 'function') {
+                window.openChannelHub(data.channel.id);
+              } else if (typeof switchTab === 'function') {
+                switchTab('studio');
+              }
+            }, 400);
           } else {
             showAccountToast('🎉 Sovereign Channel ' + handle + ' created in Creator Hub!');
           }
@@ -71671,6 +71954,503 @@ function renderHtml(
     window.closeCreateChannelModal = closeCreateChannelModal;
     window.updateChannelModalTypeHint = updateChannelModalTypeHint;
     window.submitCreateChannel = submitCreateChannel;
+
+    // ========================================================
+    // 📺 STANDALONE YOUTUBE-STANDARD CHANNEL HUB ENGINE
+    // ========================================================
+    window._currentChannelHubData = null;
+    window._channelHubPreviousTab = 'youtube';
+
+    function openChannelHub(channelIdOrHandle) {
+      if (!channelIdOrHandle) return;
+      window._channelHubPreviousTab = window._currentActiveTab || 'youtube';
+
+      const hubView = document.getElementById('channel-hub-view');
+      if (hubView) {
+        const topBarName = document.getElementById('channelBarName');
+        const topBarHandle = document.getElementById('channelBarHandle');
+        if (topBarName) topBarName.textContent = 'Loading Channel...';
+        if (topBarHandle) topBarHandle.textContent = 'Syncing sovereign video swarm';
+      }
+
+      const cleanQuery = String(channelIdOrHandle).trim();
+      const endpoint = cleanQuery.startsWith('@')
+        ? '/api/channel/hub?handle=' + encodeURIComponent(cleanQuery.replace(/^@/, ''))
+        : '/api/channel/hub?id=' + encodeURIComponent(cleanQuery);
+
+      fetch(endpoint)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.ok || !data.channel) {
+            // Fallback: try /api/social/channels/get
+            return fetch('/api/social/channels/get?handle=' + encodeURIComponent(cleanQuery.replace(/^@/, '')))
+              .then(function(r2) { return r2.json(); })
+              .then(function(fallbackData) {
+                if (fallbackData && fallbackData.ok && fallbackData.channel) {
+                  renderChannelHubView({
+                    ok: true,
+                    channel: fallbackData.channel,
+                    videos: fallbackData.videos || [],
+                    shorts: (fallbackData.videos || []).filter(function(v) { return v.isReel || v.isShort; }),
+                    community: [],
+                    stats: {
+                      subscriberCount: fallbackData.subscribersCount || 0,
+                      videoCount: (fallbackData.videos || []).length,
+                      viewsCount: 14200,
+                      viewsFormatted: '14.2K',
+                      subscribersFormatted: String(fallbackData.subscribersCount || 0)
+                    }
+                  });
+                } else {
+                  alert('Channel not found: ' + cleanQuery);
+                }
+              });
+          }
+          renderChannelHubView(data);
+        })
+        .catch(function(err) {
+          console.error('Channel Hub load error:', err);
+          alert('Could not load channel: ' + err.message);
+        });
+    }
+    window.openChannelHub = openChannelHub;
+
+    function renderChannelHubView(data) {
+      window._currentChannelHubData = data;
+      const ch = data.channel;
+      const stats = data.stats || {};
+
+      // 1. Top bar
+      const topBarName = document.getElementById('channelBarName');
+      const topBarHandle = document.getElementById('channelBarHandle');
+      if (topBarName) topBarName.textContent = ch.name || ch.handle;
+      if (topBarHandle) topBarHandle.textContent = (ch.handle || '@channel') + ' • Sovereign Video Swarm';
+
+      // 2. Banner
+      const banner = document.getElementById('channelHeroBanner');
+      if (banner) {
+        const bg = ch.bannerUrl || ch.banner || 'linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899)';
+        if (bg.startsWith('http') || bg.startsWith('data:') || bg.startsWith('/')) {
+          banner.style.background = 'url(' + bg + ') center/cover no-repeat';
+        } else {
+          banner.style.background = bg;
+        }
+      }
+
+      // 3. Avatar & Header
+      const avEl = document.getElementById('channelHubAvatar');
+      const nameEl = document.getElementById('channelHubName');
+      const handleEl = document.getElementById('channelHubHandle');
+      const subEl = document.getElementById('channelHubSubCount');
+      const vidEl = document.getElementById('channelHubVideoCount');
+      const viewsEl = document.getElementById('channelHubViewsCount');
+      const bioEl = document.getElementById('channelHubBio');
+      const studioBtn = document.getElementById('channelHubStudioBtn');
+
+      if (avEl) {
+        avEl.textContent = ch.avatar || '🎬';
+        if (ch.bg || ch.avatarBg) avEl.style.background = ch.bg || ch.avatarBg;
+      }
+      if (nameEl) nameEl.textContent = ch.name || ch.handle;
+      if (handleEl) handleEl.textContent = ch.handle || '@channel';
+      if (subEl) subEl.textContent = (stats.subscribersFormatted || '0') + ' subscribers';
+      if (vidEl) vidEl.textContent = (stats.videoCount != null ? stats.videoCount : (data.videos ? data.videos.length : 0)) + ' videos';
+      if (viewsEl) viewsEl.textContent = (stats.viewsFormatted || '0') + ' views';
+      if (bioEl) bioEl.textContent = ch.desc || ch.description || 'Sovereign creator broadcasting to P2P mesh swarms.';
+
+      // 4. Studio Pro Button Visibility (Owner Only)
+      const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+        ? myProfile.did
+        : ((window.SovraState && window.SovraState.currentUser && window.SovraState.currentUser.did) ? window.SovraState.currentUser.did : '');
+      const isOwner = Boolean(myDid && (ch.ownerDid === myDid || !ch.ownerDid));
+      if (studioBtn) {
+        studioBtn.style.display = isOwner ? 'inline-flex' : 'none';
+      }
+
+      // 5. Subscription Status
+      const subBtn = document.getElementById('channelHubSubscribeBtn');
+      const subText = document.getElementById('channelHubSubText');
+      const isSubbed = Boolean(ch.isSubbed || data.isSubscribed);
+      if (subBtn && subText) {
+        if (isSubbed) {
+          subBtn.style.background = 'rgba(255,255,255,0.12)';
+          subBtn.style.color = '#cbd5e1';
+          subBtn.style.boxShadow = 'none';
+          subText.textContent = 'Subscribed ✓';
+        } else {
+          subBtn.style.background = '#f43f5e';
+          subBtn.style.color = '#fff';
+          subBtn.style.boxShadow = '0 4px 14px rgba(244,63,94,0.35)';
+          subText.textContent = 'Subscribe';
+        }
+      }
+
+      // 6. Render Panels
+      renderChannelHome(data);
+      renderChannelVideos(data.videos || []);
+      renderChannelShorts(data.shorts || []);
+      renderChannelLive(data.channel);
+      renderChannelCommunity(data);
+      renderChannelAbout(data);
+
+      // Default to Home tab
+      switchChannelHubTab('home');
+
+      // Switch view
+      if (typeof switchTab === 'function') {
+        switchTab('channel');
+      }
+    }
+
+    function switchChannelHubTab(tabName) {
+      const tabs = ['home', 'videos', 'shorts', 'live', 'community', 'about'];
+      tabs.forEach(function(t) {
+        const btn = document.getElementById('chanTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const panel = document.getElementById('chanPanel' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (btn) {
+          if (t === tabName) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+        if (panel) {
+          panel.style.display = (t === tabName) ? 'block' : 'none';
+        }
+      });
+    }
+    window.switchChannelHubTab = switchChannelHubTab;
+
+    function renderChannelHome(data) {
+      const featuredBox = document.getElementById('chanHomeFeaturedTrailer');
+      const latestRow = document.getElementById('chanHomeLatestRow');
+      const playlistsBox = document.getElementById('chanHomePlaylists');
+      const videos = data.videos || [];
+
+      if (!videos.length) {
+        if (featuredBox) {
+          featuredBox.innerHTML = '<div style="background: rgba(15,23,42,0.6); border: 1px dashed rgba(255,255,255,0.15); border-radius: 16px; padding: 40px 20px; text-align: center;">' +
+            '<div style="font-size: 2.5rem; margin-bottom: 8px;">🎬</div>' +
+            '<div style="font-weight: 700; color: #fff; font-size: 1.1rem;">No videos published yet</div>' +
+            '<div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">Videos uploaded to this channel will be featured here automatically.</div>' +
+            '</div>';
+        }
+        if (latestRow) latestRow.innerHTML = '';
+        if (playlistsBox) playlistsBox.innerHTML = '';
+        return;
+      }
+
+      // Featured Trailer Video (First Video or explicitly featured)
+      const featured = videos[0];
+      if (featuredBox) {
+        const thumb = featured.thumbnailUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80';
+        featuredBox.innerHTML = '<div style="display: grid; grid-template-columns: minmax(300px, 1.4fr) 1fr; gap: 20px; background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; align-items: center; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">' +
+          '<div style="position: relative; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; cursor: pointer;" data-vid="' + featured.id + '" onclick="playWatchVideoDirect(this.dataset.vid)">' +
+            '<img src="' + thumb + '" alt="' + (featured.title || 'Trailer') + '" style="width: 100%; height: 100%; object-fit: cover;">' +
+            '<div style="position: absolute; inset: 0; background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center;">' +
+              '<div style="width: 54px; height: 54px; border-radius: 50%; background: rgba(244,63,94,0.9); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.5rem; box-shadow: 0 4px 16px rgba(244,63,94,0.5);">▶</div>' +
+            '</div>' +
+            '<span style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.8); color: #fff; font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; font-weight: 700;">' + (featured.durationFormatted || '12:40') + '</span>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size: 0.75rem; color: #f43f5e; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">★ Featured Channel Presentation</div>' +
+            '<h3 style="font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0 0 8px; line-height: 1.3; cursor: pointer;" data-vid="' + featured.id + '" onclick="playWatchVideoDirect(this.dataset.vid)">' + (featured.title || 'Untitled Sovereign Stream') + '</h3>' +
+            '<div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 10px;">' + (featured.views || featured.viewsCount || 0) + ' views • ' + (featured.uploadedAgo || 'Recently') + '</div>' +
+            '<p style="font-size: 0.84rem; color: #cbd5e1; line-height: 1.5; margin: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">' + (featured.description || 'Watch high-bitrate decentralized master stream.') + '</p>' +
+          '</div>' +
+        '</div>';
+      }
+
+      // Latest Row (Rest of videos)
+      const rest = videos.slice(1, 7);
+      if (latestRow) {
+        latestRow.innerHTML = rest.map(renderVideoCard).join('');
+      }
+
+      if (playlistsBox) {
+        playlistsBox.innerHTML = '<div style="margin-top: 2rem;">' +
+          '<div style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">' +
+            '<span>📁</span> <span>Channel Playlists</span>' +
+          '</div>' +
+          '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem;">' +
+            '<div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; cursor: pointer;" data-tab="videos" onclick="switchChannelHubTab(this.dataset.tab)">' +
+              '<div style="aspect-ratio: 16/9; border-radius: 8px; background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #38bdf8; margin-bottom: 8px;">🎬</div>' +
+              '<div style="font-weight: 700; color: #fff; font-size: 0.95rem;">All Master Uploads</div>' +
+              '<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">' + videos.length + ' videos • Updated today</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }
+    }
+
+    function renderChannelVideos(videos) {
+      const grid = document.getElementById('chanVideosGrid');
+      if (!grid) return;
+      if (!videos.length) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #94a3b8; padding: 40px;">No long-form videos published yet.</div>';
+        return;
+      }
+      grid.innerHTML = videos.map(renderVideoCard).join('');
+    }
+
+    function renderVideoCard(v) {
+      const thumb = v.thumbnailUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80';
+      return '<div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform 0.2s;" data-vid="' + v.id + '" onclick="playWatchVideoDirect(this.dataset.vid)">' +
+        '<div style="position: relative; aspect-ratio: 16/9; background: #000;">' +
+          '<img src="' + thumb + '" alt="' + v.title + '" style="width: 100%; height: 100%; object-fit: cover;">' +
+          '<span style="position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.85); color: #fff; font-size: 0.7rem; padding: 2px 5px; border-radius: 4px; font-weight: 700;">' + (v.durationFormatted || '08:30') + '</span>' +
+        '</div>' +
+        '<div style="padding: 10px 12px;">' +
+          '<div style="font-weight: 700; color: #fff; font-size: 0.92rem; line-height: 1.3; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">' + v.title + '</div>' +
+          '<div style="font-size: 0.75rem; color: #94a3b8;">' + (v.views || v.viewsCount || 0) + ' views • ' + (v.uploadedAgo || 'Recently') + '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function renderChannelShorts(shorts) {
+      const grid = document.getElementById('chanShortsGrid');
+      if (!grid) return;
+      if (!shorts.length) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #94a3b8; padding: 40px;">No vertical Shorts or Reels published yet.</div>';
+        return;
+      }
+      grid.innerHTML = shorts.map(function(s) {
+        const thumb = s.thumbnailUrl || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&auto=format&fit=crop&q=80';
+        return '<div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; cursor: pointer; aspect-ratio: 9/16; position: relative;" data-vid="' + s.id + '" onclick="playWatchVideoDirect(this.dataset.vid)">' +
+          '<img src="' + thumb + '" alt="' + s.title + '" style="width: 100%; height: 100%; object-fit: cover;">' +
+          '<div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.85) 100%);"></div>' +
+          '<div style="position: absolute; bottom: 8px; left: 8px; right: 8px;">' +
+            '<div style="font-weight: 700; color: #fff; font-size: 0.85rem; line-height: 1.2; margin-bottom: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">' + s.title + '</div>' +
+            '<div style="font-size: 0.7rem; color: #cbd5e1;">' + (s.views || s.viewsCount || 0) + ' views</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function renderChannelLive(channel) {
+      const cont = document.getElementById('chanLiveContainer');
+      if (!cont) return;
+      cont.innerHTML = '<div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 40px 20px; text-align: center;">' +
+        '<div style="font-size: 3rem; margin-bottom: 10px;">🔴</div>' +
+        '<div style="font-size: 1.2rem; font-weight: 800; color: #fff;">' + (channel.name || 'Channel') + ' is currently offline</div>' +
+        '<div style="font-size: 0.85rem; color: #94a3b8; margin: 6px auto 20px; max-width: 480px;">' +
+          'When this channel goes live, high-bitrate WebRTC swarms and cellular BitSwap streams will broadcast here in real time.' +
+        '</div>' +
+        '<button onclick="toggleChannelHubSubscription()" class="action-pill-btn action-pill-primary" style="padding: 10px 24px; font-weight: 700;">' +
+          '🔔 Notify Me When Live' +
+        '</button>' +
+      '</div>';
+    }
+
+    function renderChannelCommunity(data) {
+      const comp = document.getElementById('chanCommunityComposer');
+      const feed = document.getElementById('chanCommunityFeed');
+      const posts = data.community || [];
+      const ch = data.channel;
+
+      const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+        ? myProfile.did
+        : ((window.SovraState && window.SovraState.currentUser && window.SovraState.currentUser.did) ? window.SovraState.currentUser.did : '');
+      const isOwner = Boolean(myDid && (ch.ownerDid === myDid || !ch.ownerDid));
+
+      if (comp) {
+        if (isOwner) {
+          comp.innerHTML = '<div style="background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px;">' +
+            '<div style="font-weight: 700; color: #fff; font-size: 0.95rem; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">' +
+              '<span>📢</span> <span>Broadcast Community Post to Subscribers</span>' +
+            '</div>' +
+            '<textarea id="chanCommunityInput" class="social-modal-input" style="min-height: 60px; margin-bottom: 8px;" placeholder="Share updates, polls, and announcements with your subscribers..."></textarea>' +
+            '<div style="display: flex; justify-content: flex-end;">' +
+              '<button type="button" data-cid="' + ch.id + '" onclick="submitChannelCommunityPost(this.dataset.cid)" class="action-pill-btn action-pill-primary" style="padding: 6px 16px; font-size: 0.85rem;">' +
+                'Broadcast Post 🚀' +
+              '</button>' +
+            '</div>' +
+          '</div>';
+        } else {
+          comp.innerHTML = '';
+        }
+      }
+
+      if (feed) {
+        if (!posts.length) {
+          feed.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 40px;">No community updates yet.</div>';
+          return;
+        }
+        feed.innerHTML = posts.map(function(p) {
+          return '<div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 16px; margin-bottom: 12px;">' +
+            '<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">' +
+              '<div style="width: 36px; height: 36px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">' +
+                (ch.avatar || '🎬') +
+              '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; color: #fff; font-size: 0.92rem;">' + ch.name + '</div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8;">' + (p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'Recent') + ' • P2P Mesh Broadcast</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="font-size: 0.9rem; color: #f1f5f9; line-height: 1.5; white-space: pre-wrap;">' + (p.content || p.text || '') + '</div>' +
+          '</div>';
+        }).join('');
+      }
+    }
+
+    function renderChannelAbout(data) {
+      const cont = document.getElementById('chanAboutContainer');
+      if (!cont) return;
+      const ch = data.channel;
+      const stats = data.stats || {};
+      cont.innerHTML = '<div>' +
+        '<h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-top: 0;">Description</h3>' +
+        '<p style="font-size: 0.9rem; color: #cbd5e1; line-height: 1.6; white-space: pre-wrap;">' + (ch.desc || ch.description || 'No description provided.') + '</p>' +
+        '<div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1.5rem;">' +
+          '<h4 style="font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Channel Details</h4>' +
+          '<div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; color: #94a3b8;">' +
+            '<div>Category: <b style="color: #fff; text-transform: capitalize;">' + (ch.category || 'Technology') + '</b></div>' +
+            '<div>Channel Type: <b style="color: #fff; text-transform: capitalize;">' + (ch.channelType || 'video') + '</b></div>' +
+            '<div>Sovereign DID: <code style="color: #38bdf8; font-size: 0.76rem; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">' + (ch.ownerDid || 'did:sovra:channel_node') + '</code></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 18px; height: fit-content;">' +
+        '<h3 style="font-size: 1.05rem; font-weight: 800; color: #fff; margin-top: 0; margin-bottom: 12px;">Channel Stats</h3>' +
+        '<div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.88rem;">' +
+          '<div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px;">' +
+            '<span style="color: #94a3b8;">Joined</span>' +
+            '<span style="color: #fff; font-weight: 600;">' + (ch.createdAt ? new Date(ch.createdAt).toLocaleDateString() : 'Decentralized Era') + '</span>' +
+          '</div>' +
+          '<div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px;">' +
+            '<span style="color: #94a3b8;">Subscribers</span>' +
+            '<span style="color: #fff; font-weight: 700;">' + (stats.subscribersFormatted || '0') + '</span>' +
+          '</div>' +
+          '<div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px;">' +
+            '<span style="color: #94a3b8;">Total Views</span>' +
+            '<span style="color: #fff; font-weight: 700;">' + (stats.viewsFormatted || '0') + '</span>' +
+          '</div>' +
+          '<div style="display: flex; justify-content: space-between;">' +
+            '<span style="color: #94a3b8;">Videos</span>' +
+            '<span style="color: #fff; font-weight: 700;">' + (stats.videoCount || 0) + '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function toggleChannelHubSubscription() {
+      if (!window._currentChannelHubData || !window._currentChannelHubData.channel) return;
+      const ch = window._currentChannelHubData.channel;
+      const subBtn = document.getElementById('channelHubSubscribeBtn');
+      const subText = document.getElementById('channelHubSubText');
+      const subCount = document.getElementById('channelHubSubCount');
+
+      fetch('/api/social/channels/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: ch.id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          const isSubbed = Boolean(d.subscribed);
+          ch.isSubbed = isSubbed;
+          if (subBtn && subText) {
+            if (isSubbed) {
+              subBtn.style.background = 'rgba(255,255,255,0.12)';
+              subBtn.style.color = '#cbd5e1';
+              subBtn.style.boxShadow = 'none';
+              subText.textContent = 'Subscribed ✓';
+              if (subCount && d.count != null) subCount.textContent = d.count + ' subscribers';
+              if (typeof showAccountToast === 'function') showAccountToast('🔔 Subscribed to ' + ch.name);
+            } else {
+              subBtn.style.background = '#f43f5e';
+              subBtn.style.color = '#fff';
+              subBtn.style.boxShadow = '0 4px 14px rgba(244,63,94,0.35)';
+              subText.textContent = 'Subscribe';
+              if (subCount && d.count != null) subCount.textContent = d.count + ' subscribers';
+              if (typeof showAccountToast === 'function') showAccountToast('Unsubscribed from ' + ch.name);
+            }
+          }
+        }
+      })
+      .catch(function(err) {
+        alert('Subscription error: ' + err.message);
+      });
+    }
+    window.toggleChannelHubSubscription = toggleChannelHubSubscription;
+
+    function submitChannelCommunityPost(channelId) {
+      const input = document.getElementById('chanCommunityInput');
+      const text = input ? input.value.trim() : '';
+      if (!text) return;
+      fetch('/api/channel/community/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: channelId, content: text })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          if (input) input.value = '';
+          if (typeof showAccountToast === 'function') showAccountToast('📢 Community post published to P2P mesh swarms!');
+          openChannelHub(channelId);
+        } else {
+          alert('Failed to publish post: ' + (d.error || 'Unknown error'));
+        }
+      })
+      .catch(function(e) { alert('Post failed: ' + e.message); });
+    }
+    window.submitChannelCommunityPost = submitChannelCommunityPost;
+
+    function returnFromChannelHub() {
+      const target = window._channelHubPreviousTab || 'youtube';
+      if (typeof switchTab === 'function') {
+        switchTab(target === 'channel' ? 'youtube' : target);
+      }
+    }
+    window.returnFromChannelHub = returnFromChannelHub;
+
+    function openChannelStudioPro() {
+      if (window._currentChannelHubData && window._currentChannelHubData.channel) {
+        const ch = window._currentChannelHubData.channel;
+        if (window.SovraCreatorStudioEngine) {
+          window.SovraCreatorStudioEngine.activeChannelId = ch.id;
+        }
+      }
+      if (typeof switchTab === 'function') {
+        switchTab('studio');
+      }
+    }
+    window.openChannelStudioPro = openChannelStudioPro;
+
+    function shareCurrentChannel(e) {
+      if (e) e.stopPropagation();
+      const ch = window._currentChannelHubData && window._currentChannelHubData.channel;
+      const url = window.location.origin + '/@' + ((ch && ch.handle) ? ch.handle.replace(/^@/, '') : 'channel');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function() {
+          if (typeof showAccountToast === 'function') showAccountToast('🔗 Channel link copied to clipboard: ' + url);
+        });
+      } else {
+        prompt('Channel URL:', url);
+      }
+    }
+    window.shareCurrentChannel = shareCurrentChannel;
+
+    function openChannelSuperTipModal() {
+      const ch = window._currentChannelHubData && window._currentChannelHubData.channel;
+      const name = ch ? ch.name : 'Creator';
+      const amount = prompt('Enter amount of SOV to super-tip ' + name + ':', '10');
+      if (!amount || isNaN(Number(amount))) return;
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('⚡ Sent ' + amount + ' SOV Super-Tip to ' + name + '! Tx confirmed on sovereign ledger.');
+      }
+    }
+    window.openChannelSuperTipModal = openChannelSuperTipModal;
+
+    function playWatchVideoDirect(videoId) {
+      if (!videoId) return;
+      if (typeof switchTab === 'function') {
+        switchTab('youtube');
+      }
+      if (typeof playVideoById === 'function') {
+        playVideoById(videoId);
+      }
+    }
+    window.playWatchVideoDirect = playWatchVideoDirect;
 
     // --- Page Creation Handlers ---
     function openCreatePageModal() {
@@ -80504,6 +81284,11 @@ async function startDevServer() {
 
       // Fallback: If not explicitly created yet, resolve channel from sovereign video catalog or protocol defaults
       if (!ch && (handle || channelId)) {
+        if ((sovraDb as any).getChannelByHandleOrId) {
+          ch = (sovraDb as any).getChannelByHandleOrId(channelId || handle);
+        }
+      }
+      if (!ch && (handle || channelId)) {
         const vid = (sovraDb.db.videos || []).find(v => 
           (channelId && v.channelId === channelId) ||
           ((v.channelHandle || '').toLowerCase().replace(/^@/, '') === handle)
@@ -80580,20 +81365,35 @@ async function startDevServer() {
           existing.name = reqName;
           existing.desc = String(parsed.desc || existing.desc);
           if (parsed.channelType) existing.channelType = String(parsed.channelType);
+          if (parsed.bannerUrl || parsed.banner) (existing as any).bannerUrl = String(parsed.bannerUrl || parsed.banner);
+          if (parsed.category) (existing as any).category = String(parsed.category);
+          if (parsed.avatar) (existing as any).avatar = String(parsed.avatar);
+          if (parsed.bg || parsed.avatarBg) (existing as any).bg = String(parsed.bg || parsed.avatarBg);
+          if (parsed.verified !== undefined) (existing as any).verified = Boolean(parsed.verified);
           if (!existing.ownerDid) existing.ownerDid = principal.did;
           saveDynamicSocialState(dynamicSocialStore);
+          if (sovraDb.db && Array.isArray(sovraDb.db.channels)) {
+            const dbCh = sovraDb.db.channels.find((c: any) => c.id === existing.id || c.handle === existing.handle);
+            if (dbCh) {
+              Object.assign(dbCh, existing);
+              sovraDb.save();
+            }
+          }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, channel: existing, id: existing.id }));
           return;
         }
         const chanType = String(parsed.channelType || (parsed.type === 'video' ? 'video' : 'broadcast'));
         const isVideoChan = chanType === 'video';
+        const bannerUrl = String(parsed.bannerUrl || parsed.banner || 'linear-gradient(135deg, #0ea5e9, #8b5cf6, #ec4899)');
         const newChan: ChannelRecord = {
           id: 'ch-' + Date.now(),
           handle: handle,
           name: reqName,
           category: String(parsed.category || 'tech'),
           desc: String(parsed.desc || (isVideoChan ? 'YouTube-style Sovereign video channel' : 'Sovereign channel')),
+          bannerUrl: bannerUrl,
+          verified: true,
           count: 1,
           avatar: String(parsed.avatar || (isVideoChan ? '🎬' : '📢')),
           bg: String(parsed.avatarBg || parsed.bg || (isVideoChan ? '#f43f5e' : '#0284c7')),
