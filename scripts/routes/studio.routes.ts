@@ -1435,6 +1435,8 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
           if (parsed.channelName) match.name = parsed.channelName;
           if (parsed.channelBio) match.desc = parsed.channelBio;
           if (cleanHandle) match.handle = cleanHandle;
+          if (parsed.trailerVideoId) match.trailerVideoId = parsed.trailerVideoId;
+          if (parsed.featuredVideoId) match.featuredVideoId = parsed.featuredVideoId;
         }
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1758,6 +1760,12 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Channel not found' }));
       return true;
+    }
+
+    const creatorCust = ch.ownerDid ? (sovraDb.db as any).creator_customizations?.[ch.ownerDid] : null;
+    if (creatorCust) {
+      if (!ch.trailerVideoId && creatorCust.trailerVideoId) ch.trailerVideoId = creatorCust.trailerVideoId;
+      if (!ch.featuredVideoId && creatorCust.featuredVideoId) ch.featuredVideoId = creatorCust.featuredVideoId;
     }
 
     const allVideos = (sovraDb as any).db?.videos || [];

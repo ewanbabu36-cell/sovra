@@ -3612,7 +3612,7 @@ export class SovraDatabaseEngine {
       return existing;
     }
     const newChan: ChannelRecord = {
-      id: 'ch-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      id: (params as any).id || ('ch-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6)),
       handle: cleanHandle,
       name: params.name,
       category: params.category || 'tech',
@@ -8012,6 +8012,8 @@ export class SovraDatabaseEngine {
         if (data.channelBio) chan.desc = data.channelBio;
         if (data.channelAvatar) chan.avatar = data.channelAvatar;
         if (cleanHandle) chan.handle = cleanHandle;
+        if (data.trailerVideoId) chan.trailerVideoId = data.trailerVideoId;
+        if (data.featuredVideoId) chan.featuredVideoId = data.featuredVideoId;
         chan.updatedAt = Date.now();
       }
     }
