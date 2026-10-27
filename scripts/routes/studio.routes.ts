@@ -2183,8 +2183,8 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
-  // POST /api/sponsors/escrow/create
-  if (url.pathname === '/api/sponsors/escrow/create' && req.method === 'POST') {
+  // POST /api/sponsors/escrow/create or /api/studio/sponsored/create
+  if ((url.pathname === '/api/sponsors/escrow/create' || url.pathname === '/api/studio/sponsored/create') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
@@ -2211,8 +2211,8 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
-  // POST /api/sponsors/escrow/submit
-  if (url.pathname === '/api/sponsors/escrow/submit' && req.method === 'POST') {
+  // POST /api/sponsors/escrow/submit or /api/studio/sponsored/submit or /api/studio/sponsored/apply
+  if ((url.pathname === '/api/sponsors/escrow/submit' || url.pathname === '/api/studio/sponsored/submit' || url.pathname === '/api/studio/sponsored/apply') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
@@ -2220,7 +2220,7 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
       const principal = ctx.resolvePrincipal(ctx.req);
       const creatorDid = (principal && principal.did) || parsed.creatorDid || resolveCreatorDid(ctx);
 
-      const result = sovraDb.submitSponsoredContent(parsed.escrowId, parsed.contentId, creatorDid);
+      const result = sovraDb.submitSponsoredContent(parsed.escrowId, parsed.contentId || parsed.draftPostId, creatorDid);
       res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
     } catch (err: any) {
@@ -2230,8 +2230,8 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
-  // POST /api/sponsors/escrow/release
-  if (url.pathname === '/api/sponsors/escrow/release' && req.method === 'POST') {
+  // POST /api/sponsors/escrow/release or /api/studio/sponsored/release or /api/studio/sponsored/approve-release
+  if ((url.pathname === '/api/sponsors/escrow/release' || url.pathname === '/api/studio/sponsored/release' || url.pathname === '/api/studio/sponsored/approve-release') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
@@ -2247,6 +2247,71 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
       res.end(JSON.stringify({ ok: false, error: 'Escrow release error: ' + (err?.message || err) }));
     }
     return true;
+  }
+
+  // POST /api/sponsors/escrow/refund or /api/studio/sponsored/cancel-refund
+  if ((url.pathname === '/api/sponsors/escrow/refund' || url.pathname === '/api/studio/sponsored/cancel-refund') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const callerDid = (principal && principal.did) || parsed.callerDid || resolveCreatorDid(ctx);
+
+      const result = sovraDb.refundSponsoredEscrow(parsed.escrowId, callerDid);
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Escrow refund error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // GET /api/studio/sponsored/analytics (Attested CPM delivery analytics for advertisers)
+  if (url.pathname === '/api/studio/sponsored/analytics' && req.method === 'GET') {
+    try {
+      const escrows = (sovraDb.getState() as any).sponsored_escrows || [];
+      const promotions = (sovraDb.getState() as any).promotion_campaigns || [];
+      const verifiedViews = (sovraDb.getState() as any).attested_views || [];
+
+      let totalEscrowedSov = 0;
+      let totalReleasedSov = 0;
+      let totalRefundedSov = 0;
+
+      for (const e of escrows) {
+        if (e.status === 'ESCROWED' || e.status === 'SUBMITTED') {
+          totalEscrowedSov += Number(e.bountyAmountSov || 0);
+        } else if (e.status === 'RELEASED') {
+          totalReleasedSov += Number(e.bountyAmountSov || 0);
+        } else if (e.status === 'REFUNDED') {
+          totalRefundedSov += Number(e.bountyAmountSov || 0);
+        }
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(JSON.stringify({
+        ok: true,
+        summary: {
+          totalCampaignsCount: escrows.length + promotions.length,
+          activeEscrowsCount: escrows.filter((e: any) => e.status === 'ESCROWED' || e.status === 'SUBMITTED').length,
+          totalEscrowedSov: Math.round(totalEscrowedSov * 100) / 100,
+          totalReleasedSov: Math.round(totalReleasedSov * 100) / 100,
+          totalRefundedSov: Math.round(totalRefundedSov * 100) / 100,
+          totalAttestedViews: verifiedViews.length,
+        },
+        escrows,
+        promotions,
+      }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Analytics error' }));
+      return true;
+    }
   }
 
   // POST /api/promotions/campaign/create
