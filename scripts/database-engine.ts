@@ -2261,20 +2261,26 @@ export class SovraDatabaseEngine {
       let usedBackup = false;
       if (fs.existsSync(this.dbFilePath)) {
         try {
-          raw = fs.readFileSync(this.dbFilePath, 'utf-8');
-          JSON.parse(raw); // validate JSON integrity
+          const stats = fs.statSync(this.dbFilePath);
+          if (stats.size > 2) {
+            raw = fs.readFileSync(this.dbFilePath, 'utf-8');
+            JSON.parse(raw); // validate JSON integrity
+          }
         } catch (corruptErr) {
           console.warn('[SovraDB] Primary state corrupted, attempting backup restoration...', corruptErr);
-          if (fs.existsSync(this.dbBackupPath)) {
-            raw = fs.readFileSync(this.dbBackupPath, 'utf-8');
-            usedBackup = true;
-          } else {
-            throw corruptErr;
-          }
+          raw = '';
         }
-      } else if (fs.existsSync(this.dbBackupPath)) {
-        raw = fs.readFileSync(this.dbBackupPath, 'utf-8');
-        usedBackup = true;
+      }
+      if (!raw && fs.existsSync(this.dbBackupPath)) {
+        try {
+          const bStats = fs.statSync(this.dbBackupPath);
+          if (bStats.size > 2) {
+            const bRaw = fs.readFileSync(this.dbBackupPath, 'utf-8');
+            JSON.parse(bRaw);
+            raw = bRaw;
+            usedBackup = true;
+          }
+        } catch (_) {}
       }
 
       if (raw) {
@@ -2525,9 +2531,10 @@ export class SovraDatabaseEngine {
       this.save();
     }
 
-    // Filter out mock seed personas and ephemeral test fixtures so they don't pollute users or peers
-    this.db.users = this.db.users.filter(u => !isMockOrSeedRecord(u) && !isTestArtifactRecord(u));
-    this.db.contacts_and_peers = this.db.contacts_and_peers.filter(p => !isMockOrSeedRecord(p) && !isTestArtifactRecord(p));
+    // Users are never heuristically purged on load(); preserve all registered identities
+    // Only filter unparseable records lacking a DID
+    this.db.users = this.db.users.filter(u => Boolean(u && u.did));
+    this.db.contacts_and_peers = this.db.contacts_and_peers.filter(p => Boolean(p && p.did));
 
     // Deduplicate users (keeping latest record) without destructive regex filtering
     const uniqueUsers: UserRecord[] = [];
@@ -2626,18 +2633,21 @@ export class SovraDatabaseEngine {
       this.db.schemaVersion = 1;
       const data = JSON.stringify(this.db);
 
-      // Create rolling backup if no backup exists or at most once every throttle interval to prevent I/O thrashing
+      // Create rolling backup if valid primary exists
       const now = Date.now();
       const isTestEnv = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
       const shouldBackup = isTestEnv || !fs.existsSync(this.dbBackupPath) || !this.lastBackupAt || (now - this.lastBackupAt > 5000);
       if (fs.existsSync(this.dbFilePath) && shouldBackup) {
         try {
-          fs.copyFileSync(this.dbFilePath, this.dbBackupPath);
-          this.lastBackupAt = now;
+          const stats = fs.statSync(this.dbFilePath);
+          if (stats.size > 100) {
+            fs.copyFileSync(this.dbFilePath, this.dbBackupPath);
+            this.lastBackupAt = now;
+          }
         } catch (_) {}
       }
 
-      // Atomic write using unique pid-timestamp temp file and rename
+      // Atomic write using unique pid-timestamp temp file and retry-based rename
       const tempPath = path.join(
         this.storageDir,
         `dynamic-social-state.json.tmp.${process.pid}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`
@@ -2645,13 +2655,25 @@ export class SovraDatabaseEngine {
 
       fs.writeFileSync(tempPath, data, 'utf-8');
 
-      try {
-        fs.renameSync(tempPath, this.dbFilePath);
-      } catch (renameErr) {
-        // Windows fallback when target file is temporarily locked
-        fs.copyFileSync(tempPath, this.dbFilePath);
-        try { fs.unlinkSync(tempPath); } catch (_) {}
+      let replaced = false;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          fs.renameSync(tempPath, this.dbFilePath);
+          replaced = true;
+          break;
+        } catch (_) {
+          const waitEnd = Date.now() + 15;
+          while (Date.now() < waitEnd) {}
+        }
       }
+      if (!replaced) {
+        try {
+          fs.copyFileSync(tempPath, this.dbFilePath);
+        } catch (_) {}
+      }
+      try {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      } catch (_) {}
     } catch (err) {
       console.error('[SovraDB] Atomic write failed:', err);
     }
@@ -2847,7 +2869,7 @@ export class SovraDatabaseEngine {
       deviceType: record.deviceType as any,
     });
 
-    this.save();
+    this.save(true);
     try {
       this.sqliteEngine?.registerUser(record);
     } catch (_) {}
@@ -5675,7 +5697,7 @@ export class SovraDatabaseEngine {
     }
 
     this.logActivity('USER_DELETED', userDid, user.handle, `Permanently deleted user account ${user.handle} (${userDid})`);
-    this.save();
+    this.save(true);
     return { ok: true };
   }
 

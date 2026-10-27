@@ -79480,6 +79480,14 @@ async function startDevServer() {
   console.log('   SOVRA LOCALHOST DEVELOPMENT & P2P NODE RUNNER');
   console.log('------------------------------------------------------------');
 
+  process.on('uncaughtException', (err: any) => {
+    console.error('[UNCAUGHT EXCEPTION PREVENTED CRASH]:', err?.message || err);
+    if (err?.stack) console.error(err.stack);
+  });
+  process.on('unhandledRejection', (reason: any) => {
+    console.error('[UNHANDLED REJECTION PREVENTED CRASH]:', reason?.message || reason);
+  });
+
   console.log('[1/2] Initializing Cryptographic Identity, P2P Node, Storage Daemon & Social Graph...');
   const { masterKey, deviceKey, binding, node, tcpPort, storageDaemon, socialGraph, localFeed, workstationPrivKey } = await bootstrapLocalNode();
 
@@ -85695,7 +85703,8 @@ async function startDevServer() {
         const found = sovraDb.findUserByHandle(targetDid) || sovraDb.getState().users.find(u =>
           u.handle.toLowerCase() === targetDid.toLowerCase() ||
           u.handle.toLowerCase() === ('@' + targetDid).toLowerCase() ||
-          u.displayName.toLowerCase() === targetDid.toLowerCase()
+          (u.displayName && u.displayName.toLowerCase() === targetDid.toLowerCase()) ||
+          ((u as any).name && (u as any).name.toLowerCase() === targetDid.toLowerCase())
         );
         if (found) targetDid = found.did;
       }
@@ -87638,8 +87647,8 @@ async function startDevServer() {
             if (viewerDid && sovraDb.isBlocked(u.did, viewerDid)) return false;
             if (!sovraDb.canUserViewProfile(u, viewerDid)) return false;
             if (indexedDocIds.has(`user:${u.did}`)) return true;
-            return u.handle.toLowerCase().includes(q) ||
-                   u.displayName.toLowerCase().includes(q) ||
+            return ((u.handle || '').toLowerCase().includes(q)) ||
+                   (((u.displayName || (u as any).name || '')).toLowerCase().includes(q)) ||
                    (u.name && u.name.toLowerCase().includes(q)) ||
                    (u.bio && u.bio.toLowerCase().includes(q));
           })
@@ -87805,7 +87814,7 @@ async function startDevServer() {
         if (suggestions.length >= 8) break;
         if (viewerDid && sovraDb.isBlocked(u.did, viewerDid)) continue;
         if (!sovraDb.canUserViewProfile(u, viewerDid)) continue;
-        if (u.handle.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q)) {
+        if (((u.handle || '').toLowerCase().includes(q)) || (((u.displayName || (u as any).name || '')).toLowerCase().includes(q))) {
           suggestions.push({
             type: 'user',
             title: u.displayName,
