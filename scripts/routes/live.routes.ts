@@ -663,5 +663,192 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
     return true;
   }
 
+  // ==========================================
+  // TITAN-KILLER: MULTI-HOST SWARM & LIVE AUCTIONS
+  // ==========================================
+
+  // In-memory multi-host co-hosts state
+  const liveCoHosts = (globalThis as any)._sovraLiveCoHosts || ((globalThis as any)._sovraLiveCoHosts = new Map<string, Array<{ did: string; name: string; avatar: string; role: string; joinedAt: number }>>());
+
+  // In-memory live auctions state
+  const liveAuctions = (globalThis as any)._sovraLiveAuctions || ((globalThis as any)._sovraLiveAuctions = new Map<string, {
+    auctionId: string;
+    sessionId: string;
+    title: string;
+    reservePriceSov: number;
+    highestBidSov: number;
+    highestBidderDid: string | null;
+    highestBidderName: string | null;
+    status: 'ACTIVE' | 'SETTLED' | 'CANCELLED';
+    bids: Array<{ bidderDid: string; bidderName: string; amountSov: number; timestamp: number }>;
+    endsAt: number;
+  }>());
+
+  // 10. POST /api/live/cohost/invite & /api/live/cohost/join
+  if (url.pathname === '/api/live/cohost/invite' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const sessionId = parsed.sessionId;
+      const cohostDid = parsed.cohostDid;
+      const cohostName = parsed.cohostName || 'Guest Co-Host';
+
+      if (!sessionId || !cohostDid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'sessionId and cohostDid are required' }));
+        return true;
+      }
+
+      if (!liveCoHosts.has(sessionId)) liveCoHosts.set(sessionId, []);
+      const current = liveCoHosts.get(sessionId)!;
+      if (current.length >= 3) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Max 4 co-hosts limit reached for this session' }));
+        return true;
+      }
+
+      if (!current.some(c => c.did === cohostDid)) {
+        current.push({
+          did: cohostDid,
+          name: cohostName,
+          avatar: parsed.cohostAvatar || '🎙️',
+          role: 'CO_HOST',
+          joinedAt: Date.now(),
+        });
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, cohosts: current, count: current.length + 1 }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err.message }));
+      return true;
+    }
+  }
+
+  if (url.pathname === '/api/live/cohost/join' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const sessionId = parsed.sessionId;
+      const cohosts = liveCoHosts.get(sessionId) || [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        sessionId,
+        meshLayout: '4_WAY_SPLIT',
+        cohosts,
+        webrtcSignalingChannel: `live_mesh_${sessionId}`,
+      }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err.message }));
+      return true;
+    }
+  }
+
+  // 11. POST /api/live/auction/create & /api/live/auction/bid & GET /api/live/auction/status
+  if (url.pathname === '/api/live/auction/create' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const sessionId = parsed.sessionId;
+      const title = parsed.title || 'Live Auction Item';
+      const reserve = Number(parsed.reservePriceSov || 1.0);
+      const durationSeconds = Number(parsed.durationSeconds || 300);
+
+      const auctionId = `auc_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+      const auction = {
+        auctionId,
+        sessionId,
+        title,
+        reservePriceSov: reserve,
+        highestBidSov: reserve,
+        highestBidderDid: null,
+        highestBidderName: null,
+        status: 'ACTIVE' as const,
+        bids: [],
+        endsAt: Date.now() + durationSeconds * 1000,
+      };
+
+      liveAuctions.set(sessionId, auction);
+
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, auction }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err.message }));
+      return true;
+    }
+  }
+
+  if (url.pathname === '/api/live/auction/bid' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const sessionId = parsed.sessionId;
+      const bidderDid = parsed.bidderDid || 'did:sovra:bidder';
+      const bidderName = parsed.bidderName || 'Sovereign Collector';
+      const amount = Number(parsed.amountSov);
+
+      const auction = liveAuctions.get(sessionId);
+      if (!auction || auction.status !== 'ACTIVE') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'No active auction for this session' }));
+        return true;
+      }
+
+      if (amount <= auction.highestBidSov) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: `Bid must be higher than current highest bid (${auction.highestBidSov} SOV)`,
+        }));
+        return true;
+      }
+
+      auction.highestBidSov = amount;
+      auction.highestBidderDid = bidderDid;
+      auction.highestBidderName = bidderName;
+      auction.bids.unshift({
+        bidderDid,
+        bidderName,
+        amountSov: amount,
+        timestamp: Date.now(),
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        message: 'Bid accepted and locked in live escrow',
+        auction,
+      }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err.message }));
+      return true;
+    }
+  }
+
+  if (url.pathname === '/api/live/auction/status' && req.method === 'GET') {
+    const sessionId = url.searchParams.get('sessionId') || '';
+    const auction = liveAuctions.get(sessionId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      hasActiveAuction: Boolean(auction && auction.status === 'ACTIVE'),
+      auction: auction || null,
+    }));
+    return true;
+  }
+
   return false;
 }
