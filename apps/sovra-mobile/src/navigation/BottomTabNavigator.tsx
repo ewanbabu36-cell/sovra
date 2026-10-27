@@ -10,6 +10,7 @@ import { WatchScreen } from '../screens/WatchScreen.js';
 import { ChatsScreen } from '../screens/ChatsScreen.js';
 import { MeScreen } from '../screens/MeScreen.js';
 import { CallScreen } from '../screens/CallScreen.js';
+import { MeshDiagnosticsScreen } from '../screens/MeshDiagnosticsScreen.js';
 import {
   fetchMeshStatus,
   updateMeshControls,
@@ -48,6 +49,7 @@ export function BottomTabNavigator(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabKey>('feed');
   const [meshStatus, setMeshStatus] = useState<MobileMeshStatus | null>(null);
   const [showMeshDrawer, setShowMeshDrawer] = useState(false);
+  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
   const [incomingCall, setIncomingCall] = useState<MobileIncomingCall | null>(null);
   const [activeCallSession, setActiveCallSession] = useState<{
     callId: string;
@@ -529,6 +531,30 @@ export function BottomTabNavigator(): React.JSX.Element {
               </button>
             </div>
           </div>
+            <button
+              id="btnOpenMeshDiagnosticsModal"
+              onClick={() => {
+                setShowMeshDrawer(false);
+                setShowDiagnosticsModal(true);
+              }}
+              style={{
+                marginTop: 6,
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid rgba(56, 189, 248, 0.4)',
+                backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                color: '#38bdf8',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              <span>📡 Open Full RF Simulator & Diagnostics HUD</span>
+            </button>
         </div>
       )}
 
@@ -748,7 +774,14 @@ export function BottomTabNavigator(): React.JSX.Element {
         </div>
       )}
 
-      {/* Active Call Fullscreen View (Available anywhere across all tabs) */}
+      
+      {/* Fullscreen Mesh Diagnostics & RF Simulator Modal */}
+      {showDiagnosticsModal && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 90 }}>
+          <MeshDiagnosticsScreen onClose={() => setShowDiagnosticsModal(false)} />
+        </div>
+      )}
+{/* Active Call Fullscreen View (Available anywhere across all tabs) */}
       {activeCallSession && (
         <CallScreen
           peerName={activeCallSession.peerName}

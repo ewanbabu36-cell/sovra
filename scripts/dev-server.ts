@@ -87181,6 +87181,61 @@ async function startDevServer() {
       return;
     }
 
+    if (url.pathname === '/api/mesh/telemetry' && req.method === 'GET') {
+      const peers = sovraBleMesh.getConnectedPeersWithTelemetry();
+      const rfConfig = sovraBleMesh.getRfSimulation();
+      const localNoiseKey = '0x' + crypto.createHash('sha256').update('noise-xx:' + masterKey.did).digest('hex');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          localPeerId: binding.peerId,
+          localDid: masterKey.did,
+          localNoiseXxKey: localNoiseKey,
+          interfaces: {
+            ble5: { active: true, mtu: 512, phy: '2M_LE_CODED', txPowerDbm: -59 },
+            wifiDirectNan: { active: true, band: '5GHz', clusterRole: 'ANCHOR_MASTER' },
+          },
+          rfConfig,
+          peers,
+        }),
+      );
+      return;
+    }
+
+    if (url.pathname === '/api/mesh/rf-simulate' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const updated = sovraBleMesh.setRfSimulation(parsed);
+        const peers = sovraBleMesh.getConnectedPeersWithTelemetry();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, rfConfig: updated, peers }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/mesh/ping' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const principal = resolvePrincipal(req, parsed);
+        const senderDid = String(parsed.senderDid || principal?.did || masterKey.did);
+        const pingResult = sovraBleMesh.pingBroadcast(senderDid);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, pingResult }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
     // ==========================================
     // PHASE 5: LIVE SESSIONS & CHAT API
     // ==========================================
