@@ -327,6 +327,70 @@ export class SqliteSocialDatabaseEngine {
         updated_at INTEGER NOT NULL,
         updated_by TEXT NOT NULL
       );
+
+      -- 15. SOVEREIGN MINI-DAPPS REGISTRY (TITAN-KILLER)
+      CREATE TABLE IF NOT EXISTS mini_dapps (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        author_did TEXT NOT NULL,
+        version TEXT NOT NULL,
+        bundle_cid TEXT NOT NULL,
+        icon_url TEXT,
+        category TEXT NOT NULL,
+        permissions_json TEXT NOT NULL,
+        installs_count INTEGER DEFAULT 0,
+        rating REAL DEFAULT 5.0,
+        description TEXT,
+        entry_html TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_mini_dapps_category ON mini_dapps(category);
+
+      -- 16. OFFLINE SOUND-WAVE & BLE PAYMENT VOUCHERS (TITAN-KILLER)
+      CREATE TABLE IF NOT EXISTS offline_payment_vouchers (
+        voucher_id TEXT PRIMARY KEY,
+        sender_did TEXT NOT NULL,
+        recipient_did TEXT NOT NULL,
+        amount_sov REAL NOT NULL,
+        nonce TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        signature TEXT NOT NULL,
+        status TEXT DEFAULT 'pending_sync',
+        audio_fsk_payload TEXT,
+        ble_payload TEXT,
+        created_at INTEGER NOT NULL,
+        settled_at INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_offline_vouchers_sender ON offline_payment_vouchers(sender_did);
+      CREATE INDEX IF NOT EXISTS idx_offline_vouchers_recipient ON offline_payment_vouchers(recipient_did);
+
+      -- 17. CRYPTOGRAPHIC COMMUNITY NOTES (TITAN-KILLER)
+      CREATE TABLE IF NOT EXISTS community_notes (
+        id TEXT PRIMARY KEY,
+        post_id TEXT NOT NULL,
+        author_did TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        classification TEXT NOT NULL,
+        sources_json TEXT NOT NULL,
+        status TEXT DEFAULT 'needs_more_ratings',
+        helpfulness_score REAL DEFAULT 0.0,
+        divergent_cluster_agreement REAL DEFAULT 0.0,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_notes_post ON community_notes(post_id);
+
+      -- 18. COMMUNITY NOTE RATINGS MATRIX (TITAN-KILLER)
+      CREATE TABLE IF NOT EXISTS community_note_ratings (
+        id TEXT PRIMARY KEY,
+        note_id TEXT NOT NULL,
+        rater_did TEXT NOT NULL,
+        cluster_id TEXT NOT NULL,
+        helpful INTEGER NOT NULL,
+        reason TEXT,
+        created_at INTEGER NOT NULL,
+        UNIQUE(note_id, rater_did)
+      );
+      CREATE INDEX IF NOT EXISTS idx_note_ratings_note ON community_note_ratings(note_id);
     `);
     try {
       this.db.exec('ALTER TABLE posts ADD COLUMN views_count INTEGER NOT NULL DEFAULT 0;');
