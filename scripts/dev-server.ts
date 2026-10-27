@@ -2706,25 +2706,35 @@ function renderHtml(
       gap: 10px;
     }
     .hero-launcher-pill {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 10px 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 5px;
-      color: #f8fafc;
-      font-size: 0.78rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      user-select: none;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.03) 100%) !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      border-radius: 14px !important;
+      padding: 11px 8px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      gap: 6px !important;
+      color: #f8fafc !important;
+      font-size: 0.8rem !important;
+      font-weight: 700 !important;
+      cursor: pointer !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.15) !important;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      user-select: none !important;
+      position: relative !important;
+      overflow: hidden !important;
     }
     .hero-launcher-pill:hover {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(56, 189, 248, 0.4);
-      transform: translateY(-2px);
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.22) 0%, rgba(99, 102, 241, 0.18) 100%) !important;
+      border-color: rgba(56, 189, 248, 0.6) !important;
+      box-shadow: 0 6px 20px rgba(56, 189, 248, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.3) !important;
+      transform: translateY(-2px) scale(1.02) !important;
+      color: #ffffff !important;
+    }
+    .hero-launcher-pill:active {
+      transform: scale(0.97) !important;
     }
     body.theme-black .hero-launcher-pill {
       background: #111111 !important;
@@ -8027,9 +8037,14 @@ function renderHtml(
     .header-search-bar:hover {
       background: #4e4f50 !important;
     }
+    .header-search-bar {
+      width: 220px !important;
+      transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.18s ease, box-shadow 0.18s ease !important;
+    }
     .header-search-bar:focus-within {
+      width: 280px !important;
       background: #3a3b3c !important;
-      box-shadow: 0 0 0 2px #1877f2 !important;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.6) !important;
     }
     .header-search-icon-lens {
       display: none !important;
@@ -9064,21 +9079,24 @@ function renderHtml(
       width: 36px;
       height: 36px;
       border-radius: 50%;
-      background: #1877f2;
-      border: 4px solid #242526;
-      color: #ffffff;
-      font-size: 22px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      background: linear-gradient(135deg, #00f0ff 0%, #38bdf8 50%, #6366f1 100%) !important;
+      border: 3px solid #1e293b !important;
+      color: #ffffff !important;
+      font-size: 20px !important;
+      font-weight: 800 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.45) !important;
       line-height: 1;
-      transition: transform 0.2s ease, background-color 0.2s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease !important;
     }
     .story-item:hover .story-plus-badge {
-      transform: translateX(-50%) scale(1.08);
-      background: #166fe5;
+      transform: translateX(-50%) scale(1.14) !important;
+      box-shadow: 0 6px 22px rgba(56, 189, 248, 0.65) !important;
+    }
+    body.theme-normal .story-plus-badge {
+      border: 3px solid #ffffff !important;
     }
     .create-story-footer .story-username {
       font-size: 12px !important;
