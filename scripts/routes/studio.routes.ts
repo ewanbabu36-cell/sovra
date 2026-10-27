@@ -1878,6 +1878,489 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
+  // =========================================================================
+  // SOVRA COMMERCIALIZATION, REVENUE & BUSINESS LOGIC ROUTES (CYCLES 1 - 5)
+  // =========================================================================
+
+  // Helper to extract channelId from path pattern /api/channels/:id/...
+  const extractChannelIdFromPath = (pathname: string): string | null => {
+    const m = pathname.match(/^\/api\/channels\/([^/]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  };
+
+  // -------------------------------------------------------------------------
+  // CYCLE 1: MEMBERSHIP TIERS & RECURRING SUBSCRIPTIONS
+  // -------------------------------------------------------------------------
+
+  // GET /api/channels/:id/membership-tiers OR /api/membership/tiers
+  if ((url.pathname.match(/^\/api\/channels\/[^/]+\/membership-tiers$/) || url.pathname === '/api/membership/tiers') && req.method === 'GET') {
+    const channelId = extractChannelIdFromPath(url.pathname) || url.searchParams.get('channelId') || 'ch-alpha';
+    const tiers = sovraDb.getChannelMembershipTiers(channelId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, channelId, tiers }));
+    return true;
+  }
+
+  // POST /api/channels/:id/membership-tiers OR /api/membership/tiers
+  if ((url.pathname.match(/^\/api\/channels\/[^/]+\/membership-tiers$/) || url.pathname === '/api/membership/tiers') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const channelId = extractChannelIdFromPath(url.pathname) || parsed.channelId || 'ch-alpha';
+      const tiers = Array.isArray(parsed.tiers) ? parsed.tiers : [];
+      const updated = sovraDb.setChannelMembershipTiers(channelId, tiers);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, channelId, tiers: updated }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid tier payload: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // POST /api/channels/:id/subscribe-tier OR /api/membership/subscribe
+  if ((url.pathname.match(/^\/api\/channels\/[^/]+\/subscribe-tier$/) || url.pathname === '/api/membership/subscribe') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const channelIdOrHandle = extractChannelIdFromPath(url.pathname) || parsed.channelId || parsed.channelHandle || 'ch-alpha';
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const userDid = (principal && principal.did) || parsed.userDid || resolveCreatorDid(ctx);
+      const tierLevel = Number(parsed.tierLevel || parsed.level || 1);
+
+      const result = sovraDb.subscribeChannelTier({
+        channelIdOrHandle,
+        userDid,
+        tierLevel,
+      });
+
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Subscription error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // GET /api/channels/:id/my-subscription OR /api/membership/my-subscription
+  if ((url.pathname.match(/^\/api\/channels\/[^/]+\/my-subscription$/) || url.pathname === '/api/membership/my-subscription') && req.method === 'GET') {
+    const channelId = extractChannelIdFromPath(url.pathname) || url.searchParams.get('channelId') || 'ch-alpha';
+    const principal = ctx.resolvePrincipal(ctx.req);
+    const userDid = (principal && principal.did) || url.searchParams.get('userDid') || resolveCreatorDid(ctx);
+
+    const sub = sovraDb.getUserChannelSubscription(channelId, userDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      channelId,
+      userDid,
+      subscription: sub,
+      hasActiveSubscription: Boolean(sub && (sub.status === 'ACTIVE' || sub.status === 'GRACE_PERIOD')),
+    }));
+    return true;
+  }
+
+  // POST /api/channels/:id/cancel-subscription OR /api/membership/cancel
+  if ((url.pathname.match(/^\/api\/channels\/[^/]+\/cancel-subscription$/) || url.pathname === '/api/membership/cancel') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const channelId = extractChannelIdFromPath(url.pathname) || parsed.channelId || 'ch-alpha';
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const userDid = (principal && principal.did) || parsed.userDid || resolveCreatorDid(ctx);
+
+      const result = sovraDb.cancelChannelSubscription(channelId, userDid);
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Cancellation error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // GET /api/content/access-check
+  if (url.pathname === '/api/content/access-check' && req.method === 'GET') {
+    const principal = ctx.resolvePrincipal(ctx.req);
+    const userDid = (principal && principal.did) || url.searchParams.get('userDid') || resolveCreatorDid(ctx);
+    const contentId = url.searchParams.get('contentId') || undefined;
+    const channelId = url.searchParams.get('channelId') || undefined;
+    const minTier = Number(url.searchParams.get('minMembershipTier') || '0');
+    const isPPV = url.searchParams.get('isPPV') === 'true';
+    const ppvPriceSov = Number(url.searchParams.get('ppvPriceSov') || '15');
+
+    const result = sovraDb.canUserAccessContent(
+      {
+        id: contentId,
+        channelId,
+        minMembershipTier: minTier,
+        isPPV,
+        ppvPriceSov,
+      },
+      userDid
+    );
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, userDid, contentId, ...result }));
+    return true;
+  }
+
+  // -------------------------------------------------------------------------
+  // CYCLE 2: LIVE STREAM REVENUE & HIGH-VELOCITY AUDIENCE TIPPING
+  // -------------------------------------------------------------------------
+
+  // POST /api/live/super-chat
+  if (url.pathname === '/api/live/super-chat' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const senderDid = (principal && principal.did) || parsed.senderDid || resolveCreatorDid(ctx);
+
+      const result = sovraDb.sendLiveSuperChat({
+        channelId: parsed.channelId || 'ch-alpha',
+        streamId: parsed.streamId,
+        senderDid,
+        amountSov: Number(parsed.amountSov || parsed.amount || 10),
+        message: parsed.message || '',
+        stickerId: parsed.stickerId,
+      });
+
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Super Chat error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // GET /api/live/super-chat/pins
+  if (url.pathname === '/api/live/super-chat/pins' && req.method === 'GET') {
+    const channelId = url.searchParams.get('channelId') || 'ch-alpha';
+    const pins = sovraDb.getActiveLivePins(channelId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, channelId, pins }));
+    return true;
+  }
+
+  // GET /api/live/stream-revenue
+  if (url.pathname === '/api/live/stream-revenue' && req.method === 'GET') {
+    const channelId = url.searchParams.get('channelId') || 'ch-alpha';
+    const streamId = url.searchParams.get('streamId') || undefined;
+    const stats = sovraDb.getLiveStreamRevenueStats(channelId, streamId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, channelId, streamId, stats }));
+    return true;
+  }
+
+  // -------------------------------------------------------------------------
+  // CYCLE 3: PAY-PER-VIEW (PPV), GATED DIGITAL ASSETS & CREATOR STORE
+  // -------------------------------------------------------------------------
+
+  // GET /api/channels/:id/store/products OR /api/store/products
+  if ((url.pathname.match(/^\/api\/channels\/[^/]+\/store\/products$/) || url.pathname === '/api/store/products') && req.method === 'GET') {
+    const channelId = extractChannelIdFromPath(url.pathname) || url.searchParams.get('channelId') || 'ch-alpha';
+    const products = sovraDb.getChannelDigitalProducts(channelId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, channelId, products }));
+    return true;
+  }
+
+  // POST /api/channels/:id/store/products OR /api/store/products
+  if ((url.pathname.match(/^\/api\/channels\/[^/]+\/store\/products$/) || url.pathname === '/api/store/products') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const creatorDid = (principal && principal.did) || parsed.creatorDid || resolveCreatorDid(ctx);
+      const channelId = extractChannelIdFromPath(url.pathname) || parsed.channelId || 'ch-alpha';
+
+      const product = sovraDb.createDigitalProduct({
+        channelId,
+        creatorDid,
+        title: parsed.title || 'Exclusive Sovereign Asset',
+        description: parsed.description || '',
+        priceSov: Number(parsed.priceSov || 10),
+        type: parsed.type || 'digital_download',
+        targetVideoId: parsed.targetVideoId,
+        filePayloadUrl: parsed.filePayloadUrl,
+        previewUrl: parsed.previewUrl,
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, product }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Product creation error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // POST /api/store/purchase
+  if (url.pathname === '/api/store/purchase' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const buyerDid = (principal && principal.did) || parsed.buyerDid || resolveCreatorDid(ctx);
+      const productId = parsed.productId;
+
+      if (!productId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'productId is required' }));
+        return true;
+      }
+
+      const result = sovraDb.purchaseDigitalProduct({
+        productId,
+        buyerDid,
+      });
+
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Store purchase error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // GET /api/videos/access-check
+  if (url.pathname === '/api/videos/access-check' && req.method === 'GET') {
+    const videoId = url.searchParams.get('videoId') || 'yt-video-1';
+    const principal = ctx.resolvePrincipal(ctx.req);
+    const userDid = (principal && principal.did) || url.searchParams.get('userDid') || resolveCreatorDid(ctx);
+
+    const access = sovraDb.checkUserPPVAccess(videoId, userDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, videoId, userDid, ...access }));
+    return true;
+  }
+
+  // -------------------------------------------------------------------------
+  // CYCLE 4: B2B VERIFIED ORG BADGING, SPONSOR ESCROW & PROMOTIONS
+  // -------------------------------------------------------------------------
+
+  // POST /api/org/verify-subscription
+  if (url.pathname === '/api/org/verify-subscription' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const orgDid = (principal && principal.did) || parsed.orgDid || resolveCreatorDid(ctx);
+
+      const result = sovraDb.subscribeOrgVerified({
+        orgDid,
+        orgName: parsed.orgName || 'Verified Organization',
+        handle: parsed.handle || '@org',
+        tier: parsed.tier === 'enterprise_sovereign' ? 'enterprise_sovereign' : 'standard_org',
+        seats: Array.isArray(parsed.seats) ? parsed.seats : [orgDid],
+      });
+
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Org verification error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // GET /api/org/badge-status
+  if (url.pathname === '/api/org/badge-status' && req.method === 'GET') {
+    const didOrHandle = url.searchParams.get('did') || url.searchParams.get('handle') || resolveCreatorDid(ctx);
+    const badge = sovraDb.getOrgBadge(didOrHandle);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, didOrHandle, ...badge }));
+    return true;
+  }
+
+  // POST /api/sponsors/escrow/create
+  if (url.pathname === '/api/sponsors/escrow/create' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const sponsorDid = (principal && principal.did) || parsed.sponsorDid || resolveCreatorDid(ctx);
+
+      const result = sovraDb.createSponsoredEscrow({
+        sponsorDid,
+        sponsorName: parsed.sponsorName || 'Brand Sponsor',
+        creatorDid: parsed.creatorDid || 'did:sovra:creator_studio_broadcast',
+        channelId: parsed.channelId || 'ch-alpha',
+        bountyAmountSov: Number(parsed.bountyAmountSov || parsed.amount || 100),
+        requiredViews: Number(parsed.requiredViews || 100),
+        disclosureTag: parsed.disclosureTag || '#sponsored',
+      });
+
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Escrow creation error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // POST /api/sponsors/escrow/submit
+  if (url.pathname === '/api/sponsors/escrow/submit' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const creatorDid = (principal && principal.did) || parsed.creatorDid || resolveCreatorDid(ctx);
+
+      const result = sovraDb.submitSponsoredContent(parsed.escrowId, parsed.contentId, creatorDid);
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Escrow submission error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // POST /api/sponsors/escrow/release
+  if (url.pathname === '/api/sponsors/escrow/release' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const callerDid = (principal && principal.did) || parsed.callerDid || resolveCreatorDid(ctx);
+
+      const result = sovraDb.releaseSponsoredEscrow(parsed.escrowId, callerDid);
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Escrow release error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // POST /api/promotions/campaign/create
+  if (url.pathname === '/api/promotions/campaign/create' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const creatorDid = (principal && principal.did) || parsed.creatorDid || resolveCreatorDid(ctx);
+
+      const result = sovraDb.createPromotionCampaign({
+        creatorDid,
+        targetType: parsed.targetType || 'video',
+        targetId: parsed.targetId || 'yt-video-1',
+        stakedSov: Number(parsed.stakedSov || 50),
+        cpmSov: Number(parsed.cpmSov || 2.0),
+        targetChannels: Array.isArray(parsed.targetChannels) ? parsed.targetChannels : ['all'],
+      });
+
+      res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Promotion error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // POST /api/promotions/record-impression
+  if (url.pathname === '/api/promotions/record-impression' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const result = sovraDb.recordPromotionImpression(parsed.campaignId);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, ...result }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Impression error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // -------------------------------------------------------------------------
+  // CYCLE 5: AUTOMATED CREATOR PAYOUT LEDGER, FEE REVIEWS & REFERRAL LOOPS
+  // -------------------------------------------------------------------------
+
+  // GET /api/studio/financials
+  if (url.pathname === '/api/studio/financials' && req.method === 'GET') {
+    const creatorDid = url.searchParams.get('creatorDid') || resolveCreatorDid(ctx);
+    const channelId = url.searchParams.get('channelId') || undefined;
+    const format = (url.searchParams.get('format') || 'json').toLowerCase();
+
+    const financials = sovraDb.getStudioFinancials(creatorDid, channelId);
+
+    if (format === 'csv') {
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="creator-financial-ledger.csv"',
+      });
+      res.end(financials.csvExport);
+      return true;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      creatorDid,
+      channelId: channelId || 'all',
+      summary: financials.summary,
+      entries: financials.entries,
+      exportTimestamp: Date.now(),
+    }));
+    return true;
+  }
+
+  // POST /api/referrals/bind
+  if (url.pathname === '/api/referrals/bind' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const refereeDid = (principal && principal.did) || parsed.refereeDid || resolveCreatorDid(ctx);
+      const referrerDid = parsed.referrerDid;
+
+      if (!referrerDid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'referrerDid is required' }));
+        return true;
+      }
+
+      const bound = sovraDb.bindReferral(refereeDid, referrerDid);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, refereeDid, referrerDid, bound }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Referral bind error: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // GET /api/referrals/my-rewards
+  if (url.pathname === '/api/referrals/my-rewards' && req.method === 'GET') {
+    const principal = ctx.resolvePrincipal(ctx.req);
+    const referrerDid = (principal && principal.did) || url.searchParams.get('did') || resolveCreatorDid(ctx);
+    const rewards = sovraDb.getReferralRewards(referrerDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, referrerDid, ...rewards }));
+    return true;
+  }
+
   return false;
 }
 

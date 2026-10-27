@@ -547,6 +547,7 @@ export interface FeedPostRecord {
 
   // Visibility & Authorization
   visibility?: PostVisibility;
+  minMembershipTier?: number;
 
   // Social Counters & Sets
   sharesCount?: number;
@@ -903,6 +904,11 @@ export interface YoutubeVideoRecord {
   thumbnailAbVariants?: VideoThumbnailAbVariant[];
   isAbTestingEnabled?: boolean;
   endScreenConfig?: VideoEndScreenConfig;
+  minMembershipTier?: number;
+  isPPV?: boolean;
+  ppvPriceSov?: number;
+  ppvUnlockProductId?: string;
+  previewDurationSec?: number;
 }
 
 export interface YoutubeCommentRecord {
@@ -1573,6 +1579,168 @@ export interface StudioJobRecord {
   completedAt?: number;
 }
 
+// =========================================================================
+// SOVRA COMMERCIALIZATION, REVENUE & BUSINESS LOGIC ENGINE (CYCLES 1-5)
+// =========================================================================
+
+// Cycle 1: Tiered Creator Memberships
+export interface ChannelMembershipTier {
+  id: string; // tier_<channelId>_<level>
+  channelId: string;
+  channelHandle: string;
+  name: string; // e.g. "Supporter", "VIP Pass", "Sovereign Council"
+  level: number; // 1, 2, 3
+  priceSov: number; // e.g. 5, 20, 50
+  perks: string[];
+  badgeColor: string;
+  badgeIcon: string;
+  createdAt: number;
+}
+
+export type SubscriptionStatus = 'ACTIVE' | 'PAST_DUE' | 'GRACE_PERIOD' | 'CANCELLED' | 'EXPIRED';
+
+export interface ChannelSubscription {
+  id: string;
+  channelId: string;
+  channelHandle: string;
+  subscriberDid: string;
+  subscriberHandle: string;
+  tierLevel: number;
+  tierName: string;
+  priceSov: number;
+  status: SubscriptionStatus;
+  periodStart: number;
+  periodEnd: number;
+  renewalDate: number;
+  gracePeriodEndsAt?: number;
+  receiptHash: string;
+  txHash?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Cycle 2: Live Stream Revenue & High-Velocity Super Chats
+export interface LiveSuperChatPin {
+  id: string;
+  channelId: string;
+  streamId?: string;
+  senderDid: string;
+  senderHandle: string;
+  senderName: string;
+  senderAvatar: string;
+  amountSov: number;
+  message: string;
+  stickerId?: 'rocket' | 'diamond' | 'crown' | 'fire' | 'supernova' | 'shield';
+  tier: 'bronze' | 'silver' | 'gold';
+  durationMs: number;
+  pinnedAt: number;
+  expiresAt: number;
+  receiptHash: string;
+}
+
+// Cycle 3: Pay-Per-View & Digital Store
+export interface DigitalProductRecord {
+  id: string;
+  channelId: string;
+  creatorDid: string;
+  title: string;
+  description: string;
+  priceSov: number;
+  type: 'video_ppv' | 'digital_download' | 'merch';
+  targetVideoId?: string;
+  filePayloadUrl?: string;
+  filePayloadHash?: string;
+  previewUrl?: string;
+  salesCount: number;
+  totalRevenueSov: number;
+  createdAt: number;
+}
+
+export interface DigitalProductPurchase {
+  id: string;
+  productId: string;
+  channelId: string;
+  buyerDid: string;
+  buyerHandle: string;
+  priceSov: number;
+  decryptionKey: string;
+  receiptHash: string;
+  createdAt: number;
+}
+
+// Cycle 4: B2B Verified Org Badging & Sponsor Escrow & Promotions
+export interface OrgSubscription {
+  id: string;
+  orgDid: string;
+  orgName: string;
+  handle: string;
+  tier: 'standard_org' | 'enterprise_sovereign';
+  badgeColor: 'blue' | 'gold';
+  priceSovPerMonth: number;
+  multiSeatAdmins: string[];
+  status: 'ACTIVE' | 'EXPIRED';
+  expiresAt: number;
+  createdAt: number;
+}
+
+export interface SponsoredBountyEscrow {
+  id: string;
+  sponsorDid: string;
+  sponsorName: string;
+  creatorDid: string;
+  creatorChannelId: string;
+  targetPostOrVideoId?: string;
+  bountyAmountSov: number;
+  status: 'DEPOSITED' | 'SUBMITTED' | 'RELEASED' | 'REFUNDED';
+  requiredViews: number;
+  currentViews: number;
+  disclosureTag: '#sponsored' | '#ad';
+  depositTxHash: string;
+  releaseTxHash?: string;
+  autoReleaseAt: number;
+  createdAt: number;
+}
+
+export interface NativePromotionCampaign {
+  id: string;
+  creatorDid: string;
+  targetType: 'post' | 'video';
+  targetId: string;
+  stakedSov: number;
+  budgetRemainingSov: number;
+  cpmSov: number;
+  impressionsDelivered: number;
+  targetChannels: string[];
+  status: 'ACTIVE' | 'PAUSED' | 'DEPLETED';
+  createdAt: number;
+}
+
+// Cycle 5: Financial Ledger, 95/5 Instant Settlement & Referrals
+export interface FinancialLedgerEntry {
+  id: string;
+  channelId: string;
+  creatorDid: string;
+  customerDid: string;
+  customerHandle: string;
+  itemType: 'MEMBERSHIP' | 'SUPER_CHAT' | 'PPV' | 'DIGITAL_GOOD' | 'SPONSOR_ESCROW' | 'PROMOTION_REFUND' | 'REFERRAL_REWARD';
+  referenceId: string;
+  description: string;
+  grossAmountSov: number;
+  platformFeeSov: number; // 5%
+  netCreatorSov: number; // 95%
+  referrerDid?: string;
+  referralRewardSov?: number; // 2%
+  receiptHash: string;
+  timestamp: number;
+}
+
+export interface CreatorReferralBinding {
+  referrerDid: string;
+  refereeDid: string;
+  boundAt: number;
+  expiresAt: number;
+}
+
 export interface DatabaseSchema {
   schemaVersion?: number;
   users: UserRecord[];
@@ -1610,6 +1778,17 @@ export interface DatabaseSchema {
   videos: YoutubeVideoRecord[];
   video_likes: Array<{ videoId: string; userDid: string; timestamp: number }>;
   channel_subscriptions: Array<{ channelHandle: string; userDid: string; timestamp: number }>;
+  channel_membership_tiers?: ChannelMembershipTier[];
+  channel_paid_subscriptions?: ChannelSubscription[];
+  live_super_chat_pins?: LiveSuperChatPin[];
+  liveSuperChatPins?: LiveSuperChatPin[];
+  digital_products?: DigitalProductRecord[];
+  digital_product_purchases?: DigitalProductPurchase[];
+  org_subscriptions?: OrgSubscription[];
+  sponsored_escrows?: SponsoredBountyEscrow[];
+  promotion_campaigns?: NativePromotionCampaign[];
+  financial_ledger?: FinancialLedgerEntry[];
+  creator_referrals?: CreatorReferralBinding[];
   jury_cases?: JuryCaseRecord[];
   jury_policies?: ModerationPolicyConfig;
   ephemeral_mailbox?: EphemeralMailboxMessageRecord[];
@@ -1871,6 +2050,68 @@ export class SovraDatabaseEngine {
       videos: [],
       video_likes: [],
       channel_subscriptions: [],
+      channel_membership_tiers: [
+        {
+          id: 'tier_ch-alpha_1',
+          channelId: 'ch-alpha',
+          channelHandle: 'sovra_alpha',
+          name: 'Supporter Pass',
+          level: 1,
+          priceSov: 5,
+          perks: ['Loyalty Supporter Badge', 'Members-only feed posts', 'Exclusive chat room'],
+          badgeColor: '#10b981',
+          badgeIcon: '🥉',
+          createdAt: Date.now() - 5000000,
+        },
+        {
+          id: 'tier_ch-alpha_2',
+          channelId: 'ch-alpha',
+          channelHandle: 'sovra_alpha',
+          name: 'VIP Creator Circle',
+          level: 2,
+          priceSov: 20,
+          perks: ['Bronze Perks', 'VIP Swarm Live Chat', 'High-Res 4K Previews', 'Discord/Matrix Bridge'],
+          badgeColor: '#8b5cf6',
+          badgeIcon: '🥈',
+          createdAt: Date.now() - 5000000,
+        },
+        {
+          id: 'tier_ch-alpha_3',
+          channelId: 'ch-alpha',
+          channelHandle: 'sovra_alpha',
+          name: 'Sovereign Council',
+          level: 3,
+          priceSov: 50,
+          perks: ['All VIP Perks', 'Governance Vote on Content', 'Direct 1-on-1 Consultation', 'Lifetime Swarm Key'],
+          badgeColor: '#f59e0b',
+          badgeIcon: '👑',
+          createdAt: Date.now() - 5000000,
+        },
+      ],
+      channel_paid_subscriptions: [],
+      live_super_chat_pins: [],
+      digital_products: [
+        {
+          id: 'prod_seed_1',
+          channelId: 'ch-alpha',
+          creatorDid: 'did:sovra:system',
+          title: 'Decentralized GossipSub Arch Spec & Source Code',
+          description: 'Full whitepaper, Rust / TS implementation guide & encrypted genesis payloads',
+          priceSov: 15,
+          type: 'digital_download',
+          filePayloadUrl: '/assets/specs/gossipsub-spec.pdf',
+          filePayloadHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          salesCount: 12,
+          totalRevenueSov: 180,
+          createdAt: Date.now() - 1000000,
+        },
+      ],
+      digital_product_purchases: [],
+      org_subscriptions: [],
+      sponsored_escrows: [],
+      promotion_campaigns: [],
+      financial_ledger: [],
+      creator_referrals: [],
       jury_cases: [],
       jury_policies: this.getDefaultJuryPolicies(),
       ephemeral_mailbox: [],
@@ -2052,6 +2293,16 @@ export class SovraDatabaseEngine {
           wallet_ledger: Array.isArray(parsed.wallet_ledger) ? parsed.wallet_ledger : [],
           trading_orders: Array.isArray(parsed.trading_orders) ? parsed.trading_orders : [],
           trading_trades: Array.isArray(parsed.trading_trades) ? parsed.trading_trades : [],
+          channel_membership_tiers: Array.isArray(parsed.channel_membership_tiers) ? parsed.channel_membership_tiers : [],
+          channel_paid_subscriptions: Array.isArray(parsed.channel_paid_subscriptions) ? parsed.channel_paid_subscriptions : [],
+          live_super_chat_pins: Array.isArray(parsed.live_super_chat_pins) ? parsed.live_super_chat_pins : [],
+          digital_products: Array.isArray(parsed.digital_products) ? parsed.digital_products : [],
+          digital_product_purchases: Array.isArray(parsed.digital_product_purchases) ? parsed.digital_product_purchases : [],
+          org_subscriptions: Array.isArray(parsed.org_subscriptions) ? parsed.org_subscriptions : [],
+          sponsored_escrows: Array.isArray(parsed.sponsored_escrows) ? parsed.sponsored_escrows : [],
+          promotion_campaigns: Array.isArray(parsed.promotion_campaigns) ? parsed.promotion_campaigns : [],
+          financial_ledger: Array.isArray(parsed.financial_ledger) ? parsed.financial_ledger : [],
+          creator_referrals: Array.isArray(parsed.creator_referrals) ? parsed.creator_referrals : [],
         };
       } else {
         this.save();
@@ -2081,6 +2332,25 @@ export class SovraDatabaseEngine {
     if (!Array.isArray(this.db.user_sessions)) this.db.user_sessions = [];
     if (!Array.isArray(this.db.friend_relationships)) this.db.friend_relationships = [];
     if (!Array.isArray(this.db.notifications)) this.db.notifications = [];
+    if (!Array.isArray(this.db.channel_membership_tiers)) this.db.channel_membership_tiers = [];
+    if (!Array.isArray(this.db.channel_paid_subscriptions)) this.db.channel_paid_subscriptions = [];
+    if (!Array.isArray(this.db.live_super_chat_pins)) this.db.live_super_chat_pins = [];
+    if (!Array.isArray(this.db.digital_products)) this.db.digital_products = [];
+    if (!Array.isArray(this.db.digital_product_purchases)) this.db.digital_product_purchases = [];
+    if (!Array.isArray(this.db.org_subscriptions)) this.db.org_subscriptions = [];
+    if (!Array.isArray(this.db.sponsored_escrows)) this.db.sponsored_escrows = [];
+    if (!Array.isArray(this.db.promotion_campaigns)) this.db.promotion_campaigns = [];
+    if (!Array.isArray(this.db.financial_ledger)) this.db.financial_ledger = [];
+    if (!Array.isArray(this.db.creator_referrals)) this.db.creator_referrals = [];
+
+    if (!Object.prototype.hasOwnProperty.call(this.db, 'liveSuperChatPins')) {
+      Object.defineProperty(this.db, 'liveSuperChatPins', {
+        get: () => this.db.live_super_chat_pins,
+        set: (v) => { this.db.live_super_chat_pins = v; },
+        configurable: true,
+        enumerable: false,
+      });
+    }
 
     // Ensure users with a sessionToken have an active session in user_sessions
     for (const u of this.db.users) {
@@ -2259,7 +2529,7 @@ export class SovraDatabaseEngine {
 
   public findUserByDid(did: string): UserRecord | undefined {
     this.load();
-    return this.db.users.find(u => u.did === did);
+    return this.db.users.find(u => u.did === did || u.id === did);
   }
 
   public findUserByHandle(handle: string): UserRecord | undefined {
@@ -14320,6 +14590,1021 @@ export class SovraDatabaseEngine {
       totalTdsCollectedScaled: totalTds.toString(),
       totalTdsCollectedFormatted: formatScaledToFiat(totalTds),
       isHalted: Boolean(this.db.trading_halted),
+    };
+  }
+
+  // =========================================================================
+  // SOVRA COMMERCIALIZATION, REVENUE & BUSINESS LOGIC ENGINE (CYCLES 1 - 5)
+  // =========================================================================
+
+  // Helper: Resolve Channel Owner DID
+  public resolveChannelOwnerDid(channelIdOrHandle: string): string {
+    const clean = channelIdOrHandle.replace('@', '').toLowerCase();
+    const ch = (this.db.channels || []).find(c => c.id === clean || (c.handle || '').toLowerCase().replace('@', '') === clean);
+    if (ch && ch.ownerDid) return ch.ownerDid;
+    const vid = (this.db.videos || []).find(v => (v.channelHandle || '').toLowerCase().replace('@', '') === clean);
+    if (vid && vid.creatorDid) return vid.creatorDid;
+    return 'did:sovra:creator_studio_broadcast';
+  }
+
+  // -------------------------------------------------------------------------
+  // CYCLE 1: TIERED CREATOR MEMBERSHIPS & SUBSCRIPTION STATE MACHINE
+  // -------------------------------------------------------------------------
+
+  public getChannelMembershipTiers(channelIdOrHandle: string): ChannelMembershipTier[] {
+    this.load();
+    const clean = channelIdOrHandle.replace('@', '').toLowerCase();
+    const allTiers = this.db.channel_membership_tiers || [];
+    const matched = allTiers.filter(t => t.channelId === clean || (t.channelHandle && t.channelHandle.toLowerCase() === clean));
+    if (matched.length > 0) return matched;
+
+    // Default 3 YouTube/Patreon-standard tiers
+    return [
+      {
+        id: `tier_${clean}_1`,
+        channelId: clean,
+        channelHandle: clean,
+        name: 'Supporter Pass',
+        level: 1,
+        priceSov: 5,
+        perks: ['Loyalty Supporter Badge', 'Members-only feed posts', 'Exclusive chat room'],
+        badgeColor: '#10b981',
+        badgeIcon: '🥉',
+        createdAt: Date.now(),
+      },
+      {
+        id: `tier_${clean}_2`,
+        channelId: clean,
+        channelHandle: clean,
+        name: 'VIP Creator Circle',
+        level: 2,
+        priceSov: 20,
+        perks: ['Bronze Perks', 'VIP Swarm Live Chat', 'High-Res 4K Previews', 'Discord/Matrix Bridge'],
+        badgeColor: '#8b5cf6',
+        badgeIcon: '🥈',
+        createdAt: Date.now(),
+      },
+      {
+        id: `tier_${clean}_3`,
+        channelId: clean,
+        channelHandle: clean,
+        name: 'Sovereign Council',
+        level: 3,
+        priceSov: 50,
+        perks: ['All VIP Perks', 'Governance Vote on Content', 'Direct 1-on-1 Consultation', 'Lifetime Swarm Key'],
+        badgeColor: '#f59e0b',
+        badgeIcon: '👑',
+        createdAt: Date.now(),
+      },
+    ];
+  }
+
+  public setChannelMembershipTiers(channelId: string, tiers: any[]): ChannelMembershipTier[] {
+    this.load();
+    const clean = channelId.replace('@', '').toLowerCase();
+    if (!Array.isArray(this.db.channel_membership_tiers)) this.db.channel_membership_tiers = [];
+    this.db.channel_membership_tiers = this.db.channel_membership_tiers.filter(t => t.channelId !== clean && (t.channelHandle && t.channelHandle.toLowerCase() !== clean));
+    const normalized: ChannelMembershipTier[] = (tiers || []).map((t, idx) => ({
+      id: t.id || `tier_${clean}_${t.level || t.tierLevel || (idx + 1)}`,
+      channelId: clean,
+      channelHandle: t.channelHandle || clean,
+      name: t.name || `Tier ${idx + 1}`,
+      level: t.level || t.tierLevel || (idx + 1),
+      tierLevel: t.level || t.tierLevel || (idx + 1),
+      priceSov: Number(t.priceSov) || 5,
+      perks: Array.isArray(t.perks) ? t.perks : ['Tier benefits'],
+      badgeColor: t.badgeColor || '#10b981',
+      badgeIcon: t.badgeIcon || '🥉',
+      createdAt: t.createdAt || Date.now(),
+    }));
+    this.db.channel_membership_tiers.push(...normalized);
+    this.save();
+    return normalized;
+  }
+
+  public getUserChannelSubscription(channelIdOrHandle: string, userDid: string): any {
+    this.load();
+    if (!Array.isArray(this.db.channel_paid_subscriptions)) return null;
+    const clean = channelIdOrHandle.replace('@', '').toLowerCase();
+    const sub = this.db.channel_paid_subscriptions.find(s =>
+      (s.channelId === clean || (s.channelHandle && s.channelHandle.toLowerCase() === clean)) &&
+      s.subscriberDid === userDid
+    );
+    if (!sub) return null;
+
+    // State machine transitions: ACTIVE -> GRACE_PERIOD -> EXPIRED
+    const now = Date.now();
+    if (sub.status === 'ACTIVE' || sub.status === 'GRACE_PERIOD' || sub.status === 'PAST_DUE') {
+      if (now > sub.periodEnd) {
+        const graceEnd = sub.periodEnd + 3 * 24 * 60 * 60 * 1000; // 3 days grace
+        if (now <= graceEnd) {
+          sub.status = 'GRACE_PERIOD';
+          sub.gracePeriodEndsAt = graceEnd;
+          // Auto-renewal attempt if subscriber has sufficient balance
+          const user = this.findUserByDid(userDid);
+          if (user && (user.balanceSov || 0) >= sub.priceSov) {
+            user.balanceSov = Math.round(((user.balanceSov || 0) - sub.priceSov) * 100) / 100;
+            sub.status = 'ACTIVE';
+            sub.periodStart = now;
+            sub.periodEnd = now + 30 * 24 * 60 * 60 * 1000;
+            sub.renewalDate = sub.periodEnd;
+            this.recordFinancialLedgerEntry({
+              channelId: sub.channelId,
+              creatorDid: this.resolveChannelOwnerDid(sub.channelId),
+              customerDid: userDid,
+              customerHandle: user.handle,
+              itemType: 'MEMBERSHIP',
+              referenceId: sub.id,
+              description: `Auto-renewed ${sub.tierName} (${sub.priceSov} SOV)`,
+              grossAmountSov: sub.priceSov,
+            });
+          }
+        } else {
+          sub.status = 'EXPIRED';
+        }
+        sub.updatedAt = now;
+        this.save();
+      }
+    }
+    (sub as any).nextRenewalAt = sub.renewalDate || sub.periodEnd;
+    (sub as any).paymentReceiptTx = sub.receiptHash ? ('sov_sub_tx_' + sub.receiptHash.slice(0, 16)) : 'sov_sub_tx_active';
+    return sub;
+  }
+
+  public subscribeChannelTier(
+    paramsOrChannelId: any,
+    userDid?: string,
+    tierLevel?: number
+  ): any {
+    this.load();
+    let clean = '';
+    let targetUserDid = '';
+    let targetLevel = 1;
+
+    if (typeof paramsOrChannelId === 'string') {
+      clean = paramsOrChannelId.replace('@', '').toLowerCase();
+      targetUserDid = userDid || '';
+      targetLevel = Number(tierLevel) || 1;
+    } else if (paramsOrChannelId && typeof paramsOrChannelId === 'object') {
+      clean = (paramsOrChannelId.channelIdOrHandle || paramsOrChannelId.channelId || '').replace('@', '').toLowerCase();
+      targetUserDid = paramsOrChannelId.userDid || '';
+      targetLevel = Number(paramsOrChannelId.tierLevel || paramsOrChannelId.level) || 1;
+    }
+
+    const user = this.findUserByDid(targetUserDid);
+    if (!user) {
+      return { ok: false, error: 'User identity not found' };
+    }
+
+    const tiers = this.getChannelMembershipTiers(clean);
+    let selectedTier = tiers.find(t => t.level === targetLevel || (t as any).tierLevel === targetLevel);
+    if (!selectedTier) {
+      selectedTier = {
+        id: `tier_${clean}_${targetLevel}`,
+        channelId: clean,
+        channelHandle: clean,
+        name: targetLevel === 3 ? 'Sovereign Council' : (targetLevel === 2 ? 'VIP Creator Circle' : 'Supporter Pass'),
+        level: targetLevel,
+        tierLevel: targetLevel,
+        priceSov: targetLevel === 3 ? 50 : (targetLevel === 2 ? 20 : 5),
+        perks: ['Platform Tier Benefits'],
+        badgeColor: targetLevel === 3 ? '#f59e0b' : (targetLevel === 2 ? '#8b5cf6' : '#10b981'),
+        badgeIcon: targetLevel === 3 ? '👑' : (targetLevel === 2 ? '🥈' : '🥉'),
+        createdAt: Date.now(),
+      };
+    }
+
+    // Check existing active subscription to prevent accidental double-spending
+    const existingSub = this.getUserChannelSubscription(clean, targetUserDid);
+    if (existingSub && existingSub.status === 'ACTIVE' && existingSub.tierLevel === selectedTier.level) {
+      return { ok: true, ...existingSub, subscription: { ...existingSub }, newBalance: user.balanceSov };
+    }
+
+    const price = selectedTier.priceSov;
+    const currentBal = typeof user.balanceSov === 'number' ? user.balanceSov : 500.0;
+    if (currentBal < price) {
+      return { ok: false, error: `Insufficient SOV balance (Required: ${price} SOV, Available: ${currentBal} SOV)` };
+    }
+
+    // Deduct subscription fee from subscriber
+    user.balanceSov = Math.round((currentBal - price) * 100) / 100;
+
+    const now = Date.now();
+    const subId = 'csub_' + now + '_' + crypto.randomBytes(6).toString('hex');
+    const receiptHash = crypto.createHash('sha256')
+      .update(`${subId}|${targetUserDid}|${clean}|${price}|${now}`)
+      .digest('hex');
+
+    const channelOwnerDid = this.resolveChannelOwnerDid(clean);
+
+    const newSub: any = {
+      id: subId,
+      channelId: clean,
+      channelHandle: clean,
+      subscriberDid: targetUserDid,
+      subscriberHandle: user.handle,
+      tierLevel: selectedTier.level,
+      tierName: selectedTier.name,
+      priceSov: price,
+      status: 'ACTIVE',
+      periodStart: now,
+      periodEnd: now + 30 * 24 * 60 * 60 * 1000,
+      renewalDate: now + 30 * 24 * 60 * 60 * 1000,
+      nextRenewalAt: now + 30 * 24 * 60 * 60 * 1000,
+      paymentReceiptTx: 'sov_sub_tx_' + receiptHash.slice(0, 16),
+      receiptHash,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (!Array.isArray(this.db.channel_paid_subscriptions)) {
+      this.db.channel_paid_subscriptions = [];
+    }
+    const existIdx = this.db.channel_paid_subscriptions.findIndex(s =>
+      (s.channelId === clean || (s.channelHandle && s.channelHandle.toLowerCase() === clean)) &&
+      s.subscriberDid === targetUserDid
+    );
+    if (existIdx >= 0) {
+      this.db.channel_paid_subscriptions[existIdx] = newSub;
+    } else {
+      this.db.channel_paid_subscriptions.push(newSub);
+    }
+
+    // Direct 95% creator / 5% treasury settlement via ledger
+    this.recordFinancialLedgerEntry({
+      channelId: clean,
+      creatorDid: channelOwnerDid,
+      customerDid: targetUserDid,
+      customerHandle: user.handle,
+      itemType: 'MEMBERSHIP',
+      referenceId: subId,
+      description: `Subscribed to ${selectedTier.name} (${price} SOV/mo)`,
+      grossAmountSov: price,
+    });
+
+    this.save();
+    return { ok: true, ...newSub, subscription: { ...newSub }, newBalance: user.balanceSov };
+  }
+
+  public cancelChannelSubscription(channelIdOrHandle: string, userDid: string): any {
+    this.load();
+    const sub = this.getUserChannelSubscription(channelIdOrHandle, userDid);
+    if (!sub) return false;
+    sub.status = 'CANCELLED';
+    sub.updatedAt = Date.now();
+    this.save();
+    return true;
+  }
+
+  public canUserAccessContent(
+    contentOrUser: any,
+    tierOrContent?: any,
+    channelId?: string
+  ): any {
+    let content: any = {};
+    let userDid = '';
+    const isDirectBooleanCall = typeof contentOrUser === 'string';
+
+    if (isDirectBooleanCall) {
+      userDid = contentOrUser;
+      const minTier = typeof tierOrContent === 'number' ? tierOrContent : 0;
+      content = {
+        minMembershipTier: minTier,
+        channelId: channelId || '',
+        channelHandle: channelId || '',
+      };
+    } else {
+      content = contentOrUser || {};
+      userDid = tierOrContent || '';
+    }
+
+    if (content.creatorDid && content.creatorDid === userDid) {
+      return isDirectBooleanCall ? true : { allowed: true, reason: 'owner' };
+    }
+
+    const chanOwner = content.channelId ? this.resolveChannelOwnerDid(content.channelId) : '';
+    if (chanOwner && chanOwner === userDid) {
+      return isDirectBooleanCall ? true : { allowed: true, reason: 'owner' };
+    }
+
+    // PPV Check
+    if (content.isPPV && content.id) {
+      const ppvCheck = this.checkUserPPVAccess(content.id, userDid);
+      if (!ppvCheck.hasAccess) {
+        return isDirectBooleanCall ? false : { allowed: false, reason: 'requires_ppv', ppvPriceSov: content.ppvPriceSov || 15 };
+      }
+    }
+
+    // Membership Tier Check
+    if (content.minMembershipTier && content.minMembershipTier > 0) {
+      const channelKey = content.channelId || content.channelHandle || '';
+      const sub = this.getUserChannelSubscription(channelKey, userDid);
+      if (!sub || (sub.status !== 'ACTIVE' && sub.status !== 'GRACE_PERIOD') || sub.tierLevel < content.minMembershipTier) {
+        return isDirectBooleanCall ? false : { allowed: false, reason: 'requires_membership', requiredTier: content.minMembershipTier };
+      }
+      return isDirectBooleanCall ? true : { allowed: true, reason: 'member_tier' };
+    }
+
+    return isDirectBooleanCall ? true : { allowed: true, reason: content.isPPV ? 'ppv_purchased' : 'free' };
+  }
+
+  // -------------------------------------------------------------------------
+  // CYCLE 2: LIVE STREAM REVENUE & HIGH-VELOCITY AUDIENCE TIPPING
+  // -------------------------------------------------------------------------
+
+  public sendLiveSuperChat(params: {
+    channelId: string;
+    streamId?: string;
+    senderDid: string;
+    senderName?: string;
+    senderAvatar?: string;
+    amountSov: number;
+    message: string;
+    stickerId?: 'rocket' | 'diamond' | 'crown' | 'fire' | 'supernova' | 'shield' | string;
+  }): any {
+    this.load();
+    const sender = this.findUserByDid(params.senderDid);
+    if (!sender) return { ok: false, error: 'Sender user identity not found' };
+
+    const amount = Number(params.amountSov);
+    if (!amount || amount < 10) {
+      return { ok: false, error: 'Minimum Super-Chat amount is 10 SOV' };
+    }
+
+    const curBal = typeof sender.balanceSov === 'number' ? sender.balanceSov : 500.0;
+    if (curBal < amount) {
+      return { ok: false, error: `Insufficient SOV balance (Required: ${amount} SOV, Available: ${curBal} SOV)` };
+    }
+
+    // Deduct SOV
+    sender.balanceSov = Math.round((curBal - amount) * 100) / 100;
+
+    // YouTube Tier Rules:
+    // 10 to 49 SOV -> Bronze (2 mins pin)
+    // 50 to 199 SOV -> Silver (5 mins pin)
+    // 200+ SOV -> Gold (15 mins pin with rainbow border)
+    let tier: 'bronze' | 'silver' | 'gold' = 'bronze';
+    let durationMs = 2 * 60 * 1000;
+    let borderColor = '#cd7f32';
+    if (amount >= 200) {
+      tier = 'gold';
+      durationMs = 15 * 60 * 1000;
+      borderColor = 'linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6)';
+    } else if (amount >= 50) {
+      tier = 'silver';
+      durationMs = 5 * 60 * 1000;
+      borderColor = '#94a3b8';
+    }
+
+    const now = Date.now();
+    const pinId = 'pin_' + now + '_' + crypto.randomBytes(6).toString('hex');
+    const receiptHash = crypto.createHash('sha256')
+      .update(`${pinId}|${params.senderDid}|${params.channelId}|${amount}|${now}`)
+      .digest('hex');
+
+    const pin: any = {
+      id: pinId,
+      channelId: params.channelId.replace('@', '').toLowerCase(),
+      streamId: params.streamId,
+      senderDid: params.senderDid,
+      senderHandle: sender.handle,
+      senderName: params.senderName || sender.displayName || sender.handle,
+      senderAvatar: params.senderAvatar || sender.avatar || '⭐',
+      amountSov: amount,
+      message: params.message || '',
+      stickerId: params.stickerId,
+      tier,
+      badgeTier: tier,
+      borderColor,
+      durationMs,
+      durationSec: durationMs / 1000,
+      pinnedAt: now,
+      expiresAt: now + durationMs,
+      receiptHash,
+      settlementTx: 'sc_pin_tx_' + receiptHash.slice(0, 16),
+    };
+
+    if (!Array.isArray(this.db.live_super_chat_pins)) {
+      this.db.live_super_chat_pins = [];
+    }
+    this.db.live_super_chat_pins.push(pin);
+
+    // Direct 95/5 creator payout
+    const channelOwnerDid = this.resolveChannelOwnerDid(params.channelId);
+    this.recordFinancialLedgerEntry({
+      channelId: params.channelId,
+      creatorDid: channelOwnerDid,
+      customerDid: params.senderDid,
+      customerHandle: sender.handle,
+      itemType: 'SUPER_CHAT',
+      referenceId: pinId,
+      description: `Live Super Chat [${tier.toUpperCase()}] ${amount} SOV: ${params.message}`,
+      grossAmountSov: amount,
+    });
+
+    this.save();
+    return { ok: true, ...pin, pin: { ...pin }, newBalance: sender.balanceSov };
+  }
+
+  public getActiveLivePins(channelIdOrStreamId: string): LiveSuperChatPin[] {
+    this.load();
+    const now = Date.now();
+    const clean = (channelIdOrStreamId || '').replace('@', '').toLowerCase();
+    const pins = this.db.live_super_chat_pins || [];
+    return pins
+      .filter(p => {
+        const matchesTarget = (p.channelId === clean || (p.channelId && p.channelId.replace('@', '').toLowerCase() === clean) || p.streamId === channelIdOrStreamId);
+        return matchesTarget && p.expiresAt > now;
+      })
+      .sort((a, b) => b.amountSov - a.amountSov);
+  }
+
+  public getLiveStreamRevenueStats(channelIdOrStreamId: string, streamId?: string): any {
+    this.load();
+    const clean = (channelIdOrStreamId || '').replace('@', '').toLowerCase();
+    const pins = (this.db.live_super_chat_pins || []).filter(p =>
+      p.channelId === clean ||
+      (p.channelId && p.channelId.replace('@', '').toLowerCase() === clean) ||
+      p.streamId === channelIdOrStreamId ||
+      (streamId && p.streamId === streamId)
+    );
+    const supportersMap = new Map<string, { did: string; handle: string; name: string; avatar: string; totalAmountSov: number; senderDid: string }>();
+
+    let total = 0;
+    pins.forEach(p => {
+      total += p.amountSov;
+      const existing = supportersMap.get(p.senderDid) || {
+        did: p.senderDid,
+        senderDid: p.senderDid,
+        handle: p.senderHandle,
+        name: p.senderName,
+        avatar: p.senderAvatar,
+        totalAmountSov: 0,
+      };
+      existing.totalAmountSov += p.amountSov;
+      supportersMap.set(p.senderDid, existing);
+    });
+
+    const topSupporters = Array.from(supportersMap.values()).sort((a, b) => b.totalAmountSov - a.totalAmountSov);
+    return {
+      totalRevenueSov: Math.round(total * 100) / 100,
+      totalSovEarned: Math.round(total * 100) / 100,
+      superChatCount: pins.length,
+      superChatsCount: pins.length,
+      topTippers: topSupporters,
+      topSupporters,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // CYCLE 3: PAY-PER-VIEW (PPV), GATED DIGITAL ASSETS & CREATOR STORE
+  // -------------------------------------------------------------------------
+
+  public createDigitalProduct(params: any): any {
+    this.load();
+    const now = Date.now();
+    const prodId = 'prod_' + now + '_' + crypto.randomBytes(6).toString('hex');
+    const rawType = params.type || params.productType || 'digital_download';
+    const type = rawType === 'ppv_video' ? 'video_ppv' : rawType;
+    const targetVideoId = params.targetVideoId || params.linkedVideoId;
+    const filePayloadUrl = params.filePayloadUrl || params.downloadUrl;
+    const fileHash = filePayloadUrl ? crypto.createHash('sha256').update(filePayloadUrl).digest('hex') : undefined;
+    const creatorDid = params.creatorDid || params.sellerDid || this.resolveChannelOwnerDid(params.channelId);
+
+    const product: any = {
+      id: prodId,
+      channelId: (params.channelId || '').replace('@', '').toLowerCase(),
+      creatorDid,
+      title: params.title,
+      description: params.description,
+      priceSov: Number(params.priceSov) || 10,
+      type,
+      productType: rawType,
+      targetVideoId,
+      linkedVideoId: targetVideoId,
+      filePayloadUrl,
+      downloadUrl: filePayloadUrl,
+      filePayloadHash: fileHash,
+      previewUrl: params.previewUrl,
+      salesCount: 0,
+      totalRevenueSov: 0,
+      createdAt: now,
+    };
+
+    if (!Array.isArray(this.db.digital_products)) {
+      this.db.digital_products = [];
+    }
+    this.db.digital_products.push(product);
+
+    // If this is a video_ppv product, mark the video as isPPV in database
+    if (type === 'video_ppv' && targetVideoId) {
+      const vid = (this.db.videos || []).find(v => v.id === targetVideoId);
+      if (vid) {
+        vid.isPPV = true;
+        vid.ppvPriceSov = product.priceSov;
+        vid.ppvUnlockProductId = prodId;
+        vid.previewDurationSec = 30;
+      }
+    }
+
+    this.save();
+    return product;
+  }
+
+  public getChannelDigitalProducts(channelId: string): DigitalProductRecord[] {
+    this.load();
+    const clean = channelId.replace('@', '').toLowerCase();
+    return (this.db.digital_products || []).filter(p => p.channelId === clean);
+  }
+
+  public purchaseDigitalProduct(prodIdOrParams: any, buyerDidParam?: string): any {
+    this.load();
+    const productId = typeof prodIdOrParams === 'string' ? prodIdOrParams : prodIdOrParams.productId;
+    const buyerDid = typeof prodIdOrParams === 'string' ? buyerDidParam! : prodIdOrParams.buyerDid;
+
+    const product = (this.db.digital_products || []).find(p => p.id === productId);
+    if (!product) return { ok: false, error: 'Product not found in creator store' };
+
+    const buyer = this.findUserByDid(buyerDid);
+    if (!buyer) return { ok: false, error: 'Buyer identity not found' };
+
+    // Prevent duplicate purchases
+    if (!Array.isArray(this.db.digital_product_purchases)) {
+      this.db.digital_product_purchases = [];
+    }
+    const existing = this.db.digital_product_purchases.find(p => p.productId === productId && p.buyerDid === buyerDid);
+    if (existing) {
+      return { ok: true, ...existing, purchase: { ...existing }, decryptionKey: existing.decryptionKey, newBalance: buyer.balanceSov };
+    }
+
+    const price = product.priceSov;
+    const curBal = typeof buyer.balanceSov === 'number' ? buyer.balanceSov : 500.0;
+    if (curBal < price) {
+      return { ok: false, error: `Insufficient SOV balance (Required: ${price} SOV, Available: ${curBal} SOV)` };
+    }
+
+    buyer.balanceSov = Math.round((curBal - price) * 100) / 100;
+
+    const now = Date.now();
+    const purId = 'pur_' + now + '_' + crypto.randomBytes(6).toString('hex');
+    const decryptionKey = 'sov_key_' + crypto.randomBytes(16).toString('hex');
+    const receiptHash = crypto.createHash('sha256')
+      .update(`${purId}|${buyerDid}|${productId}|${price}|${now}`)
+      .digest('hex');
+
+    const purchase: any = {
+      id: purId,
+      productId: product.id,
+      channelId: product.channelId,
+      buyerDid,
+      buyerHandle: buyer.handle,
+      priceSov: price,
+      amountSov: price,
+      decryptionKey,
+      receiptHash,
+      settlementTx: 'sov_store_tx_' + receiptHash.slice(0, 16),
+      createdAt: now,
+    };
+
+    this.db.digital_product_purchases.push(purchase);
+    product.salesCount = (product.salesCount || 0) + 1;
+    product.totalRevenueSov = Math.round(((product.totalRevenueSov || 0) + price) * 100) / 100;
+
+    // Direct 95/5 creator payout
+    this.recordFinancialLedgerEntry({
+      channelId: product.channelId,
+      creatorDid: product.creatorDid,
+      customerDid: buyerDid,
+      customerHandle: buyer.handle,
+      itemType: product.type === 'video_ppv' ? 'PPV' : 'DIGITAL_GOOD',
+      referenceId: purId,
+      description: `Purchased ${product.title} (${price} SOV)`,
+      grossAmountSov: price,
+    });
+
+    this.save();
+    return { ok: true, ...purchase, purchase: { ...purchase }, decryptionKey, newBalance: buyer.balanceSov };
+  }
+
+  public checkUserPPVAccess(a: string, b: string): any {
+    this.load();
+    const isDid = (str: string) => str && str.startsWith('did:');
+    const userDid = isDid(a) ? a : b;
+    const videoId = isDid(a) ? b : a;
+
+    const vid = (this.db.videos || []).find(v => v.id === videoId);
+    const ppvProduct = (this.db.digital_products || []).find(p =>
+      (p.type === 'video_ppv' || p.productType === 'ppv_video') &&
+      (p.linkedVideoId === videoId || p.targetVideoId === videoId || p.id === videoId)
+    );
+
+    const isPPV = Boolean((vid && vid.isPPV) || ppvProduct);
+    if (!isPPV) {
+      return { hasAccess: true, previewDurationSec: 30 };
+    }
+
+    const creatorDid = (vid && vid.creatorDid) || (ppvProduct && ppvProduct.creatorDid);
+    if (creatorDid && creatorDid === userDid) {
+      return { hasAccess: true, previewDurationSec: 30 };
+    }
+
+    const purchases = this.db.digital_product_purchases || [];
+    const prodId = (vid && vid.ppvUnlockProductId) || (ppvProduct && ppvProduct.id);
+    const pur = purchases.find(p =>
+      ((prodId && p.productId === prodId) || p.productId === videoId || p.productId === `ppv_${videoId}`) &&
+      p.buyerDid === userDid
+    );
+    if (pur) {
+      return { hasAccess: true, purchase: pur, decryptionKey: pur.decryptionKey, previewDurationSec: 30 };
+    }
+    return { hasAccess: false, previewDurationSec: 30 };
+  }
+
+  // -------------------------------------------------------------------------
+  // CYCLE 4: B2B VERIFIED ORG BADGING, SPONSOR ESCROW & PROMOTIONS
+  // -------------------------------------------------------------------------
+
+  public subscribeOrgVerified(params: any): any {
+    this.load();
+    const user = this.findUserByDid(params.orgDid);
+    if (!user) return { ok: false, error: 'Org DID identity not found' };
+
+    const rawTier = params.tier || (params.badgeType === 'gold' ? 'enterprise_sovereign' : 'standard_org');
+    const price = rawTier === 'enterprise_sovereign' ? 200 : 50;
+    const curBal = typeof user.balanceSov === 'number' ? user.balanceSov : 500.0;
+    if (curBal < price) {
+      return { ok: false, error: `Insufficient SOV balance (Required: ${price} SOV/mo, Available: ${curBal} SOV)` };
+    }
+
+    user.balanceSov = Math.round((curBal - price) * 100) / 100;
+    const now = Date.now();
+    const subId = 'orgsub_' + now + '_' + crypto.randomBytes(6).toString('hex');
+    const multiSeatAdmins = params.seats || params.adminDids || [params.orgDid];
+    const badgeColor = (rawTier === 'enterprise_sovereign' || params.badgeType === 'gold') ? 'gold' : 'blue';
+
+    const orgSub: any = {
+      id: subId,
+      orgDid: params.orgDid,
+      orgName: params.orgName || user.displayName || user.alias || 'Enterprise',
+      handle: params.handle || user.handle || '@enterprise',
+      tier: rawTier,
+      badgeColor,
+      badgeType: badgeColor,
+      priceSovPerMonth: price,
+      priceSovMonth: price,
+      multiSeatAdmins,
+      adminDids: multiSeatAdmins,
+      status: 'ACTIVE',
+      expiresAt: now + 30 * 24 * 60 * 60 * 1000,
+      createdAt: now,
+    };
+
+    if (!Array.isArray(this.db.org_subscriptions)) this.db.org_subscriptions = [];
+    this.db.org_subscriptions.push(orgSub);
+
+    this.recordFinancialLedgerEntry({
+      channelId: (params.handle || user.handle || 'enterprise').replace('@', ''),
+      creatorDid: 'did:sovra:network_treasury',
+      customerDid: params.orgDid,
+      customerHandle: params.handle || user.handle || 'enterprise',
+      itemType: 'MEMBERSHIP',
+      referenceId: subId,
+      description: `Verified Org Badge [${badgeColor.toUpperCase()}] (${price} SOV/mo)`,
+      grossAmountSov: price,
+    });
+
+    this.save();
+    return { ok: true, ...orgSub, orgSub: { ...orgSub }, newBalance: user.balanceSov };
+  }
+
+  public getOrgBadge(didOrHandle: string): any {
+    this.load();
+    const clean = didOrHandle.replace('@', '').toLowerCase();
+    const now = Date.now();
+    const sub = (this.db.org_subscriptions || []).find(s =>
+      (s.orgDid === didOrHandle || (s.handle && s.handle.toLowerCase().replace('@', '') === clean) || (s.multiSeatAdmins && s.multiSeatAdmins.includes(didOrHandle))) &&
+      s.status === 'ACTIVE' && s.expiresAt > now
+    );
+    if (!sub) return { isVerifiedOrg: false, isOrgAdmin: false };
+    const isOrgAdmin = Boolean(sub.orgDid === didOrHandle || (sub.multiSeatAdmins && sub.multiSeatAdmins.includes(didOrHandle)));
+    return {
+      isVerifiedOrg: true,
+      badgeColor: sub.badgeColor,
+      badgeType: sub.badgeColor,
+      tier: sub.tier,
+      isOrgAdmin,
+    };
+  }
+
+  public createSponsoredEscrow(params: any): any {
+    this.load();
+    const sponsor = this.findUserByDid(params.sponsorDid);
+    if (!sponsor) return { ok: false, error: 'Sponsor user not found' };
+
+    const amount = Number(params.bountyAmountSov);
+    const curBal = typeof sponsor.balanceSov === 'number' ? sponsor.balanceSov : 500.0;
+    if (curBal < amount) {
+      return { ok: false, error: `Insufficient SOV balance for escrow bounty (Required: ${amount} SOV, Available: ${curBal} SOV)` };
+    }
+
+    sponsor.balanceSov = Math.round((curBal - amount) * 100) / 100;
+    const now = Date.now();
+    const escrowId = 'escrow_' + now + '_' + crypto.randomBytes(6).toString('hex');
+    const depositTxHash = crypto.createHash('sha256')
+      .update(`${escrowId}|${params.sponsorDid}|${params.creatorDid}|${amount}|${now}`)
+      .digest('hex');
+
+    const escrow: any = {
+      id: escrowId,
+      sponsorDid: params.sponsorDid,
+      sponsorName: params.sponsorName || sponsor.displayName || sponsor.handle || 'Sponsor',
+      creatorDid: params.creatorDid,
+      creatorChannelId: (params.channelId || '').replace('@', '').toLowerCase(),
+      bountyAmountSov: amount,
+      status: 'ESCROWED',
+      requiredViews: params.requiredViews || 100,
+      currentViews: 0,
+      deliverableRequirements: params.deliverableRequirements || 'Sponsored integration',
+      disclosureTag: params.disclosureTag || '#sponsored',
+      depositTxHash,
+      releaseTx: depositTxHash,
+      autoReleaseAt: now + 48 * 60 * 60 * 1000,
+      createdAt: now,
+    };
+
+    if (!Array.isArray(this.db.sponsored_escrows)) this.db.sponsored_escrows = [];
+    this.db.sponsored_escrows.push(escrow);
+    this.save();
+    return { ok: true, ...escrow, escrow: { ...escrow }, newBalance: sponsor.balanceSov };
+  }
+
+  public submitSponsoredContent(escrowId: string, contentId: string, creatorDid?: string): any {
+    this.load();
+    const escrow = (this.db.sponsored_escrows || []).find(e => e.id === escrowId);
+    if (!escrow) return { ok: false, error: 'Escrow not found' };
+    if (creatorDid && escrow.creatorDid !== creatorDid) return { ok: false, error: 'Unauthorized creator' };
+
+    escrow.targetPostOrVideoId = contentId;
+    escrow.submittedContentId = contentId;
+    escrow.status = 'SUBMITTED';
+    escrow.autoReleaseAt = Date.now() + 48 * 60 * 60 * 1000;
+    this.save();
+    return { ok: true, ...escrow, escrow: { ...escrow } };
+  }
+
+  public releaseSponsoredEscrow(escrowId: string, callerDid?: string): any {
+    this.load();
+    const escrow = (this.db.sponsored_escrows || []).find(e => e.id === escrowId);
+    if (!escrow) return { ok: false, error: 'Escrow not found' };
+    if (escrow.status === 'RELEASED') return { ok: false, error: 'Escrow already released' };
+
+    const now = Date.now();
+    const releaseTxHash = 'sov_sponsor_tx_' + crypto.createHash('sha256').update(`release|${escrow.id}|${now}`).digest('hex').slice(0, 16);
+    escrow.status = 'RELEASED';
+    escrow.releaseTxHash = releaseTxHash;
+    escrow.releaseTx = releaseTxHash;
+
+    // Credit creator 95%
+    const ledgerResult = this.recordFinancialLedgerEntry({
+      channelId: escrow.creatorChannelId,
+      creatorDid: escrow.creatorDid,
+      customerDid: escrow.sponsorDid,
+      customerHandle: escrow.sponsorName,
+      itemType: 'SPONSOR_ESCROW',
+      referenceId: escrow.id,
+      description: `Sponsored Campaign Bounty Release (${escrow.bountyAmountSov} SOV)`,
+      grossAmountSov: escrow.bountyAmountSov,
+    });
+
+    this.save();
+    return { ok: true, ...escrow, escrow: { ...escrow }, netPaidToCreator: ledgerResult.netCreatorSov };
+  }
+
+  public createPromotionCampaign(params: any): any {
+    this.load();
+    const creator = this.findUserByDid(params.creatorDid);
+    if (!creator) return { ok: false, error: 'Creator identity not found' };
+
+    const stake = Number(params.stakedSov || params.totalBudgetSov) || 10;
+    const curBal = typeof creator.balanceSov === 'number' ? creator.balanceSov : 500.0;
+    if (curBal < stake) {
+      return { ok: false, error: `Insufficient SOV balance for campaign (Required: ${stake} SOV, Available: ${curBal} SOV)` };
+    }
+
+    creator.balanceSov = Math.round((curBal - stake) * 100) / 100;
+    const now = Date.now();
+    const promoId = 'promo_' + now + '_' + crypto.randomBytes(6).toString('hex');
+    const cpm = Number(params.cpmSov) || 2.0;
+    const targetImpressions = Math.round((stake / cpm) * 1000);
+
+    const campaign: any = {
+      id: promoId,
+      creatorDid: params.creatorDid,
+      targetType: params.targetType || params.contentType || 'video',
+      targetId: params.targetId || params.targetContentId || '',
+      stakedSov: stake,
+      totalBudgetSov: stake,
+      budgetRemainingSov: stake,
+      cpmSov: cpm,
+      impressionsDelivered: 0,
+      deliveredImpressions: 0,
+      spentSov: 0,
+      targetImpressions,
+      targetChannels: params.targetChannels || ['all'],
+      status: 'ACTIVE',
+      createdAt: now,
+    };
+
+    if (!Array.isArray(this.db.promotion_campaigns)) this.db.promotion_campaigns = [];
+    this.db.promotion_campaigns.push(campaign);
+    this.save();
+    return { ok: true, ...campaign, campaign: { ...campaign }, newBalance: creator.balanceSov };
+  }
+
+  public recordPromotionImpression(campaignId: string, count: number = 1): any {
+    this.load();
+    const camp = (this.db.promotion_campaigns || []).find(c => c.id === campaignId);
+    if (!camp) return null;
+
+    camp.impressionsDelivered = (camp.impressionsDelivered || 0) + count;
+    camp.deliveredImpressions = camp.impressionsDelivered;
+    const cost = (camp.cpmSov / 1000) * count;
+    camp.budgetRemainingSov = Math.max(0, Math.round((camp.budgetRemainingSov - cost) * 10000) / 10000);
+    camp.spentSov = Math.round((camp.stakedSov - camp.budgetRemainingSov) * 100) / 100;
+    if (camp.budgetRemainingSov <= 0) {
+      camp.status = 'COMPLETED';
+    }
+    this.save();
+    return Object.assign(camp, { delivered: camp.impressionsDelivered, remaining: camp.budgetRemainingSov });
+  }
+
+  // -------------------------------------------------------------------------
+  // CYCLE 5: AUTOMATED CREATOR PAYOUT LEDGER, FEE REVIEWS & REFERRAL LOOPS
+  // -------------------------------------------------------------------------
+
+  public recordFinancialLedgerEntry(entry: any): any {
+    this.load();
+    if (!Array.isArray(this.db.financial_ledger)) {
+      this.db.financial_ledger = [];
+    }
+
+    const gross = Number(entry.grossAmountSov || entry.grossSov || 0);
+    const platformFee = Math.round(gross * 0.05 * 1000) / 1000; // 5% fee (vs YouTube 30%)
+    const netCreator = Math.round((gross - platformFee) * 1000) / 1000; // 95% creator
+    const customerDid = entry.customerDid || entry.payerDid || '';
+
+    // Check referral attribution (2% viral referral reward)
+    let referrerDid: string | undefined;
+    let referralRewardSov: number | undefined;
+    const referrals = this.db.creator_referrals || [];
+    const ref = referrals.find(r => r.refereeDid === customerDid && r.expiresAt > Date.now());
+    if (ref) {
+      referrerDid = ref.referrerDid;
+      referralRewardSov = Math.round(gross * 0.02 * 1000) / 1000;
+      const referrerUser = this.findUserByDid(referrerDid);
+      if (referrerUser) {
+        referrerUser.balanceSov = Math.round(((referrerUser.balanceSov || 0) + referralRewardSov) * 100) / 100;
+      }
+    }
+
+    // Direct instant settlement into creator wallet
+    if (entry.creatorDid && entry.creatorDid !== 'did:sovra:network_treasury') {
+      const creatorUser = this.findUserByDid(entry.creatorDid);
+      if (creatorUser) {
+        creatorUser.balanceSov = Math.round(((creatorUser.balanceSov || 0) + netCreator) * 100) / 100;
+      }
+    }
+
+    const now = Date.now();
+    const id = 'fin_' + now + '_' + crypto.randomBytes(6).toString('hex');
+    const receiptHash = crypto.createHash('sha256')
+      .update(`${id}|${entry.channelId}|${entry.creatorDid}|${gross}|${netCreator}|${platformFee}|${now}`)
+      .digest('hex');
+
+    const record: any = {
+      id,
+      channelId: entry.channelId,
+      creatorDid: entry.creatorDid,
+      customerDid,
+      payerDid: customerDid,
+      customerHandle: entry.customerHandle || 'User',
+      itemType: entry.itemType || entry.revenueType || 'MEMBERSHIP',
+      referenceId: entry.referenceId,
+      description: entry.description || 'Sovereign transaction',
+      grossAmountSov: gross,
+      grossSov: gross,
+      platformFeeSov: platformFee,
+      netCreatorSov: netCreator,
+      creatorNetSov: netCreator,
+      referrerDid,
+      referralRewardSov,
+      referralPayoutSov: referralRewardSov || 0,
+      receiptHash,
+      txHash: receiptHash,
+      timestamp: now,
+    };
+
+    this.db.financial_ledger.unshift(record);
+    if (this.db.financial_ledger.length > 5000) {
+      this.db.financial_ledger.length = 5000;
+    }
+    this.save();
+    return record;
+  }
+
+  public getStudioFinancials(creatorDid: string, channelId?: string): any {
+    this.load();
+    const cleanChan = channelId ? channelId.replace('@', '').toLowerCase() : undefined;
+    const all = this.db.financial_ledger || [];
+    const entries = all.filter(e => {
+      if (cleanChan) return e.channelId.toLowerCase() === cleanChan;
+      return e.creatorDid === creatorDid;
+    });
+
+    let totalGross = 0;
+    let totalNet = 0;
+    let totalFee = 0;
+    let memRev = 0;
+    let chatRev = 0;
+    let ppvRev = 0;
+    let escrowRev = 0;
+    let refGiven = 0;
+
+    entries.forEach(e => {
+      totalGross += e.grossAmountSov;
+      totalNet += e.netCreatorSov;
+      totalFee += e.platformFeeSov;
+      if (e.itemType === 'MEMBERSHIP') memRev += e.grossAmountSov;
+      else if (e.itemType === 'SUPER_CHAT') chatRev += e.grossAmountSov;
+      else if (e.itemType === 'PPV' || e.itemType === 'DIGITAL_GOOD') ppvRev += e.grossAmountSov;
+      else if (e.itemType === 'SPONSOR_ESCROW') escrowRev += e.grossAmountSov;
+      if (e.referralRewardSov) refGiven += e.referralRewardSov;
+    });
+
+    const csvHeaders = 'id,timestamp,type,gross_sov,creator_net_sov,platform_fee_sov,payer_did,tx_hash\n';
+    const csvRows = entries.map(e =>
+      `"${e.id}","${new Date(e.timestamp).toISOString()}","${e.itemType}",${e.grossAmountSov.toFixed(3)},${e.netCreatorSov.toFixed(3)},${e.platformFeeSov.toFixed(3)},"${e.customerDid || e.payerDid}","${e.receiptHash || e.txHash}"`
+    ).join('\n');
+
+    const csvExport = `# Creator DID: ${creatorDid}\n` + csvHeaders + csvRows;
+
+    return {
+      summary: {
+        totalGrossSov: Math.round(totalGross * 1000) / 1000,
+        grossSov: Math.round(totalGross * 1000) / 1000,
+        totalNetSov: Math.round(totalNet * 1000) / 1000,
+        creatorNetSov: Math.round(totalNet * 1000) / 1000,
+        totalFeeSov: Math.round(totalFee * 1000) / 1000,
+        platformFeeSov: Math.round(totalFee * 1000) / 1000,
+        membershipsRevenue: Math.round(memRev * 1000) / 1000,
+        superChatsRevenue: Math.round(chatRev * 1000) / 1000,
+        ppvRevenue: Math.round(ppvRev * 1000) / 1000,
+        escrowRevenue: Math.round(escrowRev * 1000) / 1000,
+        referralRewardsGiven: Math.round(refGiven * 1000) / 1000,
+      },
+      entries,
+      csvExport,
+      csv: csvExport,
+    };
+  }
+
+  public bindReferral(refereeDid: string, referrerDid: string): any {
+    this.load();
+    if (refereeDid === referrerDid) return { ok: false, error: 'Self referral not permitted' };
+    if (!Array.isArray(this.db.creator_referrals)) {
+      this.db.creator_referrals = [];
+    }
+    const existing = this.db.creator_referrals.find(r => r.refereeDid === refereeDid);
+    if (existing) {
+      return { ok: true, ...existing, refereeDid, referrerDid: existing.referrerDid, rewardPercent: 2 };
+    }
+    const now = Date.now();
+    const binding = {
+      referrerDid,
+      refereeDid,
+      rewardPercent: 2,
+      boundAt: now,
+      expiresAt: now + 365 * 24 * 60 * 60 * 1000, // 12 months attribution window
+    };
+    this.db.creator_referrals.push(binding);
+    this.save();
+    return { ok: true, ...binding, refereeDid, referrerDid, rewardPercent: 2 };
+  }
+
+  public getReferralRewards(referrerDid: string): any {
+    this.load();
+    const referrals = (this.db.creator_referrals || []).filter(r => r.referrerDid === referrerDid);
+    const ledger = (this.db.financial_ledger || []).filter(e => e.referrerDid === referrerDid);
+    let totalReward = 0;
+    ledger.forEach(e => {
+      totalReward += e.referralRewardSov || 0;
+    });
+    return {
+      totalRewardSov: Math.round(totalReward * 1000) / 1000,
+      totalEarnedSov: Math.round(totalReward * 1000) / 1000,
+      referredUsersCount: referrals.length,
+      referrals,
+      rewardsHistory: ledger,
     };
   }
 }
