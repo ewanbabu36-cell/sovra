@@ -15446,6 +15446,58 @@ export class SovraDatabaseEngine {
     return Object.assign(camp, { delivered: camp.impressionsDelivered, remaining: camp.budgetRemainingSov });
   }
 
+  public refundSponsoredEscrow(escrowId: string, callerDid?: string): any {
+    this.load();
+    const escrow = (this.db.sponsored_escrows || []).find(e => e.id === escrowId);
+    if (!escrow) return { ok: false, error: 'Escrow not found' };
+    if (escrow.status === 'RELEASED') return { ok: false, error: 'Cannot refund released escrow' };
+    if (escrow.status === 'REFUNDED') return { ok: false, error: 'Escrow already refunded' };
+
+    const sponsor = this.findUserByDid(escrow.sponsorDid);
+    if (!sponsor) return { ok: false, error: 'Sponsor identity not found' };
+
+    const refundAmount = Number(escrow.bountyAmountSov);
+    sponsor.balanceSov = Math.round(((sponsor.balanceSov || 0) + refundAmount) * 100) / 100;
+    escrow.status = 'REFUNDED';
+    escrow.refundedAt = Date.now();
+
+    this.save();
+    return {
+      ok: true,
+      escrowId: escrow.id,
+      refundedAmount: refundAmount,
+      status: 'REFUNDED',
+      newBalance: sponsor.balanceSov,
+    };
+  }
+
+  public refundPromotionCampaign(campaignId: string, callerDid?: string): any {
+    this.load();
+    const camp = (this.db.promotion_campaigns || []).find(c => c.id === campaignId);
+    if (!camp) return { ok: false, error: 'Campaign not found' };
+    if (camp.status === 'CANCELLED_REFUNDED') return { ok: false, error: 'Campaign already refunded' };
+
+    const creator = this.findUserByDid(camp.creatorDid);
+    if (!creator) return { ok: false, error: 'Campaign advertiser identity not found' };
+
+    const remainingBudget = Number(camp.budgetRemainingSov ?? camp.remainingBudgetSov ?? camp.stakedSov);
+    if (remainingBudget > 0) {
+      creator.balanceSov = Math.round(((creator.balanceSov || 0) + remainingBudget) * 100) / 100;
+    }
+    camp.status = 'CANCELLED_REFUNDED';
+    camp.budgetRemainingSov = 0;
+    camp.refundedAt = Date.now();
+
+    this.save();
+    return {
+      ok: true,
+      campaignId: camp.id,
+      refundedAmount: remainingBudget,
+      status: 'CANCELLED_REFUNDED',
+      newBalance: creator.balanceSov,
+    };
+  }
+
   // -------------------------------------------------------------------------
   // CYCLE 5: AUTOMATED CREATOR PAYOUT LEDGER, FEE REVIEWS & REFERRAL LOOPS
   // -------------------------------------------------------------------------
