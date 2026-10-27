@@ -62,6 +62,51 @@ export interface BleHandshakeReceipt {
   completedAt: number;
 }
 
+export interface RfSimulationConfig {
+  attenuationDb: number; // 0..90 dB
+  packetLossPct: number; // 0..100%
+  rangeDecayMeters: number; // 5..100m
+  multiHopFallbackEnabled: boolean;
+}
+
+export interface ConnectedMeshPeer {
+  peerDid: string;
+  handle: string;
+  displayName: string;
+  transport: 'BLE_GATT_5.3' | 'BLE_MESH_RELAY' | 'WIFI_DIRECT_NAN';
+  rssiDbm: number;
+  effectiveRssiDbm: number;
+  distanceMeters: number;
+  effectiveDistanceMeters: number;
+  hopCount: number;
+  bytesRelayed: number;
+  noiseXxKey: string;
+  signalBars: number; // 1-5
+  status: 'CONNECTED' | 'DEGRADED' | 'MULTI_HOP_FALLBACK' | 'UNREACHABLE';
+}
+
+export interface MeshPingResult {
+  pingId: string;
+  senderDid: string;
+  ephemeralNoiseKey: string;
+  cipherSuite: 'Noise_XX_25519_ChaChaPoly';
+  timestamp: number;
+  responses: Array<{
+    responderDid: string;
+    responderHandle: string;
+    rttMs: number;
+    hopCount: number;
+    rssiDbm: number;
+    routedViaMultiHop: boolean;
+    relayedBytes: number;
+    signatureHex: string;
+  }>;
+  totalRoundTripMs: number;
+  lossRatePct: number;
+  successfulPongs: number;
+  totalPings: number;
+}
+
 const BEACON_SECRET = process.env.SOVRA_BLE_HMAC_SECRET || 'sovra-ble-offline-mesh-v1-key';
 
 /**
@@ -208,6 +253,13 @@ export class OfflineBleMeshEngine {
   private beacons = new Map<string, BleRadarBeaconFrame>();
   private dtnPacketQueue = new Map<string, OfflineMeshPacket>();
   private handshakes: BleHandshakeReceipt[] = [];
+  private peerRelayBytes = new Map<string, number>();
+  private rfConfig: RfSimulationConfig = {
+    attenuationDb: 0,
+    packetLossPct: 0,
+    rangeDecayMeters: 10,
+    multiHopFallbackEnabled: true,
+  };
 
   constructor() {
     this.seedDefaultNearbyBeacons();
@@ -398,6 +450,202 @@ export class OfflineBleMeshEngine {
 
   public getRecentHandshakes(limit = 20): BleHandshakeReceipt[] {
     return this.handshakes.slice(0, limit);
+  }
+
+  public setRfSimulation(config: Partial<RfSimulationConfig>): RfSimulationConfig {
+    if (typeof config.attenuationDb === 'number') {
+      this.rfConfig.attenuationDb = Math.max(0, Math.min(90, Math.round(config.attenuationDb)));
+    }
+    if (typeof config.packetLossPct === 'number') {
+      this.rfConfig.packetLossPct = Math.max(0, Math.min(100, Math.round(config.packetLossPct)));
+    }
+    if (typeof config.rangeDecayMeters === 'number') {
+      this.rfConfig.rangeDecayMeters = Math.max(5, Math.min(100, Math.round(config.rangeDecayMeters)));
+    }
+    if (typeof config.multiHopFallbackEnabled === 'boolean') {
+      this.rfConfig.multiHopFallbackEnabled = config.multiHopFallbackEnabled;
+    }
+    return { ...this.rfConfig };
+  }
+
+  public getRfSimulation(): RfSimulationConfig {
+    return { ...this.rfConfig };
+  }
+
+  public getConnectedPeersWithTelemetry(): ConnectedMeshPeer[] {
+    const rawPeers = this.scanNearbyPeers({ maxDistanceMeters: 100 });
+    const { attenuationDb, rangeDecayMeters, multiHopFallbackEnabled } = this.rfConfig;
+
+    return rawPeers.map((p, idx) => {
+      const baseRssi = p.rssiDbm;
+      // Attenuation decays the RSSI signal strength
+      const effectiveRssi = Math.max(-110, Math.min(-25, baseRssi - attenuationDb));
+      const effectiveDist = estimateBleDistanceMeters(effectiveRssi, p.txPowerDbm);
+
+      // Noise XX 25519 Public Key Representation
+      const noiseXxKey = '0x' + crypto.createHash('sha256').update(`noise-xx:${p.peerDid}`).digest('hex').slice(0, 32);
+
+      let signalBars = 1;
+      if (effectiveRssi >= -55) signalBars = 5;
+      else if (effectiveRssi >= -68) signalBars = 4;
+      else if (effectiveRssi >= -80) signalBars = 3;
+      else if (effectiveRssi >= -92) signalBars = 2;
+      else signalBars = 1;
+
+      const directLinkUnusable = effectiveRssi < -95 || effectiveDist > rangeDecayMeters;
+
+      let hopCount = 1;
+      let status: ConnectedMeshPeer['status'] = 'CONNECTED';
+
+      if (directLinkUnusable) {
+        if (multiHopFallbackEnabled && attenuationDb < 88) {
+          hopCount = (idx % 2 === 0) ? 2 : 3;
+          status = 'MULTI_HOP_FALLBACK';
+          signalBars = Math.max(1, signalBars);
+        } else {
+          hopCount = 0;
+          status = 'UNREACHABLE';
+          signalBars = 0;
+        }
+      } else if (effectiveRssi < -80 || attenuationDb > 30) {
+        status = 'DEGRADED';
+      }
+
+      const bytesRelayed = this.peerRelayBytes.get(p.peerDid) || (320 + idx * 148);
+
+      return {
+        peerDid: p.peerDid,
+        handle: p.handle,
+        displayName: p.displayName,
+        transport: p.transport,
+        rssiDbm: baseRssi,
+        effectiveRssiDbm: effectiveRssi,
+        distanceMeters: p.distanceMeters,
+        effectiveDistanceMeters: effectiveDist,
+        hopCount,
+        bytesRelayed,
+        noiseXxKey,
+        signalBars,
+        status,
+      };
+    });
+  }
+
+  public simulatePacketTransmission(
+    senderDid: string,
+    recipientDid: string,
+    packetBytes = 256
+  ): {
+    success: boolean;
+    hops: number;
+    rttMs: number;
+    multiHopUsed: boolean;
+    path: string[];
+    lossReason?: string;
+  } {
+    const { attenuationDb, packetLossPct, rangeDecayMeters, multiHopFallbackEnabled } = this.rfConfig;
+    const peers = this.getConnectedPeersWithTelemetry();
+    const targetPeer = peers.find(p => p.peerDid === recipientDid) || peers[0];
+
+    // Check artificial packet loss probability
+    if (packetLossPct > 0) {
+      const dropRoll = crypto.randomInt(100);
+      if (dropRoll < packetLossPct) {
+        if (!multiHopFallbackEnabled || packetLossPct >= 90) {
+          return {
+            success: false,
+            hops: 0,
+            rttMs: 0,
+            multiHopUsed: false,
+            path: [senderDid],
+            lossReason: `Packet dropped by RF attenuation filter (${packetLossPct}% loss rate)`,
+          };
+        }
+      }
+    }
+
+    if (targetPeer && targetPeer.status === 'UNREACHABLE') {
+      return {
+        success: false,
+        hops: 0,
+        rttMs: 0,
+        multiHopUsed: false,
+        path: [senderDid],
+        lossReason: `Target peer out of RF range (${targetPeer.effectiveDistanceMeters}m > ${rangeDecayMeters}m)`,
+      };
+    }
+
+    const multiHopUsed = targetPeer?.status === 'MULTI_HOP_FALLBACK' || attenuationDb >= 50;
+    const hops = multiHopUsed ? Math.max(2, targetPeer?.hopCount || 2) : 1;
+    const path = multiHopUsed
+      ? [senderDid, 'did:sovra:mesh_relay_node', recipientDid]
+      : [senderDid, recipientDid];
+
+    // Compute realistic RTT: base 10ms + RF attenuation delay + 14ms per extra hop
+    const rttMs = Math.round(10 + Math.abs(targetPeer?.effectiveRssiDbm || -60) * 0.15 + (hops - 1) * 16);
+
+    // Update relay statistics
+    const curRelayed = this.peerRelayBytes.get(recipientDid) || 0;
+    this.peerRelayBytes.set(recipientDid, curRelayed + packetBytes);
+
+    return {
+      success: true,
+      hops,
+      rttMs,
+      multiHopUsed,
+      path,
+    };
+  }
+
+  public pingBroadcast(senderDid = 'did:sovra:local_node'): MeshPingResult {
+    const peers = this.getConnectedPeersWithTelemetry();
+    const pingId = 'ping_' + crypto.randomBytes(6).toString('hex');
+    const ephemeralNoiseKey = '0x' + crypto.randomBytes(16).toString('hex');
+    const timestamp = Date.now();
+
+    const responses: MeshPingResult['responses'] = [];
+    let successfulPongs = 0;
+
+    for (const p of peers) {
+      const transmission = this.simulatePacketTransmission(senderDid, p.peerDid, 128);
+      if (transmission.success) {
+        successfulPongs++;
+        const sig = crypto
+          .createHmac('sha256', BEACON_SECRET)
+          .update(`${pingId}|${p.peerDid}|${transmission.rttMs}|${transmission.hops}`)
+          .digest('hex');
+
+        responses.push({
+          responderDid: p.peerDid,
+          responderHandle: p.handle,
+          rttMs: transmission.rttMs,
+          hopCount: transmission.hops,
+          rssiDbm: p.effectiveRssiDbm,
+          routedViaMultiHop: transmission.multiHopUsed,
+          relayedBytes: p.bytesRelayed + 128,
+          signatureHex: sig,
+        });
+      }
+    }
+
+    const totalPings = peers.length;
+    const lossRatePct = totalPings > 0 ? Math.round(((totalPings - successfulPongs) / totalPings) * 100) : 0;
+    const totalRoundTripMs = responses.length > 0
+      ? Math.max(...responses.map(r => r.rttMs))
+      : 0;
+
+    return {
+      pingId,
+      senderDid,
+      ephemeralNoiseKey,
+      cipherSuite: 'Noise_XX_25519_ChaChaPoly',
+      timestamp,
+      responses,
+      totalRoundTripMs,
+      lossRatePct,
+      successfulPongs,
+      totalPings,
+    };
   }
 }
 
