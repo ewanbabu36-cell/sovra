@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+
+  <defs>
+    <!-- Deep Cosmic Obsidian Background -->
+    <linearGradient id="sovraBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080e1e"/>
+      <stop offset="50%" stop-color="#050811"/>
+      <stop offset="100%" stop-color="#020409"/>
+    </linearGradient>
+
+    <!-- Radiant Ambient Back-Aura -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.45"/>
+      <stop offset="45%" stop-color="#00f0ff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Upper Sovereign 'S' Ribbon: Pure Electric Cyan to Indigo -->
+    <linearGradient id="sUpperRibbon" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#00f5ff"/>
+      <stop offset="45%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+
+    <!-- Lower Sovereign 'S' Ribbon: Royal Indigo to Radiant Magenta/Rose -->
+    <linearGradient id="sLowerRibbon" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="45%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+
+    <!-- Specular Highlight Spine (Refractive Gemstone Core) -->
+    <linearGradient id="specularCore" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="40%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#c084fc" stop-opacity="0.8"/>
+    </linearGradient>
+
+    <!-- Subtle Titanium Glass Rim Gradient -->
+    <linearGradient id="glassRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.22)"/>
+      <stop offset="50%" stop-color="rgba(56,189,248,0.3)"/>
+      <stop offset="100%" stop-color="rgba(99,102,241,0.15)"/>
+    </linearGradient>
+
+    <!-- Wordmark Luxury Typography Gradient -->
+    <linearGradient id="wordmarkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="55%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 1. Obsidian Squircle Chassis -->
+  <rect width="512" height="512" rx="118" fill="url(#sovraBg)"/>
+  <rect width="508" height="508" x="2" y="2" rx="116" fill="none" stroke="url(#glassRim)" stroke-width="2"/>
+  <rect width="502" height="502" x="5" y="5" rx="113" fill="none" stroke="rgba(0,240,255,0.18)" stroke-width="1.2"/>
+
+  <!-- 2. Ambient Radiant Center Aura -->
+  <circle cx="256" cy="256" r="195" fill="url(#centerGlow)"/>
+
+  <!-- 3. Dynamic Sovereign 'S' Möbius Ribbon -->
+  <!-- Top Loop -->
+  <path d="M 335 195 C 335 135 300 110 256 110 C 195 110 165 145 165 195 C 165 240 215 260 256 275"
+        fill="none" stroke="url(#sUpperRibbon)" stroke-width="74" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Bottom Loop -->
+  <path d="M 256 275 C 298 290 347 310 347 355 C 347 405 315 440 256 440 C 200 440 165 415 165 360"
+        fill="none" stroke="url(#sLowerRibbon)" stroke-width="74" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Specular Core Centerline -->
+  <path d="M 335 195 C 335 135 300 110 256 110 C 195 110 165 145 165 195 C 165 240 215 260 256 275 C 298 290 347 310 347 355 C 347 405 315 440 256 440 C 200 440 165 415 165 360"
+        fill="none" stroke="url(#specularCore)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+
+  <!-- 4. Luminous Mesh Terminal Nodes -->
+  <circle cx="335" cy="195" r="10" fill="#00f5ff" opacity="0.9"/>
+  <circle cx="335" cy="195" r="5" fill="#ffffff"/>
+  <circle cx="165" cy="360" r="10" fill="#f43f5e" opacity="0.9"/>
+  <circle cx="165" cy="360" r="5" fill="#ffffff"/>
+</svg>

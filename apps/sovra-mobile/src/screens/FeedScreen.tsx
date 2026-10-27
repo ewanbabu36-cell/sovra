@@ -43,6 +43,7 @@ import {
   SovereignCheckoutModal,
   type CheckoutItemPayload,
 } from '../components/SovereignCheckoutModal.js';
+import { SovraBrandLogo } from '../components/SovraBrandLogo.js';
 
 export const INITIAL_STORIES: MobileStoryItem[] = [
   {
@@ -1181,20 +1182,8 @@ export function FeedScreen(): React.JSX.Element {
           zIndex: 40,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: -0.5 }}>SOVRA</span>
-          <span
-            style={{
-              fontSize: 10,
-              backgroundColor: 'rgba(56, 189, 248, 0.15)',
-              color: '#38bdf8',
-              padding: '2px 6px',
-              borderRadius: 4,
-              fontWeight: 600,
-            }}
-          >
-            P2P MESH
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <SovraBrandLogo size={32} showWordmark={true} showPill={true} />
           <HeaderIdentitySwitcherPill
             activePersona={activePersona}
             onOpen={() => setIsIdentitySwitcherOpen(true)}
