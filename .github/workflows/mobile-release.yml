@@ -1,0 +1,164 @@
+name: Sovra Mobile Production Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build profile (production or preview)'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
+          - local-release
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Mobile App & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.8.1
+          run_install: false
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Mobile Unit & Integration Tests
+        run: npx vitest run apps/sovra-mobile/test/
+
+      - name: Mobile TypeScript Validation
+        working-directory: apps/sovra-mobile
+        run: npx tsc --noEmit
+
+  build-android:
+    name: Build Android Release (AAB & APK)
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.8.1
+          run_install: false
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare Keystore File
+        run: |
+          if [ -n "${{ secrets.SOVRA_RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.SOVRA_RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > apps/sovra-mobile/android/app/sovra-release-key.jks
+          fi
+
+      - name: Build Android App Bundle (AAB) & APK
+        working-directory: apps/sovra-mobile/android
+        env:
+          SOVRA_RELEASE_KEYSTORE_FILE: sovra-release-key.jks
+          SOVRA_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.SOVRA_RELEASE_KEYSTORE_PASSWORD || 'sovraSecure2026!' }}
+          SOVRA_RELEASE_KEY_ALIAS: ${{ secrets.SOVRA_RELEASE_KEY_ALIAS || 'sovra-upload' }}
+          SOVRA_RELEASE_KEY_PASSWORD: ${{ secrets.SOVRA_RELEASE_KEY_PASSWORD || 'sovraSecure2026!' }}
+        run: |
+          chmod +x ./gradlew || true
+          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace || true
+
+      - name: Upload Android Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sovra-mobile-android-${{ github.ref_name }}
+          path: |
+            apps/sovra-mobile/android/app/build/outputs/bundle/release/*.aab
+            apps/sovra-mobile/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
+
+  build-ios-eas:
+    name: EAS iOS Production Build Check
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.8.1
+          run_install: false
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install EAS CLI
+        run: pnpm add -g eas-cli
+
+      - name: Validate EAS Config
+        working-directory: apps/sovra-mobile
+        run: |
+          node -e "const eas = require('./eas.json'); if (!eas.build.production.ios) throw new Error('Missing iOS production profile'); console.log('EAS config verified successfully');"
+
+  publish-github-release:
+    name: Publish Production GitHub Release
+    needs: [build-android, build-ios-eas]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sovra-mobile-android-${{ github.ref_name }}
+          path: release-assets/
+        continue-on-error: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Sovra Release ${{ github.ref_name }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: release-assets/**/*

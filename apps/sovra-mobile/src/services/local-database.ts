@@ -574,6 +574,10 @@ export class SovraLocalDatabase {
     return SovraLocalDatabase.instance;
   }
 
+  public async init(): Promise<void> {
+    return Promise.resolve();
+  }
+
   public setStorageDriver(driver: IStorageDriver): void {
     this.driver = driver;
     this.state = this.loadInitialState();
@@ -1423,6 +1427,11 @@ export class SovraLocalDatabase {
       stories: {},
       reactions: {},
       live_streams: {},
+      channel_memberships: {},
+      super_chat_pins: {},
+      store_products: {},
+      store_purchases: {},
+      financial_ledger: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
