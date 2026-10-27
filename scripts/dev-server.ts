@@ -82,6 +82,10 @@ import { handleWalletRoutes } from './routes/wallet.routes.ts';
 import { handleTradingRoutes } from './routes/trading.routes.ts';
 import { handleReferralRoutes } from './routes/referral.routes.ts';
 import { handleMediaTokenGatedRoutes } from './routes/media.routes.ts';
+import { handleDAppRoutes } from './routes/dapp.routes.ts';
+import { handleAiRoutes } from './routes/ai.routes.ts';
+import { handleOfflinePayRoutes } from './routes/offline-pay.routes.ts';
+import { handleNotesRoutes } from './routes/notes.routes.ts';
 import {
   sovraDb,
   toPublicUserDTO,
@@ -16485,6 +16489,9 @@ function renderHtml(
       <button type="button" class="header-nav-btn" id="navTabStudio" onclick="switchTab('studio')" title="Creator Studio Pro">
         <span class="hnav-icon">⚡</span> <span>Studio</span>
       </button>
+      <button type="button" class="header-nav-btn" id="navTabDApps" onclick="switchTab('dapps')" title="Sovereign Mini-DApps">
+        <span class="hnav-icon">🎮</span> <span>DApps</span>
+      </button>
       <!-- Hidden buttons preserved for JS & test compatibility -->
       <button type="button" class="header-nav-btn" id="navTabCreate" onclick="openUniversalCreateModal(event)" style="display: none !important;" title="Create"><span class="hnav-icon">➕</span> <span>Create</span></button>
       <button type="button" class="header-nav-btn" id="navTabChats" onclick="switchTab('chat')" style="display: none !important;" title="Chats"><span class="hnav-icon">💬</span> <span>Chats</span></button>
@@ -16974,6 +16981,22 @@ function renderHtml(
               <span>Store</span>
             </button>
           </div>
+        </div>
+
+        <!-- Algorithmic Horizon Switcher (Titan-Killer BYO Algorithm) -->
+        <div id="algorithmicHorizonBar" class="algo-horizon-bar" style="display: flex; gap: 8px; overflow-x: auto; padding: 10px 4px 6px; margin-bottom: 12px; scrollbar-width: none;">
+          <button type="button" class="algo-pill active" id="algoPillChronological" onclick="switchAlgorithmicHorizon('chronological', this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s;">
+            <span>⏱️ Chronological</span>
+          </button>
+          <button type="button" class="algo-pill" id="algoPillCurated" onclick="switchAlgorithmicHorizon('curated', this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s;">
+            <span>🧠 High Signal Curated</span>
+          </button>
+          <button type="button" class="algo-pill" id="algoPillViral" onclick="switchAlgorithmicHorizon('viral', this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s;">
+            <span>🚀 Viral Swarm</span>
+          </button>
+          <button type="button" class="algo-pill" id="algoPillCircles" onclick="switchAlgorithmicHorizon('circles', this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s;">
+            <span>⭕ P2P Circles</span>
+          </button>
         </div>
 
         <!-- Advance Mode: Holographic Node Telemetry HUD (Permanently hidden from consumer feed) -->
@@ -24161,6 +24184,56 @@ function renderHtml(
         </div>
       </div>
     </main>
+
+    <!-- SOVRA Titan-Killer: Sovereign Mini-DApp Hub (#dapps-view) -->
+    <main class="main-content" id="dapps-view" style="display: none; width: 100%; flex-direction: column;">
+      <div style="max-width: 1100px; margin: 0 auto; width: 100%; padding: 0.5rem 1rem 5rem;">
+        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.12) 100%); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 1.5rem; margin-bottom: 1.5rem; backdrop-filter: blur(16px); position: relative; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(129, 140, 248, 0.4); padding: 4px 10px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; color: #a5b4fc; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
+                <span>⚡ Sovereign Wasm / Iframe Sandbox</span>
+              </div>
+              <h1 style="margin: 0; font-size: 1.6rem; font-weight: 900; color: #fff; letter-spacing: -0.02em;">Sovereign Mini-DApp Hub</h1>
+              <p style="margin: 6px 0 0 0; font-size: 0.85rem; color: #cbd5e1; max-width: 600px;">
+                Zero-fee, decentralized micro-applications running in isolated sandboxes. Instant 1-click execution with cryptographic capability permissions.
+              </p>
+            </div>
+            <button type="button" onclick="openPublishDAppPrompt()" class="btn btn-primary" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 12px; padding: 10px 18px; font-weight: 700; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35); cursor: pointer;">
+              <span>🚀 Publish DApp</span>
+            </button>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 1.25rem; overflow-x: auto; padding-bottom: 4px;" id="dappsCategoryBar">
+            <button type="button" class="dapp-cat-pill active" onclick="filterDAppsCategory('all', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.15); color: #fff; font-size: 0.78rem; font-weight: 700; cursor: pointer;">All DApps</button>
+            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('games', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">🎮 Games</button>
+            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('defi', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">⚡ DeFi &amp; Swaps</button>
+            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('tools', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">🛠️ Tools &amp; ZK</button>
+            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('social', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">🔮 Social &amp; Circles</button>
+          </div>
+        </div>
+        <div id="dappsGridContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+        </div>
+      </div>
+    </main>
+
+    <!-- Sandboxed DApp Runner Drawer / Modal -->
+    <div id="dappRunnerModal" style="display: none; position: fixed; inset: 0; z-index: 99999; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); align-items: center; justify-content: center; padding: 1rem;">
+      <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; width: 100%; max-width: 680px; height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
+        <div style="padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; background: rgba(30,41,59,0.5);">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span id="dappRunnerIcon" style="font-size: 1.4rem;">📱</span>
+            <div>
+              <div id="dappRunnerTitle" style="font-weight: 800; color: #fff; font-size: 0.95rem;">Mini-DApp Sandbox</div>
+              <div id="dappRunnerMeta" style="font-size: 0.72rem; color: #10b981;">🟢 Isolated Sandbox &bull; PostMessage RPC Active</div>
+            </div>
+          </div>
+          <button type="button" onclick="closeDAppRunner()" style="background: rgba(255,255,255,0.1); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+        </div>
+        <div style="flex: 1; position: relative; background: #000;">
+          <iframe id="dappSandboxIframe" sandbox="allow-scripts allow-forms allow-same-origin" style="width: 100%; height: 100%; border: none;"></iframe>
+        </div>
+      </div>
+    </div>
 
     <!-- Main Section: Product B (Admin Console & Node Ops) -->
     <main class="main-content admin-view" id="admin-view" style="display: none; width: 100%;">
@@ -44229,6 +44302,7 @@ function renderHtml(
         search: document.getElementById('search-view'),
         notifications: document.getElementById('notifications-view'),
         settings: document.getElementById('settings-view'),
+        dapps: document.getElementById('dapps-view'),
       };
       const tabs = {
         feed: document.getElementById('tab-feed'),
@@ -44245,6 +44319,7 @@ function renderHtml(
         communities: document.getElementById('tab-communities'),
         notifications: document.getElementById('tab-notifications'),
         settings: document.getElementById('tab-settings'),
+        dapps: document.getElementById('navTabDApps'),
       };
       const bnavs = {
         feed: document.getElementById('bnav-feed'),
@@ -44381,6 +44456,7 @@ function renderHtml(
         navTabWatch: tab === 'youtube' || tab === 'reels',
         navTabFriends: tab === 'friends',
         navTabStudio: tab === 'studio',
+        navTabDApps: tab === 'dapps',
         navTabChats: tab === 'chat',
         navTabYou: tab === 'me',
       };
@@ -78905,6 +78981,318 @@ function renderHtml(
     }
     window.handleSpatialCallSignal = handleSpatialCallSignal;
 
+
+    // ========================================================
+    // ⚔️ SOVRA TITAN-KILLER CLIENT-SIDE ENGINE (CYCLES 1-6)
+    // ========================================================
+    window._sovraTitanKillerInitialized = true;
+    window._activeAlgorithmicHorizon = 'chronological';
+    window._currentDAppSessionToken = null;
+
+    // --- CYCLE 1: SOVEREIGN MINI-DAPPS ---
+    async function fetchDAppsList(category) {
+      try {
+        var cat = category || 'all';
+        var res = await fetch('/api/dapps/explore?category=' + encodeURIComponent(cat));
+        var data = await res.json();
+        if (data.ok && Array.isArray(data.dapps)) {
+          renderDAppsGrid(data.dapps);
+        }
+      } catch (err) {
+        console.warn('[DAPPS] Failed to load dapps:', err);
+      }
+    }
+    window.fetchDAppsList = fetchDAppsList;
+
+    function renderDAppsGrid(dapps) {
+      var container = document.getElementById('dappsGridContainer');
+      if (!container) return;
+      if (!dapps || dapps.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1/-1; padding: 2rem; text-align: center; color: #94a3b8;">No Mini-DApps found in this category.</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < dapps.length; i++) {
+        var d = dapps[i];
+        var permsBadges = (d.permissions || []).map(function(p) {
+          return '<span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3);">' + p + '</span>';
+        }).join(' ');
+
+        html += '<div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s;">';
+        html += '<div>';
+        html += '  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">';
+        html += '    <span style="font-size: 2rem;">' + (d.iconUrl || '📱') + '</span>';
+        html += '    <span style="font-size: 0.75rem; color: #f59e0b; font-weight: 700;">★ ' + (d.rating || 5.0) + '</span>';
+        html += '  </div>';
+        html += '  <div style="font-weight: 800; color: #fff; font-size: 1.05rem; margin-bottom: 4px;">' + d.name + '</div>';
+        html += '  <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin-bottom: 12px;">' + (d.description || '') + '</div>';
+        html += '  <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px;">' + permsBadges + '</div>';
+        html += '</div>';
+        html += '<div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">';
+        html += '  <span style="font-size: 0.72rem; color: #64748b;">' + (d.installsCount || 0) + ' runs</span>';
+        html += '  <button type="button" data-dappid="' + d.id + '" onclick="launchMiniDApp(this.getAttribute(&quot;data-dappid&quot;))" class="btn btn-primary" style="background: #6366f1; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; color: #fff;">Launch ⚡</button>';
+        html += '</div>';
+        html += '</div>';
+      }
+      container.innerHTML = html;
+    }
+    window.renderDAppsGrid = renderDAppsGrid;
+
+    function filterDAppsCategory(cat, btn) {
+      document.querySelectorAll('.dapp-cat-pill').forEach(function(p) {
+        p.classList.remove('active');
+        p.style.background = 'rgba(255,255,255,0.05)';
+        p.style.color = '#94a3b8';
+        p.style.borderColor = 'rgba(255,255,255,0.08)';
+      });
+      if (btn) {
+        btn.classList.add('active');
+        btn.style.background = 'rgba(255,255,255,0.15)';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'rgba(255,255,255,0.2)';
+      }
+      fetchDAppsList(cat);
+    }
+    window.filterDAppsCategory = filterDAppsCategory;
+
+    async function launchMiniDApp(dappId) {
+      try {
+        var myDid = (window.SovraState && window.SovraState.currentUser && window.SovraState.currentUser.did) || 'did:sovra:anonymous';
+        var res = await fetch('/api/dapps/launch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dappId: dappId, userDid: myDid })
+        });
+        var data = await res.json();
+        if (data.ok) {
+          window._currentDAppSessionToken = data.launchToken;
+          var modal = document.getElementById('dappRunnerModal');
+          var iframe = document.getElementById('dappSandboxIframe');
+          var titleEl = document.getElementById('dappRunnerTitle');
+          if (titleEl) titleEl.textContent = data.dapp.name;
+          if (iframe) iframe.src = data.sandboxUrl;
+          if (modal) modal.style.display = 'flex';
+        } else {
+          alert('Failed to launch DApp: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('DApp launch error: ' + err.message);
+      }
+    }
+    window.launchMiniDApp = launchMiniDApp;
+
+    function closeDAppRunner() {
+      var modal = document.getElementById('dappRunnerModal');
+      var iframe = document.getElementById('dappSandboxIframe');
+      if (modal) modal.style.display = 'none';
+      if (iframe) iframe.src = 'about:blank';
+      window._currentDAppSessionToken = null;
+    }
+    window.closeDAppRunner = closeDAppRunner;
+
+    function openPublishDAppPrompt() {
+      var name = prompt('Mini-DApp Name:');
+      if (!name) return;
+      var cat = prompt('Category (games, defi, tools, social):', 'tools');
+      var desc = prompt('Description:');
+      var myDid = (window.SovraState && window.SovraState.currentUser && window.SovraState.currentUser.did) || 'did:sovra:anonymous';
+
+      fetch('/api/dapps/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name,
+          category: cat || 'tools',
+          description: desc || '',
+          bundleCid: 'bafybeic' + Math.random().toString(36).substring(2, 10),
+          authorDid: myDid,
+          permissions: ['identity:profile', 'wallet:pay']
+        })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+          alert('Mini-DApp registered successfully!');
+          fetchDAppsList();
+        } else {
+          alert('Error: ' + d.error);
+        }
+      });
+    }
+    window.openPublishDAppPrompt = openPublishDAppPrompt;
+
+    // Sandboxed postMessage RPC Listener for Mini-DApps
+    window.addEventListener('message', async function(event) {
+      if (!event.data || event.data.type !== 'SOVRA_RPC_REQUEST') return;
+      var reqData = event.data;
+      var token = window._currentDAppSessionToken;
+      if (!token) return;
+
+      try {
+        var r = await fetch('/api/dapps/rpc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            launchToken: token,
+            method: reqData.method,
+            params: reqData.params
+          })
+        });
+        var resData = await r.json();
+        if (event.source) {
+          event.source.postMessage({
+            type: 'SOVRA_RPC_RESPONSE',
+            id: reqData.id,
+            result: resData.result,
+            error: resData.error
+          }, '*');
+        }
+      } catch (err) {
+        if (event.source) {
+          event.source.postMessage({
+            type: 'SOVRA_RPC_RESPONSE',
+            id: reqData.id,
+            error: err.message
+          }, '*');
+        }
+      }
+    });
+
+    // --- CYCLE 2: LOCAL EDGE AI CO-PILOT ---
+    async function triggerAiStudioSummarization() {
+      var titleInput = document.getElementById('studioVideoTitle') || document.getElementById('videoTitleInput');
+      var descInput = document.getElementById('studioVideoDesc') || document.getElementById('videoDescriptionInput');
+      var title = titleInput ? titleInput.value : 'Sovereign Protocol Demo';
+      var desc = descInput ? descInput.value : '';
+
+      try {
+        var res = await fetch('/api/ai/studio/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: title, description: desc })
+        });
+        var data = await res.json();
+        if (data.ok) {
+          var chapterText = (data.chapters || []).map(function(c) { return c.timestamp + ' ' + c.title; }).join(String.fromCharCode(10));
+          var fullDesc = (data.summary || '') + String.fromCharCode(10, 10) + 'Chapters:' + String.fromCharCode(10) + chapterText + String.fromCharCode(10, 10) + (data.tags || []).join(' ');
+          if (descInput) descInput.value = fullDesc;
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('✨ AI Smart Chapters & Summary Generated (' + data.modelUsed + ')');
+          }
+        }
+      } catch (err) {
+        alert('AI Summarization error: ' + err.message);
+      }
+    }
+    window.triggerAiStudioSummarization = triggerAiStudioSummarization;
+
+    // --- CYCLE 4: OFFLINE ULTRASONIC SOUND-WAVE PAY ---
+    async function triggerUltrasonicSoundPay(amount, recipientDid) {
+      try {
+        var myDid = (window.SovraState && window.SovraState.currentUser && window.SovraState.currentUser.did) || 'did:sovra:anonymous';
+        var res = await fetch('/api/wallet/offline/generate-voucher', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            senderDid: myDid,
+            recipientDid: recipientDid || '*',
+            amountSov: amount || 1.0
+          })
+        });
+        var data = await res.json();
+        if (data.ok) {
+          // Play acoustic tone chirp simulation (WebAudio Oscillator)
+          playUltrasonicAcousticChirp(data.audioFskFrequencies || [18500, 19200]);
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('🔊 Ultrasonic Voucher Transmitted (' + data.voucher.amountSov + ' SOV)');
+          }
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (err) {
+        alert('Offline pay error: ' + err.message);
+      }
+    }
+    window.triggerUltrasonicSoundPay = triggerUltrasonicSoundPay;
+
+    function playUltrasonicAcousticChirp(frequencies) {
+      try {
+        var AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        var ctx = new AudioCtx();
+        for (var i = 0; i < frequencies.length; i++) {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(frequencies[i], ctx.currentTime + i * 0.15);
+          gain.gain.setValueAtTime(0.05, ctx.currentTime + i * 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (i + 1) * 0.15);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.15);
+          osc.stop(ctx.currentTime + (i + 1) * 0.15);
+        }
+      } catch (_) {}
+    }
+    window.playUltrasonicAcousticChirp = playUltrasonicAcousticChirp;
+
+    // --- CYCLE 5: ALGORITHMIC HORIZON & COMMUNITY NOTES ---
+    function switchAlgorithmicHorizon(horizon, btn) {
+      window._activeAlgorithmicHorizon = horizon;
+      document.querySelectorAll('.algo-pill').forEach(function(p) {
+        p.classList.remove('active');
+        p.style.background = 'rgba(255,255,255,0.05)';
+        p.style.color = '#94a3b8';
+        p.style.borderColor = 'rgba(255,255,255,0.1)';
+      });
+      if (btn) {
+        btn.classList.add('active');
+        btn.style.background = 'rgba(56, 189, 248, 0.15)';
+        btn.style.color = '#38bdf8';
+        btn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+      }
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('🔄 Horizon Switched: ' + horizon.toUpperCase() + ' Feed');
+      }
+    }
+    window.switchAlgorithmicHorizon = switchAlgorithmicHorizon;
+
+    async function loadCommunityNotesForPost(postId, targetElId) {
+      try {
+        var res = await fetch('/api/notes/post/' + encodeURIComponent(postId));
+        var data = await res.json();
+        var container = document.getElementById(targetElId);
+        if (!container || !data.ok || !data.notes || data.notes.length === 0) return;
+
+        var note = data.notes[0];
+        container.innerHTML = '<div style="background: rgba(30, 41, 59, 0.7); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 10px 14px; margin-top: 8px; font-size: 0.8rem; color: #e2e8f0;">' +
+          '<div style="font-weight: 700; color: #38bdf8; margin-bottom: 2px;">📝 Community Note (Cross-Cluster Consensus: ' + Math.round(note.divergentClusterAgreement * 100) + '%)</div>' +
+          '<div>' + note.summary + '</div>' +
+          '</div>';
+      } catch (_) {}
+    }
+    window.loadCommunityNotesForPost = loadCommunityNotesForPost;
+
+    // --- CYCLE 6: DURESS PIN & DECOY IDENTITY ---
+    window._checkDuressPin = function(enteredPin) {
+      if (enteredPin === '9999') {
+        // Activate Decoy Persona under duress
+        if (window.SovraState && window.SovraState.currentUser) {
+          window.SovraState.currentUser.displayName = 'Peaceful Citizen';
+          window.SovraState.currentUser.handle = '@citizen_peace';
+          window.SovraState.currentUser.balance_sov = 12.50;
+          window.SovraState.currentUser.isAdmin = false;
+        }
+        var balEl = document.getElementById('heroActiveSovBalance');
+        if (balEl) balEl.textContent = '12.50 SOV';
+        var adminNav = document.getElementById('navTabAdmin');
+        if (adminNav) adminNav.style.display = 'none';
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('🔓 Citizen Mode Unlocked');
+        }
+        return true;
+      }
+      return false;
+    };
+
 </script>
 </body>
 </html>`;
@@ -84567,7 +84955,35 @@ async function startDevServer() {
     // ==========================================
     // ⚡ SOVRA LAYER-1 BLOCKCHAIN EXPLORER API
     // ==========================================
-    if (await handleExplorerRoutes(req, res, url)) {
+        if (await handleExplorerRoutes(req, res, url)) {
+      return;
+    }
+
+    // ==========================================
+    // 🎮 SOVEREIGN MINI-DAPPS RUNTIME API (TITAN-KILLER)
+    // ==========================================
+    if (await handleDAppRoutes(req, res)) {
+      return;
+    }
+
+    // ==========================================
+    // 🧠 LOCAL EDGE AI CO-PILOT & TRANSLATION API (TITAN-KILLER)
+    // ==========================================
+    if (await handleAiRoutes(req, res)) {
+      return;
+    }
+
+    // ==========================================
+    // 🔊 OFFLINE ULTRASONIC & BLE TAP-TO-PAY API (TITAN-KILLER)
+    // ==========================================
+    if (await handleOfflinePayRoutes(req, res)) {
+      return;
+    }
+
+    // ==========================================
+    // 📝 CRYPTOGRAPHIC COMMUNITY NOTES API (TITAN-KILLER)
+    // ==========================================
+    if (await handleNotesRoutes(req, res)) {
       return;
     }
 

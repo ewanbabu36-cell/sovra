@@ -1801,6 +1801,64 @@ export interface DatabaseSchema {
   trading_orders?: TradingOrderRecord[];
   trading_trades?: TradingTradeRecord[];
   trading_halted?: boolean;
+  mini_dapps?: MiniDAppRecord[];
+  offline_payment_vouchers?: OfflinePaymentVoucherRecord[];
+  community_notes?: CommunityNoteRecord[];
+  community_note_ratings?: CommunityNoteRatingRecord[];
+}
+
+export interface MiniDAppRecord {
+  id: string;
+  name: string;
+  authorDid: string;
+  version: string;
+  bundleCid: string;
+  iconUrl?: string;
+  category: 'games' | 'defi' | 'tools' | 'social';
+  permissions: string[];
+  installsCount: number;
+  rating: number;
+  description?: string;
+  entryHtml?: string;
+  createdAt: number;
+}
+
+export interface OfflinePaymentVoucherRecord {
+  voucherId: string;
+  senderDid: string;
+  recipientDid: string;
+  amountSov: number;
+  nonce: string;
+  expiresAt: number;
+  signature: string;
+  status: 'pending_sync' | 'settled' | 'expired';
+  audioFskPayload?: string;
+  blePayload?: string;
+  createdAt: number;
+  settledAt?: number;
+}
+
+export interface CommunityNoteRecord {
+  id: string;
+  postId: string;
+  authorDid: string;
+  summary: string;
+  classification: 'misleading' | 'accurate' | 'lacks_context';
+  sources: string[];
+  status: 'needs_more_ratings' | 'helpful' | 'not_helpful';
+  helpfulnessScore: number;
+  divergentClusterAgreement: number;
+  createdAt: number;
+}
+
+export interface CommunityNoteRatingRecord {
+  id: string;
+  noteId: string;
+  raterDid: string;
+  clusterId: string;
+  helpful: boolean;
+  reason?: string;
+  createdAt: number;
 }
 
 export const SOVRA_PRECISION_DECIMALS = 6;
@@ -2123,6 +2181,10 @@ export class SovraDatabaseEngine {
       wallet_ledger: [],
       trading_orders: [],
       trading_trades: [],
+      mini_dapps: this.initSeedMiniDApps(),
+      offline_payment_vouchers: [],
+      community_notes: [],
+      community_note_ratings: [],
     };
   }
 
@@ -2303,6 +2365,10 @@ export class SovraDatabaseEngine {
           promotion_campaigns: Array.isArray(parsed.promotion_campaigns) ? parsed.promotion_campaigns : [],
           financial_ledger: Array.isArray(parsed.financial_ledger) ? parsed.financial_ledger : [],
           creator_referrals: Array.isArray(parsed.creator_referrals) ? parsed.creator_referrals : [],
+          mini_dapps: Array.isArray(parsed.mini_dapps) && parsed.mini_dapps.length > 0 ? parsed.mini_dapps : this.initSeedMiniDApps(),
+          offline_payment_vouchers: Array.isArray(parsed.offline_payment_vouchers) ? parsed.offline_payment_vouchers : [],
+          community_notes: Array.isArray(parsed.community_notes) ? parsed.community_notes : [],
+          community_note_ratings: Array.isArray(parsed.community_note_ratings) ? parsed.community_note_ratings : [],
         };
       } else {
         this.save();
@@ -2342,6 +2408,10 @@ export class SovraDatabaseEngine {
     if (!Array.isArray(this.db.promotion_campaigns)) this.db.promotion_campaigns = [];
     if (!Array.isArray(this.db.financial_ledger)) this.db.financial_ledger = [];
     if (!Array.isArray(this.db.creator_referrals)) this.db.creator_referrals = [];
+    if (!Array.isArray(this.db.mini_dapps) || this.db.mini_dapps.length === 0) this.db.mini_dapps = this.initSeedMiniDApps();
+    if (!Array.isArray(this.db.offline_payment_vouchers)) this.db.offline_payment_vouchers = [];
+    if (!Array.isArray(this.db.community_notes)) this.db.community_notes = [];
+    if (!Array.isArray(this.db.community_note_ratings)) this.db.community_note_ratings = [];
 
     if (!Object.prototype.hasOwnProperty.call(this.db, 'liveSuperChatPins')) {
       Object.defineProperty(this.db, 'liveSuperChatPins', {
@@ -4637,6 +4707,26 @@ export class SovraDatabaseEngine {
       return viewerDid ? this.areFriends(targetUser.did, viewerDid) : false;
     }
     return true;
+  }
+
+  public getUserByDid(did: string): UserRecord | undefined {
+    this.load();
+    return (this.db.users || []).find(u => u.did === did);
+  }
+
+  public saveUser(user: any): UserRecord {
+    this.load();
+    if (!this.db.users) this.db.users = [];
+    const idx = this.db.users.findIndex(u => u.did === user.did);
+    if (idx >= 0) {
+      this.db.users[idx] = { ...this.db.users[idx], ...user };
+      this.save();
+      return this.db.users[idx] as UserRecord;
+    } else {
+      this.db.users.push(user);
+      this.save();
+      return user as UserRecord;
+    }
   }
 
   public getUserProfile(targetDid: string, viewerDid?: string): {
@@ -15922,6 +16012,336 @@ export class SovraDatabaseEngine {
       frozenDids: frozenList,
     };
   }
+
+  // ==========================================
+  // TITAN-KILLER: 1. SOVEREIGN MINI-DAPPS
+  // ==========================================
+
+  public initSeedMiniDApps(): MiniDAppRecord[] {
+    return [
+      {
+        id: 'dapp_flappy_sov',
+        name: 'Flappy SOV',
+        authorDid: 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD',
+        version: '1.0.0',
+        bundleCid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+        iconUrl: '🎮',
+        category: 'games',
+        permissions: ['wallet:pay', 'identity:profile'],
+        installsCount: 342,
+        rating: 4.9,
+        description: 'P2P tap-to-fly arcade game. Earn micro-SOV high-score bounties.',
+        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Flappy SOV</title><style>body{margin:0;background:#0d1117;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}button{background:#6366f1;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-size:16px;cursor:pointer;margin-top:16px}</style></head><body><h2>🎮 Flappy SOV</h2><p>Tap space or screen to fly. Top score: 42 SOV.</p><button onclick="window.parent.postMessage({type:'SOVRA_RPC_REQUEST',method:'wallet:pay',params:{amount:0.1,memo:'Flappy SOV Entry Fee'}},'*')">Play (0.1 SOV)</button><script>window.addEventListener('message',e=>{if(e.data.type==='SOVRA_RPC_RESPONSE'){alert('Payment Status: '+e.data.result.status);}});</script></body></html>`,
+        createdAt: Date.now() - 50000000,
+      },
+      {
+        id: 'dapp_p2p_swap',
+        name: 'Sovereign DEX Flash Swap',
+        authorDid: 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD',
+        version: '2.1.0',
+        bundleCid: 'bafybeibmwj7ug3vsqbqum46x762f5bftn33u4p6k23d72fxh5hsp36yymu',
+        iconUrl: '⚡',
+        category: 'defi',
+        permissions: ['wallet:pay', 'identity:profile', 'p2p:mesh'],
+        installsCount: 890,
+        rating: 4.8,
+        description: 'Instant atomic swaps between SOV and local digital assets with zero intermediary fees.',
+        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>DEX Flash Swap</title><style>body{margin:0;background:#0f172a;color:#f8fafc;font-family:sans-serif;padding:24px;text-align:center}input{padding:10px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#fff;width:80%;margin:8px 0}button{background:#10b981;color:#fff;border:none;padding:12px 20px;border-radius:10px;font-weight:bold;cursor:pointer}</style></head><body><h2>⚡ Sovereign DEX Swap</h2><input placeholder="Amount SOV" id="amt" value="5.0"/><br><button onclick="window.parent.postMessage({type:'SOVRA_RPC_REQUEST',method:'wallet:pay',params:{amount:parseFloat(document.getElementById('amt').value),memo:'DEX Swap Liquidity'}},'*')">Instant Swap</button></body></html>`,
+        createdAt: Date.now() - 40000000,
+      },
+      {
+        id: 'dapp_zk_forms',
+        name: 'ZK Encrypted Polls & Forms',
+        authorDid: 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD',
+        version: '1.2.0',
+        bundleCid: 'bafybeicgq5fx4e4whuuh2l4c54ef5q34p7k25d62fxh4hsp32yymu',
+        iconUrl: '📝',
+        category: 'tools',
+        permissions: ['identity:profile'],
+        installsCount: 154,
+        rating: 4.9,
+        description: 'Conduct zero-knowledge, cryptographically verifiable surveys and anonymous quadratic voting.',
+        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ZK Forms</title><style>body{margin:0;background:#18181b;color:#fafafa;font-family:sans-serif;padding:24px}button{background:#8b5cf6;color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer}</style></head><body><h2>📝 ZK Anonymous Poll</h2><p>Should the sovereign protocol allocate 10% to seeder relays?</p><button onclick="alert('ZK Proof generated and broadcast anonymously!')">Vote YES [ZK-Proof]</button></body></html>`,
+        createdAt: Date.now() - 30000000,
+      },
+      {
+        id: 'dapp_secret_circles',
+        name: 'Secret Circles',
+        authorDid: 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD',
+        version: '1.0.5',
+        bundleCid: 'bafybeidh6fx4e4whuuh2l4c54ef5q34p7k25d62fxh4hsp44yymu',
+        iconUrl: '🔮',
+        category: 'social',
+        permissions: ['identity:profile', 'p2p:mesh'],
+        installsCount: 620,
+        rating: 5.0,
+        description: 'Private ephemeral group channels with forward secrecy and auto-destructing media.',
+        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Secret Circles</title><style>body{margin:0;background:#09090b;color:#e4e4e7;font-family:sans-serif;padding:24px}button{background:#ec4899;color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer}</style></head><body><h2>🔮 Secret Circles</h2><p>Encrypted mesh group: active.</p><button onclick="alert('Ephemeral broadcast dispatched to 14 peers')">Broadcast Whisper</button></body></html>`,
+        createdAt: Date.now() - 20000000,
+      }
+    ];
+  }
+
+  public registerMiniDApp(dapp: MiniDAppRecord): { ok: boolean; dapp?: MiniDAppRecord; error?: string } {
+    this.load();
+    if (!this.db.mini_dapps) this.db.mini_dapps = [];
+    if (!dapp.id || !dapp.name || !dapp.authorDid) {
+      return { ok: false, error: 'Missing required Mini-DApp fields' };
+    }
+    const existingIdx = this.db.mini_dapps.findIndex(d => d.id === dapp.id);
+    if (existingIdx >= 0) {
+      this.db.mini_dapps[existingIdx] = { ...this.db.mini_dapps[existingIdx], ...dapp };
+    } else {
+      this.db.mini_dapps.unshift(dapp);
+    }
+    this.save();
+    return { ok: true, dapp };
+  }
+
+  public getMiniDApps(category?: string): MiniDAppRecord[] {
+    this.load();
+    const dapps = this.db.mini_dapps || [];
+    if (category && category !== 'all') {
+      return dapps.filter(d => d.category.toLowerCase() === category.toLowerCase());
+    }
+    return dapps;
+  }
+
+  public getMiniDAppById(id: string): MiniDAppRecord | undefined {
+    this.load();
+    return (this.db.mini_dapps || []).find(d => d.id === id);
+  }
+
+  public incrementDAppInstalls(id: string): boolean {
+    this.load();
+    const dapp = (this.db.mini_dapps || []).find(d => d.id === id);
+    if (dapp) {
+      dapp.installsCount = (dapp.installsCount || 0) + 1;
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
+  // ==========================================
+  // TITAN-KILLER: 4. OFFLINE SOUND-WAVE & BLE PAY
+  // ==========================================
+
+  public createOfflinePaymentVoucher(params: {
+    senderDid: string;
+    recipientDid: string;
+    amountSov: number;
+    signature: string;
+    nonce?: string;
+    expiresInSeconds?: number;
+  }): { ok: boolean; voucher?: OfflinePaymentVoucherRecord; error?: string } {
+    this.load();
+    if (!this.db.offline_payment_vouchers) this.db.offline_payment_vouchers = [];
+
+    const amount = Number(params.amountSov);
+    if (isNaN(amount) || amount <= 0) {
+      return { ok: false, error: 'Invalid voucher amount' };
+    }
+
+    const sender = (this.db.users || []).find(u => u.did === params.senderDid);
+    if (!sender) {
+      return { ok: false, error: 'Sender DID not found' };
+    }
+    if ((sender.balance_sov || 0) < amount) {
+      return { ok: false, error: 'Insufficient SOV balance for offline voucher' };
+    }
+
+    // Lock funds from sender
+    sender.balance_sov = Math.round(((sender.balance_sov || 0) - amount) * 1000) / 1000;
+
+    const voucherId = `vouch_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const nonce = params.nonce || crypto.randomBytes(8).toString('hex');
+    const expiresAt = Date.now() + (params.expiresInSeconds || 3600) * 1000;
+
+    // Generate ultrasonic FSK tones specification & BLE advertisement string
+    const audioFskPayload = `SOV:V1:${voucherId}:${params.senderDid.slice(-8)}:${amount}:${nonce}`;
+    const blePayload = `SOV_BLE_${voucherId}_${amount}`;
+
+    const voucher: OfflinePaymentVoucherRecord = {
+      voucherId,
+      senderDid: params.senderDid,
+      recipientDid: params.recipientDid,
+      amountSov: amount,
+      nonce,
+      expiresAt,
+      signature: params.signature,
+      status: 'pending_sync',
+      audioFskPayload,
+      blePayload,
+      createdAt: Date.now(),
+    };
+
+    this.db.offline_payment_vouchers.unshift(voucher);
+    this.save();
+    return { ok: true, voucher };
+  }
+
+  public claimOfflinePaymentVoucher(voucherId: string, claimantDid: string): {
+    ok: boolean;
+    amountSettled?: number;
+    voucher?: OfflinePaymentVoucherRecord;
+    error?: string;
+  } {
+    this.load();
+    const voucher = (this.db.offline_payment_vouchers || []).find(v => v.voucherId === voucherId);
+    if (!voucher) {
+      return { ok: false, error: 'Voucher not found' };
+    }
+    if (voucher.status === 'settled') {
+      return { ok: false, error: 'Voucher has already been settled' };
+    }
+    if (voucher.status === 'expired' || Date.now() > voucher.expiresAt) {
+      voucher.status = 'expired';
+      this.save();
+      return { ok: false, error: 'Voucher expired' };
+    }
+    if (voucher.recipientDid !== '*' && voucher.recipientDid !== claimantDid) {
+      return { ok: false, error: 'Claimant DID does not match voucher recipient' };
+    }
+
+    const claimant = (this.db.users || []).find(u => u.did === claimantDid);
+    if (!claimant) {
+      return { ok: false, error: 'Claimant user record not found' };
+    }
+
+    claimant.balance_sov = Math.round(((claimant.balance_sov || 0) + voucher.amountSov) * 1000) / 1000;
+    voucher.status = 'settled';
+    voucher.settledAt = Date.now();
+    this.save();
+
+    return {
+      ok: true,
+      amountSettled: voucher.amountSov,
+      voucher,
+    };
+  }
+
+  public getOfflinePaymentVouchers(did?: string): OfflinePaymentVoucherRecord[] {
+    this.load();
+    const all = this.db.offline_payment_vouchers || [];
+    if (!did) return all;
+    return all.filter(v => v.senderDid === did || v.recipientDid === did || v.recipientDid === '*');
+  }
+
+  // ==========================================
+  // TITAN-KILLER: 5. CRYPTOGRAPHIC COMMUNITY NOTES
+  // ==========================================
+
+  public submitCommunityNote(params: {
+    postId: string;
+    authorDid: string;
+    summary: string;
+    classification: 'misleading' | 'accurate' | 'lacks_context';
+    sources: string[];
+  }): { ok: boolean; note?: CommunityNoteRecord; error?: string } {
+    this.load();
+    if (!this.db.community_notes) this.db.community_notes = [];
+    if (!params.postId || !params.summary || !params.authorDid) {
+      return { ok: false, error: 'Missing required note parameters' };
+    }
+
+    const id = `note_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const note: CommunityNoteRecord = {
+      id,
+      postId: params.postId,
+      authorDid: params.authorDid,
+      summary: params.summary,
+      classification: params.classification,
+      sources: params.sources || [],
+      status: 'needs_more_ratings',
+      helpfulnessScore: 0.0,
+      divergentClusterAgreement: 0.0,
+      createdAt: Date.now(),
+    };
+
+    this.db.community_notes.unshift(note);
+    this.save();
+    return { ok: true, note };
+  }
+
+  public rateCommunityNote(params: {
+    noteId: string;
+    raterDid: string;
+    clusterId: string;
+    helpful: boolean;
+    reason?: string;
+  }): { ok: boolean; note?: CommunityNoteRecord; error?: string } {
+    this.load();
+    if (!this.db.community_note_ratings) this.db.community_note_ratings = [];
+    const note = (this.db.community_notes || []).find(n => n.id === params.noteId);
+    if (!note) {
+      return { ok: false, error: 'Community note not found' };
+    }
+
+    // Record or update rating
+    const ratingIdx = this.db.community_note_ratings.findIndex(
+      r => r.noteId === params.noteId && r.raterDid === params.raterDid
+    );
+    const newRating: CommunityNoteRatingRecord = {
+      id: `rate_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
+      noteId: params.noteId,
+      raterDid: params.raterDid,
+      clusterId: params.clusterId || 'cluster_neutral',
+      helpful: params.helpful,
+      reason: params.reason,
+      createdAt: Date.now(),
+    };
+
+    if (ratingIdx >= 0) {
+      this.db.community_note_ratings[ratingIdx] = newRating;
+    } else {
+      this.db.community_note_ratings.push(newRating);
+    }
+
+    // Cross-cluster bridging consensus calculation
+    const allRatings = this.db.community_note_ratings.filter(r => r.noteId === params.noteId);
+    const clusterVotes: Record<string, { yes: number; total: number }> = {};
+
+    allRatings.forEach(r => {
+      if (!clusterVotes[r.clusterId]) clusterVotes[r.clusterId] = { yes: 0, total: 0 };
+      clusterVotes[r.clusterId].total += 1;
+      if (r.helpful) clusterVotes[r.clusterId].yes += 1;
+    });
+
+    const clusters = Object.keys(clusterVotes);
+    let totalYes = 0;
+    clusters.forEach(c => {
+      totalYes += clusterVotes[c].yes;
+    });
+
+    const helpfulnessScore = allRatings.length > 0 ? totalYes / allRatings.length : 0;
+    note.helpfulnessScore = Math.round(helpfulnessScore * 100) / 100;
+
+    // Divergent cluster agreement: requires at least 2 distinct clusters with >50% approval
+    if (clusters.length >= 2) {
+      const agreeingClusters = clusters.filter(c => clusterVotes[c].total > 0 && (clusterVotes[c].yes / clusterVotes[c].total) >= 0.5);
+      note.divergentClusterAgreement = Math.round((agreeingClusters.length / clusters.length) * 100) / 100;
+      if (agreeingClusters.length >= 2 && note.helpfulnessScore >= 0.6) {
+        note.status = 'helpful';
+      } else if (note.helpfulnessScore < 0.3) {
+        note.status = 'not_helpful';
+      }
+    } else {
+      note.divergentClusterAgreement = 0.0;
+      if (allRatings.length >= 3 && note.helpfulnessScore >= 0.67) {
+        note.status = 'helpful';
+      }
+    }
+
+    this.save();
+    return { ok: true, note };
+  }
+
+  public getCommunityNotesForPost(postId: string): CommunityNoteRecord[] {
+    this.load();
+    return (this.db.community_notes || []).filter(n => n.postId === postId);
+  }
+
 }
 
 // Singleton database instance exported for application-wide use
