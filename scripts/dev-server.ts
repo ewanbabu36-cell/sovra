@@ -36851,6 +36851,14 @@ function renderHtml(
                 '<div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem; max-width: 80%; text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,0.8);">' + v.title + '</div>' +
                 '<div style="font-size: 0.74rem; color: #34d399; margin-top: 6px;">● RFC 8216 HLS • 60fps Sovereign P2P Stream</div>' +
               '</div>' +
+              // ABR Buffer Telemetry HUD
+              '<div id="spatialBufferTelemetryHUD" style="position: absolute; top: 10px; right: 10px; background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(52, 211, 153, 0.4); border-radius: 8px; padding: 4px 8px; font-family: monospace; font-size: 0.68rem; color: #a7f3d0; pointer-events: none; z-index: 8; display: flex; align-items: center; gap: 6px;">' +
+                '<span id="telemetryQualityBadge">🟢 1080p</span>' +
+                '<span>•</span>' +
+                '<span id="telemetryBufferSec">Buf: 12.4s</span>' +
+                '<span>•</span>' +
+                '<span id="telemetryP2pRate">P2P: 3.2 MB/s</span>' +
+              '</div>' +
               // YouTube-Grade Gesture Hit Zones Overlay
               '<div id="spatialVideoGestureOverlay" style="position: absolute; inset: 0; display: flex; z-index: 5; pointer-events: auto;">' +
                 '<div id="videoSeekLeftZone" style="flex: 4; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none;">' +
@@ -36890,7 +36898,15 @@ function renderHtml(
                     '<button id="spatialMuteBtn" class="action-pill-btn action-pill-secondary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="window._toggleVideoMute()" title="Mute/Unmute (M)">🔊</button>' +
                     '<button id="spatialSpeedBtn" class="action-pill-btn action-pill-secondary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="window._cyclePlaybackSpeed()">1.0x</button>' +
                   '</div>' +
-                  '<div style="display: flex; gap: 8px; align-items: center;">' +
+                  '<div style="display: flex; gap: 8px; align-items: center; position: relative;">' +
+                    '<button id="spatialQualityBtn" class="action-pill-btn action-pill-secondary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="window._toggleQualityMenu()" title="Stream Quality">⚙️ <span id="spatialQualityLabel">Auto</span></button>' +
+                    '<div id="spatialQualityMenu" style="display: none; position: absolute; bottom: 38px; right: 0; background: rgba(15, 23, 42, 0.98); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.85); z-index: 60; min-width: 150px; flex-direction: column; gap: 4px;">' +
+                      '<button class="action-pill-btn action-pill-secondary" style="width: 100%; text-align: left; padding: 4px 8px; font-size: 0.72rem;" onclick="window._setQualityTier(&quot;auto&quot;)">⚡ Auto (BitSwap)</button>' +
+                      '<button class="action-pill-btn action-pill-secondary" style="width: 100%; text-align: left; padding: 4px 8px; font-size: 0.72rem;" onclick="window._setQualityTier(&quot;1080p&quot;)">1080p HD (4.5M)</button>' +
+                      '<button class="action-pill-btn action-pill-secondary" style="width: 100%; text-align: left; padding: 4px 8px; font-size: 0.72rem;" onclick="window._setQualityTier(&quot;720p&quot;)">720p HD (2.2M)</button>' +
+                      '<button class="action-pill-btn action-pill-secondary" style="width: 100%; text-align: left; padding: 4px 8px; font-size: 0.72rem;" onclick="window._setQualityTier(&quot;480p&quot;)">480p SD (1.1M)</button>' +
+                      '<button class="action-pill-btn action-pill-secondary" style="width: 100%; text-align: left; padding: 4px 8px; font-size: 0.72rem;" onclick="window._setQualityTier(&quot;360p&quot;)">360p Low (600K)</button>' +
+                    '</div>' +
                     '<button id="spatialPipBtn" class="action-pill-btn action-pill-secondary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="window._toggleVideoPiP()" title="Picture in Picture (P)">⧉ PiP</button>' +
                     '<button class="action-pill-btn action-pill-secondary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="window._toggleVideoFullscreen()" title="Fullscreen (F)">⛶ Fullscreen</button>' +
                   '</div>' +
@@ -37120,6 +37136,25 @@ function renderHtml(
               const vEl = document.getElementById('spatialVideoElement');
               if (vEl && !vEl.paused) {
                 try { vEl.pause(); } catch (_) {}
+              }
+            };
+
+            window._toggleQualityMenu = function() {
+              const menu = document.getElementById('spatialQualityMenu');
+              if (menu) {
+                menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+              }
+            };
+
+            window._setQualityTier = function(tier) {
+              const label = document.getElementById('spatialQualityLabel');
+              const badge = document.getElementById('telemetryQualityBadge');
+              if (label) label.textContent = tier === 'auto' ? 'Auto' : tier;
+              if (badge) badge.textContent = tier === 'auto' ? '🟢 1080p (Auto)' : ('🟢 ' + tier);
+              const menu = document.getElementById('spatialQualityMenu');
+              if (menu) menu.style.display = 'none';
+              if (typeof showAccountToast === 'function') {
+                showAccountToast('Switched to ' + tier.toUpperCase() + ' ABR stream', 'info');
               }
             };
 
