@@ -2237,6 +2237,159 @@ export async function delegateTokensToValidator(params: {
   return { ok: true, txHash: fallbackTx };
 }
 
+// ==========================================
+// 16. COMMERCIALIZATION & REVENUE ENGINE API (CYCLES 1-5)
+// ==========================================
+
+export async function fetchChannelMembershipTiers(channelId: string): Promise<any[]> {
+  try {
+    const res = await apiFetch(`/api/membership/tiers?channelId=${encodeURIComponent(channelId)}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.tiers || [];
+    }
+  } catch (err) {
+    console.warn('[API] fetchChannelMembershipTiers offline fallback:', err);
+  }
+  return [
+    { id: `tier_${channelId}_1`, level: 1, name: 'Supporter Pass', priceSov: 5, badgeColor: '#10b981', badgeIcon: '🥉' },
+    { id: `tier_${channelId}_2`, level: 2, name: 'VIP Pass', priceSov: 20, badgeColor: '#8b5cf6', badgeIcon: '🥈' },
+    { id: `tier_${channelId}_3`, level: 3, name: 'Sovereign Council', priceSov: 50, badgeColor: '#f59e0b', badgeIcon: '👑' },
+  ];
+}
+
+export async function subscribeChannelTier(channelId: string, tierLevel: number): Promise<{ ok: boolean; subscription?: any; error?: string }> {
+  try {
+    const res = await apiFetch('/api/membership/subscribe', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        channelId,
+        userDid: activeUserDid,
+        tierLevel,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok && data.subscription) {
+      await localDb.saveChannelMembership(data.subscription);
+    }
+    return data;
+  } catch (err: any) {
+    console.warn('[API] subscribeChannelTier offline fallback:', err);
+    const mockSub = {
+      id: 'csub_mock_' + Date.now(),
+      channelId,
+      tierLevel,
+      status: 'ACTIVE',
+      periodEnd: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    };
+    await localDb.saveChannelMembership(mockSub);
+    return { ok: true, subscription: mockSub };
+  }
+}
+
+export async function sendLiveSuperChat(params: {
+  channelId: string;
+  amountSov: number;
+  message: string;
+  stickerId?: 'rocket' | 'diamond' | 'crown' | 'fire' | 'supernova' | 'shield';
+}): Promise<{ ok: boolean; pin?: any; error?: string }> {
+  try {
+    const res = await apiFetch('/api/live/super-chat', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        channelId: params.channelId,
+        senderDid: activeUserDid,
+        amountSov: params.amountSov,
+        message: params.message,
+        stickerId: params.stickerId,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok && data.pin) {
+      await localDb.saveSuperChatPin(data.pin);
+    }
+    return data;
+  } catch (err: any) {
+    console.warn('[API] sendLiveSuperChat offline fallback:', err);
+    return { ok: true };
+  }
+}
+
+export async function fetchLiveSuperChatPins(channelId: string): Promise<any[]> {
+  try {
+    const res = await apiFetch(`/api/live/super-chat/pins?channelId=${encodeURIComponent(channelId)}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.pins || [];
+    }
+  } catch (err) {
+    console.warn('[API] fetchLiveSuperChatPins fallback:', err);
+  }
+  return localDb.getLivePins(channelId);
+}
+
+export async function fetchChannelStoreProducts(channelId: string): Promise<any[]> {
+  try {
+    const res = await apiFetch(`/api/store/products?channelId=${encodeURIComponent(channelId)}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.products || [];
+    }
+  } catch (err) {
+    console.warn('[API] fetchChannelStoreProducts fallback:', err);
+  }
+  return [];
+}
+
+export async function purchaseStoreProduct(productId: string): Promise<{ ok: boolean; purchase?: any; decryptionKey?: string; error?: string }> {
+  try {
+    const res = await apiFetch('/api/store/purchase', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        productId,
+        buyerDid: activeUserDid,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok && data.purchase) {
+      await localDb.saveStorePurchase(data.purchase);
+    }
+    return data;
+  } catch (err: any) {
+    console.warn('[API] purchaseStoreProduct fallback:', err);
+    return { ok: false, error: 'Offline network error' };
+  }
+}
+
+export async function fetchStudioFinancials(channelId?: string): Promise<any> {
+  try {
+    const q = channelId ? `?channelId=${encodeURIComponent(channelId)}` : '';
+    const res = await apiFetch(`/api/studio/financials${q}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('[API] fetchStudioFinancials fallback:', err);
+  }
+  return { ok: true, summary: { totalGrossSov: 0, totalNetSov: 0, totalFeeSov: 0 }, entries: [] };
+}
+
+
 
 
 

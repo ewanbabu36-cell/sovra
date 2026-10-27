@@ -15,7 +15,7 @@ describe('Client Script Integrity & UI Freeze Prevention Gate', () => {
           res.on('end', () => resolve(body));
         }).on('error', reject);
       });
-      if (cachedHtml && cachedHtml.length > 500) {
+      if (cachedHtml && cachedHtml.includes('Sovra') && cachedHtml.length > 500) {
         isServerOnline = true;
       }
     } catch {

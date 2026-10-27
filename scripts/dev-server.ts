@@ -21182,6 +21182,9 @@ function renderHtml(
             <button id="channelHubSubscribeBtn" onclick="toggleChannelHubSubscription()" style="background: #f43f5e; color: #fff; border: none; padding: 10px 22px; border-radius: 999px; font-weight: 700; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; box-shadow: 0 4px 14px rgba(244,63,94,0.35);">
               <span>🔔</span> <span id="channelHubSubText">Subscribe</span>
             </button>
+            <button id="channelHubJoinBtn" onclick="openChannelMembershipModal()" style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #10b981; padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(16,185,129,0.2);">
+              <span>⭐</span> <span id="channelHubJoinText">Join Channel</span>
+            </button>
             <button id="channelHubTipBtn" onclick="openChannelSuperTipModal()" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; border: none; padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(245,158,11,0.3);">
               <span>⚡</span> <span>Super-Tip SOV</span>
             </button>
@@ -21191,13 +21194,14 @@ function renderHtml(
           </div>
         </div>
 
-        <!-- 5 YouTube Navigation Tabs -->
+        <!-- 6 YouTube Standard Navigation Tabs -->
         <div class="channel-hub-tabs" style="display: flex; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem; overflow-x: auto; scrollbar-width: none;">
           <button type="button" class="chan-tab-btn active" id="chanTabHome" onclick="switchChannelHubTab('home')">Home</button>
           <button type="button" class="chan-tab-btn" id="chanTabVideos" onclick="switchChannelHubTab('videos')">Videos</button>
           <button type="button" class="chan-tab-btn" id="chanTabShorts" onclick="switchChannelHubTab('shorts')">Shorts</button>
           <button type="button" class="chan-tab-btn" id="chanTabLive" onclick="switchChannelHubTab('live')">Live</button>
           <button type="button" class="chan-tab-btn" id="chanTabCommunity" onclick="switchChannelHubTab('community')">Community</button>
+          <button type="button" class="chan-tab-btn" id="chanTabStore" onclick="switchChannelHubTab('store')">🛍️ Store</button>
           <button type="button" class="chan-tab-btn" id="chanTabAbout" onclick="switchChannelHubTab('about')">About</button>
         </div>
 
@@ -21228,6 +21232,16 @@ function renderHtml(
         <div id="chanPanelCommunity" class="chan-tab-panel" style="display: none;">
           <div id="chanCommunityComposer" style="margin-bottom: 1.5rem;"></div>
           <div id="chanCommunityFeed"></div>
+        </div>
+
+        <div id="chanPanelStore" class="chan-tab-panel" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div>
+              <h3 style="font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0 0 4px 0;">Sovereign Creator Store</h3>
+              <p style="font-size: 0.8rem; color: #94a3b8; margin: 0;">Decentralized digital goods, source assets &amp; Pay-Per-View video access.</p>
+            </div>
+          </div>
+          <div id="chanStoreContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;"></div>
         </div>
 
         <div id="chanPanelAbout" class="chan-tab-panel" style="display: none;">
@@ -22675,12 +22689,13 @@ function renderHtml(
                   </div>
                 </div>
 
-                <!-- 4-Pillar Subtab Navigation -->
-                <div style="display: flex; gap: 8px; margin-bottom: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+                <!-- 5-Pillar Subtab Navigation -->
+                <div style="display: flex; gap: 8px; margin-bottom: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; overflow-x: auto;">
                   <button type="button" id="studioEarnSubtabBtnOverview" onclick="switchEarnSubtab('overview')" class="active" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Overview</button>
                   <button type="button" id="studioEarnSubtabBtnTiers" onclick="switchEarnSubtab('tiers')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Membership Tiers</button>
                   <button type="button" id="studioEarnSubtabBtnTips" onclick="switchEarnSubtab('tips')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Super Thanks &amp; Tips</button>
                   <button type="button" id="studioEarnSubtabBtnEligibility" onclick="switchEarnSubtab('eligibility')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Eligibility</button>
+                  <button type="button" id="studioEarnSubtabBtnLedger" onclick="switchEarnSubtab('ledger')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Financial Ledger &amp; CSV</button>
                 </div>
 
                 <!-- Subtab 1: Overview -->
@@ -22772,6 +22787,59 @@ function renderHtml(
                       <div style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;">Watch Hours Milestone</div>
                       <div style="font-size: 1.2rem; font-weight: 900; color: #fff;">✓ Reached (4,000 hrs required)</div>
                     </div>
+                  </div>
+                </div>
+
+                <!-- Subtab 5: Financial Ledger & CSV -->
+                <div id="studioEarnSubtabLedger" style="display: none;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                      <div style="font-size: 1rem; font-weight: 800; color: #fff;">Sovereign Financial Accounting Ledger</div>
+                      <div style="font-size: 0.78rem; color: #94a3b8;">Cryptographically auditable 95/5 payout records &amp; receipts</div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                      <button type="button" class="btn btn-secondary" onclick="loadStudioFinancialLedger()" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 999px;">🔄 Refresh</button>
+                      <button type="button" class="btn btn-primary" onclick="exportStudioFinancialsCsv()" style="padding: 6px 16px; font-size: 0.8rem; font-weight: 800; background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; border-radius: 999px;">📥 Download CSV</button>
+                    </div>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+                    <div class="studio-metric-card" style="padding: 0.85rem;">
+                      <div style="font-size: 0.72rem; color: #94a3b8;">Gross Volume</div>
+                      <div style="font-size: 1.3rem; font-weight: 800; color: #fff;" id="studioLedgerGross">0.00 SOV</div>
+                    </div>
+                    <div class="studio-metric-card" style="padding: 0.85rem;">
+                      <div style="font-size: 0.72rem; color: #94a3b8;">Platform Relay Fee (5%)</div>
+                      <div style="font-size: 1.3rem; font-weight: 800; color: #f59e0b;" id="studioLedgerFee">0.00 SOV</div>
+                    </div>
+                    <div class="studio-metric-card" style="padding: 0.85rem;">
+                      <div style="font-size: 0.72rem; color: #94a3b8;">Net Creator Payout (95%)</div>
+                      <div style="font-size: 1.3rem; font-weight: 800; color: #10b981;" id="studioLedgerNet">0.00 SOV</div>
+                    </div>
+                    <div class="studio-metric-card" style="padding: 0.85rem;">
+                      <div style="font-size: 0.72rem; color: #94a3b8;">Referral Rewards (2%)</div>
+                      <div style="font-size: 1.3rem; font-weight: 800; color: #ec4899;" id="studioLedgerReferrals">0.00 SOV</div>
+                    </div>
+                  </div>
+
+                  <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; overflow-x: auto;">
+                    <table class="studio-content-table" style="width: 100%; font-size: 0.78rem;">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Type</th>
+                          <th>Customer</th>
+                          <th>Description</th>
+                          <th>Gross</th>
+                          <th>5% Fee</th>
+                          <th>95% Net</th>
+                          <th>Receipt Hash</th>
+                        </tr>
+                      </thead>
+                      <tbody id="studioLedgerEntriesBody">
+                        <tr><td colspan="8" style="text-align: center; color: #64748b; padding: 1.5rem;">Loading financial ledger...</td></tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
@@ -23276,10 +23344,18 @@ function renderHtml(
 
           <!-- Live Chat & Tip Panel -->
           <div class="live-chat-panel">
-            <div class="live-chat-header">
-              <span style="font-weight: 800; font-size: 0.88rem; color: #f8fafc;">Live Stream Chat</span>
-              <span style="font-size: 0.72rem; color: #34d399; font-weight: 700;">● Active</span>
+            <div class="live-chat-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-weight: 800; font-size: 0.88rem; color: #f8fafc;">Live Stream Chat</span>
+                <span style="font-size: 0.72rem; color: #34d399; font-weight: 700; margin-left: 6px;">● Active</span>
+              </div>
+              <div id="liveStreamRevenueTicker" style="font-size: 0.75rem; font-weight: 800; color: #f59e0b; background: rgba(245,158,11,0.15); padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(245,158,11,0.3);">
+                ⚡ 0 SOV Earned
+              </div>
             </div>
+
+            <!-- YouTube Pinned Super-Chat Ticker Bar -->
+            <div id="liveSuperChatPinsTicker" style="display: flex; gap: 6px; overflow-x: auto; padding: 6px 10px; background: rgba(15,23,42,0.9); border-bottom: 1px solid rgba(255,255,255,0.08); scrollbar-width: none;"></div>
 
             <div class="live-chat-messages" id="liveChatMessagesList">
               <div class="live-chat-msg"><span class="chat-author" style="color: #38bdf8;">Aarav:</span> <span class="chat-text">The WebRTC latency here is unreal! 🚀</span></div>
@@ -23288,8 +23364,11 @@ function renderHtml(
               <div class="live-chat-msg"><span class="chat-author" style="color: #38bdf8;">Rohit (Host):</span> <span class="chat-text">Direct ICE NAT traversal whenever possible!</span></div>
             </div>
 
-            <!-- Gift Tipping Quick Bar -->
-            <div class="live-tipping-bar" style="display: flex; gap: 6px; padding: 8px 12px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.06);">
+            <!-- Gift Tipping & Super-Chat Bar -->
+            <div class="live-tipping-bar" style="display: flex; gap: 6px; padding: 8px 12px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.06); align-items: center; overflow-x: auto; scrollbar-width: none;">
+              <button type="button" class="live-gift-pill" onclick="openLiveSuperChatModal()" style="background: linear-gradient(135deg, #f59e0b, #ec4899); color: #fff; font-weight: 800; border: none; padding: 5px 12px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 8px rgba(245,158,11,0.4);">
+                <span>⚡</span> <span>Super-Chat</span>
+              </button>
               <button type="button" class="live-gift-pill" onclick="openLiveGiftModal('Heart', 5)" title="Send Heart (5 SOV)">❤️ 5</button>
               <button type="button" class="live-gift-pill" onclick="openLiveGiftModal('Coffee', 20)" title="Send Coffee (20 SOV)">☕ 20</button>
               <button type="button" class="live-gift-pill" onclick="openLiveGiftModal('Rocket', 100)" title="Send Rocket (100 SOV)">🚀 100</button>
@@ -26886,6 +26965,95 @@ function renderHtml(
         <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
           <button onclick="closeCreateChannelModal()" class="action-pill-btn action-pill-secondary" style="flex: 1; padding: 0.75rem; justify-content: center;">Cancel</button>
           <button onclick="submitCreateChannel()" class="action-pill-btn action-pill-primary" style="flex: 1; padding: 0.75rem; justify-content: center; font-size: 0.88rem;">Create Channel 🚀</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🪙 5.1 CHANNEL MEMBERSHIP TIERS MODAL -->
+  <div id="channelMembershipModal" class="omni-modal-overlay" style="display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); align-items: center; justify-content: center;">
+    <div class="omni-modal-card" style="max-width: 620px; width: 92%; background: #0f172a; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden;">
+      <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, rgba(16,185,129,0.1), transparent);">
+        <div style="font-weight: 800; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <span>⭐</span> <span id="membershipModalTitle">Join Channel Memberships</span>
+        </div>
+        <button onclick="closeChannelMembershipModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.5rem; max-height: 75vh; overflow-y: auto;">
+        <p style="font-size: 0.84rem; color: #94a3b8; margin: 0 0 1.25rem 0;">Support this creator directly with recurring monthly SOV memberships. Unlock loyalty badges, member-only posts, exclusive swarms, and 4K early access.</p>
+        <div id="membershipTiersList" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚡ 5.2 LIVE SUPER-CHAT & ANIMATED STICKER MODAL -->
+  <div id="liveSuperChatModal" class="omni-modal-overlay" style="display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); align-items: center; justify-content: center;">
+    <div class="omni-modal-card" style="max-width: 520px; width: 92%; background: #0f172a; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden;">
+      <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(236,72,153,0.15));">
+        <div style="font-weight: 800; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <span>⚡</span> <span>Send Live Super-Chat</span>
+        </div>
+        <button onclick="closeLiveSuperChatModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.5rem; max-height: 75vh; overflow-y: auto;">
+        <!-- Tier Selectors -->
+        <label style="font-size: 0.76rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Select Tier &amp; Pin Duration</label>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 16px;">
+          <button type="button" class="superchat-tier-btn active" id="scTierBronze" onclick="selectSuperChatTier('bronze', 10)" style="padding: 10px; border-radius: 12px; background: rgba(205, 127, 50, 0.2); border: 2px solid #cd7f32; color: #fff; font-weight: 800; font-size: 0.85rem; cursor: pointer; text-align: center;">
+            <div>🥉 10 SOV</div>
+            <div style="font-size: 0.68rem; color: #cbd5e1; margin-top: 2px;">2 mins pin</div>
+          </button>
+          <button type="button" class="superchat-tier-btn" id="scTierSilver" onclick="selectSuperChatTier('silver', 50)" style="padding: 10px; border-radius: 12px; background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 800; font-size: 0.85rem; cursor: pointer; text-align: center;">
+            <div>🥈 50 SOV</div>
+            <div style="font-size: 0.68rem; color: #cbd5e1; margin-top: 2px;">5 mins pin</div>
+          </button>
+          <button type="button" class="superchat-tier-btn" id="scTierGold" onclick="selectSuperChatTier('gold', 200)" style="padding: 10px; border-radius: 12px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 800; font-size: 0.85rem; cursor: pointer; text-align: center;">
+            <div>👑 200 SOV</div>
+            <div style="font-size: 0.68rem; color: #f59e0b; margin-top: 2px;">15m Rainbow</div>
+          </button>
+        </div>
+
+        <!-- 6 Sovereign Animated Reaction Stickers -->
+        <label style="font-size: 0.76rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Select Micro-Sticker</label>
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 8px 0 16px;">
+          <button type="button" class="sc-sticker-btn active" id="btnStickerRocket" data-sticker="rocket" onclick="selectScSticker('rocket')" style="background: rgba(56,189,248,0.2); border: 2px solid #38bdf8; border-radius: 10px; font-size: 1.4rem; padding: 6px; cursor: pointer;">🚀</button>
+          <button type="button" class="sc-sticker-btn" id="btnStickerDiamond" data-sticker="diamond" onclick="selectScSticker('diamond')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-size: 1.4rem; padding: 6px; cursor: pointer;">💎</button>
+          <button type="button" class="sc-sticker-btn" id="btnStickerCrown" data-sticker="crown" onclick="selectScSticker('crown')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-size: 1.4rem; padding: 6px; cursor: pointer;">👑</button>
+          <button type="button" class="sc-sticker-btn" data-sticker="fire" onclick="selectScSticker('fire')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-size: 1.4rem; padding: 6px; cursor: pointer;">🔥</button>
+          <button type="button" class="sc-sticker-btn" data-sticker="supernova" onclick="selectScSticker('supernova')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-size: 1.4rem; padding: 6px; cursor: pointer;">⚡</button>
+          <button type="button" class="sc-sticker-btn" data-sticker="shield" onclick="selectScSticker('shield')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-size: 1.4rem; padding: 6px; cursor: pointer;">🛡️</button>
+        </div>
+
+        <label style="font-size: 0.76rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Pinned Message</label>
+        <textarea id="scMessageInput" rows="2" placeholder="Your highlighted message pinned at the top of stream chat..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px; color: #fff; margin-top: 6px; font-family: inherit; font-size: 0.88rem;"></textarea>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 1.25rem;">
+          <button type="button" onclick="closeLiveSuperChatModal()" class="btn btn-secondary" style="border-radius: 999px; padding: 8px 16px;">Cancel</button>
+          <button type="button" id="btnSubmitSuperChat" onclick="submitLiveSuperChat()" class="btn btn-primary" style="border-radius: 999px; padding: 8px 22px; font-weight: 800; background: linear-gradient(135deg, #f59e0b, #ec4899); color: #fff;">Send Super-Chat ⚡</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🛍️ 5.3 DIGITAL ASSET / PPV PURCHASE CHECKOUT MODAL -->
+  <div id="channelStorePurchaseModal" class="omni-modal-overlay" style="display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); align-items: center; justify-content: center;">
+    <div class="omni-modal-card" style="max-width: 480px; width: 92%; background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden;">
+      <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, rgba(56,189,248,0.15), transparent);">
+        <div style="font-weight: 800; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <span>🛍️</span> <span>Sovereign Instant Checkout</span>
+        </div>
+        <button onclick="closeChannelStorePurchaseModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="padding: 1.5rem;">
+        <div id="storeCheckoutProductTitle" style="font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 6px;">Asset Title</div>
+        <div id="storeCheckoutProductDesc" style="font-size: 0.84rem; color: #94a3b8; margin-bottom: 1rem;">Asset Description</div>
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.88rem; color: #cbd5e1;">Price (Instant P2P Settlement):</span>
+          <span id="storeCheckoutProductPrice" style="font-size: 1.4rem; font-weight: 900; color: #10b981;">15 SOV</span>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" onclick="closeChannelStorePurchaseModal()" class="btn btn-secondary" style="border-radius: 999px; padding: 8px 16px;">Cancel</button>
+          <button type="button" id="btnConfirmStorePurchase" onclick="confirmStorePurchase()" class="btn btn-primary" style="border-radius: 999px; padding: 8px 22px; font-weight: 800; background: linear-gradient(135deg, #10b981, #059669); color: #fff;">Confirm &amp; Unlock 🔓</button>
         </div>
       </div>
     </div>
@@ -56231,7 +56399,7 @@ function renderHtml(
     // 🎬 PHASE 10: SOVEREIGN CREATOR STUDIO PRO & MULTI-RESOLUTION TRANSCODER ENGINE
     // ========================================================
     function switchEarnSubtab(tab) {
-      const tabs = ['overview', 'tiers', 'tips', 'eligibility'];
+      const tabs = ['overview', 'tiers', 'tips', 'eligibility', 'ledger'];
       tabs.forEach(function(t) {
         const btn = document.getElementById('studioEarnSubtabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
         const pane = document.getElementById('studioEarnSubtab' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -56248,10 +56416,94 @@ function renderHtml(
         }
         if (pane) pane.style.display = (t === tab ? 'block' : 'none');
       });
+      if (tab === 'ledger') {
+        loadStudioFinancialLedger();
+      }
     }
     window.switchEarnSubtab = switchEarnSubtab;
 
+    function loadStudioFinancialLedger() {
+      const sel = document.getElementById('studioActiveChannelSelect');
+      const chanId = sel ? sel.value : '';
+      const q = chanId ? ('?channelId=' + encodeURIComponent(chanId)) : '';
+      fetch('/api/studio/financials' + q)
+        .then(r => r.json())
+        .then(data => {
+          if (!data || !data.ok) return;
+          const s = data.summary || {};
+          const elGross = document.getElementById('studioLedgerGross');
+          const elFee = document.getElementById('studioLedgerFee');
+          const elNet = document.getElementById('studioLedgerNet');
+          const elRef = document.getElementById('studioLedgerReferrals');
+          if (elGross) elGross.textContent = (s.totalGrossSov || 0).toFixed(2) + ' SOV';
+          if (elFee) elFee.textContent = (s.totalFeeSov || 0).toFixed(2) + ' SOV';
+          if (elNet) elNet.textContent = (s.totalNetSov || 0).toFixed(2) + ' SOV';
+          if (elRef) elRef.textContent = (s.referralRewardsGiven || 0).toFixed(2) + ' SOV';
+
+          const tbody = document.getElementById('studioLedgerEntriesBody');
+          if (tbody) {
+            const entries = data.entries || [];
+            if (entries.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #64748b; padding: 1.5rem;">No monetization transactions recorded yet.</td></tr>';
+            } else {
+              tbody.innerHTML = entries.map(function(e) {
+                return '<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">' +
+                  '<td style="padding: 8px 10px; color: #94a3b8;">' + new Date(e.timestamp).toLocaleDateString() + '</td>' +
+                  '<td style="padding: 8px 10px;"><span style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.72rem;">' + (e.itemType || '') + '</span></td>' +
+                  '<td style="padding: 8px 10px; color: #cbd5e1; font-weight: 600;">' + (e.customerHandle || '@peer') + '</td>' +
+                  '<td style="padding: 8px 10px; color: #e2e8f0;">' + (e.description || '') + '</td>' +
+                  '<td style="padding: 8px 10px; font-weight: 700; color: #fff;">' + (Number(e.grossAmountSov) || 0).toFixed(2) + '</td>' +
+                  '<td style="padding: 8px 10px; color: #f59e0b;">' + (Number(e.platformFeeSov) || 0).toFixed(2) + '</td>' +
+                  '<td style="padding: 8px 10px; font-weight: 700; color: #10b981;">' + (Number(e.netCreatorSov) || 0).toFixed(2) + '</td>' +
+                  '<td style="padding: 8px 10px; font-family: monospace; font-size: 0.7rem; color: #64748b;">' + (e.receiptHash || '').slice(0, 10) + '...</td>' +
+                '</tr>';
+              }).join('');
+            }
+          }
+        })
+        .catch(err => console.warn('Failed to load financials:', err));
+    }
+    window.loadStudioFinancialLedger = loadStudioFinancialLedger;
+
+    function exportStudioFinancialsCsv() {
+      const sel = document.getElementById('studioActiveChannelSelect');
+      const chanId = sel ? sel.value : '';
+      const q = chanId ? ('?channelId=' + encodeURIComponent(chanId) + '&format=csv') : '?format=csv';
+      window.open('/api/studio/financials' + q, '_blank');
+    }
+    window.exportStudioFinancialsCsv = exportStudioFinancialsCsv;
+
     function openTierModal() {
+      const sel = document.getElementById('studioActiveChannelSelect');
+      const chanId = sel ? sel.value : 'ch-alpha';
+      fetch('/api/membership/tiers?channelId=' + encodeURIComponent(chanId))
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.ok && Array.isArray(data.tiers)) {
+            const t1 = data.tiers.find(t => t.level === 1);
+            const t2 = data.tiers.find(t => t.level === 2);
+            const t3 = data.tiers.find(t => t.level === 3);
+            if (t1) {
+              const elN = document.getElementById('tier1NameInput');
+              const elP = document.getElementById('tier1PriceInput');
+              if (elN) elN.value = t1.name;
+              if (elP) elP.value = t1.priceSov;
+            }
+            if (t2) {
+              const elN = document.getElementById('tier2NameInput');
+              const elP = document.getElementById('tier2PriceInput');
+              if (elN) elN.value = t2.name;
+              if (elP) elP.value = t2.priceSov;
+            }
+            if (t3) {
+              const elN = document.getElementById('tier3NameInput');
+              const elP = document.getElementById('tier3PriceInput');
+              if (elN) elN.value = t3.name;
+              if (elP) elP.value = t3.priceSov;
+            }
+          }
+        })
+        .catch(() => {});
       const m = document.getElementById('studioTierModal');
       if (m) m.style.display = 'flex';
     }
@@ -56264,10 +56516,343 @@ function renderHtml(
     window.closeTierModal = closeTierModal;
 
     function saveMembershipTiers() {
-      if (typeof showAccountToast === 'function') showAccountToast('✓ Membership tiers saved successfully!');
-      closeTierModal();
+      const sel = document.getElementById('studioActiveChannelSelect');
+      const chanId = sel ? sel.value : 'ch-alpha';
+      const el1N = document.getElementById('tier1NameInput');
+      const el1P = document.getElementById('tier1PriceInput');
+      const el2N = document.getElementById('tier2NameInput');
+      const el2P = document.getElementById('tier2PriceInput');
+      const el3N = document.getElementById('tier3NameInput');
+      const el3P = document.getElementById('tier3PriceInput');
+      const t1N = (el1N && el1N.value) || 'Supporter Pass';
+      const t1P = Number((el1P && el1P.value) || 5);
+      const t2N = (el2N && el2N.value) || 'VIP Pass';
+      const t2P = Number((el2P && el2P.value) || 20);
+      const t3N = (el3N && el3N.value) || 'Sovereign Council';
+      const t3P = Number((el3P && el3P.value) || 50);
+
+      const tiers = [
+        { id: 'tier_' + chanId + '_1', channelId: chanId, channelHandle: chanId, level: 1, name: t1N, priceSov: t1P, perks: ['Loyalty Badge', 'Member-only Posts'], badgeColor: '#10b981', badgeIcon: '🥉' },
+        { id: 'tier_' + chanId + '_2', channelId: chanId, channelHandle: chanId, level: 2, name: t2N, priceSov: t2P, perks: ['Tier 1 Perks', 'VIP Swarm Chat', '4K Early Access'], badgeColor: '#8b5cf6', badgeIcon: '🥈' },
+        { id: 'tier_' + chanId + '_3', channelId: chanId, channelHandle: chanId, level: 3, name: t3N, priceSov: t3P, perks: ['All VIP Perks', 'Council Governance', '1-on-1 Consultation'], badgeColor: '#f59e0b', badgeIcon: '👑' },
+      ];
+
+      fetch('/api/membership/tiers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: chanId, tiers })
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (d && d.ok) {
+          if (typeof showAccountToast === 'function') showAccountToast('✓ Membership tiers saved to Sovereign L1 ledger!');
+          closeTierModal();
+        } else {
+          alert('Failed to save tiers: ' + (d.error || 'Unknown error'));
+        }
+      })
+      .catch(e => alert('Error saving tiers: ' + e.message));
     }
     window.saveMembershipTiers = saveMembershipTiers;
+
+    // --- CHANNEL MEMBERSHIP MODAL CLIENT LOGIC ---
+    function openChannelMembershipModal() {
+      const data = window._currentChannelHubData;
+      if (!data || !data.channel) return;
+      const ch = data.channel;
+      const m = document.getElementById('channelMembershipModal');
+      const title = document.getElementById('membershipModalTitle');
+      const list = document.getElementById('membershipTiersList');
+      if (title) title.textContent = 'Join ' + (ch.name || ch.handle) + ' Memberships';
+      if (list) {
+        list.innerHTML = '<div style="color: #94a3b8; text-align: center; padding: 1rem;">Loading membership tiers...</div>';
+      }
+      if (m) m.style.display = 'flex';
+
+      fetch('/api/membership/tiers?channelId=' + encodeURIComponent(ch.id || ch.handle))
+        .then(r => r.json())
+        .then(res => {
+          if (!list) return;
+          const tiers = (res && res.tiers) ? res.tiers : [];
+          list.innerHTML = tiers.map(function(t) {
+            const color = t.badgeColor || '#38bdf8';
+            const icon = t.badgeIcon || '⭐';
+            const perks = (t.perks || []).join(' • ');
+            return '<div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">' +
+              '<div style="display: flex; align-items: center; gap: 12px;">' +
+                '<div style="width: 44px; height: 44px; border-radius: 12px; background: ' + color + '22; border: 1px solid ' + color + '; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">' +
+                  icon +
+                '</div>' +
+                '<div>' +
+                  '<div style="font-weight: 800; font-size: 1rem; color: #fff;">' + (t.name || '') + '</div>' +
+                  '<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">' + perks + '</div>' +
+                '</div>' +
+              '</div>' +
+              '<button onclick="subscribeToChannelTier(' + t.level + ', ' + t.priceSov + ')" style="background: ' + color + '; color: #000; border: none; padding: 8px 20px; border-radius: 999px; font-weight: 800; font-size: 0.88rem; cursor: pointer; box-shadow: 0 4px 14px ' + color + '40;">' +
+                'Join (' + t.priceSov + ' SOV/mo)' +
+              '</button>' +
+            '</div>';
+          }).join('');
+        })
+        .catch(err => {
+          if (list) list.innerHTML = '<div style="color: #ef4444; padding: 1rem;">Failed to load membership tiers: ' + err.message + '</div>';
+        });
+    }
+    window.openChannelMembershipModal = openChannelMembershipModal;
+
+    function closeChannelMembershipModal() {
+      const m = document.getElementById('channelMembershipModal');
+      if (m) m.style.display = 'none';
+    }
+    window.closeChannelMembershipModal = closeChannelMembershipModal;
+
+    function subscribeToChannelTier(tierLevel, priceSov) {
+      const data = window._currentChannelHubData;
+      if (!data || !data.channel) return;
+      const ch = data.channel;
+      fetch('/api/membership/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId: ch.id || ch.handle,
+          tierLevel: tierLevel
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.ok) {
+          closeChannelMembershipModal();
+          const joinBtn = document.getElementById('channelHubJoinText');
+          if (joinBtn) joinBtn.textContent = 'Joined (Tier ' + tierLevel + ') ⭐';
+          if (typeof showAccountToast === 'function') showAccountToast('🎉 Joined ' + ch.name + ' Tier ' + tierLevel + ' for ' + priceSov + ' SOV/mo!');
+        } else {
+          alert('Membership subscription failed: ' + (res.error || 'Unknown error'));
+        }
+      })
+      .catch(err => alert('Subscription error: ' + err.message));
+    }
+    window.subscribeToChannelTier = subscribeToChannelTier;
+
+    // --- LIVE SUPER-CHAT CLIENT LOGIC ---
+    let _activeScTier = 'bronze';
+    let _activeScAmount = 10;
+    let _activeScSticker = 'rocket';
+
+    function openLiveSuperChatModal() {
+      const m = document.getElementById('liveSuperChatModal');
+      if (m) m.style.display = 'flex';
+    }
+    window.openLiveSuperChatModal = openLiveSuperChatModal;
+
+    function closeLiveSuperChatModal() {
+      const m = document.getElementById('liveSuperChatModal');
+      if (m) m.style.display = 'none';
+    }
+    window.closeLiveSuperChatModal = closeLiveSuperChatModal;
+
+    function selectSuperChatTier(tier, amount) {
+      _activeScTier = tier;
+      _activeScAmount = amount;
+      ['scTierBronze', 'scTierSilver', 'scTierGold'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.style.border = '1px solid rgba(255,255,255,0.15)';
+      });
+      const activeBtn = document.getElementById('scTier' + tier.charAt(0).toUpperCase() + tier.slice(1));
+      if (activeBtn) {
+        activeBtn.style.border = tier === 'gold' ? '2px solid #f59e0b' : (tier === 'silver' ? '2px solid #94a3b8' : '2px solid #cd7f32');
+      }
+    }
+    window.selectSuperChatTier = selectSuperChatTier;
+
+    function selectScSticker(stickerId) {
+      _activeScSticker = stickerId;
+      document.querySelectorAll('.sc-sticker-btn').forEach(btn => {
+        const el = btn;
+        if (el.dataset.sticker === stickerId) {
+          el.style.border = '2px solid #38bdf8';
+          el.style.background = 'rgba(56,189,248,0.2)';
+        } else {
+          el.style.border = '1px solid rgba(255,255,255,0.1)';
+          el.style.background = 'rgba(255,255,255,0.05)';
+        }
+      });
+    }
+    window.selectScSticker = selectScSticker;
+
+    function submitLiveSuperChat() {
+      const inp = document.getElementById('scMessageInput');
+      const msg = inp ? inp.value.trim() : '';
+      if (!msg) {
+        alert('Please enter a message for your Super-Chat.');
+        return;
+      }
+
+      // Audio Chime synthesizer via Web Audio API
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.1);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.6);
+        }
+      } catch (_) {}
+
+      fetch('/api/live/super-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId: 'ch-alpha',
+          amountSov: _activeScAmount,
+          message: msg,
+          stickerId: _activeScSticker
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.ok) {
+          closeLiveSuperChatModal();
+          if (inp) inp.value = '';
+          if (typeof showAccountToast === 'function') showAccountToast('⚡ Pinned Super-Chat (' + _activeScAmount + ' SOV) broadcasted to swarm!');
+          refreshLiveSuperChatPins();
+        } else {
+          alert('Super-Chat failed: ' + (res.error || 'Unknown error'));
+        }
+      })
+      .catch(err => alert('Super-Chat error: ' + err.message));
+    }
+    window.submitLiveSuperChat = submitLiveSuperChat;
+
+    function refreshLiveSuperChatPins() {
+      fetch('/api/live/super-chat/pins?channelId=ch-alpha')
+        .then(r => r.json())
+        .then(res => {
+          const ticker = document.getElementById('liveSuperChatPinsTicker');
+          if (!ticker) return;
+          const pins = (res && res.pins) ? res.pins : [];
+          if (pins.length === 0) {
+            ticker.style.display = 'none';
+          } else {
+            ticker.style.display = 'flex';
+            ticker.innerHTML = pins.map(function(p) {
+              const borderStyle = p.tier === 'gold'
+                ? 'background: linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6); padding: 2px; border-radius: 12px;'
+                : (p.tier === 'silver' ? 'border: 2px solid #94a3b8; border-radius: 10px;' : 'border: 2px solid #cd7f32; border-radius: 10px;');
+              const sticker = p.stickerId === 'crown' ? '👑' : (p.stickerId === 'diamond' ? '💎' : '🚀');
+              return '<div style="' + borderStyle + ' flex-shrink: 0;">' +
+                '<div style="background: #0f172a; padding: 6px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">' +
+                  '<span style="font-size: 1.1rem;">' + sticker + '</span>' +
+                  '<div>' +
+                    '<div style="font-size: 0.74rem; font-weight: 800; color: #fff;">' + (p.senderHandle || '@supporter') + ' <span style="color: #f59e0b; margin-left: 4px;">' + p.amountSov + ' SOV</span></div>' +
+                    '<div style="font-size: 0.72rem; color: #cbd5e1;">' + (p.message || '') + '</div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>';
+            }).join('');
+          }
+        })
+        .catch(() => {});
+    }
+    window.refreshLiveSuperChatPins = refreshLiveSuperChatPins;
+
+    // --- CHANNEL STORE & DIGITAL ASSET CHECKOUT CLIENT LOGIC ---
+    var _activeCheckoutProduct = null;
+
+    function renderChannelStore(data) {
+      if (!data || !data.channel) return;
+      const ch = data.channel;
+      const container = document.getElementById('chanStoreContainer');
+      if (!container) return;
+      container.innerHTML = '<div style="color: #94a3b8; padding: 1.5rem;">Loading store products...</div>';
+
+      fetch('/api/store/products?channelId=' + encodeURIComponent(ch.id || ch.handle))
+        .then(r => r.json())
+        .then(res => {
+          const products = (res && res.products) ? res.products : [];
+          if (products.length === 0) {
+            container.innerHTML = '<div style="color: #64748b; padding: 2rem; text-align: center; grid-column: 1 / -1;">No products or Pay-Per-View video unlocks published yet.</div>';
+          } else {
+            container.innerHTML = products.map(function(p) {
+              const badge = (p.type === 'video_ppv' ? '🎥 Pay-Per-View' : '💾 Digital Asset');
+              return '<div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">' +
+                '<div>' +
+                  '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">' +
+                    '<span style="background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 0.72rem; font-weight: 800; padding: 3px 10px; border-radius: 20px;">' + badge + '</span>' +
+                    '<span style="font-size: 0.76rem; color: #94a3b8;">' + (p.salesCount || 0) + ' unlocked</span>' +
+                  '</div>' +
+                  '<div style="font-size: 1.05rem; font-weight: 800; color: #fff; margin-bottom: 6px;">' + (p.title || '') + '</div>' +
+                  '<div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin-bottom: 1rem;">' + (p.description || '') + '</div>' +
+                '</div>' +
+                '<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">' +
+                  '<div style="font-size: 1.25rem; font-weight: 900; color: #10b981;">' + p.priceSov + ' SOV</div>' +
+                  '<button data-prod-id="' + p.id + '" data-prod-price="' + p.priceSov + '" onclick="window._handleStoreBuyClick(this)" style="background: #0ea5e9; color: #fff; border: none; padding: 7px 16px; border-radius: 999px; font-weight: 800; font-size: 0.82rem; cursor: pointer;">' +
+                    '1-Click Buy 🛍️' +
+                  '</button>' +
+                '</div>' +
+              '</div>';
+            }).join('');
+          }
+        })
+        .catch(err => {
+          container.innerHTML = '<div style="color: #ef4444; padding: 1.5rem;">Failed to load store: ' + err.message + '</div>';
+        });
+    }
+    window.renderChannelStore = renderChannelStore;
+
+    window._handleStoreBuyClick = function(btn) {
+      if (!btn) return;
+      var id = btn.getAttribute('data-prod-id');
+      var price = btn.getAttribute('data-prod-price');
+      openChannelStorePurchaseModal(id, 'Store Item', price, 'Decentralized digital asset purchase');
+    };
+
+    function openChannelStorePurchaseModal(id, title, priceSov, desc) {
+      _activeCheckoutProduct = { id, title, priceSov, desc };
+      const m = document.getElementById('channelStorePurchaseModal');
+      const t = document.getElementById('storeCheckoutProductTitle');
+      const d = document.getElementById('storeCheckoutProductDesc');
+      const p = document.getElementById('storeCheckoutProductPrice');
+      if (t) t.textContent = title;
+      if (d) d.textContent = desc;
+      if (p) p.textContent = priceSov + ' SOV';
+      if (m) m.style.display = 'flex';
+    }
+    window.openChannelStorePurchaseModal = openChannelStorePurchaseModal;
+
+    function closeChannelStorePurchaseModal() {
+      const m = document.getElementById('channelStorePurchaseModal');
+      if (m) m.style.display = 'none';
+      _activeCheckoutProduct = null;
+    }
+    window.closeChannelStorePurchaseModal = closeChannelStorePurchaseModal;
+
+    function confirmStorePurchase() {
+      if (!_activeCheckoutProduct) return;
+      fetch('/api/store/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: _activeCheckoutProduct.id })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.ok) {
+          closeChannelStorePurchaseModal();
+          if (typeof showAccountToast === 'function') showAccountToast('🛍️ Purchase successful! Decryption key unlocked and saved to wallet.');
+        } else {
+          alert('Purchase failed: ' + (res.error || 'Unknown error'));
+        }
+      })
+      .catch(err => alert('Purchase error: ' + err.message));
+    }
+    window.confirmStorePurchase = confirmStorePurchase;
 
     window.SovraCreatorStudioEngine = {
       isTranscoding: false,
@@ -72895,7 +73480,7 @@ function renderHtml(
     }
 
     function switchChannelHubTab(tabName) {
-      const tabs = ['home', 'videos', 'shorts', 'live', 'community', 'about'];
+      const tabs = ['home', 'videos', 'shorts', 'live', 'community', 'store', 'about'];
       tabs.forEach(function(t) {
         const btn = document.getElementById('chanTab' + t.charAt(0).toUpperCase() + t.slice(1));
         const panel = document.getElementById('chanPanel' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -72907,6 +73492,9 @@ function renderHtml(
           panel.style.display = (t === tabName) ? 'block' : 'none';
         }
       });
+      if (tabName === 'store' && typeof renderChannelStore === 'function') {
+        renderChannelStore(window._currentChannelHubData);
+      }
     }
     window.switchChannelHubTab = switchChannelHubTab;
 

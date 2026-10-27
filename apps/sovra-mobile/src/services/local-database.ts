@@ -289,6 +289,11 @@ export interface LocalDatabaseSchema {
   stories: Record<string, CachedStory>;
   reactions: Record<string, CachedReaction[]>;
   live_streams: Record<string, CachedLiveStream>;
+  channel_memberships: Record<string, any>;
+  super_chat_pins: Record<string, any>;
+  store_products: Record<string, any>;
+  store_purchases: Record<string, any>;
+  financial_ledger: Record<string, any>;
   sync_state: ClientSyncState;
 }
 
@@ -450,7 +455,7 @@ export function resolveStorageDriver(customDriver?: IStorageDriver): IStorageDri
 export class LocalSchemaMigrator {
   public static migrate(raw: any): LocalDatabaseSchema {
     const defaultSchema: LocalDatabaseSchema = {
-      version: 8,
+      version: 9,
       users: {},
       profiles: {},
       posts: {},
@@ -471,6 +476,11 @@ export class LocalSchemaMigrator {
       stories: {},
       reactions: {},
       live_streams: {},
+      channel_memberships: {},
+      super_chat_pins: {},
+      store_products: {},
+      store_purchases: {},
+      financial_ledger: {},
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
@@ -506,24 +516,24 @@ export class LocalSchemaMigrator {
       stories: raw.stories || {},
       reactions: raw.reactions || {},
       live_streams: raw.live_streams || {},
+      channel_memberships: raw.channel_memberships || {},
+      super_chat_pins: raw.super_chat_pins || {},
+      store_products: raw.store_products || {},
+      store_purchases: raw.store_purchases || {},
+      financial_ledger: raw.financial_ledger || {},
       sync_state: {
         ...defaultSchema.sync_state,
         ...(raw.sync_state || {}),
       },
     };
 
-    if (currentVersion < 8) {
-      migrated.version = 8;
-      if (!migrated.wallet_ledger) migrated.wallet_ledger = {};
-      if (!migrated.guardians) migrated.guardians = {};
-      if (!migrated.bookmarks) migrated.bookmarks = {};
-      if (!migrated.follows) migrated.follows = {};
-      if (!migrated.stories) migrated.stories = {};
-      if (!migrated.reactions) migrated.reactions = {};
-      if (!migrated.live_streams) migrated.live_streams = {};
-      if (!migrated.custom_channels) migrated.custom_channels = {};
-      if (!migrated.groups) migrated.groups = {};
-      if (!migrated.saved_videos) migrated.saved_videos = {};
+    if (currentVersion < 9) {
+      migrated.version = 9;
+      if (!migrated.channel_memberships) migrated.channel_memberships = {};
+      if (!migrated.super_chat_pins) migrated.super_chat_pins = {};
+      if (!migrated.store_products) migrated.store_products = {};
+      if (!migrated.store_purchases) migrated.store_purchases = {};
+      if (!migrated.financial_ledger) migrated.financial_ledger = {};
     }
 
     return migrated;
@@ -561,6 +571,10 @@ export class SovraLocalDatabase {
 
   public getStorageDriver(): IStorageDriver {
     return this.driver;
+  }
+
+  public getSchema(): LocalDatabaseSchema {
+    return this.state;
   }
 
   public subscribeToOutbox(callback: (op: QueuedOperation) => void): () => void {
@@ -1412,6 +1426,69 @@ export class SovraLocalDatabase {
       localStorage.removeItem(STORAGE_KEY);
     }
     await this.persist();
+  }
+
+  // Commercialization & Monetization Methods
+  public async saveChannelMembership(membership: any): Promise<void> {
+    await this.init();
+    if (!this.state.channel_memberships) this.state.channel_memberships = {};
+    const key = membership.channelId || membership.id;
+    this.state.channel_memberships[key] = membership;
+    await this.persist();
+  }
+
+  public async getChannelMembership(channelId: string): Promise<any | null> {
+    await this.init();
+    return (this.state.channel_memberships && this.state.channel_memberships[channelId]) || null;
+  }
+
+  public async saveSuperChatPin(pin: any): Promise<void> {
+    await this.init();
+    if (!this.state.super_chat_pins) this.state.super_chat_pins = {};
+    this.state.super_chat_pins[pin.id] = pin;
+    await this.persist();
+  }
+
+  public async getActiveSuperChatPins(channelId: string): Promise<any[]> {
+    await this.init();
+    const all = Object.values(this.state.super_chat_pins || {});
+    return all.filter((p: any) => p.channelId === channelId && (!p.expiresAt || p.expiresAt > Date.now()));
+  }
+
+  public async getLivePins(channelId: string): Promise<any[]> {
+    return this.getActiveSuperChatPins(channelId);
+  }
+
+  public async saveStoreProduct(product: any): Promise<void> {
+    await this.init();
+    if (!this.state.store_products) this.state.store_products = {};
+    this.state.store_products[product.id] = product;
+    await this.persist();
+  }
+
+  public async getStoreProducts(channelId?: string): Promise<any[]> {
+    await this.init();
+    const all = Object.values(this.state.store_products || {});
+    if (!channelId) return all;
+    return all.filter((p: any) => p.channelId === channelId);
+  }
+
+  public async saveStorePurchase(purchase: any): Promise<void> {
+    await this.init();
+    if (!this.state.store_purchases) this.state.store_purchases = {};
+    this.state.store_purchases[purchase.id] = purchase;
+    await this.persist();
+  }
+
+  public async getStorePurchases(): Promise<any[]> {
+    await this.init();
+    return Object.values(this.state.store_purchases || {});
+  }
+
+  public async hasPurchasedProduct(productId: string, buyerDid?: string): Promise<boolean> {
+    await this.init();
+    const all = Object.values(this.state.store_purchases || {});
+    return all.some((p: any) => p.productId === productId && (!buyerDid || p.buyerDid === buyerDid));
   }
 }
 
