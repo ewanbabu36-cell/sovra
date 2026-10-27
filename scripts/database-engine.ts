@@ -1805,6 +1805,63 @@ export interface DatabaseSchema {
   offline_payment_vouchers?: OfflinePaymentVoucherRecord[];
   community_notes?: CommunityNoteRecord[];
   community_note_ratings?: CommunityNoteRatingRecord[];
+  zk_attestations?: ZkAttestationRecord[];
+  autonomous_agents?: AutonomousAgentRecord[];
+  depin_mesh_sessions?: DepinMeshSessionRecord[];
+  quadratic_escrows?: QuadraticEscrowRecord[];
+}
+
+export interface ZkAttestationRecord {
+  id: string;
+  subjectDid: string;
+  attestationType: 'HUMANITY_VERIFIED' | 'AGE_GTE_18' | 'BALANCE_GTE_THRESHOLD' | 'UNIQUE_DEVICE';
+  proofSnarkJson: string;
+  issuerDid: string;
+  nullifierHash: string;
+  expiresAt: number;
+  createdAt: number;
+}
+
+export interface AutonomousAgentRecord {
+  agentId: string;
+  ownerDid: string;
+  name: string;
+  role: 'FEED_CURATOR' | 'BOUNTY_HUNTER' | 'DEX_REBALANCER' | 'E2EE_AUTO_RESPONDER';
+  subWalletAddress: string;
+  dailyBudgetSov: number;
+  spentTodaySov: number;
+  capabilities: string[];
+  isActive: boolean;
+  lastExecutedAt: number;
+  logs?: Array<{ timestamp: number; action: string; result: any; spentSov: number }>;
+  createdAt: number;
+}
+
+export interface DepinMeshSessionRecord {
+  sessionId: string;
+  hotspotNodeDid: string;
+  clientPeerDid: string;
+  bytesRelayed: number;
+  ratePerMbSov: number;
+  totalEarnedSov: number;
+  status: 'ACTIVE' | 'SETTLED' | 'CLOSED';
+  startedAt: number;
+  updatedAt: number;
+}
+
+export interface QuadraticEscrowRecord {
+  campaignId: string;
+  creatorDid: string;
+  title: string;
+  goalAmountSov: number;
+  pledgedAmountSov: number;
+  quadraticMatchSov: number;
+  contributorsCount: number;
+  milestones: Array<{ title: string; targetAmountSov: number; isReleased: boolean }>;
+  pledges?: Array<{ backerDid: string; amountSov: number; timestamp: number }>;
+  status: 'ACTIVE' | 'FUNDED' | 'RELEASED' | 'REFUNDED';
+  deadline: number;
+  createdAt: number;
 }
 
 export interface MiniDAppRecord {
@@ -2185,6 +2242,10 @@ export class SovraDatabaseEngine {
       offline_payment_vouchers: [],
       community_notes: [],
       community_note_ratings: [],
+      zk_attestations: [],
+      autonomous_agents: [],
+      depin_mesh_sessions: [],
+      quadratic_escrows: [],
     };
   }
 
@@ -2369,6 +2430,10 @@ export class SovraDatabaseEngine {
           offline_payment_vouchers: Array.isArray(parsed.offline_payment_vouchers) ? parsed.offline_payment_vouchers : [],
           community_notes: Array.isArray(parsed.community_notes) ? parsed.community_notes : [],
           community_note_ratings: Array.isArray(parsed.community_note_ratings) ? parsed.community_note_ratings : [],
+          zk_attestations: Array.isArray(parsed.zk_attestations) ? parsed.zk_attestations : [],
+          autonomous_agents: Array.isArray(parsed.autonomous_agents) ? parsed.autonomous_agents : [],
+          depin_mesh_sessions: Array.isArray(parsed.depin_mesh_sessions) ? parsed.depin_mesh_sessions : [],
+          quadratic_escrows: Array.isArray(parsed.quadratic_escrows) ? parsed.quadratic_escrows : [],
         };
       } else {
         this.save();
@@ -2412,6 +2477,10 @@ export class SovraDatabaseEngine {
     if (!Array.isArray(this.db.offline_payment_vouchers)) this.db.offline_payment_vouchers = [];
     if (!Array.isArray(this.db.community_notes)) this.db.community_notes = [];
     if (!Array.isArray(this.db.community_note_ratings)) this.db.community_note_ratings = [];
+    if (!Array.isArray(this.db.zk_attestations)) this.db.zk_attestations = [];
+    if (!Array.isArray(this.db.autonomous_agents)) this.db.autonomous_agents = [];
+    if (!Array.isArray(this.db.depin_mesh_sessions)) this.db.depin_mesh_sessions = [];
+    if (!Array.isArray(this.db.quadratic_escrows)) this.db.quadratic_escrows = [];
 
     if (!Object.prototype.hasOwnProperty.call(this.db, 'liveSuperChatPins')) {
       Object.defineProperty(this.db, 'liveSuperChatPins', {
@@ -16340,6 +16409,324 @@ export class SovraDatabaseEngine {
   public getCommunityNotesForPost(postId: string): CommunityNoteRecord[] {
     this.load();
     return (this.db.community_notes || []).filter(n => n.postId === postId);
+  }
+
+  // ==========================================
+  // APEX-PREDATOR 1: ZK PROOF-OF-HUMANITY
+  // ==========================================
+
+  public registerZkAttestation(attestation: ZkAttestationRecord): { ok: boolean; attestation?: ZkAttestationRecord; error?: string } {
+    this.load();
+    if (!this.db.zk_attestations) this.db.zk_attestations = [];
+
+    // Verify nullifier uniqueness (Sybil defense)
+    const existing = this.db.zk_attestations.find(a => a.nullifierHash === attestation.nullifierHash);
+    if (existing) {
+      return { ok: false, error: 'Nullifier hash already used; duplicate proof-of-humanity attestation rejected' };
+    }
+
+    this.db.zk_attestations.unshift(attestation);
+    this.save();
+    return { ok: true, attestation };
+  }
+
+  public getZkAttestationByNullifier(nullifier: string): ZkAttestationRecord | undefined {
+    this.load();
+    return (this.db.zk_attestations || []).find(a => a.nullifierHash === nullifier);
+  }
+
+  public getZkAttestationsForDid(did: string): ZkAttestationRecord[] {
+    this.load();
+    return (this.db.zk_attestations || []).filter(a => a.subjectDid === did);
+  }
+
+  public isVerifiedHuman(did: string): boolean {
+    this.load();
+    const list = this.getZkAttestationsForDid(did);
+    return list.some(a => (a.attestationType === 'HUMANITY_VERIFIED' || a.attestationType === 'proof_of_humanity') && a.expiresAt > Date.now());
+  }
+
+  // ==========================================
+  // APEX-PREDATOR 2: AUTONOMOUS ON-NODE AGENTS
+  // ==========================================
+
+  public deployAutonomousAgent(agent: AutonomousAgentRecord): { ok: boolean; agent?: AutonomousAgentRecord; error?: string } {
+    this.load();
+    if (!this.db.autonomous_agents) this.db.autonomous_agents = [];
+    if (!agent.agentId || !agent.ownerDid || !agent.name) {
+      return { ok: false, error: 'agentId, ownerDid, and name are required' };
+    }
+
+    const existingIdx = this.db.autonomous_agents.findIndex(a => a.agentId === agent.agentId);
+    if (existingIdx >= 0) {
+      this.db.autonomous_agents[existingIdx] = { ...this.db.autonomous_agents[existingIdx], ...agent };
+    } else {
+      this.db.autonomous_agents.unshift(agent);
+    }
+    this.save();
+    return { ok: true, agent };
+  }
+
+  public getAutonomousAgents(ownerDid?: string): AutonomousAgentRecord[] {
+    this.load();
+    const all = this.db.autonomous_agents || [];
+    if (!ownerDid) return all;
+    return all.filter(a => a.ownerDid === ownerDid);
+  }
+
+  public getAutonomousAgentById(agentId: string): AutonomousAgentRecord | undefined {
+    this.load();
+    return (this.db.autonomous_agents || []).find(a => a.agentId === agentId);
+  }
+
+  public recordAgentExecution(agentId: string, spentSov: number, action: string, result: any): { ok: boolean; error?: string } {
+    this.load();
+    const agent = this.getAutonomousAgentById(agentId);
+    if (!agent) {
+      return { ok: false, error: 'Agent not found' };
+    }
+
+    if ((agent.spentTodaySov + spentSov) > agent.dailyBudgetSov) {
+      return { ok: false, error: `Daily budget exceeded (${agent.spentTodaySov}/${agent.dailyBudgetSov} SOV)` };
+    }
+
+    agent.spentTodaySov = Math.round((agent.spentTodaySov + spentSov) * 1000) / 1000;
+    agent.lastExecutedAt = Date.now();
+    if (!agent.logs) agent.logs = [];
+    agent.logs.unshift({
+      timestamp: Date.now(),
+      action,
+      spentSov,
+      result,
+    });
+    this.save();
+    return { ok: true };
+  }
+
+  // ==========================================
+  // APEX-PREDATOR 4: DEPIN MESH SESSIONS
+  // ==========================================
+
+  public startDepinSession(params: { hotspotNodeDid: string; clientPeerDid: string; ratePerMbSov?: number }): {
+    ok: boolean;
+    session?: DepinMeshSessionRecord;
+    error?: string;
+  } {
+    this.load();
+    if (!this.db.depin_mesh_sessions) this.db.depin_mesh_sessions = [];
+
+    const sessionId = `depin_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    const session: DepinMeshSessionRecord = {
+      sessionId,
+      hotspotNodeDid: params.hotspotNodeDid,
+      clientPeerDid: params.clientPeerDid,
+      bytesRelayed: 0,
+      ratePerMbSov: params.ratePerMbSov || 0.001,
+      totalEarnedSov: 0.0,
+      status: 'ACTIVE',
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    this.db.depin_mesh_sessions.unshift(session);
+    this.save();
+    return { ok: true, session };
+  }
+
+  public meterDepinSession(sessionId: string, bytesRelayed: number): {
+    ok: boolean;
+    session?: DepinMeshSessionRecord;
+    microEarnedSov?: number;
+    error?: string;
+  } {
+    this.load();
+    const session = (this.db.depin_mesh_sessions || []).find(s => s.sessionId === sessionId);
+    if (!session) {
+      return { ok: false, error: 'DePIN session not found' };
+    }
+
+    session.bytesRelayed += bytesRelayed;
+    const mbRelayed = bytesRelayed / (1024 * 1024);
+    const microEarned = Math.round(mbRelayed * session.ratePerMbSov * 10000) / 10000;
+    session.totalEarnedSov = Math.round((session.totalEarnedSov + microEarned) * 10000) / 10000;
+    session.updatedAt = Date.now();
+
+    // Credit hotspot node operator
+    const host = this.getUserByDid(session.hotspotNodeDid);
+    if (host) {
+      host.balance_sov = Math.round(((host.balance_sov || 0) + microEarned) * 10000) / 10000;
+    }
+
+    this.save();
+    return { ok: true, session, microEarnedSov: microEarned };
+  }
+
+  public getDepinSessions(hotspotDid?: string): DepinMeshSessionRecord[] {
+    this.load();
+    const all = this.db.depin_mesh_sessions || [];
+    if (!hotspotDid) return all;
+    return all.filter(s => s.hotspotNodeDid === hotspotDid);
+  }
+
+  // ==========================================
+  // APEX-PREDATOR 5: QUADRATIC FUNDING ESCROWS
+  // ==========================================
+
+  public createQuadraticEscrow(params: {
+    campaignId?: string;
+    creatorDid: string;
+    title: string;
+    goalAmountSov: number;
+    milestones: Array<{ title: string; targetAmountSov: number }>;
+    durationDays?: number;
+  }): { ok: boolean; campaign?: QuadraticEscrowRecord; error?: string } {
+    this.load();
+    if (!this.db.quadratic_escrows) this.db.quadratic_escrows = [];
+
+    const campaignId = params.campaignId || `qf_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    const deadline = Date.now() + (params.durationDays || 30) * 86400 * 1000;
+
+    const campaign: QuadraticEscrowRecord = {
+      campaignId,
+      creatorDid: params.creatorDid,
+      title: params.title,
+      goalAmountSov: params.goalAmountSov,
+      pledgedAmountSov: 0.0,
+      quadraticMatchSov: 0.0,
+      contributorsCount: 0,
+      milestones: (params.milestones || []).map(m => ({ ...m, isReleased: false })),
+      pledges: [],
+      status: 'ACTIVE',
+      deadline,
+      createdAt: Date.now(),
+    };
+
+    this.db.quadratic_escrows.unshift(campaign);
+    this.save();
+    return { ok: true, campaign };
+  }
+
+  public pledgeQuadraticEscrow(campaignId: string, backerDid: string, amountSov: number): {
+    ok: boolean;
+    campaign?: QuadraticEscrowRecord;
+    error?: string;
+  } {
+    this.load();
+    const campaign = (this.db.quadratic_escrows || []).find(c => c.campaignId === campaignId);
+    if (!campaign || campaign.status !== 'ACTIVE') {
+      return { ok: false, error: 'Active quadratic campaign not found' };
+    }
+
+    const backer = this.getUserByDid(backerDid);
+    if (backer) {
+      if ((backer.balance_sov || 0) < amountSov) {
+        return { ok: false, error: 'Insufficient SOV balance to pledge' };
+      }
+      // Lock funds from backer into quadratic escrow
+      backer.balance_sov = Math.round(((backer.balance_sov || 0) - amountSov) * 1000) / 1000;
+    }
+
+    if (!campaign.pledges) campaign.pledges = [];
+    campaign.pledges.push({
+      backerDid,
+      amountSov,
+      timestamp: Date.now(),
+    });
+    campaign.pledgedAmountSov = Math.round((campaign.pledgedAmountSov + amountSov) * 1000) / 1000;
+
+    // Recalculate unique contributors and quadratic match formula: (Sum of sqrt(c_i))^2 - sum(c_i)
+    const uniqueBackers = new Set(campaign.pledges.map(p => p.backerDid));
+    campaign.contributorsCount = uniqueBackers.size;
+
+    let sumSqrt = 0;
+    campaign.pledges.forEach(p => {
+      sumSqrt += Math.sqrt(p.amountSov);
+    });
+    const totalQuadraticValue = Math.pow(sumSqrt, 2);
+    // Quadratic matching pool subsidy
+    campaign.quadraticMatchSov = Math.round(Math.max(0, totalQuadraticValue - campaign.pledgedAmountSov) * 100) / 100;
+
+    if (campaign.pledgedAmountSov >= campaign.goalAmountSov) {
+      campaign.status = 'FUNDED';
+    }
+
+    this.save();
+    return { ok: true, campaign };
+  }
+
+  public releaseQuadraticMilestone(campaignId: string, milestoneIndex: number): {
+    ok: boolean;
+    amountReleased?: number;
+    campaign?: QuadraticEscrowRecord;
+    error?: string;
+  } {
+    this.load();
+    const campaign = (this.db.quadratic_escrows || []).find(c => c.campaignId === campaignId);
+    if (!campaign) {
+      return { ok: false, error: 'Campaign not found' };
+    }
+
+    if (!campaign.milestones || !campaign.milestones[milestoneIndex]) {
+      return { ok: false, error: 'Invalid milestone index' };
+    }
+
+    const milestone = campaign.milestones[milestoneIndex];
+    if (milestone.isReleased) {
+      return { ok: false, error: 'Milestone already released' };
+    }
+
+    const releaseAmount = milestone.targetAmountSov;
+    milestone.isReleased = true;
+
+    // Credit creator
+    const creator = this.getUserByDid(campaign.creatorDid);
+    if (creator) {
+      creator.balance_sov = Math.round(((creator.balance_sov || 0) + releaseAmount) * 1000) / 1000;
+    }
+
+    const allReleased = campaign.milestones.every(m => m.isReleased);
+    if (allReleased) {
+      campaign.status = 'RELEASED';
+    }
+
+    this.save();
+    return { ok: true, amountReleased: releaseAmount, campaign };
+  }
+
+  public refundQuadraticEscrow(campaignId: string): {
+    ok: boolean;
+    refundsCount?: number;
+    totalRefundedSov?: number;
+    error?: string;
+  } {
+    this.load();
+    const campaign = (this.db.quadratic_escrows || []).find(c => c.campaignId === campaignId);
+    if (!campaign) {
+      return { ok: false, error: 'Campaign not found' };
+    }
+
+    let refundsCount = 0;
+    let totalRefundedSov = 0;
+
+    (campaign.pledges || []).forEach(p => {
+      const backer = this.getUserByDid(p.backerDid);
+      if (backer) {
+        backer.balance_sov = Math.round(((backer.balance_sov || 0) + p.amountSov) * 1000) / 1000;
+      }
+      refundsCount++;
+      totalRefundedSov += p.amountSov;
+    });
+
+    campaign.status = 'REFUNDED';
+    this.save();
+    return { ok: true, refundsCount, totalRefundedSov };
+  }
+
+  public getQuadraticEscrows(creatorDid?: string): QuadraticEscrowRecord[] {
+    this.load();
+    const all = this.db.quadratic_escrows || [];
+    if (!creatorDid) return all;
+    return all.filter(c => c.creatorDid === creatorDid);
   }
 
 }
