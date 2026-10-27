@@ -391,6 +391,66 @@ export class SqliteSocialDatabaseEngine {
         UNIQUE(note_id, rater_did)
       );
       CREATE INDEX IF NOT EXISTS idx_note_ratings_note ON community_note_ratings(note_id);
+
+      -- 19. ZK PROOF-OF-HUMANITY & ATTESTATIONS (APEX-PREDATOR)
+      CREATE TABLE IF NOT EXISTS zk_attestations (
+        id TEXT PRIMARY KEY,
+        subject_did TEXT NOT NULL,
+        attestation_type TEXT NOT NULL,
+        proof_snark_json TEXT NOT NULL,
+        issuer_did TEXT NOT NULL,
+        nullifier_hash TEXT UNIQUE NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_zk_attest_nullifier ON zk_attestations(nullifier_hash);
+      CREATE INDEX IF NOT EXISTS idx_zk_attest_subject ON zk_attestations(subject_did);
+
+      -- 20. SELF-SOVEREIGN AUTONOMOUS AI AGENTS (APEX-PREDATOR)
+      CREATE TABLE IF NOT EXISTS autonomous_agents (
+        agent_id TEXT PRIMARY KEY,
+        owner_did TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        sub_wallet_address TEXT NOT NULL,
+        daily_budget_sov REAL DEFAULT 5.0,
+        spent_today_sov REAL DEFAULT 0.0,
+        capabilities_json TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        last_executed_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_agents_owner ON autonomous_agents(owner_did);
+
+      -- 21. DEPIN MESH HOTSPOT SESSIONS (APEX-PREDATOR)
+      CREATE TABLE IF NOT EXISTS depin_mesh_sessions (
+        session_id TEXT PRIMARY KEY,
+        hotspot_node_did TEXT NOT NULL,
+        client_peer_did TEXT NOT NULL,
+        bytes_relayed INTEGER DEFAULT 0,
+        rate_per_mb_sov REAL DEFAULT 0.001,
+        total_earned_sov REAL DEFAULT 0.0,
+        status TEXT DEFAULT 'ACTIVE',
+        started_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_depin_hotspot ON depin_mesh_sessions(hotspot_node_did);
+
+      -- 22. PROGRAMMABLE QUADRATIC FUNDING ESCROWS (APEX-PREDATOR)
+      CREATE TABLE IF NOT EXISTS quadratic_escrows (
+        campaign_id TEXT PRIMARY KEY,
+        creator_did TEXT NOT NULL,
+        title TEXT NOT NULL,
+        goal_amount_sov REAL NOT NULL,
+        pledged_amount_sov REAL DEFAULT 0.0,
+        quadratic_match_sov REAL DEFAULT 0.0,
+        contributors_count INTEGER DEFAULT 0,
+        milestones_json TEXT NOT NULL,
+        status TEXT DEFAULT 'ACTIVE',
+        deadline INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_quadratic_creator ON quadratic_escrows(creator_did);
     `);
     try {
       this.db.exec('ALTER TABLE posts ADD COLUMN views_count INTEGER NOT NULL DEFAULT 0;');
