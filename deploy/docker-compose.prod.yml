@@ -1,0 +1,88 @@
+version: '3.8'
+
+# ============================================================
+#   SOVRA TURNKEY PRODUCTION VPS STACK
+#   Autonomous Sovereign Node + Caddy TLS Reverse Proxy + SQLite WAL
+# ============================================================
+
+services:
+  sovra-node:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    container_name: sovra-node-prod
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - SOVRA_STORAGE_DIR=/app/.sovra-storage-prod
+      - SOVRA_P2P_PORT=4001
+      - SOVRA_HTTP_PORT=3001
+      - SOVRA_HTTPS_PORT=3443
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY:-sovra-production-admin-secret-key-32chars!}
+      - SOVRA_TURN_SERVERS=${SOVRA_TURN_SERVERS:-stun:stun.l.google.com:19302}
+    volumes:
+      - sovra-data-wal:/app/.sovra-storage-prod
+    ports:
+      - "4001:4001" # Sovereign Noise_XX P2P Mesh
+      - "3001:3001" # Internal HTTP Microservices
+      - "3443:3443" # Mobile WebRTC Secure Calling
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4096M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3001/readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sovra-mesh-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  caddy-proxy:
+    image: caddy:2-alpine
+    container_name: sovra-proxy-tls
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SOVRA_DOMAIN=${SOVRA_DOMAIN:-localhost}
+    volumes:
+      - ../docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-tls-data:/data
+      - caddy-tls-config:/config
+    depends_on:
+      sovra-node:
+        condition: service_healthy
+    networks:
+      - sovra-mesh-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes:
+  sovra-data-wal:
+    name: sovra-data-wal
+    driver: local
+  caddy-tls-data:
+    name: caddy-tls-data
+  caddy-tls-config:
+    name: caddy-tls-config
+
+networks:
+  sovra-mesh-net:
+    name: sovra-mesh-net
+    driver: bridge
