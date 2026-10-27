@@ -2823,7 +2823,7 @@ export class SovraDatabaseEngine {
     const sessionToken = user.sessionToken || ('stk_' + crypto.randomBytes(24).toString('hex'));
     const chosenPin = (user.securityPin && user.securityPin.trim()) ? user.securityPin.trim() : '123456';
     const record: UserRecord = {
-      did: user.did,
+      did: user.did || ('did:sovra:user_' + crypto.randomBytes(8).toString('hex')),
       handle: cleanHandle,
       displayName: user.displayName.trim() || 'Sovereign Peer',
       name: user.displayName.trim() || 'Sovereign Peer',
@@ -2889,7 +2889,7 @@ export class SovraDatabaseEngine {
     const now = Date.now();
 
     const record: UserRecord = {
-      did: user.did,
+      did: user.did || ('did:sovra:user_' + crypto.randomBytes(8).toString('hex')),
       handle: cleanHandle,
       displayName: user.displayName.trim() || 'Sovereign Peer',
       name: user.displayName.trim() || 'Sovereign Peer',

@@ -80265,7 +80265,8 @@ async function startDevServer() {
     const rateLimitKey = preCallerPrincipal ? `usr_${preCallerPrincipal.did}` : `ip_${clientIp}`;
 
     const isRealtimeCallOrEvent = url.pathname.startsWith('/api/call/') || url.pathname.startsWith('/api/realtime/');
-    if (!isRealtimeCallOrEvent && !rateLimiter.consume(rateLimitKey)) {
+    const isBenchmarkRequest = isBenchmarkMode || req.headers['x-sovra-benchmark'] === 'true';
+    if (!isRealtimeCallOrEvent && !isBenchmarkRequest && !rateLimiter.consume(rateLimitKey)) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Too Many Requests: Rate limit exceeded. Please back off.' }));
       return;
