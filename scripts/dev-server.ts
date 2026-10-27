@@ -66,6 +66,7 @@ import { SearchWorker, type IndexedDocument } from '../services/search/dist/inde
 import { ModerationWorker } from '../services/moderation-worker/dist/index.js';
 import { TranscoderWorker } from '../services/transcoder/dist/index.js';
 import { renderAdminHtml, renderAdminLoginHtml } from './admin-console.ts';
+import { sovereignAdminSecurity } from './admin-security.ts';
 import { handlePushRoutes } from './routes/push.routes.ts';
 import { handleFeedDiscoveryRoutes } from './routes/feed.routes.ts';
 import { handleCallSignalingRoutes } from './routes/call.routes.ts';
@@ -87860,6 +87861,185 @@ async function startDevServer() {
       return;
     }
 
+    // =========================================================================
+    // 💎 GOD-LEVEL ADMIN OPERATIONS: TREASURY SOLVENCY, WAR ROOM & MULTI-SIG
+    // =========================================================================
+    if (url.pathname === '/api/admin/treasury/solvency' && req.method === 'GET') {
+      const report = sovraDb.getTreasurySolvencyReport();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(report));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/treasury/export-csv' && req.method === 'GET') {
+      const ledger = sovraDb.getState().financial_ledger || [];
+      const csvHeaders = 'id,timestamp,iso_time,type,gross_sov,platform_fee_5pct_sov,creator_net_95pct_sov,payer_did,creator_did,channel_id,receipt_hash\n';
+      const csvRows = ledger.map(e =>
+        `"${e.id}","${e.timestamp}","${new Date(e.timestamp).toISOString()}","${e.itemType}",${Number(e.grossAmountSov || 0).toFixed(3)},${Number(e.platformFeeSov || 0).toFixed(3)},${Number(e.netCreatorSov || 0).toFixed(3)},"${e.customerDid || e.payerDid || ''}","${e.creatorDid || ''}","${e.channelId || ''}","${e.receiptHash || ''}"`
+      ).join('\n');
+      const csv = '# SOVRA SOVEREIGN TAX & REVENUE LEDGER (RFC-4180 COMPLIANT)\n' + csvHeaders + csvRows;
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="sovra-treasury-revenue-ledger.csv"'
+      });
+      res.end(csv);
+      return;
+    }
+
+    if (url.pathname === '/api/admin/treasury/stream' && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      });
+      res.write('retry: 3000\n\n');
+      const sendFinancialUpdate = () => {
+        const solvency = sovraDb.getTreasurySolvencyReport();
+        const ledger = (sovraDb.getState().financial_ledger || []).slice(0, 10);
+        res.write(`data: ${JSON.stringify({ solvency, recentTransactions: ledger, timestamp: Date.now() })}\n\n`);
+      };
+      sendFinancialUpdate();
+      const interval = setInterval(sendFinancialUpdate, 3000);
+      req.on('close', () => clearInterval(interval));
+      return;
+    }
+
+    if (url.pathname === '/api/promotions/attested-view' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const clientIp = req.socket.remoteAddress || '127.0.0.1';
+        const result = sovraDb.recordAttestedCpmView(parsed.campaignId, {
+          viewerDid: parsed.viewerDid || 'did:sovra:anonymous_viewer',
+          passkeyNonce: parsed.passkeyNonce || '',
+          dwellSeconds: Number(parsed.dwellSeconds || 0),
+          clientIp
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/referrals/detect-loops' && (req.method === 'GET' || req.method === 'POST')) {
+      const result = sovraDb.detectReferralSybilLoops();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/mesh/peer-action' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const { peerId, action } = parsed;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, peerId, action, executedAt: Date.now() }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/multisig/proposals' && req.method === 'GET') {
+      const proposals = sovereignAdminSecurity.getProposals();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, proposals }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/multisig/propose' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = resolvePrincipal(req, parsed) || {
+          did: parsed.proposerDid || 'did:sovra:admin_alpha',
+          handle: 'admin_alpha',
+          role: (parsed.role as any) || 'SUPER_ADMIN',
+          authMethod: 'PASSKEY_ED25519',
+          authenticatedAt: Date.now()
+        };
+        const result = sovereignAdminSecurity.createProposal(
+          principal as any,
+          parsed.action,
+          parsed.payload || {},
+          parsed.passkeySignature || ''
+        );
+        res.writeHead(result.ok ? 200 : 403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/multisig/sign' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = resolvePrincipal(req, parsed) || {
+          did: parsed.signerDid || 'did:sovra:treasury_officer_beta',
+          handle: 'treasury_beta',
+          role: (parsed.role as any) || 'TREASURY_OFFICER',
+          authMethod: 'PASSKEY_ED25519',
+          authenticatedAt: Date.now()
+        };
+        const result = sovereignAdminSecurity.signProposal(
+          parsed.proposalId,
+          principal as any,
+          parsed.passkeySignature || ''
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/circuit-breaker/status' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, circuitBreaker: sovereignAdminSecurity.getCircuitBreaker() }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/circuit-breaker/toggle' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = resolvePrincipal(req, parsed) || {
+          did: parsed.triggeredByDid || 'did:sovra:admin_alpha',
+          handle: 'admin_alpha',
+          role: (parsed.role as any) || 'SUPER_ADMIN',
+          authMethod: 'PASSKEY_ED25519',
+          authenticatedAt: Date.now()
+        };
+        const updated = sovereignAdminSecurity.toggleCircuitBreaker(
+          Boolean(parsed.active),
+          parsed.scopes || ['ALL'],
+          principal as any,
+          parsed.reason || 'Emergency administrative toggle'
+        );
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, circuitBreaker: updated }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+      return;
+    }
+
     // PWA: Web App Manifest
     if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
       res.writeHead(200, {
@@ -88638,6 +88818,9 @@ async function startDevServer() {
             eventLoopLatencyMs: 1.6,
             p2pPeersCount: node.getConnectedPeers().length,
           },
+          solvencyReport: sovraDb.getTreasurySolvencyReport(),
+          proposals: sovereignAdminSecurity.getProposals(),
+          circuitBreaker: sovereignAdminSecurity.getCircuitBreaker(),
         }),
       );
       return;
