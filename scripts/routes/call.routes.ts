@@ -44,6 +44,7 @@ interface CallSseClient {
 
 const callSseClients = new Map<string, Set<CallSseClient>>();
 const callHeartbeatMap = new Map<string, { callerLastSeen: number; calleeLastSeen: number; lastChecked: number }>();
+export const callVadSpeakerMap = new Map<string, any>();
 
 export function broadcastCallSse(callId: string, eventName: string, data: any): void {
   const clients = callSseClients.get(callId);
@@ -871,5 +872,70 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
     return true;
   }
 
+  // 10. Voice Activity Detection (VAD) & Dominant Speaker Stream Prioritization
+  if (url.pathname === '/api/call/vad-priority' && (req.method === 'POST' || req.method === 'GET')) {
+    if (req.method === 'GET') {
+      const callId = url.searchParams.get('callId') || 'call_global';
+      const dominant = callVadSpeakerMap.get(callId) || null;
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(JSON.stringify({ ok: true, callId, dominantSpeaker: dominant }));
+      return true;
+    }
+
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const callId = parsed.callId || 'call_global';
+      const speakerDid = parsed.speakerDid || '';
+      const audioLevelDb = typeof parsed.audioLevelDb === 'number' ? parsed.audioLevelDb : -30;
+      const isSpeaking = Boolean(parsed.isSpeaking);
+      const bandwidthKbps = Number(parsed.bandwidthKbps) || 128;
+
+      if (!speakerDid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'speakerDid is required' }));
+        return true;
+      }
+
+      // Relay fallback recommended if bandwidth is constrained (< 64 Kbps)
+      const relayFallbackRecommended = bandwidthKbps < 64;
+      const streamPriority = (isSpeaking && audioLevelDb > -24) ? 'DOMINANT' : (isSpeaking ? 'ACTIVE' : 'IDLE');
+
+      const speakerInfo = {
+        callId,
+        dominantSpeakerDid: speakerDid,
+        audioLevelDb,
+        isSpeaking,
+        bandwidthKbps,
+        streamPriority,
+        relayFallbackRecommended,
+        updatedAt: Date.now(),
+      };
+
+      callVadSpeakerMap.set(callId, speakerInfo);
+      broadcastCallSse(callId, 'dominant_speaker', speakerInfo);
+
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(JSON.stringify({
+        ok: true,
+        ...speakerInfo,
+      }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      return true;
+    }
+  }
+
   return false;
 }
+
+export const handleCallRoutes = handleCallSignalingRoutes;
