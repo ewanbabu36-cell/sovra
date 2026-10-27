@@ -4,3 +4,4 @@ export * from './registry.js';
 export * from './primitives.js';
 export * from './pow.js';
 export * from './steganography.js';
+export * from './prf.js';
