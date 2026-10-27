@@ -3503,7 +3503,7 @@ export class SovraDatabaseEngine {
       authorAvatar: post.authorAvatar || 'S',
       authorAvatarBg: post.authorAvatarBg || '#6366f1',
       caption: post.caption || '',
-      tags: post.tags || '',
+      tags: Array.isArray(post.tags) ? post.tags.join(' ') : String(post.tags || ''),
       timestamp: now,
       likesCount: 0,
       likedByDids: [],

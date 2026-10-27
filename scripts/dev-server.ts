@@ -17733,7 +17733,7 @@ function renderHtml(
                     </div>
                     ${post.tags ? `
                     <div class="feed-post-tags" style="margin-top: 0.45rem;">
-                      ${post.tags.split(' ').filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
+                      ${(Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
                     </div>
                     ` : ''}
                   `;
@@ -17763,7 +17763,7 @@ function renderHtml(
                     </div>
                     ${post.tags ? `
                     <div class="feed-post-tags" style="margin-top: 0.45rem;">
-                      ${post.tags.split(' ').filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
+                      ${(Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
                     </div>
                     ` : ''}
                   `;
@@ -17785,7 +17785,7 @@ function renderHtml(
                     </div>
                     ${post.tags ? `
                     <div class="feed-post-tags" style="margin-top: 0.45rem;">
-                      ${post.tags.split(' ').filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
+                      ${(Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
                     </div>
                     ` : ''}
                   `;
@@ -17801,7 +17801,7 @@ function renderHtml(
                     </div>
                     ${post.tags ? `
                     <div class="feed-post-tags" style="margin-top: 0.45rem;">
-                      ${post.tags.split(' ').filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
+                      ${(Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
                     </div>
                     ` : ''}
                   `;
@@ -17813,7 +17813,7 @@ function renderHtml(
                     </div>
                     ${post.tags ? `
                     <div class="feed-post-tags">
-                      ${post.tags.split(' ').filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
+                      ${(Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(t => `<span class="trending-chip" data-tag="${t}" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">${t}</span>`).join(' ')}
                     </div>
                     ` : ''}
                   `;
@@ -46843,7 +46843,7 @@ function renderHtml(
       let tagsHtml = '';
       if (post.tags) {
         tagsHtml = '<div class="sovra-post-modal-tags">' +
-          post.tags.split(' ').filter(Boolean).map(function(t) {
+          (Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(function(t) {
             return '<span class="trending-chip" data-tag="' + escapePostModalText(t) + '" onclick="closePostDetailModal(); searchHashtag(this.dataset.tag)" style="font-size: 0.78rem; color: #38bdf8; cursor: pointer;">' + escapePostModalText(t) + '</span>';
           }).join(' ') +
         '</div>';
@@ -49865,7 +49865,7 @@ function renderHtml(
             '<div id="heart-pop-' + post.id + '"></div>' +
           '</div>' +
           (post.tags ? '<div class="feed-post-tags" style="margin-top: 0.45rem;">' +
-            post.tags.split(' ').filter(Boolean).map(function(t) {
+            (Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(function(t) {
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
             }).join(' ') + '</div>' : '');
       } else if (post.mediaImage) {
@@ -49882,7 +49882,7 @@ function renderHtml(
             '<div id="heart-pop-' + post.id + '"></div>' +
           '</div>' +
           (post.tags ? '<div class="feed-post-tags" style="margin-top: 0.45rem;">' +
-            post.tags.split(' ').filter(Boolean).map(function(t) {
+            (Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(function(t) {
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
             }).join(' ') + '</div>' : '');
       } else if (post.mediaVideo || post.videoUrl) {
@@ -49901,7 +49901,7 @@ function renderHtml(
             '<div id="heart-pop-' + post.id + '"></div>' +
           '</div>' +
           (post.tags ? '<div class="feed-post-tags" style="margin-top: 0.45rem;">' +
-            post.tags.split(' ').filter(Boolean).map(function(t) {
+            (Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(function(t) {
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
             }).join(' ') + '</div>' : '');
       } else if (post.postType === 'canvas') {
@@ -49913,7 +49913,7 @@ function renderHtml(
             '<div id="heart-pop-' + post.id + '"></div>' +
           '</div>' +
           (post.tags ? '<div class="feed-post-tags" style="margin-top: 0.45rem;">' +
-            post.tags.split(' ').filter(Boolean).map(function(t) {
+            (Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(function(t) {
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
             }).join(' ') + '</div>' : '');
       } else {
@@ -49935,7 +49935,7 @@ function renderHtml(
           '</div>' +
           smartSummaryPill +
           (post.tags ? '<div class="feed-post-tags">' +
-            post.tags.split(' ').filter(Boolean).map(function(t) {
+            (Array.isArray(post.tags) ? post.tags : String(post.tags || '').split(' ')).filter(Boolean).map(function(t) {
               return '<span class="trending-chip" data-tag="' + t + '" onclick="searchHashtag(this.dataset.tag)" style="font-size: 0.8rem; color: #38bdf8; cursor: pointer;">' + t + '</span>';
             }).join(' ') + '</div>' : '');
       }
