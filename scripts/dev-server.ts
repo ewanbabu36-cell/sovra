@@ -2276,6 +2276,228 @@ function renderHtml(
       color: #0284c7 !important;
       border: 1px solid rgba(2, 132, 199, 0.35) !important;
     }
+
+    /* =========================================================================
+       COMPLETE 100% HIGH-CONTRAST LIGHT MODE READABILITY MATRIX
+       ========================================================================= */
+    body.theme-normal {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .app-top-header {
+      background: #ffffff !important;
+      border-bottom: 1px solid #cbd5e1 !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+    }
+    body.theme-normal .header-search-bar {
+      background: #f1f5f9 !important;
+      border: 1px solid #cbd5e1 !important;
+    }
+    body.theme-normal .header-search-input {
+      color: #0f172a !important;
+    }
+    body.theme-normal .header-search-input::placeholder {
+      color: #64748b !important;
+    }
+    body.theme-normal .identity-horizon-pill {
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+    }
+    body.theme-normal .identity-pill-handle {
+      color: #0f172a !important;
+      font-weight: 800 !important;
+    }
+    body.theme-normal .identity-pill-chevron {
+      color: #475569 !important;
+    }
+    body.theme-normal .header-action-icon-btn {
+      color: #1e293b !important;
+      background: #f1f5f9 !important;
+      border: 1px solid #cbd5e1 !important;
+    }
+    body.theme-normal .header-action-icon-btn:hover {
+      background: #e2e8f0 !important;
+      color: #0284c7 !important;
+    }
+    body.theme-normal .header-nav-btn {
+      color: #475569 !important;
+    }
+    body.theme-normal .header-nav-btn:hover {
+      background: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .header-nav-btn.active {
+      color: #0284c7 !important;
+      border-bottom: 3px solid #0284c7 !important;
+    }
+
+    /* RIGHT RAIL 100% CONTRAST & LEGIBILITY */
+    body.theme-normal .app-right-rail {
+      background: #f8fafc !important;
+      border-left: 1px solid #e2e8f0 !important;
+    }
+    body.theme-normal .app-right-rail .card {
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .fb-contacts-card span,
+    body.theme-normal .fb-contact-name {
+      color: #0f172a !important;
+      font-weight: 700 !important;
+    }
+    body.theme-normal .fb-contact-row:hover {
+      background: #f1f5f9 !important;
+    }
+    body.theme-normal .app-right-rail .card [style*="color: #fff"],
+    body.theme-normal .app-right-rail .card [style*="color:#fff"],
+    body.theme-normal .app-right-rail .card [style*="color: #f8fafc"],
+    body.theme-normal .app-right-rail .card [style*="color:#f8fafc"],
+    body.theme-normal .app-right-rail .card [style*="color: #e4e6eb"],
+    body.theme-normal .app-right-rail .card [style*="color:#e4e6eb"] {
+      color: #0f172a !important;
+      font-weight: 700 !important;
+    }
+    body.theme-normal .app-right-rail .card [style*="color: #b0b3b8"],
+    body.theme-normal .app-right-rail .card [style*="color:#b0b3b8"],
+    body.theme-normal .app-right-rail .card [style*="color: #94a3b8"],
+    body.theme-normal .app-right-rail .card [style*="color:#94a3b8"],
+    body.theme-normal .app-right-rail .card [style*="color: #64748b"],
+    body.theme-normal .app-right-rail .card [style*="color:#64748b"] {
+      color: #475569 !important;
+      font-weight: 600 !important;
+    }
+    body.theme-normal .app-right-rail .card [style*="color: #e2e8f0"] {
+      color: #0f172a !important;
+      font-weight: 700 !important;
+    }
+    body.theme-normal .trending-chip {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+    body.theme-normal .suggestion-user-name {
+      color: #0f172a !important;
+      font-weight: 700 !important;
+    }
+    body.theme-normal .suggestion-user-handle {
+      color: #475569 !important;
+      font-weight: 500 !important;
+    }
+    body.theme-normal #railWalletSovBalance {
+      color: #0f172a !important;
+      font-weight: 900 !important;
+    }
+
+    /* ALGO FILTER PILLS */
+    body.theme-normal .algo-pill {
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      color: #334155 !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+      font-weight: 700 !important;
+    }
+    body.theme-normal .algo-pill:hover {
+      background: #f1f5f9 !important;
+      color: #0f172a !important;
+      border-color: #94a3b8 !important;
+    }
+    body.theme-normal .algo-pill.active {
+      background: rgba(2, 132, 199, 0.12) !important;
+      border-color: rgba(2, 132, 199, 0.45) !important;
+      color: #0284c7 !important;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2) !important;
+    }
+
+    /* COMPOSER & SMART AI POLISH */
+    body.theme-normal .feed-composer-card {
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal #dynamicPostCaption {
+      background: #f8fafc !important;
+      border: 1px solid #cbd5e1 !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal #dynamicPostCaption::placeholder {
+      color: #64748b !important;
+    }
+    body.theme-normal .smart-ai-polish-btn {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.12)) !important;
+      border: 1px solid rgba(147, 51, 234, 0.4) !important;
+      color: #7c3aed !important;
+      box-shadow: 0 1px 4px rgba(147, 51, 234, 0.12) !important;
+    }
+    body.theme-normal .smart-ai-polish-btn:hover {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2)) !important;
+      color: #6d28d9 !important;
+    }
+    body.theme-normal .composer-action-btn,
+    body.theme-normal .feed-action-btn,
+    body.theme-normal .post-action-btn,
+    body.theme-normal .insta-action-btn {
+      color: #475569 !important;
+      font-weight: 600 !important;
+    }
+    body.theme-normal .composer-action-btn:hover,
+    body.theme-normal .feed-action-btn:hover,
+    body.theme-normal .post-action-btn:hover,
+    body.theme-normal .insta-action-btn:hover {
+      background: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+
+    /* FEED POST CARDS */
+    body.theme-normal .insta-post-card,
+    body.theme-normal .post-card,
+    body.theme-normal .main-content .card {
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .insta-post-card .feed-post-text-body {
+      color: #0f172a !important;
+    }
+    body.theme-normal .insta-author-info span[style*="color: #fff"],
+    body.theme-normal .insta-author-info span[style*="color:#fff"] {
+      color: #0f172a !important;
+      font-weight: 700 !important;
+    }
+
+    /* DROPDOWNS & SHEETS */
+    body.theme-normal .fb-header-dropdown,
+    body.theme-normal .header-create-dropdown,
+    body.theme-normal #messengerDropdown,
+    body.theme-normal #notificationDropdown,
+    body.theme-normal #headerSearchDropdown,
+    body.theme-normal .omni-modal-card,
+    body.theme-normal .dev-main-drawer {
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12) !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .fb-header-dropdown [style*="color: #e4e6eb"],
+    body.theme-normal .fb-header-dropdown [style*="color: #fff"],
+    body.theme-normal .fb-header-dropdown [style*="color: #b0b3b8"],
+    body.theme-normal #messengerDropdown [style*="color: #e4e6eb"],
+    body.theme-normal #messengerDropdown [style*="color: #fff"],
+    body.theme-normal #notificationDropdown [style*="color: #e4e6eb"],
+    body.theme-normal #notificationDropdown [style*="color: #fff"] {
+      color: #0f172a !important;
+    }
+    body.theme-normal #messengerDropdownSearch {
+      background: #f1f5f9 !important;
+      border: 1px solid #cbd5e1 !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal #messengerDropdownSearch::placeholder {
+      color: #64748b !important;
+    }
     body.theme-normal .app-right-rail {
       background: #f0f2f5 !important;
       border-left: 1px solid #ced0d4 !important;
@@ -2557,13 +2779,49 @@ function renderHtml(
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
     body.theme-normal .sovra-hero-anchor-card {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #075985 100%) !important;
-      border: 1px solid rgba(56, 189, 248, 0.28) !important;
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
       border-radius: 20px !important;
-      backdrop-filter: blur(16px) !important;
-      -webkit-backdrop-filter: blur(16px) !important;
-      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 0 24px rgba(56, 189, 248, 0.12) !important;
-      color: #f8fafc !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .sovra-hero-anchor-card .hero-sov-balance-text {
+      color: #0f172a !important;
+      font-weight: 800 !important;
+    }
+    body.theme-normal .sovra-hero-anchor-card .hero-cache-progress-label {
+      color: #334155 !important;
+      font-weight: 700 !important;
+    }
+    body.theme-normal .sovra-hero-anchor-card .hero-cache-track {
+      background: #e2e8f0 !important;
+    }
+    body.theme-normal .sovra-hero-anchor-card .hero-cache-bar {
+      background: linear-gradient(90deg, #0284c7, #38bdf8) !important;
+    }
+    body.theme-normal .sovra-hero-anchor-card .hero-cache-prune-btn {
+      background: rgba(239, 68, 68, 0.1) !important;
+      color: #dc2626 !important;
+      border: 1px solid rgba(239, 68, 68, 0.25) !important;
+      font-weight: 700 !important;
+    }
+    body.theme-normal .sovra-hero-anchor-card .hero-launcher-pill {
+      background: #f8fafc !important;
+      border: 1px solid #cbd5e1 !important;
+      color: #0f172a !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+      font-weight: 700 !important;
+    }
+    body.theme-normal .sovra-hero-anchor-card .hero-launcher-pill:hover {
+      background: #f1f5f9 !important;
+      border-color: #94a3b8 !important;
+      color: #0284c7 !important;
+    }
+    body.theme-normal .hero-p2p-health-pill {
+      background: #ecfdf5 !important;
+      border: 1px solid #a7f3d0 !important;
+      color: #065f46 !important;
+      font-weight: 700 !important;
     }
     :root .sovra-hero-anchor-card {
       background: rgba(15, 23, 42, 0.75);
@@ -4640,19 +4898,30 @@ function renderHtml(
     }
 
     /* Responsive Navigation Breakpoints (Desktop, Laptop, Tablet, Mobile) */
+    @media (max-width: 1180px) {
+      .header-desktop-nav .header-nav-btn span:not(.hnav-icon) {
+        display: none !important;
+      }
+      .header-desktop-nav .header-nav-btn {
+        min-width: 44px !important;
+        max-width: 52px !important;
+        padding: 0 !important;
+      }
+      .header-desktop-nav {
+        max-width: 270px !important;
+        gap: 4px !important;
+      }
+      .header-search-wrap {
+        max-width: 180px !important;
+      }
+    }
     @media (max-width: 1080px) {
       .header-desktop-nav {
         gap: 2px;
-        max-width: 440px;
-      }
-      .header-nav-btn {
-        min-width: 68px;
-        padding: 0 6px;
-        font-size: 13px;
-        gap: 4px;
+        max-width: 250px;
       }
       .header-search-wrap {
-        max-width: 180px;
+        max-width: 170px;
       }
     }
 
@@ -8037,14 +8306,26 @@ function renderHtml(
     .header-search-bar:hover {
       background: #4e4f50 !important;
     }
+    .header-left-zone .header-search-wrap {
+      flex: 0 1 210px !important;
+      min-width: 0 !important;
+      max-width: 210px !important;
+      position: relative !important;
+    }
     .header-search-bar {
-      width: 220px !important;
-      transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.18s ease, box-shadow 0.18s ease !important;
+      width: 100% !important;
+      max-width: 210px !important;
+      box-sizing: border-box !important;
+      transition: background 0.18s ease, box-shadow 0.18s ease !important;
     }
     .header-search-bar:focus-within {
-      width: 280px !important;
       background: #3a3b3c !important;
       box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.6) !important;
+    }
+    .header-desktop-nav {
+      flex: 0 1 auto !important;
+      margin: 0 14px !important;
+      min-width: 0 !important;
     }
     .header-search-icon-lens {
       display: none !important;
@@ -73948,8 +74229,8 @@ function renderHtml(
           '<div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0;">' +
             avatarHtml +
             '<div style="min-width: 0;">' +
-              '<div style="font-weight: 700; color: #fff; font-size: 0.84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (p.displayName || p.name || 'Peer') + '</div>' +
-              '<div style="font-size: 0.72rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (p.handle || '@peer') + '</div>' +
+              '<div class="suggestion-user-name" style="font-size: 0.84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (p.displayName || p.name || 'Peer') + '</div>' +
+              '<div class="suggestion-user-handle" style="font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (p.handle || '@peer') + '</div>' +
             '</div>' +
           '</div>' +
           '<button class="action-pill-btn action-pill-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;" data-action="send-friend-request" data-did="' + p.did + '" data-name="' + (p.displayName || p.name || 'Peer').replace(/"/g, '&quot;') + '">+ Add</button>' +
