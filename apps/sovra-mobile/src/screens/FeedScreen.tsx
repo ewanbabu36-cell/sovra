@@ -32,6 +32,17 @@ import {
 } from '../services/api.js';
 import { localDb } from '../services/local-database.js';
 import { syncEngine } from '../services/sync-engine.js';
+import { SovereignHeroAnchorCard } from '../components/SovereignHeroAnchorCard.js';
+import {
+  IdentitySwitcherModal,
+  HeaderIdentitySwitcherPill,
+  DEFAULT_PERSONAS,
+  type SovereignPersona,
+} from '../components/IdentitySwitcherModal.js';
+import {
+  SovereignCheckoutModal,
+  type CheckoutItemPayload,
+} from '../components/SovereignCheckoutModal.js';
 
 export const INITIAL_STORIES: MobileStoryItem[] = [
   {
@@ -734,6 +745,12 @@ export function FeedScreen(): React.JSX.Element {
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set());
   const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
 
+  // Airtel UX & Horizon Switcher States
+  const [activePersona, setActivePersona] = useState<SovereignPersona>(DEFAULT_PERSONAS[0]);
+  const [isIdentitySwitcherOpen, setIsIdentitySwitcherOpen] = useState<boolean>(false);
+  const [checkoutItem, setCheckoutItem] = useState<CheckoutItemPayload | null>(null);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -1178,6 +1195,10 @@ export function FeedScreen(): React.JSX.Element {
           >
             P2P MESH
           </span>
+          <HeaderIdentitySwitcherPill
+            activePersona={activePersona}
+            onOpen={() => setIsIdentitySwitcherOpen(true)}
+          />
         </div>
 
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
@@ -1227,6 +1248,28 @@ export function FeedScreen(): React.JSX.Element {
           </button>
         </div>
       </header>
+
+      {/* Top Sovereign Node & Wallet Hero Anchor Card */}
+      <SovereignHeroAnchorCard
+        balance="450.50 SOV"
+        peerCount={7}
+        rttMs={12}
+        onSendSov={() => showToast('Opening P2P Transfer Drawer...')}
+        onScanQr={() => showToast('Activating Peer DID Camera Scanner...')}
+        onGoLive={() => showToast('Initializing Instant P2P Live Broadcast Swarm...')}
+        onOpenStore={() => {
+          setCheckoutItem({
+            id: 'prod_tee_01',
+            type: 'store',
+            title: 'Sovereign Node Cotton Hoodie',
+            priceSov: 45,
+            creatorDid: 'did:key:z6MkhaXgBZDvotDkL5257faiz48Z8x28z44SS42E',
+            creatorHandle: '@alice_p2p',
+            creatorName: 'Alice',
+          });
+          setIsCheckoutOpen(true);
+        }}
+      />
 
       {/* For You vs Trending Filter Tabs */}
       <div
@@ -2228,6 +2271,32 @@ export function FeedScreen(): React.JSX.Element {
         onSelectPost={(postId) => {
           setIsSearchOpen(false);
           openComments(postId);
+        }}
+      />
+
+      {/* Horizon Identity Switcher Sheet */}
+      <IdentitySwitcherModal
+        isOpen={isIdentitySwitcherOpen}
+        activePersonaId={activePersona.id}
+        onClose={() => setIsIdentitySwitcherOpen(false)}
+        onSelectPersona={(p) => {
+          setActivePersona(p);
+          showToast(`Switched active persona to ${p.name}`);
+        }}
+        onAddPersona={() => showToast('Opening Channel / DAO Page Creator...')}
+      />
+
+      {/* Sovereign Checkout Bottom Sheet */}
+      <SovereignCheckoutModal
+        isOpen={isCheckoutOpen}
+        item={checkoutItem}
+        userBalanceSov={450.5}
+        onClose={() => {
+          setIsCheckoutOpen(false);
+          setCheckoutItem(null);
+        }}
+        onSuccess={(receipt) => {
+          showToast(`✓ Payment settled: ${receipt.amount} SOV`);
         }}
       />
     </div>

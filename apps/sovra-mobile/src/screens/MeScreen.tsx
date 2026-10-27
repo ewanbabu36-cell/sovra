@@ -34,6 +34,17 @@ import {
   type SovereignValidator,
 } from '../services/api.js';
 import { localDb } from '../services/local-database.js';
+import { SovereignHeroAnchorCard } from '../components/SovereignHeroAnchorCard.js';
+import {
+  IdentitySwitcherModal,
+  HeaderIdentitySwitcherPill,
+  DEFAULT_PERSONAS,
+  type SovereignPersona,
+} from '../components/IdentitySwitcherModal.js';
+import {
+  SovereignCheckoutModal,
+  type CheckoutItemPayload,
+} from '../components/SovereignCheckoutModal.js';
 
 function getDynamicDeviceId(): string {
   if (typeof localStorage !== 'undefined') {
@@ -1498,6 +1509,8 @@ export function MeScreen(): React.JSX.Element {
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [savedPosts, setSavedPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [activePersona, setActivePersona] = useState<SovereignPersona>(DEFAULT_PERSONAS[0]);
+  const [isIdentitySwitcherOpen, setIsIdentitySwitcherOpen] = useState(false);
 
   const loadUserData = useCallback(async () => {
     setIsLoading(true);
@@ -1705,6 +1718,10 @@ export function MeScreen(): React.JSX.Element {
           <div style={{ fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>{profile.handle}</span>
             {isLoading && <span style={{ fontSize: 11, color: '#38bdf8' }}>● Syncing</span>}
+            <HeaderIdentitySwitcherPill
+              activePersona={activePersona}
+              onOpen={() => setIsIdentitySwitcherOpen(true)}
+            />
           </div>
           <div style={{ display: 'flex', gap: 16, fontSize: 18 }}>
             <span
@@ -1723,6 +1740,17 @@ export function MeScreen(): React.JSX.Element {
             </span>
           </div>
         </div>
+
+        {/* Top Sovereign Node & Wallet Hero Anchor Card */}
+        <SovereignHeroAnchorCard
+          balance={`${walletBalance} SOV`}
+          peerCount={7}
+          rttMs={12}
+          onSendSov={() => setIsWalletOpen(true)}
+          onScanQr={() => setIsSettingsOpen(true)}
+          onGoLive={() => {}}
+          onOpenStore={() => {}}
+        />
 
         {/* Avatar & Follower Stats */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -2085,6 +2113,17 @@ export function MeScreen(): React.JSX.Element {
         onClose={() => setIsWalletOpen(false)}
         userDid={profile?.did}
         onBalanceUpdated={(newBal) => setWalletBalance(newBal.toFixed(2))}
+      />
+
+      {/* Horizon Identity Switcher Sheet */}
+      <IdentitySwitcherModal
+        isOpen={isIdentitySwitcherOpen}
+        activePersonaId={activePersona.id}
+        onClose={() => setIsIdentitySwitcherOpen(false)}
+        onSelectPersona={(p) => {
+          setActivePersona(p);
+        }}
+        onAddPersona={() => setIsOnboardingOpen(true)}
       />
     </div>
   );
