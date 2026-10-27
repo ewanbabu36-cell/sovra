@@ -41,10 +41,7 @@ import {
   DEFAULT_PERSONAS,
   type SovereignPersona,
 } from '../components/IdentitySwitcherModal.js';
-import {
-  SovereignCheckoutModal,
-  type CheckoutItemPayload,
-} from '../components/SovereignCheckoutModal.js';
+
 
 function getDynamicDeviceId(): string {
   if (typeof localStorage !== 'undefined') {
@@ -1509,7 +1506,7 @@ export function MeScreen(): React.JSX.Element {
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [savedPosts, setSavedPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activePersona, setActivePersona] = useState<SovereignPersona>(DEFAULT_PERSONAS[0]);
+  const [activePersona, setActivePersona] = useState<SovereignPersona>(DEFAULT_PERSONAS[0]!);
   const [isIdentitySwitcherOpen, setIsIdentitySwitcherOpen] = useState(false);
 
   const loadUserData = useCallback(async () => {

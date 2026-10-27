@@ -746,7 +746,7 @@ export function FeedScreen(): React.JSX.Element {
   const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
 
   // Airtel UX & Horizon Switcher States
-  const [activePersona, setActivePersona] = useState<SovereignPersona>(DEFAULT_PERSONAS[0]);
+  const [activePersona, setActivePersona] = useState<SovereignPersona>(DEFAULT_PERSONAS[0]!);
   const [isIdentitySwitcherOpen, setIsIdentitySwitcherOpen] = useState<boolean>(false);
   const [checkoutItem, setCheckoutItem] = useState<CheckoutItemPayload | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);

@@ -12,7 +12,7 @@
  * 4. Fast Add Persona / Channel action.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { localDb } from '../services/local-database.js';
 
 export interface SovereignPersona {
@@ -297,12 +297,13 @@ export function IdentitySwitcherModal({
  * Header Identity Pill component to stick at top bar for opening Horizon Switcher
  */
 export function HeaderIdentitySwitcherPill({
-  activePersona = DEFAULT_PERSONAS[0],
+  activePersona = DEFAULT_PERSONAS[0]!,
   onOpen,
 }: {
   readonly activePersona?: SovereignPersona;
   readonly onOpen: () => void;
 }): React.JSX.Element {
+  const persona: SovereignPersona = (activePersona || DEFAULT_PERSONAS[0])!;
   return (
     <button
       id="headerIdentitySwitcherPill"
@@ -323,20 +324,20 @@ export function HeaderIdentitySwitcherPill({
         boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
       }}
     >
-      <span>{activePersona.avatar}</span>
+      <span>{persona.avatar}</span>
       <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {activePersona.handle}
+        {persona.handle}
       </span>
       <span
         style={{
           fontSize: '0.65rem',
-          backgroundColor: `${activePersona.badgeColor}33`,
-          color: activePersona.badgeColor,
+          backgroundColor: `${persona.badgeColor}33`,
+          color: persona.badgeColor,
           padding: '0.1rem 0.4rem',
           borderRadius: '9999px',
         }}
       >
-        {activePersona.role}
+        {persona.role}
       </span>
       <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>▾</span>
     </button>

@@ -17,10 +17,10 @@ android {
 
     signingConfigs {
         release {
-            storeFile file(System.getenv("SOVRA_KEYSTORE_FILE") ?: "sovra-release-key.jks")
-            storePassword(System.getenv("SOVRA_KEYSTORE_PASSWORD") ?: "sovraSecure2026!")
-            keyAlias(System.getenv("SOVRA_KEY_ALIAS") ?: "sovra-upload")
-            keyPassword(System.getenv("SOVRA_KEY_PASSWORD") ?: "sovraSecure2026!")
+            storeFile file(System.getenv("SOVRA_RELEASE_KEYSTORE_FILE") ?: System.getenv("SOVRA_KEYSTORE_FILE") ?: "sovra-release-key.jks")
+            storePassword(System.getenv("SOVRA_RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("SOVRA_KEYSTORE_PASSWORD") ?: "sovraSecure2026!")
+            keyAlias(System.getenv("SOVRA_RELEASE_KEY_ALIAS") ?: System.getenv("SOVRA_KEY_ALIAS") ?: "sovra-upload")
+            keyPassword(System.getenv("SOVRA_RELEASE_KEY_PASSWORD") ?: System.getenv("SOVRA_KEY_PASSWORD") ?: "sovraSecure2026!")
         }
     }
 
