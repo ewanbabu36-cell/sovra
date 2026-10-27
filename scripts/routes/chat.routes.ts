@@ -597,6 +597,77 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     return true;
   }
 
+  // 4D. Generate Cryptographic Safety Number (Deterministic 60-digit fingerprint blocks & QR)
+  if ((url.pathname === '/api/chat/safety-number/generate' || url.pathname === '/api/chat/safety-number') && (req.method === 'GET' || req.method === 'POST')) {
+    let parsedBody: any = {};
+    if (req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (ok && body) {
+        try { parsedBody = JSON.parse(body); } catch (_) {}
+      }
+    }
+    const principal = resolvePrincipal(req, parsedBody);
+    const userDid = parsedBody.userDid || url.searchParams.get('userDid') || (principal ? principal.did : 'did:key:alice_node');
+    const peerDid = url.searchParams.get('peerDid') || parsedBody.peerDid;
+
+    if (!peerDid) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'peerDid is required' }));
+      return true;
+    }
+
+    const sorted = [userDid, String(peerDid)].sort();
+    const hash = crypto.createHash('sha512').update(`${sorted[0]}:${sorted[1]}`).digest();
+    let digits = '';
+    for (let i = 0; i < 30; i++) {
+      const val = (hash.readUInt16BE(i * 2) % 100000).toString().padStart(5, '0');
+      digits += val;
+      if (digits.length >= 60) break;
+    }
+    digits = digits.substring(0, 60);
+    const blocks: string[] = [];
+    for (let i = 0; i < 60; i += 5) {
+      blocks.push(digits.substring(i, i + 5));
+    }
+    const safetyNumber = blocks.join(' ');
+    const qrPayload = `sovra-safety://${encodeURIComponent(sorted[0])}/${encodeURIComponent(sorted[1])}/${digits.substring(0, 32)}`;
+    const status = sovraDb.getContactSafetyVerification(userDid, String(peerDid));
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(JSON.stringify({
+      ok: true,
+      userDid,
+      peerDid,
+      safetyNumber,
+      digits,
+      fingerprintBlocks: blocks,
+      qrPayload,
+      isVerified: Boolean(status?.isVerified),
+      verifiedAt: status?.verifiedAt,
+    }));
+    return true;
+  }
+
+  // 4E. Ephemeral Disappearing Messages Sweep
+  if (url.pathname === '/api/chat/disappearing/sweep' && (req.method === 'POST' || req.method === 'GET')) {
+    const sweepResult = sovraDb.purgeExpiredDisappearingMessages();
+    const remainingCount = (sovraDb.getState().chatMessages || []).length;
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(JSON.stringify({
+      ok: true,
+      purgedCount: sweepResult.purgedCount,
+      remainingMessagesCount: remainingCount,
+      timestamp: Date.now(),
+    }));
+    return true;
+  }
+
   // 5. Message Reaction
   if ((url.pathname === '/api/chat/reaction' || url.pathname === '/api/chat/react') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);

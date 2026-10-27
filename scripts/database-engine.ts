@@ -3093,6 +3093,14 @@ export class SovraDatabaseEngine {
     if (peer) {
       peer.isVerified = isVerified;
       if (fingerprint) peer.safetyNumbers = fingerprint;
+    } else {
+      this.db.contacts_and_peers.push({
+        did: peerDid,
+        isVerified,
+        safetyNumbers: fingerprint || '',
+        name: 'Peer',
+        handle: 'peer',
+      } as any);
     }
     if (this.db.friend_relationships) {
       const rel = this.db.friend_relationships.find(r => 
