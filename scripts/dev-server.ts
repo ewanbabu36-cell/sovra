@@ -5922,83 +5922,116 @@ function renderHtml(
       transform: scale(0.96) !important;
     }
 
-    /* Mobile / Small Screen: Solid Blue Circle Badge (#1877f2) with White 'S' */
+    /* =========================================================================
+       SOVRA MASTER BRAND IDENTITY: SOPHISTICATED, SIMPLE, SMART & ELEGANT
+       ========================================================================= */
+    .sovra-brand-gateway-btn,
+    .sovra-core-gateway-btn {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 10px !important;
+      cursor: pointer !important;
+      user-select: none !important;
+      text-decoration: none !important;
+      padding: 4px 6px !important;
+      border-radius: 12px !important;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+
+    .sovra-brand-gateway-btn:hover,
+    .sovra-core-gateway-btn:hover {
+      opacity: 0.95 !important;
+      transform: translateY(-1px) !important;
+    }
+
+    .sovra-brand-gateway-btn:active,
+    .sovra-core-gateway-btn:active {
+      transform: scale(0.96) !important;
+    }
+
+    /* 3D Glassmorphic Obsidian Squircle Emblem */
+    .sovra-brand-emblem-box,
     .fb-standard-logo-circle {
       position: relative !important;
-      width: 40px !important;
-      height: 40px !important;
-      border-radius: 50% !important;
-      background: #1877f2 !important;
+      width: 38px !important;
+      height: 38px !important;
+      border-radius: 10px !important;
+      background: linear-gradient(135deg, #080e1e 0%, #050811 50%, #020409 100%) !important;
+      border: 1px solid rgba(56, 189, 248, 0.35) !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      box-shadow: 0 2px 8px rgba(24, 119, 242, 0.45) !important;
+      box-shadow: 0 2px 10px rgba(56, 189, 248, 0.22), 0 0 16px rgba(99, 102, 241, 0.16) !important;
       flex-shrink: 0 !important;
       overflow: hidden !important;
-      border: none !important;
+      transition: box-shadow 0.25s ease, border-color 0.25s ease !important;
     }
 
-    .fb-logo-letter-s {
-      color: #ffffff !important;
-      fill: #ffffff !important;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-      font-size: 28px !important;
-      font-weight: 900 !important;
-      line-height: 1 !important;
-      letter-spacing: -1px !important;
-      transform: translateY(-0.5px) !important;
-      user-select: none !important;
+    .sovra-brand-gateway-btn:hover .sovra-brand-emblem-box,
+    .sovra-core-gateway-btn:hover .fb-standard-logo-circle {
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.45), 0 0 30px rgba(99, 102, 241, 0.25) !important;
+      border-color: rgba(56, 189, 248, 0.6) !important;
+    }
+
+    .sovra-brand-emblem-svg {
+      width: 32px !important;
+      height: 32px !important;
       display: block !important;
     }
 
-    /* Big Screen: Solid Blue Badge (#1877f2) with Bold White "SOVRA" (in the exact same style as S) */
+    /* Horizontal Wordmark & Subscript Lockup */
+    .sovra-brand-text-box,
     .fb-standard-logo-badge {
-      height: 38px !important;
-      padding: 0 16px !important;
-      background: #1877f2 !important;
-      border-radius: 20px !important;
       display: inline-flex !important;
       align-items: center !important;
-      justify-content: center !important;
-      box-shadow: 0 2px 10px rgba(24, 119, 242, 0.45) !important;
-      flex-shrink: 0 !important;
+      gap: 7px !important;
+      background: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
       border: none !important;
-      user-select: none !important;
     }
 
+    .sovra-brand-name,
     .fb-logo-wordmark-bold {
-      color: #ffffff !important;
-      fill: #ffffff !important;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-      font-size: 1.45rem !important;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      font-size: 1.42rem !important;
       font-weight: 900 !important;
-      letter-spacing: 0.5px !important;
+      letter-spacing: 3.5px !important;
       line-height: 1 !important;
-      user-select: none !important;
+      background: linear-gradient(135deg, #ffffff 30%, #f1f5f9 65%, #38bdf8 100%) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      color: #ffffff !important;
       display: inline-block !important;
       text-transform: uppercase !important;
     }
 
-    .fb-standard-logo-wordmark {
-      display: none !important;
+    .sovra-brand-mesh-pill {
+      font-size: 9px !important;
+      font-weight: 800 !important;
+      letter-spacing: 1px !important;
+      padding: 2px 6px !important;
+      border-radius: 5px !important;
+      background: rgba(56, 189, 248, 0.12) !important;
+      color: #38bdf8 !important;
+      border: 1px solid rgba(56, 189, 248, 0.35) !important;
+      line-height: 1.1 !important;
+      text-transform: uppercase !important;
+      display: inline-block !important;
     }
 
-    /* Responsive visibility: Big Screen removes single S circle, shows full bold white SOVRA badge */
-    @media (min-width: 521px) {
-      .fb-standard-logo-circle {
+    /* Responsive: Mobile shows the 38px glowing emblem; Desktop shows both Emblem + Wordmark */
+    @media (max-width: 520px) {
+      .sovra-brand-text-box,
+      .fb-standard-logo-badge {
         display: none !important;
       }
+    }
+
+    @media (min-width: 521px) {
+      .sovra-brand-text-box,
       .fb-standard-logo-badge {
         display: inline-flex !important;
-      }
-    }
-
-    @media (max-width: 520px) {
-      .fb-standard-logo-badge {
-        display: none !important;
-      }
-      .fb-standard-logo-circle {
-        display: flex !important;
       }
     }
 
@@ -16454,17 +16487,56 @@ function renderHtml(
         ☰
       </button>
 
-      <!-- SOVRA Facebook Standard Logo (Clean, Crisp & Permanent) -->
-      <div id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="switchTab('feed'); event.stopPropagation();" aria-label="Open SOVRA holographic command center" title="SOVRA Home (Return to Feed)">
-        <!-- Mobile View (<=520px): Single "S" Circle Badge -->
-        <div class="fb-standard-logo-circle">
-          <span class="fb-logo-letter-s">S</span>
+      <!-- SOVRA Master Brand Identity: Sophisticated, Simple, Smart & Elegant -->
+      <div id="sovraCoreBtn" class="sovra-brand-gateway-btn sovra-core-gateway-btn" onclick="switchTab('feed'); event.stopPropagation();" aria-label="SOVRA Home" title="SOVRA — Sovereign Social & P2P Mesh">
+        <div class="sovra-brand-emblem-box">
+          <svg class="sovra-brand-emblem-svg" viewBox="0 0 512 512" width="36" height="36" aria-hidden="true">
+            <defs>
+              <linearGradient id="sovraBgH" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#080e1e"/>
+                <stop offset="50%" stop-color="#050811"/>
+                <stop offset="100%" stop-color="#020409"/>
+              </linearGradient>
+              <radialGradient id="centerGlowH" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#6366f1" stop-opacity="0.45"/>
+                <stop offset="45%" stop-color="#00f0ff" stop-opacity="0.22"/>
+                <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+              </radialGradient>
+              <linearGradient id="sUpperH" x1="10%" y1="0%" x2="90%" y2="100%">
+                <stop offset="0%" stop-color="#00f5ff"/>
+                <stop offset="45%" stop-color="#38bdf8"/>
+                <stop offset="100%" stop-color="#6366f1"/>
+              </linearGradient>
+              <linearGradient id="sLowerH" x1="10%" y1="0%" x2="90%" y2="100%">
+                <stop offset="0%" stop-color="#6366f1"/>
+                <stop offset="45%" stop-color="#a855f7"/>
+                <stop offset="100%" stop-color="#f43f5e"/>
+              </linearGradient>
+              <linearGradient id="specCoreH" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff"/>
+                <stop offset="40%" stop-color="#ffffff" stop-opacity="0.95"/>
+                <stop offset="100%" stop-color="#c084fc" stop-opacity="0.8"/>
+              </linearGradient>
+            </defs>
+            <rect width="512" height="512" rx="118" fill="url(#sovraBgH)"/>
+            <rect width="508" height="508" x="2" y="2" rx="116" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3"/>
+            <circle cx="256" cy="256" r="195" fill="url(#centerGlowH)"/>
+            <path d="M 335 195 C 335 135 300 110 256 110 C 195 110 165 145 165 195 C 165 240 215 260 256 275"
+                  fill="none" stroke="url(#sUpperH)" stroke-width="74" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M 256 275 C 298 290 347 310 347 355 C 347 405 315 440 256 440 C 200 440 165 415 165 360"
+                  fill="none" stroke="url(#sLowerH)" stroke-width="74" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M 335 195 C 335 135 300 110 256 110 C 195 110 165 145 165 195 C 165 240 215 260 256 275 C 298 290 347 310 347 355 C 347 405 315 440 256 440 C 200 440 165 415 165 360"
+                  fill="none" stroke="url(#specCoreH)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+            <circle cx="335" cy="195" r="10" fill="#00f5ff"/>
+            <circle cx="335" cy="195" r="5" fill="#ffffff"/>
+            <circle cx="165" cy="360" r="10" fill="#f43f5e"/>
+            <circle cx="165" cy="360" r="5" fill="#ffffff"/>
+          </svg>
         </div>
-        <!-- Big Screen (>520px): Solid Blue Badge with Bold White "SOVRA" (in the exact same style as S) -->
-        <div class="fb-standard-logo-badge">
-          <span class="fb-logo-wordmark-bold">SOVRA</span>
+        <div class="sovra-brand-text-box fb-standard-logo-badge">
+          <span class="sovra-brand-name fb-logo-wordmark-bold">SOVRA</span>
+          <span class="sovra-brand-mesh-pill">MESH</span>
         </div>
-        <span class="fb-standard-logo-wordmark" style="display: none;">sovra</span>
       </div>
 
       <!-- Fresh, Neat & Streamlined Search Bar (Zero Popup - 100% Inline Dropdown) -->
@@ -16669,12 +16741,18 @@ function renderHtml(
     <!-- Column 1: Left Navigation Rail (Desktop) -->
     <aside class="app-left-rail">
       <div class="rail-brand" onclick="switchTab('feed'); event.stopPropagation();" style="cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 14px;" title="SOVRA Home (Return to Feed)">
-        <div class="fb-standard-logo-circle" style="width: 36px; height: 36px;">
-          <span class="fb-logo-letter-s" style="font-size: 24px;">S</span>
+        <div class="sovra-brand-emblem-box" style="width: 36px; height: 36px;">
+          <svg class="sovra-brand-emblem-svg" viewBox="0 0 512 512" width="28" height="28" aria-hidden="true">
+            <rect width="512" height="512" rx="118" fill="#080e1e"/>
+            <circle cx="256" cy="256" r="195" fill="rgba(99,102,241,0.3)"/>
+            <path d="M 335 195 C 335 135 300 110 256 110 C 195 110 165 145 165 195 C 165 240 215 260 256 275" fill="none" stroke="#00f0ff" stroke-width="74" stroke-linecap="round"/>
+            <path d="M 256 275 C 298 290 347 310 347 355 C 347 405 315 440 256 440 C 200 440 165 415 165 360" fill="none" stroke="#ec4899" stroke-width="74" stroke-linecap="round"/>
+            <path d="M 335 195 C 335 135 300 110 256 110 C 195 110 165 145 165 195 C 165 240 215 260 256 275 C 298 290 347 310 347 355 C 347 405 315 440 256 440 C 200 440 165 415 165 360" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" opacity="0.95"/>
+          </svg>
         </div>
         <div>
-          <div class="fb-standard-logo-wordmark" style="font-size: 1.45rem;">sovra</div>
-          <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">Decentralized Mesh</div>
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size: 1.35rem; font-weight: 900; letter-spacing: 2.5px; background: linear-gradient(135deg, #ffffff 30%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">SOVRA</div>
+          <div style="font-size: 0.68rem; color: #38bdf8; font-weight: 700; letter-spacing: 1px;">SOVEREIGN P2P MESH</div>
         </div>
       </div>
 
