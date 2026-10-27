@@ -2260,7 +2260,21 @@ function renderHtml(
       color: #1877f2 !important;
     }
     body.theme-normal .rail-brand .fb-standard-logo-wordmark {
-      color: #1877f2 !important;
+      color: #0284c7 !important;
+    }
+    /* Light Mode: High-contrast Deep Navy & Cyan for SOVRA brand wordmark */
+    body.theme-normal .sovra-brand-name,
+    body.theme-normal .fb-logo-wordmark-bold {
+      background: linear-gradient(135deg, #090e17 0%, #0f172a 45%, #0284c7 100%) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      color: #090e17 !important;
+      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08)) !important;
+    }
+    body.theme-normal .sovra-brand-mesh-pill {
+      background: rgba(2, 132, 199, 0.1) !important;
+      color: #0284c7 !important;
+      border: 1px solid rgba(2, 132, 199, 0.35) !important;
     }
     body.theme-normal .app-right-rail {
       background: #f0f2f5 !important;
@@ -2542,7 +2556,15 @@ function renderHtml(
       box-sizing: border-box;
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    body.theme-normal .sovra-hero-anchor-card,
+    body.theme-normal .sovra-hero-anchor-card {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #075985 100%) !important;
+      border: 1px solid rgba(56, 189, 248, 0.28) !important;
+      border-radius: 20px !important;
+      backdrop-filter: blur(16px) !important;
+      -webkit-backdrop-filter: blur(16px) !important;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 0 24px rgba(56, 189, 248, 0.12) !important;
+      color: #f8fafc !important;
+    }
     :root .sovra-hero-anchor-card {
       background: rgba(15, 23, 42, 0.75);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -9059,11 +9081,14 @@ function renderHtml(
       background: #166fe5;
     }
     .create-story-footer .story-username {
-      font-size: 13px;
-      font-weight: 600;
-      color: #e4e6eb;
-      text-align: center;
-      line-height: 1.2;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      color: inherit !important;
+      max-width: 100% !important;
+      white-space: normal !important;
+      overflow: visible !important;
+      text-align: center !important;
+      line-height: 1.2 !important;
     }
 
     /* User Stories Cards */
@@ -16324,12 +16349,12 @@ function renderHtml(
     }
   </style>
 </head>
-<body class="nav-mode-auto theme-normal" data-active-tab="feed">
+<body class="nav-mode-auto theme-black" data-active-tab="feed">
   <script>
     (function() {
       try {
         var s = localStorage.getItem('sovra_theme_mode');
-        var t = (s === 'black') ? 'black' : 'normal';
+        var t = (s === 'normal') ? 'normal' : 'black';
         document.documentElement.setAttribute('data-theme', t);
         if (document.body) {
           document.body.classList.remove('theme-normal', 'theme-black', 'theme-cyber', 'theme-ios', 'theme-android', 'mode-advance');
@@ -16488,7 +16513,7 @@ function renderHtml(
       </button>
 
       <!-- SOVRA Master Brand Identity: Sophisticated, Simple, Smart & Elegant -->
-      <div id="sovraCoreBtn" class="sovra-brand-gateway-btn sovra-core-gateway-btn" onclick="switchTab('feed'); event.stopPropagation();" aria-label="SOVRA Home" title="SOVRA — Sovereign Social & P2P Mesh">
+      <div id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="switchTab('feed'); event.stopPropagation();" aria-label="Open SOVRA holographic command center" title="SOVRA — Sovereign Social & P2P Mesh">
         <div class="sovra-brand-emblem-box">
           <svg class="sovra-brand-emblem-svg" viewBox="0 0 512 512" width="36" height="36" aria-hidden="true">
             <defs>
@@ -43916,7 +43941,7 @@ function renderHtml(
         var saved = localStorage.getItem('sovra_theme_mode');
         if (saved === 'black' || saved === 'normal') return saved;
       } catch (_) {}
-      return 'normal';
+      return 'black';
     })();
 
     function setSovraTheme(theme, showToast) {
