@@ -294,6 +294,11 @@ export interface LocalDatabaseSchema {
   store_products: Record<string, any>;
   store_purchases: Record<string, any>;
   financial_ledger: Record<string, any>;
+  balance_privacy_masked?: boolean;
+  cached_balance?: string;
+  active_persona?: any;
+  personas?: any[];
+  cache_quota?: { usedMb: number; totalMb: number };
   sync_state: ClientSyncState;
 }
 
@@ -481,6 +486,11 @@ export class LocalSchemaMigrator {
       store_products: {},
       store_purchases: {},
       financial_ledger: {},
+      balance_privacy_masked: false,
+      cached_balance: '450.50 SOV',
+      active_persona: null,
+      personas: [],
+      cache_quota: { usedMb: 420, totalMb: 500 },
       sync_state: {
         lastSyncTimestamp: 0,
         lastKnownServerCursor: '0',
@@ -1489,6 +1499,104 @@ export class SovraLocalDatabase {
     await this.init();
     const all = Object.values(this.state.store_purchases || {});
     return all.some((p: any) => p.productId === productId && (!buyerDid || p.buyerDid === buyerDid));
+  }
+
+  // ==========================================
+  // HERO CARD, BALANCE PRIVACY & QUOTA METHODS
+  // ==========================================
+
+  public isBalanceMasked(): boolean {
+    return !!this.state.balance_privacy_masked;
+  }
+
+  public async setBalanceMasked(masked: boolean): Promise<void> {
+    this.state.balance_privacy_masked = masked;
+    await this.persist();
+  }
+
+  public getCachedBalance(): string {
+    return this.state.cached_balance || '450.50 SOV';
+  }
+
+  public async setCachedBalance(balance: string): Promise<void> {
+    this.state.cached_balance = balance;
+    await this.persist();
+  }
+
+  public getCacheQuotaStats(): { usedMb: number; totalMb: number; percent: number } {
+    const quota = this.state.cache_quota || { usedMb: 420, totalMb: 500 };
+    const percent = Math.min(100, Math.round((quota.usedMb / quota.totalMb) * 100));
+    return { usedMb: quota.usedMb, totalMb: quota.totalMb, percent };
+  }
+
+  public async pruneCache(): Promise<{ prunedMb: number; remainingMb: number }> {
+    const currentUsed = (this.state.cache_quota && this.state.cache_quota.usedMb) || 420;
+    const remainingMb = Math.max(32, Math.round(currentUsed * 0.15));
+    const prunedMb = currentUsed - remainingMb;
+    this.state.cache_quota = {
+      usedMb: remainingMb,
+      totalMb: (this.state.cache_quota && this.state.cache_quota.totalMb) || 500,
+    };
+    await this.persist();
+    return { prunedMb, remainingMb };
+  }
+
+  // ==========================================
+  // HORIZON IDENTITY SWITCHER PERSONAS
+  // ==========================================
+
+  public getActivePersona(): any {
+    return this.state.active_persona || null;
+  }
+
+  public async setActivePersona(persona: any): Promise<void> {
+    this.state.active_persona = persona;
+    await this.persist();
+  }
+
+  public getPersonas(): any[] {
+    return this.state.personas || [];
+  }
+
+  public async savePersonas(personas: any[]): Promise<void> {
+    this.state.personas = personas;
+    await this.persist();
+  }
+
+  // ==========================================
+  // OFFLINE CHECKOUT & TIPPING OUTBOX QUEUE
+  // ==========================================
+
+  public getOutboxOperations(): QueuedOperation[] {
+    return Object.values(this.state.outbox || {});
+  }
+
+  public async queueCheckoutPayment(payload: {
+    id: string;
+    type: 'ppv' | 'super_chat' | 'store';
+    title: string;
+    amount: number;
+    creatorDid: string;
+    buyerDid?: string;
+    pinDurationSec?: number;
+  }): Promise<QueuedOperation> {
+    const idempotencyKey = `checkout_${payload.id}_${Date.now()}`;
+    const op: QueuedOperation = {
+      operationId: payload.id,
+      deviceId: 'mobile_device',
+      actorId: payload.buyerDid || 'current_user',
+      createdAt: Date.now(),
+      type: 'SEND_CHAT' as any,
+      payload,
+      idempotencyKey,
+      attemptCount: 0,
+      status: 'PENDING',
+      expiresAt: Date.now() + DEFAULT_EXPIRATION_MS,
+    };
+    this.state.operations[op.operationId] = op;
+    this.state.outbox[op.operationId] = op;
+    await this.persist();
+    return op;
   }
 }
 
