@@ -67,6 +67,7 @@ import { ModerationWorker } from '../services/moderation-worker/dist/index.js';
 import { TranscoderWorker } from '../services/transcoder/dist/index.js';
 import { renderAdminHtml, renderAdminLoginHtml } from './admin-console.ts';
 import { sovereignAdminSecurity } from './admin-security.ts';
+import { selfHealingDaemon } from './self-healing-daemon.ts';
 import { handlePushRoutes } from './routes/push.routes.ts';
 import { handleFeedDiscoveryRoutes } from './routes/feed.routes.ts';
 import { handleCallSignalingRoutes } from './routes/call.routes.ts';
@@ -88075,6 +88076,44 @@ async function startDevServer() {
       return;
     }
 
+    // --- AUTONOMOUS SELF-HEALING & 24/7 SOLVENCY AUDIT DAEMON ROUTES ---
+    if (url.pathname === '/api/admin/self-healing/status' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, status: selfHealingDaemon.getStatus() }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/self-healing/trigger-wal' && req.method === 'POST') {
+      const walResult = selfHealingDaemon.runWalCheckpoint();
+      const orphanResult = selfHealingDaemon.cleanupUnixFsOrphans();
+      const quotaResult = selfHealingDaemon.enforceMediaCacheQuota();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, wal: walResult, orphans: orphanResult, quota: quotaResult }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/self-healing/trigger-solvency' && req.method === 'POST') {
+      const result = selfHealingDaemon.runContinuousSolvencyAudit();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, ...result }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/self-healing/trigger-peer-diagnostics' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      let peers: any[] | undefined = undefined;
+      if (ok && body) {
+        try {
+          const parsed = JSON.parse(body);
+          if (Array.isArray(parsed.peers)) peers = parsed.peers;
+        } catch (_) {}
+      }
+      const result = selfHealingDaemon.runPeerMeshDiagnostics(peers);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, ...result }));
+      return;
+    }
+
     // PWA: Web App Manifest
     if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
       res.writeHead(200, {
@@ -89681,6 +89720,14 @@ async function startDevServer() {
         console.warn('[BACKUP] Initial startup snapshot warning:', backupErr);
       }
     }, 5000).unref();
+
+    // Start Sovereign Autonomous Self-Healing & 24/7 Solvency Daemon
+    try {
+      selfHealingDaemon.startDaemon();
+      console.log('[SELF-HEALING] 24/7 Solvency & Mesh Health Daemon active.');
+    } catch (daemonErr) {
+      console.warn('[SELF-HEALING] Failed to initialize daemon:', daemonErr);
+    }
   });
 }
 
