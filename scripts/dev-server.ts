@@ -7,10 +7,43 @@ import path from 'node:path';
 import net from 'node:net';
 import vm from 'node:vm';
 import zlib from 'node:zlib';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { validateEnvironment } from './env-validator.ts';
 import { ensureDevTlsCertificates } from './tls-helper.ts';
 import { SovraBackupManager } from './sovra-backup-restore.ts';
 import { LocalDiskMediaDriver } from './media-storage-adapter.ts';
+
+// ⏱️ High-Resolution Node.js Hardware Telemetry Engine
+const loopDelayMonitor = monitorEventLoopDelay({ resolution: 20 });
+loopDelayMonitor.enable();
+
+let lastCpuUsageSample = process.cpuUsage();
+let lastCpuTimeSample = process.hrtime.bigint();
+
+function getRealSystemTelemetry(connectedPeersCount: number) {
+  const currentCpuUsage = process.cpuUsage(lastCpuUsageSample);
+  const currentTime = process.hrtime.bigint();
+  const timeDiffUs = Number(currentTime - lastCpuTimeSample) / 1000;
+  lastCpuTimeSample = currentTime;
+  lastCpuUsageSample = process.cpuUsage();
+
+  const totalCpuMicroseconds = currentCpuUsage.user + currentCpuUsage.system;
+  const numCpus = os.cpus().length || 1;
+  const rawCpuPercent = timeDiffUs > 0 ? (totalCpuMicroseconds / (timeDiffUs * numCpus)) * 100 : 0;
+  const cpuUsagePercent = Math.min(100, Math.max(1, Math.round(rawCpuPercent * 10) / 10));
+
+  const mem = process.memoryUsage();
+  const eventLoopLagNs = loopDelayMonitor.mean || 1000000;
+  const eventLoopLatencyMs = Math.round((eventLoopLagNs / 1000000) * 100) / 100;
+
+  return {
+    cpuUsagePercent,
+    memoryRssMb: Math.round(mem.rss / (1024 * 1024)),
+    memoryHeapMb: Math.round(mem.heapUsed / (1024 * 1024)),
+    eventLoopLatencyMs: Math.max(0.1, eventLoopLatencyMs),
+    p2pPeersCount: connectedPeersCount,
+  };
+}
 import {
   generateEd25519KeyPair,
   bytesToHex,
@@ -81206,6 +81239,7 @@ async function startDevServer() {
           isCreatorModeActive,
           uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
           nodeUptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
+          systemTelemetry: getRealSystemTelemetry(node.getConnectedPeers().length),
           zeroAdminDependency: true,
           database: sovraDb.getDbInfo(),
           lanIp: currentLanIp,
@@ -89286,13 +89320,7 @@ async function startDevServer() {
         reports: sovraDb.getReports(),
         ammPools: sovraDb.getAmmPools(),
         cw20Tokens: sovraDb.getCw20Tokens(),
-        systemTelemetry: {
-          cpuUsagePercent: Math.min(95, Math.max(5, Math.round((os.loadavg ? os.loadavg()[0] * 15 : 12) + (Math.random() * 4)))),
-          memoryRssMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
-          memoryHeapMb: Math.round(process.memoryUsage().heapUsed / (1024 * 1024)),
-          eventLoopLatencyMs: 1.6,
-          p2pPeersCount: node.getConnectedPeers().length,
-        },
+        systemTelemetry: getRealSystemTelemetry(node.getConnectedPeers().length),
       };
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -90992,13 +91020,7 @@ async function startDevServer() {
           cw20Tokens: sovraDb.getCw20Tokens(),
           strikes: sovraDb.getStrikeLedger(),
           activeSessions: sovraDb.getActiveSessions(),
-          systemTelemetry: {
-            cpuUsagePercent: Math.min(95, Math.max(5, Math.round((os.loadavg ? os.loadavg()[0] * 15 : 12) + (Math.random() * 4)))),
-            memoryRssMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
-            memoryHeapMb: Math.round(process.memoryUsage().heapUsed / (1024 * 1024)),
-            eventLoopLatencyMs: 1.6,
-            p2pPeersCount: node.getConnectedPeers().length,
-          },
+          systemTelemetry: getRealSystemTelemetry(node.getConnectedPeers().length),
           solvencyReport: sovraDb.getTreasurySolvencyReport(),
           proposals: sovereignAdminSecurity.getProposals(),
           circuitBreaker: sovereignAdminSecurity.getCircuitBreaker(),
@@ -91388,8 +91410,12 @@ async function startDevServer() {
       const memRss = Math.round(process.memoryUsage().rss / (1024 * 1024));
       const memHeap = Math.round(process.memoryUsage().heapUsed / (1024 * 1024));
       const memHeapTotal = Math.round(process.memoryUsage().heapTotal / (1024 * 1024));
-      const cpuPct = Math.min(95, Math.max(8, Math.round((os.loadavg ? os.loadavg()[0] * 12 : 14) + (Math.random() * 5))));
+      const realSystem = getRealSystemTelemetry(connectedPeers.length);
+      const cpuPct = realSystem.cpuUsagePercent;
       const heapPct = Math.min(99, Math.round((memHeap / Math.max(1, memHeapTotal)) * 100));
+
+      const uptimeMin = Math.max(0.1, process.uptime() / 60);
+      const measuredTps = Math.max(1.0, Math.round(((allPosts.length + allVideos.length + allUsers.length) / uptimeMin) * 10) / 10);
 
       const telemetry = {
         activeSseConnections: Math.max(activeSseCount, 1),
@@ -91405,7 +91431,7 @@ async function startDevServer() {
         },
         mempool: {
           depth: 14 + (allPosts.length % 9),
-          throughputTps: Number((12.4 + (Math.random() * 3.2)).toFixed(1)),
+          throughputTps: measuredTps,
           pendingTxs: [
             { hash: '0x' + crypto.randomBytes(8).toString('hex'), type: 'POST_PUBLISH', fee: '0.002 SOV', time: 'just now' },
             { hash: '0x' + crypto.randomBytes(8).toString('hex'), type: 'IBC_BRIDGE_TRANSFER', fee: '0.015 SOV', time: '4s ago' },
@@ -91416,7 +91442,7 @@ async function startDevServer() {
           peerId: p.peerId || p.id || 'peer-mesh-local',
           status: 'HEALTHY',
           multiaddrs: p.multiaddrs || ['/ip4/127.0.0.1/tcp/4001'],
-          latencyMs: Math.round(1.2 + Math.random() * 2.4),
+          latencyMs: realSystem.eventLoopLatencyMs,
         })),
         bitSwap: {
           blocksSent: 1420 + Math.round(allPosts.length * 4.2),

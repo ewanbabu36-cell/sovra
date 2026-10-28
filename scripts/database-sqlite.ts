@@ -668,6 +668,59 @@ export class SqliteSocialDatabaseEngine {
       );
       CREATE INDEX IF NOT EXISTS idx_audit_seq ON admin_tamper_evident_audit_ledger(sequence_num);
       CREATE INDEX IF NOT EXISTS idx_audit_admin ON admin_tamper_evident_audit_ledger(admin_did);
+
+      -- 40. EPHEMERAL 24H STORIES (PERSISTENT CRDT STORAGE)
+      CREATE TABLE IF NOT EXISTS ephemeral_stories (
+        id TEXT PRIMARY KEY,
+        creator_did TEXT NOT NULL,
+        creator_handle TEXT NOT NULL,
+        creator_name TEXT NOT NULL,
+        media_url TEXT NOT NULL,
+        media_type TEXT NOT NULL DEFAULT 'image',
+        caption TEXT NOT NULL DEFAULT '',
+        is_close_friends INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_stories_expires ON ephemeral_stories(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_stories_creator ON ephemeral_stories(creator_did);
+
+      -- 41. SOVEREIGN COMMERCE STORE PRODUCTS (DECENTRALIZED CATALOG)
+      CREATE TABLE IF NOT EXISTS store_products (
+        id TEXT PRIMARY KEY,
+        channel_id TEXT NOT NULL DEFAULT 'ch-alpha',
+        creator_did TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        price_sov REAL NOT NULL,
+        inventory_count INTEGER NOT NULL DEFAULT 100,
+        media_cid TEXT NOT NULL DEFAULT '',
+        media_url TEXT NOT NULL DEFAULT '',
+        category TEXT NOT NULL DEFAULT 'digital',
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_store_creator ON store_products(creator_did);
+      CREATE INDEX IF NOT EXISTS idx_store_channel ON store_products(channel_id);
+      CREATE INDEX IF NOT EXISTS idx_store_status ON store_products(status);
+
+      -- 42. SOVEREIGN COMMERCE STORE ORDERS & ATOMIC ESCROW SETTLEMENTS
+      CREATE TABLE IF NOT EXISTS store_orders (
+        id TEXT PRIMARY KEY,
+        buyer_did TEXT NOT NULL,
+        seller_did TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        amount_sov REAL NOT NULL,
+        escrow_fee_sov REAL NOT NULL DEFAULT 0.0,
+        status TEXT NOT NULL DEFAULT 'ESCROWED',
+        decryption_key TEXT,
+        created_at INTEGER NOT NULL,
+        fulfilled_at INTEGER,
+        audit_hash TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_orders_buyer ON store_orders(buyer_did);
+      CREATE INDEX IF NOT EXISTS idx_orders_seller ON store_orders(seller_did);
+      CREATE INDEX IF NOT EXISTS idx_orders_status ON store_orders(status);
     `);
 
     // Seed default algorithmic dials if empty
@@ -3169,6 +3222,302 @@ export class SqliteSocialDatabaseEngine {
     }
 
     return detectedCycles;
+  }
+
+  // ==========================================
+  // 📸 EPHEMERAL 24H STORIES ENGINE (SQLITE WAL)
+  // ==========================================
+  public saveEphemeralStoryRecord(story: {
+    id: string;
+    creatorDid: string;
+    creatorHandle: string;
+    creatorName: string;
+    mediaUrl: string;
+    mediaType?: string;
+    caption?: string;
+    isCloseFriends?: boolean;
+    createdAt?: number;
+    expiresAt?: number;
+  }): boolean {
+    try {
+      const now = story.createdAt || Date.now();
+      const expiresAt = story.expiresAt || (now + 24 * 3600 * 1000);
+      this.prepareCached(`
+        INSERT OR REPLACE INTO ephemeral_stories (
+          id, creator_did, creator_handle, creator_name, media_url, media_type, caption, is_close_friends, created_at, expires_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        story.id,
+        story.creatorDid,
+        story.creatorHandle,
+        story.creatorName,
+        story.mediaUrl,
+        story.mediaType || 'image',
+        story.caption || '',
+        story.isCloseFriends ? 1 : 0,
+        now,
+        expiresAt
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public getActiveEphemeralStories(viewerDid?: string): Array<{
+    id: string;
+    creatorDid: string;
+    creatorHandle: string;
+    creatorName: string;
+    mediaUrl: string;
+    mediaType: string;
+    caption: string;
+    isCloseFriends: boolean;
+    createdAt: number;
+    expiresAt: number;
+    hoursRemaining: number;
+  }> {
+    try {
+      const now = Date.now();
+      const rows = this.db.prepare(`
+        SELECT id, creator_did, creator_handle, creator_name, media_url, media_type, caption, is_close_friends, created_at, expires_at
+        FROM ephemeral_stories
+        WHERE expires_at > ?
+        ORDER BY created_at DESC
+      `).all(now) as any[];
+
+      return rows.map(r => ({
+        id: r.id,
+        creatorDid: r.creator_did,
+        creatorHandle: r.creator_handle,
+        creatorName: r.creator_name,
+        mediaUrl: r.media_url,
+        mediaType: r.media_type,
+        caption: r.caption,
+        isCloseFriends: Boolean(r.is_close_friends),
+        createdAt: r.created_at,
+        expiresAt: r.expires_at,
+        hoursRemaining: Math.max(0, Math.round((r.expires_at - now) / 3600000)),
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public pruneExpiredEphemeralStories(): number {
+    try {
+      const now = Date.now();
+      const res = this.db.prepare('DELETE FROM ephemeral_stories WHERE expires_at <= ?').run(now);
+      return res.changes || 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  // ==========================================
+  // 🛍️ SOVEREIGN COMMERCE STORE & ATOMIC ESCROW
+  // ==========================================
+  public createStoreProduct(product: {
+    id?: string;
+    channelId?: string;
+    creatorDid: string;
+    title: string;
+    description?: string;
+    priceSov: number;
+    inventoryCount?: number;
+    mediaCid?: string;
+    mediaUrl?: string;
+    category?: string;
+  }): { id: string; ok: boolean } {
+    try {
+      const id = product.id || 'prod_' + crypto.randomUUID().slice(0, 10);
+      const now = Date.now();
+      this.prepareCached(`
+        INSERT INTO store_products (
+          id, channel_id, creator_did, title, description, price_sov, inventory_count, media_cid, media_url, category, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+      `).run(
+        id,
+        product.channelId || 'ch-alpha',
+        product.creatorDid,
+        product.title,
+        product.description || '',
+        product.priceSov,
+        product.inventoryCount ?? 100,
+        product.mediaCid || '',
+        product.mediaUrl || '',
+        product.category || 'digital',
+        now
+      );
+      return { id, ok: true };
+    } catch (_) {
+      return { id: '', ok: false };
+    }
+  }
+
+  public getStoreProducts(channelId?: string, creatorDid?: string): Array<{
+    id: string;
+    channelId: string;
+    creatorDid: string;
+    title: string;
+    description: string;
+    priceSov: number;
+    inventoryCount: number;
+    mediaCid: string;
+    mediaUrl: string;
+    category: string;
+    status: string;
+    createdAt: number;
+  }> {
+    try {
+      let query = "SELECT id, channel_id, creator_did, title, description, price_sov, inventory_count, media_cid, media_url, category, status, created_at FROM store_products WHERE status = 'ACTIVE'";
+      const params: any[] = [];
+      if (channelId) {
+        query += ' AND channel_id = ?';
+        params.push(channelId);
+      }
+      if (creatorDid) {
+        query += ' AND creator_did = ?';
+        params.push(creatorDid);
+      }
+      query += ' ORDER BY created_at DESC';
+      const rows = this.db.prepare(query).all(...params) as any[];
+      return rows.map(r => ({
+        id: r.id,
+        channelId: r.channel_id,
+        creatorDid: r.creator_did,
+        title: r.title,
+        description: r.description,
+        priceSov: Number(r.price_sov),
+        inventoryCount: Number(r.inventory_count),
+        mediaCid: r.media_cid,
+        mediaUrl: r.media_url,
+        category: r.category,
+        status: r.status,
+        createdAt: r.created_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public createStoreOrderWithEscrow(params: {
+    buyerDid: string;
+    productId: string;
+    adminDid?: string;
+    ipAddress?: string;
+  }): {
+    ok: boolean;
+    orderId?: string;
+    txId?: string;
+    amountSov?: number;
+    escrowFeeSov?: number;
+    decryptionKey?: string;
+    error?: string;
+  } {
+    const product = this.db.prepare('SELECT * FROM store_products WHERE id = ?').get(params.productId) as any;
+    if (!product) {
+      return { ok: false, error: 'Product not found in sovereign store catalog' };
+    }
+    if (product.inventory_count <= 0) {
+      return { ok: false, error: 'Product out of stock' };
+    }
+
+    const priceSov = Number(product.price_sov);
+    const escrowFeeSov = Math.round(priceSov * 0.05 * 100) / 100;
+    const sellerPayoutSov = Math.round((priceSov - escrowFeeSov) * 100) / 100;
+    const orderId = 'ord_' + crypto.randomUUID().slice(0, 12);
+    const decryptionKey = 'sov_key_' + crypto.randomBytes(16).toString('hex');
+    const now = Date.now();
+
+    try {
+      // Execute 4-column atomic double-entry transfer to seller with protocol take rate
+      const transfer = this.executeAtomicLedgerTransfer({
+        fromDid: params.buyerDid,
+        toDid: product.creator_did,
+        amountSov: sellerPayoutSov,
+        feeSov: escrowFeeSov,
+        txType: 'STORE_PURCHASE_ESCROW',
+        memo: `Order ${orderId}: ${product.title}`,
+        adminDid: params.adminDid,
+        ipAddress: params.ipAddress,
+      });
+
+      // Insert store order record
+      this.prepareCached(`
+        INSERT INTO store_orders (
+          id, buyer_did, seller_did, product_id, amount_sov, escrow_fee_sov, status, decryption_key, created_at, fulfilled_at, audit_hash
+        ) VALUES (?, ?, ?, ?, ?, ?, 'FULFILLED', ?, ?, ?, ?)
+      `).run(
+        orderId,
+        params.buyerDid,
+        product.creator_did,
+        product.id,
+        priceSov,
+        escrowFeeSov,
+        decryptionKey,
+        now,
+        now,
+        transfer.txId
+      );
+
+      // Decrement inventory
+      this.db.prepare('UPDATE store_products SET inventory_count = inventory_count - 1 WHERE id = ?').run(product.id);
+
+      return {
+        ok: true,
+        orderId,
+        txId: transfer.txId,
+        amountSov: priceSov,
+        escrowFeeSov,
+        decryptionKey,
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        error: err?.message || 'Escrow transfer failed',
+      };
+    }
+  }
+
+  public getStoreOrders(userDid?: string): Array<{
+    id: string;
+    buyerDid: string;
+    sellerDid: string;
+    productId: string;
+    amountSov: number;
+    escrowFeeSov: number;
+    status: string;
+    decryptionKey?: string;
+    createdAt: number;
+    fulfilledAt?: number;
+    auditHash?: string;
+  }> {
+    try {
+      let query = 'SELECT id, buyer_did, seller_did, product_id, amount_sov, escrow_fee_sov, status, decryption_key, created_at, fulfilled_at, audit_hash FROM store_orders';
+      const params: any[] = [];
+      if (userDid) {
+        query += ' WHERE buyer_did = ? OR seller_did = ?';
+        params.push(userDid, userDid);
+      }
+      query += ' ORDER BY created_at DESC';
+      const rows = this.db.prepare(query).all(...params) as any[];
+      return rows.map(r => ({
+        id: r.id,
+        buyerDid: r.buyer_did,
+        sellerDid: r.seller_did,
+        productId: r.product_id,
+        amountSov: Number(r.amount_sov),
+        escrowFeeSov: Number(r.escrow_fee_sov),
+        status: r.status,
+        decryptionKey: r.decryption_key,
+        createdAt: r.created_at,
+        fulfilledAt: r.fulfilled_at,
+        auditHash: r.audit_hash,
+      }));
+    } catch (_) {
+      return [];
+    }
   }
 
   public close(): void {
