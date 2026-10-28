@@ -15386,6 +15386,24 @@ export class SovraDatabaseEngine {
     }
     this.db.digital_products.push(product);
 
+    // Sync to SQLite store_products table
+    if (this.sqliteEngine) {
+      try {
+        this.sqliteEngine.createStoreProduct({
+          id: prodId,
+          channelId: product.channelId,
+          creatorDid,
+          title: product.title,
+          description: product.description,
+          priceSov: product.priceSov,
+          inventoryCount: 100,
+          mediaCid: product.filePayloadHash || '',
+          mediaUrl: product.filePayloadUrl || '',
+          category: type,
+        });
+      } catch (_) {}
+    }
+
     // If this is a video_ppv product, mark the video as isPPV in database
     if (type === 'video_ppv' && targetVideoId) {
       const vid = (this.db.videos || []).find(v => v.id === targetVideoId);
@@ -15433,6 +15451,27 @@ export class SovraDatabaseEngine {
       return { ok: false, error: `Insufficient SOV balance (Required: ${price} SOV, Available: ${curBal} SOV)` };
     }
 
+    // Atomic 4-Column Double-Entry Ledger Transfer (95% Seller Payout, 5% Protocol Fee)
+    let settlementTxId = '';
+    if (this.sqliteEngine) {
+      try {
+        const feeSov = Math.round(price * 0.05 * 100) / 100;
+        const sellerAmount = Math.round((price - feeSov) * 100) / 100;
+        const transfer = this.sqliteEngine.executeAtomicLedgerTransfer({
+          fromDid: buyerDid,
+          toDid: product.creatorDid || 'did:sov:creator_vault',
+          amountSov: sellerAmount,
+          feeSov,
+          txType: 'STORE_PURCHASE_ESCROW',
+          memo: `Store purchase: ${product.title} (${productId})`,
+          requireSolvencyCheck: false,
+        });
+        settlementTxId = transfer.txId;
+      } catch (err: any) {
+        return { ok: false, error: 'Double-entry transfer failed: ' + (err?.message || err) };
+      }
+    }
+
     buyer.balanceSov = Math.round((curBal - price) * 100) / 100;
 
     const now = Date.now();
@@ -15452,7 +15491,7 @@ export class SovraDatabaseEngine {
       amountSov: price,
       decryptionKey,
       receiptHash,
-      settlementTx: 'sov_store_tx_' + receiptHash.slice(0, 16),
+      settlementTx: settlementTxId || ('sov_store_tx_' + receiptHash.slice(0, 16)),
       createdAt: now,
     };
 
