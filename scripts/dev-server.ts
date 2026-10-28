@@ -2097,6 +2097,9 @@ function renderHtml(
   <link rel="mask-icon" href="/icon.svg" color="#1877f2">
   <meta name="msapplication-TileImage" content="/icon-512.png">
   <meta name="msapplication-TileColor" content="#18191a">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700;800&family=Roboto+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
   <script src="/assets/bundle.js" defer></script>
   <style>
     :root, [data-theme="normal"], body.theme-normal {
@@ -2262,19 +2265,19 @@ function renderHtml(
     body.theme-normal .rail-brand .fb-standard-logo-wordmark {
       color: #0284c7 !important;
     }
-    /* Light Mode: High-contrast Deep Navy & Cyan for SOVRA brand wordmark */
+    /* Light Mode: YouTube-Style Crisp Solid Black (#0f0f0f) for SOVRA brand wordmark */
     body.theme-normal .sovra-brand-name,
     body.theme-normal .fb-logo-wordmark-bold {
-      background: linear-gradient(135deg, #090e17 0%, #0f172a 45%, #0284c7 100%) !important;
-      -webkit-background-clip: text !important;
-      -webkit-text-fill-color: transparent !important;
-      color: #090e17 !important;
-      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08)) !important;
+      background: none !important;
+      -webkit-background-clip: unset !important;
+      -webkit-text-fill-color: #0f0f0f !important;
+      color: #0f0f0f !important;
+      filter: none !important;
     }
     body.theme-normal .sovra-brand-mesh-pill {
-      background: rgba(2, 132, 199, 0.1) !important;
-      color: #0284c7 !important;
-      border: 1px solid rgba(2, 132, 199, 0.35) !important;
+      background: rgba(0, 0, 0, 0.06) !important;
+      color: #606060 !important;
+      border: 1px solid rgba(0, 0, 0, 0.15) !important;
     }
 
     /* =========================================================================
@@ -6250,34 +6253,10 @@ function renderHtml(
       transform: scale(0.96) !important;
     }
 
-    /* 3D Glassmorphic Obsidian Squircle Emblem */
+    /* S Emblem: Reserved strictly for App Icons & Launchers (Hidden in Header/Navbar Brand) */
     .sovra-brand-emblem-box,
     .fb-standard-logo-circle {
-      position: relative !important;
-      width: 38px !important;
-      height: 38px !important;
-      border-radius: 10px !important;
-      background: linear-gradient(135deg, #080e1e 0%, #050811 50%, #020409 100%) !important;
-      border: 1px solid rgba(56, 189, 248, 0.35) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      box-shadow: 0 2px 10px rgba(56, 189, 248, 0.22), 0 0 16px rgba(99, 102, 241, 0.16) !important;
-      flex-shrink: 0 !important;
-      overflow: hidden !important;
-      transition: box-shadow 0.25s ease, border-color 0.25s ease !important;
-    }
-
-    .sovra-brand-gateway-btn:hover .sovra-brand-emblem-box,
-    .sovra-core-gateway-btn:hover .fb-standard-logo-circle {
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.45), 0 0 30px rgba(99, 102, 241, 0.25) !important;
-      border-color: rgba(56, 189, 248, 0.6) !important;
-    }
-
-    .sovra-brand-emblem-svg {
-      width: 32px !important;
-      height: 32px !important;
-      display: block !important;
+      display: none !important;
     }
 
     /* Horizontal Wordmark & Subscript Lockup */
@@ -6285,47 +6264,62 @@ function renderHtml(
     .fb-standard-logo-badge {
       display: inline-flex !important;
       align-items: center !important;
-      gap: 7px !important;
+      gap: 5px !important;
       background: none !important;
       box-shadow: none !important;
       padding: 0 !important;
       border: none !important;
     }
 
+    /* Iconic YouTube-Style SOVRA Wordmark */
     .sovra-brand-name,
     .fb-logo-wordmark-bold {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-      font-size: 1.42rem !important;
-      font-weight: 900 !important;
-      letter-spacing: 3.5px !important;
+      font-family: "YouTube Sans", "Oswald", "Roboto Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+      font-size: 1.62rem !important;
+      font-weight: 700 !important;
+      letter-spacing: -0.04em !important;
+      font-stretch: condensed !important;
       line-height: 1 !important;
-      background: linear-gradient(135deg, #ffffff 30%, #f1f5f9 65%, #38bdf8 100%) !important;
-      -webkit-background-clip: text !important;
-      -webkit-text-fill-color: transparent !important;
+      background: none !important;
       color: #ffffff !important;
+      -webkit-text-fill-color: #ffffff !important;
       display: inline-block !important;
       text-transform: uppercase !important;
+      font-feature-settings: "ss01", "cv01" !important;
+      user-select: none !important;
+      filter: none !important;
+      vertical-align: middle !important;
     }
 
+    /* YouTube Edition Subscript Badge (e.g. IN / PREMIUM / MESH) */
     .sovra-brand-mesh-pill {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
       font-size: 9px !important;
-      font-weight: 800 !important;
-      letter-spacing: 1px !important;
-      padding: 2px 6px !important;
-      border-radius: 5px !important;
-      background: rgba(56, 189, 248, 0.12) !important;
-      color: #38bdf8 !important;
-      border: 1px solid rgba(56, 189, 248, 0.35) !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.5px !important;
+      padding: 1px 5px !important;
+      border-radius: 3px !important;
       line-height: 1.1 !important;
+      vertical-align: super !important;
+      align-self: flex-start !important;
+      margin-top: 1px !important;
+      margin-left: 2px !important;
       text-transform: uppercase !important;
       display: inline-block !important;
+      background: rgba(255, 255, 255, 0.12) !important;
+      color: #aaaaaa !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
     }
 
-    /* Responsive: Mobile shows the 38px glowing emblem; Desktop shows both Emblem + Wordmark */
+    /* Responsive: Clean YouTube Wordmark on all screen sizes */
     @media (max-width: 520px) {
       .sovra-brand-text-box,
       .fb-standard-logo-badge {
-        display: none !important;
+        display: inline-flex !important;
+      }
+      .sovra-brand-name,
+      .fb-logo-wordmark-bold {
+        font-size: 1.38rem !important;
       }
     }
 
@@ -17075,7 +17069,7 @@ function renderHtml(
           </svg>
         </div>
         <div>
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size: 1.35rem; font-weight: 900; letter-spacing: 2.5px; background: linear-gradient(135deg, #ffffff 30%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">SOVRA</div>
+          <div style="font-family: 'YouTube Sans', 'Oswald', 'Roboto Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.04em; color: #fff; line-height: 1.1;">SOVRA</div>
           <div style="font-size: 0.68rem; color: #38bdf8; font-weight: 700; letter-spacing: 1px;">SOVEREIGN P2P MESH</div>
         </div>
       </div>
