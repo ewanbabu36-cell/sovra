@@ -10567,6 +10567,304 @@ function renderHtml(
       color: #0284c7 !important;
     }
 
+    /* ========================================================================= */
+    /* 📱 SOVRA ANDROID MULTITASKING RECENTS OVERVIEW (OPEN APPS CAROUSEL)       */
+    /* ========================================================================= */
+    .sovra-recents-overlay {
+      position: fixed;
+      inset: 0;
+      bottom: 48px;
+      z-index: 10005;
+      background: rgba(5, 8, 18, 0.78);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      animation: recentsFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+    @keyframes recentsFadeIn {
+      from { opacity: 0; transform: scale(0.97); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    body.theme-normal .sovra-recents-overlay {
+      background: rgba(241, 245, 249, 0.88) !important;
+    }
+
+    .sovra-recents-content {
+      width: 100%;
+      height: 100%;
+      max-height: calc(100vh - 48px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 1rem 0 1.25rem 0;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .recents-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .recents-header-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    body.theme-normal .recents-header-title {
+      color: #0f172a !important;
+    }
+    .recents-task-counter {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 2px 10px;
+      border-radius: 999px;
+    }
+    .recents-header-close-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+    .recents-header-close-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+    }
+
+    .recents-cards-track {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 1.5rem 15vw;
+      box-sizing: border-box;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .recents-cards-track::-webkit-scrollbar {
+      display: none;
+    }
+
+    .recents-app-card {
+      flex: 0 0 260px;
+      height: 380px;
+      max-height: 55vh;
+      border-radius: 24px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      cursor: pointer;
+      scroll-snap-align: center;
+      transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+    @media (min-width: 640px) {
+      .recents-app-card {
+        flex: 0 0 290px;
+        height: 420px;
+      }
+    }
+    .recents-app-card:hover {
+      transform: translateY(-8px) scale(1.03);
+      border-color: rgba(56, 189, 248, 0.55);
+      box-shadow: 0 22px 50px rgba(0, 0, 0, 0.7);
+    }
+    body.theme-normal .recents-app-card {
+      background: #ffffff !important;
+      border-color: #cbd5e1 !important;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .recents-card-header {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.25);
+    }
+    body.theme-normal .recents-card-header {
+      background: #f8fafc !important;
+      border-bottom-color: #e2e8f0 !important;
+    }
+    .recents-card-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .recents-card-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+    .recents-card-name {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+    body.theme-normal .recents-card-name {
+      color: #0f172a !important;
+    }
+    .recents-card-kill-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255, 255, 255, 0.1);
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.75rem;
+      transition: all 0.18s ease;
+    }
+    .recents-card-kill-btn:hover {
+      background: #ef4444;
+      color: #ffffff;
+      transform: scale(1.15);
+    }
+
+    .recents-card-preview {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      padding: 1.5rem;
+    }
+    .recents-preview-glass {
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(12px);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 1.25rem 1rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 85%;
+    }
+    .recents-preview-glyph {
+      font-size: 2.4rem;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+    }
+    .recents-preview-desc {
+      font-size: 0.74rem;
+      color: #cbd5e1;
+      line-height: 1.35;
+      max-height: 2.7em;
+      overflow: hidden;
+    }
+    .recents-preview-tag {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #10b981;
+      background: rgba(16, 185, 129, 0.18);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin-top: 4px;
+    }
+
+    .recents-footer-bar {
+      display: flex;
+      justify-content: center;
+      padding: 0.75rem 0;
+    }
+    .recents-clear-all-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 24px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #f1f5f9;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .recents-clear-all-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+      color: #fca5a5;
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 12px 30px rgba(239, 68, 68, 0.35);
+    }
+    .recents-clear-all-btn:active {
+      transform: scale(0.95);
+    }
+    body.theme-normal .recents-clear-all-btn {
+      background: #ffffff !important;
+      border-color: #cbd5e1 !important;
+      color: #0f172a !important;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    .recents-empty-state {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 3rem 1.5rem;
+    }
+    .recents-empty-home-btn {
+      margin-top: 1.25rem;
+      padding: 8px 20px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid #38bdf8;
+      color: #38bdf8;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .recents-empty-home-btn:hover {
+      background: rgba(56, 189, 248, 0.3);
+      transform: scale(1.04);
+    }
+
     /* Instagram Parity: Explore Mosaic Staggered Grid */
     .explore-mosaic-grid {
       display: grid;
@@ -29072,11 +29370,11 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- 📱 SOVRA ANDROID 3-BUTTON SYSTEM NAVIGATION BAR -->
+  <!-- 📱 SOVRA ANDROID 3-BUTTON SYSTEM NAVIGATION BAR (LEFT: RECENTS | CENTER: HOME | RIGHT: BACK) -->
   <nav id="sovraAndroidNavBar" class="sovra-android-nav-bar" aria-label="Android System Navigation">
-    <button type="button" class="android-nav-btn" id="androidNavBackBtn" onclick="window.SovraAndroidOS.goBack()" title="Back" aria-label="Back">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 18 9 12 15 6"></polyline>
+    <button type="button" class="android-nav-btn" id="androidNavRecentsBtn" onclick="window.SovraAndroidOS.toggleRecents()" title="Open Apps (Multitasking Overview)" aria-label="Open Apps Overview">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="5" width="14" height="14" rx="3"></rect>
       </svg>
     </button>
     <button type="button" class="android-nav-btn" id="androidNavHomeBtn" onclick="window.SovraAndroidOS.goHome()" title="Home Screen" aria-label="Home Screen">
@@ -29084,12 +29382,42 @@ function renderHtml(
         <circle cx="12" cy="12" r="8"></circle>
       </svg>
     </button>
-    <button type="button" class="android-nav-btn" id="androidNavRecentsBtn" onclick="window.SovraAndroidOS.openAppDrawer()" title="All Apps Drawer" aria-label="All Apps Drawer">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="5" y="5" width="14" height="14" rx="3"></rect>
+    <button type="button" class="android-nav-btn" id="androidNavBackBtn" onclick="window.SovraAndroidOS.goBack()" title="Back" aria-label="Back">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
     </button>
   </nav>
+
+  <!-- 📱 SOVRA ANDROID MULTITASKING RECENTS OVERVIEW (OPEN APPS CAROUSEL) -->
+  <div id="sovraRecentsOverview" class="sovra-recents-overlay" style="display: none;" onclick="window.SovraAndroidOS.closeRecents()">
+    <div class="sovra-recents-content" onclick="event.stopPropagation()">
+      <div class="sheet-grab-handle"></div>
+
+      <!-- Recents Header & Active Task Counter -->
+      <div class="recents-header-bar">
+        <div class="recents-header-title">
+          <span style="font-size: 1.1rem;">▢</span>
+          <span>Open Apps</span>
+          <span id="recentsTaskCounter" class="recents-task-counter">0 Active</span>
+        </div>
+        <button type="button" id="recentsCloseBtn" class="recents-header-close-btn" onclick="window.SovraAndroidOS.closeRecents()" aria-label="Close Overview">✕</button>
+      </div>
+
+      <!-- Horizontal 3D Card Carousel -->
+      <div id="recentsCardsTrack" class="recents-cards-track">
+        <!-- Dynamically rendered by SovraTaskManager.renderRecentsOverview() -->
+      </div>
+
+      <!-- Footer Bar: "Clear All" Action Button -->
+      <div class="recents-footer-bar">
+        <button type="button" id="recentsClearAllBtn" class="recents-clear-all-btn" onclick="window.SovraAndroidOS.clearAllTasks()">
+          <span style="font-size: 0.95rem;">🗑️</span>
+          <span>Close All Apps</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- 🖼️ SOVRA WALLPAPER CUSTOMIZER MODAL -->
   <div id="sovraWallpaperModal" class="sovra-wallpaper-modal-overlay" onclick="window.SovraAndroidOS.closeWallpaperModal()">
@@ -82037,7 +82365,11 @@ function renderHtml(
 
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-          closeDrawer();
+          if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goBack === 'function') {
+            window.SovraAndroidOS.goBack();
+          } else {
+            closeDrawer();
+          }
         }
       });
 
@@ -82120,6 +82452,7 @@ function renderHtml(
       const WALLPAPER_KEY = 'sovra_os_wallpaper_v1';
       const HOME_APPS_KEY = 'sovra_os_home_apps_v1';
       const OS_MODE_KEY = 'sovra_os_mode_v1';
+      const ACTIVE_TASKS_KEY = 'sovra_os_active_tasks_v1';
 
       let wallpaperConfig = {
         id: 'nebula',
@@ -82130,6 +82463,7 @@ function renderHtml(
       };
 
       let homeScreenApps = ['feed', 'reels', 'watch', 'chat', 'wallet', 'studio', 'live', 'profile'];
+      let activeTasks = ['feed'];
       let currentMode = 'home';
       let activeAppId = null;
       let previousAppId = 'home';
@@ -82156,6 +82490,16 @@ function renderHtml(
         try {
           const rawMode = localStorage.getItem(OS_MODE_KEY);
           if (rawMode === 'app' || rawMode === 'home') currentMode = rawMode;
+        } catch (_) {}
+      }
+
+      function loadActiveTasks() {
+        try {
+          const rawTasks = sessionStorage.getItem(ACTIVE_TASKS_KEY);
+          if (rawTasks) {
+            const parsed = JSON.parse(rawTasks);
+            if (Array.isArray(parsed) && parsed.length > 0) activeTasks = parsed;
+          }
         } catch (_) {}
       }
 
@@ -82286,7 +82630,177 @@ function renderHtml(
         });
       }
 
-      // 5. Android Navigation Bar Actions
+      // 5. Android Multitasking & Task Lifecycle Engine
+      function saveActiveTasks() {
+        try {
+          sessionStorage.setItem(ACTIVE_TASKS_KEY, JSON.stringify(activeTasks));
+        } catch (_) {}
+      }
+
+      function pushTask(appId) {
+        if (!appId || appId === 'home') return;
+        const idx = activeTasks.indexOf(appId);
+        if (idx !== -1) activeTasks.splice(idx, 1);
+        activeTasks.unshift(appId);
+        if (activeTasks.length > 12) activeTasks.pop();
+        saveActiveTasks();
+      }
+
+      function killTask(appId) {
+        if (navigator.vibrate) navigator.vibrate(12);
+        const idx = activeTasks.indexOf(appId);
+        if (idx !== -1) {
+          activeTasks.splice(idx, 1);
+          saveActiveTasks();
+          renderRecentsOverview();
+          if (typeof showAccountToast === 'function') {
+            const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+            showAccountToast('Closed ' + (feat ? feat.name : appId));
+          }
+        }
+        if (activeTasks.length === 0 || activeAppId === appId) {
+          activeAppId = activeTasks[0] || null;
+          if (!activeAppId) {
+            goHome();
+          } else {
+            openApp(activeAppId);
+          }
+        }
+      }
+
+      function clearAllTasks() {
+        if (navigator.vibrate) navigator.vibrate(20);
+        activeTasks = [];
+        activeAppId = null;
+        saveActiveTasks();
+        closeRecents();
+        goHome();
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('All apps closed');
+        }
+      }
+
+      function openRecents() {
+        if (navigator.vibrate) navigator.vibrate(15);
+        closeWallpaperModal();
+        closeHomeContextMenu();
+        if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.closeDrawer === 'function') {
+          window.SovraModularGlassOS.closeDrawer();
+        }
+        const modal = document.getElementById('sovraRecentsOverview');
+        if (modal) {
+          modal.style.display = 'flex';
+          renderRecentsOverview();
+        }
+      }
+
+      function closeRecents() {
+        const modal = document.getElementById('sovraRecentsOverview');
+        if (modal) modal.style.display = 'none';
+      }
+
+      function toggleRecents() {
+        const modal = document.getElementById('sovraRecentsOverview');
+        if (modal && modal.style.display === 'flex') {
+          closeRecents();
+        } else {
+          openRecents();
+        }
+      }
+
+      function renderRecentsOverview() {
+        const track = document.getElementById('recentsCardsTrack');
+        const counter = document.getElementById('recentsTaskCounter');
+        if (counter) counter.textContent = activeTasks.length + ' Active';
+        if (!track) return;
+        track.innerHTML = '';
+
+        if (activeTasks.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'recents-empty-state';
+          empty.innerHTML = '<span style="font-size: 2.8rem; opacity: 0.6;">📱</span>' +
+            '<div style="font-size: 1.05rem; font-weight: 700; color: #cbd5e1; margin-top: 10px;">No recent apps running</div>' +
+            '<div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Launch an app from Home or the App Drawer</div>' +
+            '<button type="button" onclick="window.SovraAndroidOS.goHome()" class="recents-empty-home-btn">Go to Home Screen</button>';
+          track.appendChild(empty);
+          return;
+        }
+
+        activeTasks.forEach(appId => {
+          const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+          if (!feat) return;
+
+          const theme = (window.SOVRA_FEATURE_THEMES && window.SOVRA_FEATURE_THEMES[appId]) || { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(0,0,0,0.4)' };
+
+          const card = document.createElement('div');
+          card.className = 'recents-app-card';
+          card.setAttribute('data-app-id', appId);
+          card.onclick = () => openApp(appId);
+
+          const header = document.createElement('div');
+          header.className = 'recents-card-header';
+
+          const brand = document.createElement('div');
+          brand.className = 'recents-card-brand';
+
+          const icon = document.createElement('div');
+          icon.className = 'recents-card-icon';
+          icon.style.background = theme.gradient;
+          icon.textContent = feat.icon;
+
+          const name = document.createElement('span');
+          name.className = 'recents-card-name';
+          name.textContent = feat.name;
+
+          brand.appendChild(icon);
+          brand.appendChild(name);
+
+          const killBtn = document.createElement('button');
+          killBtn.type = 'button';
+          killBtn.className = 'recents-card-kill-btn';
+          killBtn.innerHTML = '&times;';
+          killBtn.title = 'Close app';
+          killBtn.onclick = (e) => {
+            e.stopPropagation();
+            killTask(appId);
+          };
+
+          header.appendChild(brand);
+          header.appendChild(killBtn);
+
+          const preview = document.createElement('div');
+          preview.className = 'recents-card-preview';
+          preview.style.background = theme.gradient;
+
+          const previewGlass = document.createElement('div');
+          previewGlass.className = 'recents-preview-glass';
+
+          const glyph = document.createElement('span');
+          glyph.className = 'recents-preview-glyph';
+          glyph.textContent = feat.icon;
+
+          const desc = document.createElement('div');
+          desc.className = 'recents-preview-desc';
+          desc.textContent = feat.desc;
+
+          const tag = document.createElement('span');
+          tag.className = 'recents-preview-tag';
+          tag.textContent = (appId === activeAppId && currentMode === 'app') ? '● Active Foreground' : 'In RAM Background';
+
+          previewGlass.appendChild(glyph);
+          previewGlass.appendChild(desc);
+          previewGlass.appendChild(tag);
+
+          preview.appendChild(previewGlass);
+
+          card.appendChild(header);
+          card.appendChild(preview);
+
+          track.appendChild(card);
+        });
+      }
+
+      // 6. Android Navigation Bar Actions
       function goHome() {
         if (navigator.vibrate) navigator.vibrate(15);
         previousAppId = activeAppId || 'home';
@@ -82295,6 +82809,7 @@ function renderHtml(
         syncOSModeVisuals();
         closeWallpaperModal();
         closeHomeContextMenu();
+        closeRecents();
         if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.closeDrawer === 'function') {
           window.SovraModularGlassOS.closeDrawer();
         }
@@ -82306,10 +82821,12 @@ function renderHtml(
         previousAppId = currentMode === 'app' ? (activeAppId || 'home') : 'home';
         activeAppId = appId;
         currentMode = 'app';
+        pushTask(appId);
         saveOSMode();
         syncOSModeVisuals();
         closeWallpaperModal();
         closeHomeContextMenu();
+        closeRecents();
         if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.closeDrawer === 'function') {
           window.SovraModularGlassOS.closeDrawer();
         }
@@ -82324,16 +82841,25 @@ function renderHtml(
 
       function goBack() {
         if (navigator.vibrate) navigator.vibrate(15);
+        // Priority 1: Recents Overview is open -> close it
+        const recents = document.getElementById('sovraRecentsOverview');
+        if (recents && recents.style.display === 'flex') {
+          closeRecents();
+          return;
+        }
+        // Priority 2: Wallpaper modal is open -> close it
         const wpModal = document.getElementById('sovraWallpaperModal');
         if (wpModal && wpModal.classList.contains('active')) {
           closeWallpaperModal();
           return;
         }
+        // Priority 2b: App Drawer is open -> close it
         const drawer = document.getElementById('sovraMasterDrawerOverlay');
         if (drawer && drawer.classList.contains('active')) {
           if (window.SovraModularGlassOS) window.SovraModularGlassOS.closeDrawer();
           return;
         }
+        // Priority 3: Minimize active app and return to Home Screen
         if (currentMode === 'app') {
           if (previousAppId && previousAppId !== activeAppId && previousAppId !== 'home') {
             openApp(previousAppId);
@@ -82576,15 +83102,35 @@ function renderHtml(
 
       setInterval(refreshTelemetry, 10000);
 
+      const SovraTaskManager = {
+        getActiveTasks: () => activeTasks,
+        pushTask,
+        killTask,
+        clearAllTasks,
+        openRecents,
+        closeRecents,
+        toggleRecents,
+        renderRecentsOverview
+      };
+      window.SovraTaskManager = SovraTaskManager;
+
       const SovraAndroidOS = {
         WALLPAPER_PRESETS,
         getMode: () => currentMode,
         getWallpaper: () => wallpaperConfig,
         getHomeApps: () => homeScreenApps,
+        getActiveTasks: () => activeTasks,
         goHome,
         openApp,
         goBack,
         openAppDrawer,
+        openRecents,
+        closeRecents,
+        toggleRecents,
+        killTask,
+        clearAllTasks,
+        pushTask,
+        renderRecentsOverview,
         pinToHome,
         removeFromHome,
         setWallpaperPreset,
@@ -82599,13 +83145,15 @@ function renderHtml(
         toggleEditMode,
         renderHomeScreen,
         applyWallpaper,
-        refreshTelemetry
+        refreshTelemetry,
+        taskManager: SovraTaskManager
       };
 
       window.SovraAndroidOS = SovraAndroidOS;
 
       function bootAndroidOS() {
         loadOSState();
+        loadActiveTasks();
         applyWallpaper();
         syncOSModeVisuals();
         renderHomeScreen();
