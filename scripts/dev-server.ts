@@ -28070,57 +28070,74 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- 👤 AIRTEL-INSPIRED HORIZON IDENTITY SWITCHER BOTTOM SHEET -->
+  <!-- 👤 MODERN RESPONSIVE PROFILE & ACCOUNT SWITCHER -->
   <div id="identitySwitcherOverlay" class="sovra-sheet-overlay" onclick="closeIdentitySwitcherSheet()">
-    <div id="identitySwitcherSheet" class="sovra-bottom-sheet" onclick="event.stopPropagation()">
+    <div id="identitySwitcherSheet" class="sovra-bottom-sheet" onclick="event.stopPropagation()" style="max-width: 520px; width: 100%; border-radius: 20px; padding: 1.5rem; box-sizing: border-box;">
       <div class="sheet-grab-handle"></div>
       
       <!-- Sheet Header -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem;">
         <div>
-          <div style="font-weight: 800; font-size: 1.2rem; color: #fff; display: flex; align-items: center; gap: 8px;">
-            <span>🌐</span> <span>Horizon Identity Switcher</span>
+          <div style="font-weight: 800; font-size: 1.25rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+            <span>👤</span> <span>Switch Profile</span>
           </div>
-          <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Switch sovereign persona, creator studio, or enterprise node</div>
+          <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 3px;">Select your personal account, creator channel, or team workspace</div>
         </div>
-        <button type="button" onclick="closeIdentitySwitcherSheet()" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; font-size: 1.1rem; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
+        <button type="button" onclick="closeIdentitySwitcherSheet()" aria-label="Close" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">✕</button>
       </div>
 
-      <!-- Section 1: Dynamic Personal Citizen Profile Card -->
-      <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Sovereign Citizen Profile</div>
-      <div id="personaCardCitizen" class="identity-card-active" onclick="switchDynamicCitizenPersona()" style="background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.35); border-radius: 14px; padding: 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div id="personaCitizenAvatarWrap" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; color: #fff;">👤</div>
-          <div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span id="personaCitizenName" style="font-weight: 800; font-size: 0.95rem; color: #fff;">Sovereign Citizen</span>
-              <span style="font-size: 0.65rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.3);">CITIZEN</span>
+      <!-- Scrollable Accounts List (Vertical, Mobile-First, Zero Clutter) -->
+      <div style="max-height: 62vh; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 1.25rem;">
+        
+        <!-- Section 1: Personal Profile -->
+        <div>
+          <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.5rem;">Personal Profile</div>
+          <div id="personaCardCitizen" class="identity-card-active" onclick="switchDynamicCitizenPersona()" style="background: rgba(99,102,241,0.08); border: 1.5px solid rgba(99,102,241,0.3); border-radius: 14px; padding: 0.85rem 1rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div id="personaCitizenAvatarWrap" style="width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; font-weight: 700; color: #fff; flex-shrink: 0;">👤</div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span id="personaCitizenName" style="font-weight: 700; font-size: 0.95rem; color: #fff;">Personal Account</span>
+                  <span style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: rgba(99,102,241,0.2); color: #818cf8;">Personal</span>
+                </div>
+                <div id="personaCitizenHandle" style="font-size: 0.78rem; color: #94a3b8; margin-top: 1px;">@sovereign_citizen</div>
+              </div>
             </div>
-            <div id="personaCitizenHandle" style="font-size: 0.78rem; color: #94a3b8; margin-top: 1px;">@sovereign_citizen</div>
+            <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+              <div id="personaCitizenActiveIndicator" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; color: #10b981;">
+                <span>●</span> <span>Active</span>
+              </div>
+              <div id="personaCitizenBalance" style="font-size: 0.82rem; font-weight: 700; color: #94a3b8;">500.00 SOV</div>
+            </div>
           </div>
         </div>
-        <div style="text-align: right;">
-          <div style="font-size: 0.7rem; color: #94a3b8;">Liquid Ledger</div>
-          <div id="personaCitizenBalance" style="font-size: 0.95rem; font-weight: 800; color: #10b981;">500.00 SOV</div>
+
+        <!-- Section 2: Creator Channels (Vertical List, Zero Horizontal Scrollbars) -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em;">Creator Channels</div>
+            <button type="button" onclick="closeIdentitySwitcherSheet(); openCreateChannelModal();" style="background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.25); color: #38bdf8; font-size: 0.74rem; font-weight: 700; border-radius: 8px; padding: 4px 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease;">
+              <span>+</span> <span>New Channel</span>
+            </button>
+          </div>
+          <div id="identityChannelsList" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Dynamically rendered by renderDynamicIdentitySwitcher() -->
+          </div>
         </div>
-      </div>
 
-      <!-- Section 2: Dynamic Owned Broadcast Channels Carousel -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Owned Broadcast Channels (Studio Pro)</div>
-        <button type="button" onclick="closeIdentitySwitcherSheet(); openCreateChannelModal();" style="background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; font-size: 0.72rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; cursor: pointer;">+ New Channel</button>
-      </div>
-      <div id="identityChannelsList" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 1.25rem;">
-        <!-- Dynamically rendered by renderDynamicIdentitySwitcher() -->
-      </div>
+        <!-- Section 3: Teams & Workspaces -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em;">Workspaces & Teams</div>
+            <button type="button" onclick="closeIdentitySwitcherSheet(); promptCreateOrgModal();" style="background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.25); color: #eab308; font-size: 0.74rem; font-weight: 700; border-radius: 8px; padding: 4px 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease;">
+              <span>+</span> <span>New Team</span>
+            </button>
+          </div>
+          <div id="identityOrgsList" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Dynamically rendered by renderDynamicIdentitySwitcher() -->
+          </div>
+        </div>
 
-      <!-- Section 3: Dynamic Affiliated B2B Organizations -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Affiliated Organizations (B2B Seats)</div>
-        <button type="button" onclick="closeIdentitySwitcherSheet(); promptCreateOrgModal();" style="background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.3); color: #eab308; font-size: 0.72rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; cursor: pointer;">+ Register Org</button>
-      </div>
-      <div id="identityOrgsList" style="display: flex; flex-direction: column; gap: 8px;">
-        <!-- Dynamically rendered by renderDynamicIdentitySwitcher() -->
       </div>
     </div>
   </div>
@@ -58205,7 +58222,7 @@ function renderHtml(
 
     function renderDynamicIdentitySwitcher() {
       try {
-        var myName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Sovereign Citizen';
+        var myName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Account';
         var myHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : '@sovereign_citizen';
         var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : 'did:sovra:citizen';
         var myAvatar = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : '👤';
@@ -58221,71 +58238,113 @@ function renderHtml(
         if (balEl) balEl.textContent = myBal;
         if (avatarWrapEl) avatarWrapEl.textContent = myAvatar;
 
-        // Render dynamic channels carousel
+        var activePersona = window.__currentActivePersona || { type: 'CITIZEN', id: myDid };
+        var isCitizenActive = (!activePersona || activePersona.type === 'CITIZEN' || activePersona.id === myDid);
+
+        var citizenCard = document.getElementById('personaCardCitizen');
+        var citizenIndicator = document.getElementById('personaCitizenActiveIndicator');
+        if (citizenCard) {
+          citizenCard.style.border = isCitizenActive ? '1.5px solid rgba(99,102,241,0.6)' : '1px solid rgba(255,255,255,0.08)';
+          citizenCard.style.background = isCitizenActive ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.03)';
+        }
+        if (citizenIndicator) {
+          citizenIndicator.style.display = isCitizenActive ? 'inline-flex' : 'none';
+        }
+
+        // Render dynamic creator channels (Only channels strictly owned by current user)
         var channelsContainer = document.getElementById('identityChannelsList');
         if (channelsContainer) {
           var chList = (typeof allChannelsData !== 'undefined' && Array.isArray(allChannelsData)) ? allChannelsData : [];
-          var ownedCh = chList.filter(function(c) { return myDid && c.ownerDid && c.ownerDid === myDid; });
-          var displayCh = ownedCh.length > 0 ? ownedCh : chList.slice(0, 4);
-
-          var chHtml = '';
-          displayCh.forEach(function(c) {
-            var subsText = (typeof c.count === 'number' && c.count >= 1000) ? (c.count / 1000).toFixed(1) + 'K Subscribers' : (c.count || 0) + ' Subscribers';
-            var safeName = String(c.name || 'Studio Channel');
-            var safeHandle = String(c.handle || '@channel');
-            var safeId = String(c.id || '');
-            var avatarIcon = c.avatar || '📡';
-
-            chHtml += '<div class="identity-channel-card" data-type="CHANNEL" data-id="' + safeId + '" data-handle="' + safeHandle + '" data-name="' + safeName + '" data-role-badge="Studio Pro" data-avatar="' + avatarIcon + '" onclick="handlePersonaCardClick(this)" style="min-width: 200px; flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.2s ease;">' +
-              '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">' +
-                '<div style="width: 32px; height: 32px; border-radius: 8px; background: ' + (c.bg || 'linear-gradient(135deg, #f59e0b, #ef4444)') + '; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">' + avatarIcon + '</div>' +
-                '<div style="overflow: hidden;">' +
-                  '<div style="font-weight: 700; font-size: 0.82rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">' + c.name + '</div>' +
-                  '<div style="font-size: 0.7rem; color: #94a3b8;">' + subsText + '</div>' +
-                '</div>' +
-              '</div>' +
-              '<span style="font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);">STUDIO PRO</span>' +
-            '</div>';
+          var ownedCh = chList.filter(function(c) {
+            return Boolean(myDid && (c.ownerDid === myDid || c.creatorDid === myDid));
           });
 
-          // Add New Channel Tile
-          chHtml += '<div onclick="closeIdentitySwitcherSheet(); openCreateChannelModal();" style="min-width: 140px; background: rgba(56,189,248,0.04); border: 1px dashed rgba(56,189,248,0.35); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; text-align: center;">' +
-            '<div style="font-size: 1.2rem; margin-bottom: 4px;">➕</div>' +
-            '<div style="font-size: 0.75rem; font-weight: 700; color: #38bdf8;">New Channel</div>' +
-          '</div>';
+          if (ownedCh.length === 0) {
+            channelsContainer.innerHTML = '<div style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.12); border-radius: 12px; padding: 1.1rem 1rem; text-align: center; color: #94a3b8;">' +
+              '<div style="font-size: 1.3rem; margin-bottom: 4px;">📡</div>' +
+              '<div style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">No Creator Channels Yet</div>' +
+              '<div style="font-size: 0.73rem; color: #64748b; margin-top: 2px; margin-bottom: 10px;">Create a channel to stream live, publish videos, and receive direct viewer tips.</div>' +
+              '<button type="button" onclick="closeIdentitySwitcherSheet(); openCreateChannelModal();" style="background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; font-size: 0.75rem; font-weight: 700; border-radius: 8px; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s ease;">' +
+                '<span>+</span> <span>Create First Channel</span>' +
+              '</button>' +
+            '</div>';
+          } else {
+            var chHtml = '';
+            ownedCh.forEach(function(c) {
+              var isChActive = Boolean(activePersona && activePersona.type === 'CHANNEL' && String(activePersona.id) === String(c.id));
+              var subsText = (typeof c.count === 'number' && c.count >= 1000) ? (c.count / 1000).toFixed(1) + 'K Subscribers' : (c.count || 0) + ' Subscribers';
+              var safeName = String(c.name || 'Studio Channel');
+              var safeHandle = String(c.handle || '@channel');
+              var safeId = String(c.id || '');
+              var avatarIcon = c.avatar || '📡';
 
-          channelsContainer.innerHTML = chHtml;
+              chHtml += '<div class="identity-channel-card" data-type="CHANNEL" data-id="' + safeId + '" data-handle="' + safeHandle + '" data-name="' + safeName + '" data-role-badge="Creator" data-avatar="' + avatarIcon + '" onclick="handlePersonaCardClick(this)" style="background: ' + (isChActive ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.04)') + '; border: ' + (isChActive ? '1.5px solid rgba(56,189,248,0.5)' : '1px solid rgba(255,255,255,0.08)') + '; border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">' +
+                '<div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">' +
+                  '<div style="width: 38px; height: 38px; border-radius: 10px; background: ' + (c.bg || 'linear-gradient(135deg, #f59e0b, #ef4444)') + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;">' + avatarIcon + '</div>' +
+                  '<div style="overflow: hidden;">' +
+                    '<div style="font-weight: 700; font-size: 0.88rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + safeName + '</div>' +
+                    '<div style="font-size: 0.74rem; color: #94a3b8; display: flex; align-items: center; gap: 6px;">' +
+                      '<span>' + safeHandle + '</span>' +
+                      '<span>•</span>' +
+                      '<span>' + subsText + '</span>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+                '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">' +
+                  (isChActive ? '<span style="font-size: 0.72rem; font-weight: 700; color: #10b981; display: inline-flex; align-items: center; gap: 4px;"><span>●</span> <span>Active</span></span>' : '<span style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3);">CREATOR</span>') +
+                '</div>' +
+              '</div>';
+            });
+            channelsContainer.innerHTML = chHtml;
+          }
         }
 
-        // Render dynamic organizations
+        // Render dynamic organizations (Only orgs user genuinely owns or belongs to)
         var orgsContainer = document.getElementById('identityOrgsList');
         if (orgsContainer) {
           var orgList = (typeof allOrgsData !== 'undefined' && Array.isArray(allOrgsData)) ? allOrgsData : [];
-          var orgHtml = '';
-          orgList.forEach(function(o) {
-            var safeName = String(o.name || 'Organization');
-            var safeHandle = String(o.handle || '@org');
-            var safeId = String(o.id || '');
-            var avatarIcon = o.avatar || '🏢';
-            var checkColor = o.verifiedTier === 'gold' ? '#eab308' : '#38bdf8';
-            var roleBadge = (o.ownerDid === myDid) ? 'OWNER' : 'ADMIN';
-
-            orgHtml += '<div class="identity-org-row" data-type="ORG" data-id="' + safeId + '" data-handle="' + safeHandle + '" data-name="' + safeName + '" data-role-badge="' + roleBadge + '" data-avatar="' + avatarIcon + '" onclick="handlePersonaCardClick(this)" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">' +
-              '<div style="display: flex; align-items: center; gap: 10px;">' +
-                '<div style="width: 34px; height: 34px; border-radius: 8px; background: ' + (o.bg || 'linear-gradient(135deg, #eab308, #ca8a04)') + '; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 800; color: #000;">' + avatarIcon + '</div>' +
-                '<div>' +
-                  '<div style="font-weight: 700; font-size: 0.85rem; color: #fff; display: flex; align-items: center; gap: 4px;">' +
-                    '<span>' + o.name + '</span>' +
-                    '<span style="color: ' + checkColor + ';" title="Verified Checkmark">✓</span>' +
-                  '</div>' +
-                  '<div style="font-size: 0.72rem; color: #94a3b8;">' + o.handle + '</div>' +
-                '</div>' +
-              '</div>' +
-              '<span style="font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid rgba(234,179,8,0.4);">' + roleBadge + '</span>' +
-            '</div>';
+          var myOrgs = orgList.filter(function(o) {
+            return Boolean(myDid && (o.ownerDid === myDid || (Array.isArray(o.members) && o.members.some(function(m) { return m.userDid === myDid; }))));
           });
 
-          orgsContainer.innerHTML = orgHtml;
+          if (myOrgs.length === 0) {
+            orgsContainer.innerHTML = '<div style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.12); border-radius: 12px; padding: 1.1rem 1rem; text-align: center; color: #94a3b8;">' +
+              '<div style="font-size: 1.3rem; margin-bottom: 4px;">🏢</div>' +
+              '<div style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">No Workspaces Yet</div>' +
+              '<div style="font-size: 0.73rem; color: #64748b; margin-top: 2px; margin-bottom: 10px;">Register an organization or team workspace to collaborate and manage shared assets.</div>' +
+              '<button type="button" onclick="closeIdentitySwitcherSheet(); promptCreateOrgModal();" style="background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.3); color: #eab308; font-size: 0.75rem; font-weight: 700; border-radius: 8px; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s ease;">' +
+                '<span>+</span> <span>Register Workspace</span>' +
+              '</button>' +
+            '</div>';
+          } else {
+            var orgHtml = '';
+            myOrgs.forEach(function(o) {
+              var isOrgActive = Boolean(activePersona && activePersona.type === 'ORG' && String(activePersona.id) === String(o.id));
+              var safeName = String(o.name || 'Organization');
+              var safeHandle = String(o.handle || '@org');
+              var safeId = String(o.id || '');
+              var avatarIcon = o.avatar || '🏢';
+              var checkColor = o.verifiedTier === 'gold' ? '#eab308' : '#38bdf8';
+              var roleBadge = (o.ownerDid === myDid) ? 'OWNER' : 'MEMBER';
+
+              orgHtml += '<div class="identity-org-row" data-type="ORG" data-id="' + safeId + '" data-handle="' + safeHandle + '" data-name="' + safeName + '" data-role-badge="' + roleBadge + '" data-avatar="' + avatarIcon + '" onclick="handlePersonaCardClick(this)" style="background: ' + (isOrgActive ? 'rgba(234,179,8,0.12)' : 'rgba(255,255,255,0.04)') + '; border: ' + (isOrgActive ? '1.5px solid rgba(234,179,8,0.5)' : '1px solid rgba(255,255,255,0.08)') + '; border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">' +
+                '<div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">' +
+                  '<div style="width: 38px; height: 38px; border-radius: 10px; background: ' + (o.bg || 'linear-gradient(135deg, #eab308, #ca8a04)') + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 800; color: #000; flex-shrink: 0;">' + avatarIcon + '</div>' +
+                  '<div style="overflow: hidden;">' +
+                    '<div style="font-weight: 700; font-size: 0.88rem; color: #fff; display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' +
+                      '<span>' + safeName + '</span>' +
+                      '<span style="color: ' + checkColor + ';" title="Verified">✓</span>' +
+                    '</div>' +
+                    '<div style="font-size: 0.74rem; color: #94a3b8;">' + safeHandle + '</div>' +
+                  '</div>' +
+                '</div>' +
+                '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">' +
+                  (isOrgActive ? '<span style="font-size: 0.72rem; font-weight: 700; color: #10b981; display: inline-flex; align-items: center; gap: 4px;"><span>●</span> <span>Active</span></span>' : '<span style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: rgba(234,179,8,0.15); color: #eab308; border: 1px solid rgba(234,179,8,0.3);">' + roleBadge + '</span>') +
+                '</div>' +
+              '</div>';
+            });
+            orgsContainer.innerHTML = orgHtml;
+          }
         }
       } catch (err) {
         console.warn('renderDynamicIdentitySwitcher error:', err);
