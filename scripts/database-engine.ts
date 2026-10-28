@@ -660,6 +660,25 @@ export interface PageRecord {
   pinnedAnnouncement?: PinnedAnnouncement | null;
 }
 
+export interface OrganizationMemberRecord {
+  userDid: string;
+  role: 'OWNER' | 'ADMIN' | 'TREASURER' | 'MEMBER';
+  joinedAt: number;
+}
+
+export interface OrganizationRecord {
+  id: string;
+  handle: string;
+  name: string;
+  bio?: string;
+  avatar?: string;
+  bg?: string;
+  verifiedTier?: 'gold' | 'blue' | 'none';
+  ownerDid: string;
+  members: OrganizationMemberRecord[];
+  createdAt: number;
+}
+
 export type SpaceRole = 'OWNER' | 'ADMIN' | 'EDITOR' | 'MODERATOR' | 'MEMBER' | 'TOP_CONTRIBUTOR';
 export type SpaceType = 'channel' | 'page' | 'group';
 
@@ -1749,6 +1768,7 @@ export interface DatabaseSchema {
   posts: FeedPostRecord[];
   channels: ChannelRecord[];
   pages: PageRecord[];
+  organizations?: OrganizationRecord[];
   groups: GroupRecord[];
   space_members: SpaceMemberRecord[];
   space_rules: SpaceRuleRecord[];
@@ -4119,6 +4139,87 @@ export class SovraDatabaseEngine {
   public getPageById(id: string): PageRecord | undefined {
     this.load();
     return this.getAllPages().find(p => p.id === id || p.handle.toLowerCase() === id.toLowerCase());
+  }
+
+  public getAllOrganizations(): OrganizationRecord[] {
+    this.load();
+    if (!Array.isArray(this.db.organizations) || this.db.organizations.length === 0) {
+      this.db.organizations = [
+        {
+          id: 'org_acme_corp',
+          handle: '@acme_global',
+          name: 'Acme Sovereign Corp',
+          bio: 'Global Decentralized Logistics & Infrastructure Node',
+          avatar: '🏢',
+          bg: 'linear-gradient(135deg, #eab308, #ca8a04)',
+          verifiedTier: 'gold',
+          ownerDid: 'did:sovra:system',
+          members: [
+            { userDid: 'did:sovra:system', role: 'OWNER', joinedAt: Date.now() - 10000000 }
+          ],
+          createdAt: Date.now() - 10000000
+        },
+        {
+          id: 'org_dao_alpha',
+          handle: '@dao_alpha',
+          name: 'Alpha DAO Foundation',
+          bio: 'Decentralized Autonomous Research & Treasury Node',
+          avatar: '🏛️',
+          bg: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+          verifiedTier: 'blue',
+          ownerDid: 'did:sovra:system',
+          members: [
+            { userDid: 'did:sovra:system', role: 'ADMIN', joinedAt: Date.now() - 8000000 }
+          ],
+          createdAt: Date.now() - 8000000
+        }
+      ];
+      this.save();
+    }
+    return this.db.organizations;
+  }
+
+  public getOrganizationsForUser(userDid: string): OrganizationRecord[] {
+    const orgs = this.getAllOrganizations();
+    if (!userDid) return orgs;
+    const userOrgs = orgs.filter(o => 
+      o.ownerDid === userDid || 
+      (Array.isArray(o.members) && o.members.some(m => m.userDid === userDid))
+    );
+    return userOrgs.length > 0 ? userOrgs : orgs;
+  }
+
+  public createOrganization(params: {
+    handle: string;
+    name: string;
+    bio?: string;
+    avatar?: string;
+    bg?: string;
+    verifiedTier?: 'gold' | 'blue' | 'none';
+    ownerDid: string;
+  }): OrganizationRecord {
+    this.load();
+    if (!Array.isArray(this.db.organizations)) this.db.organizations = [];
+    const cleanHandle = params.handle.startsWith('@') ? params.handle : '@' + params.handle;
+    const existing = this.db.organizations.find(o => o.handle.toLowerCase() === cleanHandle.toLowerCase());
+    if (existing) return existing;
+    const newOrg: OrganizationRecord = {
+      id: 'org_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6),
+      handle: cleanHandle,
+      name: params.name,
+      bio: params.bio || '',
+      avatar: params.avatar || '🏢',
+      bg: params.bg || 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+      verifiedTier: params.verifiedTier || 'blue',
+      ownerDid: params.ownerDid,
+      members: [
+        { userDid: params.ownerDid, role: 'OWNER', joinedAt: Date.now() }
+      ],
+      createdAt: Date.now()
+    };
+    this.db.organizations.push(newOrg);
+    this.save();
+    return newOrg;
   }
 
   public deleteChannel(channelId: string, requesterDid?: string): { ok: boolean; error?: string } {

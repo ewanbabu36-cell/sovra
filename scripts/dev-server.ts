@@ -28053,11 +28053,11 @@ function renderHtml(
         <button type="button" onclick="closeIdentitySwitcherSheet()" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; font-size: 1.1rem; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
       </div>
 
-      <!-- Section 1: Personal Citizen Profile Card -->
+      <!-- Section 1: Dynamic Personal Citizen Profile Card -->
       <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Sovereign Citizen Profile</div>
-      <div id="personaCardCitizen" class="identity-card-active" onclick="switchToPersona({ type: 'CITIZEN', id: 'did:sovra:citizen', handle: '@sovereign_citizen', name: 'Sovereign Citizen', roleBadge: 'Citizen', balance: '450.50 SOV' })" style="background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.35); border-radius: 14px; padding: 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
+      <div id="personaCardCitizen" class="identity-card-active" onclick="switchDynamicCitizenPersona()" style="background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.35); border-radius: 14px; padding: 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; color: #fff;">👤</div>
+          <div id="personaCitizenAvatarWrap" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; color: #fff;">👤</div>
           <div>
             <div style="display: flex; align-items: center; gap: 6px;">
               <span id="personaCitizenName" style="font-weight: 800; font-size: 0.95rem; color: #fff;">Sovereign Citizen</span>
@@ -28067,66 +28067,27 @@ function renderHtml(
           </div>
         </div>
         <div style="text-align: right;">
-          <div style="font-size: 0.7rem; color: #94a3b8;">Wallet</div>
-          <div style="font-size: 0.95rem; font-weight: 800; color: #10b981;">450.50 SOV</div>
+          <div style="font-size: 0.7rem; color: #94a3b8;">Liquid Ledger</div>
+          <div id="personaCitizenBalance" style="font-size: 0.95rem; font-weight: 800; color: #10b981;">500.00 SOV</div>
         </div>
       </div>
 
-      <!-- Section 2: Owned Broadcast Channels Carousel -->
-      <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Owned Broadcast Channels (Studio Pro)</div>
+      <!-- Section 2: Dynamic Owned Broadcast Channels Carousel -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Owned Broadcast Channels (Studio Pro)</div>
+        <button type="button" onclick="closeIdentitySwitcherSheet(); openCreateChannelModal();" style="background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; font-size: 0.72rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; cursor: pointer;">+ New Channel</button>
+      </div>
       <div id="identityChannelsList" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 1.25rem;">
-        <div class="identity-channel-card" onclick="switchToPersona({ type: 'CHANNEL', id: 'did:sovra:channel:sovra_news', handle: '@sovra_news', name: 'SOVRA News Network', roleBadge: 'Studio Pro', subscribers: '14.2K' })" style="min-width: 200px; flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.2s ease;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #f59e0b, #ef4444); display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">📡</div>
-            <div>
-              <div style="font-weight: 700; font-size: 0.82rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">SOVRA News Network</div>
-              <div style="font-size: 0.7rem; color: #94a3b8;">14.2K Subscribers</div>
-            </div>
-          </div>
-          <span style="font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);">STUDIO PRO</span>
-        </div>
-        <div class="identity-channel-card" onclick="switchToPersona({ type: 'CHANNEL', id: 'did:sovra:channel:crypto_lab', handle: '@crypto_lab', name: 'Crypto Lab Broadcast', roleBadge: 'Studio Pro', subscribers: '3.8K' })" style="min-width: 200px; flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.2s ease;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #06b6d4, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">⚡</div>
-            <div>
-              <div style="font-weight: 700; font-size: 0.82rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">Crypto Lab Broadcast</div>
-              <div style="font-size: 0.7rem; color: #94a3b8;">3.8K Subscribers</div>
-            </div>
-          </div>
-          <span style="font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: rgba(6,182,212,0.2); color: #06b6d4; border: 1px solid rgba(6,182,212,0.3);">STUDIO PRO</span>
-        </div>
+        <!-- Dynamically rendered by renderDynamicIdentitySwitcher() -->
       </div>
 
-      <!-- Section 3: Affiliated B2B Organizations -->
-      <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Affiliated Organizations (B2B Seats)</div>
+      <!-- Section 3: Dynamic Affiliated B2B Organizations -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Affiliated Organizations (B2B Seats)</div>
+        <button type="button" onclick="closeIdentitySwitcherSheet(); promptCreateOrgModal();" style="background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.3); color: #eab308; font-size: 0.72rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; cursor: pointer;">+ Register Org</button>
+      </div>
       <div id="identityOrgsList" style="display: flex; flex-direction: column; gap: 8px;">
-        <div class="identity-org-row" onclick="switchToPersona({ type: 'ORG', id: 'org_acme_corp', handle: '@acme_global', name: 'Acme Sovereign Corp', roleBadge: 'Owner', checkmark: 'gold' })" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, #eab308, #ca8a04); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 800; color: #000;">🏢</div>
-            <div>
-              <div style="font-weight: 700; font-size: 0.85rem; color: #fff; display: flex; align-items: center; gap: 4px;">
-                <span>Acme Sovereign Corp</span>
-                <span style="color: #eab308;" title="Gold Enterprise Checkmark">✓</span>
-              </div>
-              <div style="font-size: 0.72rem; color: #94a3b8;">@acme_global</div>
-            </div>
-          </div>
-          <span style="font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid rgba(234,179,8,0.4);">OWNER</span>
-        </div>
-
-        <div class="identity-org-row" onclick="switchToPersona({ type: 'ORG', id: 'org_dao_alpha', handle: '@dao_alpha', name: 'Alpha DAO Foundation', roleBadge: 'Admin', checkmark: 'blue' })" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 800; color: #fff;">🏛️</div>
-            <div>
-              <div style="font-weight: 700; font-size: 0.85rem; color: #fff; display: flex; align-items: center; gap: 4px;">
-                <span>Alpha DAO Foundation</span>
-                <span style="color: #3b82f6;" title="Blue Verified Checkmark">✓</span>
-              </div>
-              <div style="font-size: 0.72rem; color: #94a3b8;">@dao_alpha</div>
-            </div>
-          </div>
-          <span style="font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4);">ADMIN</span>
-        </div>
+        <!-- Dynamically rendered by renderDynamicIdentitySwitcher() -->
       </div>
     </div>
   </div>
@@ -48153,6 +48114,7 @@ function renderHtml(
     let feedPostsData = ${safeJsonForScript(livePosts)};
     let allPagesData = ${safeJsonForScript(sovraDb.getAllPages())};
     let allChannelsData = ${safeJsonForScript(sovraDb.getAllChannels())};
+    let allOrgsData = ${safeJsonForScript(sovraDb.getAllOrganizations ? sovraDb.getAllOrganizations() : [])};
     currentProfileGridTab = currentProfileGridTab || 'posts';
     walletBalanceSov = (typeof myProfile !== 'undefined' && myProfile && typeof myProfile.balanceSov === 'number') ? myProfile.balanceSov : (walletBalanceSov || 500.0);
 
@@ -58174,8 +58136,182 @@ function renderHtml(
       avatar: '👤'
     };
 
+    function handlePersonaCardClick(el) {
+      if (!el) return;
+      var type = el.getAttribute('data-type') || 'CITIZEN';
+      var id = el.getAttribute('data-id') || '';
+      var handle = el.getAttribute('data-handle') || '';
+      var name = el.getAttribute('data-name') || '';
+      var roleBadge = el.getAttribute('data-role-badge') || '';
+      var avatar = el.getAttribute('data-avatar') || '';
+      switchToPersona({
+        type: type,
+        id: id,
+        handle: handle,
+        name: name,
+        roleBadge: roleBadge,
+        avatar: avatar
+      });
+    }
+    window.handlePersonaCardClick = handlePersonaCardClick;
+
+    function renderDynamicIdentitySwitcher() {
+      try {
+        var myName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Sovereign Citizen';
+        var myHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : '@sovereign_citizen';
+        var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : 'did:sovra:citizen';
+        var myAvatar = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : '👤';
+        var myBal = (typeof walletBalanceSov === 'number' ? walletBalanceSov.toFixed(2) : (typeof myProfile !== 'undefined' && myProfile && typeof myProfile.balanceSov === 'number' ? myProfile.balanceSov.toFixed(2) : '500.00')) + ' SOV';
+
+        var nameEl = document.getElementById('personaCitizenName');
+        var handleEl = document.getElementById('personaCitizenHandle');
+        var balEl = document.getElementById('personaCitizenBalance');
+        var avatarWrapEl = document.getElementById('personaCitizenAvatarWrap');
+
+        if (nameEl) nameEl.textContent = myName;
+        if (handleEl) handleEl.textContent = myHandle;
+        if (balEl) balEl.textContent = myBal;
+        if (avatarWrapEl) avatarWrapEl.textContent = myAvatar;
+
+        // Render dynamic channels carousel
+        var channelsContainer = document.getElementById('identityChannelsList');
+        if (channelsContainer) {
+          var chList = (typeof allChannelsData !== 'undefined' && Array.isArray(allChannelsData)) ? allChannelsData : [];
+          var ownedCh = chList.filter(function(c) { return myDid && c.ownerDid && c.ownerDid === myDid; });
+          var displayCh = ownedCh.length > 0 ? ownedCh : chList.slice(0, 4);
+
+          var chHtml = '';
+          displayCh.forEach(function(c) {
+            var subsText = (typeof c.count === 'number' && c.count >= 1000) ? (c.count / 1000).toFixed(1) + 'K Subscribers' : (c.count || 0) + ' Subscribers';
+            var safeName = String(c.name || 'Studio Channel');
+            var safeHandle = String(c.handle || '@channel');
+            var safeId = String(c.id || '');
+            var avatarIcon = c.avatar || '📡';
+
+            chHtml += '<div class="identity-channel-card" data-type="CHANNEL" data-id="' + safeId + '" data-handle="' + safeHandle + '" data-name="' + safeName + '" data-role-badge="Studio Pro" data-avatar="' + avatarIcon + '" onclick="handlePersonaCardClick(this)" style="min-width: 200px; flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.2s ease;">' +
+              '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">' +
+                '<div style="width: 32px; height: 32px; border-radius: 8px; background: ' + (c.bg || 'linear-gradient(135deg, #f59e0b, #ef4444)') + '; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">' + avatarIcon + '</div>' +
+                '<div style="overflow: hidden;">' +
+                  '<div style="font-weight: 700; font-size: 0.82rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">' + c.name + '</div>' +
+                  '<div style="font-size: 0.7rem; color: #94a3b8;">' + subsText + '</div>' +
+                '</div>' +
+              '</div>' +
+              '<span style="font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);">STUDIO PRO</span>' +
+            '</div>';
+          });
+
+          // Add New Channel Tile
+          chHtml += '<div onclick="closeIdentitySwitcherSheet(); openCreateChannelModal();" style="min-width: 140px; background: rgba(56,189,248,0.04); border: 1px dashed rgba(56,189,248,0.35); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; text-align: center;">' +
+            '<div style="font-size: 1.2rem; margin-bottom: 4px;">➕</div>' +
+            '<div style="font-size: 0.75rem; font-weight: 700; color: #38bdf8;">New Channel</div>' +
+          '</div>';
+
+          channelsContainer.innerHTML = chHtml;
+        }
+
+        // Render dynamic organizations
+        var orgsContainer = document.getElementById('identityOrgsList');
+        if (orgsContainer) {
+          var orgList = (typeof allOrgsData !== 'undefined' && Array.isArray(allOrgsData)) ? allOrgsData : [];
+          var orgHtml = '';
+          orgList.forEach(function(o) {
+            var safeName = String(o.name || 'Organization');
+            var safeHandle = String(o.handle || '@org');
+            var safeId = String(o.id || '');
+            var avatarIcon = o.avatar || '🏢';
+            var checkColor = o.verifiedTier === 'gold' ? '#eab308' : '#38bdf8';
+            var roleBadge = (o.ownerDid === myDid) ? 'OWNER' : 'ADMIN';
+
+            orgHtml += '<div class="identity-org-row" data-type="ORG" data-id="' + safeId + '" data-handle="' + safeHandle + '" data-name="' + safeName + '" data-role-badge="' + roleBadge + '" data-avatar="' + avatarIcon + '" onclick="handlePersonaCardClick(this)" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">' +
+              '<div style="display: flex; align-items: center; gap: 10px;">' +
+                '<div style="width: 34px; height: 34px; border-radius: 8px; background: ' + (o.bg || 'linear-gradient(135deg, #eab308, #ca8a04)') + '; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 800; color: #000;">' + avatarIcon + '</div>' +
+                '<div>' +
+                  '<div style="font-weight: 700; font-size: 0.85rem; color: #fff; display: flex; align-items: center; gap: 4px;">' +
+                    '<span>' + o.name + '</span>' +
+                    '<span style="color: ' + checkColor + ';" title="Verified Checkmark">✓</span>' +
+                  '</div>' +
+                  '<div style="font-size: 0.72rem; color: #94a3b8;">' + o.handle + '</div>' +
+                '</div>' +
+              '</div>' +
+              '<span style="font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid rgba(234,179,8,0.4);">' + roleBadge + '</span>' +
+            '</div>';
+          });
+
+          orgsContainer.innerHTML = orgHtml;
+        }
+      } catch (err) {
+        console.warn('renderDynamicIdentitySwitcher error:', err);
+      }
+    }
+    window.renderDynamicIdentitySwitcher = renderDynamicIdentitySwitcher;
+
+    function switchDynamicCitizenPersona() {
+      var myName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Sovereign Citizen';
+      var myHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : '@sovereign_citizen';
+      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : 'did:sovra:citizen';
+      var myBal = (typeof walletBalanceSov === 'number' ? walletBalanceSov.toFixed(2) : '500.00') + ' SOV';
+      switchToPersona({
+        type: 'CITIZEN',
+        id: myDid,
+        handle: myHandle,
+        name: myName,
+        roleBadge: 'Citizen',
+        balance: myBal,
+        avatar: (typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : '👤'
+      });
+    }
+    window.switchDynamicCitizenPersona = switchDynamicCitizenPersona;
+
+    function promptCreateOrgModal() {
+      var name = prompt('🏢 Enter Enterprise Organization / DAO Name (e.g. Apex Labs Corp):');
+      if (!name || !name.trim()) return;
+      var handle = prompt('🏷️ Enter Unique Handle (e.g. @apex_labs):');
+      if (!handle || !handle.trim()) return;
+      var cleanHandle = handle.trim().startsWith('@') ? handle.trim() : ('@' + handle.trim());
+
+      var token = (typeof getEffectiveSessionToken === 'function') ? getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
+      var headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+
+      fetch('/api/organizations/create', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          name: name.trim(),
+          handle: cleanHandle,
+          bio: 'Registered Sovereign B2B Organization Node'
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && data.ok && data.organization) {
+          if (typeof allOrgsData !== 'undefined' && Array.isArray(allOrgsData)) {
+            allOrgsData.unshift(data.organization);
+          }
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('🏢 Enterprise Organization registered: ' + data.organization.name, 'success');
+          }
+          switchToPersona({
+            type: 'ORG',
+            id: data.organization.id,
+            handle: data.organization.handle,
+            name: data.organization.name,
+            roleBadge: 'OWNER',
+            avatar: data.organization.avatar || '🏢'
+          });
+        } else {
+          alert('Could not register organization: ' + (data && data.error ? data.error : 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        alert('Registration request failed: ' + err.message);
+      });
+    }
+    window.promptCreateOrgModal = promptCreateOrgModal;
+
     function openIdentitySwitcherSheet(e) {
       if (e) e.stopPropagation();
+      renderDynamicIdentitySwitcher();
       var overlay = document.getElementById('identitySwitcherOverlay');
       if (overlay) {
         overlay.style.display = 'flex';
@@ -85628,6 +85764,44 @@ async function startDevServer() {
       enforceAuth,
       broadcastChatEvent: (recip, payload, eventType) => broadcastChatEvent(recip, payload, eventType),
     })) {
+      return;
+    }
+
+    // ==========================================
+    // 🏢 B2B ENTERPRISE ORGANIZATIONS API
+    // ==========================================
+    if (url.pathname === '/api/organizations/list' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, organizations: sovraDb.getAllOrganizations ? sovraDb.getAllOrganizations() : [] }));
+      return;
+    }
+
+    if (url.pathname === '/api/organizations/create' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        if (!parsed.name || !parsed.handle) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Organization name and handle are required' }));
+          return;
+        }
+        const principal = resolvePrincipal(req);
+        const ownerDid = principal ? principal.did : 'did:sovra:citizen';
+        const newOrg = sovraDb.createOrganization({
+          name: parsed.name,
+          handle: parsed.handle,
+          bio: parsed.bio || '',
+          avatar: parsed.avatar || '🏢',
+          verifiedTier: parsed.verifiedTier || 'gold',
+          ownerDid: ownerDid
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, organization: newOrg }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to create organization' }));
+      }
       return;
     }
 

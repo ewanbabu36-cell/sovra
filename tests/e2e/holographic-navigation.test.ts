@@ -201,4 +201,42 @@ describe('Sovra Holographic Central Navigation & Clean Production UI Gate', { ti
     expect(html).toContain('#profileSettingsBtn {');
     expect(html).toContain('.sovra-surface-card.is-active');
   });
+
+  it('renders 100% dynamic Horizon Multi-Persona Identity Switcher backed by dynamic organizations & channels', async () => {
+    // 1. Verify dynamic switcher DOM hooks and JS rendering function
+    const res = await fetch(`${BASE_URL}/`);
+    const html = await res.text();
+    expect(html).toContain('id="identitySwitcherSheet"');
+    expect(html).toContain('id="personaCitizenName"');
+    expect(html).toContain('id="personaCitizenHandle"');
+    expect(html).toContain('id="personaCitizenBalance"');
+    expect(html).toContain('id="identityChannelsList"');
+    expect(html).toContain('id="identityOrgsList"');
+    expect(html).toContain('renderDynamicIdentitySwitcher');
+    expect(html).toContain('promptCreateOrgModal');
+
+    // 2. Verify dynamic B2B Organizations API
+    const orgsRes = await fetch(`${BASE_URL}/api/organizations/list`);
+    expect(orgsRes.status).toBe(200);
+    const orgsData = await orgsRes.json();
+    expect(orgsData.ok).toBe(true);
+    expect(Array.isArray(orgsData.organizations)).toBe(true);
+    expect(orgsData.organizations.length).toBeGreaterThan(0);
+
+    // 3. Verify B2B Organization registration endpoint
+    const createRes = await fetch(`${BASE_URL}/api/organizations/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Apex Test Enterprise',
+        handle: '@apex_test_corp',
+        bio: 'Automated test enterprise node'
+      })
+    });
+    expect(createRes.status).toBe(200);
+    const createData = await createRes.json();
+    expect(createData.ok).toBe(true);
+    expect(createData.organization.name).toBe('Apex Test Enterprise');
+    expect(createData.organization.handle).toBe('@apex_test_corp');
+  });
 });
