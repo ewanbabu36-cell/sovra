@@ -15380,10 +15380,10 @@ function renderHtml(
         width: 100% !important;
         display: flex !important;
         flex-direction: row !important;
-        flex-wrap: nowrap !important;
+        flex-wrap: wrap !important;
         align-items: center !important;
-        gap: 6px !important;
-        justify-content: space-between !important;
+        gap: 8px !important;
+        justify-content: flex-start !important;
         margin-top: 0.5rem !important;
         margin-bottom: 0.75rem !important;
       }
@@ -15391,20 +15391,35 @@ function renderHtml(
         min-height: 38px !important;
         height: 38px !important;
         box-sizing: border-box !important;
+        font-size: 0.82rem !important;
+        border-radius: 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        white-space: nowrap !important;
+      }
+      .profile-actions-wrap .profile-btn svg {
+        flex-shrink: 0 !important;
       }
       .profile-actions-wrap .profile-btn-primary {
-        flex: 1.2 !important;
+        flex: 1 1 calc(50% - 4px) !important;
         min-width: 0 !important;
         padding: 0 10px !important;
-        font-size: 0.8rem !important;
-        border-radius: 10px !important;
       }
-      .profile-actions-wrap .profile-settings-btn {
-        flex: 1 !important;
+      .profile-actions-wrap #profileOpenWalletBtn {
+        flex: 1 1 calc(50% - 4px) !important;
         min-width: 0 !important;
         padding: 0 10px !important;
-        font-size: 0.8rem !important;
-        border-radius: 10px !important;
+      }
+      .profile-actions-wrap #btnBackupSovereignIdentity {
+        flex: 1 1 calc(38% - 6px) !important;
+        min-width: 0 !important;
+        padding: 0 10px !important;
+      }
+      .profile-actions-wrap #profileSettingsBtn {
+        flex: 1 1 calc(38% - 6px) !important;
+        min-width: 0 !important;
+        padding: 0 10px !important;
       }
       .profile-actions-wrap #toggleGhostModeBtn {
         flex: 0 0 38px !important;
@@ -16517,10 +16532,14 @@ function renderHtml(
         border-radius: 24px 24px 0 0 !important;
         transform: translateY(100%);
         transform-origin: bottom center !important;
+        z-index: 100002 !important;
       }
 
       .sovra-surface-card.is-active {
         transform: translateY(0) !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        z-index: 100002 !important;
       }
 
       .sovra-surface-card.is-receded {
@@ -21226,16 +21245,16 @@ function renderHtml(
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                 <span>Wallet</span>
               </button>
-              <button class="profile-btn profile-btn-secondary" id="btnBackupSovereignIdentity" onclick="openSovereignBackupModal()" aria-label="Backup Sovereign Identity" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.35); color: #a5b4fc; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;" title="Backup 12-Word Sovereign Mnemonic Seed Phrase">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-                <span>🔑 Backup</span>
+              <button class="profile-btn profile-btn-secondary" id="btnBackupSovereignIdentity" onclick="openSovereignBackupModal()" aria-label="Backup Sovereign Identity" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.35); color: #a5b4fc; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" title="Backup 12-Word Sovereign Mnemonic Seed Phrase">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                <span>Backup</span>
               </button>
               <!-- Hidden duplicate to preserve ID without visual redundancy (Single Authoritative trigger below Bio) -->
               <button class="profile-btn profile-btn-secondary" id="profileChannelsBtn" onclick="openSpatialChannelsPagesSurface(this)" aria-label="Channels &amp; Public Pages" style="display: none;">
                 <span>Channels &amp; Pages</span>
               </button>
-              <button class="profile-btn profile-btn-secondary" id="profileSettingsBtn" onclick="openSpatialSettingsSurface(this)" aria-label="Settings" style="display: inline-flex; align-items: center; gap: 6px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <button class="profile-btn profile-btn-secondary" id="profileSettingsBtn" onclick="openSpatialSettingsSurface(this)" aria-label="Settings" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 <span>Settings</span>
               </button>
               <div class="profile-overflow-wrap">
@@ -33539,6 +33558,18 @@ function renderHtml(
         render: function(bodyEl, ctx) {
           let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
 
+          // 0A. Direct Full Page Settings Console
+          html += '<div class="spatial-option-card" id="spatialSettingsFullPageItem" onclick="window.SovraSurfaceManager.closeAll(); switchTab(&quot;settings&quot;);" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); cursor: pointer;">' +
+            '<div class="spatial-option-card-left">' +
+              '<div class="spatial-option-icon" style="background: rgba(255, 255, 255, 0.1); color: #fff;">⚙️</div>' +
+              '<div class="spatial-option-details">' +
+                '<div class="spatial-option-title" style="color: #fff; font-weight: 700;">All Settings &amp; Preferences</div>' +
+                '<div class="spatial-option-desc">Open dedicated full-page settings console</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="color: #94a3b8; font-size: 1.1rem; font-weight: 700;">›</div>' +
+          '</div>';
+
           // 0. Account & Security Settings Hub (Prominent entry point requested by user)
           html += '<div class="spatial-option-card" id="spatialSettingsSecurityHubItem" onclick="window.openSpatialSecurityHubSurface(this)" style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(99, 102, 241, 0.12) 100%); border: 1px solid rgba(56, 189, 248, 0.35); box-shadow: 0 4px 16px rgba(56, 189, 248, 0.08);">' +
             '<div class="spatial-option-card-left">' +
@@ -41429,6 +41460,10 @@ function renderHtml(
       if (!modal || !grid) return;
 
       modal.style.display = 'flex';
+      modal.classList.add('is-open');
+      modal.classList.add('active');
+      modal.style.opacity = '1';
+      modal.style.pointerEvents = 'auto';
 
       function renderWords(phrase) {
         _activeMnemonicPhrase = phrase;
@@ -41446,7 +41481,10 @@ function renderHtml(
       if (myProfile && myProfile.recoveryPhrase && myProfile.recoveryPhrase.trim()) {
         renderWords(myProfile.recoveryPhrase);
       } else {
-        fetch('/api/user/recovery-phrase')
+        var token = (typeof getEffectiveSessionToken === 'function') ? getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
+        var url = '/api/user/recovery-phrase' + (token ? ('?sessionToken=' + encodeURIComponent(token)) : '');
+        var headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        fetch(url, { headers: headers })
           .then(function(r) { return r.json(); })
           .then(function(data) {
             if (data && data.ok && data.recoveryPhrase) {
@@ -41465,11 +41503,21 @@ function renderHtml(
           });
       }
     }
+    window.openSovereignBackupModal = openSovereignBackupModal;
 
     function closeSovereignBackupModal() {
       var modal = document.getElementById('sovereignBackupModal');
-      if (modal) modal.style.display = 'none';
+      if (modal) {
+        modal.classList.remove('is-open');
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+        modal.style.opacity = '0';
+        modal.style.pointerEvents = 'none';
+      }
     }
+    window.closeSovereignBackupModal = closeSovereignBackupModal;
+    window.copyMnemonicToClipboard = copyMnemonicToClipboard;
+    window.downloadKeystoreFile = downloadKeystoreFile;
 
     function copyMnemonicToClipboard() {
       var phrase = _activeMnemonicPhrase || (myProfile && myProfile.recoveryPhrase) || '';
