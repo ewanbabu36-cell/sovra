@@ -60,6 +60,10 @@ export class SqliteSocialDatabaseEngine {
     return this.migrationRunner;
   }
 
+  public getRawDb(): DatabaseSync {
+    return this.db;
+  }
+
   public prepareCached(sql: string): StatementSync {
     let stmt = this.stmtCache.get(sql);
     if (!stmt) {
@@ -638,6 +642,32 @@ export class SqliteSocialDatabaseEngine {
         created_by TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
+
+      -- 38. ROLE-BASED ACCESS CONTROL (RBAC PERMISSIONS MATRIX)
+      CREATE TABLE IF NOT EXISTS admin_rbac_roles (
+        admin_did TEXT PRIMARY KEY,
+        role TEXT NOT NULL,
+        permissions_json TEXT NOT NULL,
+        assigned_by TEXT NOT NULL,
+        assigned_at INTEGER NOT NULL
+      );
+
+      -- 39. CRYPTOGRAPHIC TAMPER-EVIDENT AUDIT LEDGER (MERKLE HASH CHAIN)
+      CREATE TABLE IF NOT EXISTS admin_tamper_evident_audit_ledger (
+        entry_id TEXT PRIMARY KEY,
+        sequence_num INTEGER NOT NULL,
+        admin_did TEXT NOT NULL,
+        role TEXT NOT NULL,
+        action_type TEXT NOT NULL,
+        target_resource TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        ip_address TEXT NOT NULL,
+        prev_hash TEXT NOT NULL,
+        current_hash TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_seq ON admin_tamper_evident_audit_ledger(sequence_num);
+      CREATE INDEX IF NOT EXISTS idx_audit_admin ON admin_tamper_evident_audit_ledger(admin_did);
     `);
 
     // Seed default algorithmic dials if empty
@@ -701,6 +731,35 @@ export class SqliteSocialDatabaseEngine {
         for (const [id, label, desc] of seedSwitches) {
           insertSwitch.run(id, label, desc);
         }
+      }
+
+      // Seed default RBAC roles if empty
+      const rbacCount = (this.db.prepare('SELECT COUNT(*) as c FROM admin_rbac_roles').get() as any)?.c || 0;
+      if (rbacCount === 0) {
+        const seedRoles: Array<[string, string, string[], string]> = [
+          ['did:sov:admin_root', 'SUPER_ADMIN', ['*'], 'SYSTEM_GENESIS'],
+          ['did:sov:admin_commander', 'INCIDENT_COMMANDER', ['kill_switches:write', 'broadcasts:write', 'sessions:terminate', 'telemetry:read'], 'did:sov:admin_root'],
+          ['did:sov:admin_auditor', 'FINANCE_AUDITOR', ['solvency:read', 'take_rate:write', 'ledger:transfer', 'wash_trading:read', 'disintermediation:read'], 'did:sov:admin_root'],
+          ['did:sov:admin_moderator', 'CONTENT_MODERATOR', ['god_dial:write', 'shadowbans:write', 'flags:write', 'forensics:read'], 'did:sov:admin_root'],
+          ['did:sov:admin_observer', 'SYSTEM_OBSERVER', ['*:read'], 'did:sov:admin_root'],
+        ];
+        const insertRole = this.db.prepare('INSERT OR REPLACE INTO admin_rbac_roles (admin_did, role, permissions_json, assigned_by, assigned_at) VALUES (?, ?, ?, ?, ?)');
+        for (const [did, role, perms, by] of seedRoles) {
+          insertRole.run(did, role, JSON.stringify(perms), by, Date.now());
+        }
+      }
+
+      // Seed genesis audit entry if empty
+      const auditCount = (this.db.prepare('SELECT COUNT(*) as c FROM admin_tamper_evident_audit_ledger').get() as any)?.c || 0;
+      if (auditCount === 0) {
+        const genesisPrev = '0000000000000000000000000000000000000000000000000000000000000000';
+        const now = Date.now();
+        const payloadStr = JSON.stringify({ genesis: true, version: '1.0.0' });
+        const genesisHash = crypto.createHash('sha256').update(genesisPrev + ':0:did:sov:system_genesis:GENESIS_INITIALIZE:SYSTEM_CORE:' + payloadStr + ':' + now).digest('hex');
+        this.db.prepare(`
+          INSERT INTO admin_tamper_evident_audit_ledger (entry_id, sequence_num, admin_did, role, action_type, target_resource, payload_json, ip_address, prev_hash, current_hash, created_at)
+          VALUES ('audit_genesis', 0, 'did:sov:system_genesis', 'SYSTEM', 'GENESIS_INITIALIZE', 'SYSTEM_CORE', ?, '127.0.0.1', ?, ?, ?)
+        `).run(payloadStr, genesisPrev, genesisHash, now);
       }
     } catch (_) {}
     try {
@@ -952,6 +1011,10 @@ export class SqliteSocialDatabaseEngine {
       const res = this.registerUser(user);
       return res.user!;
     }
+  }
+
+  public getUserByDid(did: string): UserRecord | undefined {
+    return this.findUserByDid(did);
   }
 
   public findUserByDid(did: string): UserRecord | undefined {
@@ -2694,6 +2757,418 @@ export class SqliteSocialDatabaseEngine {
     } catch (_) {
       return [];
     }
+  }
+
+  // ==========================================
+  // 🔐 ROLE-BASED ACCESS CONTROL (RBAC) STATION
+  // ==========================================
+  public assignRbacRole(adminDid: string, role: string, permissions: string[], assignedBy = 'did:sov:admin_root'): void {
+    const now = Date.now();
+    this.prepareCached(`
+      INSERT OR REPLACE INTO admin_rbac_roles (admin_did, role, permissions_json, assigned_by, assigned_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(adminDid, role, JSON.stringify(permissions), assignedBy, now);
+
+    this.recordTamperProofAuditEntry({
+      adminDid: assignedBy,
+      role: 'SUPER_ADMIN',
+      actionType: 'RBAC_ROLE_ASSIGNED',
+      targetResource: adminDid,
+      payload: { role, permissions },
+      ipAddress: '127.0.0.1',
+    });
+  }
+
+  public getRbacRole(adminDid: string): { adminDid: string; role: string; permissions: string[] } | null {
+    if (adminDid === 'did:sov:admin_root') {
+      return { adminDid, role: 'SUPER_ADMIN', permissions: ['*'] };
+    }
+    try {
+      const row = this.db.prepare('SELECT admin_did, role, permissions_json FROM admin_rbac_roles WHERE admin_did = ?').get(adminDid) as any;
+      if (!row) return null;
+      return {
+        adminDid: row.admin_did,
+        role: row.role,
+        permissions: JSON.parse(row.permissions_json || '[]'),
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  public listRbacRoles(): Array<{ adminDid: string; role: string; permissions: string[]; assignedBy: string; assignedAt: number }> {
+    try {
+      const rows = this.db.prepare('SELECT admin_did, role, permissions_json, assigned_by, assigned_at FROM admin_rbac_roles ORDER BY assigned_at DESC').all() as any[];
+      return rows.map(r => ({
+        adminDid: r.admin_did,
+        role: r.role,
+        permissions: JSON.parse(r.permissions_json || '[]'),
+        assignedBy: r.assigned_by,
+        assignedAt: r.assigned_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public hasPermission(adminDid: string, permission: string): boolean {
+    if (!adminDid || adminDid === 'did:sov:admin_root') return true;
+    const rbac = this.getRbacRole(adminDid);
+    if (!rbac) return false;
+    if (rbac.permissions.includes('*')) return true;
+    if (rbac.permissions.includes(permission)) return true;
+    // Check wildcard prefix e.g. "kill_switches:*" or "*:read"
+    for (const p of rbac.permissions) {
+      if (p.endsWith(':*') && permission.startsWith(p.replace(':*', ':'))) return true;
+      if (p.startsWith('*:') && permission.endsWith(p.replace('*:', ':'))) return true;
+    }
+    return false;
+  }
+
+  // ==========================================
+  // ⛓️ CRYPTOGRAPHIC TAMPER-EVIDENT AUDIT LEDGER
+  // ==========================================
+  public recordTamperProofAuditEntry(params: {
+    adminDid: string;
+    role?: string;
+    actionType: string;
+    targetResource: string;
+    payload: any;
+    ipAddress?: string;
+  }): { entryId: string; sequenceNum: number; prevHash: string; currentHash: string; createdAt: number } {
+    const now = Date.now();
+    const entryId = 'aud_' + crypto.randomUUID().slice(0, 10);
+    const ip = params.ipAddress || '127.0.0.1';
+    const role = params.role || this.getRbacRole(params.adminDid)?.role || 'ADMIN';
+    const payloadStr = typeof params.payload === 'string' ? params.payload : JSON.stringify(params.payload || {});
+
+    // Fetch latest entry for hash-chaining
+    let prevHash = '0000000000000000000000000000000000000000000000000000000000000000';
+    let sequenceNum = 0;
+    try {
+      const lastEntry = this.db.prepare('SELECT sequence_num, current_hash FROM admin_tamper_evident_audit_ledger ORDER BY sequence_num DESC LIMIT 1').get() as any;
+      if (lastEntry) {
+        prevHash = lastEntry.current_hash;
+        sequenceNum = Number(lastEntry.sequence_num) + 1;
+      }
+    } catch (_) {}
+
+    const hashInput = `${prevHash}:${sequenceNum}:${params.adminDid}:${params.actionType}:${params.targetResource}:${payloadStr}:${now}`;
+    const currentHash = crypto.createHash('sha256').update(hashInput).digest('hex');
+
+    try {
+      this.prepareCached(`
+        INSERT INTO admin_tamper_evident_audit_ledger (
+          entry_id, sequence_num, admin_did, role, action_type, target_resource, payload_json, ip_address, prev_hash, current_hash, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(entryId, sequenceNum, params.adminDid, role, params.actionType, params.targetResource, payloadStr, ip, prevHash, currentHash, now);
+    } catch (_) {}
+
+    return {
+      entryId,
+      sequenceNum,
+      prevHash,
+      currentHash,
+      createdAt: now,
+    };
+  }
+
+  public getTamperProofAuditLedger(limit = 100): Array<{
+    entryId: string;
+    sequenceNum: number;
+    adminDid: string;
+    role: string;
+    actionType: string;
+    targetResource: string;
+    payload: any;
+    ipAddress: string;
+    prevHash: string;
+    currentHash: string;
+    createdAt: number;
+  }> {
+    try {
+      const rows = this.db.prepare(`
+        SELECT entry_id, sequence_num, admin_did, role, action_type, target_resource, payload_json, ip_address, prev_hash, current_hash, created_at
+        FROM admin_tamper_evident_audit_ledger
+        ORDER BY sequence_num DESC
+        LIMIT ?
+      `).all(limit) as any[];
+
+      return rows.map(r => {
+        let parsedPayload = {};
+        try { parsedPayload = JSON.parse(r.payload_json); } catch (_) { parsedPayload = r.payload_json; }
+        return {
+          entryId: r.entry_id,
+          sequenceNum: r.sequence_num,
+          adminDid: r.admin_did,
+          role: r.role,
+          actionType: r.action_type,
+          targetResource: r.target_resource,
+          payload: parsedPayload,
+          ipAddress: r.ip_address,
+          prevHash: r.prev_hash,
+          currentHash: r.current_hash,
+          createdAt: r.created_at,
+        };
+      });
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public verifyTamperProofAuditChain(): {
+    isValid: boolean;
+    totalEntries: number;
+    tamperedAtSeq?: number;
+    headHash: string;
+    reason?: string;
+  } {
+    try {
+      const rows = this.db.prepare(`
+        SELECT entry_id, sequence_num, admin_did, role, action_type, target_resource, payload_json, ip_address, prev_hash, current_hash, created_at
+        FROM admin_tamper_evident_audit_ledger
+        ORDER BY sequence_num ASC
+      `).all() as any[];
+
+      if (rows.length === 0) {
+        return { isValid: true, totalEntries: 0, headHash: 'EMPTY' };
+      }
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (i === 0) {
+          if (row.sequence_num !== 0) {
+            return { isValid: false, totalEntries: rows.length, tamperedAtSeq: row.sequence_num, headHash: row.current_hash, reason: 'Genesis sequence number is not 0' };
+          }
+        } else {
+          const prevRow = rows[i - 1];
+          if (row.prev_hash !== prevRow.current_hash) {
+            return {
+              isValid: false,
+              totalEntries: rows.length,
+              tamperedAtSeq: row.sequence_num,
+              headHash: rows[rows.length - 1].current_hash,
+              reason: `Broken hash chain at sequence ${row.sequence_num}: prev_hash does not match previous current_hash`,
+            };
+          }
+          if (row.sequence_num !== prevRow.sequence_num + 1) {
+            return {
+              isValid: false,
+              totalEntries: rows.length,
+              tamperedAtSeq: row.sequence_num,
+              headHash: rows[rows.length - 1].current_hash,
+              reason: `Missing sequence gap detected between ${prevRow.sequence_num} and ${row.sequence_num}`,
+            };
+          }
+        }
+
+        // Recompute current_hash to detect unauthorized column alterations
+        const expectedHash = crypto.createHash('sha256').update(
+          `${row.prev_hash}:${row.sequence_num}:${row.admin_did}:${row.action_type}:${row.target_resource}:${row.payload_json}:${row.created_at}`
+        ).digest('hex');
+
+        if (row.current_hash !== expectedHash) {
+          return {
+            isValid: false,
+            totalEntries: rows.length,
+            tamperedAtSeq: row.sequence_num,
+            headHash: rows[rows.length - 1].current_hash,
+            reason: `Cryptographic signature mismatch at sequence ${row.sequence_num}: payload or metadata was altered`,
+          };
+        }
+      }
+
+      return {
+        isValid: true,
+        totalEntries: rows.length,
+        headHash: rows[rows.length - 1].current_hash,
+      };
+    } catch (err: any) {
+      return { isValid: false, totalEntries: 0, headHash: 'ERROR', reason: err.message };
+    }
+  }
+
+  // ==========================================
+  // ⚖️ ATOMIC 4-COLUMN DOUBLE-ENTRY BALANCE TRANSFER ENGINE
+  // ==========================================
+  public executeAtomicLedgerTransfer(params: {
+    fromDid: string;
+    toDid: string;
+    amountSov: number;
+    feeSov?: number;
+    txType?: string;
+    memo?: string;
+    adminDid?: string;
+    requireSolvencyCheck?: boolean;
+    ipAddress?: string;
+  }): {
+    txId: string;
+    fromBalanceAfter: number;
+    toBalanceAfter: number;
+    solvencyInvariantPassed: boolean;
+    invariantDeltaSov: number;
+  } {
+    const adminDid = params.adminDid || 'did:sov:admin_root';
+    const feeSov = params.feeSov || 0.0;
+    const amountSov = Math.round(Number(params.amountSov) * 100) / 100;
+    if (amountSov <= 0) {
+      throw new Error('Transfer amount must be strictly positive');
+    }
+
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      let fromBalance = 0;
+      if (params.fromDid !== 'did:sov:treasury_genesis' && !params.fromDid.startsWith('did:sov:mint:')) {
+        const sender = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(params.fromDid) as any;
+        if (!sender) {
+          throw new Error(`Sender DID ${params.fromDid} not found`);
+        }
+        fromBalance = Number(sender.balance_sov || 0);
+        if (fromBalance < (amountSov + feeSov)) {
+          throw new Error(`Insufficient balance: sender has ${fromBalance} SOV, requested ${amountSov + feeSov} SOV`);
+        }
+        this.db.prepare('UPDATE users SET balance_sov = balance_sov - ?, updated_at = ? WHERE did = ?')
+          .run(amountSov + feeSov, Date.now(), params.fromDid);
+        fromBalance = fromBalance - (amountSov + feeSov);
+      }
+
+      let toBalance = 0;
+      if (params.toDid !== 'did:sov:treasury_burn' && !params.toDid.startsWith('did:sov:burn:')) {
+        const receiver = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(params.toDid) as any;
+        if (!receiver) {
+          throw new Error(`Receiver DID ${params.toDid} not found`);
+        }
+        this.db.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?')
+          .run(amountSov, Date.now(), params.toDid);
+        toBalance = Number(receiver.balance_sov || 0) + amountSov;
+      }
+
+      const txId = 'tx_' + crypto.randomUUID().slice(0, 12);
+      const now = Date.now();
+      this.db.prepare(`
+        INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(txId, params.fromDid, params.toDid, amountSov, feeSov, params.txType || 'ADMIN_LEDGER_TRANSFER', now);
+
+      // Verify 4-Column Double-Entry Solvency Invariant
+      const audit = this.getTreasurySolvencyReport();
+      if (params.requireSolvencyCheck !== false && !audit.isSolvent) {
+        throw new Error(`Solvency invariant violation detected! Delta: ${audit.solvencyDeltaSov} SOV. Transaction aborted.`);
+      }
+
+      this.db.exec('COMMIT');
+
+      // Record tamper-evident audit log
+      this.recordTamperProofAuditEntry({
+        adminDid,
+        role: 'SUPER_ADMIN',
+        actionType: 'ATOMIC_LEDGER_TRANSFER',
+        targetResource: txId,
+        payload: {
+          fromDid: params.fromDid,
+          toDid: params.toDid,
+          amountSov,
+          feeSov,
+          txType: params.txType,
+          memo: params.memo,
+          solvencyDeltaSov: audit.solvencyDeltaSov,
+        },
+        ipAddress: params.ipAddress || '127.0.0.1',
+      });
+
+      return {
+        txId,
+        fromBalanceAfter: fromBalance,
+        toBalanceAfter: toBalance,
+        solvencyInvariantPassed: audit.isSolvent,
+        invariantDeltaSov: audit.solvencyDeltaSov,
+      };
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  // ==========================================
+  // ⚡ ZERO-BLOCKING ASYNC WASH-TRADING CYCLE DETECTOR
+  // ==========================================
+  public async detectWashTradingCyclesAsync(
+    lookbackHours = 72,
+    maxSliceBudgetMs = 5
+  ): Promise<Array<{ id: string; cycle: string[]; totalVolumeSov: number; txCount: number; detectedAt: number }>> {
+    const cutoff = Date.now() - (lookbackHours * 3600 * 1000);
+    let rows: any[] = [];
+    try {
+      rows = this.db.prepare('SELECT from_did, to_did, amount_sov, created_at FROM token_transfers WHERE created_at >= ?').all(cutoff) as any[];
+    } catch (_) {
+      return [];
+    }
+
+    if (rows.length < 2) return [];
+
+    const adj = new Map<string, Array<{ to: string; amount: number }>>();
+    for (const r of rows) {
+      if (!adj.has(r.from_did)) adj.set(r.from_did, []);
+      adj.get(r.from_did)!.push({ to: r.to_did, amount: Number(r.amount_sov) });
+    }
+
+    const detectedCycles: Array<{ id: string; cycle: string[]; totalVolumeSov: number; txCount: number; detectedAt: number }> = [];
+    const seenCycles = new Set<string>();
+
+    function canonicalize(path: string[]): string {
+      let minIdx = 0;
+      for (let i = 1; i < path.length; i++) {
+        if (path[i] < path[minIdx]) minIdx = i;
+      }
+      const rotated = [...path.slice(minIdx), ...path.slice(0, minIdx)];
+      return rotated.join('->');
+    }
+
+    let sliceStartTime = performance.now();
+
+    const dfs = async (start: string, current: string, path: string[], volumeAcc: number, depth: number): Promise<void> => {
+      if (depth > 4) return;
+      if (performance.now() - sliceStartTime > maxSliceBudgetMs) {
+        await new Promise(resolve => setImmediate(resolve));
+        sliceStartTime = performance.now();
+      }
+
+      const neighbors = adj.get(current) || [];
+      for (const edge of neighbors) {
+        if (edge.to === start && path.length >= 2) {
+          const canonKey = canonicalize(path);
+          if (!seenCycles.has(canonKey)) {
+            seenCycles.add(canonKey);
+            const cycleId = 'wash_' + crypto.randomUUID().slice(0, 8);
+            detectedCycles.push({
+              id: cycleId,
+              cycle: [...path, start],
+              totalVolumeSov: Math.round((volumeAcc + edge.amount) * 100) / 100,
+              txCount: path.length,
+              detectedAt: Date.now(),
+            });
+          }
+        } else if (!path.includes(edge.to) && depth < 4) {
+          await dfs(start, edge.to, [...path, edge.to], volumeAcc + edge.amount, depth + 1);
+        }
+      }
+    };
+
+    for (const node of adj.keys()) {
+      await dfs(node, node, [node], 0, 1);
+    }
+
+    const insertFlag = this.prepareCached(`
+      INSERT OR REPLACE INTO admin_wash_trading_flags (id, cycle_dids_json, total_volume_sov, tx_count, status, detected_at)
+      VALUES (?, ?, ?, ?, 'FLAGGED', ?)
+    `);
+    for (const c of detectedCycles) {
+      try {
+        insertFlag.run(c.id, JSON.stringify(c.cycle), c.totalVolumeSov, c.txCount, c.detectedAt);
+      } catch (_) {}
+    }
+
+    return detectedCycles;
   }
 
   public close(): void {
