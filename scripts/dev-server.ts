@@ -10071,12 +10071,23 @@ function renderHtml(
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 2.5rem 1.25rem 5rem 1.25rem;
+      padding: 4.25rem 1.25rem 130px 1.25rem;
       box-sizing: border-box;
       overflow-y: auto;
       overflow-x: hidden;
       user-select: none;
-      transition: opacity 0.25s ease, transform 0.25s ease;
+      animation: sovraHomeFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes sovraHomeFadeIn {
+      from { opacity: 0; transform: scale(0.97); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    body.sovra-mode-app .app-layout {
+      animation: sovraAppFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes sovraAppFadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
     }
     body.sovra-mode-app .sovra-home-screen-view {
       display: none !important;
@@ -10090,11 +10101,29 @@ function renderHtml(
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
       box-shadow: none !important;
+      padding: 10px 24px !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      z-index: 100 !important;
     }
-    body.sovra-mode-home .header-brand-wrap,
+    body.sovra-mode-home .header-desktop-nav,
     body.sovra-mode-home .header-search-wrap,
-    body.sovra-mode-home .header-actions-wrap {
-      opacity: 0.85;
+    body.sovra-mode-home .header-quick-slots,
+    body.sovra-mode-home #currentUserPill,
+    body.sovra-mode-home #headerCreateWrap,
+    body.sovra-mode-home #headerChatBtn,
+    body.sovra-mode-home #notificationBellWrap {
+      display: none !important;
+    }
+    body.sovra-mode-home .header-brand-wrap {
+      opacity: 0.95;
+    }
+    body.sovra-mode-home .header-right-zone {
+      display: flex !important;
+      align-items: center !important;
+      gap: 10px !important;
     }
 
     /* Android Glance Widget (Clock & Live Status) */
@@ -10103,8 +10132,8 @@ function renderHtml(
       flex-direction: column;
       align-items: center;
       text-align: center;
-      margin-top: 1.5rem;
-      margin-bottom: 1.75rem;
+      margin-top: 1rem;
+      margin-bottom: 2rem;
       animation: glanceFadeIn 0.5s ease-out;
     }
     @keyframes glanceFadeIn {
@@ -10112,103 +10141,106 @@ function renderHtml(
       to { opacity: 1; transform: translateY(0); }
     }
     .android-glance-clock {
-      font-size: 3.8rem;
-      font-weight: 800;
+      font-size: 5.2rem;
+      font-weight: 850;
       color: #ffffff;
-      line-height: 1;
-      letter-spacing: -0.04em;
-      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+      line-height: 0.95;
+      letter-spacing: -3px;
+      text-shadow: 0 4px 30px rgba(0, 0, 0, 0.7);
       font-variant-numeric: tabular-nums;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Google Sans", sans-serif;
     }
     body.theme-normal .android-glance-clock {
       color: #0f172a !important;
       text-shadow: 0 2px 10px rgba(255, 255, 255, 0.8);
     }
     .android-glance-date {
-      font-size: 1.05rem;
+      font-size: 1.15rem;
       font-weight: 600;
       color: #cbd5e1;
-      margin-top: 6px;
-      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      margin-top: 8px;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+      letter-spacing: 0.2px;
     }
     body.theme-normal .android-glance-date {
       color: #334155 !important;
     }
     .android-glance-status-pill {
-      margin-top: 10px;
-      padding: 5px 14px;
+      margin-top: 12px;
+      padding: 6px 18px;
       border-radius: 999px;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
       color: #e2e8f0;
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 700;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       cursor: pointer;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-      transition: all 0.2s ease;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      transition: all 0.22s ease;
     }
     .android-glance-status-pill:hover {
-      transform: scale(1.04);
+      transform: scale(1.05);
       border-color: #38bdf8;
-      background: rgba(15, 23, 42, 0.8);
+      box-shadow: 0 8px 25px rgba(56, 189, 248, 0.35);
     }
     body.theme-normal .android-glance-status-pill {
-      background: rgba(255, 255, 255, 0.85) !important;
+      background: rgba(255, 255, 255, 0.88) !important;
       border-color: #cbd5e1 !important;
       color: #0f172a !important;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
     }
     .glance-status-dot {
-      width: 7px;
-      height: 7px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: #10b981;
-      box-shadow: 0 0 8px #10b981;
+      box-shadow: 0 0 10px #10b981;
       animation: pulseDot 2s infinite;
     }
 
     /* Android Google/Pixel Search Pill */
     .android-search-pill {
       width: 100%;
-      max-width: 440px;
-      height: 48px;
-      border-radius: 24px;
-      background: rgba(15, 23, 42, 0.55);
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      max-width: 480px;
+      height: 52px;
+      border-radius: 26px;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
       display: flex;
       align-items: center;
-      padding: 0 16px;
-      gap: 10px;
+      padding: 0 18px;
+      gap: 12px;
       cursor: pointer;
-      margin-bottom: 2rem;
+      margin-bottom: 2.2rem;
       transition: all 0.22s ease;
     }
     .android-search-pill:hover {
-      background: rgba(15, 23, 42, 0.75);
-      border-color: rgba(56, 189, 248, 0.5);
+      background: rgba(15, 23, 42, 0.8);
+      border-color: rgba(56, 189, 248, 0.6);
       transform: translateY(-2px);
-      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
     }
     body.theme-normal .android-search-pill {
-      background: rgba(255, 255, 255, 0.88) !important;
+      background: rgba(255, 255, 255, 0.9) !important;
       border-color: #cbd5e1 !important;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
     }
     .android-search-icon {
-      font-size: 1.1rem;
-      opacity: 0.8;
+      font-size: 1.15rem;
+      opacity: 0.85;
+      color: #38bdf8;
     }
     .android-search-placeholder {
       flex: 1;
-      font-size: 0.86rem;
+      font-size: 0.88rem;
       color: #94a3b8;
       font-weight: 500;
     }
@@ -10216,38 +10248,38 @@ function renderHtml(
       color: #64748b !important;
     }
     .android-search-mic {
-      font-size: 1.05rem;
+      font-size: 1.1rem;
       cursor: pointer;
       padding: 4px;
       border-radius: 50%;
       transition: transform 0.2s ease;
+      background: rgba(56, 189, 248, 0.15);
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .android-search-mic:hover {
-      transform: scale(1.2);
+      transform: scale(1.15);
+      background: rgba(56, 189, 248, 0.3);
     }
 
-    /* Android Home Screen App Grid */
+    /* Android Home Screen App Grid (Symmetrical 4-Column Layout) */
     .sovra-home-app-grid {
       display: grid;
-      grid-template-columns: repeat(4, 76px);
-      gap: 22px 18px;
+      grid-template-columns: repeat(4, 82px);
+      gap: 24px 28px;
       justify-content: center;
       width: 100%;
-      max-width: 440px;
-      margin-bottom: 2.5rem;
+      max-width: 480px;
+      margin: 0 auto 2.2rem auto;
     }
     @media (min-width: 640px) {
       .sovra-home-app-grid {
-        grid-template-columns: repeat(5, 82px);
-        gap: 26px 22px;
-        max-width: 560px;
-      }
-    }
-    @media (min-width: 1024px) {
-      .sovra-home-app-grid {
-        grid-template-columns: repeat(6, 86px);
-        gap: 28px 26px;
-        max-width: 720px;
+        grid-template-columns: repeat(4, 92px);
+        gap: 28px 36px;
+        max-width: 540px;
       }
     }
 
@@ -10259,35 +10291,69 @@ function renderHtml(
       position: relative;
     }
     .sovra-home-tile-wrap .sovra-app-tile {
-      width: 64px;
-      height: 64px;
-      border-radius: 20px;
+      width: 70px;
+      height: 70px;
+      border-radius: 22px;
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     }
     @media (min-width: 640px) {
       .sovra-home-tile-wrap .sovra-app-tile {
-        width: 70px;
-        height: 70px;
-        border-radius: 22px;
+        width: 76px;
+        height: 76px;
+        border-radius: 24px;
       }
+    }
+    .sovra-home-tile-wrap .sovra-app-tile:hover {
+      transform: translateY(-5px) scale(1.08);
+    }
+    .sovra-home-tile-wrap .sovra-app-tile-icon {
+      font-size: 1.85rem;
+      line-height: 1;
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
+    }
+    .sovra-home-tile-wrap .sovra-app-tile-label {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-top: 6px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      max-width: 80px;
+    }
+    body.theme-normal .sovra-home-tile-wrap .sovra-app-tile-label {
+      color: #0f172a !important;
+      text-shadow: 0 1px 4px rgba(255, 255, 255, 0.8) !important;
+    }
+
+    .sovra-home-tile-wrap.is-editing .sovra-app-tile {
+      animation: sovraTileJiggle 0.3s infinite alternate ease-in-out;
+    }
+    @keyframes sovraTileJiggle {
+      0% { transform: rotate(-2deg) scale(1.03); }
+      100% { transform: rotate(2deg) scale(1.03); }
     }
 
     .android-home-hint {
       margin-top: auto;
+      margin-bottom: 16px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
-      font-size: 0.72rem;
+      gap: 4px;
+      font-size: 0.74rem;
       font-weight: 700;
-      color: rgba(255, 255, 255, 0.6);
+      color: rgba(255, 255, 255, 0.75);
       cursor: pointer;
-      padding: 8px 16px;
-      border-radius: 20px;
+      padding: 5px 16px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       transition: all 0.2s ease;
     }
     .android-home-hint:hover {
       color: #38bdf8;
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(0, 0, 0, 0.55);
+      border-color: rgba(56, 189, 248, 0.4);
     }
     .android-home-hint-chevron {
       font-size: 0.75rem;
@@ -10312,8 +10378,9 @@ function renderHtml(
       border-top: 1px solid rgba(255, 255, 255, 0.1);
       display: flex;
       align-items: center;
-      justify-content: space-around;
-      padding: 0 10%;
+      justify-content: center;
+      gap: clamp(40px, 15vw, 90px);
+      padding: 0 16px;
       box-sizing: border-box;
       user-select: none;
     }
@@ -10325,7 +10392,7 @@ function renderHtml(
       background: transparent;
       border: none;
       color: #94a3b8;
-      width: 60px;
+      width: 64px;
       height: 40px;
       border-radius: 12px;
       display: flex;
@@ -10349,6 +10416,13 @@ function renderHtml(
     body.theme-normal .android-nav-btn:hover {
       background: #f1f5f9 !important;
       color: #0284c7 !important;
+    }
+
+    /* Mobile Immersion: Hide floating dock in active app mode */
+    @media (max-width: 768px) {
+      body.sovra-mode-app .sovra-floating-glass-dock {
+        display: none !important;
+      }
     }
 
     /* Layer 5: Wallpaper Modal */
@@ -17970,6 +18044,11 @@ function renderHtml(
       <div id="headerQuickActionSlots" class="header-quick-slots">
         <!-- Hydrated dynamically by SovraModularGlassOS.renderHeader() -->
       </div>
+
+      <!-- 🖼️ Wallpaper Trigger Pill -->
+      <button id="headerWallpaperBtn" type="button" class="header-action-icon-btn" onclick="window.SovraAndroidOS.openWallpaperModal()" title="Wallpaper &amp; Theme Studio" aria-label="Wallpaper Studio" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 999px; padding: 4px 12px; font-size: 0.76rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
+        <span>🖼️</span> <span>Wallpaper</span>
+      </button>
 
       <!-- 4. User Profile Avatar with Integrated Presence Badge (Desktop Only) -->
       <div id="currentUserPill" class="header-avatar-wrap is-online" role="button" tabindex="0" onclick="switchTab('me'); event.stopPropagation();" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" title="Open Your Profile (Click to View / Toggle Ghost Mode)" aria-label="Your Sovereign Profile">
@@ -81246,6 +81325,35 @@ function renderHtml(
         { id: 'settings', name: 'Settings', icon: '🛠️', category: 'utility', badge: '', action: () => switchTab('settings'), desc: 'Preferences, Themes & Privacy' }
       ];
 
+      // Signature Brand Themes & Glows for all 24 Sovereign Apps
+      const FEATURE_THEMES = {
+        feed: { gradient: 'linear-gradient(135deg, #1e40af, #3b82f6)', shadow: 'rgba(59, 130, 246, 0.45)' },
+        reels: { gradient: 'linear-gradient(135deg, #be185d, #ec4899, #f97316)', shadow: 'rgba(236, 72, 153, 0.45)' },
+        watch: { gradient: 'linear-gradient(135deg, #b91c1c, #ef4444)', shadow: 'rgba(239, 68, 68, 0.45)' },
+        chat: { gradient: 'linear-gradient(135deg, #047857, #10b981)', shadow: 'rgba(16, 185, 129, 0.45)' },
+        profile: { gradient: 'linear-gradient(135deg, #4338ca, #6366f1)', shadow: 'rgba(99, 102, 241, 0.45)' },
+        wallet: { gradient: 'linear-gradient(135deg, #b45309, #f59e0b, #fbbf24)', shadow: 'rgba(245, 158, 11, 0.45)' },
+        studio: { gradient: 'linear-gradient(135deg, #6d28d9, #a855f7, #c026d3)', shadow: 'rgba(168, 85, 247, 0.45)' },
+        live: { gradient: 'linear-gradient(135deg, #991b1b, #dc2626, #ea580c)', shadow: 'rgba(220, 38, 38, 0.5)' },
+        calls: { gradient: 'linear-gradient(135deg, #0369a1, #0ea5e9)', shadow: 'rgba(14, 165, 233, 0.45)' },
+        friends: { gradient: 'linear-gradient(135deg, #0f766e, #14b8a6)', shadow: 'rgba(20, 184, 166, 0.45)' },
+        communities: { gradient: 'linear-gradient(135deg, #5b21b6, #7c3aed)', shadow: 'rgba(124, 58, 237, 0.45)' },
+        channels: { gradient: 'linear-gradient(135deg, #0e7490, #06b6d4)', shadow: 'rgba(6, 182, 212, 0.45)' },
+        hub: { gradient: 'linear-gradient(135deg, #065f46, #059669)', shadow: 'rgba(5, 150, 105, 0.45)' },
+        dapps: { gradient: 'linear-gradient(135deg, #15803d, #22c55e)', shadow: 'rgba(34, 197, 94, 0.45)' },
+        admin: { gradient: 'linear-gradient(135deg, #334155, #475569)', shadow: 'rgba(71, 85, 105, 0.45)' },
+        qr_scan: { gradient: 'linear-gradient(135deg, #0284c7, #38bdf8)', shadow: 'rgba(56, 189, 248, 0.45)' },
+        upload: { gradient: 'linear-gradient(135deg, #c2410c, #f97316)', shadow: 'rgba(249, 115, 22, 0.45)' },
+        bridge: { gradient: 'linear-gradient(135deg, #3730a3, #4f46e5)', shadow: 'rgba(79, 70, 229, 0.45)' },
+        key_vault: { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(51, 65, 85, 0.45)' },
+        id_card: { gradient: 'linear-gradient(135deg, #075985, #0284c7)', shadow: 'rgba(2, 132, 199, 0.45)' },
+        mesh_node: { gradient: 'linear-gradient(135deg, #065f46, #10b981)', shadow: 'rgba(16, 185, 129, 0.45)' },
+        ghost_mode: { gradient: 'linear-gradient(135deg, #1e1b4b, #312e81)', shadow: 'rgba(49, 46, 129, 0.45)' },
+        backup: { gradient: 'linear-gradient(135deg, #92400e, #d97706)', shadow: 'rgba(217, 119, 6, 0.45)' },
+        settings: { gradient: 'linear-gradient(135deg, #475569, #64748b)', shadow: 'rgba(100, 116, 139, 0.45)' }
+      };
+      window.SOVRA_FEATURE_THEMES = FEATURE_THEMES;
+
       // 2. Curated Persona Presets
       const PRESETS = {
         social: {
@@ -81362,6 +81470,11 @@ function renderHtml(
           tile.setAttribute('title', feat.name + ' - ' + feat.desc);
           tile.setAttribute('role', 'button');
           tile.setAttribute('tabindex', '0');
+
+          const theme = FEATURE_THEMES[id] || { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(0,0,0,0.4)' };
+          tile.style.background = theme.gradient;
+          tile.style.boxShadow = '0 6px 16px -2px ' + theme.shadow + ', inset 0 1px 1px 0 rgba(255, 255, 255, 0.45)';
+          tile.style.border = '1px solid rgba(255, 255, 255, 0.22)';
 
           if (isEditMode) {
             tile.setAttribute('draggable', 'true');
@@ -81530,6 +81643,11 @@ function renderHtml(
           tile.style.width = '72px';
           tile.style.height = '72px';
           tile.style.margin = '0 auto';
+
+          const theme = FEATURE_THEMES[feat.id] || { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(0,0,0,0.4)' };
+          tile.style.background = theme.gradient;
+          tile.style.boxShadow = '0 8px 20px -3px ' + theme.shadow + ', inset 0 1px 1px 0 rgba(255, 255, 255, 0.45)';
+          tile.style.border = '1px solid rgba(255, 255, 255, 0.22)';
 
           if (isEditMode) {
             tile.setAttribute('draggable', 'true');
@@ -82011,7 +82129,7 @@ function renderHtml(
         customDataUrl: ''
       };
 
-      let homeScreenApps = ['feed', 'reels', 'watch', 'chat', 'profile', 'wallet', 'studio', 'live'];
+      let homeScreenApps = ['feed', 'reels', 'watch', 'chat', 'wallet', 'studio', 'live', 'profile'];
       let currentMode = 'home';
       let activeAppId = null;
       let previousAppId = 'home';
@@ -82150,15 +82268,18 @@ function renderHtml(
         grid.innerHTML = '';
 
         WALLPAPER_PRESETS.forEach(preset => {
+          const isActive = wallpaperConfig.id === preset.id;
           const card = document.createElement('div');
-          card.className = 'wallpaper-preset-card' + (wallpaperConfig.id === preset.id ? ' active' : '');
+          card.className = 'wallpaper-preset-card' + (isActive ? ' active' : '');
           card.style.background = preset.gradient;
+          card.style.border = isActive ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.2)';
+          card.style.boxShadow = isActive ? '0 0 16px rgba(56, 189, 248, 0.5)' : 'none';
           card.title = preset.name;
           card.onclick = () => setWallpaperPreset(preset.id);
 
           const label = document.createElement('span');
           label.className = 'wallpaper-preset-label';
-          label.textContent = preset.name;
+          label.textContent = (isActive ? '✓ ' : '') + preset.name;
           card.appendChild(label);
 
           grid.appendChild(card);
@@ -82345,7 +82466,7 @@ function renderHtml(
           if (!feat) return;
 
           const wrap = document.createElement('div');
-          wrap.className = 'sovra-home-tile-wrap';
+          wrap.className = 'sovra-home-tile-wrap' + (isEditMode ? ' is-editing' : '');
 
           const tile = document.createElement('div');
           tile.className = 'sovra-app-tile';
@@ -82353,6 +82474,11 @@ function renderHtml(
           tile.setAttribute('title', feat.name + ' - ' + feat.desc);
           tile.setAttribute('role', 'button');
           tile.setAttribute('tabindex', '0');
+
+          const theme = (window.SOVRA_FEATURE_THEMES && window.SOVRA_FEATURE_THEMES[appId]) || { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(0,0,0,0.4)' };
+          tile.style.background = theme.gradient;
+          tile.style.boxShadow = '0 10px 24px -4px ' + theme.shadow + ', inset 0 1px 1px 0 rgba(255, 255, 255, 0.45)';
+          tile.style.border = '1px solid rgba(255, 255, 255, 0.22)';
 
           if (isEditMode) {
             const unpinBtn = document.createElement('button');
@@ -82386,6 +82512,13 @@ function renderHtml(
             openApp(appId);
           };
 
+          tile.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (navigator.vibrate) navigator.vibrate(20);
+            toggleEditMode();
+          };
+
           let timer = null;
           tile.ontouchstart = () => {
             timer = setTimeout(() => {
@@ -82409,6 +82542,28 @@ function renderHtml(
         });
       }
 
+      async function refreshTelemetry() {
+        try {
+          const [balRes, statusRes] = await Promise.all([
+            fetch('/api/wallet/balance').then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch('/api/status').then(r => r.ok ? r.json() : null).catch(() => null)
+          ]);
+          if (balRes && typeof balRes.balance === 'number') {
+            if (!window.SovraState) window.SovraState = {};
+            window.SovraState.walletBalance = balRes.balance;
+            window.walletBalanceSov = balRes.balance;
+          }
+          if (statusRes && statusRes.ok) {
+            const peers = (statusRes.connectedPeers && statusRes.connectedPeers.length) || (statusRes.systemTelemetry && statusRes.systemTelemetry.p2pPeersCount) || 0;
+            if (!window.SovraState) window.SovraState = {};
+            window.SovraState.connectedPeers = statusRes.connectedPeers || [];
+            if (!window.p2pSwarm) window.p2pSwarm = {};
+            window.p2pSwarm.peerCount = peers;
+          }
+          renderHomeScreen();
+        } catch (_) {}
+      }
+
       setInterval(() => {
         const now = new Date();
         const clockEl = document.getElementById('androidGlanceClock');
@@ -82418,6 +82573,8 @@ function renderHtml(
           clockEl.textContent = hrs + ':' + mins;
         }
       }, 1000);
+
+      setInterval(refreshTelemetry, 10000);
 
       const SovraAndroidOS = {
         WALLPAPER_PRESETS,
@@ -82441,7 +82598,8 @@ function renderHtml(
         focusDrawerSearch,
         toggleEditMode,
         renderHomeScreen,
-        applyWallpaper
+        applyWallpaper,
+        refreshTelemetry
       };
 
       window.SovraAndroidOS = SovraAndroidOS;
@@ -82451,6 +82609,7 @@ function renderHtml(
         applyWallpaper();
         syncOSModeVisuals();
         renderHomeScreen();
+        refreshTelemetry();
       }
 
       if (document.readyState === 'loading') {
@@ -84390,6 +84549,18 @@ async function startDevServer() {
           error: err?.message || 'Invalid Ed25519 DID or key',
         }));
       }
+      return;
+    }
+
+    // API: Wallet Balance (Direct SQLite Balance Query for OS Telemetry)
+    if (url.pathname === '/api/wallet/balance' && req.method === 'GET') {
+      const principal = resolvePrincipal(req);
+      const queryDid = url.searchParams.get('did');
+      const targetDid = queryDid || (principal ? principal.did : masterKey.did);
+      const targetUser = sovraDb.findUserByDid(targetDid);
+      const balanceSov = targetUser && typeof targetUser.balanceSov === 'number' ? targetUser.balanceSov : 500.0;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, balance: balanceSov, balanceSov, did: targetDid }));
       return;
     }
 
