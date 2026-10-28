@@ -2645,6 +2645,109 @@ function renderHtml(
       color: #1877f2 !important;
     }
 
+    /* ======================================================== */
+    /* 🎨 PROFILE COMPONENT THEME INTEGRATION (LIGHT MODE)      */
+    /* ======================================================== */
+    body.theme-normal .profile-header-card {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .profile-identity-col #meProfileName {
+      color: #0f172a !important;
+    }
+    body.theme-normal .profile-handle {
+      color: #64748b !important;
+    }
+    body.theme-normal .profile-did-badge {
+      background: #f8fafc !important;
+      border-color: #cbd5e1 !important;
+    }
+    body.theme-normal .profile-did-badge #meProfileDid {
+      color: #334155 !important;
+    }
+    body.theme-normal .profile-actions-wrap .profile-btn-secondary {
+      background: #f1f5f9 !important;
+      border-color: #cbd5e1 !important;
+      color: #334155 !important;
+    }
+    body.theme-normal .profile-actions-wrap .profile-btn-secondary:hover {
+      background: #e2e8f0 !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .profile-bio-card {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .profile-bio-title {
+      color: #64748b !important;
+    }
+    body.theme-normal .profile-bio-text {
+      color: #1e293b !important;
+    }
+    body.theme-normal .profile-stat-box {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+    }
+    body.theme-normal .stat-category-title {
+      color: #64748b !important;
+    }
+    body.theme-normal .stat-number {
+      color: #0f172a !important;
+    }
+    body.theme-normal .stat-subtext {
+      color: #94a3b8 !important;
+    }
+    body.theme-normal .creator-hub-trigger-banner {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+    }
+    body.theme-normal .creator-hub-trigger-banner span {
+      color: #0f172a !important;
+    }
+    body.theme-normal .creator-hub-trigger-banner .badge {
+      color: #0284c7 !important;
+    }
+    body.theme-normal .creator-hub-trigger-banner #bannerAudiencePill {
+      color: #059669 !important;
+    }
+    body.theme-normal .profile-surface-card {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .profile-surface-card .profile-section-title {
+      color: #0f172a !important;
+    }
+    body.theme-normal .profile-surface-card .highlight-title {
+      color: #334155 !important;
+    }
+    body.theme-normal .profile-surface-card .highlight-ring {
+      background: #f8fafc !important;
+      border-color: #cbd5e1 !important;
+    }
+    body.theme-normal .profile-new-highlight-btn {
+      background: rgba(2, 132, 199, 0.1) !important;
+      border-color: rgba(2, 132, 199, 0.3) !important;
+      color: #0284c7 !important;
+    }
+    body.theme-normal .profile-tab-btn {
+      color: #64748b !important;
+      background: #f8fafc !important;
+      border-color: #e2e8f0 !important;
+    }
+    body.theme-normal .profile-tab-btn.active {
+      background: #0284c7 !important;
+      color: #ffffff !important;
+      border-color: #0284c7 !important;
+    }
+
     body.theme-black {
       background-color: #000000 !important;
       color: #e4e6eb !important;
@@ -9676,6 +9779,36 @@ function renderHtml(
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    /* Production-Grade Profile Surface Card (Unified Dark/Light System) */
+    .profile-surface-card {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+      box-sizing: border-box;
+      width: 100%;
+      color: #f1f5f9;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .profile-surface-card .profile-section-title {
+      color: #f8fafc;
+    }
+    .profile-new-highlight-btn {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      border-radius: 12px;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .profile-new-highlight-btn:hover {
+      background: rgba(56, 189, 248, 0.25);
+      transform: translateY(-1px);
     }
 
     /* Instagram Parity: Explore Mosaic Staggered Grid */
@@ -17438,7 +17571,7 @@ function renderHtml(
             <div class="hero-balance-wrap">
               <span class="hero-balance-label">Active Sovereign Balance</span>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span id="heroActiveSovBalance" class="hero-sov-balance-text">450.50 SOV</span>
+                <span id="heroActiveSovBalance" class="hero-sov-balance-text">0.00 SOV</span>
                 <button type="button" id="heroBalancePrivacyBtn" class="hero-privacy-eye-btn" onclick="toggleBalancePrivacy()" title="Mask / Unmask Balance" aria-label="Toggle Balance Privacy">
                   <svg id="heroEyeIconOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
@@ -17446,7 +17579,7 @@ function renderHtml(
             </div>
             <div id="heroNetworkHealthPill" class="hero-p2p-health-pill" title="P2P Mesh Network Status">
               <span class="hero-health-pulse-dot"></span>
-              <span id="heroNetworkPeerCount">🟢 7 Peers Connected | 12ms</span>
+              <span id="heroNetworkPeerCount">🟢 0 Peers Connected</span>
             </div>
           </div>
 
@@ -21192,7 +21325,7 @@ function renderHtml(
             <div class="hero-balance-wrap">
               <span class="hero-balance-label">Active Sovereign Balance</span>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span id="heroActiveSovBalanceProfile" class="hero-sov-balance-text">450.50 SOV</span>
+                <span id="heroActiveSovBalanceProfile" class="hero-sov-balance-text">0.00 SOV</span>
                 <button type="button" class="hero-privacy-eye-btn" onclick="toggleBalancePrivacy()" title="Mask / Unmask Balance" aria-label="Toggle Balance Privacy">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
@@ -21200,7 +21333,7 @@ function renderHtml(
             </div>
             <div class="hero-p2p-health-pill" title="P2P Mesh Network Status">
               <span class="hero-health-pulse-dot"></span>
-              <span>🟢 7 Peers Connected | 12ms</span>
+              <span id="heroNetworkPeerCountProfile">🟢 0 Peers Connected</span>
             </div>
           </div>
 
@@ -21448,14 +21581,14 @@ function renderHtml(
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-weight: 800; font-size: 0.92rem; color: #f8fafc; letter-spacing: -0.01em;">Channels &amp; Public Pages</span>
                     <span class="badge" style="background: rgba(56, 189, 248, 0.18); color: #38bdf8; font-size: 0.65rem; padding: 2px 7px; border-radius: 6px; font-weight: 700;">2.0 ADVANCED</span>
-                    <span id="bannerChannelsPill" class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); font-size: 0.68rem; padding: 1px 6px; border-radius: 6px;">📢 2 Channels</span>
-                    <span id="bannerPagesPill" class="badge" style="background: rgba(192, 132, 252, 0.12); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.25); font-size: 0.68rem; padding: 1px 6px; border-radius: 6px;">🏢 1 Page</span>
+                    <span id="bannerChannelsPill" class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); font-size: 0.68rem; padding: 1px 6px; border-radius: 6px;">📢 0 Channels</span>
+                    <span id="bannerPagesPill" class="badge" style="background: rgba(192, 132, 252, 0.12); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.25); font-size: 0.68rem; padding: 1px 6px; border-radius: 6px;">🏢 0 Pages</span>
                   </div>
                   <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 3px;">Broadcast dispatches for subscribers &amp; public brand storefronts</div>
                 </div>
               </div>
               <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                <span id="bannerAudiencePill" class="badge" style="background: rgba(52, 211, 153, 0.12); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); font-size: 0.72rem; font-weight: 700; padding: 4px 9px; border-radius: 8px;">👥 28.5K Reach</span>
+                <span id="bannerAudiencePill" class="badge" style="background: rgba(52, 211, 153, 0.12); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); font-size: 0.72rem; font-weight: 700; padding: 4px 9px; border-radius: 8px;">👥 0 Reach</span>
                 <span style="background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.45); color: #c7d2fe; font-size: 0.76rem; font-weight: 700; padding: 5px 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
                   <span>Open Hub</span>
                   <span style="font-size: 1rem; line-height: 1;">›</span>
@@ -21948,12 +22081,12 @@ function renderHtml(
         </div>
 
         <!-- Instagram Parity: Story Highlights Tray on Profile -->
-        <div class="card" style="padding: 10px 14px; margin-bottom: 1rem; border-radius: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 4px;">
-            <span style="font-weight: 700; font-size: 0.85rem; color: #f1f5f9; display: flex; align-items: center; gap: 6px;">
+        <div class="profile-surface-card" id="profileStoryHighlightsCard" style="padding: 12px 16px; margin-bottom: 1rem; border-radius: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 0 4px;">
+            <span class="profile-section-title" style="font-weight: 700; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;">
               <span>✨</span> <span>Story Highlights</span>
             </span>
-            <button type="button" onclick="openCreateHighlightModal()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 12px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">
+            <button type="button" onclick="openCreateHighlightModal()" class="profile-new-highlight-btn">
               + New
             </button>
           </div>
@@ -21971,7 +22104,7 @@ function renderHtml(
         </div>
 
         <!-- 3-Column Profile Media Grid Tabs & Container -->
-        <div class="card" style="padding: 1rem; border-radius: 16px;">
+        <div class="profile-surface-card" id="profileMediaGridCard" style="padding: 1rem; border-radius: 16px; margin-bottom: 1.5rem;">
           <div class="profile-media-tabs" style="display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 4px;">
             <button class="profile-tab-btn active" id="ptab-posts" onclick="switchProfileGridTab('posts')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -33734,8 +33867,11 @@ function renderHtml(
         render: function(bodyEl, ctx) {
           var allCh = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
           var allPg = (typeof allPagesData !== 'undefined' ? allPagesData : []);
-          var totalAudience = allCh.reduce(function(acc, c) { return acc + (c.count || 0); }, 0) +
-                              allPg.reduce(function(acc, p) { return acc + (p.count || 0); }, 0);
+          var currentDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : null;
+          var myCh = allCh.filter(function(c) { return Boolean(currentDid && (c.ownerDid === currentDid || c.creatorDid === currentDid)); });
+          var myPg = allPg.filter(function(p) { return Boolean(currentDid && (p.ownerDid === currentDid || p.creatorDid === currentDid)); });
+          var totalAudience = myCh.reduce(function(acc, c) { return acc + (c.count || 0); }, 0) +
+                              myPg.reduce(function(acc, p) { return acc + (p.count || 0); }, 0);
           var audText = totalAudience >= 1000 ? (totalAudience / 1000).toFixed(1) + 'K+' : totalAudience.toLocaleString();
 
           var html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
@@ -50851,6 +50987,12 @@ function renderHtml(
             hubStatusText.innerText = peerCount > 0 ? ('Online • ' + peerCount + ' Peers') : 'Online • Secured';
           }
 
+          const heroPeerEl = document.getElementById('heroNetworkPeerCount');
+          const heroPeerProfEl = document.getElementById('heroNetworkPeerCountProfile');
+          const heroPeerText = '🟢 ' + peerCount + (peerCount === 1 ? ' Peer' : ' Peers') + ' Connected | ' + rtt + 'ms';
+          if (heroPeerEl) heroPeerEl.innerText = heroPeerText;
+          if (heroPeerProfEl) heroPeerProfEl.innerText = heroPeerText;
+
           const meshBadge = document.getElementById('meMeshStatusBadge');
           if (meshBadge) {
             if (peerCount > 0) {
@@ -58094,7 +58236,7 @@ function renderHtml(
 
     // --- AIRTEL-INSPIRED GLANCEABLE HERO CARD CLIENT LOGIC ---
     var _balancePrivacyMasked = false;
-    var _cachedRealBalance = '450.50 SOV';
+    var _cachedRealBalance = (typeof walletBalanceSov === 'number' ? walletBalanceSov.toFixed(2) : (typeof myProfile !== 'undefined' && myProfile && typeof myProfile.balanceSov === 'number' ? myProfile.balanceSov.toFixed(2) : '450.50')) + ' SOV';
 
     function toggleBalancePrivacy() {
       _balancePrivacyMasked = !_balancePrivacyMasked;
@@ -58106,6 +58248,11 @@ function renderHtml(
     window.toggleBalancePrivacy = toggleBalancePrivacy;
 
     function updateBalanceDisplay() {
+      if (typeof walletBalanceSov === 'number') {
+        _cachedRealBalance = walletBalanceSov.toFixed(2) + ' SOV';
+      } else if (typeof myProfile !== 'undefined' && myProfile && typeof myProfile.balanceSov === 'number') {
+        _cachedRealBalance = myProfile.balanceSov.toFixed(2) + ' SOV';
+      }
       var elList = document.querySelectorAll('.hero-sov-balance-text, #heroActiveSovBalance, #heroActiveSovBalanceProfile');
       var iconList = document.querySelectorAll('.hero-privacy-eye-btn, #heroBalancePrivacyBtn');
       elList.forEach(function(el) {
@@ -76843,34 +76990,20 @@ function renderHtml(
       const allCh = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
       const allPg = (typeof allPagesData !== 'undefined' ? allPagesData : []);
 
-      // 1. Get entities created/owned by the active logged-in user
+      // 1. Get entities strictly created/owned by the active logged-in user (Zero fake fallbacks)
       let channels = allCh.filter(function(c) {
-        return currentDid && c.ownerDid && c.ownerDid === currentDid;
+        return Boolean(currentDid && (c.ownerDid === currentDid || c.creatorDid === currentDid));
       });
       let pages = allPg.filter(function(p) {
-        return currentDid && p.ownerDid && p.ownerDid === currentDid;
+        return Boolean(currentDid && (p.ownerDid === currentDid || p.creatorDid === currentDid));
       });
-
-      // 2. Fallback seed spaces for immediate exploration
-      if (channels.length === 0) {
-        const primaryCh = allCh.filter(function(c) {
-          return c.id === 'ch-host-primary' || c.id === 'ch-alpha' || c.ownerDid === 'did:sovra:system';
-        });
-        channels = primaryCh.length > 0 ? primaryCh.slice(0, 2) : (allCh.length > 0 ? allCh.slice(0, 2) : []);
-      }
-      if (pages.length === 0) {
-        const primaryPg = allPg.filter(function(p) {
-          return p.id === 'pg-host-primary' || p.id === 'pg-meshlabs' || p.id === 'pg-metropolis' || p.ownerDid === 'did:sovra:system';
-        });
-        pages = primaryPg.length > 0 ? primaryPg.slice(0, 2) : (allPg.length > 0 ? allPg.slice(0, 1) : []);
-      }
 
       const totalAudience = channels.reduce(function(acc, c) { return acc + (c.count || 0); }, 0) +
                             pages.reduce(function(acc, p) { return acc + (p.count || 0); }, 0);
 
       const ribbonAudienceEl = document.getElementById('creatorHubAudienceRibbon');
       if (ribbonAudienceEl) {
-        ribbonAudienceEl.innerText = (totalAudience >= 1000 ? (totalAudience / 1000).toFixed(1) + 'K+' : totalAudience.toLocaleString());
+        ribbonAudienceEl.innerText = (totalAudience >= 1000 ? (totalAudience / 1000).toFixed(1) + 'K+' : totalAudience.toLocaleString()) + ' Audience';
       }
 
       const bannerChEl = document.getElementById('bannerChannelsPill');
