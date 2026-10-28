@@ -451,7 +451,98 @@ export class SqliteSocialDatabaseEngine {
         created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_quadratic_creator ON quadratic_escrows(creator_did);
+
+      -- 23. THE GOD DIAL: VIRALITY & ALGORITHMIC MULTIPLIERS
+      CREATE TABLE IF NOT EXISTS admin_algo_dials (
+        key TEXT PRIMARY KEY,
+        multiplier REAL NOT NULL DEFAULT 1.0,
+        category TEXT NOT NULL,
+        description TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      -- 24. SHADOWBAN & VISIBILITY FILTERING
+      CREATE TABLE IF NOT EXISTS admin_shadowbans (
+        did TEXT PRIMARY KEY,
+        handle TEXT NOT NULL DEFAULT '',
+        reason TEXT NOT NULL,
+        decay_factor REAL NOT NULL DEFAULT 0.05,
+        expires_at INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_shadowbans_handle ON admin_shadowbans(handle);
+
+      -- 25. CANARY FEATURE FLAGS & ZERO-DOWNTIME EXPERIMENTATION
+      CREATE TABLE IF NOT EXISTS admin_feature_flags (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        rollout_percentage INTEGER NOT NULL DEFAULT 100,
+        target_criteria TEXT NOT NULL DEFAULT 'all',
+        crash_threshold_percent REAL DEFAULT 0.5,
+        updated_at INTEGER NOT NULL
+      );
+
+      -- 26. GLOBAL BROADCAST & EMERGENCY ALERT DISPATCHER (AMBER ALERT HUD)
+      CREATE TABLE IF NOT EXISTS admin_broadcast_alerts (
+        id TEXT PRIMARY KEY,
+        level TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        action_label TEXT,
+        action_url TEXT,
+        is_sticky INTEGER NOT NULL DEFAULT 0,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_alerts_active ON admin_broadcast_alerts(active);
+
+      -- 27. FORENSIC VAULT & IMMUTABLE LEGAL HOLDS
+      CREATE TABLE IF NOT EXISTS admin_legal_holds (
+        did TEXT PRIMARY KEY,
+        case_reference TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        investigator TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
     `);
+
+    // Seed default algorithmic dials if empty
+    try {
+      const dialsCount = (this.db.prepare('SELECT COUNT(*) as c FROM admin_algo_dials').get() as any)?.c || 0;
+      if (dialsCount === 0) {
+        const seedDials = [
+          ['breaking_news', 2.0, 'Breaking News & Live Swarms', 'Multiplies propagation velocity during live community events'],
+          ['p2p_mesh_discovery', 1.8, 'Local P2P BLE/Wi-Fi Mesh Nodes', 'Prioritizes offline direct proximity peers in local feeds'],
+          ['verified_creators', 1.5, 'Verified Sovereign Creators', 'High-reputation verified DID creator distribution boost'],
+          ['general_organic', 1.0, 'Organic Community Feed', 'Default organic distribution baseline'],
+          ['unverified_links', 0.3, 'External Unverified Hyperlinks', 'Dampens phishing/clickbait external URLs'],
+          ['commercial_promotions', 0.5, 'Commercial Drops & Ads', 'Throttles commercial frequency to preserve engagement'],
+        ];
+        const insertDial = this.db.prepare('INSERT OR REPLACE INTO admin_algo_dials (key, multiplier, category, description, updated_at) VALUES (?, ?, ?, ?, ?)');
+        for (const [k, m, cat, desc] of seedDials) {
+          insertDial.run(k, m, cat, desc, Date.now());
+        }
+      }
+
+      // Seed default feature flags if empty
+      const flagsCount = (this.db.prepare('SELECT COUNT(*) as c FROM admin_feature_flags').get() as any)?.c || 0;
+      if (flagsCount === 0) {
+        const seedFlags = [
+          ['webrtc_calling_v2', 'WebRTC Calling HUD v2', 'Encrypted spatial P2P voice & video calling overlay', 1, 100, 'all'],
+          ['ai_smart_polish', 'AI Smart Polish Magic', 'AI-assisted creator post enhancement and sentiment tuning', 1, 100, 'all'],
+          ['mesh_isp_bandwidth_metering', 'Micro-ISP Bandwidth Metering', 'Autonomous micropayments for Wi-Fi Direct & BLE relay nodes', 0, 25, 'canary'],
+          ['ephemeral_stories_v2', 'Ephemeral 24h Stories Tray', 'Instagram-grade 24-hour disappearing video and photo stories', 1, 100, 'all'],
+          ['holographic_core_overlay', 'Holographic Central Core', 'Central spatial radial command center gateway', 1, 100, 'all'],
+          ['dapp_store_mini_apps', 'Sovereign P2P Mini DApps', 'Autonomous sandboxed micro-applications and mini-games', 1, 100, 'all'],
+        ];
+        const insertFlag = this.db.prepare('INSERT OR REPLACE INTO admin_feature_flags (id, name, description, enabled, rollout_percentage, target_criteria, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        for (const [id, name, desc, en, pct, crit] of seedFlags) {
+          insertFlag.run(id, name, desc, en, pct, crit, Date.now());
+        }
+      }
+    } catch (_) {}
     try {
       this.db.exec('ALTER TABLE posts ADD COLUMN views_count INTEGER NOT NULL DEFAULT 0;');
     } catch (_) {}
@@ -1210,6 +1301,327 @@ export class SqliteSocialDatabaseEngine {
   public backup(destinationPath: string): void {
     const sanitized = destinationPath.replace(/\\/g, '/').replace(/'/g, "''");
     this.db.exec(`VACUUM INTO '${sanitized}'`);
+  }
+
+  // ==========================================
+  // 🎛️ THE GOD DIAL & SHADOWBAN (BIG TECH OPERATIONS)
+  // ==========================================
+  public getAlgoDials(): Array<{ key: string; multiplier: number; category: string; description: string; updatedAt: number }> {
+    try {
+      const rows = this.db.prepare('SELECT key, multiplier, category, description, updated_at FROM admin_algo_dials ORDER BY multiplier DESC').all() as any[];
+      return rows.map(r => ({
+        key: r.key,
+        multiplier: Number(r.multiplier),
+        category: r.category,
+        description: r.description,
+        updatedAt: r.updated_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public setAlgoDial(key: string, multiplier: number, category?: string, description?: string): boolean {
+    try {
+      const existing = this.db.prepare('SELECT * FROM admin_algo_dials WHERE key = ?').get(key) as any;
+      const cat = category || existing?.category || 'Custom Category';
+      const desc = description || existing?.description || 'Algorithmic Multiplier Dial';
+      this.prepareCached(`
+        INSERT OR REPLACE INTO admin_algo_dials (key, multiplier, category, description, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(key, Math.max(0.01, Math.min(10.0, multiplier)), cat, desc, Date.now());
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public getShadowbans(): Array<{ did: string; handle: string; reason: string; decayFactor: number; expiresAt: number; createdAt: number }> {
+    try {
+      const rows = this.db.prepare('SELECT did, handle, reason, decay_factor, expires_at, created_at FROM admin_shadowbans ORDER BY created_at DESC').all() as any[];
+      return rows.map(r => ({
+        did: r.did,
+        handle: r.handle || '',
+        reason: r.reason,
+        decayFactor: Number(r.decay_factor),
+        expiresAt: r.expires_at,
+        createdAt: r.created_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public setShadowban(did: string, handle: string, reason: string, decayFactor = 0.05, expiresAt = 0): boolean {
+    try {
+      this.prepareCached(`
+        INSERT OR REPLACE INTO admin_shadowbans (did, handle, reason, decay_factor, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(did, handle, reason, Math.max(0.0, Math.min(1.0, decayFactor)), expiresAt, Date.now());
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public removeShadowban(did: string): boolean {
+    try {
+      this.prepareCached('DELETE FROM admin_shadowbans WHERE did = ?').run(did);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public isShadowbanned(did: string): { shadowbanned: boolean; decayFactor: number } {
+    try {
+      const row = this.prepareCached('SELECT decay_factor, expires_at FROM admin_shadowbans WHERE did = ?').get(did) as any;
+      if (!row) return { shadowbanned: false, decayFactor: 1.0 };
+      if (row.expires_at > 0 && Date.now() > row.expires_at) {
+        this.removeShadowban(did);
+        return { shadowbanned: false, decayFactor: 1.0 };
+      }
+      return { shadowbanned: true, decayFactor: Number(row.decay_factor) };
+    } catch (_) {
+      return { shadowbanned: false, decayFactor: 1.0 };
+    }
+  }
+
+  // ==========================================
+  // 🚩 CANARY FEATURE FLAGS
+  // ==========================================
+  public getFeatureFlags(): Array<{ id: string; name: string; description: string; enabled: boolean; rolloutPercentage: number; targetCriteria: string; updatedAt: number }> {
+    try {
+      const rows = this.db.prepare('SELECT id, name, description, enabled, rollout_percentage, target_criteria, updated_at FROM admin_feature_flags ORDER BY name ASC').all() as any[];
+      return rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        enabled: Boolean(r.enabled),
+        rolloutPercentage: Number(r.rollout_percentage),
+        targetCriteria: r.target_criteria,
+        updatedAt: r.updated_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public setFeatureFlag(id: string, enabled: boolean, rolloutPercentage = 100, name?: string, description?: string): boolean {
+    try {
+      const existing = this.db.prepare('SELECT * FROM admin_feature_flags WHERE id = ?').get(id) as any;
+      if (existing) {
+        this.prepareCached(`
+          UPDATE admin_feature_flags
+          SET enabled = ?, rollout_percentage = ?, updated_at = ?
+          WHERE id = ?
+        `).run(enabled ? 1 : 0, Math.max(0, Math.min(100, rolloutPercentage)), Date.now(), id);
+      } else {
+        this.prepareCached(`
+          INSERT INTO admin_feature_flags (id, name, description, enabled, rollout_percentage, target_criteria, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'all', ?)
+        `).run(id, name || id, description || 'Dynamic runtime feature flag', enabled ? 1 : 0, Math.max(0, Math.min(100, rolloutPercentage)), Date.now());
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public evaluateClientFlags(userDid?: string): Record<string, boolean> {
+    const flags = this.getFeatureFlags();
+    const result: Record<string, boolean> = {};
+    for (const f of flags) {
+      if (!f.enabled) {
+        result[f.id] = false;
+        continue;
+      }
+      if (f.rolloutPercentage >= 100) {
+        result[f.id] = true;
+        continue;
+      }
+      if (f.rolloutPercentage <= 0) {
+        result[f.id] = false;
+        continue;
+      }
+      const hashInput = (userDid || 'guest') + ':' + f.id;
+      let hash = 0;
+      for (let i = 0; i < hashInput.length; i++) {
+        hash = ((hash << 5) - hash + hashInput.charCodeAt(i)) | 0;
+      }
+      const bucket = Math.abs(hash) % 100;
+      result[f.id] = bucket < f.rolloutPercentage;
+    }
+    return result;
+  }
+
+  // ==========================================
+  // 📢 GLOBAL BROADCAST ALERTS
+  // ==========================================
+  public getBroadcastAlerts(): Array<{ id: string; level: string; title: string; message: string; actionLabel?: string; actionUrl?: string; isSticky: boolean; active: boolean; createdAt: number }> {
+    try {
+      const rows = this.db.prepare('SELECT id, level, title, message, action_label, action_url, is_sticky, active, created_at FROM admin_broadcast_alerts ORDER BY created_at DESC').all() as any[];
+      return rows.map(r => ({
+        id: r.id,
+        level: r.level,
+        title: r.title,
+        message: r.message,
+        actionLabel: r.action_label || undefined,
+        actionUrl: r.action_url || undefined,
+        isSticky: Boolean(r.is_sticky),
+        active: Boolean(r.active),
+        createdAt: r.created_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public getActiveBroadcastAlerts(): Array<{ id: string; level: string; title: string; message: string; actionLabel?: string; actionUrl?: string; isSticky: boolean; createdAt: number }> {
+    try {
+      const rows = this.db.prepare('SELECT id, level, title, message, action_label, action_url, is_sticky, created_at FROM admin_broadcast_alerts WHERE active = 1 ORDER BY created_at DESC LIMIT 3').all() as any[];
+      return rows.map(r => ({
+        id: r.id,
+        level: r.level,
+        title: r.title,
+        message: r.message,
+        actionLabel: r.action_label || undefined,
+        actionUrl: r.action_url || undefined,
+        isSticky: Boolean(r.is_sticky),
+        createdAt: r.created_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public publishBroadcastAlert(alert: { id?: string; level: string; title: string; message: string; actionLabel?: string; actionUrl?: string; isSticky?: boolean }): string {
+    const id = alert.id || 'alert_' + crypto.randomUUID().slice(0, 8);
+    try {
+      this.prepareCached(`
+        INSERT INTO admin_broadcast_alerts (id, level, title, message, action_label, action_url, is_sticky, active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+      `).run(id, alert.level.toUpperCase(), alert.title, alert.message, alert.actionLabel || null, alert.actionUrl || null, alert.isSticky ? 1 : 0, Date.now());
+    } catch (_) {}
+    return id;
+  }
+
+  public dismissBroadcastAlert(id: string): boolean {
+    try {
+      this.prepareCached('UPDATE admin_broadcast_alerts SET active = 0 WHERE id = ?').run(id);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ==========================================
+  // 🛡️ FORENSIC COMPLIANCE & LEGAL HOLDS
+  // ==========================================
+  public getLegalHolds(): Array<{ did: string; caseReference: string; reason: string; investigator: string; createdAt: number }> {
+    try {
+      const rows = this.db.prepare('SELECT did, case_reference, reason, investigator, created_at FROM admin_legal_holds ORDER BY created_at DESC').all() as any[];
+      return rows.map(r => ({
+        did: r.did,
+        caseReference: r.case_reference,
+        reason: r.reason,
+        investigator: r.investigator,
+        createdAt: r.created_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public setLegalHold(did: string, caseReference: string, reason: string, investigator: string): boolean {
+    try {
+      this.prepareCached(`
+        INSERT OR REPLACE INTO admin_legal_holds (did, case_reference, reason, investigator, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(did, caseReference, reason, investigator, Date.now());
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public removeLegalHold(did: string): boolean {
+    try {
+      this.prepareCached('DELETE FROM admin_legal_holds WHERE did = ?').run(did);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public hasLegalHold(did: string): boolean {
+    try {
+      const row = this.prepareCached('SELECT did FROM admin_legal_holds WHERE did = ?').get(did);
+      return Boolean(row);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public generateForensicDossier(did: string): { dossier: any; sha256Seal: string } {
+    const user = this.findUserByDid(did) || { did, handle: 'unknown', displayName: 'Unknown Subject', createdAt: 0 };
+    let sessions: any[] = [];
+    let postsCount = 0;
+    let commentsCount = 0;
+    let followersCount = 0;
+    let followingCount = 0;
+    let auditLogs: any[] = [];
+    let juryCases: any[] = [];
+
+    try {
+      sessions = (this.db.prepare('SELECT session_id, device_name, device_type, ip_address, user_agent, created_at, last_active_at, is_revoked FROM user_sessions WHERE user_did = ?').all(did) as any[]) || [];
+      postsCount = (this.db.prepare('SELECT COUNT(*) as c FROM posts WHERE author_did = ?').get(did) as any)?.c || 0;
+      commentsCount = (this.db.prepare('SELECT COUNT(*) as c FROM comments WHERE author_did = ?').get(did) as any)?.c || 0;
+      followersCount = (this.db.prepare('SELECT COUNT(*) as c FROM follows WHERE target_did = ?').get(did) as any)?.c || 0;
+      followingCount = (this.db.prepare('SELECT COUNT(*) as c FROM follows WHERE follower_did = ?').get(did) as any)?.c || 0;
+      auditLogs = (this.db.prepare('SELECT id, action, details, ip_address, timestamp FROM audit_logs WHERE actor_did = ? ORDER BY timestamp DESC LIMIT 50').all(did) as any[]) || [];
+      juryCases = (this.db.prepare('SELECT id, target_type, violation_category, status, verdict, created_at FROM jury_cases WHERE author_did = ?').all(did) as any[]) || [];
+    } catch (_) {}
+
+    const shadowban = this.isShadowbanned(did);
+    const legalHold = this.hasLegalHold(did);
+
+    const dossier = {
+      specVersion: 'SOVRA-FORENSIC-V1.0',
+      generatedAt: Date.now(),
+      generatedIso: new Date().toISOString(),
+      subject: {
+        did: user.did,
+        handle: user.handle,
+        displayName: user.displayName,
+        deviceType: user.deviceType,
+        publicKey: user.publicKey,
+        balanceSov: user.balanceSov,
+        registeredAt: user.createdAt,
+      },
+      securityState: {
+        shadowbanned: shadowban.shadowbanned,
+        shadowbanDecayFactor: shadowban.decayFactor,
+        underLegalHold: legalHold,
+        activeSessionsCount: sessions.filter(s => !s.is_revoked).length,
+        totalDeviceSessionsHistory: sessions.length,
+      },
+      socialMetrics: {
+        postsCount,
+        commentsCount,
+        followersCount,
+        followingCount,
+      },
+      auditRecordsCount: auditLogs.length,
+      auditHistorySample: auditLogs,
+      juryEnforcementRecords: juryCases,
+      hardwareSessions: sessions,
+    };
+
+    const canonicalJson = JSON.stringify(dossier);
+    const sha256Seal = crypto.createHash('sha256').update(canonicalJson).digest('hex');
+
+    return { dossier, sha256Seal };
   }
 
   public close(): void {

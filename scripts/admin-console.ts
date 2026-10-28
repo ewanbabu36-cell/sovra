@@ -84,6 +84,11 @@ export interface AdminConsoleOptions {
     eventLoopLatencyMs?: number;
     p2pPeersCount?: number;
   };
+  algoDials?: Array<{ key: string; multiplier: number; category: string; description: string; updatedAt: number }>;
+  shadowbans?: Array<{ did: string; handle: string; reason: string; decayFactor: number; expiresAt: number; createdAt: number }>;
+  featureFlags?: Array<{ id: string; name: string; description: string; enabled: boolean; rolloutPercentage: number; targetCriteria: string; updatedAt: number }>;
+  broadcastAlerts?: Array<{ id: string; level: string; title: string; message: string; actionLabel?: string; actionUrl?: string; isSticky: boolean; active: boolean; createdAt: number }>;
+  legalHolds?: Array<{ did: string; caseReference: string; reason: string; investigator: string; createdAt: number }>;
 }
 
 export function renderAdminHtml(opts: AdminConsoleOptions): string {
@@ -113,6 +118,11 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     cw20Tokens = [],
     strikes = [],
     activeSessions = [],
+    algoDials = [],
+    shadowbans = [],
+    featureFlags = [],
+    broadcastAlerts = [],
+    legalHolds = [],
     systemTelemetry = {
       cpuUsagePercent: 12,
       memoryRssMb: 145,
@@ -830,6 +840,30 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <span class="admin-nav-icon">💎</span>
         <span>Financial War Room</span>
         <span class="admin-nav-badge" style="background: #10b981; color: #000;">SOLVENT</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('god-dial')">
+        <span class="admin-nav-icon">🎛️</span>
+        <span>The God Dial &amp; Virality</span>
+        <span class="admin-nav-badge" style="background: #ec4899; color: #fff;">Algorithmic</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('feature-flags')">
+        <span class="admin-nav-icon">🚩</span>
+        <span>Canary Feature Flags</span>
+        <span class="admin-nav-badge" style="background: #a855f7; color: #fff;">Rollouts</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('broadcast-alerts')">
+        <span class="admin-nav-icon">📢</span>
+        <span>Broadcast Dispatcher</span>
+        <span class="admin-nav-badge" style="background: #f59e0b; color: #000;">Amber HUD</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('forensic-vault')">
+        <span class="admin-nav-icon">🛡️</span>
+        <span>Forensic &amp; Legal Vault</span>
+        <span class="admin-nav-badge" style="background: #38bdf8; color: #000;">SHA-256</span>
       </button>
 
       <button class="admin-nav-item" onclick="switchAdminTab('mesh-visualizer')">
@@ -2294,6 +2328,338 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               }
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           MODULE 13: THE GOD DIAL (VIRALITY & SHADOWBAN)
+           ============================================== -->
+      <section class="ops-section" id="view-god-dial" style="display: none;">
+        <div class="ops-section-header">
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>🎛️</span> The God Dial: Algorithmic Virality &amp; Visibility Filtering
+            </h2>
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+              Meta &amp; ByteDance (TikTok) Parity: Live category multipliers and silent de-amplification (Shadowbanning) across the decentralized P2P swarm.
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 1.25rem; margin-top: 1rem;">
+          <!-- Card A: Category Multipliers Matrix -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>⚡ Category Virality Multipliers Matrix</span>
+              <span class="badge" style="background: rgba(236, 72, 153, 0.15); color: #ec4899; border: 1px solid rgba(236, 72, 153, 0.3);">Dynamic Dials</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 1rem;">
+              Adjust propagation velocity factors ($0.1x$ to $5.0x$). High multipliers propagate deeper through P2P GossipSub hops.
+            </div>
+
+            <div id="algoDialsContainer" style="display: flex; flex-direction: column; gap: 1rem;">
+              ${
+                (algoDials && algoDials.length > 0)
+                  ? algoDials.map(d => `
+                    <div style="background: #0f172a; padding: 0.85rem 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <div>
+                          <strong style="font-size: 0.88rem; color: #f8fafc;">${d.category}</strong>
+                          <span style="font-size: 0.72rem; color: #64748b; margin-left: 6px;">(${d.key})</span>
+                        </div>
+                        <span id="dialVal_${d.key}" style="font-family: var(--font-mono); font-size: 0.95rem; font-weight: 800; color: #38bdf8;">${d.multiplier.toFixed(1)}x</span>
+                      </div>
+                      <div style="font-size: 0.74rem; color: #94a3b8; margin-bottom: 8px;">${d.description}</div>
+                      <div style="display: flex; align-items: center; gap: 12px;">
+                        <input type="range" id="slider_${d.key}" min="0.1" max="5.0" step="0.1" value="${d.multiplier}" style="flex: 1; accent-color: #ec4899; cursor: pointer;" oninput="document.getElementById('dialVal_${d.key}').textContent = Number(this.value).toFixed(1) + 'x';" />
+                        <button class="btn-ops" style="background: rgba(236,72,153,0.15); border: 1px solid rgba(236,72,153,0.35); color: #f472b6; font-size: 0.75rem; padding: 4px 10px;" onclick="saveAlgoDial('${d.key}', 'slider_${d.key}')">Save Dial</button>
+                      </div>
+                    </div>
+                  `).join('')
+                  : '<div style="color: #64748b; font-size: 0.8rem; text-align: center; padding: 1rem;">No custom dials configured. Defaults active (1.0x baseline).</div>'
+              }
+            </div>
+          </div>
+
+          <!-- Card B: Visibility Filtering (Shadowban) Control Surface -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>👁️ Silent Visibility Filter (Shadowban)</span>
+              <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">Anti-Sybil</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 1rem;">
+              Silently decays or extinguishes a malicious peer's gossip fanout without returning error responses. The bad actor believes their posts succeed, preventing counter-adaptation.
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; background: #0f172a; padding: 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+              <div>
+                <label style="font-size: 0.76rem; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 4px;">Target Subject (DID or @handle)</label>
+                <input type="text" id="sbTargetInput" placeholder="did:key:z6Mkk... or @spammer" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem;" />
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                  <label style="font-size: 0.76rem; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 4px;">Decay Factor (<span id="sbDecayVal">0.05</span>x)</label>
+                  <input type="range" id="sbDecaySlider" min="0.00" max="0.50" step="0.01" value="0.05" style="width: 100%; accent-color: #ef4444;" oninput="document.getElementById('sbDecayVal').textContent = Number(this.value).toFixed(2);" />
+                </div>
+                <div>
+                  <label style="font-size: 0.76rem; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 4px;">Duration</label>
+                  <select id="sbDurationSelect" style="width: 100%; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">
+                    <option value="86400000">24 Hours</option>
+                    <option value="604800000" selected>7 Days</option>
+                    <option value="2592000000">30 Days</option>
+                    <option value="0">Permanent (Manual Lift Only)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style="font-size: 0.76rem; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 4px;">Enforcement Reason</label>
+                <input type="text" id="sbReasonInput" placeholder="e.g. Coordinated Sybil botnet spam / harassment" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem;" />
+              </div>
+              <button class="btn-ops" style="background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; font-weight: 700; padding: 8px; justify-content: center; margin-top: 4px;" onclick="applyShadowban()">Enforce Silent Visibility Filter</button>
+            </div>
+
+            <!-- Active Shadowbans List -->
+            <div style="margin-top: 1.25rem;">
+              <strong style="font-size: 0.88rem; color: #f8fafc; display: block; margin-bottom: 8px;">Active Visibility Filters (${shadowbans.length})</strong>
+              <div id="activeShadowbansList" style="display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto;">
+                ${
+                  (shadowbans && shadowbans.length > 0)
+                    ? shadowbans.map(s => `
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(239,68,68,0.2);">
+                        <div style="min-width: 0;">
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-weight: 700; color: #f87171; font-size: 0.82rem;">${s.handle || s.did.slice(0, 16) + '...'}</span>
+                            <span class="badge" style="background: rgba(239,68,68,0.15); color: #ef4444; font-size: 0.68rem;">Decay: ${s.decayFactor}x</span>
+                          </div>
+                          <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">${s.reason}</div>
+                        </div>
+                        <button class="btn-ops" style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #34d399; font-size: 0.72rem; padding: 3px 8px; flex-shrink: 0;" onclick="removeShadowban('${s.did}')">Lift</button>
+                      </div>
+                    `).join('')
+                    : '<div style="color: #64748b; font-size: 0.78rem; text-align: center; padding: 0.75rem;">No active shadowbans. Network running clean.</div>'
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           MODULE 14: CANARY FEATURE FLAGS
+           ============================================== -->
+      <section class="ops-section" id="view-feature-flags" style="display: none;">
+        <div class="ops-section-header">
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>🚩</span> Canary Feature Flags &amp; Live Experimentation
+            </h2>
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+              Meta QuickExperiments &amp; LaunchDarkly Parity: Dynamically roll out features from 0% to 100% of the swarm with zero server downtime.
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+          ${
+            (featureFlags && featureFlags.length > 0)
+              ? featureFlags.map(f => `
+                <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+                  <div style="flex: 1; min-width: 280px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                      <strong style="font-size: 1rem; color: #f8fafc;">${f.name}</strong>
+                      <code style="font-size: 0.75rem; color: #38bdf8; background: rgba(56,189,248,0.1); padding: 2px 6px; border-radius: 4px;">${f.id}</code>
+                      <span class="badge" style="${f.enabled ? (f.rolloutPercentage >= 100 ? 'background:rgba(16,185,129,0.15); color:#34d399;' : 'background:rgba(168,85,247,0.15); color:#c084fc;') : 'background:rgba(239,68,68,0.15); color:#f87171;'}">
+                        ${f.enabled ? (f.rolloutPercentage >= 100 ? '100% PRODUCTION' : 'CANARY (' + f.rolloutPercentage + '%)') : 'DISABLED'}
+                      </span>
+                    </div>
+                    <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.4;">${f.description}</div>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 14px; flex-shrink: 0;">
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                      <span style="font-size: 0.72rem; color: #64748b;">Rollout Percentage</span>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="range" id="flagRollout_${f.id}" min="0" max="100" step="5" value="${f.rolloutPercentage}" style="width: 110px; accent-color: #a855f7;" oninput="document.getElementById('flagPctLabel_${f.id}').textContent = this.value + '%';" />
+                        <span id="flagPctLabel_${f.id}" style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 700; color: #f8fafc; min-width: 42px;">${f.rolloutPercentage}%</span>
+                      </div>
+                    </div>
+
+                    <button class="btn-ops" style="${f.enabled ? 'background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#34d399;' : 'background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;'}; min-width: 80px; justify-content: center;" onclick="toggleFeatureFlag('${f.id}', ${!f.enabled})">
+                      ${f.enabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                    <button class="btn-ops" style="background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8;" onclick="updateFlagRollout('${f.id}', 'flagRollout_${f.id}')">Apply</button>
+                  </div>
+                </div>
+              `).join('')
+              : '<div style="color: #64748b; text-align: center; padding: 2rem;">No dynamic flags registered.</div>'
+          }
+        </div>
+      </section>
+
+      <!-- ==============================================
+           MODULE 15: BROADCAST DISPATCHER (AMBER ALERT HUD)
+           ============================================== -->
+      <section class="ops-section" id="view-broadcast-alerts" style="display: none;">
+        <div class="ops-section-header">
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>📢</span> Global System Broadcast &amp; Amber Alert Dispatcher
+            </h2>
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+              X/Twitter Public Safety Alert Parity: Transmit high-priority protocol updates and critical announcements live to every active client viewport.
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.25rem; margin-top: 1rem;">
+          <!-- Publish Form -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>Transmit Swarm Announcement</span>
+              <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);">Instant Dispatch</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.85rem;">
+              <div>
+                <label style="font-size: 0.76rem; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 4px;">Severity Level</label>
+                <select id="alertLevelSelect" style="width: 100%; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 10px; color: #fff; font-size: 0.85rem;">
+                  <option value="INFO">🔵 INFO — General Community Notice</option>
+                  <option value="WARNING" selected>🟡 WARNING — Protocol Maintenance Notice</option>
+                  <option value="CRITICAL">🟠 CRITICAL — P2P Mesh Security Advisory</option>
+                  <option value="EMERGENCY">🔴 EMERGENCY — Amber Alert / Immediate Action</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size: 0.76rem; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 4px;">Alert Headline</label>
+                <input type="text" id="alertTitleInput" placeholder="e.g. Scheduled Maintenance in 10 Minutes" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem;" />
+              </div>
+              <div>
+                <label style="font-size: 0.76rem; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 4px;">Alert Details</label>
+                <textarea id="alertMessageInput" rows="3" placeholder="Explain the event, impact on calls/feeds, and expected resolution time..." style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem; resize: vertical;"></textarea>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                  <label style="font-size: 0.76rem; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 4px;">Action Button Text (Optional)</label>
+                  <input type="text" id="alertActionLabel" placeholder="e.g. Read Release Notes" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 10px; color: #fff; font-size: 0.82rem;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.76rem; color: #cbd5e1; font-weight: 600; display: block; margin-bottom: 4px;">Action URL (Optional)</label>
+                  <input type="text" id="alertActionUrl" placeholder="https://... or /admin" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 10px; color: #fff; font-size: 0.82rem;" />
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="alertStickyCheck" style="accent-color: #f59e0b; width: 16px; height: 16px;" />
+                <label for="alertStickyCheck" style="font-size: 0.78rem; color: #cbd5e1; cursor: pointer;">Sticky Alert (Cannot be dismissed by user until revoked by Admin)</label>
+              </div>
+              <button class="btn-ops" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; font-weight: 800; padding: 10px; justify-content: center; margin-top: 4px;" onclick="publishBroadcastAlert()">📢 Transmit Global Swarm Broadcast</button>
+            </div>
+          </div>
+
+          <!-- Active Alerts -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>Active Broadcasts Live on Client Screens</span>
+              <span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8;">Real-Time</span>
+            </div>
+            <div id="activeAlertsFeed" style="display: flex; flex-direction: column; gap: 0.85rem; margin-top: 1rem;">
+              ${
+                (broadcastAlerts && broadcastAlerts.filter(a => a.active).length > 0)
+                  ? broadcastAlerts.filter(a => a.active).map(a => `
+                    <div style="background: #0f172a; padding: 1rem; border-radius: 10px; border-left: 4px solid ${a.level === 'EMERGENCY' ? '#ef4444' : (a.level === 'CRITICAL' ? '#f97316' : (a.level === 'WARNING' ? '#f59e0b' : '#38bdf8'))};">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                        <div>
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="badge" style="background: rgba(255,255,255,0.1); font-size: 0.68rem; font-weight: 800;">${a.level}</span>
+                            <strong style="color: #f8fafc; font-size: 0.92rem;">${a.title}</strong>
+                            ${a.isSticky ? '<span class="badge" style="background: rgba(239,68,68,0.15); color: #f87171; font-size: 0.65rem;">STICKY</span>' : ''}
+                          </div>
+                          <div style="font-size: 0.82rem; color: #cbd5e1; margin-top: 4px; line-height: 1.4;">${a.message}</div>
+                        </div>
+                        <button class="btn-ops" style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; font-size: 0.72rem; padding: 3px 8px; flex-shrink: 0;" onclick="dismissBroadcastAlert('${a.id}')">Dismiss</button>
+                      </div>
+                    </div>
+                  `).join('')
+                  : '<div style="color: #64748b; font-size: 0.82rem; text-align: center; padding: 2rem;">No active broadcasts. Swarm running normally.</div>'
+              }
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           MODULE 16: FORENSIC COMPLIANCE & LEGAL HOLDS
+           ============================================== -->
+      <section class="ops-section" id="view-forensic-vault" style="display: none;">
+        <div class="ops-section-header">
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>🛡️</span> Forensic Compliance Vault &amp; Legal Hold Registry
+            </h2>
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+              Meta SRM Law Enforcement Portal Parity: 1-click cryptographically signed audit dossiers and immutable preservation holds admissible in legal jurisdictions.
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.25rem; margin-top: 1rem;">
+          <!-- Dossier Lookup & Generator -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>1-Click Forensic Dossier Generator</span>
+              <span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3);">SHA-256 Sealed</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 0.85rem;">
+              <input type="text" id="forensicDidInput" placeholder="Enter DID: did:key:z6Mkk... or handle" style="flex: 1; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem;" />
+              <button class="btn-ops" style="background: #0284c7; color: #fff; font-weight: 700; padding: 0 16px;" onclick="lookupForensicDossier()">Generate</button>
+            </div>
+
+            <!-- Dossier Output Card -->
+            <div id="dossierResultBox" style="display: none; margin-top: 1.25rem; background: #0f172a; padding: 1rem; border-radius: 10px; border: 1px solid rgba(56,189,248,0.25);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <strong style="font-size: 0.9rem; color: #f8fafc;">Cryptographic Evidence Profile</strong>
+                <button class="btn-ops" style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #34d399; font-size: 0.72rem; padding: 3px 8px;" onclick="downloadForensicDossier()">Download JSON</button>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem; color: #cbd5e1; margin-bottom: 10px;">
+                <div>Subject: <strong id="dosHandle" style="color:#fff;">-</strong></div>
+                <div>Status: <span id="dosStatus" class="badge">-</span></div>
+                <div>Posts Authored: <strong id="dosPosts" style="color:#fff;">0</strong></div>
+                <div>Active Sessions: <strong id="dosSessions" style="color:#fff;">0</strong></div>
+              </div>
+              <div style="background: #020617; padding: 8px; border-radius: 6px; font-family: var(--font-mono); font-size: 0.72rem; color: #38bdf8; word-break: break-all;">
+                <div style="color: #64748b; font-size: 0.68rem; margin-bottom: 2px;">SHA-256 Tamper-Proof Seal:</div>
+                <span id="dosSha256">Computing...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Legal Hold Registry -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>Active Immutable Legal Holds</span>
+              <span class="badge" style="background: rgba(168,85,247,0.15); color: #c084fc;">Prune Protection</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
+              Accounts under formal subpoena or fraud review are exempted from TTL automated data deletion jobs.
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              ${
+                (legalHolds && legalHolds.length > 0)
+                  ? legalHolds.map(h => `
+                    <div style="background: #0f172a; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(168,85,247,0.25); display: flex; justify-content: space-between; align-items: center;">
+                      <div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <strong style="color: #f8fafc; font-size: 0.82rem;">${h.caseReference}</strong>
+                          <span style="font-size: 0.7rem; color: #a855f7;">${h.investigator}</span>
+                        </div>
+                        <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">DID: ${h.did.slice(0, 20)}... &bull; ${h.reason}</div>
+                      </div>
+                      <button class="btn-ops" style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; font-size: 0.72rem; padding: 3px 8px;" onclick="toggleLegalHold('${h.did}', 'remove')">Release</button>
+                    </div>
+                  `).join('')
+                  : '<div style="color: #64748b; font-size: 0.78rem; text-align: center; padding: 1.5rem;">No legal preservation holds currently active.</div>'
+              }
+            </div>
+          </div>
         </div>
       </section>
 
@@ -4095,6 +4461,192 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         }
       })
       .catch(function(e) { alert('Circuit Breaker error: ' + e.message); });
+    }
+
+    // ==============================================
+    // 🎛️ PHASE 1 BIG TECH CONTROL HANDLERS
+    // ==============================================
+    function saveAlgoDial(key, sliderId) {
+      var slider = document.getElementById(sliderId);
+      if (!slider) return;
+      var mult = Number(slider.value);
+      fetch('/api/admin/algorithm/dial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key, multiplier: mult })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('🎛️ Algorithmic dial [' + key + '] set to ' + mult + 'x');
+        } else {
+          alert('Failed to update dial: ' + (d.error || 'Unknown'));
+        }
+      })
+      .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    function applyShadowban() {
+      var target = document.getElementById('sbTargetInput').value.trim();
+      var decay = Number(document.getElementById('sbDecaySlider').value);
+      var duration = Number(document.getElementById('sbDurationSelect').value);
+      var reason = document.getElementById('sbReasonInput').value.trim();
+      if (!target) { alert('Please enter target DID or handle'); return; }
+      var expiresAt = duration > 0 ? (Date.now() + duration) : 0;
+      fetch('/api/admin/moderation/shadowban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: target, decayFactor: decay, expiresAt: expiresAt, reason: reason || 'Visibility filtering' })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('👁️ Shadowban visibility filter enforced for ' + target);
+          setTimeout(function() { window.location.reload(); }, 1200);
+        } else {
+          alert('Failed to apply shadowban: ' + (d.error || 'Unknown'));
+        }
+      })
+      .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    function removeShadowban(did) {
+      if (!confirm('Lift visibility filter for ' + did + '?')) return;
+      fetch('/api/admin/moderation/shadowban/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: did })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('✅ Visibility filter lifted');
+          setTimeout(function() { window.location.reload(); }, 1000);
+        }
+      });
+    }
+
+    function toggleFeatureFlag(id, enabled) {
+      fetch('/api/admin/flags/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, enabled: enabled })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('🚩 Feature flag [' + id + '] ' + (enabled ? 'ENABLED' : 'DISABLED'));
+          setTimeout(function() { window.location.reload(); }, 1000);
+        }
+      });
+    }
+
+    function updateFlagRollout(id, sliderId) {
+      var slider = document.getElementById(sliderId);
+      if (!slider) return;
+      var pct = Number(slider.value);
+      fetch('/api/admin/flags/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, enabled: pct > 0, rolloutPercentage: pct })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('🚩 Flag [' + id + '] rollout set to ' + pct + '%');
+          setTimeout(function() { window.location.reload(); }, 1000);
+        }
+      });
+    }
+
+    function publishBroadcastAlert() {
+      var level = document.getElementById('alertLevelSelect').value;
+      var title = document.getElementById('alertTitleInput').value.trim();
+      var message = document.getElementById('alertMessageInput').value.trim();
+      var actionLabel = document.getElementById('alertActionLabel').value.trim();
+      var actionUrl = document.getElementById('alertActionUrl').value.trim();
+      var isSticky = document.getElementById('alertStickyCheck').checked;
+      if (!title || !message) { alert('Title and message are required'); return; }
+      fetch('/api/admin/broadcast/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: level, title: title, message: message, actionLabel: actionLabel, actionUrl: actionUrl, isSticky: isSticky })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('📢 Broadcast transmitted to active swarm!');
+          setTimeout(function() { window.location.reload(); }, 1200);
+        } else {
+          alert('Broadcast failed: ' + (d.error || 'Unknown'));
+        }
+      });
+    }
+
+    function dismissBroadcastAlert(id) {
+      fetch('/api/admin/broadcast/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('Broadcast dismissed');
+          setTimeout(function() { window.location.reload(); }, 800);
+        }
+      });
+    }
+
+    var _currentForensicDossier = null;
+    function lookupForensicDossier() {
+      var did = document.getElementById('forensicDidInput').value.trim();
+      if (!did) { alert('Enter target DID or handle'); return; }
+      fetch('/api/admin/compliance/dossier/' + encodeURIComponent(did))
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok && d.dossier) {
+          _currentForensicDossier = d;
+          document.getElementById('dossierResultBox').style.display = 'block';
+          document.getElementById('dosHandle').textContent = d.dossier.subject.handle || d.dossier.subject.did.slice(0, 16);
+          document.getElementById('dosStatus').textContent = d.dossier.securityState.underLegalHold ? 'LEGAL HOLD ACTIVE' : 'NORMAL';
+          document.getElementById('dosStatus').style.background = d.dossier.securityState.underLegalHold ? '#a855f7' : '#10b981';
+          document.getElementById('dosPosts').textContent = d.dossier.socialMetrics.postsCount;
+          document.getElementById('dosSessions').textContent = d.dossier.securityState.activeSessionsCount;
+          document.getElementById('dosSha256').textContent = d.sha256Seal;
+          showAdminToast('🛡️ Cryptographic dossier generated & sealed');
+        } else {
+          alert('Could not compile dossier: ' + (d.error || 'Unknown'));
+        }
+      })
+      .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    function downloadForensicDossier() {
+      if (!_currentForensicDossier) return;
+      var str = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(_currentForensicDossier, null, 2));
+      var a = document.createElement('a');
+      a.setAttribute('href', str);
+      a.setAttribute('download', 'SOVRA_FORENSIC_DOSSIER_' + Date.now() + '.json');
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function toggleLegalHold(did, action) {
+      if (!confirm((action === 'remove' ? 'Release' : 'Enforce') + ' legal hold on ' + did + '?')) return;
+      fetch('/api/admin/compliance/legal-hold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: did, action: action })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('Legal hold status updated');
+          setTimeout(function() { window.location.reload(); }, 1000);
+        }
+      });
     }
 
     // Auto-poll admin metrics, moderation queue, strike ledger, mesh telemetry, and financial war room

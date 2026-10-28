@@ -16643,6 +16643,52 @@ function renderHtml(
   </style>
 </head>
 <body class="nav-mode-auto theme-black" data-active-tab="feed">
+  <!-- 📢 GLOBAL SYSTEM BROADCAST / AMBER ALERT BANNER (Auto-Reactive) -->
+  <div id="sovraGlobalAlertBanner" style="display: none; width: 100%; position: sticky; top: 0; z-index: 10002; transition: all 0.3s ease;"></div>
+  <script>
+    (function initGlobalAlertWatcher() {
+      async function pollAlerts() {
+        try {
+          var res = await fetch('/api/alerts/active');
+          var data = await res.json();
+          var banner = document.getElementById('sovraGlobalAlertBanner');
+          if (!banner) return;
+          if (data && data.ok && Array.isArray(data.alerts) && data.alerts.length > 0) {
+            var alert = data.alerts[0];
+            var bgGrad = alert.level === 'EMERGENCY'
+              ? 'linear-gradient(90deg, #991b1b, #dc2626)'
+              : (alert.level === 'CRITICAL'
+                ? 'linear-gradient(90deg, #c2410c, #ea580c)'
+                : (alert.level === 'WARNING'
+                  ? 'linear-gradient(90deg, #854d0e, #ca8a04)'
+                  : 'linear-gradient(90deg, #1e40af, #2563eb)'));
+            banner.style.background = bgGrad;
+            banner.style.display = 'block';
+            banner.innerHTML = '<div style="max-width: 1200px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #fff; font-family: -apple-system, sans-serif;">' +
+              '<div style="display: flex; align-items: center; gap: 10px; min-width: 0;">' +
+                '<span style="padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.3); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.5px;">' + (alert.level || 'INFO') + '</span>' +
+                '<strong style="font-size: 0.88rem; white-space: nowrap;">' + alert.title + ':</strong>' +
+                '<span style="font-size: 0.84rem; opacity: 0.95; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + alert.message + '</span>' +
+              '</div>' +
+              '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">' +
+                (alert.actionUrl ? '<a href="' + alert.actionUrl + '" target="_blank" style="color: #fff; text-decoration: underline; font-size: 0.8rem; font-weight: 700;">' + (alert.actionLabel || 'Details &rarr;') + '</a>' : '') +
+                (!alert.isSticky ? '<button id="sovraAlertDismissBtn" style="background: none; border: none; color: #fff; font-size: 1.1rem; cursor: pointer; padding: 0 4px; opacity: 0.8;" title="Dismiss">&times;</button>' : '') +
+              '</div>' +
+            '</div>';
+            var dBtn = document.getElementById('sovraAlertDismissBtn');
+            if (dBtn) {
+              dBtn.onclick = function() { banner.style.display = 'none'; };
+            }
+          } else {
+            banner.style.display = 'none';
+          }
+        } catch (_) {}
+      }
+      setTimeout(pollAlerts, 1500);
+      setInterval(pollAlerts, 30000);
+      window.refreshGlobalAlerts = pollAlerts;
+    })();
+  </script>
   <script>
     (function() {
       try {
@@ -89195,6 +89241,281 @@ async function startDevServer() {
       return;
     }
 
+    // ==========================================
+    // 🎛️ THE GOD DIAL: ALGORITHMIC MULTIPLIERS (BIG TECH VIRALITY)
+    // ==========================================
+    if (url.pathname === '/api/admin/algorithm/dials' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const dials = sqlite ? sqlite.getAlgoDials() : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, dials }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/algorithm/dial' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const key = String(parsed.key || '').trim();
+        const multiplier = Number(parsed.multiplier || 1.0);
+        const category = parsed.category ? String(parsed.category) : undefined;
+        const description = parsed.description ? String(parsed.description) : undefined;
+        if (!key) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Dial key required' }));
+          return;
+        }
+        const sqlite = sovraDb.getSqliteEngine();
+        if (sqlite) {
+          sqlite.setAlgoDial(key, multiplier, category, description);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: `Algorithmic dial '${key}' updated to ${multiplier}x`, key, multiplier }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // 👁️ VISIBILITY FILTERING & SHADOWBANS (META PARITY)
+    // ==========================================
+    if (url.pathname === '/api/admin/moderation/shadowbans' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const shadowbans = sqlite ? sqlite.getShadowbans() : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, shadowbans }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/moderation/shadowban' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const did = String(parsed.did || '').trim();
+        const handle = String(parsed.handle || '').trim();
+        const reason = String(parsed.reason || 'Visibility filtering policy violation');
+        const decayFactor = Number(parsed.decayFactor ?? 0.05);
+        const expiresAt = Number(parsed.expiresAt || 0);
+        if (!did) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Target DID required' }));
+          return;
+        }
+        const sqlite = sovraDb.getSqliteEngine();
+        if (sqlite) {
+          sqlite.setShadowban(did, handle, reason, decayFactor, expiresAt);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: `Shadowban active for ${did} (Decay: ${decayFactor}x)`, did }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/moderation/shadowban/remove' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const did = String(parsed.did || '').trim();
+        const sqlite = sovraDb.getSqliteEngine();
+        if (sqlite && did) {
+          sqlite.removeShadowban(did);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: `Shadowban lifted for ${did}`, did }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // 🚩 CANARY FEATURE FLAGS & DYNAMIC ROLLOUTS (LAUNCHDARKLY PARITY)
+    // ==========================================
+    if (url.pathname === '/api/admin/flags' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const flags = sqlite ? sqlite.getFeatureFlags() : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, flags }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/flags/update' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const id = String(parsed.id || '').trim();
+        const enabled = Boolean(parsed.enabled);
+        const rolloutPercentage = Number(parsed.rolloutPercentage ?? 100);
+        const sqlite = sovraDb.getSqliteEngine();
+        let success = false;
+        if (sqlite && id) {
+          success = sqlite.setFeatureFlag(id, enabled, rolloutPercentage);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: success, message: `Flag '${id}' updated: ${enabled ? 'ENABLED' : 'DISABLED'} (${rolloutPercentage}%)` }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/client/flags' && req.method === 'GET') {
+      const userDid = url.searchParams.get('did') || undefined;
+      const sqlite = sovraDb.getSqliteEngine();
+      const flags = sqlite ? sqlite.evaluateClientFlags(userDid) : {};
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=5',
+      });
+      res.end(JSON.stringify({ ok: true, flags }));
+      return;
+    }
+
+    // ==========================================
+    // 📢 GLOBAL BROADCAST & AMBER ALERT DISPATCHER (X/TWITTER PARITY)
+    // ==========================================
+    if (url.pathname === '/api/alerts/active' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const alerts = sqlite ? sqlite.getActiveBroadcastAlerts() : [];
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(JSON.stringify({ ok: true, alerts }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/broadcast/alerts' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const alerts = sqlite ? sqlite.getBroadcastAlerts() : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, alerts }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/broadcast/publish' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const level = String(parsed.level || 'INFO').toUpperCase();
+        const title = String(parsed.title || 'System Notification').trim();
+        const message = String(parsed.message || '').trim();
+        const actionLabel = parsed.actionLabel ? String(parsed.actionLabel) : undefined;
+        const actionUrl = parsed.actionUrl ? String(parsed.actionUrl) : undefined;
+        const isSticky = Boolean(parsed.isSticky);
+        if (!title || !message) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Alert title and message required' }));
+          return;
+        }
+        const sqlite = sovraDb.getSqliteEngine();
+        let alertId = '';
+        if (sqlite) {
+          alertId = sqlite.publishBroadcastAlert({ level, title, message, actionLabel, actionUrl, isSticky });
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, alertId, message: 'Broadcast alert published to active swarm' }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/broadcast/dismiss' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const id = String(parsed.id || '').trim();
+        const sqlite = sovraDb.getSqliteEngine();
+        if (sqlite && id) {
+          sqlite.dismissBroadcastAlert(id);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: `Alert '${id}' dismissed` }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // 🛡️ 1-CLICK FORENSIC DOSSIER & COMPLIANCE VAULT (META SRM PARITY)
+    // ==========================================
+    if (url.pathname.startsWith('/api/admin/compliance/dossier') && req.method === 'GET') {
+      const segments = url.pathname.split('/').filter(Boolean);
+      const targetDid = decodeURIComponent(segments[segments.length - 1] || '');
+      if (!targetDid || targetDid === 'dossier') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Target DID required' }));
+        return;
+      }
+      const sqlite = sovraDb.getSqliteEngine();
+      if (!sqlite) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Database unavailable' }));
+        return;
+      }
+      const result = sqlite.generateForensicDossier(targetDid);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, targetDid, ...result }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/compliance/legal-holds' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const legalHolds = sqlite ? sqlite.getLegalHolds() : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, legalHolds }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/compliance/legal-hold' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const did = String(parsed.did || '').trim();
+        const caseReference = String(parsed.caseReference || 'CASE-' + Date.now()).trim();
+        const reason = String(parsed.reason || 'Pending formal inquiry').trim();
+        const investigator = String(parsed.investigator || 'SOVRA-COMPLIANCE-DESK').trim();
+        const action = parsed.action || 'set';
+        const sqlite = sovraDb.getSqliteEngine();
+        if (!sqlite || !did) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Target DID required' }));
+          return;
+        }
+        if (action === 'remove') {
+          sqlite.removeLegalHold(did);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, message: `Legal hold lifted for ${did}`, legalHold: false }));
+        } else {
+          sqlite.setLegalHold(did, caseReference, reason, investigator);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, message: `Legal hold sealed for ${did}`, legalHold: true, caseReference }));
+        }
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
     // PWA: Web App Manifest
     if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
       res.writeHead(200, {
@@ -89976,6 +90297,11 @@ async function startDevServer() {
           solvencyReport: sovraDb.getTreasurySolvencyReport(),
           proposals: sovereignAdminSecurity.getProposals(),
           circuitBreaker: sovereignAdminSecurity.getCircuitBreaker(),
+          algoDials: sovraDb.getSqliteEngine()?.getAlgoDials() || [],
+          shadowbans: sovraDb.getSqliteEngine()?.getShadowbans() || [],
+          featureFlags: sovraDb.getSqliteEngine()?.getFeatureFlags() || [],
+          broadcastAlerts: sovraDb.getSqliteEngine()?.getBroadcastAlerts() || [],
+          legalHolds: sovraDb.getSqliteEngine()?.getLegalHolds() || [],
         }),
       );
       return;
