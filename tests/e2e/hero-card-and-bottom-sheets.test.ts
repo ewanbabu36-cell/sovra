@@ -179,13 +179,9 @@ describe('Airtel-Inspired Hero Cards, Horizon Switcher & Glassmorphic Checkout S
       expect(devServerCode).toContain('id="personaCardCitizen"');
       expect(devServerCode).toContain('@sovereign_citizen');
       expect(devServerCode).toContain('id="identityChannelsList"');
-      expect(devServerCode).toContain('SOVRA News Network');
-      expect(devServerCode).toContain('14.2K Subscribers');
-      expect(devServerCode).toContain('Crypto Lab Broadcast');
-      expect(devServerCode).toContain('STUDIO PRO');
+      expect(devServerCode).toContain('renderDynamicIdentitySwitcher');
       expect(devServerCode).toContain('id="identityOrgsList"');
-      expect(devServerCode).toContain('Acme Sovereign Corp');
-      expect(devServerCode).toContain('Alpha DAO Foundation');
+      expect(devServerCode).toContain('promptCreateOrgModal');
     });
 
     it('should execute switchToPersona and update active handle, avatar and badge', () => {
