@@ -137,12 +137,6 @@ export interface AdminConsoleOptions {
     recommendedPosture: string;
     auditedAt: number;
   };
-  phonyfiTelemetry?: {
-    invoicing: { totalInvoices: number; totalVoided: number; voidRatePct: number };
-    theftDefense: { totalTheftAlerts: number; cannibalizationAlerts: number; pendingProposalsCount: number };
-    hardwareCustody: { activeManifests: number; tamperedDevicesCount: number };
-    workingCapital: { totalLockedInr: number; deadCapitalOver60DaysInr: number; deadItemsCount: number; recommendedClearanceInr: number };
-  };
 }
 
 export function renderAdminHtml(opts: AdminConsoleOptions): string {
@@ -196,12 +190,6 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       memoryHeapMb: 65,
       eventLoopLatencyMs: 1.8,
       p2pPeersCount: connectedPeers.length,
-    },
-    phonyfiTelemetry = {
-      invoicing: { totalInvoices: 0, totalVoided: 0, voidRatePct: 0 },
-      theftDefense: { totalTheftAlerts: 0, cannibalizationAlerts: 0, pendingProposalsCount: 0 },
-      hardwareCustody: { activeManifests: 1, tamperedDevicesCount: 0 },
-      workingCapital: { totalLockedInr: 184500, deadCapitalOver60DaysInr: 51500, deadItemsCount: 2, recommendedClearanceInr: 43775 },
     },
   } = opts;
 
@@ -949,12 +937,6 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <span class="admin-nav-icon">👁️</span>
         <span>The God Eye (Panopticon)</span>
         <span class="admin-nav-badge" style="background: #ef4444; color: #fff;">OMNIPRESENT</span>
-      </button>
-
-      <button class="admin-nav-item" onclick="switchAdminTab('phonyfi-super-erp')">
-        <span class="admin-nav-icon">📱</span>
-        <span>PhonyFi Super-ERP</span>
-        <span class="admin-nav-badge" style="background: #ec4899; color: #fff;">ANTI-THEFT</span>
       </button>
 
       <button class="admin-nav-item" onclick="switchAdminTab('mesh-visualizer')">
@@ -2887,217 +2869,6 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               }
             </div>
             <button class="btn-ops" style="width: 100%; margin-top: 10px; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.3); color: #c084fc; justify-content: center;" onclick="refreshWashTradingCycles()">Analyze Live P2P Swarm Graph</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- ==============================================
-           MODULE 19: PHONYFI SUPER-ERP & ANTI-THEFT CONSOLE
-           ============================================== -->
-      <section class="ops-section" id="view-phonyfi-super-erp" style="display: none;">
-        <div class="ops-section-header" style="background: rgba(17,24,39,0.7); backdrop-filter: blur(12px); border-radius: 14px; padding: 1.25rem; border: 1px solid rgba(236,72,153,0.3); margin-bottom: 1.5rem;">
-          <div>
-            <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-              <span style="color: #ec4899;">📱</span> PhonyFi Super-ERP: Anti-Theft &amp; Forensic Custody
-            </h2>
-            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
-              Zero-Trust Enterprise Telemetry &bull; 5 Shrinkage Vectors Neutralized &bull; Cryptographic Hardware Serial Custody &bull; Dead Capital Radar &bull; 4-Eyes Dual Authorization
-            </div>
-          </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); font-weight: 800;">
-              SHIELD: 100% GATED
-            </span>
-            <span class="badge" style="background: rgba(236,72,153,0.15); color: #f472b6; border: 1px solid rgba(236,72,153,0.3); font-weight: 800;">
-              4-EYES: ACTIVE
-            </span>
-          </div>
-        </div>
-
-        <!-- Real-time Glassmorphic KPI Row -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-          <div style="background: rgba(17,24,39,0.65); backdrop-filter: blur(12px); border: 1px solid rgba(236,72,153,0.2); border-radius: 12px; padding: 1rem;">
-            <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Locked Working Capital</div>
-            <div style="font-size: 1.35rem; font-weight: 800; color: #f472b6; margin-top: 4px;">₹${phonyfiTelemetry.workingCapital.totalLockedInr.toLocaleString('en-IN')}</div>
-            <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">Total Inventory Balance</div>
-          </div>
-
-          <div style="background: rgba(17,24,39,0.65); backdrop-filter: blur(12px); border: 1px solid rgba(239,68,68,0.2); border-radius: 12px; padding: 1rem;">
-            <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Dead Capital (>60 Days)</div>
-            <div style="font-size: 1.35rem; font-weight: 800; color: #f87171; margin-top: 4px;">₹${phonyfiTelemetry.workingCapital.deadCapitalOver60DaysInr.toLocaleString('en-IN')}</div>
-            <div style="font-size: 0.7rem; color: #ef4444; margin-top: 2px;">${phonyfiTelemetry.workingCapital.deadItemsCount} Aged Items Pending Clearance</div>
-          </div>
-
-          <div style="background: rgba(17,24,39,0.65); backdrop-filter: blur(12px); border: 1px solid rgba(56,189,248,0.2); border-radius: 12px; padding: 1rem;">
-            <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Hardware Part Custody</div>
-            <div style="font-size: 1.35rem; font-weight: 800; color: #38bdf8; margin-top: 4px;">${phonyfiTelemetry.hardwareCustody.activeManifests} Active Intake</div>
-            <div style="font-size: 0.7rem; color: #34d399; margin-top: 2px;">0 Unauthorized Swaps (Compliant)</div>
-          </div>
-
-          <div style="background: rgba(17,24,39,0.65); backdrop-filter: blur(12px); border: 1px solid rgba(245,158,11,0.2); border-radius: 12px; padding: 1rem;">
-            <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">4-Eyes Dual Auth Queue</div>
-            <div style="font-size: 1.35rem; font-weight: 800; color: #fbbf24; margin-top: 4px;">${phonyfiTelemetry.theftDefense.pendingProposalsCount} Pending</div>
-            <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 2px;">Manager Signoff Enforced</div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.25rem;">
-          <!-- CARD 1: 5 SHRINKAGE VECTORS THEFT PREVENTION SHIELD -->
-          <div class="ops-card" style="background: rgba(17,24,39,0.7); backdrop-filter: blur(16px); border: 1px solid rgba(236,72,153,0.3); border-radius: 14px; padding: 1.25rem;">
-            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-              <span style="display: flex; align-items: center; gap: 6px;">
-                <span style="color: #ec4899;">🛡️</span> Theft Prevention: 5 Shrinkage Vectors
-              </span>
-              <span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399;">SERVER GATED</span>
-            </div>
-            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
-              Automated circuit breakers against the 5 primary retail shrink leakage paths:
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <div style="padding: 8px 10px; background: rgba(15,23,42,0.6); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <div style="font-weight: 700; font-size: 0.8rem; color: #f8fafc;">1. Void-After-Print Guard</div>
-                  <div style="font-size: 0.7rem; color: #94a3b8;">Printed invoices cannot be deleted/voided by cashiers alone.</div>
-                </div>
-                <span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399;">4-Eyes Gate</span>
-              </div>
-
-              <div style="padding: 8px 10px; background: rgba(15,23,42,0.6); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <div style="font-weight: 700; font-size: 0.8rem; color: #f8fafc;">2. Discount Skimming Ceiling</div>
-                  <div style="font-size: 0.7rem; color: #94a3b8;">Hard cap at 5% / ₹500 discretionary cashier discount limit.</div>
-                </div>
-                <span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399;">Capped</span>
-              </div>
-
-              <div style="padding: 8px 10px; background: rgba(15,23,42,0.6); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <div style="font-weight: 700; font-size: 0.8rem; color: #f8fafc;">3. No-Sale Drawer Pop Audit</div>
-                  <div style="font-size: 0.7rem; color: #94a3b8;">Mandatory reason code logging; flags unassociated pops > 2/shift.</div>
-                </div>
-                <span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8;">Logged</span>
-              </div>
-
-              <div style="padding: 8px 10px; background: rgba(15,23,42,0.6); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <div style="font-weight: 700; font-size: 0.8rem; color: #f8fafc;">4. Appraisal Collusion Detector</div>
-                  <div style="font-size: 0.7rem; color: #94a3b8;">Locks trade-in payouts when technician deviance > 15% from diagnostic.</div>
-                </div>
-                <span class="badge" style="background: rgba(245,158,11,0.15); color: #fbbf24;">Deviance Lock</span>
-              </div>
-
-              <div style="padding: 8px 10px; background: rgba(15,23,42,0.6); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <div style="font-weight: 700; font-size: 0.8rem; color: #f8fafc;">5. Galla Creep (Blind Shift Close)</div>
-                  <div style="font-size: 0.7rem; color: #94a3b8;">Cashier enters physical count blind; variances > ₹100 auto-alerted.</div>
-                </div>
-                <span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399;">Blind Recon</span>
-              </div>
-            </div>
-
-            <button class="btn-ops" style="width: 100%; margin-top: 10px; background: rgba(236,72,153,0.15); border: 1px solid rgba(236,72,153,0.3); color: #f472b6; justify-content: center;" onclick="testVoidAfterPrintSimulation()">
-              Simulate Cashier Void-After-Print Attack
-            </button>
-          </div>
-
-          <!-- CARD 2: FORENSIC HARDWARE CUSTODY & ANTI-CANNIBALIZATION -->
-          <div class="ops-card" style="background: rgba(17,24,39,0.7); backdrop-filter: blur(16px); border: 1px solid rgba(56,189,248,0.3); border-radius: 14px; padding: 1.25rem;">
-            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-              <span style="display: flex; align-items: center; gap: 6px;">
-                <span style="color: #38bdf8;">🔬</span> Forensic Hardware Custody (Anti-Cannibalization)
-              </span>
-              <span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8;">SHA-256 SEALED</span>
-            </div>
-            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
-              Cryptographic intake fingerprint matching Display, Battery, Camera, and Logic Board serials to prevent technician part-swapping.
-            </div>
-
-            <div style="background: #020617; border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 10px; font-family: var(--font-mono); font-size: 0.72rem; color: #cbd5e1; margin-bottom: 10px;">
-              <div style="color: #38bdf8; font-weight: 700; margin-bottom: 4px;">ACTIVE INTAKE MANIFEST: iPhone 14 Pro [359182049182741]</div>
-              <div style="display: grid; grid-template-columns: 100px 1fr; gap: 4px;">
-                <span style="color: #64748b;">Display OEM:</span> <span style="color: #34d399;">DSP_OEM_APL_09182</span>
-                <span style="color: #64748b;">Battery OEM:</span> <span style="color: #34d399;">BAT_OEM_APL_77218 (142 Cyc)</span>
-                <span style="color: #64748b;">Camera OEM:</span> <span style="color: #34d399;">CAM_OEM_APL_33190</span>
-                <span style="color: #64748b;">Logic Board:</span> <span style="color: #94a3b8;">MLB_APL_88192</span>
-                <span style="color: #64748b;">Intake Seal:</span> <span style="color: #c084fc; font-size: 0.65rem; word-break: break-all;">sha256:7b919d...e194</span>
-              </div>
-            </div>
-
-            <div style="padding: 8px 10px; background: rgba(16,185,129,0.08); border-radius: 8px; border: 1px solid rgba(16,185,129,0.2); font-size: 0.75rem; color: #34d399; margin-bottom: 10px;">
-              &bull; Egress checkout requires full match or an authorized Part Requisition ticket signed by inventory manager.
-            </div>
-
-            <button class="btn-ops" style="width: 100%; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; justify-content: center;" onclick="testEgressPartCheckSimulation()">
-              Run Egress Anti-Cannibalization Check
-            </button>
-          </div>
-
-          <!-- CARD 3: DEAD CAPITAL RADAR & WORKING CAPITAL -->
-          <div class="ops-card" style="background: rgba(17,24,39,0.7); backdrop-filter: blur(16px); border: 1px solid rgba(244,63,94,0.3); border-radius: 14px; padding: 1.25rem;">
-            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-              <span style="display: flex; align-items: center; gap: 6px;">
-                <span style="color: #f43f5e;">📉</span> Dead Capital Radar (Aging Bands)
-              </span>
-              <span class="badge" style="background: rgba(244,63,94,0.15); color: #f87171;">WORKING CAPITAL</span>
-            </div>
-            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
-              Surfaces aged inventory (>30/60 days) to prevent capital stagnation and market depreciation:
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-              <div style="background: #0f172a; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-                <div style="font-size: 0.65rem; color: #94a3b8;">0-30 Days (Fresh)</div>
-                <div style="font-size: 0.95rem; font-weight: 800; color: #34d399; margin-top: 2px;">₹62,000</div>
-                <div style="font-size: 0.65rem; color: #64748b;">1 Item</div>
-              </div>
-
-              <div style="background: #0f172a; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-                <div style="font-size: 0.65rem; color: #94a3b8;">31-60 Days (Slow)</div>
-                <div style="font-size: 0.95rem; font-weight: 800; color: #f59e0b; margin-top: 2px;">₹71,000</div>
-                <div style="font-size: 0.65rem; color: #64748b;">1 Item</div>
-              </div>
-
-              <div style="background: #0f172a; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(239,68,68,0.2);">
-                <div style="font-size: 0.65rem; color: #f87171;">>60 Days (Dead)</div>
-                <div style="font-size: 0.95rem; font-weight: 800; color: #f87171; margin-top: 2px;">₹51,500</div>
-                <div style="font-size: 0.65rem; color: #ef4444;">2 Items</div>
-              </div>
-            </div>
-
-            <div style="padding: 8px 10px; background: rgba(244,63,94,0.08); border-radius: 8px; border: 1px solid rgba(244,63,94,0.2); font-size: 0.75rem; color: #f43f5e; margin-bottom: 10px;">
-              Clearance Recommendation: 15% markdown recovers <strong>₹43,775</strong> immediate cash liquidity.
-            </div>
-
-            <button class="btn-ops" style="width: 100%; background: rgba(244,63,94,0.15); border: 1px solid rgba(244,63,94,0.3); color: #f43f5e; justify-content: center;" onclick="refreshPhonyFiHud()">
-              Refresh Dead Capital Radar
-            </button>
-          </div>
-
-          <!-- CARD 4: 4-EYES GOVERNANCE QUEUE & GSTR-2B GATE -->
-          <div class="ops-card" style="background: rgba(17,24,39,0.7); backdrop-filter: blur(16px); border: 1px solid rgba(245,158,11,0.3); border-radius: 14px; padding: 1.25rem;">
-            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-              <span style="display: flex; align-items: center; gap: 6px;">
-                <span style="color: #f59e0b;">⚖️</span> 4-Eyes Dual Authorization &amp; GSTR-2B
-              </span>
-              <span class="badge" style="background: rgba(245,158,11,0.15); color: #fbbf24;">DUAL SIGNOFF</span>
-            </div>
-            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
-              High-risk mutations require secondary manager approval. Vendor payouts blocked without matched GSTR-2B filings.
-            </div>
-
-            <div id="fourEyesQueueContainer" style="background: #020617; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px; font-size: 0.72rem; min-height: 120px; max-height: 160px; overflow-y: auto; color: #94a3b8;">
-              <div style="color: #64748b; text-align: center; padding: 2rem 0;">No pending 4-Eyes proposals in queue. High-risk mutations are cleanly reconciled.</div>
-            </div>
-
-            <div style="margin-top: 10px; display: flex; gap: 8px;">
-              <button class="btn-ops" style="flex: 1; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #34d399; justify-content: center;" onclick="loadPendingProposals()">
-                Fetch Pending Proposals
-              </button>
-              <button class="btn-ops" style="flex: 1; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); color: #fbbf24; justify-content: center;" onclick="testGstr2bGateSimulation()">
-                Test GSTR-2B Gate
-              </button>
-            </div>
           </div>
         </div>
       </section>
