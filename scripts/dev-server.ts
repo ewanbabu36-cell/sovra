@@ -89792,6 +89792,26 @@ async function startDevServer() {
       return;
     }
 
+    function checkAdminRbac(req: http.IncomingMessage, requiredPerm: string): { authorized: boolean; adminDid: string; role: string; error?: string } {
+      const adminDid = (req.headers['x-admin-did'] as string) || (new URL(req.url || '/', 'http://localhost').searchParams.get('adminDid')) || 'did:sov:admin_root';
+      const sqlite = sovraDb.getSqliteEngine();
+      if (!sqlite) return { authorized: true, adminDid, role: 'SUPER_ADMIN' };
+
+      const hasPerm = sqlite.hasPermission(adminDid, requiredPerm);
+      const rbac = sqlite.getRbacRole(adminDid);
+      const role = rbac?.role || (adminDid === 'did:sov:admin_root' ? 'SUPER_ADMIN' : 'UNKNOWN');
+
+      if (!hasPerm) {
+        return {
+          authorized: false,
+          adminDid,
+          role,
+          error: `RBAC_PERMISSION_DENIED: Role '${role}' lacks required permission '${requiredPerm}'`,
+        };
+      }
+      return { authorized: true, adminDid, role };
+    }
+
     if (url.pathname === '/api/admin/nuclear/switches' && req.method === 'GET') {
       const sqlite = sovraDb.getSqliteEngine();
       const switches = sqlite ? sqlite.getKillSwitches() : [];
@@ -89804,13 +89824,28 @@ async function startDevServer() {
       const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
       if (!ok) return;
       try {
+        const auth = checkAdminRbac(req, 'kill_switches:write');
+        if (!auth.authorized) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: auth.error }));
+          return;
+        }
+
         const parsed = JSON.parse(body);
         const switchId = String(parsed.switchId || '').trim();
         const active = Boolean(parsed.active);
         const sqlite = sovraDb.getSqliteEngine();
         let success = false;
         if (sqlite && switchId) {
-          success = sqlite.setKillSwitch(switchId, active, 'ADMIN-COMMAND');
+          success = sqlite.setKillSwitch(switchId, active, auth.adminDid);
+          sqlite.recordTamperProofAuditEntry({
+            adminDid: auth.adminDid,
+            role: auth.role,
+            actionType: 'KILL_SWITCH_MUTATED',
+            targetResource: switchId,
+            payload: { active, reason: parsed.reason || 'Hardware switch toggled' },
+            ipAddress: req.socket.remoteAddress || '127.0.0.1',
+          });
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: success, message: `Kill switch '${switchId}' set to ${active ? 'ACTIVE (FROZEN)' : 'STANDBY'}` }));
@@ -89922,6 +89957,115 @@ async function startDevServer() {
       const snapshots = sqlite ? sqlite.listChronosSnapshots() : [];
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, snapshots }));
+      return;
+    }
+
+    // ==========================================
+    // 🔐 RBAC STATION & CRYPTOGRAPHIC AUDIT LEDGER ENDPOINTS
+    // ==========================================
+    if (url.pathname === '/api/admin/rbac/roles' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const roles = sqlite ? sqlite.listRbacRoles() : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, roles }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/rbac/assign' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const auth = checkAdminRbac(req, 'rbac:write');
+        if (!auth.authorized) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: auth.error }));
+          return;
+        }
+        const parsed = JSON.parse(body);
+        const adminDid = String(parsed.adminDid || '').trim();
+        const role = String(parsed.role || '').trim();
+        const permissions = Array.isArray(parsed.permissions) ? parsed.permissions : ['*:read'];
+        const sqlite = sovraDb.getSqliteEngine();
+        if (sqlite && adminDid && role) {
+          sqlite.assignRbacRole(adminDid, role, permissions, auth.adminDid);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: `Role '${role}' assigned to ${adminDid}` }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/audit/ledger' && req.method === 'GET') {
+      const limit = Number(url.searchParams.get('limit') || 100);
+      const sqlite = sovraDb.getSqliteEngine();
+      const ledger = sqlite ? sqlite.getTamperProofAuditLedger(limit) : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, count: ledger.length, ledger }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/audit/verify-chain' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const audit = sqlite ? sqlite.verifyTamperProofAuditChain() : { isValid: false, totalEntries: 0, headHash: 'EMPTY' };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, audit }));
+      return;
+    }
+
+    // ==========================================
+    // ⚖️ ATOMIC 4-COLUMN DOUBLE-ENTRY TRANSFER ENDPOINT
+    // ==========================================
+    if (url.pathname === '/api/admin/ledger/atomic-transfer' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+      if (!ok) return;
+      try {
+        const auth = checkAdminRbac(req, 'ledger:transfer');
+        if (!auth.authorized) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: auth.error }));
+          return;
+        }
+
+        const parsed = JSON.parse(body);
+        const sqlite = sovraDb.getSqliteEngine();
+        if (!sqlite) throw new Error('Database engine not initialized');
+
+        const result = sqlite.executeAtomicLedgerTransfer({
+          fromDid: String(parsed.fromDid || '').trim(),
+          toDid: String(parsed.toDid || '').trim(),
+          amountSov: Number(parsed.amountSov || 0),
+          feeSov: Number(parsed.feeSov || 0),
+          txType: parsed.txType || 'ADMIN_LEDGER_TRANSFER',
+          memo: parsed.memo || 'Atomic admin double-entry transfer',
+          adminDid: auth.adminDid,
+          ipAddress: req.socket.remoteAddress || '127.0.0.1',
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, result }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Atomic transfer failed' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // ⚡ ZERO-BLOCKING ASYNC WASH-TRADING CYCLE SCANNER
+    // ==========================================
+    if (url.pathname === '/api/admin/revenue/wash-trading-async' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      if (!sqlite) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, cycles: [] }));
+        return;
+      }
+      const cycles = await sqlite.detectWashTradingCyclesAsync(72, 5);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, count: cycles.length, cycles }));
       return;
     }
 
