@@ -551,6 +551,55 @@ export class SqliteSocialDatabaseEngine {
         status TEXT NOT NULL DEFAULT 'FLAGGED',
         detected_at INTEGER NOT NULL
       );
+
+      -- 32. NUCLEAR KILL-SWITCH MATRIX (GOD-MODE BLAST-RADIUS PROTECTION)
+      CREATE TABLE IF NOT EXISTS admin_kill_switches (
+        switch_id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        description TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 0,
+        triggered_by TEXT,
+        triggered_at INTEGER
+      );
+
+      -- 33. HONEYPOT INTRUSION SENSORS (CANARY TRAPS)
+      CREATE TABLE IF NOT EXISTS admin_honeypot_intrusions (
+        id TEXT PRIMARY KEY,
+        trap_path TEXT NOT NULL,
+        source_ip TEXT NOT NULL,
+        user_agent TEXT NOT NULL,
+        headers_json TEXT,
+        payload_snippet TEXT,
+        action_taken TEXT NOT NULL,
+        detected_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_honeypot_detected ON admin_honeypot_intrusions(detected_at);
+
+      -- 34. GHOST IMPERSONATION SESSIONS (ZERO-KNOWLEDGE AUDITED ACCESS)
+      CREATE TABLE IF NOT EXISTS admin_ghost_sessions (
+        session_id TEXT PRIMARY KEY,
+        target_did TEXT NOT NULL,
+        target_handle TEXT NOT NULL,
+        admin_did TEXT NOT NULL,
+        ip_address TEXT NOT NULL,
+        user_agent TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_ghost_target ON admin_ghost_sessions(target_did);
+
+      -- 35. AI SENTINEL ANOMALIES & THREAT LOGS (24/7 HEURISTIC DEFENSE)
+      CREATE TABLE IF NOT EXISTS admin_sentinel_threats (
+        id TEXT PRIMARY KEY,
+        threat_level TEXT NOT NULL,
+        threat_type TEXT NOT NULL,
+        subject_did TEXT,
+        description TEXT NOT NULL,
+        auto_action_taken TEXT NOT NULL,
+        detected_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_sentinel_detected ON admin_sentinel_threats(detected_at);
     `);
 
     // Seed default algorithmic dials if empty
@@ -595,6 +644,25 @@ export class SqliteSocialDatabaseEngine {
         insertSetting.run('platform_take_rate_pct', 5.0, null, Date.now());
         insertSetting.run('total_genesis_minted_sov', 5000000.0, null, Date.now());
         insertSetting.run('off_platform_friction_enabled', 1.0, null, Date.now());
+      }
+
+      // Seed default nuclear kill switches if empty
+      const switchesCount = (this.db.prepare('SELECT COUNT(*) as c FROM admin_kill_switches').get() as any)?.c || 0;
+      if (switchesCount === 0) {
+        const seedSwitches = [
+          ['GLOBAL_WITHDRAWALS_FROZEN', 'Halt All Wallet Withdrawals', 'Emergency freeze on outgoing capital outflows'],
+          ['NEW_REGISTRATIONS_FROZEN', 'Halt New Account Registrations', 'Blocks Sybil account generation during bot floods'],
+          ['P2P_MESH_RELAY_FROZEN', 'Halt DePIN Mesh Bandwidth Rewards', 'Freezes micro-ISP packet rewards during telemetry audit'],
+          ['MEDIA_UPLOADS_FROZEN', 'Halt Image & Video Uploads', 'Emergency freeze on new media ingestion to prevent abuse'],
+          ['WEBRTC_CALLING_FROZEN', 'Halt WebRTC P2P Calling Signaling', 'Conserves bandwidth during peak server load'],
+          ['OFFLINE_PAYMENT_VOUCHERS_FROZEN', 'Halt Offline Voucher Redemption', 'Prevents voucher claims during cryptographic rotation'],
+          ['COMMENTS_AND_POSTING_FROZEN', 'Read-Only Network Mode', 'Freezes public write operations during state migration'],
+          ['GLOBAL_LOCKDOWN_MODE', 'Global Swarm Lockdown (503)', 'Returns HTTP 503 to all consumers; Admin remains live'],
+        ];
+        const insertSwitch = this.db.prepare('INSERT OR REPLACE INTO admin_kill_switches (switch_id, label, description, is_active, triggered_by, triggered_at) VALUES (?, ?, ?, 0, null, 0)');
+        for (const [id, label, desc] of seedSwitches) {
+          insertSwitch.run(id, label, desc);
+        }
       }
     } catch (_) {}
     try {
@@ -2062,6 +2130,286 @@ export class SqliteSocialDatabaseEngine {
     } catch (_) {
       return [];
     }
+  }
+
+  // ==========================================
+  // 👁️ THE PANOPTICON: LIVE SWARM INSPECTOR & SESSION TERMINATOR
+  // ==========================================
+  public getPanopticonSessions(limit = 100): Array<{
+    sessionId: string;
+    userDid: string;
+    handle: string;
+    displayName: string;
+    deviceName: string;
+    deviceType: string;
+    ipAddress: string;
+    userAgent: string;
+    createdAt: number;
+    lastActiveAt: number;
+    isRevoked: boolean;
+    balanceSov: number;
+  }> {
+    try {
+      const rows = this.db.prepare(`
+        SELECT s.session_id, s.user_did, s.device_name, s.device_type, s.ip_address, s.user_agent,
+               s.created_at, s.last_active_at, s.is_revoked, u.handle, u.display_name, u.balance_sov
+        FROM user_sessions s
+        LEFT JOIN users u ON s.user_did = u.did
+        ORDER BY s.last_active_at DESC
+        LIMIT ?
+      `).all(limit) as any[];
+      return rows.map(r => ({
+        sessionId: r.session_id,
+        userDid: r.user_did,
+        handle: r.handle || 'unknown',
+        displayName: r.display_name || 'Anonymous Peer',
+        deviceName: r.device_name,
+        deviceType: r.device_type,
+        ipAddress: r.ip_address,
+        userAgent: r.user_agent,
+        createdAt: r.created_at,
+        lastActiveAt: r.last_active_at,
+        isRevoked: Boolean(r.is_revoked),
+        balanceSov: Number(r.balance_sov || 0),
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public terminateUserSession(sessionId: string): boolean {
+    try {
+      this.prepareCached('UPDATE user_sessions SET is_revoked = 1 WHERE session_id = ?').run(sessionId);
+      const row = this.prepareCached('SELECT token FROM user_sessions WHERE session_id = ?').get(sessionId) as any;
+      if (row && row.token) {
+        this.revokeSession(row.token);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public terminateAllUserSessions(userDid: string): boolean {
+    try {
+      this.prepareCached('UPDATE user_sessions SET is_revoked = 1 WHERE user_did = ?').run(userDid);
+      const rows = this.db.prepare('SELECT token FROM user_sessions WHERE user_did = ?').all(userDid) as any[];
+      for (const r of rows) {
+        if (r.token) this.revokeSession(r.token);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ==========================================
+  // 🛑 NUCLEAR KILL-SWITCH MATRIX (BLAST-RADIUS ISOLATION)
+  // ==========================================
+  public getKillSwitches(): Array<{ switchId: string; label: string; description: string; isActive: boolean; triggeredBy?: string; triggeredAt: number }> {
+    try {
+      const rows = this.db.prepare('SELECT switch_id, label, description, is_active, triggered_by, triggered_at FROM admin_kill_switches ORDER BY switch_id ASC').all() as any[];
+      return rows.map(r => ({
+        switchId: r.switch_id,
+        label: r.label,
+        description: r.description,
+        isActive: Boolean(r.is_active),
+        triggeredBy: r.triggered_by || undefined,
+        triggeredAt: r.triggered_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public setKillSwitch(switchId: string, active: boolean, adminDid = 'SOVRA-COMMAND-CONSOLE'): boolean {
+    try {
+      this.prepareCached(`
+        UPDATE admin_kill_switches
+        SET is_active = ?, triggered_by = ?, triggered_at = ?
+        WHERE switch_id = ?
+      `).run(active ? 1 : 0, adminDid, Date.now(), switchId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public isKillSwitchActive(switchId: string): boolean {
+    try {
+      const row = this.prepareCached('SELECT is_active FROM admin_kill_switches WHERE switch_id = ?').get(switchId) as any;
+      return Boolean(row && row.is_active);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ==========================================
+  // 🍯 HONEYPOT CANARY INTRUSION TRAPS (ZERO-DAY NEUTRALIZER)
+  // ==========================================
+  public recordHoneypotIntrusion(
+    trapPath: string,
+    sourceIp: string,
+    userAgent: string,
+    headersJson = '',
+    payloadSnippet = '',
+  ): { intrusionId: string; actionTaken: string } {
+    const id = 'trap_' + crypto.randomUUID().slice(0, 8);
+    const actionTaken = 'ZERO_REACH_SHADOWBAN_APPLIED';
+    try {
+      this.prepareCached(`
+        INSERT INTO admin_honeypot_intrusions (id, trap_path, source_ip, user_agent, headers_json, payload_snippet, action_taken, detected_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, trapPath, sourceIp, userAgent, headersJson, payloadSnippet.slice(0, 500), actionTaken, Date.now());
+
+      // Auto-shadowban intruder IP with 0.00x visibility decay
+      const intruderDid = 'did:ip:' + sourceIp.replace(/[^a-zA-Z0-9]/g, '_');
+      this.setShadowban(intruderDid, '@intruder_' + id.slice(0, 6), `Automated Honeypot Trap Trigger: ${trapPath}`, 0.0, Date.now() + 86400000 * 30);
+    } catch (_) {}
+    return { intrusionId: id, actionTaken };
+  }
+
+  public getHoneypotIntrusions(limit = 50): Array<{
+    id: string;
+    trapPath: string;
+    sourceIp: string;
+    userAgent: string;
+    actionTaken: string;
+    detectedAt: number;
+  }> {
+    try {
+      const rows = this.db.prepare('SELECT id, trap_path, source_ip, user_agent, action_taken, detected_at FROM admin_honeypot_intrusions ORDER BY detected_at DESC LIMIT ?').all(limit) as any[];
+      return rows.map(r => ({
+        id: r.id,
+        trapPath: r.trap_path,
+        sourceIp: r.source_ip,
+        userAgent: r.user_agent,
+        actionTaken: r.action_taken,
+        detectedAt: r.detected_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ==========================================
+  // 👻 GHOST MODE: ZERO-KNOWLEDGE AUDITED IMPERSONATION
+  // ==========================================
+  public createGhostSession(targetDid: string, adminDid: string, ipAddress = '127.0.0.1', userAgent = 'AdminConsole/GhostMode'): {
+    ghostToken: string;
+    targetDid: string;
+    targetHandle: string;
+    expiresAt: number;
+  } | null {
+    const user = this.findUserByDid(targetDid);
+    if (!user) return null;
+    const ghostToken = 'ghost_sec_' + crypto.randomBytes(24).toString('hex');
+    const expiresAt = Date.now() + 2 * 3600 * 1000; // 2 hour TTL
+    try {
+      this.prepareCached(`
+        INSERT INTO admin_ghost_sessions (session_id, target_did, target_handle, admin_did, ip_address, user_agent, is_active, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `).run(ghostToken, user.did, user.handle, adminDid, ipAddress, userAgent, Date.now(), expiresAt);
+
+      // Audit log entry
+      this.prepareCached(`
+        INSERT INTO audit_logs (id, actor_did, action, details, ip_address, timestamp)
+        VALUES (?, ?, 'GHOST_IMPERSONATION_START', ?, ?, ?)
+      `).run('audit_' + crypto.randomUUID().slice(0, 8), adminDid, `Read-only impersonation of ${user.did} (${user.handle})`, ipAddress, Date.now());
+    } catch (_) {}
+    return { ghostToken, targetDid: user.did, targetHandle: user.handle, expiresAt };
+  }
+
+  public validateGhostSession(ghostToken: string): { valid: boolean; targetDid?: string; targetHandle?: string } {
+    try {
+      const row = this.prepareCached('SELECT target_did, target_handle, expires_at, is_active FROM admin_ghost_sessions WHERE session_id = ?').get(ghostToken) as any;
+      if (!row || !row.is_active || Date.now() > row.expires_at) {
+        return { valid: false };
+      }
+      return { valid: true, targetDid: row.target_did, targetHandle: row.target_handle };
+    } catch (_) {
+      return { valid: false };
+    }
+  }
+
+  // ==========================================
+  // 🤖 24/7 AUTONOMOUS AI SENTINEL HEURISTIC ENGINE
+  // ==========================================
+  public runSentinelHealthAudit(): {
+    threatLevel: 'GREEN' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+    score: number;
+    heuristics: {
+      activeSessions: number;
+      sybilSpikeRate1h: number;
+      activeWashCycles: number;
+      honeypotTriggers24h: number;
+      solvencyStatus: string;
+      activeKillSwitches: number;
+    };
+    recommendedPosture: string;
+    auditedAt: number;
+  } {
+    let activeSessions = 0;
+    try {
+      activeSessions = (this.db.prepare('SELECT COUNT(*) as c FROM user_sessions WHERE is_revoked = 0').get() as any)?.c || 0;
+    } catch (_) {}
+
+    const oneHourAgo = Date.now() - 3600 * 1000;
+    let sybilSpikeRate1h = 0;
+    try {
+      sybilSpikeRate1h = (this.db.prepare('SELECT COUNT(*) as c FROM users WHERE created_at >= ?').get(oneHourAgo) as any)?.c || 0;
+    } catch (_) {}
+
+    let activeWashCycles = 0;
+    try {
+      activeWashCycles = this.detectWashTradingCycles(72).length;
+    } catch (_) {}
+
+    const oneDayAgo = Date.now() - 86400 * 1000;
+    let honeypotTriggers24h = 0;
+    try {
+      honeypotTriggers24h = (this.db.prepare('SELECT COUNT(*) as c FROM admin_honeypot_intrusions WHERE detected_at >= ?').get(oneDayAgo) as any)?.c || 0;
+    } catch (_) {}
+
+    const solvency = this.getTreasurySolvencyReport();
+    const activeKillSwitches = this.getKillSwitches().filter(s => s.isActive).length;
+
+    let score = 10;
+    if (sybilSpikeRate1h > 100) score += 30;
+    else if (sybilSpikeRate1h > 30) score += 15;
+
+    if (activeWashCycles > 0) score += 20;
+    if (honeypotTriggers24h > 0) score += 25;
+    if (!solvency.isSolvent) score += 35;
+
+    let threatLevel: 'GREEN' | 'ELEVATED' | 'HIGH' | 'CRITICAL' = 'GREEN';
+    let recommendedPosture = 'ALL_CLEAR_STANDARD_OPERATIONS';
+
+    if (score >= 70 || !solvency.isSolvent) {
+      threatLevel = 'CRITICAL';
+      recommendedPosture = 'ENGAGE_GLOBAL_WITHDRAWALS_FREEZE';
+    } else if (score >= 45 || honeypotTriggers24h > 0) {
+      threatLevel = 'HIGH';
+      recommendedPosture = 'RESTRICT_HIGH_VELOCITY_TIPPING_AND_PROMOS';
+    } else if (score >= 25 || activeWashCycles > 0) {
+      threatLevel = 'ELEVATED';
+      recommendedPosture = 'INCREASE_NLP_OCR_SAMPLING_AND_CYCLE_POLLING';
+    }
+
+    return {
+      threatLevel,
+      score: Math.min(100, score),
+      heuristics: {
+        activeSessions,
+        sybilSpikeRate1h,
+        activeWashCycles,
+        honeypotTriggers24h,
+        solvencyStatus: solvency.healthStatus,
+        activeKillSwitches,
+      },
+      recommendedPosture,
+      auditedAt: Date.now(),
+    };
   }
 
   public close(): void {
