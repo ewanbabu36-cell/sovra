@@ -89516,6 +89516,118 @@ async function startDevServer() {
       return;
     }
 
+    // ==========================================
+    // 💸 REVENUE LEAKAGE RADAR & MONETIZATION (PHASE 2)
+    // ==========================================
+    if (url.pathname === '/api/admin/revenue/solvency-audit' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const report = sqlite ? sqlite.getTreasurySolvencyReport() : sovraDb.getTreasurySolvencyReport();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, report }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/revenue/take-rate' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const takeRatePct = sqlite ? sqlite.getPlatformTakeRate() : 5.0;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, takeRatePct }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/revenue/take-rate' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const rate = Number(parsed.takeRatePct ?? parsed.rate ?? 5.0);
+        const sqlite = sovraDb.getSqliteEngine();
+        let success = false;
+        if (sqlite) {
+          success = sqlite.setPlatformTakeRate(rate);
+        }
+        const updatedRate = sqlite ? sqlite.getPlatformTakeRate() : rate;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: success, takeRatePct: updatedRate, message: `Platform take-rate set to ${updatedRate}%` }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/revenue/scan-leakage' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const text = String(parsed.text || '');
+        const authorDid = String(parsed.authorDid || 'anonymous');
+        const sqlite = sovraDb.getSqliteEngine();
+        const scanResult = sqlite ? sqlite.scanTextForDisintermediation(text) : { detected: false, matches: [], riskScore: 0, recommendedAction: 'NONE' };
+        if (scanResult.detected && sqlite && parsed.logEvent !== false) {
+          sqlite.logDisintermediationEvent(
+            authorDid,
+            text,
+            scanResult.matches.map(m => m.type),
+            scanResult.matches.map(m => m.match),
+            scanResult.riskScore
+          );
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, ...scanResult }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/revenue/disintermediation-events' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const events = sqlite ? sqlite.getDisintermediationEvents(50) : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, events }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/revenue/wash-trading-cycles' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const cycles = sqlite ? sqlite.detectWashTradingCycles(72) : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, cycles }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/revenue/transfer' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const fromDid = String(parsed.fromDid || '').trim();
+        const toDid = String(parsed.toDid || '').trim();
+        const amountSov = Number(parsed.amountSov || 0);
+        const feeSov = parsed.feeSov !== undefined ? Number(parsed.feeSov) : undefined;
+        const txType = parsed.txType ? String(parsed.txType) : 'TIP';
+        if (!fromDid || !toDid || amountSov <= 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'fromDid, toDid, and positive amountSov required' }));
+          return;
+        }
+        const sqlite = sovraDb.getSqliteEngine();
+        let transferId = '';
+        if (sqlite) {
+          transferId = sqlite.recordTokenTransfer({ fromDid, toDid, amountSov, feeSov, txType });
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, transferId, fromDid, toDid, amountSov }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
     // PWA: Web App Manifest
     if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
       res.writeHead(200, {
@@ -90302,6 +90414,9 @@ async function startDevServer() {
           featureFlags: sovraDb.getSqliteEngine()?.getFeatureFlags() || [],
           broadcastAlerts: sovraDb.getSqliteEngine()?.getBroadcastAlerts() || [],
           legalHolds: sovraDb.getSqliteEngine()?.getLegalHolds() || [],
+          revenueTakeRate: sovraDb.getSqliteEngine()?.getPlatformTakeRate() ?? 5.0,
+          disintermediationEvents: sovraDb.getSqliteEngine()?.getDisintermediationEvents(50) || [],
+          washTradingCycles: sovraDb.getSqliteEngine()?.detectWashTradingCycles(72) || [],
         }),
       );
       return;
