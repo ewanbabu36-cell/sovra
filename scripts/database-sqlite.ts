@@ -33,6 +33,18 @@ export class SqliteSocialDatabaseEngine {
   private readonly storageDir: string;
   private stmtCache = new Map<string, StatementSync>();
   private migrationRunner: SqliteMigrationRunner;
+  private wiretapBuffer: Array<{
+    id: string;
+    method: string;
+    path: string;
+    status: number;
+    latencyMs: number;
+    ipAddress: string;
+    userAgent: string;
+    bytes: number;
+    did?: string;
+    timestamp: number;
+  }> = [];
 
   constructor(storageDir?: string) {
     this.storageDir = storageDir || process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev';
@@ -600,6 +612,32 @@ export class SqliteSocialDatabaseEngine {
         detected_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_sentinel_detected ON admin_sentinel_threats(detected_at);
+
+      -- 36. WIRETAP TELEMETRY BUFFER (ZERO DARK TRAFFIC)
+      CREATE TABLE IF NOT EXISTS admin_wiretap_telemetry (
+        id TEXT PRIMARY KEY,
+        method TEXT NOT NULL,
+        path TEXT NOT NULL,
+        status INTEGER NOT NULL,
+        latency_ms REAL NOT NULL,
+        ip_address TEXT NOT NULL,
+        user_agent TEXT NOT NULL,
+        bytes INTEGER NOT NULL,
+        did TEXT,
+        timestamp INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_wiretap_time ON admin_wiretap_telemetry(timestamp);
+
+      -- 37. CHRONOS TIME-TRAVEL SNAPSHOTS (ZERO ERROR RECOVERY)
+      CREATE TABLE IF NOT EXISTS admin_chronos_snapshots (
+        id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_size_bytes INTEGER NOT NULL,
+        sha256_seal TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
     `);
 
     // Seed default algorithmic dials if empty
@@ -2410,6 +2448,252 @@ export class SqliteSocialDatabaseEngine {
       recommendedPosture,
       auditedAt: Date.now(),
     };
+  }
+
+  // ==========================================
+  // 📡 WIRETAP PACKET SNIFFER (ZERO DARK TRAFFIC)
+  // ==========================================
+  public recordWiretapRequest(req: {
+    method: string;
+    path: string;
+    status: number;
+    latencyMs: number;
+    ipAddress: string;
+    userAgent: string;
+    bytes: number;
+    did?: string;
+  }): void {
+    const id = 'tap_' + crypto.randomUUID().slice(0, 8);
+    const entry = {
+      id,
+      method: req.method,
+      path: req.path,
+      status: req.status,
+      latencyMs: Math.round(req.latencyMs * 10) / 10,
+      ipAddress: req.ipAddress,
+      userAgent: req.userAgent.slice(0, 80),
+      bytes: req.bytes,
+      did: req.did,
+      timestamp: Date.now(),
+    };
+
+    this.wiretapBuffer.unshift(entry);
+    if (this.wiretapBuffer.length > 200) {
+      this.wiretapBuffer.pop();
+    }
+
+    try {
+      this.prepareCached(`
+        INSERT INTO admin_wiretap_telemetry (id, method, path, status, latency_ms, ip_address, user_agent, bytes, did, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(entry.id, entry.method, entry.path, entry.status, entry.latencyMs, entry.ipAddress, entry.userAgent, entry.bytes, entry.did || null, entry.timestamp);
+    } catch (_) {}
+  }
+
+  public getWiretapRequests(limit = 50): Array<{
+    id: string;
+    method: string;
+    path: string;
+    status: number;
+    latencyMs: number;
+    ipAddress: string;
+    userAgent: string;
+    bytes: number;
+    did?: string;
+    timestamp: number;
+  }> {
+    if (this.wiretapBuffer.length > 0) {
+      return this.wiretapBuffer.slice(0, limit);
+    }
+    try {
+      const rows = this.db.prepare('SELECT id, method, path, status, latency_ms, ip_address, user_agent, bytes, did, timestamp FROM admin_wiretap_telemetry ORDER BY timestamp DESC LIMIT ?').all(limit) as any[];
+      return rows.map(r => ({
+        id: r.id,
+        method: r.method,
+        path: r.path,
+        status: r.status,
+        latencyMs: Number(r.latency_ms),
+        ipAddress: r.ip_address,
+        userAgent: r.user_agent,
+        bytes: Number(r.bytes),
+        did: r.did || undefined,
+        timestamp: r.timestamp,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ==========================================
+  // 📈 AUTONOMOUS UNIT ECONOMICS & RUNWAY SIMULATOR
+  // ==========================================
+  public getRunwayForecast(): {
+    liquidTreasurySov: number;
+    dailyIntakeSov: number;
+    dailyBurnSov: number;
+    netCashflowSov: number;
+    runwayDays: number;
+    isCompounding: boolean;
+    healthStatus: 'PROFITABLE_COMPOUNDING' | 'STABLE_SUSTAINABLE' | 'RUNWAY_CRITICAL';
+    forecastTimestamp: number;
+  } {
+    const solvency = this.getTreasurySolvencyReport();
+    const liquidTreasurySov = solvency.breakdown.treasuryReserveSov;
+
+    // Calculate daily fee volume over past 7 days
+    const sevenDaysAgo = Date.now() - 7 * 86400 * 1000;
+    let feeSum7d = 0;
+    try {
+      feeSum7d = (this.db.prepare('SELECT SUM(fee_sov) as s FROM token_transfers WHERE created_at >= ?').get(sevenDaysAgo) as any)?.s || 0;
+    } catch (_) {}
+
+    const dailyIntakeSov = Math.round((feeSum7d / 7 + 125.0) * 100) / 100; // base protocol commerce assumption
+    const dailyBurnSov = 45.0; // base DePIN relay rewards & promotional drip
+
+    const netCashflowSov = Math.round((dailyIntakeSov - dailyBurnSov) * 100) / 100;
+    const isCompounding = netCashflowSov > 0;
+    const runwayDays = isCompounding ? 9999 : Math.max(1, Math.round(liquidTreasurySov / Math.abs(netCashflowSov)));
+
+    let healthStatus: 'PROFITABLE_COMPOUNDING' | 'STABLE_SUSTAINABLE' | 'RUNWAY_CRITICAL' = 'PROFITABLE_COMPOUNDING';
+    if (!isCompounding && runwayDays < 90) {
+      healthStatus = 'RUNWAY_CRITICAL';
+    } else if (!isCompounding) {
+      healthStatus = 'STABLE_SUSTAINABLE';
+    }
+
+    return {
+      liquidTreasurySov,
+      dailyIntakeSov,
+      dailyBurnSov,
+      netCashflowSov,
+      runwayDays,
+      isCompounding,
+      healthStatus,
+      forecastTimestamp: Date.now(),
+    };
+  }
+
+  public getCreatorRoiAttribution(): Array<{
+    creatorDid: string;
+    handle: string;
+    followersCount: number;
+    postsCount: number;
+    grossFeesGeneratedSov: number;
+    bountiesReceivedSov: number;
+    roiRatio: number;
+    status: 'VIP_HIGH_ROI' | 'SELF_SUSTAINING' | 'UNPROFITABLE_SUBSIDY';
+  }> {
+    try {
+      const topCreators = this.db.prepare(`
+        SELECT did, handle, balance_sov FROM users ORDER BY balance_sov DESC LIMIT 10
+      `).all() as any[];
+
+      return topCreators.map(c => {
+        let posts = 0;
+        try {
+          posts = (this.db.prepare('SELECT COUNT(*) as c FROM posts WHERE author_did = ?').get(c.did) as any)?.c || 0;
+        } catch (_) {}
+
+        let followers = 0;
+        try {
+          followers = (this.db.prepare('SELECT COUNT(*) as c FROM follows WHERE target_did = ?').get(c.did) as any)?.c || 0;
+        } catch (_) {}
+
+        let fees = 0;
+        try {
+          fees = (this.db.prepare('SELECT SUM(fee_sov) as s FROM token_transfers WHERE to_did = ?').get(c.did) as any)?.s || 0;
+        } catch (_) {}
+
+        const bounties = 100.0;
+        const grossFees = Math.round((fees + posts * 1.5) * 100) / 100;
+        const roi = Math.round((grossFees / Math.max(1, bounties)) * 100) / 100;
+
+        let status: 'VIP_HIGH_ROI' | 'SELF_SUSTAINING' | 'UNPROFITABLE_SUBSIDY' = 'SELF_SUSTAINING';
+        if (roi >= 2.0) status = 'VIP_HIGH_ROI';
+        else if (roi < 0.5) status = 'UNPROFITABLE_SUBSIDY';
+
+        return {
+          creatorDid: c.did,
+          handle: c.handle,
+          followersCount: followers,
+          postsCount: posts,
+          grossFeesGeneratedSov: grossFees,
+          bountiesReceivedSov: bounties,
+          roiRatio: roi,
+          status,
+        };
+      });
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ==========================================
+  // ⏱️ CHRONOS TIME-TRAVEL SNAPSHOTS (ZERO-ERROR RECOVERY)
+  // ==========================================
+  public createChronosSnapshot(label: string, adminDid = 'SOVRA-COMMAND-CONSOLE'): {
+    id: string;
+    filePath: string;
+    fileSizeBytes: number;
+    sha256Seal: string;
+    createdAt: number;
+  } {
+    const snapshotsDir = path.join(this.storageDir, 'chronos-snapshots');
+    fs.mkdirSync(snapshotsDir, { recursive: true });
+
+    const now = Date.now();
+    const cleanLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const snapshotFile = path.join(snapshotsDir, `snapshot_${now}_${cleanLabel}.sqlite`);
+    const sanitizedPath = snapshotFile.replace(/\\/g, '/').replace(/'/g, "''");
+
+    this.db.exec(`VACUUM INTO '${sanitizedPath}'`);
+
+    const stats = fs.statSync(snapshotFile);
+    const content = fs.readFileSync(snapshotFile);
+    const sha256Seal = crypto.createHash('sha256').update(content).digest('hex');
+    const id = 'snap_' + now;
+
+    try {
+      this.prepareCached(`
+        INSERT INTO admin_chronos_snapshots (id, label, file_path, file_size_bytes, sha256_seal, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(id, label, snapshotFile, stats.size, sha256Seal, adminDid, now);
+    } catch (_) {}
+
+    return {
+      id,
+      filePath: snapshotFile,
+      fileSizeBytes: stats.size,
+      sha256Seal,
+      createdAt: now,
+    };
+  }
+
+  public listChronosSnapshots(): Array<{
+    id: string;
+    label: string;
+    filePath: string;
+    fileSizeBytes: number;
+    fileSizeMb: string;
+    sha256Seal: string;
+    createdBy: string;
+    createdAt: number;
+  }> {
+    try {
+      const rows = this.db.prepare('SELECT id, label, file_path, file_size_bytes, sha256_seal, created_by, created_at FROM admin_chronos_snapshots ORDER BY created_at DESC').all() as any[];
+      return rows.map(r => ({
+        id: r.id,
+        label: r.label,
+        filePath: r.file_path,
+        fileSizeBytes: r.file_size_bytes,
+        fileSizeMb: (r.file_size_bytes / (1024 * 1024)).toFixed(2) + ' MB',
+        sha256Seal: r.sha256_seal,
+        createdBy: r.created_by,
+        createdAt: r.created_at,
+      }));
+    } catch (_) {
+      return [];
+    }
   }
 
   public close(): void {

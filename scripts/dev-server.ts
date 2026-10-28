@@ -89775,6 +89775,63 @@ async function startDevServer() {
       return;
     }
 
+    // ==========================================
+    // 📡 WIRETAP X-RAY & UNIT ECONOMICS APIS (PHASE 4)
+    // ==========================================
+    if (url.pathname === '/api/admin/wiretap/stream' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const telemetry = sqlite ? sqlite.getWiretapRequests(50) : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, telemetry }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/economics/runway' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const runway = sqlite ? sqlite.getRunwayForecast() : null;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, runway }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/economics/creator-roi' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const creators = sqlite ? sqlite.getCreatorRoiAttribution() : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, creators }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/chronos/snapshot' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const label = String(parsed.label || 'manual_audit').trim();
+        const sqlite = sovraDb.getSqliteEngine();
+        if (!sqlite) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Database unavailable' }));
+          return;
+        }
+        const snapshot = sqlite.createChronosSnapshot(label, 'ADMIN-DESK');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, snapshot, message: 'Chronos immutable point-in-time snapshot sealed' }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/chronos/snapshots' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const snapshots = sqlite ? sqlite.listChronosSnapshots() : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, snapshots }));
+      return;
+    }
+
     // PWA: Web App Manifest
     if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
       res.writeHead(200, {
