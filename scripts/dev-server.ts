@@ -44638,8 +44638,23 @@ function renderHtml(
     // 💬 Non-Intrusive Floating Top Chat Toast & Quick Reply
     let _floatingChatToastTimer = null;
     let _activeToastMessageData = null;
+    const _shownToastMessageIds = new Set();
 
     function triggerFloatingChatToast(msg) {
+      if (!msg || !msg.id) return;
+      if (_shownToastMessageIds.has(msg.id)) return;
+
+      // 🛡️ Standard Industry Protocol (WhatsApp / Telegram Recency Gate):
+      // Only pop a floating heads-up toast banner if the message arrived in real-time within the last 15 seconds.
+      // Historical messages fetched during initial page load, hydration, or offline catch-up must NEVER pop up.
+      const now = Date.now();
+      const msgTime = Number(msg.timestamp || msg.createdAt || 0);
+      if (now - msgTime > 15000) {
+        _shownToastMessageIds.add(msg.id);
+        return; // Stale historical message - quietly sync without popping heads-up banner
+      }
+
+      _shownToastMessageIds.add(msg.id);
       const toast = document.getElementById('floatingChatToast');
       if (!toast) return;
 
@@ -66099,6 +66114,7 @@ function renderHtml(
     window.handleIncomingRealtimeChatMessage = handleIncomingRealtimeChatMessage;
 
     let lastChatSyncTimestamp = 0;
+    let _isInitialChatHydration = true;
     async function syncChatMessages() {
       if (document.hidden) return;
       const myDid = (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : null) || (myProfile ? myProfile.did : '');
@@ -66113,8 +66129,13 @@ function renderHtml(
           let hasNew = false;
           const deliveredIds = [];
           const readIds = [];
+          const wasInitial = _isInitialChatHydration;
 
           for (const msg of data.messages) {
+            // Seed into _shownToastMessageIds so historical messages are never popped on page load/refresh
+            if (wasInitial && typeof _shownToastMessageIds !== 'undefined') {
+              _shownToastMessageIds.add(msg.id);
+            }
             if (msg.timestamp > lastChatSyncTimestamp) {
               lastChatSyncTimestamp = msg.timestamp;
             }
@@ -66151,9 +66172,10 @@ function renderHtml(
                   deliveredIds.push(msg.id);
                 }
 
-                // Non-intrusive floating chat toast when user is browsing feed, reels, video, or profile
+                // Non-intrusive floating chat toast ONLY for live incoming messages (Standard Industry Protocol: WhatsApp/Telegram)
                 const curActiveTab = document.body.dataset.activeTab || window._currentActiveTab || 'feed';
-                if (curActiveTab !== 'chat') {
+                const msgAgeMs = Date.now() - (msg.timestamp || 0);
+                if (!wasInitial && msgAgeMs < 15000 && curActiveTab !== 'chat') {
                   if (typeof triggerFloatingChatToast === 'function') {
                     triggerFloatingChatToast(msg);
                   }
@@ -66229,7 +66251,10 @@ function renderHtml(
             }).catch(function() {});
           }
         }
-      } catch(err) {}
+        _isInitialChatHydration = false;
+      } catch(err) {
+        _isInitialChatHydration = false;
+      }
     }
     setInterval(syncChatMessages, 2000);
 

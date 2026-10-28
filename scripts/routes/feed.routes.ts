@@ -26,8 +26,8 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
     const reels = sovraDb.getAllReels();
     const tagCounts = new Map<string, number>();
 
-    const extractTags = (text?: string) => {
-      if (!text) return;
+    const extractTags = (text?: any) => {
+      if (!text || typeof text !== 'string') return;
       const matches = text.match(/#[\w\u0590-\u05ff]+/gi);
       if (matches) {
         matches.forEach(t => {
