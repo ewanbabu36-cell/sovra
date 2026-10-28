@@ -88,77 +88,7 @@ import { handleOfflinePayRoutes } from './routes/offline-pay.routes.ts';
 import { handleNotesRoutes } from './routes/notes.routes.ts';
 import { handleZkRoutes } from './routes/zk.routes.ts';
 import { handleAgentRoutes } from './routes/agent.routes.ts';
-import { PhonyFiErpEngine } from './phonyfi-erp-engine.ts';
 
-let phonyFiErp: PhonyFiErpEngine | null = null;
-export function getPhonyFiErp(): PhonyFiErpEngine | null {
-  if (!phonyFiErp) {
-    const rawDb = sovraDb.getSqliteEngine()?.getRawDb();
-    if (rawDb) {
-      phonyFiErp = new PhonyFiErpEngine(rawDb);
-      try {
-        const radar = phonyFiErp.getDeadCapitalRadar();
-        if (radar.totalWorkingCapitalLockedInr === 0) {
-          const now = Date.now();
-          const dayMs = 24 * 3600 * 1000;
-          phonyFiErp.addInventoryItem({
-            imeiOrSku: 'SKU_IPHONE15_BLK_128',
-            title: 'Apple iPhone 15 Black 128GB (Pristine Refurb)',
-            category: 'DEVICE',
-            costPriceInr: 62000.0,
-            sellingPriceInr: 69999.0,
-            intakeDate: now - 12 * dayMs,
-            storeId: 'STORE_MUMBAI_BANDRA',
-          });
-          phonyFiErp.addInventoryItem({
-            imeiOrSku: 'SKU_S23_ULTRA_GRN',
-            title: 'Samsung Galaxy S23 Ultra 256GB Phantom',
-            category: 'DEVICE',
-            costPriceInr: 71000.0,
-            sellingPriceInr: 79999.0,
-            intakeDate: now - 38 * dayMs,
-            storeId: 'STORE_MUMBAI_BANDRA',
-          });
-          phonyFiErp.addInventoryItem({
-            imeiOrSku: 'SKU_ONEPLUS11_5G_16',
-            title: 'OnePlus 11 5G 16GB/256GB (Aged Stock)',
-            category: 'DEVICE',
-            costPriceInr: 39000.0,
-            sellingPriceInr: 44999.0,
-            intakeDate: now - 72 * dayMs,
-            storeId: 'STORE_MUMBAI_BANDRA',
-          });
-          phonyFiErp.addInventoryItem({
-            imeiOrSku: 'SKU_OEM_DISP_IP13PRO',
-            title: 'OEM Display Module iPhone 13 Pro (Spare)',
-            category: 'OEM_SPARE_PART',
-            costPriceInr: 12500.0,
-            sellingPriceInr: 16500.0,
-            intakeDate: now - 85 * dayMs,
-            storeId: 'STORE_MUMBAI_BANDRA',
-          });
-          phonyFiErp.createHardwareCustodyIntake({
-            imei: '359182049182741',
-            brand: 'Apple',
-            model: 'iPhone 14 Pro Space Black',
-            displaySerial: 'DSP_OEM_APL_09182',
-            batterySerial: 'BAT_OEM_APL_77218',
-            batteryCycles: 142,
-            cameraSerial: 'CAM_OEM_APL_33190',
-            logicBoardSerial: 'MLB_APL_88192',
-            technicianId: 'tech_deepak_kumar',
-          });
-          phonyFiErp.openCashDrawerShift({
-            storeId: 'STORE_MUMBAI_BANDRA',
-            cashierId: 'cashier_rahul_verma',
-            openingFloatInr: 5000.0,
-          });
-        }
-      } catch (_) {}
-    }
-  }
-  return phonyFiErp;
-}
 import { handleDepinRoutes } from './routes/depin.routes.ts';
 import { handleQuadraticRoutes } from './routes/quadratic.routes.ts';
 import {
@@ -90069,133 +89999,6 @@ async function startDevServer() {
       return;
     }
 
-    // ==========================================
-    // 📱 PHONYFI SUPER-ERP REST APIS
-    // ==========================================
-    if (url.pathname === '/api/phonyfi/telemetry' && req.method === 'GET') {
-      const erp = getPhonyFiErp();
-      const telemetry = erp ? erp.getEnterpriseTelemetrySummary() : null;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, telemetry }));
-      return;
-    }
-
-    if (url.pathname === '/api/phonyfi/theft/alerts' && req.method === 'GET') {
-      const erp = getPhonyFiErp();
-      const alerts = erp ? erp.getTheftAlerts(50) : [];
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, alerts }));
-      return;
-    }
-
-    if (url.pathname === '/api/phonyfi/inventory/dead-capital' && req.method === 'GET') {
-      const erp = getPhonyFiErp();
-      const radar = erp ? erp.getDeadCapitalRadar() : null;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, radar }));
-      return;
-    }
-
-    if (url.pathname === '/api/phonyfi/governance/proposals' && req.method === 'GET') {
-      const erp = getPhonyFiErp();
-      const storeId = url.searchParams.get('storeId') || undefined;
-      const proposals = erp ? erp.getPendingProposals(storeId) : [];
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, proposals }));
-      return;
-    }
-
-    if (url.pathname === '/api/phonyfi/governance/review' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
-      if (!ok) return;
-      try {
-        const erp = getPhonyFiErp();
-        if (!erp) throw new Error('PhonyFi ERP Engine not initialized');
-        const parsed = JSON.parse(body);
-        const result = erp.reviewFourEyesProposal({
-          proposalId: parsed.proposalId,
-          approverId: parsed.approverId || 'mgr_admin_console',
-          approverRole: parsed.approverRole || 'STORE_MANAGER',
-          decision: parsed.decision || 'APPROVE',
-          reason: parsed.reason || 'Super-Console Authorized',
-        });
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, result }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed review' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/phonyfi/pos/invoice' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
-      if (!ok) return;
-      try {
-        const erp = getPhonyFiErp();
-        if (!erp) throw new Error('PhonyFi ERP Engine not initialized');
-        const parsed = JSON.parse(body);
-        const invoice = erp.createInvoice(parsed);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, invoice }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invoice creation failed' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/phonyfi/pos/invoice/finalize' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
-      if (!ok) return;
-      try {
-        const erp = getPhonyFiErp();
-        if (!erp) throw new Error('PhonyFi ERP Engine not initialized');
-        const parsed = JSON.parse(body);
-        const invoice = erp.finalizeAndPrintInvoice(parsed.invoiceId, parsed.cashierId || 'cashier_main');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, invoice }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invoice finalize failed' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/phonyfi/pos/invoice/void' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
-      if (!ok) return;
-      try {
-        const erp = getPhonyFiErp();
-        if (!erp) throw new Error('PhonyFi ERP Engine not initialized');
-        const parsed = JSON.parse(body);
-        const result = erp.attemptVoidInvoice(parsed);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, result }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invoice void failed' }));
-      }
-      return;
-    }
-
-    if (url.pathname === '/api/phonyfi/custody/egress' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
-      if (!ok) return;
-      try {
-        const erp = getPhonyFiErp();
-        if (!erp) throw new Error('PhonyFi ERP Engine not initialized');
-        const parsed = JSON.parse(body);
-        const result = erp.verifyHardwareCustodyEgress(parsed);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, result }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Custody egress check failed' }));
-      }
-      return;
-    }
-
     // PWA: Web App Manifest
     if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
       res.writeHead(200, {
@@ -90989,7 +90792,6 @@ async function startDevServer() {
           honeypotIntrusions: sovraDb.getSqliteEngine()?.getHoneypotIntrusions(50) || [],
           panopticonSessions: sovraDb.getSqliteEngine()?.getPanopticonSessions(100) || [],
           sentinelStatus: sovraDb.getSqliteEngine()?.runSentinelHealthAudit(),
-          phonyfiTelemetry: getPhonyFiErp()?.getEnterpriseTelemetrySummary(),
         }),
       );
       return;
