@@ -89628,6 +89628,116 @@ async function startDevServer() {
       return;
     }
 
+    // ==========================================
+    // 👁️ GOD-MODE OMNISCIENT APIS (PANOPTICON, NUCLEAR & GHOST)
+    // ==========================================
+    if (url.pathname === '/api/admin/panopticon/sessions' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const sessions = sqlite ? sqlite.getPanopticonSessions(100) : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, sessions }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/panopticon/terminate' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const sessionId = String(parsed.sessionId || '').trim();
+        const userDid = String(parsed.userDid || '').trim();
+        const sqlite = sovraDb.getSqliteEngine();
+        let success = false;
+        if (sqlite && sessionId) {
+          success = sqlite.terminateUserSession(sessionId);
+        } else if (sqlite && userDid) {
+          success = sqlite.terminateAllUserSessions(userDid);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: success, message: 'Session terminated and credentials revoked' }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/nuclear/switches' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const switches = sqlite ? sqlite.getKillSwitches() : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, switches }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/nuclear/switch' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const switchId = String(parsed.switchId || '').trim();
+        const active = Boolean(parsed.active);
+        const sqlite = sovraDb.getSqliteEngine();
+        let success = false;
+        if (sqlite && switchId) {
+          success = sqlite.setKillSwitch(switchId, active, 'ADMIN-COMMAND');
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: success, message: `Kill switch '${switchId}' set to ${active ? 'ACTIVE (FROZEN)' : 'STANDBY'}` }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/honeypot/intrusions' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const intrusions = sqlite ? sqlite.getHoneypotIntrusions(50) : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, intrusions }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/ghost/impersonate' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const targetDid = String(parsed.targetDid || '').trim();
+        const sqlite = sovraDb.getSqliteEngine();
+        if (!sqlite || !targetDid) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'targetDid is required' }));
+          return;
+        }
+        const session = sqlite.createGhostSession(targetDid, 'SUPER-ADMIN-DESK', req.socket.remoteAddress || '127.0.0.1');
+        if (!session) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Subject DID not found' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          ...session,
+          ghostUrl: `/?ghostToken=${session.ghostToken}`,
+        }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/sentinel/status' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const status = sqlite ? sqlite.runSentinelHealthAudit() : { threatLevel: 'GREEN', score: 10 };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, status }));
+      return;
+    }
+
     // PWA: Web App Manifest
     if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
       res.writeHead(200, {
@@ -90417,6 +90527,10 @@ async function startDevServer() {
           revenueTakeRate: sovraDb.getSqliteEngine()?.getPlatformTakeRate() ?? 5.0,
           disintermediationEvents: sovraDb.getSqliteEngine()?.getDisintermediationEvents(50) || [],
           washTradingCycles: sovraDb.getSqliteEngine()?.detectWashTradingCycles(72) || [],
+          killSwitches: sovraDb.getSqliteEngine()?.getKillSwitches() || [],
+          honeypotIntrusions: sovraDb.getSqliteEngine()?.getHoneypotIntrusions(50) || [],
+          panopticonSessions: sovraDb.getSqliteEngine()?.getPanopticonSessions(100) || [],
+          sentinelStatus: sovraDb.getSqliteEngine()?.runSentinelHealthAudit(),
         }),
       );
       return;

@@ -107,6 +107,36 @@ export interface AdminConsoleOptions {
     txCount: number;
     detectedAt: number;
   }>;
+  killSwitches?: Array<{ switchId: string; label: string; description: string; isActive: boolean; triggeredBy?: string; triggeredAt: number }>;
+  honeypotIntrusions?: Array<{ id: string; trapPath: string; sourceIp: string; userAgent: string; actionTaken: string; detectedAt: number }>;
+  panopticonSessions?: Array<{
+    sessionId: string;
+    userDid: string;
+    handle: string;
+    displayName: string;
+    deviceName: string;
+    deviceType: string;
+    ipAddress: string;
+    userAgent: string;
+    createdAt: number;
+    lastActiveAt: number;
+    isRevoked: boolean;
+    balanceSov: number;
+  }>;
+  sentinelStatus?: {
+    threatLevel: 'GREEN' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+    score: number;
+    heuristics: {
+      activeSessions: number;
+      sybilSpikeRate1h: number;
+      activeWashCycles: number;
+      honeypotTriggers24h: number;
+      solvencyStatus: string;
+      activeKillSwitches: number;
+    };
+    recommendedPosture: string;
+    auditedAt: number;
+  };
 }
 
 export function renderAdminHtml(opts: AdminConsoleOptions): string {
@@ -144,6 +174,16 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     revenueTakeRate = 5.0,
     disintermediationEvents = [],
     washTradingCycles = [],
+    killSwitches = [],
+    honeypotIntrusions = [],
+    panopticonSessions = [],
+    sentinelStatus = {
+      threatLevel: 'GREEN',
+      score: 10,
+      heuristics: { activeSessions: 0, sybilSpikeRate1h: 0, activeWashCycles: 0, honeypotTriggers24h: 0, solvencyStatus: 'HEALTHY', activeKillSwitches: 0 },
+      recommendedPosture: 'ALL_CLEAR_STANDARD_OPERATIONS',
+      auditedAt: Date.now(),
+    },
     systemTelemetry = {
       cpuUsagePercent: 12,
       memoryRssMb: 145,
@@ -891,6 +931,12 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <span class="admin-nav-icon">💸</span>
         <span>Revenue Leakage Radar</span>
         <span class="admin-nav-badge" style="background: #10b981; color: #000;">4-Col Audit</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('panopticon-god-mode')">
+        <span class="admin-nav-icon">👁️</span>
+        <span>The God Eye (Panopticon)</span>
+        <span class="admin-nav-badge" style="background: #ef4444; color: #fff;">OMNIPRESENT</span>
       </button>
 
       <button class="admin-nav-item" onclick="switchAdminTab('mesh-visualizer')">
@@ -2823,6 +2869,150 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               }
             </div>
             <button class="btn-ops" style="width: 100%; margin-top: 10px; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.3); color: #c084fc; justify-content: center;" onclick="refreshWashTradingCycles()">Analyze Live P2P Swarm Graph</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           MODULE 18: THE GOD EYE & PANOPTICON COMMAND MATRIX
+           ============================================== -->
+      <section class="ops-section" id="view-panopticon-god-mode" style="display: none;">
+        <div class="ops-section-header">
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>👁️</span> The God Eye: Omnipresent Panopticon &amp; Nuclear Matrix
+            </h2>
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+              Zero Dark Traffic Parity: Live global user session inspect, 8 nuclear hardware kill-switches, honeypot canary trap logs, and 24/7 AI Sentinel autonomous anomaly defense.
+            </div>
+          </div>
+          <div>
+            <span id="sentinelThreatPill" class="badge" style="background: rgba(16,185,129,0.2); color: #34d399; border: 1px solid rgba(16,185,129,0.4); font-size: 0.85rem; padding: 6px 12px; font-weight: 800;">
+              THREAT LEVEL: ${sentinelStatus.threatLevel} (${sentinelStatus.score}/100)
+            </span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.25rem; margin-top: 1rem;">
+          <!-- 1. Nuclear Kill-Switch Matrix -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(239,68,68,0.3); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #ef4444;">🛑</span> Nuclear Kill-Switch Matrix
+              </span>
+              <span class="badge" style="background: rgba(239,68,68,0.15); color: #f87171;">Blast-Radius Control</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
+              Hardware-level circuit breakers severing subsystems in &lt;2ms during an active exploit without taking down the full swarm.
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              ${
+                (killSwitches && killSwitches.length > 0)
+                  ? killSwitches.map(s => `
+                    <div style="background: #0f172a; padding: 10px 12px; border-radius: 8px; border: 1px solid ${s.isActive ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.06)'}; display: flex; justify-content: space-between; align-items: center;">
+                      <div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <strong style="color: ${s.isActive ? '#f87171' : '#f8fafc'}; font-size: 0.8rem;">${s.label}</strong>
+                          <span class="badge" style="background: ${s.isActive ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.1)'}; color: ${s.isActive ? '#f87171' : '#34d399'}; font-size: 0.65rem;">
+                            ${s.isActive ? 'FROZEN / ACTIVE' : 'ARMED / STANDBY'}
+                          </span>
+                        </div>
+                        <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">${s.description}</div>
+                      </div>
+                      <button class="btn-ops" style="background: ${s.isActive ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; border: 1px solid ${s.isActive ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}; color: ${s.isActive ? '#34d399' : '#f87171'}; font-size: 0.72rem; padding: 4px 10px;" onclick="toggleKillSwitch('${s.switchId}', ${!s.isActive})">
+                        ${s.isActive ? 'Lift Freeze' : 'ENGAGE FREEZE'}
+                      </button>
+                    </div>
+                  `).join('')
+                  : '<div style="color: #64748b; font-size: 0.75rem; text-align: center; padding: 1rem;">No kill-switches initialized.</div>'
+              }
+            </div>
+          </div>
+
+          <!-- 2. The Panopticon Live Session Spy -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #38bdf8;">👁️</span> Live Swarm Session Spy
+              </span>
+              <span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8;">Zero Dark Sessions</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
+              FullStory &amp; Datadog Parity: Real-time telemetry of every connected user device, IP address, and active state with 1-click revocation.
+            </div>
+
+            <div id="panopticonSessionsList" style="max-height: 275px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+              ${
+                (panopticonSessions && panopticonSessions.length > 0)
+                  ? panopticonSessions.map(s => `
+                    <div style="background: #0f172a; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
+                      <div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <strong style="color: #38bdf8;">${s.handle}</strong>
+                          <span style="color: #64748b; font-size: 0.68rem;">${s.deviceType} &bull; ${s.ipAddress}</span>
+                          ${s.isRevoked ? '<span class="badge" style="background: rgba(239,68,68,0.2); color: #f87171; font-size: 0.6rem;">REVOKED</span>' : '<span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 0.6rem;">LIVE</span>'}
+                        </div>
+                        <div style="color: #94a3b8; font-size: 0.68rem; margin-top: 2px;">Balance: ${s.balanceSov} SOV &bull; Token: ${s.sessionId.slice(0, 12)}...</div>
+                      </div>
+                      ${!s.isRevoked ? `<button class="btn-ops" style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #f87171; font-size: 0.68rem; padding: 3px 8px;" onclick="terminatePanopticonSession('${s.sessionId}')">Kill Session</button>` : ''}
+                    </div>
+                  `).join('')
+                  : '<div style="color: #64748b; font-size: 0.75rem; text-align: center; padding: 1.5rem;">No active user sessions tracked.</div>'
+              }
+            </div>
+            <button class="btn-ops" style="width: 100%; margin-top: 10px; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; justify-content: center;" onclick="refreshPanopticonSessions()">Refresh Swarm Sessions</button>
+          </div>
+
+          <!-- 3. Ghost Mode: Zero-Knowledge Impersonation -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #a855f7;">👻</span> Ghost Mode Impersonation Launchpad
+              </span>
+              <span class="badge" style="background: rgba(168,85,247,0.15); color: #c084fc;">Zero-Knowledge Replay</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
+              Meta Tier-3 Engineering Parity: View the application exactly as any user sees it in read-only mode without passwords or private keys, leaving an immutable cryptographic audit record.
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <input type="text" id="ghostDidInput" placeholder="Enter target DID: did:key:z6Mkk..." style="flex: 1; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.8rem;" />
+              <button class="btn-ops" style="background: #9333ea; color: #fff; font-weight: 700; padding: 0 16px;" onclick="launchGhostSession()">Launch Ghost View</button>
+            </div>
+            <div id="ghostResultBox" style="display: none; padding: 10px; background: #0f172a; border-radius: 8px; border: 1px solid rgba(168,85,247,0.3); font-size: 0.78rem;"></div>
+          </div>
+
+          <!-- 4. Honeypot Intrusion Traps & 24/7 AI Sentinel -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #f59e0b;">🍯</span> Honeypot Traps &amp; AI Sentinel
+              </span>
+              <span class="badge" style="background: rgba(245,158,11,0.15); color: #fbbf24;">Zero-Day Intrusion Radar</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
+              Active decoys (/.env, /wp-admin, /api/internal/debug-keys) catching crawlers and instantly applying 0.00x shadowbans.
+            </div>
+
+            <div style="max-height: 195px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+              ${
+                (honeypotIntrusions && honeypotIntrusions.length > 0)
+                  ? honeypotIntrusions.map(h => `
+                    <div style="background: #0f172a; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.25); font-size: 0.75rem;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #f87171; font-weight: 700;">TRAP: ${h.trapPath}</span>
+                        <span class="badge" style="background: rgba(239,68,68,0.2); color: #f87171; font-size: 0.65rem;">${h.actionTaken}</span>
+                      </div>
+                      <div style="color: #94a3b8; font-size: 0.68rem; margin-top: 2px;">IP: ${h.sourceIp} &bull; Agent: ${h.userAgent.slice(0, 32)}...</div>
+                    </div>
+                  `).join('')
+                  : '<div style="color: #64748b; font-size: 0.75rem; text-align: center; padding: 1.5rem;">Zero intrusion attempts caught by honeypots. Perimeter secure.</div>'
+              }
+            </div>
+            <div style="margin-top: 10px; padding: 8px; background: #020617; border-radius: 6px; font-size: 0.72rem; color: #94a3b8;">
+              Posture: <strong style="color: #38bdf8;">${sentinelStatus.recommendedPosture}</strong> &bull; Active Swarm Wash Cycles: <strong style="color: #f59e0b;">${sentinelStatus.heuristics.activeWashCycles}</strong>
+            </div>
           </div>
         </div>
       </section>
