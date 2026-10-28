@@ -9816,7 +9816,7 @@ function renderHtml(
     /* ========================================================================= */
     .sovra-floating-glass-dock {
       position: fixed;
-      bottom: 16px;
+      bottom: 58px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 9998;
@@ -10022,6 +10022,475 @@ function renderHtml(
       display: flex;
       align-items: center;
       gap: 6px;
+    }
+
+    /* ========================================================================= */
+    /* 📱 SOVRA ANDROID HOMESCREEN OS: WALLPAPER, DESKTOP GRID & 3-BUTTON BAR     */
+    /* ========================================================================= */
+    :root {
+      --wallpaper-blur: 0px;
+      --wallpaper-dim: 0.2;
+    }
+
+    /* Layer 0: Wallpaper Canvas */
+    .sovra-wallpaper-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .sovra-wallpaper-backdrop {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      transition: background 0.4s ease, transform 0.4s ease;
+    }
+    .sovra-wallpaper-dimmer {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, var(--wallpaper-dim));
+      backdrop-filter: blur(var(--wallpaper-blur));
+      -webkit-backdrop-filter: blur(var(--wallpaper-blur));
+      transition: background 0.3s ease, backdrop-filter 0.3s ease;
+    }
+    body.theme-normal .sovra-wallpaper-dimmer {
+      background: rgba(255, 255, 255, calc(var(--wallpaper-dim) * 0.7));
+    }
+
+    /* Layer 1: Dedicated Android Home Screen Desktop */
+    .sovra-home-screen-view {
+      position: fixed;
+      inset: 0;
+      bottom: 48px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1.25rem 5rem 1.25rem;
+      box-sizing: border-box;
+      overflow-y: auto;
+      overflow-x: hidden;
+      user-select: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    body.sovra-mode-app .sovra-home-screen-view {
+      display: none !important;
+    }
+    body.sovra-mode-home .app-layout {
+      display: none !important;
+    }
+    body.sovra-mode-home .app-top-header {
+      background: transparent !important;
+      border-bottom: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      box-shadow: none !important;
+    }
+    body.sovra-mode-home .header-brand-wrap,
+    body.sovra-mode-home .header-search-wrap,
+    body.sovra-mode-home .header-actions-wrap {
+      opacity: 0.85;
+    }
+
+    /* Android Glance Widget (Clock & Live Status) */
+    .android-glance-widget {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-top: 1.5rem;
+      margin-bottom: 1.75rem;
+      animation: glanceFadeIn 0.5s ease-out;
+    }
+    @keyframes glanceFadeIn {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .android-glance-clock {
+      font-size: 3.8rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+      font-variant-numeric: tabular-nums;
+    }
+    body.theme-normal .android-glance-clock {
+      color: #0f172a !important;
+      text-shadow: 0 2px 10px rgba(255, 255, 255, 0.8);
+    }
+    .android-glance-date {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-top: 6px;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+    body.theme-normal .android-glance-date {
+      color: #334155 !important;
+    }
+    .android-glance-status-pill {
+      margin-top: 10px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #e2e8f0;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+    }
+    .android-glance-status-pill:hover {
+      transform: scale(1.04);
+      border-color: #38bdf8;
+      background: rgba(15, 23, 42, 0.8);
+    }
+    body.theme-normal .android-glance-status-pill {
+      background: rgba(255, 255, 255, 0.85) !important;
+      border-color: #cbd5e1 !important;
+      color: #0f172a !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+    }
+    .glance-status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulseDot 2s infinite;
+    }
+
+    /* Android Google/Pixel Search Pill */
+    .android-search-pill {
+      width: 100%;
+      max-width: 440px;
+      height: 48px;
+      border-radius: 24px;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 10px;
+      cursor: pointer;
+      margin-bottom: 2rem;
+      transition: all 0.22s ease;
+    }
+    .android-search-pill:hover {
+      background: rgba(15, 23, 42, 0.75);
+      border-color: rgba(56, 189, 248, 0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+    }
+    body.theme-normal .android-search-pill {
+      background: rgba(255, 255, 255, 0.88) !important;
+      border-color: #cbd5e1 !important;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
+    }
+    .android-search-icon {
+      font-size: 1.1rem;
+      opacity: 0.8;
+    }
+    .android-search-placeholder {
+      flex: 1;
+      font-size: 0.86rem;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    body.theme-normal .android-search-placeholder {
+      color: #64748b !important;
+    }
+    .android-search-mic {
+      font-size: 1.05rem;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+    .android-search-mic:hover {
+      transform: scale(1.2);
+    }
+
+    /* Android Home Screen App Grid */
+    .sovra-home-app-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 76px);
+      gap: 22px 18px;
+      justify-content: center;
+      width: 100%;
+      max-width: 440px;
+      margin-bottom: 2.5rem;
+    }
+    @media (min-width: 640px) {
+      .sovra-home-app-grid {
+        grid-template-columns: repeat(5, 82px);
+        gap: 26px 22px;
+        max-width: 560px;
+      }
+    }
+    @media (min-width: 1024px) {
+      .sovra-home-app-grid {
+        grid-template-columns: repeat(6, 86px);
+        gap: 28px 26px;
+        max-width: 720px;
+      }
+    }
+
+    .sovra-home-tile-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+    }
+    .sovra-home-tile-wrap .sovra-app-tile {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+    }
+    @media (min-width: 640px) {
+      .sovra-home-tile-wrap .sovra-app-tile {
+        width: 70px;
+        height: 70px;
+        border-radius: 22px;
+      }
+    }
+
+    .android-home-hint {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      padding: 8px 16px;
+      border-radius: 20px;
+      transition: all 0.2s ease;
+    }
+    .android-home-hint:hover {
+      color: #38bdf8;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .android-home-hint-chevron {
+      font-size: 0.75rem;
+      animation: floatChevron 1.5s infinite ease-in-out;
+    }
+    @keyframes floatChevron {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    /* Layer 3: Android 3-Button System Navigation Bar */
+    .sovra-android-nav-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      z-index: 9999;
+      background: rgba(10, 14, 26, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 10%;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body.theme-normal .sovra-android-nav-bar {
+      background: rgba(255, 255, 255, 0.94) !important;
+      border-top: 1px solid #cbd5e1 !important;
+    }
+    .android-nav-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      width: 60px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .android-nav-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #38bdf8;
+      transform: scale(1.12);
+    }
+    .android-nav-btn:active {
+      transform: scale(0.92);
+      background: rgba(56, 189, 248, 0.2);
+    }
+    body.theme-normal .android-nav-btn {
+      color: #475569 !important;
+    }
+    body.theme-normal .android-nav-btn:hover {
+      background: #f1f5f9 !important;
+      color: #0284c7 !important;
+    }
+
+    /* Layer 5: Wallpaper Modal */
+    .sovra-wallpaper-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 10010;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .sovra-wallpaper-modal-overlay.active {
+      display: flex;
+    }
+    .sovra-wallpaper-modal-content {
+      width: 100%;
+      max-width: 520px;
+      max-height: 85vh;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 28px 28px 0 0;
+      padding: 1.5rem;
+      box-sizing: border-box;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
+      overflow-y: auto;
+      animation: sovraDrawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    body.theme-normal .sovra-wallpaper-modal-content {
+      background: #ffffff !important;
+      border-color: #cbd5e1 !important;
+      color: #0f172a !important;
+    }
+
+    .wallpaper-presets-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 0.5rem;
+    }
+    .wallpaper-preset-card {
+      height: 80px;
+      border-radius: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      padding: 6px;
+      box-sizing: border-box;
+      transition: all 0.2s ease;
+    }
+    .wallpaper-preset-card:hover {
+      transform: translateY(-2px);
+      border-color: #38bdf8;
+      box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
+    }
+    .wallpaper-preset-card.active {
+      border-color: #38bdf8;
+      box-shadow: 0 0 12px #38bdf8;
+    }
+    .wallpaper-preset-label {
+      font-size: 0.68rem;
+      font-weight: 800;
+      color: #ffffff;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      background: rgba(0, 0, 0, 0.45);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    .wallpaper-upload-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 14px;
+      border: 1px dashed rgba(56, 189, 248, 0.5);
+      background: rgba(56, 189, 248, 0.08);
+      color: #38bdf8;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .wallpaper-upload-btn:hover {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: #38bdf8;
+    }
+
+    /* Long-Press Home Context Menu */
+    .sovra-home-context-menu {
+      position: fixed;
+      z-index: 10008;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 6px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 180px;
+    }
+    body.theme-normal .sovra-home-context-menu {
+      background: #ffffff !important;
+      border-color: #cbd5e1 !important;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+    }
+    .home-context-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: transparent;
+      border: none;
+      color: #cbd5e1;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+    .home-context-item:hover {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+    }
+    body.theme-normal .home-context-item {
+      color: #1e293b !important;
+    }
+    body.theme-normal .home-context-item:hover {
+      background: #f1f5f9 !important;
+      color: #0284c7 !important;
     }
 
     /* Instagram Parity: Explore Mosaic Staggered Grid */
@@ -17041,7 +17510,12 @@ function renderHtml(
     }
   </style>
 </head>
-<body class="nav-mode-auto theme-black" data-active-tab="feed">
+<body class="nav-mode-auto theme-black sovra-mode-home" data-active-tab="feed">
+  <!-- 🖼️ SOVRA ANDROID OS: DYNAMIC WALLPAPER CANVAS -->
+  <div id="sovraWallpaperCanvas" class="sovra-wallpaper-canvas" aria-hidden="true">
+    <div id="sovraWallpaperBackdrop" class="sovra-wallpaper-backdrop"></div>
+    <div id="sovraWallpaperDimmer" class="sovra-wallpaper-dimmer"></div>
+  </div>
   <!-- 📢 GLOBAL SYSTEM BROADCAST / AMBER ALERT BANNER (Auto-Reactive) -->
   <div id="sovraGlobalAlertBanner" style="display: none; width: 100%; position: sticky; top: 0; z-index: 10002; transition: all 0.3s ease;"></div>
   <script>
@@ -17504,6 +17978,39 @@ function renderHtml(
       </div>
     </div>
   </header>
+
+  <!-- 📱 SOVRA ANDROID OS: DEDICATED HOME SCREEN / DESKTOP LAUNCHER -->
+  <div id="sovraHomeScreenView" class="sovra-home-screen-view" oncontextmenu="window.SovraAndroidOS.handleHomeContextMenu(event)">
+    <!-- Android Glance Header Widget -->
+    <div class="android-glance-widget">
+      <div id="androidGlanceClock" class="android-glance-clock">12:00</div>
+      <div id="androidGlanceDate" class="android-glance-date">Monday, January 1</div>
+      <div id="androidGlanceStatusPill" class="android-glance-status-pill" onclick="window.SovraAndroidOS.openApp('wallet')" title="View Sovereign Balance &amp; Mesh Health">
+        <span class="glance-status-dot"></span>
+        <span id="androidGlancePeerCount">0 Peers</span>
+        <span style="opacity: 0.4;">|</span>
+        <span id="androidGlanceBalance">0.00 SOV</span>
+      </div>
+    </div>
+
+    <!-- Android Quick Search Pill -->
+    <div class="android-search-pill" onclick="window.SovraAndroidOS.focusDrawerSearch()">
+      <span class="android-search-icon">🔍</span>
+      <span class="android-search-placeholder">Search apps, peers, or tools...</span>
+      <span class="android-search-mic" onclick="event.stopPropagation(); window.SovraAndroidOS.openAppDrawer()" title="All Apps">✨</span>
+    </div>
+
+    <!-- Home Screen App Grid (User-Pinned Apps) -->
+    <div id="sovraHomeAppGrid" class="sovra-home-app-grid">
+      <!-- Dynamically populated by SovraAndroidOS.renderHomeScreen() -->
+    </div>
+
+    <!-- Quick Hint Bar -->
+    <div class="android-home-hint" onclick="window.SovraAndroidOS.openAppDrawer()">
+      <span class="android-home-hint-chevron">▲</span>
+      <span>Swipe up or tap for App Drawer</span>
+    </div>
+  </div>
 
   <div class="app-layout">
     <!-- Column 1: Left Navigation Rail (Desktop) -->
@@ -28484,6 +28991,84 @@ function renderHtml(
         <!-- Dynamically rendered by SovraModularGlassOS.renderDrawerGrid() -->
       </div>
     </div>
+  </div>
+
+  <!-- 📱 SOVRA ANDROID 3-BUTTON SYSTEM NAVIGATION BAR -->
+  <nav id="sovraAndroidNavBar" class="sovra-android-nav-bar" aria-label="Android System Navigation">
+    <button type="button" class="android-nav-btn" id="androidNavBackBtn" onclick="window.SovraAndroidOS.goBack()" title="Back" aria-label="Back">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <button type="button" class="android-nav-btn" id="androidNavHomeBtn" onclick="window.SovraAndroidOS.goHome()" title="Home Screen" aria-label="Home Screen">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="12" cy="12" r="8"></circle>
+      </svg>
+    </button>
+    <button type="button" class="android-nav-btn" id="androidNavRecentsBtn" onclick="window.SovraAndroidOS.openAppDrawer()" title="All Apps Drawer" aria-label="All Apps Drawer">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="5" width="14" height="14" rx="3"></rect>
+      </svg>
+    </button>
+  </nav>
+
+  <!-- 🖼️ SOVRA WALLPAPER CUSTOMIZER MODAL -->
+  <div id="sovraWallpaperModal" class="sovra-wallpaper-modal-overlay" onclick="window.SovraAndroidOS.closeWallpaperModal()">
+    <div class="sovra-wallpaper-modal-content" onclick="event.stopPropagation()">
+      <div class="sheet-grab-handle"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div style="font-weight: 800; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <span>🖼️</span> <span>Wallpaper &amp; Theme Studio</span>
+        </div>
+        <button type="button" onclick="window.SovraAndroidOS.closeWallpaperModal()" style="background: rgba(255,255,255,0.1); border: none; color: #cbd5e1; border-radius: 50%; width: 28px; height: 28px; cursor: pointer;">✕</button>
+      </div>
+
+      <!-- Presets Gallery -->
+      <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; margin-bottom: 0.6rem; letter-spacing: 0.5px;">CURATED GLASS PRESETS</div>
+      <div id="wallpaperPresetsGrid" class="wallpaper-presets-grid">
+        <!-- Dynamically rendered by SovraAndroidOS.renderWallpaperModal() -->
+      </div>
+
+      <!-- Custom Upload Section -->
+      <div style="margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.1);">
+        <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; margin-bottom: 0.6rem; letter-spacing: 0.5px;">CUSTOM DEVICE WALLPAPER</div>
+        <label class="wallpaper-upload-btn">
+          <span>📁 Choose Photo from Device / Gallery</span>
+          <input type="file" id="wallpaperFileInput" accept="image/*" style="display: none;" onchange="window.SovraAndroidOS.handleWallpaperUpload(event)">
+        </label>
+      </div>
+
+      <!-- Adjustments: Blur & Dim -->
+      <div style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 12px; padding-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.1);">
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+            <span>Backdrop Frosted Blur</span>
+            <span id="wallpaperBlurVal" style="color: #38bdf8; font-weight: 700;">0px</span>
+          </div>
+          <input type="range" id="wallpaperBlurRange" min="0" max="25" value="0" style="width: 100%; accent-color: #38bdf8;" oninput="window.SovraAndroidOS.setWallpaperBlur(this.value)">
+        </div>
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+            <span>Dim / Contrast Overlay</span>
+            <span id="wallpaperDimVal" style="color: #38bdf8; font-weight: 700;">20%</span>
+          </div>
+          <input type="range" id="wallpaperDimRange" min="0" max="75" value="20" style="width: 100%; accent-color: #38bdf8;" oninput="window.SovraAndroidOS.setWallpaperDim(this.value)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🖱️ HOME SCREEN LONG-PRESS CONTEXT MENU -->
+  <div id="sovraHomeContextMenu" class="sovra-home-context-menu" style="display: none;">
+    <button type="button" class="home-context-item" onclick="window.SovraAndroidOS.openWallpaperModal(); window.SovraAndroidOS.closeHomeContextMenu();">
+      <span>🖼️</span> Change Wallpaper
+    </button>
+    <button type="button" class="home-context-item" onclick="window.SovraAndroidOS.openAppDrawer(); window.SovraAndroidOS.closeHomeContextMenu();">
+      <span>➕</span> Add Apps to Home
+    </button>
+    <button type="button" class="home-context-item" onclick="window.SovraAndroidOS.toggleEditMode(); window.SovraAndroidOS.closeHomeContextMenu();">
+      <span>✏️</span> Rearrange Home Screen
+    </button>
   </div>
 
   <!-- 👤 MODERN RESPONSIVE PROFILE & ACCOUNT SWITCHER -->
@@ -80987,6 +81572,10 @@ function renderHtml(
 
           tile.onclick = () => {
             if (isEditMode) {
+              if (window.SovraAndroidOS) {
+                window.SovraAndroidOS.pinToHome(feat.id);
+                return;
+              }
               if (!layoutConfig.dockSlots.includes(feat.id) && layoutConfig.dockSlots.length < 5) {
                 addSlot('dock', feat.id);
                 if (typeof showAccountToast === 'function') {
@@ -81004,8 +81593,12 @@ function renderHtml(
               }
               return;
             }
-            closeDrawer();
-            handleTileClick(feat.id);
+            if (window.SovraAndroidOS) {
+              window.SovraAndroidOS.openApp(feat.id);
+            } else {
+              closeDrawer();
+              handleTileClick(feat.id);
+            }
           };
 
           grid.appendChild(tile);
@@ -81309,6 +81902,10 @@ function renderHtml(
       }
 
       function handleTileClick(featureId) {
+        if (window.SovraAndroidOS && window.SovraAndroidOS.getMode() !== 'app') {
+          window.SovraAndroidOS.openApp(featureId);
+          return;
+        }
         const feat = getFeature(featureId);
         if (!feat) return;
         try {
@@ -81365,6 +81962,501 @@ function renderHtml(
         document.addEventListener('DOMContentLoaded', boot);
       } else {
         boot();
+      }
+    })();
+
+    // =========================================================================
+    // 📱 SOVRA ANDROID OS: WALLPAPER, HOME SCREEN LAUNCHER & 3-BUTTON SYSTEM
+    // =========================================================================
+    (function initSovraAndroidOS() {
+      // 1. Wallpaper Presets
+      const WALLPAPER_PRESETS = [
+        {
+          id: 'nebula',
+          name: 'Cosmic Nebula',
+          gradient: 'radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.45) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(56, 189, 248, 0.35) 0%, transparent 50%), linear-gradient(135deg, #090614 0%, #130924 40%, #1e1145 75%, #0a1128 100%)'
+        },
+        {
+          id: 'cyberpunk',
+          name: 'Cyberpunk Neon',
+          gradient: 'radial-gradient(circle at 10% 20%, rgba(236, 72, 153, 0.4) 0%, transparent 45%), radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.4) 0%, transparent 45%), linear-gradient(135deg, #030308 0%, #0c081c 45%, #180928 80%, #01141e 100%)'
+        },
+        {
+          id: 'aurora',
+          name: 'Nordic Aurora',
+          gradient: 'radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.45) 0%, transparent 60%), radial-gradient(circle at 80% 70%, rgba(14, 165, 233, 0.35) 0%, transparent 50%), linear-gradient(135deg, #020b0e 0%, #041d20 40%, #07332c 75%, #041018 100%)'
+        },
+        {
+          id: 'obsidian',
+          name: 'Minimalist Obsidian',
+          gradient: 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 70%), linear-gradient(135deg, #08080a 0%, #101014 50%, #16161c 100%)'
+        },
+        {
+          id: 'golden',
+          name: 'Golden Sunset',
+          gradient: 'radial-gradient(circle at 70% 30%, rgba(245, 158, 11, 0.4) 0%, transparent 50%), radial-gradient(circle at 20% 70%, rgba(225, 29, 72, 0.35) 0%, transparent 50%), linear-gradient(135deg, #140a06 0%, #241009 35%, #35150d 70%, #100818 100%)'
+        }
+      ];
+
+      // 2. Storage Keys & Defaults
+      const WALLPAPER_KEY = 'sovra_os_wallpaper_v1';
+      const HOME_APPS_KEY = 'sovra_os_home_apps_v1';
+      const OS_MODE_KEY = 'sovra_os_mode_v1';
+
+      let wallpaperConfig = {
+        id: 'nebula',
+        type: 'preset',
+        blur: 0,
+        dim: 20,
+        customDataUrl: ''
+      };
+
+      let homeScreenApps = ['feed', 'reels', 'watch', 'chat', 'profile', 'wallet', 'studio', 'live'];
+      let currentMode = 'home';
+      let activeAppId = null;
+      let previousAppId = 'home';
+      let isEditMode = false;
+
+      // 3. State Loaders & Persisters
+      function loadOSState() {
+        try {
+          const rawWp = localStorage.getItem(WALLPAPER_KEY);
+          if (rawWp) {
+            const parsed = JSON.parse(rawWp);
+            if (parsed && parsed.id) wallpaperConfig = { ...wallpaperConfig, ...parsed };
+          }
+        } catch (_) {}
+
+        try {
+          const rawApps = localStorage.getItem(HOME_APPS_KEY);
+          if (rawApps) {
+            const parsed = JSON.parse(rawApps);
+            if (Array.isArray(parsed) && parsed.length > 0) homeScreenApps = parsed;
+          }
+        } catch (_) {}
+
+        try {
+          const rawMode = localStorage.getItem(OS_MODE_KEY);
+          if (rawMode === 'app' || rawMode === 'home') currentMode = rawMode;
+        } catch (_) {}
+      }
+
+      function saveWallpaperState() {
+        try {
+          localStorage.setItem(WALLPAPER_KEY, JSON.stringify(wallpaperConfig));
+        } catch (_) {}
+      }
+
+      function saveHomeApps() {
+        try {
+          localStorage.setItem(HOME_APPS_KEY, JSON.stringify(homeScreenApps));
+        } catch (_) {}
+      }
+
+      function saveOSMode() {
+        try {
+          localStorage.setItem(OS_MODE_KEY, currentMode);
+        } catch (_) {}
+      }
+
+      // 4. Wallpaper Engine Implementation
+      function applyWallpaper() {
+        const backdrop = document.getElementById('sovraWallpaperBackdrop');
+        const dimmer = document.getElementById('sovraWallpaperDimmer');
+        if (!backdrop || !dimmer) return;
+
+        if (wallpaperConfig.type === 'custom' && wallpaperConfig.customDataUrl) {
+          backdrop.style.background = 'url(' + wallpaperConfig.customDataUrl + ') center center / cover no-repeat';
+        } else {
+          const preset = WALLPAPER_PRESETS.find(p => p.id === wallpaperConfig.id) || WALLPAPER_PRESETS[0];
+          backdrop.style.background = preset.gradient;
+        }
+
+        document.documentElement.style.setProperty('--wallpaper-blur', wallpaperConfig.blur + 'px');
+        document.documentElement.style.setProperty('--wallpaper-dim', String(wallpaperConfig.dim / 100));
+
+        const blurVal = document.getElementById('wallpaperBlurVal');
+        if (blurVal) blurVal.textContent = wallpaperConfig.blur + 'px';
+        const blurRange = document.getElementById('wallpaperBlurRange');
+        if (blurRange) blurRange.value = String(wallpaperConfig.blur);
+
+        const dimVal = document.getElementById('wallpaperDimVal');
+        if (dimVal) dimVal.textContent = wallpaperConfig.dim + '%';
+        const dimRange = document.getElementById('wallpaperDimRange');
+        if (dimRange) dimRange.value = String(wallpaperConfig.dim);
+      }
+
+      function setWallpaperPreset(presetId) {
+        wallpaperConfig.id = presetId;
+        wallpaperConfig.type = 'preset';
+        saveWallpaperState();
+        applyWallpaper();
+        renderWallpaperModal();
+        if (typeof showAccountToast === 'function') {
+          const p = WALLPAPER_PRESETS.find(x => x.id === presetId);
+          showAccountToast('Applied ' + (p ? p.name : 'Wallpaper'));
+        }
+      }
+
+      function handleWallpaperUpload(e) {
+        const file = e.target && e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const res = evt.target && evt.target.result;
+          if (typeof res === 'string') {
+            wallpaperConfig.id = 'custom';
+            wallpaperConfig.type = 'custom';
+            wallpaperConfig.customDataUrl = res;
+            saveWallpaperState();
+            applyWallpaper();
+            renderWallpaperModal();
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('Custom Device Wallpaper Applied');
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function setWallpaperBlur(px) {
+        wallpaperConfig.blur = parseInt(px, 10) || 0;
+        saveWallpaperState();
+        applyWallpaper();
+      }
+
+      function setWallpaperDim(percent) {
+        wallpaperConfig.dim = parseInt(percent, 10) || 0;
+        saveWallpaperState();
+        applyWallpaper();
+      }
+
+      function openWallpaperModal() {
+        const modal = document.getElementById('sovraWallpaperModal');
+        if (modal) {
+          modal.classList.add('active');
+          renderWallpaperModal();
+        }
+      }
+
+      function closeWallpaperModal() {
+        const modal = document.getElementById('sovraWallpaperModal');
+        if (modal) modal.classList.remove('active');
+      }
+
+      function renderWallpaperModal() {
+        const grid = document.getElementById('wallpaperPresetsGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        WALLPAPER_PRESETS.forEach(preset => {
+          const card = document.createElement('div');
+          card.className = 'wallpaper-preset-card' + (wallpaperConfig.id === preset.id ? ' active' : '');
+          card.style.background = preset.gradient;
+          card.title = preset.name;
+          card.onclick = () => setWallpaperPreset(preset.id);
+
+          const label = document.createElement('span');
+          label.className = 'wallpaper-preset-label';
+          label.textContent = preset.name;
+          card.appendChild(label);
+
+          grid.appendChild(card);
+        });
+      }
+
+      // 5. Android Navigation Bar Actions
+      function goHome() {
+        if (navigator.vibrate) navigator.vibrate(15);
+        previousAppId = activeAppId || 'home';
+        currentMode = 'home';
+        saveOSMode();
+        syncOSModeVisuals();
+        closeWallpaperModal();
+        closeHomeContextMenu();
+        if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.closeDrawer === 'function') {
+          window.SovraModularGlassOS.closeDrawer();
+        }
+        renderHomeScreen();
+      }
+
+      function openApp(appId) {
+        if (navigator.vibrate) navigator.vibrate(12);
+        previousAppId = currentMode === 'app' ? (activeAppId || 'home') : 'home';
+        activeAppId = appId;
+        currentMode = 'app';
+        saveOSMode();
+        syncOSModeVisuals();
+        closeWallpaperModal();
+        closeHomeContextMenu();
+        if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.closeDrawer === 'function') {
+          window.SovraModularGlassOS.closeDrawer();
+        }
+
+        const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+        if (feat && typeof feat.action === 'function') {
+          try { feat.action(); } catch (_) {}
+        } else if (typeof switchTab === 'function') {
+          switchTab(appId);
+        }
+      }
+
+      function goBack() {
+        if (navigator.vibrate) navigator.vibrate(15);
+        const wpModal = document.getElementById('sovraWallpaperModal');
+        if (wpModal && wpModal.classList.contains('active')) {
+          closeWallpaperModal();
+          return;
+        }
+        const drawer = document.getElementById('sovraMasterDrawerOverlay');
+        if (drawer && drawer.classList.contains('active')) {
+          if (window.SovraModularGlassOS) window.SovraModularGlassOS.closeDrawer();
+          return;
+        }
+        if (currentMode === 'app') {
+          if (previousAppId && previousAppId !== activeAppId && previousAppId !== 'home') {
+            openApp(previousAppId);
+          } else {
+            goHome();
+          }
+        }
+      }
+
+      function openAppDrawer() {
+        if (navigator.vibrate) navigator.vibrate(15);
+        closeHomeContextMenu();
+        if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.toggleDrawer === 'function') {
+          window.SovraModularGlassOS.toggleDrawer(true);
+        }
+      }
+
+      function syncOSModeVisuals() {
+        if (currentMode === 'home') {
+          document.body.classList.add('sovra-mode-home');
+          document.body.classList.remove('sovra-mode-app');
+        } else {
+          document.body.classList.add('sovra-mode-app');
+          document.body.classList.remove('sovra-mode-home');
+        }
+      }
+
+      // 6. Home Screen App Pinning / Unpinning
+      function pinToHome(appId) {
+        if (homeScreenApps.includes(appId)) {
+          if (typeof showAccountToast === 'function') showAccountToast('App already on Home Screen');
+          return;
+        }
+        if (homeScreenApps.length >= 24) {
+          if (typeof showAccountToast === 'function') showAccountToast('Home Screen is full (max 24)');
+          return;
+        }
+        homeScreenApps.push(appId);
+        saveHomeApps();
+        renderHomeScreen();
+        if (typeof showAccountToast === 'function') {
+          const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+          showAccountToast('Added ' + (feat ? feat.name : appId) + ' to Home Screen');
+        }
+      }
+
+      function removeFromHome(appId) {
+        const idx = homeScreenApps.indexOf(appId);
+        if (idx !== -1) {
+          homeScreenApps.splice(idx, 1);
+          saveHomeApps();
+          renderHomeScreen();
+          if (typeof showAccountToast === 'function') {
+            const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+            showAccountToast('Removed ' + (feat ? feat.name : appId) + ' from Home');
+          }
+        }
+      }
+
+      // 7. Context Menu for Empty Wallpaper Long-Press
+      function handleHomeContextMenu(e) {
+        e.preventDefault();
+        const menu = document.getElementById('sovraHomeContextMenu');
+        if (!menu) return;
+        menu.style.display = 'flex';
+        const x = Math.min(e.clientX || 50, window.innerWidth - 200);
+        const y = Math.min(e.clientY || 100, window.innerHeight - 150);
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+      }
+
+      function closeHomeContextMenu() {
+        const menu = document.getElementById('sovraHomeContextMenu');
+        if (menu) menu.style.display = 'none';
+      }
+
+      document.addEventListener('click', () => {
+        closeHomeContextMenu();
+      });
+
+      function focusDrawerSearch() {
+        openAppDrawer();
+        const input = document.getElementById('masterDrawerSearchInput');
+        if (input) {
+          setTimeout(() => input.focus(), 150);
+        }
+      }
+
+      function toggleEditMode() {
+        isEditMode = !isEditMode;
+        renderHomeScreen();
+      }
+
+      // 8. Render Home Screen Grid & Glance Widget
+      function renderHomeScreen() {
+        const now = new Date();
+        const clockEl = document.getElementById('androidGlanceClock');
+        if (clockEl) {
+          const hrs = String(now.getHours()).padStart(2, '0');
+          const mins = String(now.getMinutes()).padStart(2, '0');
+          clockEl.textContent = hrs + ':' + mins;
+        }
+        const dateEl = document.getElementById('androidGlanceDate');
+        if (dateEl) {
+          const options = { weekday: 'long', month: 'short', day: 'numeric' };
+          dateEl.textContent = now.toLocaleDateString('en-US', options);
+        }
+
+        const peerCountEl = document.getElementById('androidGlancePeerCount');
+        if (peerCountEl) {
+          const peers = (window.SovraState && Array.isArray(window.SovraState.connectedPeers))
+            ? window.SovraState.connectedPeers.length
+            : (window.p2pSwarm && typeof window.p2pSwarm.peerCount === 'number' ? window.p2pSwarm.peerCount : 0);
+          peerCountEl.textContent = peers + (peers === 1 ? ' Peer' : ' Peers');
+        }
+        const balanceEl = document.getElementById('androidGlanceBalance');
+        if (balanceEl) {
+          const bal = (window.SovraState && typeof window.SovraState.walletBalance === 'number')
+            ? window.SovraState.walletBalance
+            : (typeof window.walletBalanceSov === 'number' ? window.walletBalanceSov : 0);
+          balanceEl.textContent = Number(bal).toFixed(2) + ' SOV';
+        }
+
+        const grid = document.getElementById('sovraHomeAppGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        homeScreenApps.forEach(appId => {
+          const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+          if (!feat) return;
+
+          const wrap = document.createElement('div');
+          wrap.className = 'sovra-home-tile-wrap';
+
+          const tile = document.createElement('div');
+          tile.className = 'sovra-app-tile';
+          tile.setAttribute('data-feature-id', appId);
+          tile.setAttribute('title', feat.name + ' - ' + feat.desc);
+          tile.setAttribute('role', 'button');
+          tile.setAttribute('tabindex', '0');
+
+          if (isEditMode) {
+            const unpinBtn = document.createElement('button');
+            unpinBtn.type = 'button';
+            unpinBtn.className = 'sovra-tile-unpin-btn';
+            unpinBtn.style.display = 'flex';
+            unpinBtn.innerHTML = '&times;';
+            unpinBtn.title = 'Remove from Home Screen';
+            unpinBtn.onclick = (e) => {
+              e.stopPropagation();
+              removeFromHome(appId);
+            };
+            tile.appendChild(unpinBtn);
+          }
+
+          if (feat.badge) {
+            const badgeSpan = document.createElement('span');
+            badgeSpan.className = 'sovra-micro-badge sovra-micro-badge-' + feat.badge;
+            badgeSpan.id = 'homeBadge_' + feat.id;
+            tile.appendChild(badgeSpan);
+          }
+
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'sovra-app-tile-icon';
+          iconSpan.style.fontSize = '1.65rem';
+          iconSpan.textContent = feat.icon;
+          tile.appendChild(iconSpan);
+
+          tile.onclick = () => {
+            if (isEditMode) return;
+            openApp(appId);
+          };
+
+          let timer = null;
+          tile.ontouchstart = () => {
+            timer = setTimeout(() => {
+              if (navigator.vibrate) navigator.vibrate(25);
+              toggleEditMode();
+            }, 450);
+          };
+          tile.ontouchend = () => { if (timer) clearTimeout(timer); };
+          tile.ontouchmove = () => { if (timer) clearTimeout(timer); };
+
+          wrap.appendChild(tile);
+
+          const labelSpan = document.createElement('span');
+          labelSpan.className = 'sovra-app-tile-label';
+          labelSpan.style.maxWidth = '72px';
+          labelSpan.style.fontSize = '0.72rem';
+          labelSpan.textContent = feat.name;
+          wrap.appendChild(labelSpan);
+
+          grid.appendChild(wrap);
+        });
+      }
+
+      setInterval(() => {
+        const now = new Date();
+        const clockEl = document.getElementById('androidGlanceClock');
+        if (clockEl) {
+          const hrs = String(now.getHours()).padStart(2, '0');
+          const mins = String(now.getMinutes()).padStart(2, '0');
+          clockEl.textContent = hrs + ':' + mins;
+        }
+      }, 1000);
+
+      const SovraAndroidOS = {
+        WALLPAPER_PRESETS,
+        getMode: () => currentMode,
+        getWallpaper: () => wallpaperConfig,
+        getHomeApps: () => homeScreenApps,
+        goHome,
+        openApp,
+        goBack,
+        openAppDrawer,
+        pinToHome,
+        removeFromHome,
+        setWallpaperPreset,
+        handleWallpaperUpload,
+        setWallpaperBlur,
+        setWallpaperDim,
+        openWallpaperModal,
+        closeWallpaperModal,
+        handleHomeContextMenu,
+        closeHomeContextMenu,
+        focusDrawerSearch,
+        toggleEditMode,
+        renderHomeScreen,
+        applyWallpaper
+      };
+
+      window.SovraAndroidOS = SovraAndroidOS;
+
+      function bootAndroidOS() {
+        loadOSState();
+        applyWallpaper();
+        syncOSModeVisuals();
+        renderHomeScreen();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootAndroidOS);
+      } else {
+        bootAndroidOS();
       }
     })();
 
