@@ -9811,6 +9811,219 @@ function renderHtml(
       transform: translateY(-1px);
     }
 
+    /* ========================================================================= */
+    /* 🔮 SOVRA MODULAR GLASS OS: 3D LIQUID GLASS TILES & CUSTOMIZABLE DOCK     */
+    /* ========================================================================= */
+    .sovra-floating-glass-dock {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9998;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 26px;
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        inset 0 1px 1px rgba(255, 255, 255, 0.25);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      max-width: calc(100vw - 32px);
+      box-sizing: border-box;
+    }
+    body.theme-normal .sovra-floating-glass-dock {
+      background: rgba(255, 255, 255, 0.88) !important;
+      border: 1px solid rgba(203, 213, 225, 0.9) !important;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12) !important;
+    }
+
+    .sovra-dock-slots-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sovra-app-tile {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      user-select: none;
+      touch-action: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      flex-shrink: 0;
+    }
+    .sovra-app-tile:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(56, 189, 248, 0.5);
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+    .sovra-app-tile:active {
+      transform: scale(0.95);
+    }
+    body.theme-normal .sovra-app-tile {
+      background: rgba(241, 245, 249, 0.9) !important;
+      border: 1px solid #cbd5e1 !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .sovra-app-tile:hover {
+      background: #e2e8f0 !important;
+      border-color: #0284c7 !important;
+    }
+
+    .sovra-app-tile-icon {
+      font-size: 1.35rem;
+      line-height: 1;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+    }
+    .sovra-app-tile-label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      margin-top: 2px;
+      max-width: 48px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+    }
+    body.theme-normal .sovra-app-tile-label {
+      color: #334155 !important;
+    }
+
+    /* Living Micro-Widgets Badges */
+    .sovra-micro-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      border-radius: 999px;
+      padding: 1px 5px;
+      font-size: 0.58rem;
+      font-weight: 800;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      z-index: 2;
+    }
+    .sovra-micro-badge-wallet {
+      background: #10b981;
+      color: #ffffff;
+      border: 1px solid #34d399;
+    }
+    .sovra-micro-badge-mesh {
+      background: #0284c7;
+      color: #ffffff;
+      border: 1px solid #38bdf8;
+    }
+    .sovra-micro-badge-chat {
+      background: #ef4444;
+      color: #ffffff;
+      border: 1px solid #f87171;
+    }
+    .sovra-micro-badge-live {
+      background: #dc2626;
+      color: #ffffff;
+      animation: sovraBadgePulse 1.2s infinite;
+    }
+    @keyframes sovraBadgePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.1); }
+    }
+
+    /* Edit Mode (Jiggle & Unpin Badges) */
+    .sovra-edit-mode .sovra-app-tile {
+      animation: sovraTileJiggle 0.26s infinite alternate ease-in-out;
+    }
+    @keyframes sovraTileJiggle {
+      0% { transform: rotate(-1.5deg) scale(1.02); }
+      100% { transform: rotate(1.5deg) scale(1.02); }
+    }
+    .sovra-tile-unpin-btn {
+      position: absolute;
+      top: -5px;
+      left: -5px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ef4444;
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      border: 1.5px solid #ffffff;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 5;
+    }
+    .sovra-edit-mode .sovra-tile-unpin-btn {
+      display: flex;
+    }
+
+    /* Master App Drawer Overlay & Modal */
+    .sovra-drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 10005;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      transition: opacity 0.25s ease;
+    }
+    .sovra-drawer-overlay.active {
+      display: flex;
+    }
+    .sovra-master-drawer {
+      width: 100%;
+      max-width: 580px;
+      max-height: 82vh;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 28px 28px 0 0;
+      padding: 1.25rem 1.5rem;
+      box-sizing: border-box;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      animation: sovraDrawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes sovraDrawerSlideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    body.theme-normal .sovra-master-drawer {
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.15) !important;
+      color: #0f172a !important;
+    }
+
+    /* Header Quick Action Slots */
+    .header-quick-slots {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
     /* Instagram Parity: Explore Mosaic Staggered Grid */
     .explore-mosaic-grid {
       display: grid;
@@ -17277,6 +17490,11 @@ function renderHtml(
         <span id="identityPillHandle" class="identity-pill-handle">@sovereign</span>
         <span id="identityPillRoleBadge" class="identity-pill-badge">Citizen</span>
         <span class="identity-pill-chevron">▾</span>
+      </div>
+
+      <!-- 🔮 Modular Header Quick Action Slots -->
+      <div id="headerQuickActionSlots" class="header-quick-slots">
+        <!-- Hydrated dynamically by SovraModularGlassOS.renderHeader() -->
       </div>
 
       <!-- 4. User Profile Avatar with Integrated Presence Badge (Desktop Only) -->
@@ -28199,6 +28417,71 @@ function renderHtml(
           <button type="button" onclick="closeChannelStorePurchaseModal()" class="btn btn-secondary" style="border-radius: 999px; padding: 8px 16px;">Cancel</button>
           <button type="button" id="btnConfirmStorePurchase" onclick="confirmStorePurchase()" class="btn btn-primary" style="border-radius: 999px; padding: 8px 22px; font-weight: 800; background: linear-gradient(135deg, #10b981, #059669); color: #fff;">Confirm &amp; Unlock 🔓</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔮 SOVRA MODULAR GLASS OS: FLOATING GLASS DOCK & MASTER APP DRAWER -->
+  <nav id="sovraFloatingGlassDock" class="sovra-floating-glass-dock" aria-label="Modular Glass Dock">
+    <div id="floatingDockSlotsContainer" class="sovra-dock-slots-container">
+      <!-- Dynamically hydrated by SovraModularGlassOS.renderDock() -->
+    </div>
+    <div style="width: 1px; height: 28px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
+    <!-- Master App Drawer Launcher Tile -->
+    <button type="button" id="dockLauncherBtn" class="sovra-app-tile" onclick="window.SovraModularGlassOS.toggleDrawer()" title="Open App Drawer &amp; Customize" aria-label="Open App Drawer &amp; Customize" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;">
+      <span class="sovra-app-tile-icon">✨</span>
+      <span class="sovra-app-tile-label" style="color: #38bdf8;">Apps</span>
+    </button>
+  </nav>
+
+  <!-- Master App Drawer Modal Overlay -->
+  <div id="sovraMasterDrawerOverlay" class="sovra-drawer-overlay" onclick="window.SovraModularGlassOS.closeDrawer()">
+    <div id="sovraMasterAppDrawer" class="sovra-master-drawer" onclick="event.stopPropagation()">
+      <div class="sheet-grab-handle"></div>
+
+      <!-- Drawer Header & Controls -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.3rem;">✨</span>
+          <div>
+            <div style="font-weight: 800; font-size: 1.15rem; color: #fff;">Sovra Glass OS</div>
+            <div style="font-size: 0.74rem; color: #94a3b8;">Modular Sovereign Apps &amp; Workspace</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button type="button" id="btnToggleCustomizeLayout" onclick="window.SovraModularGlassOS.toggleEditMode()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.45); color: #a5b4fc; font-size: 0.74rem; font-weight: 700; border-radius: 999px; padding: 5px 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease;">
+            <span id="btnEditModeIcon">✏️</span> <span id="btnEditModeText">Customize</span>
+          </button>
+          <button type="button" onclick="window.SovraModularGlassOS.closeDrawer()" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">✕</button>
+        </div>
+      </div>
+
+      <!-- Quick Preset Selector Bar -->
+      <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 0.75rem; scrollbar-width: none;">
+        <button type="button" class="preset-pill-btn" onclick="window.SovraModularGlassOS.applyPreset('social')" style="padding: 4px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">⚡ Social Classic</button>
+        <button type="button" class="preset-pill-btn" onclick="window.SovraModularGlassOS.applyPreset('creator')" style="padding: 4px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">🎬 Creator Studio</button>
+        <button type="button" class="preset-pill-btn" onclick="window.SovraModularGlassOS.applyPreset('finance')" style="padding: 4px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">💳 Finance Hub</button>
+        <button type="button" class="preset-pill-btn" onclick="window.SovraModularGlassOS.applyPreset('minimal')" style="padding: 4px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">✨ Minimalist</button>
+      </div>
+
+      <!-- Search Input -->
+      <div style="margin-bottom: 0.65rem;">
+        <input type="text" id="masterDrawerSearchInput" oninput="window.SovraModularGlassOS.filterDrawer(this.value)" placeholder="Search apps, tools, and actions..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 9px 14px; color: #fff; font-size: 0.84rem; outline: none;" />
+      </div>
+
+      <!-- Category Filter Pills -->
+      <div id="drawerCategoryPills" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 0.85rem; scrollbar-width: none;">
+        <button type="button" class="drawer-cat-pill active" onclick="window.SovraModularGlassOS.setCategoryFilter('all')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.2); color: #38bdf8; cursor: pointer; white-space: nowrap;">All</button>
+        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('social')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Social</button>
+        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('media')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Media</button>
+        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('creator')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Creator</button>
+        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('finance')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Finance</button>
+        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('utility')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Utility</button>
+      </div>
+
+      <!-- 24-App Grid Container -->
+      <div id="masterDrawerTilesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 12px; overflow-y: auto; max-height: 52vh; padding-right: 4px; padding-bottom: 12px;">
+        <!-- Dynamically rendered by SovraModularGlassOS.renderDrawerGrid() -->
       </div>
     </div>
   </div>
@@ -80345,6 +80628,745 @@ function renderHtml(
       } catch (_) {}
     }
     window.loginWithHardwareEnclavePrf = loginWithHardwareEnclavePrf;
+
+    // =========================================================================
+    // 🔮 SOVRA MODULAR GLASS OS: ARCHITECTURE, DOCK & MASTER DRAWER ENGINE
+    // =========================================================================
+    (function initSovraModularGlassOS() {
+      // 1. Canonical Feature Registry (24 Native Modules)
+      const SOVRA_FEATURE_REGISTRY = [
+        { id: 'feed', name: 'Feed', icon: '📰', category: 'social', badge: '', action: () => switchTab('feed'), desc: 'Decentralized Social Feed' },
+        { id: 'reels', name: 'Reels', icon: '🎬', category: 'media', badge: '', action: () => switchTab('reels'), desc: 'Sovereign Short Videos' },
+        { id: 'watch', name: 'Watch', icon: '📺', category: 'media', badge: '', action: () => switchTab('youtube'), desc: 'Longform Decentralized Video' },
+        { id: 'chat', name: 'Chat', icon: '💬', category: 'social', badge: 'chat', action: () => switchTab('chat'), desc: 'Double-Ratchet Noise_XX E2EE' },
+        { id: 'profile', name: 'Profile', icon: '👤', category: 'social', badge: '', action: () => switchTab('me'), desc: 'Sovereign DID Identity & Posts' },
+        { id: 'wallet', name: 'Wallet', icon: '💰', category: 'finance', badge: 'wallet', action: () => { if (typeof openFullPageWallet === 'function') openFullPageWallet(); else switchTab('me'); }, desc: 'DID Vault & Balance' },
+        { id: 'studio', name: 'Studio', icon: '🎨', category: 'creator', badge: '', action: () => switchTab('studio'), desc: 'Creator Studio & Video Analytics' },
+        { id: 'live', name: 'Live', icon: '🔴', category: 'media', badge: 'live', action: () => switchTab('live'), desc: 'P2P WebRTC Swarm Stream' },
+        { id: 'calls', name: 'Calls', icon: '📞', category: 'social', badge: '', action: () => switchTab('calls'), desc: 'Encrypted P2P Voice & Video' },
+        { id: 'friends', name: 'Peers', icon: '👥', category: 'social', badge: '', action: () => switchTab('friends'), desc: 'Discover Sovereign Nodes & Peers' },
+        { id: 'communities', name: 'Spaces', icon: '🏛️', category: 'social', badge: '', action: () => switchTab('communities'), desc: 'Sovereign Community Channels' },
+        { id: 'channels', name: 'Channels', icon: '📢', category: 'media', badge: '', action: () => switchTab('channel'), desc: 'Public Broadcast Channels' },
+        { id: 'hub', name: 'Explore', icon: '🧭', category: 'utility', badge: '', action: () => switchTab('hub'), desc: 'Global Discovery & Media Hub' },
+        { id: 'dapps', name: 'dApps', icon: '⚡', category: 'utility', badge: '', action: () => switchTab('dapps'), desc: 'Decentralized Applications' },
+        { id: 'admin', name: 'Admin', icon: '⚙️', category: 'utility', badge: '', action: () => switchTab('admin'), desc: 'Apex Operations & Health Console' },
+        { id: 'qr_scan', name: 'Scanner', icon: '📷', category: 'utility', badge: '', action: () => { if (typeof openQrScannerModal === 'function') openQrScannerModal(); else if (typeof openSharePostQrModal === 'function') openSharePostQrModal(); }, desc: 'WebRTC Camera QR Scanner' },
+        { id: 'upload', name: 'Create', icon: '➕', category: 'creator', badge: '', action: () => { if (typeof openUniversalCreateModal === 'function') openUniversalCreateModal(); else if (typeof openCreateModal === 'function') openCreateModal('post'); }, desc: 'Publish Post, Video, or Reel' },
+        { id: 'bridge', name: 'Bridge', icon: '🌉', category: 'finance', badge: '', action: () => { if (typeof openWalletBridgeModal === 'function') openWalletBridgeModal(); else if (typeof openFullPageWallet === 'function') openFullPageWallet(); }, desc: 'Multi-Chain Liquidity Bridge' },
+        { id: 'key_vault', name: 'Enclave', icon: '🔐', category: 'utility', badge: '', action: () => { if (typeof openSovereignKeyVaultModal === 'function') openSovereignKeyVaultModal(); else if (typeof openSovereignMfaModal === 'function') openSovereignMfaModal(); }, desc: 'Sovereign Key Enclave & Passkeys' },
+        { id: 'id_card', name: 'ID Card', icon: '🪪', category: 'social', badge: '', action: () => { if (typeof openSovereignIdCardModal === 'function') openSovereignIdCardModal(); else if (typeof openIdentitySwitcherSheet === 'function') openIdentitySwitcherSheet(); }, desc: 'Sovereign DID Credential Card' },
+        { id: 'mesh_node', name: 'Mesh', icon: '🌐', category: 'utility', badge: 'mesh', action: () => { if (typeof toggleDepinHotspot === 'function') toggleDepinHotspot(); }, desc: 'DePIN Hotspot & libp2p Mesh' },
+        { id: 'ghost_mode', name: 'Ghost', icon: '👻', category: 'utility', badge: '', action: () => { if (typeof toggleGhostMode === 'function') toggleGhostMode(); else if (typeof showAccountToast === 'function') showAccountToast('Ghost Mode Toggled'); }, desc: 'Incognito Ephemeral Routing' },
+        { id: 'backup', name: 'Backup', icon: '🛡️', category: 'finance', badge: '', action: () => { if (typeof openSovereignBackupModal === 'function') openSovereignBackupModal(); }, desc: 'Encrypted Seed & Keys Backup' },
+        { id: 'settings', name: 'Settings', icon: '🛠️', category: 'utility', badge: '', action: () => switchTab('settings'), desc: 'Preferences, Themes & Privacy' }
+      ];
+
+      // 2. Curated Persona Presets
+      const PRESETS = {
+        social: {
+          name: 'Social Classic',
+          dockSlots: ['feed', 'reels', 'watch', 'chat', 'profile'],
+          headerSlots: ['hub', 'upload', 'wallet']
+        },
+        creator: {
+          name: 'Creator Studio',
+          dockSlots: ['feed', 'studio', 'live', 'upload', 'profile'],
+          headerSlots: ['channels', 'chat', 'wallet']
+        },
+        finance: {
+          name: 'Finance Hub',
+          dockSlots: ['feed', 'wallet', 'bridge', 'mesh_node', 'profile'],
+          headerSlots: ['qr_scan', 'key_vault', 'backup']
+        },
+        minimal: {
+          name: 'Minimalist',
+          dockSlots: ['feed', 'chat', 'profile'],
+          headerSlots: ['hub', 'settings']
+        }
+      };
+
+      // 3. Layout State Manager
+      const STORAGE_KEY = 'sovra_glass_dock_layout_v1';
+      let layoutConfig = {
+        version: 1,
+        activePreset: 'social',
+        dockSlots: ['feed', 'reels', 'watch', 'chat', 'profile'],
+        headerSlots: ['hub', 'upload', 'wallet'],
+        lastUpdated: Date.now()
+      };
+
+      let isEditMode = false;
+      let activeCategoryFilter = 'all';
+      let activeSearchQuery = '';
+      let draggedFeatureId = null;
+      let draggedSourceZone = null;
+      let draggedSourceIndex = -1;
+
+      function loadLayout() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.dockSlots) && parsed.dockSlots.length > 0) {
+              layoutConfig = {
+                version: 1,
+                activePreset: parsed.activePreset || 'custom',
+                dockSlots: parsed.dockSlots.slice(0, 5),
+                headerSlots: Array.isArray(parsed.headerSlots) ? parsed.headerSlots.slice(0, 3) : ['hub', 'upload', 'wallet'],
+                lastUpdated: parsed.lastUpdated || Date.now()
+              };
+            }
+          }
+        } catch (_) {}
+      }
+
+      function saveLayout() {
+        try {
+          layoutConfig.lastUpdated = Date.now();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(layoutConfig));
+        } catch (_) {}
+      }
+
+      function getFeature(id) {
+        return SOVRA_FEATURE_REGISTRY.find(f => f.id === id) || null;
+      }
+
+      function getBadgeText(badgeType) {
+        if (badgeType === 'wallet') {
+          const bal = (window.SovraState && typeof window.SovraState.walletBalance === 'number')
+            ? window.SovraState.walletBalance
+            : (typeof window.walletBalanceSov === 'number' ? window.walletBalanceSov : null);
+          if (bal !== null) {
+            return Number(bal).toFixed(0);
+          }
+          return '';
+        }
+        if (badgeType === 'mesh') {
+          const peers = (window.SovraState && Array.isArray(window.SovraState.connectedPeers))
+            ? window.SovraState.connectedPeers.length
+            : (window.p2pSwarm && typeof window.p2pSwarm.peerCount === 'number' ? window.p2pSwarm.peerCount : 0);
+          return peers > 0 ? (peers + 'p') : '';
+        }
+        if (badgeType === 'chat') {
+          const unread = (window.SovraChat && typeof window.SovraChat.unreadCount === 'number')
+            ? window.SovraChat.unreadCount
+            : 0;
+          return unread > 0 ? String(unread) : '';
+        }
+        if (badgeType === 'live') {
+          return 'LIVE';
+        }
+        return '';
+      }
+
+      // Render Floating Bottom Dock Slots
+      function renderDock() {
+        const container = document.getElementById('floatingDockSlotsContainer');
+        if (!container) return;
+        container.innerHTML = '';
+
+        layoutConfig.dockSlots.forEach((id, idx) => {
+          const feat = getFeature(id);
+          if (!feat) return;
+
+          const tile = document.createElement('div');
+          tile.className = 'sovra-app-tile sovra-dock-tile';
+          tile.setAttribute('data-feature-id', id);
+          tile.setAttribute('data-zone', 'dock');
+          tile.setAttribute('data-slot-index', String(idx));
+          tile.setAttribute('title', feat.name + ' - ' + feat.desc);
+          tile.setAttribute('role', 'button');
+          tile.setAttribute('tabindex', '0');
+
+          if (isEditMode) {
+            tile.setAttribute('draggable', 'true');
+          }
+
+          // Unpin Button (shown only in Edit Mode)
+          const unpinBtn = document.createElement('button');
+          unpinBtn.type = 'button';
+          unpinBtn.className = 'sovra-tile-unpin-btn';
+          unpinBtn.innerHTML = '&times;';
+          unpinBtn.title = 'Remove from Dock';
+          unpinBtn.onclick = (e) => {
+            e.stopPropagation();
+            unpinSlot('dock', idx);
+          };
+          tile.appendChild(unpinBtn);
+
+          // Micro badge
+          if (feat.badge) {
+            const badgeSpan = document.createElement('span');
+            badgeSpan.className = 'sovra-micro-badge sovra-micro-badge-' + feat.badge;
+            badgeSpan.id = 'dockBadge_' + feat.id;
+            badgeSpan.textContent = getBadgeText(feat.badge);
+            tile.appendChild(badgeSpan);
+          }
+
+          // Icon
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'sovra-app-tile-icon';
+          iconSpan.textContent = feat.icon;
+          tile.appendChild(iconSpan);
+
+          // Label
+          const labelSpan = document.createElement('span');
+          labelSpan.className = 'sovra-app-tile-label';
+          labelSpan.textContent = feat.name;
+          tile.appendChild(labelSpan);
+
+          // Click handler
+          tile.onclick = () => {
+            if (isEditMode) return;
+            handleTileClick(feat.id);
+          };
+
+          container.appendChild(tile);
+        });
+
+        // Add Empty Slot indicator if edit mode and dock has room (< 5 slots)
+        if (isEditMode && layoutConfig.dockSlots.length < 5) {
+          const emptySlot = document.createElement('div');
+          emptySlot.className = 'sovra-app-tile sovra-drop-slot';
+          emptySlot.setAttribute('data-zone', 'dock');
+          emptySlot.setAttribute('data-slot-index', String(layoutConfig.dockSlots.length));
+          emptySlot.style.border = '2px dashed rgba(56, 189, 248, 0.4)';
+          emptySlot.style.background = 'rgba(56, 189, 248, 0.08)';
+          emptySlot.title = 'Drop or tap an app from drawer to add here';
+          emptySlot.innerHTML = '<span style="font-size: 1.1rem; color: #38bdf8;">+</span><span class="sovra-app-tile-label" style="color: #38bdf8;">Add</span>';
+          container.appendChild(emptySlot);
+        }
+
+        bindDragDropHandlers();
+      }
+
+      // Render Header Quick Action Slots
+      function renderHeader() {
+        const container = document.getElementById('headerQuickActionSlots');
+        if (!container) return;
+        container.innerHTML = '';
+
+        layoutConfig.headerSlots.forEach((id, idx) => {
+          const feat = getFeature(id);
+          if (!feat) return;
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sovra-app-tile header-quick-tile';
+          btn.setAttribute('data-feature-id', id);
+          btn.setAttribute('data-zone', 'header');
+          btn.setAttribute('data-slot-index', String(idx));
+          btn.setAttribute('title', feat.name + ' - ' + feat.desc);
+          btn.style.width = '38px';
+          btn.style.height = '38px';
+          btn.style.borderRadius = '12px';
+          btn.style.padding = '0';
+
+          if (isEditMode) {
+            btn.setAttribute('draggable', 'true');
+          }
+
+          if (feat.badge) {
+            const badgeSpan = document.createElement('span');
+            badgeSpan.className = 'sovra-micro-badge sovra-micro-badge-' + feat.badge;
+            badgeSpan.id = 'headerBadge_' + feat.id;
+            badgeSpan.style.fontSize = '0.52rem';
+            badgeSpan.style.padding = '0 3px';
+            badgeSpan.textContent = getBadgeText(feat.badge);
+            btn.appendChild(badgeSpan);
+          }
+
+          const unpinBtn = document.createElement('span');
+          unpinBtn.className = 'sovra-tile-unpin-btn';
+          unpinBtn.innerHTML = '&times;';
+          unpinBtn.onclick = (e) => {
+            e.stopPropagation();
+            unpinSlot('header', idx);
+          };
+          btn.appendChild(unpinBtn);
+
+          const iconSpan = document.createElement('span');
+          iconSpan.style.fontSize = '1.1rem';
+          iconSpan.textContent = feat.icon;
+          btn.appendChild(iconSpan);
+
+          btn.onclick = () => {
+            if (isEditMode) return;
+            handleTileClick(feat.id);
+          };
+
+          container.appendChild(btn);
+        });
+
+        if (isEditMode && layoutConfig.headerSlots.length < 3) {
+          const emptySlot = document.createElement('button');
+          emptySlot.type = 'button';
+          emptySlot.className = 'sovra-app-tile header-quick-tile sovra-drop-slot';
+          emptySlot.setAttribute('data-zone', 'header');
+          emptySlot.setAttribute('data-slot-index', String(layoutConfig.headerSlots.length));
+          emptySlot.style.width = '38px';
+          emptySlot.style.height = '38px';
+          emptySlot.style.borderRadius = '12px';
+          emptySlot.style.border = '2px dashed rgba(56, 189, 248, 0.4)';
+          emptySlot.style.background = 'rgba(56, 189, 248, 0.08)';
+          emptySlot.innerHTML = '<span style="font-size: 1rem; color: #38bdf8;">+</span>';
+          emptySlot.title = 'Drop or tap an app to pin to Header';
+          container.appendChild(emptySlot);
+        }
+
+        bindDragDropHandlers();
+      }
+
+      // Render Master App Drawer Grid
+      function renderDrawerGrid(filter) {
+        const grid = document.getElementById('masterDrawerTilesGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        const q = (typeof filter === 'string' ? filter : activeSearchQuery).toLowerCase().trim();
+
+        const filtered = SOVRA_FEATURE_REGISTRY.filter(feat => {
+          const matchCategory = activeCategoryFilter === 'all' || feat.category === activeCategoryFilter;
+          const matchQuery = !q || feat.name.toLowerCase().includes(q) || feat.desc.toLowerCase().includes(q) || feat.category.toLowerCase().includes(q);
+          return matchCategory && matchQuery;
+        });
+
+        if (filtered.length === 0) {
+          grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.85rem;">No matching apps found</div>';
+          return;
+        }
+
+        filtered.forEach(feat => {
+          const tile = document.createElement('div');
+          tile.className = 'sovra-app-tile drawer-grid-tile';
+          tile.setAttribute('data-feature-id', feat.id);
+          tile.setAttribute('data-zone', 'drawer');
+          tile.setAttribute('title', feat.name + ' - ' + feat.desc);
+          tile.style.width = '72px';
+          tile.style.height = '72px';
+          tile.style.margin = '0 auto';
+
+          if (isEditMode) {
+            tile.setAttribute('draggable', 'true');
+          }
+
+          if (feat.badge) {
+            const badgeSpan = document.createElement('span');
+            badgeSpan.className = 'sovra-micro-badge sovra-micro-badge-' + feat.badge;
+            badgeSpan.id = 'drawerBadge_' + feat.id;
+            badgeSpan.textContent = getBadgeText(feat.badge);
+            tile.appendChild(badgeSpan);
+          }
+
+          const isPinnedInDock = layoutConfig.dockSlots.includes(feat.id);
+          const isPinnedInHeader = layoutConfig.headerSlots.includes(feat.id);
+          if (isPinnedInDock || isPinnedInHeader) {
+            const pinnedDot = document.createElement('span');
+            pinnedDot.style.position = 'absolute';
+            pinnedDot.style.bottom = '4px';
+            pinnedDot.style.right = '4px';
+            pinnedDot.style.width = '6px';
+            pinnedDot.style.height = '6px';
+            pinnedDot.style.borderRadius = '50%';
+            pinnedDot.style.background = '#38bdf8';
+            pinnedDot.title = 'Pinned';
+            tile.appendChild(pinnedDot);
+          }
+
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'sovra-app-tile-icon';
+          iconSpan.style.fontSize = '1.45rem';
+          iconSpan.textContent = feat.icon;
+          tile.appendChild(iconSpan);
+
+          const labelSpan = document.createElement('span');
+          labelSpan.className = 'sovra-app-tile-label';
+          labelSpan.style.maxWidth = '64px';
+          labelSpan.textContent = feat.name;
+          tile.appendChild(labelSpan);
+
+          tile.onclick = () => {
+            if (isEditMode) {
+              if (!layoutConfig.dockSlots.includes(feat.id) && layoutConfig.dockSlots.length < 5) {
+                addSlot('dock', feat.id);
+                if (typeof showAccountToast === 'function') {
+                  showAccountToast('Added ' + feat.name + ' to Dock');
+                }
+              } else if (!layoutConfig.headerSlots.includes(feat.id) && layoutConfig.headerSlots.length < 3) {
+                addSlot('header', feat.id);
+                if (typeof showAccountToast === 'function') {
+                  showAccountToast('Added ' + feat.name + ' to Header');
+                }
+              } else {
+                if (typeof showAccountToast === 'function') {
+                  showAccountToast(feat.name + ' is already pinned');
+                }
+              }
+              return;
+            }
+            closeDrawer();
+            handleTileClick(feat.id);
+          };
+
+          grid.appendChild(tile);
+        });
+
+        bindDragDropHandlers();
+      }
+
+      function bindDragDropHandlers() {
+        const tiles = document.querySelectorAll('.sovra-app-tile');
+        tiles.forEach(tile => {
+          tile.ondragstart = (e) => {
+            const featId = tile.getAttribute('data-feature-id');
+            const zone = tile.getAttribute('data-zone');
+            const idx = tile.getAttribute('data-slot-index');
+            if (!featId && zone !== 'dock' && zone !== 'header') return;
+            draggedFeatureId = featId;
+            draggedSourceZone = zone;
+            draggedSourceIndex = idx ? parseInt(idx, 10) : -1;
+            if (e.dataTransfer) {
+              e.dataTransfer.setData('text/plain', featId || '');
+              e.dataTransfer.effectAllowed = 'copyMove';
+            }
+            tile.style.opacity = '0.5';
+          };
+
+          tile.ondragend = () => {
+            tile.style.opacity = '1';
+            document.querySelectorAll('.is-hovered').forEach(el => el.classList.remove('is-hovered'));
+          };
+
+          tile.ondragover = (e) => {
+            const zone = tile.getAttribute('data-zone');
+            if (zone === 'dock' || zone === 'header') {
+              e.preventDefault();
+              tile.classList.add('is-hovered');
+            }
+          };
+
+          tile.ondragleave = () => {
+            tile.classList.remove('is-hovered');
+          };
+
+          tile.ondrop = (e) => {
+            e.preventDefault();
+            tile.classList.remove('is-hovered');
+            const targetZone = tile.getAttribute('data-zone');
+            const targetIndex = parseInt(tile.getAttribute('data-slot-index') || '0', 10);
+            if (targetZone === 'dock' || targetZone === 'header') {
+              handleDrop(targetZone, targetIndex);
+            }
+          };
+
+          let longPressTimer = null;
+          tile.ontouchstart = () => {
+            longPressTimer = setTimeout(() => {
+              if (navigator.vibrate) navigator.vibrate(25);
+              if (!isEditMode) {
+                toggleEditMode();
+                if (typeof showAccountToast === 'function') {
+                  showAccountToast('Customization Mode Enabled - Drag or tap apps to rearrange');
+                }
+              }
+            }, 400);
+          };
+          tile.ontouchend = () => {
+            if (longPressTimer) clearTimeout(longPressTimer);
+          };
+          tile.ontouchmove = () => {
+            if (longPressTimer) clearTimeout(longPressTimer);
+          };
+        });
+
+        const dockContainer = document.getElementById('floatingDockSlotsContainer');
+        if (dockContainer) {
+          dockContainer.ondragover = (e) => { e.preventDefault(); };
+          dockContainer.ondrop = (e) => {
+            e.preventDefault();
+            if (draggedFeatureId) {
+              addSlot('dock', draggedFeatureId);
+            }
+          };
+        }
+        const headerContainer = document.getElementById('headerQuickActionSlots');
+        if (headerContainer) {
+          headerContainer.ondragover = (e) => { e.preventDefault(); };
+          headerContainer.ondrop = (e) => {
+            e.preventDefault();
+            if (draggedFeatureId) {
+              addSlot('header', draggedFeatureId);
+            }
+          };
+        }
+      }
+
+      function handleDrop(targetZone, targetIndex) {
+        if (!draggedFeatureId) return;
+        const slots = targetZone === 'dock' ? layoutConfig.dockSlots : layoutConfig.headerSlots;
+        const maxSlots = targetZone === 'dock' ? 5 : 3;
+
+        if (draggedSourceZone === targetZone && draggedSourceIndex >= 0) {
+          const item = slots.splice(draggedSourceIndex, 1)[0];
+          slots.splice(targetIndex, 0, item);
+        } else {
+          const existingIdx = slots.indexOf(draggedFeatureId);
+          if (existingIdx !== -1) {
+            slots.splice(existingIdx, 1);
+          }
+          if (targetIndex < slots.length) {
+            slots[targetIndex] = draggedFeatureId;
+          } else if (slots.length < maxSlots) {
+            slots.push(draggedFeatureId);
+          } else {
+            slots[maxSlots - 1] = draggedFeatureId;
+          }
+        }
+
+        layoutConfig.activePreset = 'custom';
+        saveLayout();
+        renderDock();
+        renderHeader();
+        renderDrawerGrid();
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('Dock Layout Updated');
+        }
+      }
+
+      function unpinSlot(zone, index) {
+        const slots = zone === 'dock' ? layoutConfig.dockSlots : layoutConfig.headerSlots;
+        if (zone === 'dock' && slots.length <= 1) {
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('Dock must contain at least 1 app');
+          }
+          return;
+        }
+        if (index >= 0 && index < slots.length) {
+          const removed = slots.splice(index, 1)[0];
+          layoutConfig.activePreset = 'custom';
+          saveLayout();
+          renderDock();
+          renderHeader();
+          renderDrawerGrid();
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('Unpinned ' + (getFeature(removed)?.name || 'app'));
+          }
+        }
+      }
+
+      function addSlot(zone, featureId) {
+        const slots = zone === 'dock' ? layoutConfig.dockSlots : layoutConfig.headerSlots;
+        const max = zone === 'dock' ? 5 : 3;
+        if (slots.includes(featureId)) {
+          return;
+        }
+        if (slots.length < max) {
+          slots.push(featureId);
+        } else {
+          slots[max - 1] = featureId;
+        }
+        layoutConfig.activePreset = 'custom';
+        saveLayout();
+        renderDock();
+        renderHeader();
+        renderDrawerGrid();
+      }
+
+      function applyPreset(presetKey) {
+        const preset = PRESETS[presetKey];
+        if (!preset) return;
+        layoutConfig.activePreset = presetKey;
+        layoutConfig.dockSlots = [...preset.dockSlots];
+        layoutConfig.headerSlots = [...preset.headerSlots];
+        saveLayout();
+        renderDock();
+        renderHeader();
+        renderDrawerGrid();
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('Applied ' + preset.name + ' Preset');
+        }
+      }
+
+      function toggleDrawer(show) {
+        const overlay = document.getElementById('sovraMasterDrawerOverlay');
+        if (!overlay) return;
+        const willShow = typeof show === 'boolean' ? show : !overlay.classList.contains('active');
+        if (willShow) {
+          overlay.classList.add('active');
+          renderDrawerGrid();
+          const searchInput = document.getElementById('masterDrawerSearchInput');
+          if (searchInput) {
+            searchInput.value = '';
+            activeSearchQuery = '';
+            setTimeout(() => searchInput.focus(), 150);
+          }
+        } else {
+          overlay.classList.remove('active');
+        }
+      }
+
+      function closeDrawer() {
+        toggleDrawer(false);
+      }
+
+      function openDrawer() {
+        toggleDrawer(true);
+      }
+
+      function toggleEditMode() {
+        isEditMode = !isEditMode;
+        const dock = document.getElementById('sovraFloatingGlassDock');
+        const header = document.getElementById('headerQuickActionSlots');
+        const btnText = document.getElementById('btnEditModeText');
+        const btnIcon = document.getElementById('btnEditModeIcon');
+        const btn = document.getElementById('btnToggleCustomizeLayout');
+
+        if (isEditMode) {
+          if (dock) dock.classList.add('sovra-edit-mode');
+          if (header) header.classList.add('sovra-edit-mode');
+          if (btnText) btnText.textContent = 'Done';
+          if (btnIcon) btnIcon.textContent = '✓';
+          if (btn) {
+            btn.style.background = 'rgba(16, 185, 129, 0.25)';
+            btn.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+            btn.style.color = '#34d399';
+          }
+        } else {
+          if (dock) dock.classList.remove('sovra-edit-mode');
+          if (header) header.classList.remove('sovra-edit-mode');
+          if (btnText) btnText.textContent = 'Customize';
+          if (btnIcon) btnIcon.textContent = '✎';
+          if (btn) {
+            btn.style.background = 'rgba(99, 102, 241, 0.2)';
+            btn.style.borderColor = 'rgba(99, 102, 241, 0.45)';
+            btn.style.color = '#a5b4fc';
+          }
+        }
+
+        renderDock();
+        renderHeader();
+        renderDrawerGrid();
+      }
+
+      function filterDrawer(val) {
+        activeSearchQuery = val || '';
+        renderDrawerGrid(activeSearchQuery);
+      }
+
+      function setCategoryFilter(category) {
+        activeCategoryFilter = category;
+        const pills = document.querySelectorAll('.drawer-cat-pill');
+        pills.forEach(pill => {
+          const isMatch = pill.getAttribute('onclick')?.includes("'" + category + "'");
+          if (isMatch) {
+            pill.style.borderColor = '#38bdf8';
+            pill.style.background = 'rgba(56, 189, 248, 0.2)';
+            pill.style.color = '#38bdf8';
+          } else {
+            pill.style.borderColor = 'rgba(255,255,255,0.1)';
+            pill.style.background = 'rgba(255,255,255,0.04)';
+            pill.style.color = '#cbd5e1';
+          }
+        });
+        renderDrawerGrid();
+      }
+
+      async function updateMicroBadges() {
+        try {
+          if (typeof window.walletBalanceSov !== 'number') {
+            const res = await fetch('/api/wallet/balance');
+            if (res.ok) {
+              const data = await res.json();
+              if (data && typeof data.balance === 'number') {
+                window.walletBalanceSov = data.balance;
+              }
+            }
+          }
+        } catch (_) {}
+
+        try {
+          const res = await fetch('/api/status');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.connectedPeers)) {
+              if (!window.SovraState) window.SovraState = {};
+              window.SovraState.connectedPeers = data.connectedPeers;
+            }
+          }
+        } catch (_) {}
+
+        SOVRA_FEATURE_REGISTRY.forEach(feat => {
+          if (!feat.badge) return;
+          const text = getBadgeText(feat.badge);
+          ['dockBadge_' + feat.id, 'headerBadge_' + feat.id, 'drawerBadge_' + feat.id].forEach(badgeId => {
+            const el = document.getElementById(badgeId);
+            if (el) {
+              el.textContent = text;
+              el.style.display = text ? 'inline-flex' : 'none';
+            }
+          });
+        });
+      }
+
+      function handleTileClick(featureId) {
+        const feat = getFeature(featureId);
+        if (!feat) return;
+        try {
+          if (typeof feat.action === 'function') {
+            feat.action();
+          }
+        } catch (err) {
+          console.warn('[ModularGlassOS] Tile action error:', err);
+        }
+      }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeDrawer();
+        }
+      });
+
+      setInterval(updateMicroBadges, 10000);
+
+      const SovraModularGlassOS = {
+        FEATURE_REGISTRY: SOVRA_FEATURE_REGISTRY,
+        PRESETS,
+        getLayout: () => layoutConfig,
+        getFeature,
+        loadLayout,
+        saveLayout,
+        renderDock,
+        renderHeader,
+        renderDrawerGrid,
+        toggleDrawer,
+        closeDrawer,
+        openDrawer,
+        toggleEditMode,
+        applyPreset,
+        filterDrawer,
+        setCategoryFilter,
+        handleTileClick,
+        unpinSlot,
+        addSlot,
+        updateMicroBadges,
+        initDragAndDrop: bindDragDropHandlers
+      };
+
+      window.SovraModularGlassOS = SovraModularGlassOS;
+
+      function boot() {
+        loadLayout();
+        renderDock();
+        renderHeader();
+        updateMicroBadges();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+      } else {
+        boot();
+      }
+    })();
 
 </script>
 </body>
