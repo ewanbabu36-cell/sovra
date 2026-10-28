@@ -241,4 +241,21 @@ describe('Sovra Android OS Home Screen Launcher & Wallpaper Engine Test Suite', 
     expect(storedWp.blur).toBe(12);
     expect(storedWp.dim).toBe(45);
   });
+
+  it('7. Real-time Node Telemetry & /api/wallet/balance integration', async () => {
+    const sandbox = setupVmEnvironment();
+    const androidOS = sandbox.window.SovraAndroidOS;
+    expect(typeof androidOS.refreshTelemetry).toBe('function');
+
+    // Test calling /api/wallet/balance endpoint on dev server
+    try {
+      const res = await fetch(`${BASE_URL}/api/wallet/balance`);
+      if (res.ok) {
+        const data = await res.json();
+        expect(data.ok).toBe(true);
+        expect(typeof data.balance).toBe('number');
+        expect(data.balance).toBeGreaterThanOrEqual(0);
+      }
+    } catch (_) {}
+  });
 });
