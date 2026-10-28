@@ -179,4 +179,26 @@ describe('Sovra Holographic Central Navigation & Clean Production UI Gate', { ti
     // 3. Subtle non-opaque backdrop with blur
     expect(html).toContain('backdrop-filter: blur(8px);');
   });
+
+  it('provides fully responsive, interactive Backup and Settings buttons in Profile action row', async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const html = await res.text();
+
+    // 1. Buttons exist with clean SVG icons and responsive styling
+    expect(html).toContain('id="btnBackupSovereignIdentity"');
+    expect(html).toContain('id="profileSettingsBtn"');
+    expect(html).toContain('onclick="openSovereignBackupModal()"');
+    expect(html).toContain('onclick="openSpatialSettingsSurface(this)"');
+
+    // 2. Verified global window bindings
+    expect(html).toContain('window.openSovereignBackupModal = openSovereignBackupModal;');
+    expect(html).toContain('window.closeSovereignBackupModal = closeSovereignBackupModal;');
+    expect(html).toContain('window.openSpatialSettingsSurface');
+
+    // 3. Mobile responsive wrapping and surface z-index
+    expect(html).toContain('flex-wrap: wrap !important;');
+    expect(html).toContain('#btnBackupSovereignIdentity {');
+    expect(html).toContain('#profileSettingsBtn {');
+    expect(html).toContain('.sovra-surface-card.is-active');
+  });
 });
