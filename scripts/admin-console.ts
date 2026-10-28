@@ -89,6 +89,24 @@ export interface AdminConsoleOptions {
   featureFlags?: Array<{ id: string; name: string; description: string; enabled: boolean; rolloutPercentage: number; targetCriteria: string; updatedAt: number }>;
   broadcastAlerts?: Array<{ id: string; level: string; title: string; message: string; actionLabel?: string; actionUrl?: string; isSticky: boolean; active: boolean; createdAt: number }>;
   legalHolds?: Array<{ did: string; caseReference: string; reason: string; investigator: string; createdAt: number }>;
+  revenueTakeRate?: number;
+  disintermediationEvents?: Array<{
+    id: string;
+    authorDid: string;
+    contentSnippet: string;
+    matchedTypes: string[];
+    matchedTerms: string[];
+    riskScore: number;
+    status: string;
+    createdAt: number;
+  }>;
+  washTradingCycles?: Array<{
+    id: string;
+    cycle: string[];
+    totalVolumeSov: number;
+    txCount: number;
+    detectedAt: number;
+  }>;
 }
 
 export function renderAdminHtml(opts: AdminConsoleOptions): string {
@@ -123,6 +141,9 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     featureFlags = [],
     broadcastAlerts = [],
     legalHolds = [],
+    revenueTakeRate = 5.0,
+    disintermediationEvents = [],
+    washTradingCycles = [],
     systemTelemetry = {
       cpuUsagePercent: 12,
       memoryRssMb: 145,
@@ -864,6 +885,12 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <span class="admin-nav-icon">🛡️</span>
         <span>Forensic &amp; Legal Vault</span>
         <span class="admin-nav-badge" style="background: #38bdf8; color: #000;">SHA-256</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('revenue-leakage-radar')">
+        <span class="admin-nav-icon">💸</span>
+        <span>Revenue Leakage Radar</span>
+        <span class="admin-nav-badge" style="background: #10b981; color: #000;">4-Col Audit</span>
       </button>
 
       <button class="admin-nav-item" onclick="switchAdminTab('mesh-visualizer')">
@@ -2659,6 +2686,143 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                   : '<div style="color: #64748b; font-size: 0.78rem; text-align: center; padding: 1.5rem;">No legal preservation holds currently active.</div>'
               }
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           MODULE 17: REVENUE LEAKAGE RADAR & SOLVENCY RECONCILER (PHASE 2)
+           ============================================== -->
+      <section class="ops-section" id="view-revenue-leakage-radar" style="display: none;">
+        <div class="ops-section-header">
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>💸</span> Revenue Leakage Radar &amp; Solvency Reconciler
+            </h2>
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+              Big Tech RevOps Parity: True 4-column double-entry invariant verification, real-time off-platform disintermediation detection (UPI/Telegram), circular wash-trading graph analysis, and dynamic take-rate elasticity.
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.25rem; margin-top: 1rem;">
+          <!-- 1. 4-Column Double-Entry Solvency Balance Sheet -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>4-Column Double-Entry Balance Sheet</span>
+              <span id="solvencyDeltaBadge" class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3);">INVARIANT VERIFIED</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 1rem;">
+              <div style="background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase;">1. Injected Capital (Mints)</div>
+                <div id="col1Injected" style="font-size: 1.1rem; font-weight: 800; color: #38bdf8; margin-top: 2px;">5,000,000.00 SOV</div>
+              </div>
+              <div style="background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase;">2. User Liabilities</div>
+                <div id="col2Liabilities" style="font-size: 1.1rem; font-weight: 800; color: #f59e0b; margin-top: 2px;">Calculating...</div>
+              </div>
+              <div style="background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase;">3. Locked Escrows</div>
+                <div id="col3Escrows" style="font-size: 1.1rem; font-weight: 800; color: #a855f7; margin-top: 2px;">0.00 SOV</div>
+              </div>
+              <div style="background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase;">4. Treasury Platform Fees</div>
+                <div id="col4Treasury" style="font-size: 1.1rem; font-weight: 800; color: #10b981; margin-top: 2px;">0.00 SOV</div>
+              </div>
+            </div>
+            <div style="margin-top: 12px; padding: 8px 12px; background: #020617; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
+              <span style="color: #94a3b8;">Leakage / Solvency Delta:</span>
+              <strong id="colSolvencyDelta" style="color: #34d399; font-family: var(--font-mono);">0.00 SOV (0.00% Drift)</strong>
+            </div>
+            <button class="btn-ops" style="width: 100%; margin-top: 10px; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; justify-content: center;" onclick="refreshSolvencyAudit()">Run Invariant Reconciler</button>
+          </div>
+
+          <!-- 2. Dynamic Take-Rate Elasticity Controller -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>Dynamic Take-Rate Elasticity</span>
+              <span class="badge" style="background: rgba(236,72,153,0.15); color: #f472b6;">Real-Time Elasticity</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 1rem;">
+              Configure platform take-rate percentage (2.5% to 10.0%) applied to creator tips, pay-per-view unlock fees, and peer micro-settlements.
+            </div>
+            <div style="background: #0f172a; padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 0.82rem; color: #cbd5e1; font-weight: 700;">Platform Fee Take-Rate:</span>
+                <span id="takeRateDisplay" style="font-size: 1.25rem; font-weight: 800; color: #ec4899; font-family: var(--font-mono);">${revenueTakeRate}%</span>
+              </div>
+              <input type="range" id="takeRateSlider" min="2.5" max="10.0" step="0.1" value="${revenueTakeRate}" style="width: 100%; accent-color: #ec4899; cursor: pointer;" oninput="document.getElementById('takeRateDisplay').innerText = Number(this.value).toFixed(1) + '%';" />
+              <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #64748b; margin-top: 4px;">
+                <span>2.5% (Growth / Low-Friction)</span>
+                <span>5.0% (Standard)</span>
+                <span>10.0% (Peak Viral Congestion)</span>
+              </div>
+            </div>
+            <button class="btn-ops" style="width: 100%; background: #db2777; color: #fff; font-weight: 700; justify-content: center;" onclick="updatePlatformTakeRate()">Apply Dynamic Take-Rate</button>
+          </div>
+
+          <!-- 3. Off-Platform Disintermediation Radar -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>Off-Platform Payment Leakage Radar</span>
+              <span class="badge" style="background: rgba(245,158,11,0.15); color: #fbbf24;">NLP / Regex Engine</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
+              Real-time inspection of bios, captions, and comments for UPI IDs, Telegram payment channels, and external links attempting to bypass platform fees.
+            </div>
+            <!-- Test Scanner Box -->
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <input type="text" id="leakageScanInput" placeholder="Test scan snippet: e.g. 'Pay to creator@okhdfcbank or t.me/vip'" style="flex: 1; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.8rem;" />
+              <button class="btn-ops" style="background: #f59e0b; color: #000; font-weight: 700; padding: 0 14px;" onclick="testDisintermediationScan()">Scan</button>
+            </div>
+            <div id="scanResultBadge" style="display: none; padding: 8px; border-radius: 6px; font-size: 0.78rem; margin-bottom: 12px;"></div>
+
+            <!-- Recent Flagged Events -->
+            <div style="max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+              ${
+                (disintermediationEvents && disintermediationEvents.length > 0)
+                  ? disintermediationEvents.map(e => `
+                    <div style="background: #0f172a; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.2); font-size: 0.75rem;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #fbbf24; font-weight: 700;">${e.matchedTypes.join(', ')}</span>
+                        <span class="badge" style="background: rgba(239,68,68,0.15); color: #f87171; font-size: 0.65rem;">Risk ${e.riskScore}%</span>
+                      </div>
+                      <div style="color: #94a3b8; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Snippet: "${e.contentSnippet}"</div>
+                      <div style="color: #64748b; font-size: 0.68rem; margin-top: 2px;">Matched: <strong>${e.matchedTerms.join(', ')}</strong> &bull; DID: ${e.authorDid.slice(0, 16)}...</div>
+                    </div>
+                  `).join('')
+                  : '<div style="color: #64748b; font-size: 0.75rem; text-align: center; padding: 1rem;">No off-platform disintermediation events detected yet.</div>'
+              }
+            </div>
+          </div>
+
+          <!-- 4. Circular Wash-Trading Swarm Graph -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>Circular Wash-Trading Swarm Graph</span>
+              <span class="badge" style="background: rgba(168,85,247,0.15); color: #c084fc;">DFS Cycle Check</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
+              Graph cycle detection algorithm identifying collusive token loops (A &rarr; B &rarr; C &rarr; A) attempting to farm promotional rewards and wash trade.
+            </div>
+            <div id="washCyclesList" style="max-height: 230px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+              ${
+                (washTradingCycles && washTradingCycles.length > 0)
+                  ? washTradingCycles.map(c => `
+                    <div style="background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid rgba(168,85,247,0.25);">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <strong style="color: #c084fc; font-size: 0.8rem;">Cycle: ${c.cycle.length - 1} Hops (${c.txCount} txs)</strong>
+                        <span style="font-size: 0.75rem; color: #34d399; font-weight: 800;">${c.totalVolumeSov} SOV</span>
+                      </div>
+                      <div style="font-family: var(--font-mono); font-size: 0.7rem; color: #94a3b8; margin-top: 4px; word-break: break-all;">
+                        ${c.cycle.map(d => d.slice(0, 14) + '...').join(' &rarr; ')}
+                      </div>
+                    </div>
+                  `).join('')
+                  : '<div style="color: #64748b; font-size: 0.75rem; text-align: center; padding: 1.5rem;">Zero circular wash-trading loops currently detected in 72h window.</div>'
+              }
+            </div>
+            <button class="btn-ops" style="width: 100%; margin-top: 10px; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.3); color: #c084fc; justify-content: center;" onclick="refreshWashTradingCycles()">Analyze Live P2P Swarm Graph</button>
           </div>
         </div>
       </section>

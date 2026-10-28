@@ -506,6 +506,51 @@ export class SqliteSocialDatabaseEngine {
         investigator TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
+
+      -- 28. REVENUE & MONETIZATION SETTINGS (DYNAMIC TAKE-RATE & INVARIANTS)
+      CREATE TABLE IF NOT EXISTS admin_revenue_settings (
+        key TEXT PRIMARY KEY,
+        value_num REAL,
+        value_text TEXT,
+        updated_at INTEGER NOT NULL
+      );
+
+      -- 29. REVENUE LEAKAGE & DISINTERMEDIATION EVENTS (OFF-PLATFORM RADAR)
+      CREATE TABLE IF NOT EXISTS admin_disintermediation_events (
+        id TEXT PRIMARY KEY,
+        author_did TEXT NOT NULL,
+        content_snippet TEXT NOT NULL,
+        matched_types TEXT NOT NULL,
+        matched_terms TEXT NOT NULL,
+        risk_score REAL NOT NULL,
+        status TEXT NOT NULL DEFAULT 'FLAGGED',
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_disinterm_author ON admin_disintermediation_events(author_did);
+
+      -- 30. TOKEN TRANSFERS & TIPS LEDGER (CIRCULAR WASH-TRADING AUDIT)
+      CREATE TABLE IF NOT EXISTS token_transfers (
+        id TEXT PRIMARY KEY,
+        from_did TEXT NOT NULL,
+        to_did TEXT NOT NULL,
+        amount_sov REAL NOT NULL,
+        fee_sov REAL NOT NULL DEFAULT 0.0,
+        tx_type TEXT NOT NULL DEFAULT 'TIP',
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_transfers_from ON token_transfers(from_did);
+      CREATE INDEX IF NOT EXISTS idx_transfers_to ON token_transfers(to_did);
+      CREATE INDEX IF NOT EXISTS idx_transfers_created ON token_transfers(created_at);
+
+      -- 31. CIRCULAR WASH-TRADING DETECTIONS
+      CREATE TABLE IF NOT EXISTS admin_wash_trading_flags (
+        id TEXT PRIMARY KEY,
+        cycle_dids_json TEXT NOT NULL,
+        total_volume_sov REAL NOT NULL,
+        tx_count INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'FLAGGED',
+        detected_at INTEGER NOT NULL
+      );
     `);
 
     // Seed default algorithmic dials if empty
@@ -541,6 +586,15 @@ export class SqliteSocialDatabaseEngine {
         for (const [id, name, desc, en, pct, crit] of seedFlags) {
           insertFlag.run(id, name, desc, en, pct, crit, Date.now());
         }
+      }
+
+      // Seed default revenue settings if empty
+      const settingsCount = (this.db.prepare('SELECT COUNT(*) as c FROM admin_revenue_settings').get() as any)?.c || 0;
+      if (settingsCount === 0) {
+        const insertSetting = this.db.prepare('INSERT OR REPLACE INTO admin_revenue_settings (key, value_num, value_text, updated_at) VALUES (?, ?, ?, ?)');
+        insertSetting.run('platform_take_rate_pct', 5.0, null, Date.now());
+        insertSetting.run('total_genesis_minted_sov', 5000000.0, null, Date.now());
+        insertSetting.run('off_platform_friction_enabled', 1.0, null, Date.now());
       }
     } catch (_) {}
     try {
@@ -1622,6 +1676,392 @@ export class SqliteSocialDatabaseEngine {
     const sha256Seal = crypto.createHash('sha256').update(canonicalJson).digest('hex');
 
     return { dossier, sha256Seal };
+  }
+
+  // ==========================================
+  // 💸 REVENUE OPERATIONS, SETTINGS & DYNAMIC TAKE-RATE
+  // ==========================================
+  public getRevenueSetting(key: string, defaultNum = 0.0, defaultText = ''): { valueNum: number; valueText: string } {
+    try {
+      const row = this.prepareCached('SELECT value_num, value_text FROM admin_revenue_settings WHERE key = ?').get(key) as any;
+      if (!row) return { valueNum: defaultNum, valueText: defaultText };
+      return {
+        valueNum: typeof row.value_num === 'number' ? row.value_num : defaultNum,
+        valueText: row.value_text || defaultText,
+      };
+    } catch (_) {
+      return { valueNum: defaultNum, valueText: defaultText };
+    }
+  }
+
+  public setRevenueSetting(key: string, valueNum: number, valueText?: string): boolean {
+    try {
+      this.prepareCached(`
+        INSERT OR REPLACE INTO admin_revenue_settings (key, value_num, value_text, updated_at)
+        VALUES (?, ?, ?, ?)
+      `).run(key, valueNum, valueText || null, Date.now());
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public getPlatformTakeRate(): number {
+    return this.getRevenueSetting('platform_take_rate_pct', 5.0).valueNum;
+  }
+
+  public setPlatformTakeRate(ratePercent: number): boolean {
+    const clamped = Math.max(2.5, Math.min(10.0, Number(ratePercent) || 5.0));
+    return this.setRevenueSetting('platform_take_rate_pct', clamped);
+  }
+
+  // ==========================================
+  // ⚖️ TRUE 4-COLUMN DOUBLE-ENTRY SOLVENCY ENGINE
+  // ==========================================
+  public getTreasurySolvencyReport(): {
+    ok: boolean;
+    solvencyDeltaSov: number;
+    isSolvent: boolean;
+    healthStatus: 'HEALTHY' | 'DISCREPANCY';
+    totalSystemSov: number;
+    breakdown: {
+      totalInjectedSov: number;
+      userBalancesSov: number;
+      escrowsLockedSov: {
+        total: number;
+        sponsoredBounties: number;
+        quadraticEscrows: number;
+        promotionsUnspent: number;
+      };
+      treasuryReserveSov: number;
+      unsettledReferralsSov: number;
+    };
+    verificationHash: string;
+    auditTimestamp: number;
+  } {
+    let userBalancesSov = 0;
+    try {
+      userBalancesSov = (this.db.prepare('SELECT SUM(balance_sov) as s FROM users').get() as any)?.s || 0;
+    } catch (_) {}
+
+    let quadraticEscrowSov = 0;
+    try {
+      quadraticEscrowSov = (this.db.prepare("SELECT SUM(balance_sov) as s FROM quadratic_escrows WHERE status = 'LOCKED'").get() as any)?.s || 0;
+    } catch (_) {}
+
+    let platformFeesSov = 0;
+    try {
+      platformFeesSov = (this.db.prepare('SELECT SUM(fee_sov) as s FROM token_transfers').get() as any)?.s || 0;
+    } catch (_) {}
+
+    const totalInjectedSov = this.getRevenueSetting('total_genesis_minted_sov', 5000000.0).valueNum;
+    const escrowsTotal = Math.round(quadraticEscrowSov * 1000) / 1000;
+    const treasuryReserveSov = Math.round(platformFeesSov * 1000) / 1000;
+    const unsettledReferralsSov = 0.0;
+
+    const totalSystemAccounting = Math.round((userBalancesSov + escrowsTotal + treasuryReserveSov) * 1000) / 1000;
+    // Solvency Invariant: Injected capital must equal or back all current liabilities and accumulated reserves
+    // Delta = Total Injected - Total Accounted
+    const solvencyDeltaSov = Math.round((totalInjectedSov - totalSystemAccounting) * 1000) / 1000;
+    const isSolvent = Math.abs(solvencyDeltaSov) < 0.001 || solvencyDeltaSov >= 0; // >= 0 means surplus buffer intact
+
+    const auditTimestamp = Date.now();
+    const verificationHash = crypto.createHash('sha256')
+      .update(`SOLVENCY_V2|${totalInjectedSov}|${userBalancesSov}|${escrowsTotal}|${treasuryReserveSov}|${solvencyDeltaSov}|${auditTimestamp}`)
+      .digest('hex');
+
+    return {
+      ok: true,
+      solvencyDeltaSov,
+      isSolvent,
+      healthStatus: isSolvent ? 'HEALTHY' : 'DISCREPANCY',
+      totalSystemSov: totalSystemAccounting,
+      breakdown: {
+        totalInjectedSov: Math.round(totalInjectedSov * 1000) / 1000,
+        userBalancesSov: Math.round(userBalancesSov * 1000) / 1000,
+        escrowsLockedSov: {
+          total: escrowsTotal,
+          sponsoredBounties: 0,
+          quadraticEscrows: escrowsTotal,
+          promotionsUnspent: 0,
+        },
+        treasuryReserveSov,
+        unsettledReferralsSov,
+      },
+      verificationHash,
+      auditTimestamp,
+    };
+  }
+
+  // ==========================================
+  // 🔍 OFF-PLATFORM DISINTERMEDIATION RADAR (NLP / REGEX)
+  // ==========================================
+  public scanTextForDisintermediation(text: string): {
+    detected: boolean;
+    matches: Array<{ type: string; match: string }>;
+    riskScore: number;
+    recommendedAction: string;
+  } {
+    if (!text || typeof text !== 'string') {
+      return { detected: false, matches: [], riskScore: 0, recommendedAction: 'NONE' };
+    }
+
+    const matches: Array<{ type: string; match: string }> = [];
+    let riskScore = 0;
+
+    // 1. UPI VPA Handles (India/SEA P2P disintermediation)
+    const upiRegex = /[a-zA-Z0-9.\-_]{2,256}@(okhdfcbank|okaxis|okicici|oksbi|paytm|ybl|apl|upi|axl|ibl|barodampay|postbank|sbi|hdfcbank|icici|kotak)/gi;
+    let upiMatch;
+    while ((upiMatch = upiRegex.exec(text)) !== null) {
+      matches.push({ type: 'UPI_VPA', match: upiMatch[0] });
+      riskScore += 45;
+    }
+
+    // 2. Telegram Payment / Channel Handles
+    const tgLinkRegex = /(?:https?:\/\/)?(?:t\.me|telegram\.me)\/[a-zA-Z0-9_]{3,64}/gi;
+    let tgMatch;
+    while ((tgMatch = tgLinkRegex.exec(text)) !== null) {
+      matches.push({ type: 'TELEGRAM_LINK', match: tgMatch[0] });
+      riskScore += 35;
+    }
+    const tgHandleRegex = /@(?!sovra)[a-zA-Z0-9_]{3,32}_(?:bot|channel|group|pay|vip)/gi;
+    let tgHandleMatch;
+    while ((tgHandleMatch = tgHandleRegex.exec(text)) !== null) {
+      matches.push({ type: 'TELEGRAM_BOT_HANDLE', match: tgHandleMatch[0] });
+      riskScore += 30;
+    }
+
+    // 3. External Wallets & Tipping Links
+    const walletRegex = /(?:https?:\/\/)?(?:www\.)?(?:paypal\.me|buymeacoffee\.com|ko-fi\.com|patreon\.com|venmo\.com|cash\.app\/[$a-zA-Z0-9_]+)/gi;
+    let walletMatch;
+    while ((walletMatch = walletRegex.exec(text)) !== null) {
+      matches.push({ type: 'EXTERNAL_WALLET', match: walletMatch[0] });
+      riskScore += 40;
+    }
+
+    // 4. Raw Payment Phone Numbers
+    const phoneRegex = /(?:(?:\+91|0091|0)?[ -]?)?[6789]\d{9}/g;
+    let phoneMatch;
+    while ((phoneMatch = phoneRegex.exec(text)) !== null) {
+      matches.push({ type: 'PAYMENT_PHONE_NUMBER', match: phoneMatch[0] });
+      riskScore += 15;
+    }
+
+    const detected = matches.length > 0;
+    let recommendedAction = 'NONE';
+    if (riskScore >= 40) {
+      recommendedAction = 'WARN_CREATOR_AND_SOFT_SUPPRESS';
+    } else if (riskScore > 0) {
+      recommendedAction = 'MONITOR_ENGAGEMENT';
+    }
+
+    return {
+      detected,
+      matches,
+      riskScore: Math.min(100, riskScore),
+      recommendedAction,
+    };
+  }
+
+  public logDisintermediationEvent(
+    authorDid: string,
+    contentSnippet: string,
+    matchedTypes: string[],
+    matchedTerms: string[],
+    riskScore: number,
+  ): string {
+    const id = 'leak_' + crypto.randomUUID().slice(0, 8);
+    try {
+      this.prepareCached(`
+        INSERT INTO admin_disintermediation_events (id, author_did, content_snippet, matched_types, matched_terms, risk_score, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'FLAGGED', ?)
+      `).run(
+        id,
+        authorDid,
+        contentSnippet.slice(0, 500),
+        matchedTypes.join(','),
+        matchedTerms.join(','),
+        riskScore,
+        Date.now(),
+      );
+    } catch (_) {}
+    return id;
+  }
+
+  public getDisintermediationEvents(limit = 50): Array<{
+    id: string;
+    authorDid: string;
+    contentSnippet: string;
+    matchedTypes: string[];
+    matchedTerms: string[];
+    riskScore: number;
+    status: string;
+    createdAt: number;
+  }> {
+    try {
+      const rows = this.db.prepare('SELECT id, author_did, content_snippet, matched_types, matched_terms, risk_score, status, created_at FROM admin_disintermediation_events ORDER BY created_at DESC LIMIT ?').all(limit) as any[];
+      return rows.map(r => ({
+        id: r.id,
+        authorDid: r.author_did,
+        contentSnippet: r.content_snippet,
+        matchedTypes: (r.matched_types || '').split(',').filter(Boolean),
+        matchedTerms: (r.matched_terms || '').split(',').filter(Boolean),
+        riskScore: Number(r.risk_score),
+        status: r.status,
+        createdAt: r.created_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ==========================================
+  // 🔄 CIRCULAR WASH-TRADING GRAPH CYCLE DETECTOR (DFS)
+  // ==========================================
+  public recordTokenTransfer(transfer: {
+    id?: string;
+    fromDid: string;
+    toDid: string;
+    amountSov: number;
+    feeSov?: number;
+    txType?: string;
+  }): string {
+    const id = transfer.id || 'tx_' + crypto.randomUUID().slice(0, 8);
+    const fee = transfer.feeSov ?? (transfer.amountSov * (this.getPlatformTakeRate() / 100));
+    try {
+      this.prepareCached(`
+        INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(id, transfer.fromDid, transfer.toDid, transfer.amountSov, fee, transfer.txType || 'TIP', Date.now());
+    } catch (_) {}
+    return id;
+  }
+
+  public getTokenTransfers(limit = 100): Array<{
+    id: string;
+    fromDid: string;
+    toDid: string;
+    amountSov: number;
+    feeSov: number;
+    txType: string;
+    createdAt: number;
+  }> {
+    try {
+      const rows = this.db.prepare('SELECT id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at FROM token_transfers ORDER BY created_at DESC LIMIT ?').all(limit) as any[];
+      return rows.map(r => ({
+        id: r.id,
+        fromDid: r.from_did,
+        toDid: r.to_did,
+        amountSov: Number(r.amount_sov),
+        feeSov: Number(r.fee_sov),
+        txType: r.tx_type,
+        createdAt: r.created_at,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public detectWashTradingCycles(lookbackHours = 72): Array<{
+    id: string;
+    cycle: string[];
+    totalVolumeSov: number;
+    txCount: number;
+    detectedAt: number;
+  }> {
+    const cutoff = Date.now() - (lookbackHours * 3600 * 1000);
+    let rows: any[] = [];
+    try {
+      rows = this.db.prepare('SELECT from_did, to_did, amount_sov, created_at FROM token_transfers WHERE created_at >= ?').all(cutoff) as any[];
+    } catch (_) {
+      return [];
+    }
+
+    if (rows.length < 2) return [];
+
+    // Build directed adjacency list
+    const adj = new Map<string, Array<{ to: string; amount: number }>>();
+    for (const r of rows) {
+      if (!adj.has(r.from_did)) adj.set(r.from_did, []);
+      adj.get(r.from_did)!.push({ to: r.to_did, amount: Number(r.amount_sov) });
+    }
+
+    const detectedCycles: Array<{ id: string; cycle: string[]; totalVolumeSov: number; txCount: number; detectedAt: number }> = [];
+    const seenCycles = new Set<string>();
+
+    // Normalize cycle so the lexicographically smallest DID comes first
+    function canonicalize(path: string[]): string {
+      let minIdx = 0;
+      for (let i = 1; i < path.length; i++) {
+        if (path[i] < path[minIdx]) minIdx = i;
+      }
+      const rotated = [...path.slice(minIdx), ...path.slice(0, minIdx)];
+      return rotated.join('->');
+    }
+
+    // Depth-First Search for cycles of length 2, 3, and 4
+    function dfs(start: string, current: string, path: string[], volumeAcc: number, depth: number) {
+      if (depth > 4) return;
+      const neighbors = adj.get(current) || [];
+      for (const edge of neighbors) {
+        if (edge.to === start && path.length >= 2) {
+          const canonKey = canonicalize(path);
+          if (!seenCycles.has(canonKey)) {
+            seenCycles.add(canonKey);
+            const cycleId = 'wash_' + crypto.randomUUID().slice(0, 8);
+            detectedCycles.push({
+              id: cycleId,
+              cycle: [...path, start],
+              totalVolumeSov: Math.round((volumeAcc + edge.amount) * 100) / 100,
+              txCount: path.length,
+              detectedAt: Date.now(),
+            });
+          }
+        } else if (!path.includes(edge.to) && depth < 4) {
+          dfs(start, edge.to, [...path, edge.to], volumeAcc + edge.amount, depth + 1);
+        }
+      }
+    }
+
+    for (const node of adj.keys()) {
+      dfs(node, node, [node], 0, 1);
+    }
+
+    // Persist new flags
+    const insertFlag = this.prepareCached(`
+      INSERT OR REPLACE INTO admin_wash_trading_flags (id, cycle_dids_json, total_volume_sov, tx_count, status, detected_at)
+      VALUES (?, ?, ?, ?, 'FLAGGED', ?)
+    `);
+    for (const c of detectedCycles) {
+      try {
+        insertFlag.run(c.id, JSON.stringify(c.cycle), c.totalVolumeSov, c.txCount, c.detectedAt);
+      } catch (_) {}
+    }
+
+    return detectedCycles;
+  }
+
+  public getWashTradingFlags(): Array<{
+    id: string;
+    cycleDids: string[];
+    totalVolumeSov: number;
+    txCount: number;
+    status: string;
+    detectedAt: number;
+  }> {
+    try {
+      const rows = this.db.prepare('SELECT id, cycle_dids_json, total_volume_sov, tx_count, status, detected_at FROM admin_wash_trading_flags ORDER BY detected_at DESC').all() as any[];
+      return rows.map(r => ({
+        id: r.id,
+        cycleDids: JSON.parse(r.cycle_dids_json || '[]'),
+        totalVolumeSov: Number(r.total_volume_sov),
+        txCount: Number(r.tx_count),
+        status: r.status,
+        detectedAt: r.detected_at,
+      }));
+    } catch (_) {
+      return [];
+    }
   }
 
   public close(): void {

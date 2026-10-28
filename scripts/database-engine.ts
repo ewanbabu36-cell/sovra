@@ -15914,21 +15914,25 @@ export class SovraDatabaseEngine {
     const escrowsTotal = Math.round((sponsoredEscrowSov + promotionsUnspentSov) * 1000) / 1000;
     const totalSystemSov = Math.round((userBalancesSov + escrowsTotal + treasuryReserveSov + unsettledReferralsSov) * 1000) / 1000;
     
-    // Double-entry invariant verification:
-    // Total System SOV matches liabilities + reserves with zero unaccounted leakage (0.00 SOV delta)
-    const theoreticalSystemBalance = totalSystemSov;
-    const solvencyDeltaSov = Math.round((totalSystemSov - theoreticalSystemBalance) * 1000) / 1000;
+    // True 4-Column Double-entry invariant verification (Phase 2):
+    // Total Injected Capital (Genesis Minted / On-ramp Deposits) vs Liabilities + Reserves
+    const totalInjectedSov = this.sqliteEngine
+      ? this.sqliteEngine.getRevenueSetting('total_genesis_minted_sov', 5000000.0).valueNum
+      : 5000000.0;
+    const totalLiabilitiesAndReserves = Math.round((userBalancesSov + escrowsTotal + treasuryReserveSov + unsettledReferralsSov) * 1000) / 1000;
+    const solvencyDeltaSov = Math.round((totalInjectedSov - totalLiabilitiesAndReserves) * 1000) / 1000;
+    const isSolvent = Math.abs(solvencyDeltaSov) < 0.001 || solvencyDeltaSov >= 0;
 
     const auditTimestamp = Date.now();
     const verificationHash = crypto.createHash('sha256')
-      .update(`SOLVENCY|${totalSystemSov}|${userBalancesSov}|${escrowsTotal}|${treasuryReserveSov}|${auditTimestamp}`)
+      .update(`SOLVENCY_V2|${totalInjectedSov}|${userBalancesSov}|${escrowsTotal}|${treasuryReserveSov}|${solvencyDeltaSov}|${auditTimestamp}`)
       .digest('hex');
 
     return {
       ok: true,
       solvencyDeltaSov,
-      isSolvent: Math.abs(solvencyDeltaSov) < 0.001,
-      healthStatus: Math.abs(solvencyDeltaSov) < 0.001 ? 'HEALTHY' : 'DISCREPANCY',
+      isSolvent,
+      healthStatus: isSolvent ? 'HEALTHY' : 'DISCREPANCY',
       totalSystemSov,
       breakdown: {
         userBalancesSov: Math.round(userBalancesSov * 1000) / 1000,
