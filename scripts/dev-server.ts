@@ -10071,10 +10071,9 @@ function renderHtml(
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 4.25rem 1.25rem 130px 1.25rem;
+      padding: 3.5rem 0 0 0;
       box-sizing: border-box;
-      overflow-y: auto;
-      overflow-x: hidden;
+      overflow: hidden;
       user-select: none;
       animation: sovraHomeFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }
@@ -10265,6 +10264,124 @@ function renderHtml(
       background: rgba(56, 189, 248, 0.3);
     }
 
+    /* Android 18 Multi-Page Workspace Container & Track */
+    .sovra-multi-page-container {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+      touch-action: pan-y;
+      display: flex;
+    }
+    .sovra-multi-page-track {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sovra-workspace-page {
+      flex: 0 0 100%;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0 16px 140px 16px;
+      scrollbar-width: none;
+    }
+    .sovra-workspace-page::-webkit-scrollbar {
+      display: none;
+    }
+    .workspace-page-header {
+      margin-top: 1.8rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    .workspace-page-title {
+      font-size: 0.84rem;
+      font-weight: 800;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 5px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: inline-block;
+    }
+    body.theme-normal .workspace-page-title {
+      color: #475569 !important;
+      background: rgba(0, 0, 0, 0.05) !important;
+      border-color: rgba(0, 0, 0, 0.08) !important;
+    }
+
+    /* Dynamic Pagination Dot Indicator */
+    .sovra-page-dots-indicator {
+      position: fixed;
+      bottom: 122px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 100;
+      pointer-events: auto;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: rgba(10, 14, 26, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    }
+    body.theme-normal .sovra-page-dots-indicator {
+      background: rgba(255, 255, 255, 0.85) !important;
+      border-color: #cbd5e1 !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+    }
+    .sovra-page-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.35);
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sovra-page-dot:hover {
+      background: rgba(255, 255, 255, 0.6);
+      transform: scale(1.2);
+    }
+    .sovra-page-dot.active {
+      width: 22px;
+      border-radius: 999px;
+      background: #38bdf8;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
+    }
+    body.theme-normal .sovra-page-dot {
+      background: rgba(15, 23, 42, 0.25) !important;
+    }
+    body.theme-normal .sovra-page-dot.active {
+      background: #0284c7 !important;
+      box-shadow: 0 0 10px rgba(2, 132, 199, 0.45) !important;
+    }
+
+    /* Spatial Drag-and-Drop & Tile Lift Styles */
+    .sovra-home-tile-wrap.is-dragging {
+      opacity: 0.35;
+      transform: scale(0.9);
+    }
+    .sovra-home-tile-wrap.is-drag-over .sovra-app-tile {
+      outline: 2px dashed #38bdf8;
+      outline-offset: 4px;
+      transform: scale(1.1);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+    }
+
     /* Android Home Screen App Grid (Symmetrical 4-Column Layout) */
     .sovra-home-app-grid {
       display: grid;
@@ -10274,6 +10391,9 @@ function renderHtml(
       width: 100%;
       max-width: 480px;
       margin: 0 auto 2.2rem auto;
+    }
+    .sovra-home-app-grid.full-grid {
+      margin-top: 1rem;
     }
     @media (min-width: 640px) {
       .sovra-home-app-grid {
@@ -18356,30 +18476,66 @@ function renderHtml(
     </div>
   </header>
 
-  <!-- 📱 SOVRA ANDROID OS: DEDICATED HOME SCREEN / DESKTOP LAUNCHER -->
+  <!-- 📱 SOVRA ANDROID 18 OS: MULTI-PAGE DESKTOP CANVAS -->
   <div id="sovraHomeScreenView" class="sovra-home-screen-view" oncontextmenu="window.SovraAndroidOS.handleHomeContextMenu(event)">
-    <!-- Android Glance Header Widget -->
-    <div class="android-glance-widget">
-      <div id="androidGlanceClock" class="android-glance-clock">12:00</div>
-      <div id="androidGlanceDate" class="android-glance-date">Monday, January 1</div>
-      <div id="androidGlanceStatusPill" class="android-glance-status-pill" onclick="window.SovraAndroidOS.openApp('wallet')" title="View Sovereign Balance &amp; Mesh Health">
-        <span class="glance-status-dot"></span>
-        <span id="androidGlancePeerCount">0 Peers</span>
-        <span style="opacity: 0.4;">|</span>
-        <span id="androidGlanceBalance">0.00 SOV</span>
+    <div id="sovraMultiPageContainer" class="sovra-multi-page-container">
+      <div id="sovraMultiPageTrack" class="sovra-multi-page-track">
+
+        <!-- Workspace Page 0: Daily Hub (Glance Widget, Search, Primary 8 Apps) -->
+        <div id="sovraWorkspacePage_0" class="sovra-workspace-page active" data-page-index="0">
+          <!-- Android Glance Header Widget -->
+          <div class="android-glance-widget">
+            <div id="androidGlanceClock" class="android-glance-clock">12:00</div>
+            <div id="androidGlanceDate" class="android-glance-date">Monday, January 1</div>
+            <div id="androidGlanceStatusPill" class="android-glance-status-pill" onclick="window.SovraAndroidOS.openApp('wallet')" title="View Sovereign Balance &amp; Mesh Health">
+              <span class="glance-status-dot"></span>
+              <span id="androidGlancePeerCount">0 Peers</span>
+              <span style="opacity: 0.4;">|</span>
+              <span id="androidGlanceBalance">0.00 SOV</span>
+            </div>
+          </div>
+
+          <!-- Android Quick Search Pill -->
+          <div class="android-search-pill" onclick="window.SovraAndroidOS.focusDrawerSearch()">
+            <span class="android-search-icon">🔍</span>
+            <span class="android-search-placeholder">Search apps, peers, or tools...</span>
+            <span class="android-search-mic" onclick="event.stopPropagation(); window.SovraAndroidOS.openAppDrawer()" title="All Apps">✨</span>
+          </div>
+
+          <!-- Primary Home Screen App Grid -->
+          <div id="sovraHomeAppGrid" class="sovra-home-app-grid">
+            <!-- Dynamically populated by SovraAndroidOS.renderHomeScreen() -->
+          </div>
+        </div>
+
+        <!-- Workspace Page 1: Creator, Media & Social DApps -->
+        <div id="sovraWorkspacePage_1" class="sovra-workspace-page" data-page-index="1">
+          <div class="workspace-page-header">
+            <span class="workspace-page-title">🎬 Creator &amp; Media Studio</span>
+          </div>
+          <div id="sovraHomeAppGrid_1" class="sovra-home-app-grid full-grid">
+            <!-- Dynamically populated by SovraAndroidOS.renderHomeScreen() -->
+          </div>
+        </div>
+
+        <!-- Workspace Page 2: DePIN, Security & Utilities -->
+        <div id="sovraWorkspacePage_2" class="sovra-workspace-page" data-page-index="2">
+          <div class="workspace-page-header">
+            <span class="workspace-page-title">🛡️ DePIN, Security &amp; Web3</span>
+          </div>
+          <div id="sovraHomeAppGrid_2" class="sovra-home-app-grid full-grid">
+            <!-- Dynamically populated by SovraAndroidOS.renderHomeScreen() -->
+          </div>
+        </div>
+
       </div>
     </div>
 
-    <!-- Android Quick Search Pill -->
-    <div class="android-search-pill" onclick="window.SovraAndroidOS.focusDrawerSearch()">
-      <span class="android-search-icon">🔍</span>
-      <span class="android-search-placeholder">Search apps, peers, or tools...</span>
-      <span class="android-search-mic" onclick="event.stopPropagation(); window.SovraAndroidOS.openAppDrawer()" title="All Apps">✨</span>
-    </div>
-
-    <!-- Home Screen App Grid (User-Pinned Apps) -->
-    <div id="sovraHomeAppGrid" class="sovra-home-app-grid">
-      <!-- Dynamically populated by SovraAndroidOS.renderHomeScreen() -->
+    <!-- Dynamic Pagination Dot Indicator (Fixed above floating dock) -->
+    <div id="sovraPageDotsIndicator" class="sovra-page-dots-indicator" aria-label="Desktop Workspace Pages">
+      <button type="button" class="sovra-page-dot active" data-page="0" onclick="window.SovraAndroidOS.goToPage(0)" title="Page 1: Daily Hub" aria-label="Page 1: Daily Hub"></button>
+      <button type="button" class="sovra-page-dot" data-page="1" onclick="window.SovraAndroidOS.goToPage(1)" title="Page 2: Creator &amp; Media" aria-label="Page 2: Creator &amp; Media"></button>
+      <button type="button" class="sovra-page-dot" data-page="2" onclick="window.SovraAndroidOS.goToPage(2)" title="Page 3: DePIN &amp; Utilities" aria-label="Page 3: DePIN &amp; Utilities"></button>
     </div>
 
     <!-- Quick Hint Bar -->
@@ -82451,8 +82607,22 @@ function renderHtml(
       // 2. Storage Keys & Defaults
       const WALLPAPER_KEY = 'sovra_os_wallpaper_v1';
       const HOME_APPS_KEY = 'sovra_os_home_apps_v1';
+      const MULTIPAGE_KEY = 'sovra_os_multipage_v1';
       const OS_MODE_KEY = 'sovra_os_mode_v1';
       const ACTIVE_TASKS_KEY = 'sovra_os_active_tasks_v1';
+
+      const DEFAULT_PAGES = [
+        ['reels', 'watch', 'studio', 'live', 'profile', 'hub', 'qr_scan', 'id_card'],
+        ['dapps', 'upload', 'bridge', 'key_vault', 'mesh_node', 'ghost_mode', 'backup', 'admin'],
+        ['settings']
+      ];
+
+      let workspacePages = [
+        ['reels', 'watch', 'studio', 'live', 'profile', 'hub', 'qr_scan', 'id_card'],
+        ['dapps', 'upload', 'bridge', 'key_vault', 'mesh_node', 'ghost_mode', 'backup', 'admin'],
+        ['settings']
+      ];
+      let currentPage = 0;
 
       let wallpaperConfig = {
         id: 'nebula',
@@ -82468,6 +82638,20 @@ function renderHtml(
       let activeAppId = null;
       let previousAppId = 'home';
       let isEditMode = false;
+      let draggedApp = null;
+      let edgeScrollTimer = null;
+
+      function syncHomeAppsFromPages() {
+        const flat = [];
+        ['feed', 'chat', 'wallet'].forEach(a => { if (!flat.includes(a)) flat.push(a); });
+        workspacePages.forEach(p => {
+          if (Array.isArray(p)) {
+            p.forEach(a => { if (!flat.includes(a)) flat.push(a); });
+          }
+        });
+        homeScreenApps = flat;
+        return homeScreenApps;
+      }
 
       // 3. State Loaders & Persisters
       function loadOSState() {
@@ -82480,12 +82664,27 @@ function renderHtml(
         } catch (_) {}
 
         try {
-          const rawApps = localStorage.getItem(HOME_APPS_KEY);
-          if (rawApps) {
-            const parsed = JSON.parse(rawApps);
-            if (Array.isArray(parsed) && parsed.length > 0) homeScreenApps = parsed;
+          const rawMulti = localStorage.getItem(MULTIPAGE_KEY);
+          if (rawMulti) {
+            const parsed = JSON.parse(rawMulti);
+            if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
+              workspacePages = parsed;
+            }
+          } else {
+            const rawApps = localStorage.getItem(HOME_APPS_KEY);
+            if (rawApps) {
+              const parsed = JSON.parse(rawApps);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                const nonDock = parsed.filter(a => a !== 'feed' && a !== 'chat' && a !== 'wallet');
+                workspacePages[0] = nonDock.slice(0, 8);
+                if (nonDock.length > 8) workspacePages[1] = nonDock.slice(8, 16);
+                if (nonDock.length > 16) workspacePages[2] = nonDock.slice(16);
+              }
+            }
           }
         } catch (_) {}
+
+        syncHomeAppsFromPages();
 
         try {
           const rawMode = localStorage.getItem(OS_MODE_KEY);
@@ -82509,10 +82708,16 @@ function renderHtml(
         } catch (_) {}
       }
 
-      function saveHomeApps() {
+      function saveMultiPageState() {
+        syncHomeAppsFromPages();
         try {
+          localStorage.setItem(MULTIPAGE_KEY, JSON.stringify(workspacePages));
           localStorage.setItem(HOME_APPS_KEY, JSON.stringify(homeScreenApps));
         } catch (_) {}
+      }
+
+      function saveHomeApps() {
+        saveMultiPageState();
       }
 
       function saveOSMode() {
@@ -82887,8 +83092,10 @@ function renderHtml(
         }
       }
 
-      // 6. Home Screen App Pinning / Unpinning
+      // 6. Home Screen App Pinning / Unpinning across Multi-Page Canvas
       function pinToHome(appId) {
+        if (!appId) return;
+        syncHomeAppsFromPages();
         if (homeScreenApps.includes(appId)) {
           if (typeof showAccountToast === 'function') showAccountToast('App already on Home Screen');
           return;
@@ -82897,9 +83104,18 @@ function renderHtml(
           if (typeof showAccountToast === 'function') showAccountToast('Home Screen is full (max 24)');
           return;
         }
-        homeScreenApps.push(appId);
-        saveHomeApps();
+
+        let targetPage = currentPage;
+        if (!workspacePages[targetPage]) workspacePages[targetPage] = [];
+        if (workspacePages[targetPage].length >= 16) {
+          const available = workspacePages.findIndex(p => p.length < 16);
+          targetPage = available !== -1 ? available : (workspacePages.length - 1);
+        }
+
+        workspacePages[targetPage].push(appId);
+        saveMultiPageState();
         renderHomeScreen();
+
         if (typeof showAccountToast === 'function') {
           const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
           showAccountToast('Added ' + (feat ? feat.name : appId) + ' to Home Screen');
@@ -82907,10 +83123,17 @@ function renderHtml(
       }
 
       function removeFromHome(appId) {
-        const idx = homeScreenApps.indexOf(appId);
-        if (idx !== -1) {
-          homeScreenApps.splice(idx, 1);
-          saveHomeApps();
+        let removed = false;
+        for (let p = 0; p < workspacePages.length; p++) {
+          const idx = workspacePages[p].indexOf(appId);
+          if (idx !== -1) {
+            workspacePages[p].splice(idx, 1);
+            removed = true;
+            break;
+          }
+        }
+        if (removed) {
+          saveMultiPageState();
           renderHomeScreen();
           if (typeof showAccountToast === 'function') {
             const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
@@ -82953,7 +83176,164 @@ function renderHtml(
         renderHomeScreen();
       }
 
-      // 8. Render Home Screen Grid & Glance Widget
+      // 8. Multi-Page Navigation & Pagination Controls
+      function goToPage(pageIdx) {
+        const total = workspacePages.length || 3;
+        let clamped = parseInt(pageIdx, 10);
+        if (isNaN(clamped) || clamped < 0) clamped = 0;
+        if (clamped >= total) clamped = total - 1;
+        currentPage = clamped;
+
+        const track = document.getElementById('sovraMultiPageTrack');
+        if (track) {
+          track.style.transform = 'translateX(-' + (currentPage * 100) + '%)';
+        }
+
+        const dots = document.querySelectorAll('.sovra-page-dot');
+        if (dots && dots.length) {
+          dots.forEach((dot, idx) => {
+            const p = parseInt(dot.getAttribute('data-page') || String(idx), 10);
+            if (p === currentPage) {
+              dot.classList.add('active');
+            } else {
+              dot.classList.remove('active');
+            }
+          });
+        }
+
+        for (let p = 0; p < total; p++) {
+          const pageEl = document.getElementById('sovraWorkspacePage_' + p);
+          if (pageEl) {
+            if (p === currentPage) pageEl.classList.add('active');
+            else pageEl.classList.remove('active');
+          }
+        }
+      }
+
+      function nextPage() {
+        if (currentPage < workspacePages.length - 1) {
+          goToPage(currentPage + 1);
+        }
+      }
+
+      function prevPage() {
+        if (currentPage > 0) {
+          goToPage(currentPage - 1);
+        }
+      }
+
+      // 9. Spatial Drag-and-Drop & Screen Edge Auto-Transition
+      function clearEdgeScroll() {
+        if (edgeScrollTimer) {
+          clearTimeout(edgeScrollTimer);
+          edgeScrollTimer = null;
+        }
+      }
+
+      function handleDragOverEdge(clientX) {
+        const edgeThreshold = 38;
+        if (clientX < edgeThreshold) {
+          if (!edgeScrollTimer && currentPage > 0) {
+            edgeScrollTimer = setTimeout(() => {
+              prevPage();
+              clearEdgeScroll();
+            }, 450);
+          }
+        } else if (clientX > window.innerWidth - edgeThreshold) {
+          if (!edgeScrollTimer && currentPage < workspacePages.length - 1) {
+            edgeScrollTimer = setTimeout(() => {
+              nextPage();
+              clearEdgeScroll();
+            }, 450);
+          }
+        } else {
+          clearEdgeScroll();
+        }
+      }
+
+      function swapApps(fromPage, fromSlot, toPage, toSlot) {
+        if (!workspacePages[fromPage] || !workspacePages[toPage]) return;
+        const sourceApp = workspacePages[fromPage][fromSlot];
+        if (!sourceApp) return;
+
+        if (fromPage === toPage) {
+          const targetApp = workspacePages[toPage][toSlot];
+          if (targetApp) {
+            workspacePages[fromPage][fromSlot] = targetApp;
+            workspacePages[toPage][toSlot] = sourceApp;
+          } else {
+            workspacePages[fromPage].splice(fromSlot, 1);
+            workspacePages[toPage].splice(toSlot, 0, sourceApp);
+          }
+        } else {
+          const targetApp = workspacePages[toPage][toSlot];
+          if (targetApp) {
+            workspacePages[fromPage][fromSlot] = targetApp;
+            workspacePages[toPage][toSlot] = sourceApp;
+          } else {
+            workspacePages[fromPage].splice(fromSlot, 1);
+            workspacePages[toPage].push(sourceApp);
+          }
+        }
+
+        saveMultiPageState();
+        renderHomeScreen();
+        if (navigator.vibrate) navigator.vibrate(18);
+        if (typeof showAccountToast === 'function') {
+          const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(sourceApp) : null;
+          showAccountToast('Rearranged ' + (feat ? feat.name : sourceApp));
+        }
+      }
+
+      // Desktop Keyboard Page Navigation (ArrowRight / ArrowLeft)
+      document.addEventListener('keydown', (e) => {
+        if (currentMode !== 'home') return;
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        if (e.key === 'ArrowRight') {
+          nextPage();
+        } else if (e.key === 'ArrowLeft') {
+          prevPage();
+        }
+      });
+
+      // Touch Swipe Physics with Momentum & Threshold
+      function initTouchSwipe() {
+        const container = document.getElementById('sovraMultiPageContainer');
+        if (!container || typeof container.addEventListener !== 'function') return;
+        let startX = 0;
+        let startY = 0;
+        let isTouching = false;
+
+        container.addEventListener('touchstart', (e) => {
+          if (isEditMode) return;
+          if (!e.touches || e.touches.length !== 1) return;
+          startX = e.touches[0].clientX;
+          startY = e.touches[0].clientY;
+          isTouching = true;
+        }, { passive: true });
+
+        container.addEventListener('touchmove', (e) => {
+          if (!isTouching || isEditMode) return;
+        }, { passive: true });
+
+        container.addEventListener('touchend', (e) => {
+          if (!isTouching || isEditMode) return;
+          isTouching = false;
+          if (!e.changedTouches || e.changedTouches.length !== 1) return;
+          const diffX = e.changedTouches[0].clientX - startX;
+          const diffY = e.changedTouches[0].clientY - startY;
+          if (Math.abs(diffX) > 42 && Math.abs(diffX) > Math.abs(diffY)) {
+            if (diffX < 0) {
+              nextPage();
+            } else {
+              prevPage();
+            }
+          }
+        }, { passive: true });
+      }
+
+      // 10. Render Multi-Page Desktop Grids & Glance Telemetry
       function renderHomeScreen() {
         const now = new Date();
         const clockEl = document.getElementById('androidGlanceClock');
@@ -82983,89 +83363,137 @@ function renderHtml(
           balanceEl.textContent = Number(bal).toFixed(2) + ' SOV';
         }
 
-        const grid = document.getElementById('sovraHomeAppGrid');
-        if (!grid) return;
-        grid.innerHTML = '';
+        // Render each workspace page grid
+        for (let p = 0; p < 3; p++) {
+          const gridId = p === 0 ? 'sovraHomeAppGrid' : ('sovraHomeAppGrid_' + p);
+          const grid = document.getElementById(gridId);
+          if (!grid) continue;
+          grid.innerHTML = '';
 
-        homeScreenApps.forEach(appId => {
-          const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
-          if (!feat) return;
+          const pageApps = workspacePages[p] || [];
+          pageApps.forEach((appId, slotIdx) => {
+            const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+            if (!feat) return;
 
-          const wrap = document.createElement('div');
-          wrap.className = 'sovra-home-tile-wrap' + (isEditMode ? ' is-editing' : '');
+            const wrap = document.createElement('div');
+            wrap.className = 'sovra-home-tile-wrap' + (isEditMode ? ' is-editing' : '');
+            wrap.setAttribute('draggable', 'true');
+            wrap.setAttribute('data-page-index', String(p));
+            wrap.setAttribute('data-slot-index', String(slotIdx));
+            wrap.setAttribute('data-app-id', appId);
 
-          const tile = document.createElement('div');
-          tile.className = 'sovra-app-tile';
-          tile.setAttribute('data-feature-id', appId);
-          tile.setAttribute('title', feat.name + ' - ' + feat.desc);
-          tile.setAttribute('role', 'button');
-          tile.setAttribute('tabindex', '0');
-
-          const theme = (window.SOVRA_FEATURE_THEMES && window.SOVRA_FEATURE_THEMES[appId]) || { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(0,0,0,0.4)' };
-          tile.style.background = theme.gradient;
-          tile.style.boxShadow = '0 10px 24px -4px ' + theme.shadow + ', inset 0 1px 1px 0 rgba(255, 255, 255, 0.45)';
-          tile.style.border = '1px solid rgba(255, 255, 255, 0.22)';
-
-          if (isEditMode) {
-            const unpinBtn = document.createElement('button');
-            unpinBtn.type = 'button';
-            unpinBtn.className = 'sovra-tile-unpin-btn';
-            unpinBtn.style.display = 'flex';
-            unpinBtn.innerHTML = '&times;';
-            unpinBtn.title = 'Remove from Home Screen';
-            unpinBtn.onclick = (e) => {
-              e.stopPropagation();
-              removeFromHome(appId);
+            // Drag-and-drop spatial events
+            wrap.ondragstart = (e) => {
+              draggedApp = { page: p, slot: slotIdx, appId: appId };
+              wrap.classList.add('is-dragging');
+              if (e.dataTransfer) {
+                e.dataTransfer.setData('text/plain', JSON.stringify(draggedApp));
+                e.dataTransfer.effectAllowed = 'move';
+              }
             };
-            tile.appendChild(unpinBtn);
-          }
+            wrap.ondragover = (e) => {
+              e.preventDefault();
+              wrap.classList.add('is-drag-over');
+              handleDragOverEdge(e.clientX);
+            };
+            wrap.ondragleave = () => {
+              wrap.classList.remove('is-drag-over');
+              clearEdgeScroll();
+            };
+            wrap.ondrop = (e) => {
+              e.preventDefault();
+              wrap.classList.remove('is-drag-over');
+              clearEdgeScroll();
+              if (draggedApp) {
+                swapApps(draggedApp.page, draggedApp.slot, p, slotIdx);
+                draggedApp = null;
+              }
+            };
+            wrap.ondragend = () => {
+              wrap.classList.remove('is-dragging');
+              clearEdgeScroll();
+              draggedApp = null;
+              const overEls = document.querySelectorAll('.sovra-home-tile-wrap.is-drag-over');
+              if (overEls && overEls.length) {
+                overEls.forEach(el => el.classList.remove('is-drag-over'));
+              }
+            };
 
-          if (feat.badge) {
-            const badgeSpan = document.createElement('span');
-            badgeSpan.className = 'sovra-micro-badge sovra-micro-badge-' + feat.badge;
-            badgeSpan.id = 'homeBadge_' + feat.id;
-            tile.appendChild(badgeSpan);
-          }
+            const tile = document.createElement('div');
+            tile.className = 'sovra-app-tile';
+            tile.setAttribute('data-feature-id', appId);
+            tile.setAttribute('title', feat.name + ' - ' + feat.desc);
+            tile.setAttribute('role', 'button');
+            tile.setAttribute('tabindex', '0');
 
-          const iconSpan = document.createElement('span');
-          iconSpan.className = 'sovra-app-tile-icon';
-          iconSpan.style.fontSize = '1.65rem';
-          iconSpan.textContent = feat.icon;
-          tile.appendChild(iconSpan);
+            const theme = (window.SOVRA_FEATURE_THEMES && window.SOVRA_FEATURE_THEMES[appId]) || { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(0,0,0,0.4)' };
+            tile.style.background = theme.gradient;
+            tile.style.boxShadow = '0 10px 24px -4px ' + theme.shadow + ', inset 0 1px 1px 0 rgba(255, 255, 255, 0.45)';
+            tile.style.border = '1px solid rgba(255, 255, 255, 0.22)';
 
-          tile.onclick = () => {
-            if (isEditMode) return;
-            openApp(appId);
-          };
+            if (isEditMode) {
+              const unpinBtn = document.createElement('button');
+              unpinBtn.type = 'button';
+              unpinBtn.className = 'sovra-tile-unpin-btn';
+              unpinBtn.style.display = 'flex';
+              unpinBtn.innerHTML = '&times;';
+              unpinBtn.title = 'Remove from Home Screen';
+              unpinBtn.onclick = (e) => {
+                e.stopPropagation();
+                removeFromHome(appId);
+              };
+              tile.appendChild(unpinBtn);
+            }
 
-          tile.oncontextmenu = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (navigator.vibrate) navigator.vibrate(20);
-            toggleEditMode();
-          };
+            if (feat.badge) {
+              const badgeSpan = document.createElement('span');
+              badgeSpan.className = 'sovra-micro-badge sovra-micro-badge-' + feat.badge;
+              badgeSpan.id = 'homeBadge_' + feat.id;
+              tile.appendChild(badgeSpan);
+            }
 
-          let timer = null;
-          tile.ontouchstart = () => {
-            timer = setTimeout(() => {
-              if (navigator.vibrate) navigator.vibrate(25);
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'sovra-app-tile-icon';
+            iconSpan.style.fontSize = '1.65rem';
+            iconSpan.textContent = feat.icon;
+            tile.appendChild(iconSpan);
+
+            tile.onclick = () => {
+              if (isEditMode) return;
+              openApp(appId);
+            };
+
+            tile.oncontextmenu = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (navigator.vibrate) navigator.vibrate(20);
               toggleEditMode();
-            }, 450);
-          };
-          tile.ontouchend = () => { if (timer) clearTimeout(timer); };
-          tile.ontouchmove = () => { if (timer) clearTimeout(timer); };
+            };
 
-          wrap.appendChild(tile);
+            let timer = null;
+            tile.ontouchstart = () => {
+              timer = setTimeout(() => {
+                if (navigator.vibrate) navigator.vibrate(25);
+                toggleEditMode();
+              }, 450);
+            };
+            tile.ontouchend = () => { if (timer) clearTimeout(timer); };
+            tile.ontouchmove = () => { if (timer) clearTimeout(timer); };
 
-          const labelSpan = document.createElement('span');
-          labelSpan.className = 'sovra-app-tile-label';
-          labelSpan.style.maxWidth = '72px';
-          labelSpan.style.fontSize = '0.72rem';
-          labelSpan.textContent = feat.name;
-          wrap.appendChild(labelSpan);
+            wrap.appendChild(tile);
 
-          grid.appendChild(wrap);
-        });
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'sovra-app-tile-label';
+            labelSpan.style.maxWidth = '72px';
+            labelSpan.style.fontSize = '0.72rem';
+            labelSpan.textContent = feat.name;
+            wrap.appendChild(labelSpan);
+
+            grid.appendChild(wrap);
+          });
+        }
+
+        goToPage(currentPage);
       }
 
       async function refreshTelemetry() {
@@ -83118,8 +83546,15 @@ function renderHtml(
         WALLPAPER_PRESETS,
         getMode: () => currentMode,
         getWallpaper: () => wallpaperConfig,
-        getHomeApps: () => homeScreenApps,
+        getHomeApps: () => syncHomeAppsFromPages(),
         getActiveTasks: () => activeTasks,
+        getCurrentPage: () => currentPage,
+        getWorkspacePages: () => workspacePages,
+        getPageApps: (p) => workspacePages[p] || [],
+        goToPage,
+        nextPage,
+        prevPage,
+        swapApps,
         goHome,
         openApp,
         goBack,
@@ -83157,6 +83592,7 @@ function renderHtml(
         applyWallpaper();
         syncOSModeVisuals();
         renderHomeScreen();
+        initTouchSwipe();
         refreshTelemetry();
       }
 
