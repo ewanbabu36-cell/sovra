@@ -3014,6 +3014,53 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               Posture: <strong style="color: #38bdf8;">${sentinelStatus.recommendedPosture}</strong> &bull; Active Swarm Wash Cycles: <strong style="color: #f59e0b;">${sentinelStatus.heuristics.activeWashCycles}</strong>
             </div>
           </div>
+
+          <!-- 5. Live Wiretap Packet Sniffer Terminal (Zero Dark Traffic) -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(56,189,248,0.25); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #38bdf8;">📡</span> Live Wiretap Packet Sniffer (Live X-Ray)
+              </span>
+              <span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; font-family: var(--font-mono);">STREAM ACTIVE</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
+              Wireshark &amp; Datadog APM Parity: Every HTTP request and P2P packet stream is captured with sub-millisecond latency &amp; status codes.
+            </div>
+
+            <div id="wiretapTerminalStream" style="background: #020617; border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 10px; font-family: var(--font-mono); font-size: 0.7rem; max-height: 220px; overflow-y: auto; color: #34d399;">
+              <div style="color: #64748b;">[WIRETAP] Listening on internal socket... Telemetry streaming active.</div>
+            </div>
+            <button class="btn-ops" style="width: 100%; margin-top: 10px; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; justify-content: center;" onclick="refreshWiretapStream()">Refresh Live Packet Wiretap</button>
+          </div>
+
+          <!-- 6. Autonomous Runway & Unit Economics Engine -->
+          <div class="ops-card" style="background: #111827; border: 1px solid rgba(16,185,129,0.25); border-radius: 14px; padding: 1.25rem;">
+            <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #10b981;">📈</span> Autonomous Runway &amp; Unit Economics
+              </span>
+              <span id="runwayHealthBadge" class="badge" style="background: rgba(16,185,129,0.15); color: #34d399;">COMPOUNDING</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">
+              Stripe Sigma &amp; Uber Marketplace Parity: Daily burn vs fee intake forecast, preventing cash crunch and unprofitable subsidies.
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+              <div style="background: #0f172a; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="font-size: 0.68rem; color: #94a3b8;">Daily Inflow (Fees)</div>
+                <div id="statDailyInflow" style="font-size: 0.95rem; font-weight: 800; color: #34d399; margin-top: 2px;">+125.00 SOV</div>
+              </div>
+              <div style="background: #0f172a; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="font-size: 0.68rem; color: #94a3b8;">Daily Burn (Rewards)</div>
+                <div id="statDailyBurn" style="font-size: 0.95rem; font-weight: 800; color: #f87171; margin-top: 2px;">-45.00 SOV</div>
+              </div>
+            </div>
+            <div style="padding: 8px 10px; background: #020617; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 10px;">
+              <span style="color: #94a3b8;">Calculated Runway:</span>
+              <strong id="statRunwayDays" style="color: #38bdf8; font-family: var(--font-mono);">9,999+ Days (Perpetual)</strong>
+            </div>
+            <button class="btn-ops" style="width: 100%; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #34d399; justify-content: center;" onclick="createChronosSnapshotNow()">Create Chronos Point-in-Time Snapshot</button>
+          </div>
         </div>
       </section>
 

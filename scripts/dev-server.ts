@@ -80665,6 +80665,28 @@ async function startDevServer() {
     const hostHeader = req.headers.host || (isEncrypted ? `localhost:${HTTPS_PORT}` : `localhost:${HTTP_PORT}`);
     const url = new URL(req.url ?? '/', `${isEncrypted ? 'https' : 'http'}://${hostHeader}`);
 
+    // 📡 GOD-MODE WIRETAP HOOK (Zero Dark Traffic)
+    const reqStartTime = performance.now();
+    const origEnd = res.end;
+    res.end = function(chunk?: any, encoding?: any, callback?: any) {
+      const latencyMs = Math.round((performance.now() - reqStartTime) * 10) / 10;
+      if (!url.pathname.startsWith('/api/admin/wiretap') && !url.pathname.includes('/health')) {
+        const sqlite = sovraDb.getSqliteEngine();
+        if (sqlite) {
+          sqlite.recordWiretapRequest({
+            method: req.method || 'GET',
+            path: url.pathname,
+            status: res.statusCode || 200,
+            latencyMs,
+            ipAddress: req.socket.remoteAddress || '127.0.0.1',
+            userAgent: String(req.headers['user-agent'] || 'Unknown'),
+            bytes: typeof chunk === 'string' ? chunk.length : (chunk?.length || 0),
+          });
+        }
+      }
+      return (origEnd as any).apply(this, arguments);
+    };
+
     // ==========================================
     // 🍯 HONEYPOT CANARY TRAPS (CRAWLER & EXPLOIT NEUTRALIZER)
     // ==========================================
