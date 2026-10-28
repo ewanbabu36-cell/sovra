@@ -80665,6 +80665,43 @@ async function startDevServer() {
     const hostHeader = req.headers.host || (isEncrypted ? `localhost:${HTTPS_PORT}` : `localhost:${HTTP_PORT}`);
     const url = new URL(req.url ?? '/', `${isEncrypted ? 'https' : 'http'}://${hostHeader}`);
 
+    // ==========================================
+    // 🍯 HONEYPOT CANARY TRAPS (CRAWLER & EXPLOIT NEUTRALIZER)
+    // ==========================================
+    if (url.pathname === '/.env' || url.pathname === '/wp-admin' || url.pathname === '/api/internal/debug-keys' || url.pathname === '/admin/config.json') {
+      const clientIp = req.socket.remoteAddress || '127.0.0.1';
+      const userAgent = req.headers['user-agent'] || 'Unknown Crawler';
+      const sqlite = sovraDb.getSqliteEngine();
+      if (sqlite) {
+        sqlite.recordHoneypotIntrusion(url.pathname, clientIp, userAgent);
+      }
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Access Denied: Sovereign Honeypot Trap Sensor Engaged. Perimeter intrusion logged.' }));
+      return;
+    }
+
+    // ==========================================
+    // 🛑 NUCLEAR KILL-SWITCH GATEWAY (BLAST-RADIUS ISOLATION)
+    // ==========================================
+    const sqliteEngine = sovraDb.getSqliteEngine();
+    if (sqliteEngine) {
+      if (sqliteEngine.isKillSwitchActive('GLOBAL_LOCKDOWN_MODE') && !url.pathname.startsWith('/admin') && !url.pathname.startsWith('/api/admin')) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Sovereign Protocol is under emergency administrative lockdown. Standard consumer routing suspended.' }));
+        return;
+      }
+      if (sqliteEngine.isKillSwitchActive('GLOBAL_WITHDRAWALS_FROZEN') && url.pathname.includes('/withdraw')) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Withdrawals temporarily suspended by Admin Nuclear Circuit Breaker.' }));
+        return;
+      }
+      if (sqliteEngine.isKillSwitchActive('NEW_REGISTRATIONS_FROZEN') && url.pathname.includes('/register')) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'New registrations temporarily paused to prevent Sybil swarms.' }));
+        return;
+      }
+    }
+
     // Anti-Replay Nonce Validation for cryptographic assertions
     const nonceHeader = req.headers['x-sovra-nonce'];
     if (nonceHeader && typeof nonceHeader === 'string') {
