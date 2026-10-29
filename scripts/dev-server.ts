@@ -46829,6 +46829,21 @@ function renderHtml(
 
     // Tab switching for all modes + admin console + friends discovery
     function switchTab(tab) {
+      // Pre-flight Auth Guard for navigation links & tab switches
+      var isAuth = (typeof window.isUserAuthenticated === 'function')
+        ? window.isUserAuthenticated()
+        : (window.SovraAndroidOS && typeof window.SovraAndroidOS.isUserAuthenticated === 'function' ? window.SovraAndroidOS.isUserAuthenticated() : true);
+
+      if (!isAuth) {
+        window._pendingTargetAppId = tab;
+        if (typeof window.showAuthLandingModal === 'function') {
+          window.showAuthLandingModal('login');
+        } else if (typeof window.showAuthLandingGate === 'function') {
+          window.showAuthLandingGate(true);
+        }
+        return;
+      }
+
       if (tab === 'watch') tab = 'youtube';
       if (tab === 'home') tab = 'feed';
       if (tab === 'you') tab = 'me';
@@ -83135,7 +83150,7 @@ function renderHtml(
       }
 
       function handleTileClick(featureId) {
-        if (window.SovraAndroidOS && window.SovraAndroidOS.getMode() !== 'app') {
+        if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
           window.SovraAndroidOS.openApp(featureId);
           return;
         }
@@ -83687,11 +83702,23 @@ function renderHtml(
           if (window.myProfile.isGuest || !window.myProfile.sessionToken) return false;
           return true;
         }
-        var isLoggedOut = (typeof localStorage !== 'undefined') ? (localStorage.getItem('sovra_logged_out') === 'true') : false;
-        var isGuest = (typeof localStorage !== 'undefined') ? (localStorage.getItem('sovra_is_guest') === 'true') : false;
-        if (isLoggedOut || isGuest) return false;
+        if (typeof localStorage !== 'undefined') {
+          if (localStorage.getItem('sovra_logged_out') === 'true') return false;
+          if (localStorage.getItem('sovra_is_guest') === 'true') return false;
+          const token = localStorage.getItem('sovra_session_token');
+          const profile = localStorage.getItem('sovra_user_profile');
+          if (!token || !profile) {
+            if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
+              return false;
+            }
+            if (typeof window !== 'undefined' && window.location && window.location.href) {
+              return false;
+            }
+          }
+        }
         return true;
       }
+      window.isUserAuthenticated = isUserAuthenticated;
 
       function openApp(appId) {
         if (navigator.vibrate) navigator.vibrate(12);
@@ -83707,6 +83734,25 @@ function renderHtml(
           return;
         }
 
+        // If authenticated: enforce role-based workspace permissions as per user profile!
+        if (appId === 'admin') {
+          const p = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
+          const isAdminUser = Boolean(p && (
+            p.role === 'SUPER_ADMIN' ||
+            p.role === 'ADMIN' ||
+            p.role === 'OPERATOR' ||
+            p.role === 'SECURITY_ADMIN' ||
+            p.isAdmin === true ||
+            p.handle === '@laptop_host'
+          ));
+          if (!isAdminUser) {
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('🔒 Operations Console is reserved for Node Operators and Admins.');
+            }
+            return;
+          }
+        }
+
         previousAppId = currentMode === 'app' ? (activeAppId || 'home') : 'home';
         activeAppId = appId;
         currentMode = 'app';
@@ -83720,12 +83766,58 @@ function renderHtml(
           window.SovraModularGlassOS.closeDrawer();
         }
 
+        // Ensure private app view is hydrated with user's profile and displayed
+        if (typeof showAuthenticatedAppView === 'function') {
+          showAuthenticatedAppView();
+        }
+
         const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
         if (feat && typeof feat.action === 'function') {
           try { feat.action(); } catch (_) {}
         } else if (typeof switchTab === 'function') {
           switchTab(appId);
         }
+      }
+
+      // Global Navigation Link & Anchor Interceptor for Unauthenticated Visitors
+      if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        document.addEventListener('click', function(e) {
+          var target = e.target;
+          if (!target || typeof target.closest !== 'function') return;
+          var link = target.closest('a[href], [data-tab], [data-app-id], button[onclick*="switchTab"]');
+          if (!link) return;
+
+          var href = link.getAttribute('href');
+          if (href && (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:'))) {
+            return;
+          }
+
+          if (!isUserAuthenticated()) {
+            if (link.closest('#welcomeOnboardingModal') || link.id === 'headerPublicLoginBtn' || link.id === 'headerPublicRegisterBtn' || link.id === 'btnGuestRibbonSignIn') {
+              return;
+            }
+
+            var targetId = link.getAttribute('data-app-id') || link.getAttribute('data-tab');
+            if (!targetId && href && href.startsWith('#')) {
+              targetId = href.replace('#', '');
+            }
+            if (!targetId) {
+              var onclickAttr = link.getAttribute('onclick') || '';
+              var match = onclickAttr.match(/switchTab\(['"]([^'"]+)['"]\)/);
+              if (match) targetId = match[1];
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            window._pendingTargetAppId = targetId || 'feed';
+            if (typeof window.showAuthLandingModal === 'function') {
+              window.showAuthLandingModal('login');
+            } else if (typeof window.showAuthLandingGate === 'function') {
+              window.showAuthLandingGate(true);
+            }
+          }
+        }, true);
       }
 
       function goBack() {
