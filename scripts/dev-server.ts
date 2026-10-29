@@ -17626,7 +17626,8 @@ function renderHtml(
     .mobile-bottom-nav.app-hidden {
       display: none !important;
     }
-    html.sovra-unauthenticated #welcomeOnboardingModal {
+    html.sovra-unauthenticated #welcomeOnboardingModal:not(.modal-dismissed) {
+      display: flex !important;
       z-index: 999998;
     }
     html.sovra-unauthenticated .header-desktop-nav,
@@ -31868,15 +31869,32 @@ function renderHtml(
           token = localToken;
         }
       }
-      if (!token) {
-        if (typeof window.SOVRA_HOST_SESSION !== 'undefined' && window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) {
-          token = window.SOVRA_HOST_SESSION.token || '';
+      return token;
+    };
+
+    window.isUserAuthenticated = function() {
+      if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
+        return false;
+      }
+      if (typeof window !== 'undefined' && window.myProfile) {
+        if (window.myProfile.isGuest || !window.myProfile.sessionToken) return false;
+        return true;
+      }
+      if (typeof localStorage !== 'undefined') {
+        if (localStorage.getItem('sovra_logged_out') === 'true') return false;
+        if (localStorage.getItem('sovra_is_guest') === 'true') return false;
+        var token = localStorage.getItem('sovra_session_token');
+        var profile = localStorage.getItem('sovra_user_profile');
+        if (!token || !profile) {
+          if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
+            return false;
+          }
+          if (typeof window !== 'undefined' && window.location && window.location.href) {
+            return false;
+          }
         }
       }
-      if (token && (!localStorage.getItem('sovra_session_token') || localStorage.getItem('sovra_session_token') === 'undefined')) {
-        try { localStorage.setItem('sovra_session_token', token); } catch(e) {}
-      }
-      return token;
+      return true;
     };
 
     window.registerPeerOnLan = function(customProfile) {
@@ -32017,8 +32035,7 @@ function renderHtml(
           console.warn('[AuthenticatedFetch] 401 Unauthorized for endpoint:', input);
           const currentToken = localStorage.getItem('sovra_session_token');
           const canonicalToken = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : '';
-          const hostToken = (typeof window.SOVRA_HOST_SESSION !== 'undefined' && window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) ? window.SOVRA_HOST_SESSION.token : '';
-          const freshTok = (canonicalToken && canonicalToken !== currentToken) ? canonicalToken : (hostToken !== currentToken ? hostToken : '');
+          const freshTok = (canonicalToken && canonicalToken !== currentToken) ? canonicalToken : '';
           if (freshTok) {
             try {
               localStorage.setItem('sovra_session_token', freshTok);
@@ -32052,7 +32069,7 @@ function renderHtml(
     window.getAuthHeaders = function() {
       var token = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
       if (token === 'undefined' || token === 'null') token = '';
-      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : ((typeof window.SOVRA_HOST_SESSION !== 'undefined' && window.SOVRA_HOST_SESSION) ? window.SOVRA_HOST_SESSION.did : '');
+      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
       return {
         'Content-Type': 'application/json',
         'Authorization': token ? ('Bearer ' + token) : '',
@@ -42268,7 +42285,8 @@ function renderHtml(
       const wom = document.getElementById('welcomeOnboardingModal');
       if (wom) {
         wom.style.zIndex = '999998';
-        if (forceModal === true) {
+        if (forceModal !== false) {
+          wom.classList.remove('modal-dismissed');
           wom.style.display = 'flex';
           const s1 = document.getElementById('womStep1');
           const s2 = document.getElementById('womStep2');
@@ -42281,8 +42299,11 @@ function renderHtml(
           if (closeBtn) {
             closeBtn.style.display = 'flex';
           }
-          switchWomAuthTab('login');
+          if (typeof switchWomAuthTab === 'function') {
+            switchWomAuthTab('login');
+          }
         } else {
+          wom.classList.add('modal-dismissed');
           wom.style.display = 'none';
         }
       }
@@ -42290,6 +42311,11 @@ function renderHtml(
     window.showAuthLandingGate = showAuthLandingGate;
 
     function showAuthLandingModal(tab) {
+      const wom = document.getElementById('welcomeOnboardingModal');
+      if (wom) {
+        wom.classList.remove('modal-dismissed');
+        wom.style.display = 'flex';
+      }
       showAuthLandingGate(true);
       if (typeof switchWomAuthTab === 'function') {
         switchWomAuthTab(tab || 'login');
@@ -42304,7 +42330,10 @@ function renderHtml(
       const bottomNav = document.querySelector('.mobile-bottom-nav');
       if (bottomNav) bottomNav.classList.remove('app-hidden');
       const wom = document.getElementById('welcomeOnboardingModal');
-      if (wom) wom.style.display = 'none';
+      if (wom) {
+        wom.classList.add('modal-dismissed');
+        wom.style.display = 'none';
+      }
       updateUserDisplayInUI();
       if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
       if (typeof syncChatMessages === 'function') syncChatMessages();
@@ -42319,7 +42348,10 @@ function renderHtml(
 
     function closeOnboardingModal() {
       const wom = document.getElementById('welcomeOnboardingModal');
-      if (wom) wom.style.display = 'none';
+      if (wom) {
+        wom.classList.add('modal-dismissed');
+        wom.style.display = 'none';
+      }
       if (!myProfile || !myProfile.sessionToken || myProfile.isGuest) {
         if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
           window.SovraAndroidOS.goHome();
@@ -43015,7 +43047,7 @@ function renderHtml(
         myProfile = null;
         currentUserHandle = '@guest';
         updateUserDisplayInUI();
-        showAuthLandingGate(false);
+        showAuthLandingGate(true);
         if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
           window.SovraAndroidOS.goHome();
         }
@@ -43055,7 +43087,7 @@ function renderHtml(
               localStorage.removeItem('sovra_user_profile');
               localStorage.removeItem('sovra_session_token');
               updateUserDisplayInUI();
-              showAuthLandingGate(false);
+              showAuthLandingGate(true);
               if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
                 window.SovraAndroidOS.goHome();
               }
@@ -43073,13 +43105,13 @@ function renderHtml(
                   routeByRespectedProfileRole(myProfile.role);
                 }
               } catch(e) {
-                showAuthLandingGate(false);
+                showAuthLandingGate(true);
                 if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
                   window.SovraAndroidOS.goHome();
                 }
               }
             } else {
-              showAuthLandingGate(false);
+              showAuthLandingGate(true);
               if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
                 window.SovraAndroidOS.goHome();
               }
@@ -43087,7 +43119,7 @@ function renderHtml(
           });
       } else {
         updateUserDisplayInUI();
-        showAuthLandingGate();
+        showAuthLandingGate(true);
       }
 
       if (!isSovraAppInstalled()) {
@@ -46832,7 +46864,7 @@ function renderHtml(
       // Pre-flight Auth Guard for navigation links & tab switches
       var isAuth = (typeof window.isUserAuthenticated === 'function')
         ? window.isUserAuthenticated()
-        : (window.SovraAndroidOS && typeof window.SovraAndroidOS.isUserAuthenticated === 'function' ? window.SovraAndroidOS.isUserAuthenticated() : true);
+        : (window.SovraAndroidOS && typeof window.SovraAndroidOS.isUserAuthenticated === 'function' ? window.SovraAndroidOS.isUserAuthenticated() : false);
 
       if (!isAuth) {
         window._pendingTargetAppId = tab;
