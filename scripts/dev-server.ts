@@ -10092,20 +10092,22 @@ function renderHtml(
       display: none !important;
     }
     body.sovra-mode-app .sovra-android-nav-bar {
-      display: none !important;
+      display: flex !important;
+    }
+    body.sovra-mode-app .app-layout {
+      padding-bottom: 56px !important;
     }
     body.sovra-mode-home .app-layout {
       display: none !important;
     }
+    body.sovra-mode-home .sovra-android-nav-bar {
+      display: flex !important;
+    }
+    .mobile-bottom-nav {
+      display: none !important;
+    }
     body.sovra-mode-home .app-top-header {
-      background: rgba(10, 14, 26, 0.85) !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-      backdrop-filter: blur(20px) !important;
-      -webkit-backdrop-filter: blur(20px) !important;
-      padding: 10px 24px !important;
-      position: sticky !important;
-      top: 0 !important;
-      z-index: 100 !important;
+      display: none !important;
     }
     body.sovra-mode-home .header-brand-wrap {
       opacity: 0.95;
@@ -17421,7 +17423,7 @@ function renderHtml(
       display: none !important;
     }
     html.sovra-unauthenticated #welcomeOnboardingModal {
-      display: flex !important;
+      z-index: 999998;
     }
     html.sovra-unauthenticated .header-desktop-nav,
     html.sovra-unauthenticated .header-search-wrap,
@@ -18056,7 +18058,7 @@ function renderHtml(
     }
   </style>
 </head>
-<body class="nav-mode-auto theme-black sovra-mode-app" data-active-tab="feed">
+<body class="nav-mode-auto theme-black sovra-mode-home" data-active-tab="home">
   <!-- 🖼️ SOVRA ANDROID OS: DYNAMIC WALLPAPER CANVAS -->
   <div id="sovraWallpaperCanvas" class="sovra-wallpaper-canvas" aria-hidden="true">
     <div id="sovraWallpaperBackdrop" class="sovra-wallpaper-backdrop"></div>
@@ -29594,10 +29596,12 @@ function renderHtml(
   <nav id="sovraAndroidNavBar" class="sovra-android-nav-bar" aria-label="Android System Navigation">
     <button type="button" class="android-nav-btn" id="androidNavRecentsBtn" onclick="window.SovraAndroidOS.toggleRecents()" title="Open Apps (Multitasking Overview)" aria-label="Open Apps Overview">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="5" y="5" width="14" height="14" rx="3"></rect>
+        <line x1="6" y1="5" x2="6" y2="19"></line>
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="18" y1="5" x2="18" y2="19"></line>
       </svg>
     </button>
-    <button type="button" class="android-nav-btn" id="androidNavHomeBtn" onclick="window.SovraAndroidOS.goHome()" title="Home Screen" aria-label="Home Screen">
+    <button type="button" class="android-nav-btn" id="androidNavHomeBtn" onclick="if(window.SovraAndroidOS&amp;&amp;typeof window.SovraAndroidOS.handleHomeNavClick==='function')window.SovraAndroidOS.handleHomeNavClick();else if(window.SovraAndroidOS)window.SovraAndroidOS.goHome();" title="Home Screen / Apps Menu" aria-label="Home Screen / Apps Menu">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5">
         <circle cx="12" cy="12" r="8"></circle>
       </svg>
@@ -41968,7 +41972,7 @@ function renderHtml(
     }
     window.routeByRespectedProfileRole = routeByRespectedProfileRole;
 
-    function showAuthLandingGate() {
+    function showAuthLandingGate(forceModal) {
       try { document.documentElement.classList.add('sovra-unauthenticated'); } catch(e) {}
       const appLayout = document.querySelector('.app-layout');
       if (appLayout) appLayout.classList.add('app-hidden');
@@ -41978,25 +41982,29 @@ function renderHtml(
       const wom = document.getElementById('welcomeOnboardingModal');
       if (wom) {
         wom.style.zIndex = '999998';
-        wom.style.display = 'flex';
-        const s1 = document.getElementById('womStep1');
-        const s2 = document.getElementById('womStep2');
-        const s3 = document.getElementById('womStep3');
-        if (s1) s1.style.display = 'block';
-        if (s2) s2.style.display = 'none';
-        if (s3) s3.style.display = 'none';
+        if (forceModal === true) {
+          wom.style.display = 'flex';
+          const s1 = document.getElementById('womStep1');
+          const s2 = document.getElementById('womStep2');
+          const s3 = document.getElementById('womStep3');
+          if (s1) s1.style.display = 'block';
+          if (s2) s2.style.display = 'none';
+          if (s3) s3.style.display = 'none';
 
-        const closeBtn = document.getElementById('womCloseBtn');
-        if (closeBtn) {
-          closeBtn.style.display = (myProfile && myProfile.sessionToken && !myProfile.isGuest) ? 'flex' : 'none';
+          const closeBtn = document.getElementById('womCloseBtn');
+          if (closeBtn) {
+            closeBtn.style.display = 'flex';
+          }
+          switchWomAuthTab('login');
+        } else {
+          wom.style.display = 'none';
         }
-        switchWomAuthTab('login');
       }
     }
     window.showAuthLandingGate = showAuthLandingGate;
 
     function showAuthLandingModal(tab) {
-      showAuthLandingGate();
+      showAuthLandingGate(true);
       if (typeof switchWomAuthTab === 'function') {
         switchWomAuthTab(tab || 'login');
       }
@@ -42024,8 +42032,12 @@ function renderHtml(
     window.showAuthenticatedAppView = showAuthenticatedAppView;
 
     function closeOnboardingModal() {
+      const wom = document.getElementById('welcomeOnboardingModal');
+      if (wom) wom.style.display = 'none';
       if (!myProfile || !myProfile.sessionToken || myProfile.isGuest) {
-        showAuthLandingGate();
+        if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+          window.SovraAndroidOS.goHome();
+        }
         return;
       }
       showAuthenticatedAppView();
@@ -42225,7 +42237,15 @@ function renderHtml(
         if (typeof syncChatMessages === 'function') syncChatMessages();
         if (typeof renderChatContactsList === 'function') renderChatContactsList();
         showAuthenticatedAppView();
-        routeByRespectedProfileRole(myProfile.role);
+        if (window._pendingTargetAppId && window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+          const pendingApp = window._pendingTargetAppId;
+          window._pendingTargetAppId = null;
+          window.SovraAndroidOS.openApp(pendingApp);
+        } else if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+          window.SovraAndroidOS.goHome();
+        } else {
+          routeByRespectedProfileRole(myProfile.role);
+        }
         showAccountToast('🎉 Welcome back, ' + (myProfile.name || myProfile.handle) + '!');
       } catch (err) {
         if (errBox) {
@@ -42709,7 +42729,10 @@ function renderHtml(
         myProfile = null;
         currentUserHandle = '@guest';
         updateUserDisplayInUI();
-        showAuthLandingGate();
+        showAuthLandingGate(false);
+        if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+          window.SovraAndroidOS.goHome();
+        }
         return;
       }
 
@@ -42729,7 +42752,11 @@ function renderHtml(
                 localStorage.removeItem('sovra_logged_out');
               } catch(e) {}
               showAuthenticatedAppView();
-              routeByRespectedProfileRole(myProfile.role);
+              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+                window.SovraAndroidOS.goHome();
+              } else {
+                routeByRespectedProfileRole(myProfile.role);
+              }
               if (typeof fetchNotifications === 'function') fetchNotifications();
               if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
               if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
@@ -42742,7 +42769,10 @@ function renderHtml(
               localStorage.removeItem('sovra_user_profile');
               localStorage.removeItem('sovra_session_token');
               updateUserDisplayInUI();
-              showAuthLandingGate();
+              showAuthLandingGate(false);
+              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+                window.SovraAndroidOS.goHome();
+              }
             }
           })
           .catch(() => {
@@ -42751,12 +42781,22 @@ function renderHtml(
                 myProfile = JSON.parse(savedProfile);
                 currentUserHandle = myProfile.handle;
                 showAuthenticatedAppView();
-                routeByRespectedProfileRole(myProfile.role);
+                if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+                  window.SovraAndroidOS.goHome();
+                } else {
+                  routeByRespectedProfileRole(myProfile.role);
+                }
               } catch(e) {
-                showAuthLandingGate();
+                showAuthLandingGate(false);
+                if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+                  window.SovraAndroidOS.goHome();
+                }
               }
             } else {
-              showAuthLandingGate();
+              showAuthLandingGate(false);
+              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+                window.SovraAndroidOS.goHome();
+              }
             }
           });
       } else {
@@ -44613,7 +44653,15 @@ function renderHtml(
       lastChatSyncTimestamp = 0;
       activeContactDid = 'self';
       showAuthenticatedAppView();
-      switchTab('feed');
+      if (window._pendingTargetAppId && window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+        const pendingApp = window._pendingTargetAppId;
+        window._pendingTargetAppId = null;
+        window.SovraAndroidOS.openApp(pendingApp);
+      } else if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+        window.SovraAndroidOS.goHome();
+      } else {
+        switchTab('feed');
+      }
       if (typeof updateOnboardingChecklistUI === 'function') updateOnboardingChecklistUI();
       if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
       if (typeof syncChatMessages === 'function') syncChatMessages();
@@ -82885,7 +82933,7 @@ function renderHtml(
         customDataUrl: ''
       };
 
-      let homeScreenApps = ['feed', 'reels', 'watch', 'chat', 'wallet', 'studio', 'live', 'profile'];
+      let homeScreenApps = ['feed', 'reels', 'watch', 'chat', 'wallet', 'studio', 'live', 'profile', 'upload', 'settings', 'mesh_node'];
       let activeTasks = ['feed'];
       let currentMode = 'home';
       let activeAppId = null;
@@ -82923,17 +82971,6 @@ function renderHtml(
             if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
               workspacePages = parsed;
             }
-          } else {
-            const rawApps = localStorage.getItem(HOME_APPS_KEY);
-            if (rawApps) {
-              const parsed = JSON.parse(rawApps);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                const nonDock = parsed.filter(a => a !== 'feed' && a !== 'chat' && a !== 'wallet');
-                workspacePages[0] = nonDock.slice(0, 8);
-                if (nonDock.length > 8) workspacePages[1] = nonDock.slice(8, 16);
-                if (nonDock.length > 16) workspacePages[2] = nonDock.slice(16);
-              }
-            }
           }
         } catch (_) {}
 
@@ -82941,11 +82978,14 @@ function renderHtml(
 
         try {
           const rawMode = localStorage.getItem(OS_MODE_KEY);
-          if (rawMode === 'app' || rawMode === 'home') currentMode = rawMode;
-          if (typeof window !== 'undefined' && window.location && !sessionStorage.getItem('sovra_user_navigated')) {
-            currentMode = 'app';
+          if (rawMode === 'app' || rawMode === 'home') {
+            currentMode = rawMode;
+          } else {
+            currentMode = 'home';
           }
-        } catch (_) {}
+        } catch (_) {
+          currentMode = 'home';
+        }
       }
 
       function loadActiveTasks() {
@@ -83277,8 +83317,34 @@ function renderHtml(
         renderHomeScreen();
       }
 
+      function isUserAuthenticated() {
+        if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
+          return false;
+        }
+        if (typeof window !== 'undefined' && window.myProfile) {
+          if (window.myProfile.isGuest || !window.myProfile.sessionToken) return false;
+          return true;
+        }
+        var isLoggedOut = (typeof localStorage !== 'undefined') ? (localStorage.getItem('sovra_logged_out') === 'true') : false;
+        var isGuest = (typeof localStorage !== 'undefined') ? (localStorage.getItem('sovra_is_guest') === 'true') : false;
+        if (isLoggedOut || isGuest) return false;
+        return true;
+      }
+
       function openApp(appId) {
         if (navigator.vibrate) navigator.vibrate(12);
+
+        // Guard unauthenticated visitors: remember intended app and open Landing Gateway
+        if (!isUserAuthenticated()) {
+          window._pendingTargetAppId = appId;
+          if (typeof window.showAuthLandingModal === 'function') {
+            window.showAuthLandingModal('login');
+          } else if (typeof window.showAuthLandingGate === 'function') {
+            window.showAuthLandingGate(true);
+          }
+          return;
+        }
+
         previousAppId = currentMode === 'app' ? (activeAppId || 'home') : 'home';
         activeAppId = appId;
         currentMode = 'app';
@@ -83302,6 +83368,16 @@ function renderHtml(
 
       function goBack() {
         if (navigator.vibrate) navigator.vibrate(15);
+        // Priority 0: Auth Landing Modal is open -> close it
+        const wom = document.getElementById('welcomeOnboardingModal');
+        if (wom && (wom.style.display === 'flex' || wom.classList.contains('active'))) {
+          if (typeof window.closeOnboardingModal === 'function') {
+            window.closeOnboardingModal();
+          } else {
+            wom.style.display = 'none';
+          }
+          return;
+        }
         // Priority 1: Recents Overview is open -> close it
         const recents = document.getElementById('sovraRecentsOverview');
         if (recents && recents.style.display === 'flex') {
@@ -83322,11 +83398,16 @@ function renderHtml(
         }
         // Priority 3: Minimize active app and return to Home Screen
         if (currentMode === 'app') {
-          if (previousAppId && previousAppId !== activeAppId && previousAppId !== 'home') {
-            openApp(previousAppId);
-          } else {
-            goHome();
-          }
+          goHome();
+        }
+      }
+
+      function handleHomeNavClick() {
+        if (navigator.vibrate) navigator.vibrate(15);
+        if (currentMode === 'app') {
+          goHome();
+        } else {
+          openAppDrawer();
         }
       }
 
@@ -83814,6 +83895,8 @@ function renderHtml(
         goHome,
         openApp,
         goBack,
+        handleHomeNavClick,
+        isUserAuthenticated,
         openAppDrawer,
         openRecents,
         closeRecents,
