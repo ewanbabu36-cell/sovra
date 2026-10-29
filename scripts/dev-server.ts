@@ -10088,34 +10088,83 @@ function renderHtml(
       from { opacity: 0; transform: scale(0.98); }
       to { opacity: 1; transform: scale(1); }
     }
+    /* =========================================================================
+       PURE SMARTPHONE OS: TOTAL EXTERIOR SHELL PURGE & ENCAPSULATION
+       ========================================================================= */
+    body.sovra-mode-home .app-top-header,
+    body.sovra-mode-app .app-top-header,
+    .app-top-header,
+    .app-left-rail,
+    .app-right-rail,
+    #appStageFooter,
+    #guestModeRibbon,
+    .mobile-bottom-nav,
+    .fb-contacts-card,
+    #insecureContextNotice,
+    #feed-view #sovraHeroAnchorCard {
+      display: none !important;
+    }
+
+    body.sovra-mode-home .app-layout {
+      display: none !important;
+    }
+    body.sovra-mode-home .sovra-home-screen-view {
+      display: flex !important;
+    }
+    body.sovra-mode-home .sovra-android-nav-bar {
+      display: flex !important;
+    }
+    body.sovra-mode-home .sovra-native-app-bar {
+      display: none !important;
+    }
+
     body.sovra-mode-app .sovra-home-screen-view {
+      display: none !important;
+    }
+    body.sovra-mode-app .sovra-modular-glass-dock,
+    body.sovra-mode-app #sovraModularGlassDock,
+    body.sovra-mode-app #sovraFloatingDockPill {
       display: none !important;
     }
     body.sovra-mode-app .sovra-android-nav-bar {
       display: flex !important;
     }
+    body.sovra-mode-app .sovra-native-app-bar {
+      display: flex !important;
+    }
     body.sovra-mode-app .app-layout {
-      padding-bottom: 56px !important;
-    }
-    body.sovra-mode-home .app-layout {
-      display: none !important;
-    }
-    body.sovra-mode-home .sovra-android-nav-bar {
       display: flex !important;
+      flex-direction: column !important;
+      width: 100vw !important;
+      height: calc(100vh - 48px) !important;
+      max-width: 100vw !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      position: fixed !important;
+      inset: 0 !important;
+      bottom: 48px !important;
+      z-index: 20 !important;
+      background: #080c18 !important;
+      animation: sovraAppFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .mobile-bottom-nav {
-      display: none !important;
-    }
-    body.sovra-mode-home .app-top-header {
-      display: none !important;
-    }
-    body.sovra-mode-home .header-brand-wrap {
-      opacity: 0.95;
-    }
-    body.sovra-mode-home .header-right-zone {
+    body.sovra-mode-app .app-center-stage {
       display: flex !important;
-      align-items: center !important;
-      gap: 10px !important;
+      flex-direction: column !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow-y: auto !important;
+      flex: 1 !important;
+    }
+    body.sovra-mode-app .main-content {
+      width: 100% !important;
+      max-width: 900px !important;
+      margin: 0 auto !important;
+      padding: 0.75rem 1rem 3.5rem 1rem !important;
+      box-sizing: border-box !important;
     }
 
     /* 🚪 Sovereign Direct Header Logout Action Button */
@@ -19033,6 +19082,23 @@ function renderHtml(
 
     <!-- Column 2: Center Stage -->
     <div class="app-center-stage">
+      <!-- 📱 SOVRA NATIVE ANDROID APP BAR (Visible when an App is Open) -->
+      <header id="sovraNativeAppBar" class="sovra-native-app-bar" style="position: sticky; top: 0; z-index: 100; height: 50px; background: rgba(8, 12, 24, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; padding: 0 16px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button type="button" class="sovra-app-bar-back-btn" onclick="window.SovraAndroidOS &amp;&amp; window.SovraAndroidOS.goBack()" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; color: #f8fafc; cursor: pointer; transition: all 0.2s ease;" title="Back (◂)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span id="sovraNativeAppIcon" style="font-size: 1.25rem;">📱</span>
+            <span id="sovraNativeAppTitle" style="font-weight: 800; font-size: 1.05rem; color: #ffffff; letter-spacing: -0.01em;">App</span>
+          </div>
+        </div>
+        <div id="sovraNativeAppRightActions" style="display: flex; align-items: center; gap: 8px;">
+          <button type="button" onclick="window.SovraAndroidOS &amp;&amp; window.SovraAndroidOS.goHome()" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px; padding: 5px 12px; color: #94a3b8; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px;" title="Home Desktop">
+            <span>○</span> <span>Home</span>
+          </button>
+        </div>
+      </header>
       <!-- 💬 Non-Intrusive Floating Top Chat Message Capsule (Dynamic Heads-Up) -->
       <div id="floatingChatToast" class="floating-chat-toast" onclick="handleFloatingToastClick(event)" aria-live="polite">
         <div class="toast-avatar" id="toastAvatar">👤</div>
@@ -26361,6 +26427,18 @@ function renderHtml(
                 <button type="button" class="btn btn-secondary" onclick="alert('Local node cache successfully cleared.')" style="font-size: 0.8rem; padding: 8px 16px; border-radius: 10px; border: 1px solid rgba(239,68,68,0.4); color: #f87171;">Purge Cached Media Files</button>
               </div>
             </div>
+
+            <!-- Knox Security & Account Lifecycle -->
+            <div style="margin-top: 24px; padding: 16px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <div style="font-weight: 800; color: #f87171; font-size: 0.95rem;">Session Management</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Safely terminate your sovereign session on this device.</div>
+              </div>
+              <button type="button" id="headerLogoutBtn" onclick="openLogoutModal(event)" class="header-action-logout-btn" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #ffffff; padding: 8px 18px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Log out from Sovra">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span>Log Out</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -30405,14 +30483,14 @@ function renderHtml(
   </div>
 
   <!-- 💳 6F. FULL PAGE SOVEREIGN WALLET MODAL / VIEW -->
-  <div id="fullPageWalletModal" style="display: none; position: fixed; inset: 0; width: 100vw; height: 100vh; background: #080d14; z-index: 10060; overflow-y: auto; -webkit-overflow-scrolling: touch; flex-direction: column;">
+  <div id="fullPageWalletModal" style="display: none; position: fixed; inset: 0; bottom: 48px; width: 100vw; height: calc(100vh - 48px); background: #080d14; z-index: 10060; overflow-y: auto; -webkit-overflow-scrolling: touch; flex-direction: column;">
     
     <!-- Full Page Header (Sticky Top) -->
-    <div style="position: sticky; top: 0; z-index: 100; padding: 1.1rem 1.4rem; background: rgba(11, 17, 32, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+    <div style="position: sticky; top: 0; z-index: 100; padding: 0.9rem 1.25rem; background: rgba(11, 17, 32, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
       <div style="display: flex; align-items: center; gap: 12px;">
-        <button type="button" onclick="closeFullPageWallet()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #f8fafc; padding: 7px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+        <button type="button" onclick="closeFullPageWallet(); window.SovraAndroidOS &amp;&amp; window.SovraAndroidOS.goHome();" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #f8fafc; padding: 7px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-          <span>Back to Profile</span>
+          <span>Home</span>
         </button>
         <div>
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -55050,6 +55128,9 @@ function renderHtml(
       }
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
+      if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+        window.SovraAndroidOS.goHome();
+      }
     }
 
     async function claimBitSwapSeederRewards() {
@@ -83720,6 +83801,8 @@ function renderHtml(
         closeWallpaperModal();
         closeHomeContextMenu();
         closeRecents();
+        const walletModal = document.getElementById('fullPageWalletModal');
+        if (walletModal) walletModal.style.display = 'none';
         if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.closeDrawer === 'function') {
           window.SovraModularGlassOS.closeDrawer();
         }
@@ -83803,6 +83886,31 @@ function renderHtml(
           showAuthenticatedAppView();
         }
 
+        // Update native top app bar title and icon
+        const appTitles = {
+          feed: { title: 'Feed', icon: '📰' },
+          chat: { title: 'Messages & Calls', icon: '💬' },
+          reels: { title: 'Shorts & Reels', icon: '🎞️' },
+          watch: { title: 'Watch Video Hub', icon: '🎬' },
+          youtube: { title: 'Watch Video Hub', icon: '🎬' },
+          wallet: { title: 'Sovereign Wallet & Vault', icon: '💰' },
+          friends: { title: 'Friends & P2P Swarm', icon: '👥' },
+          studio: { title: 'Creator Studio Pro', icon: '🎙️' },
+          upload: { title: 'Media Composer', icon: '➕' },
+          profile: { title: 'Sovereign Profile', icon: '👤' },
+          me: { title: 'Sovereign Profile', icon: '👤' },
+          settings: { title: 'Knox OS Settings', icon: '⚙️' },
+          admin: { title: 'Operations Console', icon: '🛡️' },
+          dapps: { title: 'Sovereign DApps', icon: '🎮' },
+          live: { title: 'P2P Swarm Live', icon: '📡' },
+          calls: { title: 'Encrypted Calls', icon: '📞' }
+        };
+        const appInfo = appTitles[appId] || { title: (appId ? (appId.charAt(0).toUpperCase() + appId.slice(1)) : 'App'), icon: '📱' };
+        const appTitleEl = document.getElementById('sovraNativeAppTitle');
+        if (appTitleEl) appTitleEl.textContent = appInfo.title;
+        const appIconEl = document.getElementById('sovraNativeAppIcon');
+        if (appIconEl) appIconEl.textContent = appInfo.icon;
+
         const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
         if (feat && typeof feat.action === 'function') {
           try { feat.action(); } catch (_) {}
@@ -83868,6 +83976,13 @@ function renderHtml(
         const recents = document.getElementById('sovraRecentsOverview');
         if (recents && recents.style.display === 'flex') {
           closeRecents();
+          return;
+        }
+        // Priority 1b: Full Page Wallet is open -> close it
+        const walletModal = document.getElementById('fullPageWalletModal');
+        if (walletModal && (walletModal.style.display === 'flex' || walletModal.style.display === 'block')) {
+          walletModal.style.display = 'none';
+          goHome();
           return;
         }
         // Priority 2a: App Context Menu is open -> close it
