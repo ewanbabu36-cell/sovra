@@ -10091,30 +10091,21 @@ function renderHtml(
     body.sovra-mode-app .sovra-home-screen-view {
       display: none !important;
     }
+    body.sovra-mode-app .sovra-android-nav-bar {
+      display: none !important;
+    }
     body.sovra-mode-home .app-layout {
       display: none !important;
     }
     body.sovra-mode-home .app-top-header {
-      background: transparent !important;
-      border-bottom: none !important;
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
-      box-shadow: none !important;
+      background: rgba(10, 14, 26, 0.85) !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
       padding: 10px 24px !important;
-      position: absolute !important;
+      position: sticky !important;
       top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
       z-index: 100 !important;
-    }
-    body.sovra-mode-home .header-desktop-nav,
-    body.sovra-mode-home .header-search-wrap,
-    body.sovra-mode-home .header-quick-slots,
-    body.sovra-mode-home #currentUserPill,
-    body.sovra-mode-home #headerCreateWrap,
-    body.sovra-mode-home #headerChatBtn,
-    body.sovra-mode-home #notificationBellWrap {
-      display: none !important;
     }
     body.sovra-mode-home .header-brand-wrap {
       opacity: 0.95;
@@ -10125,14 +10116,61 @@ function renderHtml(
       gap: 10px !important;
     }
 
+    /* 🚪 Sovereign Direct Header Logout Action Button */
+    .header-action-logout-btn {
+      background: rgba(239, 68, 68, 0.14);
+      border: 1px solid rgba(239, 68, 68, 0.38);
+      color: #f87171;
+      border-radius: 999px;
+      padding: 5px 13px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .header-action-logout-btn:hover {
+      background: rgba(239, 68, 68, 0.28);
+      border-color: #ef4444;
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
+    }
+    .header-action-logout-btn:active {
+      transform: scale(0.96);
+    }
+    body.theme-normal .header-action-logout-btn {
+      background: #fee2e2 !important;
+      border-color: #fca5a5 !important;
+      color: #dc2626 !important;
+    }
+    body.theme-normal .header-action-logout-btn:hover {
+      background: #fecaca !important;
+      border-color: #ef4444 !important;
+      color: #b91c1c !important;
+    }
+    @media (max-width: 580px) {
+      .header-action-logout-btn span {
+        display: none;
+      }
+      .header-action-logout-btn {
+        padding: 6px 10px;
+      }
+    }
+
     /* Android Glance Widget (Clock & Live Status) */
     .android-glance-widget {
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      margin-top: 1rem;
-      margin-bottom: 2rem;
+      margin-top: 0.75rem;
+      margin-bottom: 1.25rem;
       animation: glanceFadeIn 0.5s ease-out;
     }
     @keyframes glanceFadeIn {
@@ -10140,12 +10178,12 @@ function renderHtml(
       to { opacity: 1; transform: translateY(0); }
     }
     .android-glance-clock {
-      font-size: 5.2rem;
-      font-weight: 850;
+      font-size: 2.75rem;
+      font-weight: 800;
       color: #ffffff;
-      line-height: 0.95;
-      letter-spacing: -3px;
-      text-shadow: 0 4px 30px rgba(0, 0, 0, 0.7);
+      line-height: 1;
+      letter-spacing: -1px;
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
       font-variant-numeric: tabular-nums;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Google Sans", sans-serif;
     }
@@ -18002,7 +18040,7 @@ function renderHtml(
     }
   </style>
 </head>
-<body class="nav-mode-auto theme-black sovra-mode-home" data-active-tab="feed">
+<body class="nav-mode-auto theme-black sovra-mode-app" data-active-tab="feed">
   <!-- 🖼️ SOVRA ANDROID OS: DYNAMIC WALLPAPER CANVAS -->
   <div id="sovraWallpaperCanvas" class="sovra-wallpaper-canvas" aria-hidden="true">
     <div id="sovraWallpaperBackdrop" class="sovra-wallpaper-backdrop"></div>
@@ -18464,15 +18502,25 @@ function renderHtml(
       </div>
 
       <!-- 🖼️ Wallpaper Trigger Pill -->
-      <button id="headerWallpaperBtn" type="button" class="header-action-icon-btn" onclick="window.SovraAndroidOS.openWallpaperModal()" title="Wallpaper &amp; Theme Studio" aria-label="Wallpaper Studio" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 999px; padding: 4px 12px; font-size: 0.76rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
-        <span>🖼️</span> <span>Wallpaper</span>
+      <button id="headerWallpaperBtn" type="button" class="header-action-icon-btn" onclick="window.SovraAndroidOS.openWallpaperModal()" title="Wallpaper &amp; Theme Studio" aria-label="Wallpaper Studio" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.22); color: #38bdf8; border-radius: 999px; padding: 4px 10px; font-size: 0.74rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+        <span>🖼️</span> <span>Theme</span>
       </button>
 
-      <!-- 4. User Profile Avatar with Integrated Presence Badge (Desktop Only) -->
+      <!-- 4. User Profile Avatar with Integrated Presence Badge -->
       <div id="currentUserPill" class="header-avatar-wrap is-online" role="button" tabindex="0" onclick="switchTab('me'); event.stopPropagation();" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" title="Open Your Profile (Click to View / Toggle Ghost Mode)" aria-label="Your Sovereign Profile">
         <span id="currentUserAvatar" class="header-avatar-circle">👤</span>
         <span id="headerLiveIndicator" class="header-live-indicator"><span class="avatar-presence-dot live-connected" id="liveDotPulse" title="Status: Online (Live Mesh)"></span></span>
       </div>
+
+      <!-- 🚪 Dedicated Sovereign Direct Logout Action -->
+      <button id="headerLogoutBtn" type="button" class="header-action-logout-btn" onclick="openLogoutModal(event)" title="Log Out Sovereign Session" aria-label="Log Out">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+        <span>Log Out</span>
+      </button>
     </div>
   </header>
 
@@ -82689,6 +82737,9 @@ function renderHtml(
         try {
           const rawMode = localStorage.getItem(OS_MODE_KEY);
           if (rawMode === 'app' || rawMode === 'home') currentMode = rawMode;
+          if (typeof window !== 'undefined' && window.location && !sessionStorage.getItem('sovra_user_navigated')) {
+            currentMode = 'app';
+          }
         } catch (_) {}
       }
 
