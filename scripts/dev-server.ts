@@ -17423,6 +17423,22 @@ function renderHtml(
     html.sovra-unauthenticated #welcomeOnboardingModal {
       display: flex !important;
     }
+    html.sovra-unauthenticated .header-desktop-nav,
+    html.sovra-unauthenticated .header-search-wrap,
+    html.sovra-unauthenticated #headerCreateWrap,
+    html.sovra-unauthenticated #headerChatBtn,
+    html.sovra-unauthenticated #headerNotificationBell,
+    html.sovra-unauthenticated #headerIdentitySwitcherPill,
+    html.sovra-unauthenticated #currentUserPill,
+    html.sovra-unauthenticated #headerWallpaperBtn,
+    html.sovra-unauthenticated #headerWatchStudioPill,
+    html.sovra-unauthenticated #studioHeaderChanSwitcher,
+    html.sovra-unauthenticated #headerLogoutBtn {
+      display: none !important;
+    }
+    html.sovra-unauthenticated #headerPublicAuthGroup {
+      display: flex !important;
+    }
     @media (max-width: 860px) {
       .sovra-landing-container {
         flex-direction: column !important;
@@ -18191,31 +18207,10 @@ function renderHtml(
     (function() {
       try {
         var isLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
-        if (isLoggedOut) {
+        var sessionToken = localStorage.getItem('sovra_session_token');
+        var savedProfile = localStorage.getItem('sovra_user_profile');
+        if (isLoggedOut || !sessionToken || !savedProfile) {
           document.documentElement.classList.add('sovra-unauthenticated');
-        } else {
-          var savedProfile = localStorage.getItem('sovra_user_profile');
-          if (!savedProfile) {
-            var isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            var autoName = isMob ? 'Mobile Peer' : 'Host Node';
-            var autoHandle = '@peer_' + Math.random().toString(36).substring(2, 7);
-            var autoProf = {
-              did: 'did:key:z6Mks' + Date.now(),
-              name: autoName,
-              displayName: autoName,
-              handle: autoHandle,
-              bio: 'Decentralized Sovereign Mesh Node',
-              avatar: isMob ? '📱' : '💻',
-              avatarBg: '#0284c7',
-              sessionToken: 'mesh_token_' + Date.now(),
-              balanceSov: 500.0,
-              isVerified: true
-            };
-            try {
-              localStorage.setItem('sovra_user_profile', JSON.stringify(autoProf));
-              localStorage.setItem('sovra_session_token', autoProf.sessionToken);
-            } catch(e) {}
-          }
         }
       } catch(e) {}
     })();
@@ -18521,6 +18516,20 @@ function renderHtml(
         </svg>
         <span>Log Out</span>
       </button>
+
+      <!-- 🌐 Sovereign Public Auth Action Group (Visible when Unauthenticated) -->
+      <div id="headerPublicAuthGroup" class="header-public-auth-group" style="display: none; align-items: center; gap: 8px;">
+        <div class="public-mesh-pill" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; color: #10b981; font-weight: 700;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
+          <span>Live Network</span>
+        </div>
+        <button id="headerPublicLoginBtn" type="button" onclick="showAuthLandingModal('login')" style="padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.1); color: #38bdf8; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+          🔑 Log In
+        </button>
+        <button id="headerPublicRegisterBtn" type="button" onclick="showAuthLandingModal('register')" style="padding: 6px 14px; border-radius: 999px; border: none; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #ffffff; font-size: 0.82rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(59, 130, 246, 0.35); transition: all 0.2s ease;">
+          ✨ Create Account
+        </button>
+      </div>
     </div>
   </header>
 
@@ -28665,27 +28674,34 @@ function renderHtml(
           Zero surveillance algorithms. Zero corporate censorship. Connect directly with friends, share reels, and chat over an encrypted P2P cryptographic mesh.
         </p>
 
-        <!-- 3 Core Pillars -->
+        <!-- 4 Core Pillars -->
         <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">💬</div>
+            <div>
+              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">Signal-Grade E2EE Encrypted Chats &amp; Calls</div>
+              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Zero server interception. Peer-to-peer WebRTC crystal-clear audio/video calls and direct messaging.</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">🎬</div>
+            <div>
+              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">4K Decentralized Video &amp; Creator Monetization</div>
+              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">BitSwap streaming, viral vertical shorts, and direct micropayments with zero platform tax.</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">💰</div>
+            <div>
+              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">Sovereign Multi-Asset Off-Chain Wallet</div>
+              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Instant micro-tipping, decentralized liquidity vouchers, and multi-asset peer settlement.</div>
+            </div>
+          </div>
           <div style="display: flex; align-items: flex-start; gap: 12px;">
             <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">🛡️</div>
             <div>
-              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">Cryptographic Sovereign Identity</div>
-              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Your Ed25519 DID lives safely in your device hardware, never on corporate servers.</div>
-            </div>
-          </div>
-          <div style="display: flex; align-items: flex-start; gap: 12px;">
-            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">⚡</div>
-            <div>
-              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">BitSwap Peer-to-Peer Mesh</div>
-              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Feeds and media distribute directly between neighboring peer nodes.</div>
-            </div>
-          </div>
-          <div style="display: flex; align-items: flex-start; gap: 12px;">
-            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">🔑</div>
-            <div>
-              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">Zero Passwords &amp; Biometrics</div>
-              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Seamless resident passkeys and biometric sign-in eliminate stolen password risk.</div>
+              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">Self-Sovereign Identity (Ed25519 DID)</div>
+              <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Your private keys stay strictly in your device hardware enclave, backed by 12-word mnemonic.</div>
             </div>
           </div>
         </div>
@@ -30625,6 +30641,12 @@ function renderHtml(
         <button onclick="closePostOptionsModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">✕</button>
       </div>
       <div style="padding: 0.5rem 0; display: flex; flex-direction: column;">
+        <button id="postOptionEditBtn" onclick="triggerEditFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #38bdf8; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
+          <span>✏️</span> <span>Edit Post</span>
+        </button>
+        <button id="postOptionDeleteBtn" onclick="triggerDeleteFromModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #ef4444; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
+          <span>🗑️</span> <span>Delete Post</span>
+        </button>
         <button onclick="triggerCopyPostLink()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #fff; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s;">
           <span>🔗</span> <span>Copy Post Link</span>
         </button>
@@ -30646,6 +30668,24 @@ function renderHtml(
         <button onclick="triggerSafetyReportModal()" style="padding: 0.85rem 1.25rem; text-align: left; background: none; border: none; color: #f87171; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); transition: background 0.15s;">
           <span>🚨</span> <span>Report Post</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✏️ EDIT POST MODAL -->
+  <div id="editPostModal" class="omni-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;">
+    <div class="omni-modal-card" style="max-width: 480px; width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 1.25rem; box-shadow: 0 20px 40px rgba(0,0,0,0.8);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem;">
+        <span style="font-weight: 800; font-size: 1.1rem; color: #fff;">✏️ Edit Post</span>
+        <button type="button" onclick="closeEditPostModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Caption &amp; Thoughts</label>
+        <textarea id="editPostCaptionInput" rows="4" placeholder="Edit your thoughts..." style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; border-radius: 10px; color: #fff; font-size: 0.95rem; padding: 10px; resize: vertical; outline: none;"></textarea>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" id="cancelEditPostBtn" onclick="closeEditPostModal()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: transparent; color: #cbd5e1; font-weight: 600; cursor: pointer;">Cancel</button>
+        <button type="button" id="saveEditPostBtn" onclick="submitEditPost()" style="padding: 8px 18px; border-radius: 8px; border: none; background: #3b82f6; color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(59,130,246,0.4);">Save Changes</button>
       </div>
     </div>
   </div>
@@ -41916,6 +41956,18 @@ function renderHtml(
       if (typeof renderStoriesBar === 'function') renderStoriesBar();
     }
 
+    function routeByRespectedProfileRole(role) {
+      var r = String(role || '').toLowerCase();
+      if (r === 'creator') {
+        if (typeof switchTab === 'function') switchTab('studio');
+      } else if (r === 'admin' || r === 'super_admin' || r === 'operator' || r === 'security_admin') {
+        if (typeof switchTab === 'function') switchTab('admin');
+      } else {
+        if (typeof switchTab === 'function') switchTab('feed');
+      }
+    }
+    window.routeByRespectedProfileRole = routeByRespectedProfileRole;
+
     function showAuthLandingGate() {
       try { document.documentElement.classList.add('sovra-unauthenticated'); } catch(e) {}
       const appLayout = document.querySelector('.app-layout');
@@ -41935,10 +41987,21 @@ function renderHtml(
         if (s3) s3.style.display = 'none';
 
         const closeBtn = document.getElementById('womCloseBtn');
-        if (closeBtn) closeBtn.style.display = 'flex';
+        if (closeBtn) {
+          closeBtn.style.display = (myProfile && myProfile.sessionToken && !myProfile.isGuest) ? 'flex' : 'none';
+        }
         switchWomAuthTab('login');
       }
     }
+    window.showAuthLandingGate = showAuthLandingGate;
+
+    function showAuthLandingModal(tab) {
+      showAuthLandingGate();
+      if (typeof switchWomAuthTab === 'function') {
+        switchWomAuthTab(tab || 'login');
+      }
+    }
+    window.showAuthLandingModal = showAuthLandingModal;
 
     function showAuthenticatedAppView() {
       try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
@@ -41958,10 +42021,11 @@ function renderHtml(
       if (ribbon) ribbon.style.display = isGuest ? 'flex' : 'none';
       if (typeof updateOnboardingChecklistUI === 'function') updateOnboardingChecklistUI();
     }
+    window.showAuthenticatedAppView = showAuthenticatedAppView;
 
     function closeOnboardingModal() {
-      if (!myProfile || !myProfile.sessionToken) {
-        enterAsGuest();
+      if (!myProfile || !myProfile.sessionToken || myProfile.isGuest) {
+        showAuthLandingGate();
         return;
       }
       showAuthenticatedAppView();
@@ -42161,6 +42225,7 @@ function renderHtml(
         if (typeof syncChatMessages === 'function') syncChatMessages();
         if (typeof renderChatContactsList === 'function') renderChatContactsList();
         showAuthenticatedAppView();
+        routeByRespectedProfileRole(myProfile.role);
         showAccountToast('🎉 Welcome back, ' + (myProfile.name || myProfile.handle) + '!');
       } catch (err) {
         if (errBox) {
@@ -42641,10 +42706,8 @@ function renderHtml(
       const savedProfile = localStorage.getItem('sovra_user_profile');
 
       if (isExplicitlyLoggedOut || !sessionToken || !savedProfile) {
-        if (!isExplicitlyLoggedOut) {
-          enterAsGuest();
-          return;
-        }
+        myProfile = null;
+        currentUserHandle = '@guest';
         updateUserDisplayInUI();
         showAuthLandingGate();
         return;
@@ -42653,14 +42716,20 @@ function renderHtml(
       if (sessionToken) {
         const _meDidParam = (myProfile && myProfile.did) ? ('&did=' + encodeURIComponent(myProfile.did)) : '';
         const _meHandleParam = (myProfile && myProfile.handle) ? ('&handle=' + encodeURIComponent(myProfile.handle)) : '';
-        fetch('/api/user/me?sessionToken=' + encodeURIComponent(sessionToken) + _meDidParam + _meHandleParam)
+        fetch('/api/user/me?sessionToken=' + encodeURIComponent(sessionToken) + _meDidParam + _meHandleParam, {
+          headers: { 'Authorization': 'Bearer ' + sessionToken }
+        })
           .then(r => r.json())
           .then(data => {
             if (data.ok && data.user) {
               myProfile = data.user;
               currentUserHandle = myProfile.handle;
-              try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
-              updateUserDisplayInUI();
+              try {
+                localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+                localStorage.removeItem('sovra_logged_out');
+              } catch(e) {}
+              showAuthenticatedAppView();
+              routeByRespectedProfileRole(myProfile.role);
               if (typeof fetchNotifications === 'function') fetchNotifications();
               if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
               if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
@@ -42673,14 +42742,22 @@ function renderHtml(
               localStorage.removeItem('sovra_user_profile');
               localStorage.removeItem('sovra_session_token');
               updateUserDisplayInUI();
-              if (!isExplicitlyLoggedOut) enterAsGuest();
-              else showAuthLandingGate();
+              showAuthLandingGate();
             }
           })
           .catch(() => {
-            if (myProfile) updateUserDisplayInUI();
-            else if (!isExplicitlyLoggedOut) enterAsGuest();
-            else showAuthLandingGate();
+            if (savedProfile && !isExplicitlyLoggedOut) {
+              try {
+                myProfile = JSON.parse(savedProfile);
+                currentUserHandle = myProfile.handle;
+                showAuthenticatedAppView();
+                routeByRespectedProfileRole(myProfile.role);
+              } catch(e) {
+                showAuthLandingGate();
+              }
+            } else {
+              showAuthLandingGate();
+            }
           });
       } else {
         updateUserDisplayInUI();
@@ -79417,14 +79494,137 @@ function renderHtml(
 
     // --- Feed Post Options & Actions ---
     function openPostOptionsModal(postId, author, cid) {
-      activeTargetPost = { id: postId, author: author, cid: cid };
+      var foundPost = (typeof feedPostsData !== 'undefined' && Array.isArray(feedPostsData))
+        ? feedPostsData.find(function(p) { return p.id === postId; })
+        : null;
+      var authorDid = (foundPost && foundPost.authorDid) || (foundPost && foundPost.author);
+      activeTargetPost = {
+        id: postId,
+        author: author || (foundPost && (foundPost.authorHandle || foundPost.authorName || foundPost.author)),
+        cid: cid || (foundPost && foundPost.cid),
+        authorDid: authorDid
+      };
+
+      var editBtn = document.getElementById('postOptionEditBtn');
+      var deleteBtn = document.getElementById('postOptionDeleteBtn');
+      var currentDid = (myProfile && myProfile.did) || '';
+      var currentHandle = (myProfile && myProfile.handle) || currentUserHandle || '';
+      var isAdmin = Boolean(myProfile && (myProfile.role === 'admin' || myProfile.role === 'SUPER_ADMIN' || myProfile.isAdmin));
+      var isOwner = Boolean(
+        isAdmin ||
+        !myProfile ||
+        (authorDid && currentDid && authorDid === currentDid) ||
+        (activeTargetPost.author && currentHandle && activeTargetPost.author.replace('@', '').toLowerCase() === currentHandle.replace('@', '').toLowerCase())
+      );
+
+      if (editBtn) editBtn.style.display = isOwner ? 'flex' : 'none';
+      if (deleteBtn) deleteBtn.style.display = isOwner ? 'flex' : 'none';
+
       const m = document.getElementById('postOptionsModal');
       if (m) m.style.display = 'flex';
     }
+    window.openPostOptionsModal = openPostOptionsModal;
+
     function closePostOptionsModal() {
       const m = document.getElementById('postOptionsModal');
       if (m) m.style.display = 'none';
     }
+    window.closePostOptionsModal = closePostOptionsModal;
+
+    function triggerEditFromModal() {
+      closePostOptionsModal();
+      if (!activeTargetPost || !activeTargetPost.id) return;
+      openEditPostModal(activeTargetPost.id);
+    }
+    window.triggerEditFromModal = triggerEditFromModal;
+
+    function openEditPostModal(postId) {
+      var modal = document.getElementById('editPostModal');
+      var textarea = document.getElementById('editPostCaptionInput');
+      if (!modal || !textarea) return;
+
+      var currentText = '';
+      var card = document.getElementById('card-' + postId);
+      if (card) {
+        var captionEl = card.querySelector('.post-caption-text, .post-text, .post-content-body, p');
+        if (captionEl) currentText = captionEl.innerText || '';
+      }
+      if (!currentText && typeof feedPostsData !== 'undefined' && Array.isArray(feedPostsData)) {
+        var p = feedPostsData.find(function(item) { return item.id === postId; });
+        if (p) currentText = p.caption || p.text || '';
+      }
+
+      textarea.value = currentText.replace(/\s*\(edited\)\s*$/, '').trim();
+      modal.style.display = 'flex';
+      setTimeout(function() { textarea.focus(); }, 100);
+    }
+    window.openEditPostModal = openEditPostModal;
+
+    function closeEditPostModal() {
+      var modal = document.getElementById('editPostModal');
+      if (modal) modal.style.display = 'none';
+    }
+    window.closeEditPostModal = closeEditPostModal;
+
+    async function submitEditPost() {
+      var saveBtn = document.getElementById('saveEditPostBtn');
+      var textarea = document.getElementById('editPostCaptionInput');
+      if (!textarea || !activeTargetPost || !activeTargetPost.id) return;
+      var newCaption = textarea.value.trim();
+      var postId = activeTargetPost.id;
+      var token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || '';
+
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerText = 'Saving...';
+      }
+
+      try {
+        var res = await fetch('/api/feed/edit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            postId: postId,
+            caption: newCaption,
+            sessionToken: token
+          })
+        });
+        var data = await res.json();
+        if (res.ok && data.ok) {
+          if (typeof feedPostsData !== 'undefined' && Array.isArray(feedPostsData)) {
+            var postObj = feedPostsData.find(function(p) { return p.id === postId; });
+            if (postObj) {
+              postObj.caption = newCaption;
+              postObj.isEdited = true;
+            }
+          }
+          var card = document.getElementById('card-' + postId);
+          if (card) {
+            var captionEl = card.querySelector('.post-caption-text, .post-text, .post-content-body, p');
+            if (captionEl) {
+              var safeHtml = (typeof escapeHtml === 'function') ? escapeHtml(newCaption) : newCaption;
+              captionEl.innerHTML = safeHtml + ' <span class="post-edited-badge" style="font-size: 0.72rem; color: #94a3b8; font-style: italic; margin-left: 4px;">(edited)</span>';
+            }
+          }
+          closeEditPostModal();
+          showAccountToast('✅ Post updated successfully!');
+        } else {
+          showAccountToast('⚠️ Could not edit post: ' + (data.error || 'Server error'));
+        }
+      } catch (err) {
+        showAccountToast('⚠️ Network error while editing post.');
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.innerText = 'Save Changes';
+        }
+      }
+    }
+    window.submitEditPost = submitEditPost;
+
     function triggerCopyPostLink() {
       const link = window.location.origin + '/#card-' + activeTargetPost.id;
       copyToClipboard(link, function() {
@@ -79489,6 +79689,7 @@ function renderHtml(
     }
     function triggerDeleteFromModal() {
       closePostOptionsModal();
+      var token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || '';
       const card = document.getElementById('card-' + activeTargetPost.id);
       if (card) {
         card.style.opacity = '0';
@@ -79500,11 +79701,15 @@ function renderHtml(
       updateProfileDynamicStats();
       fetch('/api/feed/delete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: activeTargetPost.id })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ postId: activeTargetPost.id, sessionToken: token })
       }).catch(function(err) { console.warn('[Feed] Delete error:', err); });
       showAccountToast('🗑️ Post deleted');
     }
+    window.triggerDeleteFromModal = triggerDeleteFromModal;
 
     // --- Dislike Handler ---
     function handleFeedDislike(postId) {
