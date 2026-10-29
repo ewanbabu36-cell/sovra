@@ -10485,11 +10485,215 @@ function renderHtml(
     }
 
     .sovra-home-tile-wrap.is-editing .sovra-app-tile {
-      animation: sovraTileJiggle 0.3s infinite alternate ease-in-out;
+      animation: sovraTileJiggle 0.24s infinite alternate ease-in-out;
     }
     @keyframes sovraTileJiggle {
-      0% { transform: rotate(-2deg) scale(1.03); }
-      100% { transform: rotate(2deg) scale(1.03); }
+      0% { transform: rotate(-2.2deg) scale(1.02); }
+      100% { transform: rotate(2.2deg) scale(1.02); }
+    }
+
+    /* ✕ Circular Unpin Badge for Edit / Jiggle Mode */
+    .sovra-tile-unpin-btn {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #ef4444;
+      color: #ffffff;
+      font-size: 0.85rem;
+      font-weight: 800;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 15;
+      line-height: 1;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .sovra-tile-unpin-btn:hover {
+      transform: scale(1.18);
+      background: #dc2626;
+    }
+    .sovra-home-tile-wrap.is-editing .sovra-tile-unpin-btn {
+      display: flex !important;
+    }
+
+    /* 📱 Floating Drag Ghost Clone */
+    .sovra-drag-ghost-clone {
+      position: fixed;
+      pointer-events: none;
+      z-index: 999999;
+      transform: translate(-50%, -50%) scale(1.08);
+      opacity: 0.95;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65), 0 0 24px rgba(56, 189, 248, 0.5);
+      border-radius: 24px;
+      transition: transform 0.05s linear;
+    }
+
+    /* 📱 Android Home Screen App Context Menu (Long-Press / 3D Touch) */
+    .sovra-app-context-menu {
+      position: fixed;
+      z-index: 100020;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 18px;
+      padding: 12px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      width: 240px;
+      box-sizing: border-box;
+      user-select: none;
+      animation: sovraCtxIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes sovraCtxIn {
+      from { opacity: 0; transform: scale(0.92); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    body.theme-normal .sovra-app-context-menu {
+      background: rgba(255, 255, 255, 0.96) !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18) !important;
+    }
+    .sovra-ctx-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 8px;
+    }
+    .sovra-ctx-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      flex-shrink: 0;
+    }
+    .sovra-ctx-title-wrap {
+      flex: 1;
+      overflow: hidden;
+    }
+    .sovra-ctx-title {
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #ffffff;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    body.theme-normal .sovra-ctx-title {
+      color: #0f172a !important;
+    }
+    .sovra-ctx-desc {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    .sovra-ctx-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 6px 0;
+    }
+    body.theme-normal .sovra-ctx-divider {
+      background: #e2e8f0 !important;
+    }
+    .sovra-ctx-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .sovra-ctx-action-btn {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-radius: 10px;
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #cbd5e1;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+    .sovra-ctx-action-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+    body.theme-normal .sovra-ctx-action-btn {
+      color: #334155 !important;
+    }
+    body.theme-normal .sovra-ctx-action-btn:hover {
+      background: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+    .sovra-ctx-action-btn.danger {
+      color: #f87171;
+    }
+    .sovra-ctx-action-btn.danger:hover {
+      background: rgba(239, 68, 68, 0.18);
+      color: #ef4444;
+    }
+
+    /* 📁 Squircle App Folder & Mini-Icons Grid */
+    .sovra-folder-tile {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      grid-template-rows: 1fr 1fr !important;
+      gap: 4px !important;
+      padding: 8px !important;
+      box-sizing: border-box !important;
+      background: rgba(30, 41, 59, 0.72) !important;
+      border: 1px solid rgba(255, 255, 255, 0.22) !important;
+      backdrop-filter: blur(14px) !important;
+      box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.5) !important;
+    }
+    .sovra-folder-mini-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      line-height: 1;
+    }
+    .sovra-folder-card {
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 28px;
+      padding: 1.5rem;
+      max-width: 380px;
+      width: 90%;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      animation: sovraFolderCardIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes sovraFolderCardIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    body.theme-normal .sovra-folder-card {
+      background: rgba(255, 255, 255, 0.97) !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22) !important;
+    }
+    .sovra-home-tile-wrap.is-folder-target .sovra-app-tile {
+      border: 2px solid #38bdf8 !important;
+      transform: scale(1.12);
+      box-shadow: 0 0 24px rgba(56, 189, 248, 0.8) !important;
     }
 
     .android-home-hint {
@@ -29700,6 +29904,88 @@ function renderHtml(
     <button type="button" class="home-context-item" onclick="window.SovraAndroidOS.toggleEditMode(); window.SovraAndroidOS.closeHomeContextMenu();">
       <span>✏️</span> Rearrange Home Screen
     </button>
+  </div>
+
+  <!-- 📱 SOVRA ANDROID APP CONTEXT MENU (LONG-PRESS / 3D TOUCH) -->
+  <div id="sovraAppContextMenu" class="sovra-app-context-menu" style="display: none;" onclick="event.stopPropagation()">
+    <div class="sovra-ctx-header">
+      <div id="sovraCtxAppIcon" class="sovra-ctx-icon">💬</div>
+      <div class="sovra-ctx-title-wrap">
+        <div id="sovraCtxAppName" class="sovra-ctx-title">Chat</div>
+        <div id="sovraCtxAppDesc" class="sovra-ctx-desc">Noise_XX E2EE Messenger</div>
+      </div>
+    </div>
+    <div class="sovra-ctx-divider"></div>
+    <div class="sovra-ctx-actions">
+      <button type="button" class="sovra-ctx-action-btn" id="sovraCtxActionQuick1" onclick="window.SovraAndroidOS.handleContextQuickAction(1)">
+        <span id="sovraCtxActionQuickIcon1">💬</span>
+        <span id="sovraCtxActionQuickLabel1">New Message</span>
+      </button>
+      <button type="button" class="sovra-ctx-action-btn" id="sovraCtxActionQuick2" onclick="window.SovraAndroidOS.handleContextQuickAction(2)">
+        <span id="sovraCtxActionQuickIcon2">📞</span>
+        <span id="sovraCtxActionQuickLabel2">Audio / Video Call</span>
+      </button>
+      <div class="sovra-ctx-divider"></div>
+      <button type="button" class="sovra-ctx-action-btn" id="sovraCtxActionAppInfo" onclick="window.SovraAndroidOS.openAppInfoModal()">
+        <span>ℹ️</span>
+        <span>App Info &amp; Security</span>
+      </button>
+      <button type="button" class="sovra-ctx-action-btn" id="sovraCtxActionEditHome" onclick="window.SovraAndroidOS.toggleEditMode(true); window.SovraAndroidOS.closeAppContextMenu();">
+        <span>✏️</span>
+        <span>Edit Home Screen</span>
+      </button>
+      <div class="sovra-ctx-divider"></div>
+      <button type="button" class="sovra-ctx-action-btn danger" id="sovraCtxActionRemove" onclick="window.SovraAndroidOS.removeActiveContextApp()">
+        <span>🗑️</span>
+        <span>Remove from Home Screen</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 📱 SOVRA ANDROID APP INFO MODAL -->
+  <div id="sovraAppInfoModal" class="sovra-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(12px); z-index: 100030; align-items: center; justify-content: center; padding: 1.5rem;" onclick="window.SovraAndroidOS.closeAppInfoModal()">
+    <div class="sovra-folder-card" onclick="event.stopPropagation()">
+      <div class="sheet-grab-handle"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div id="appInfoIcon" style="width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); line-height: 1;">📱</div>
+          <div>
+            <div id="appInfoName" style="font-weight: 800; font-size: 1.25rem; color: #fff;">App Name</div>
+            <div id="appInfoCategory" style="font-size: 0.76rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">CATEGORY</div>
+          </div>
+        </div>
+        <button type="button" onclick="window.SovraAndroidOS.closeAppInfoModal()" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">✕</button>
+      </div>
+      <div id="appInfoDesc" style="font-size: 0.88rem; color: #cbd5e1; margin-bottom: 1.2rem; line-height: 1.4;">App description goes here...</div>
+      <div class="app-info-metrics-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.2rem;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px;">
+          <div style="font-size: 0.72rem; color: #94a3b8;">Local Cache / Storage</div>
+          <div id="appInfoStorage" style="font-size: 0.95rem; font-weight: 700; color: #38bdf8;">1.4 MB (SQLite WAL)</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px;">
+          <div style="font-size: 0.72rem; color: #94a3b8;">Encryption &amp; Swarm</div>
+          <div id="appInfoSecurity" style="font-size: 0.95rem; font-weight: 700; color: #34d399;">Noise_XX E2EE</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" id="appInfoLaunchBtn" onclick="window.SovraAndroidOS.launchFromAppInfo()" style="flex: 1; background: #3b82f6; color: #fff; border: none; border-radius: 12px; padding: 10px; font-weight: 700; font-size: 0.88rem; cursor: pointer;">Open App ➔</button>
+        <button type="button" onclick="window.SovraAndroidOS.closeAppInfoModal()" style="background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 10px 16px; font-weight: 700; font-size: 0.88rem; cursor: pointer;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📱 SOVRA ANDROID FOLDER CARD VIEW OVERLAY -->
+  <div id="sovraFolderViewModal" class="sovra-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(14px); z-index: 100030; align-items: center; justify-content: center; padding: 1.5rem;" onclick="window.SovraAndroidOS.closeFolderModal()">
+    <div class="sovra-folder-card" onclick="event.stopPropagation()">
+      <div class="sheet-grab-handle"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+        <input type="text" id="folderTitleInput" onchange="window.SovraAndroidOS.renameActiveFolder(this.value)" placeholder="Folder Name" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.3); color: #fff; font-size: 1.35rem; font-weight: 800; outline: none; width: 70%;" />
+        <button type="button" onclick="window.SovraAndroidOS.closeFolderModal()" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">✕</button>
+      </div>
+      <div id="folderAppTilesGrid" class="sovra-folder-tiles-grid" style="display: grid; grid-template-columns: repeat(3, 80px); gap: 16px; justify-content: center; max-height: 50vh; overflow-y: auto; padding: 8px 0;">
+        <!-- Populated dynamically with apps inside this folder -->
+      </div>
+    </div>
   </div>
 
   <!-- 👤 MODERN RESPONSIVE PROFILE & ACCOUNT SWITCHER -->
@@ -82261,9 +82547,31 @@ function renderHtml(
           tile.style.boxShadow = '0 6px 16px -2px ' + theme.shadow + ', inset 0 1px 1px 0 rgba(255, 255, 255, 0.45)';
           tile.style.border = '1px solid rgba(255, 255, 255, 0.22)';
 
-          if (isEditMode) {
-            tile.setAttribute('draggable', 'true');
-          }
+          tile.setAttribute('draggable', 'true');
+          tile.setAttribute('data-app-id', feat.id);
+
+          tile.ondragstart = (e) => {
+            window._spatialDraggingAppId = feat.id;
+            if (e.dataTransfer) {
+              e.dataTransfer.setData('text/plain', feat.id);
+              e.dataTransfer.effectAllowed = 'copyMove';
+            }
+            if (typeof closeDrawer === 'function') closeDrawer();
+          };
+
+          let drawerTouchTimer = null;
+          tile.ontouchstart = (e) => {
+            drawerTouchTimer = setTimeout(() => {
+              if (navigator.vibrate) navigator.vibrate(25);
+              window._spatialDraggingAppId = feat.id;
+              if (typeof closeDrawer === 'function') closeDrawer();
+              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.startGhostDrag === 'function') {
+                window.SovraAndroidOS.startGhostDrag(feat.id, e.touches ? e.touches[0] : e);
+              }
+            }, 380);
+          };
+          tile.ontouchend = () => { if (drawerTouchTimer) clearTimeout(drawerTouchTimer); };
+          tile.ontouchmove = () => { if (drawerTouchTimer) clearTimeout(drawerTouchTimer); };
 
           // Unpin Button (shown only in Edit Mode)
           const unpinBtn = document.createElement('button');
@@ -82434,9 +82742,31 @@ function renderHtml(
           tile.style.boxShadow = '0 8px 20px -3px ' + theme.shadow + ', inset 0 1px 1px 0 rgba(255, 255, 255, 0.45)';
           tile.style.border = '1px solid rgba(255, 255, 255, 0.22)';
 
-          if (isEditMode) {
-            tile.setAttribute('draggable', 'true');
-          }
+          tile.setAttribute('draggable', 'true');
+          tile.setAttribute('data-app-id', feat.id);
+
+          tile.ondragstart = (e) => {
+            window._spatialDraggingAppId = feat.id;
+            if (e.dataTransfer) {
+              e.dataTransfer.setData('text/plain', feat.id);
+              e.dataTransfer.effectAllowed = 'copyMove';
+            }
+            if (typeof closeDrawer === 'function') closeDrawer();
+          };
+
+          let drawerTouchTimer = null;
+          tile.ontouchstart = (e) => {
+            drawerTouchTimer = setTimeout(() => {
+              if (navigator.vibrate) navigator.vibrate(25);
+              window._spatialDraggingAppId = feat.id;
+              if (typeof closeDrawer === 'function') closeDrawer();
+              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.startGhostDrag === 'function') {
+                window.SovraAndroidOS.startGhostDrag(feat.id, e.touches ? e.touches[0] : e);
+              }
+            }, 380);
+          };
+          tile.ontouchend = () => { if (drawerTouchTimer) clearTimeout(drawerTouchTimer); };
+          tile.ontouchmove = () => { if (drawerTouchTimer) clearTimeout(drawerTouchTimer); };
 
           if (feat.badge) {
             const badgeSpan = document.createElement('span');
@@ -82911,6 +83241,7 @@ function renderHtml(
       const MULTIPAGE_KEY = 'sovra_os_multipage_v1';
       const OS_MODE_KEY = 'sovra_os_mode_v1';
       const ACTIVE_TASKS_KEY = 'sovra_os_active_tasks_v1';
+      const FOLDERS_KEY = 'sovra_os_folders_v1';
 
       const DEFAULT_PAGES = [
         ['reels', 'watch', 'studio', 'live', 'profile', 'hub', 'qr_scan', 'id_card'],
@@ -82924,6 +83255,11 @@ function renderHtml(
         ['settings']
       ];
       let currentPage = 0;
+      let workspaceFolders = {};
+      let activeFolderId = null;
+      let activeContextAppId = null;
+      let activeContextPage = 0;
+      let activeContextSlot = 0;
 
       let wallpaperConfig = {
         id: 'nebula',
@@ -82947,11 +83283,35 @@ function renderHtml(
         ['feed', 'chat', 'wallet'].forEach(a => { if (!flat.includes(a)) flat.push(a); });
         workspacePages.forEach(p => {
           if (Array.isArray(p)) {
-            p.forEach(a => { if (!flat.includes(a)) flat.push(a); });
+            p.forEach(item => {
+              if (item && workspaceFolders[item] && Array.isArray(workspaceFolders[item].apps)) {
+                workspaceFolders[item].apps.forEach(a => { if (!flat.includes(a)) flat.push(a); });
+              } else if (item && typeof item === 'string' && !flat.includes(item)) {
+                flat.push(item);
+              }
+            });
           }
         });
         homeScreenApps = flat;
         return homeScreenApps;
+      }
+
+      function loadFolderState() {
+        try {
+          const raw = localStorage.getItem(FOLDERS_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+              workspaceFolders = parsed;
+            }
+          }
+        } catch (_) {}
+      }
+
+      function saveFolderState() {
+        try {
+          localStorage.setItem(FOLDERS_KEY, JSON.stringify(workspaceFolders));
+        } catch (_) {}
       }
 
       // 3. State Loaders & Persisters
@@ -82974,6 +83334,7 @@ function renderHtml(
           }
         } catch (_) {}
 
+        loadFolderState();
         syncHomeAppsFromPages();
 
         try {
@@ -83006,6 +83367,7 @@ function renderHtml(
 
       function saveMultiPageState() {
         syncHomeAppsFromPages();
+        saveFolderState();
         try {
           localStorage.setItem(MULTIPAGE_KEY, JSON.stringify(workspacePages));
           localStorage.setItem(HOME_APPS_KEY, JSON.stringify(homeScreenApps));
@@ -83384,16 +83746,39 @@ function renderHtml(
           closeRecents();
           return;
         }
-        // Priority 2: Wallpaper modal is open -> close it
+        // Priority 2a: App Context Menu is open -> close it
+        const ctxMenu = document.getElementById('sovraAppContextMenu');
+        if (ctxMenu && (ctxMenu.style.display === 'block' || ctxMenu.style.display === 'flex' || ctxMenu.classList.contains('active'))) {
+          closeAppContextMenu();
+          return;
+        }
+        // Priority 2b: App Info Modal is open -> close it
+        const appInfo = document.getElementById('sovraAppInfoModal');
+        if (appInfo && appInfo.style.display === 'flex') {
+          closeAppInfoModal();
+          return;
+        }
+        // Priority 2c: Folder Modal is open -> close it
+        const folderModal = document.getElementById('sovraFolderViewModal');
+        if (folderModal && folderModal.style.display === 'flex') {
+          closeFolderModal();
+          return;
+        }
+        // Priority 2d: Wallpaper modal is open -> close it
         const wpModal = document.getElementById('sovraWallpaperModal');
         if (wpModal && wpModal.classList.contains('active')) {
           closeWallpaperModal();
           return;
         }
-        // Priority 2b: App Drawer is open -> close it
+        // Priority 2e: App Drawer is open -> close it
         const drawer = document.getElementById('sovraMasterDrawerOverlay');
         if (drawer && drawer.classList.contains('active')) {
           if (window.SovraModularGlassOS) window.SovraModularGlassOS.closeDrawer();
+          return;
+        }
+        // Priority 2f: Edit mode is active -> exit edit mode
+        if (isEditMode) {
+          toggleEditMode(false);
           return;
         }
         // Priority 3: Minimize active app and return to Home Screen
@@ -83414,6 +83799,7 @@ function renderHtml(
       function openAppDrawer() {
         if (navigator.vibrate) navigator.vibrate(15);
         closeHomeContextMenu();
+        closeAppContextMenu();
         if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.toggleDrawer === 'function') {
           window.SovraModularGlassOS.toggleDrawer(true);
         }
@@ -83496,8 +83882,12 @@ function renderHtml(
         if (menu) menu.style.display = 'none';
       }
 
-      document.addEventListener('click', () => {
+      document.addEventListener('click', (e) => {
         closeHomeContextMenu();
+        const ctx = document.getElementById('sovraAppContextMenu');
+        if (ctx && ctx.style.display !== 'none' && e && e.target && !ctx.contains(e.target)) {
+          closeAppContextMenu();
+        }
       });
 
       function focusDrawerSearch() {
@@ -83508,9 +83898,499 @@ function renderHtml(
         }
       }
 
-      function toggleEditMode() {
-        isEditMode = !isEditMode;
+      function toggleEditMode(forceState) {
+        isEditMode = typeof forceState === 'boolean' ? forceState : !isEditMode;
+        closeAppContextMenu();
+        closeHomeContextMenu();
         renderHomeScreen();
+      }
+
+      // 8. Spatial App Folders Engine
+      function isFolderId(id) {
+        return Boolean(id && (workspaceFolders[id] || (typeof id === 'string' && id.startsWith('folder_'))));
+      }
+
+      function getFolder(folderId) {
+        return workspaceFolders[folderId] || null;
+      }
+
+      function getFolders() {
+        return workspaceFolders;
+      }
+
+      function createFolder(pageIdx, targetSlotIdx, sourceAppId, title) {
+        if (!workspacePages[pageIdx]) return null;
+        const targetItem = workspacePages[pageIdx][targetSlotIdx];
+        if (!targetItem) return null;
+
+        const folderId = 'folder_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+        const folderTitle = title || 'Folder';
+
+        let initialApps = [];
+        if (isFolderId(targetItem)) {
+          const existing = workspaceFolders[targetItem];
+          initialApps = existing ? [...existing.apps] : [];
+          if (!initialApps.includes(sourceAppId)) initialApps.push(sourceAppId);
+          existing.apps = initialApps;
+          saveMultiPageState();
+          renderHomeScreen();
+          return existing;
+        } else {
+          initialApps = [targetItem];
+          if (!initialApps.includes(sourceAppId)) initialApps.push(sourceAppId);
+        }
+
+        workspaceFolders[folderId] = {
+          id: folderId,
+          title: folderTitle,
+          apps: initialApps
+        };
+
+        workspacePages[pageIdx][targetSlotIdx] = folderId;
+
+        // If source was placed on any page, remove its old slot
+        for (let p = 0; p < workspacePages.length; p++) {
+          for (let s = 0; s < workspacePages[p].length; s++) {
+            if (p === pageIdx && s === targetSlotIdx) continue;
+            if (workspacePages[p][s] === sourceAppId) {
+              workspacePages[p].splice(s, 1);
+              break;
+            }
+          }
+        }
+
+        saveMultiPageState();
+        renderHomeScreen();
+        if (navigator.vibrate) navigator.vibrate(25);
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('Created folder "' + folderTitle + '"');
+        }
+        return workspaceFolders[folderId];
+      }
+
+      function createOrMergeFolder(pageIdx, targetSlotIdx, sourceAppId) {
+        if (!workspacePages[pageIdx]) return null;
+        const targetItem = workspacePages[pageIdx][targetSlotIdx];
+        if (!targetItem || targetItem === sourceAppId) return null;
+
+        if (isFolderId(targetItem)) {
+          const folder = workspaceFolders[targetItem];
+          if (folder) {
+            if (!folder.apps.includes(sourceAppId)) {
+              folder.apps.push(sourceAppId);
+            }
+            for (let p = 0; p < workspacePages.length; p++) {
+              const idx = workspacePages[p].indexOf(sourceAppId);
+              if (idx !== -1) workspacePages[p].splice(idx, 1);
+            }
+            saveMultiPageState();
+            renderHomeScreen();
+            if (navigator.vibrate) navigator.vibrate(20);
+            return folder;
+          }
+        }
+
+        return createFolder(pageIdx, targetSlotIdx, sourceAppId, 'Folder');
+      }
+
+      function openFolderModal(folderId) {
+        const folder = workspaceFolders[folderId];
+        if (!folder) return;
+        activeFolderId = folderId;
+        const modal = document.getElementById('sovraFolderViewModal');
+        const titleInput = document.getElementById('folderTitleInput');
+        const grid = document.getElementById('folderAppTilesGrid');
+        if (!modal || !titleInput || !grid) return;
+
+        titleInput.value = folder.title || 'Folder';
+        grid.innerHTML = '';
+
+        (folder.apps || []).forEach(appId => {
+          const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+          if (!feat) return;
+
+          const tileWrap = document.createElement('div');
+          tileWrap.style.display = 'flex';
+          tileWrap.style.flexDirection = 'column';
+          tileWrap.style.alignItems = 'center';
+          tileWrap.style.gap = '6px';
+          tileWrap.style.cursor = 'pointer';
+
+          const tile = document.createElement('div');
+          tile.className = 'sovra-app-tile';
+          tile.style.width = '64px';
+          tile.style.height = '64px';
+          const theme = (window.SOVRA_FEATURE_THEMES && window.SOVRA_FEATURE_THEMES[appId]) || { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(0,0,0,0.4)' };
+          tile.style.background = theme.gradient;
+          tile.style.boxShadow = '0 6px 16px -2px ' + theme.shadow;
+          tile.style.border = '1px solid rgba(255, 255, 255, 0.22)';
+          tile.style.display = 'flex';
+          tile.style.alignItems = 'center';
+          tile.style.justifyContent = 'center';
+
+          const iconSpan = document.createElement('span');
+          iconSpan.style.fontSize = '1.5rem';
+          iconSpan.textContent = feat.icon;
+          tile.appendChild(iconSpan);
+
+          tileWrap.onclick = () => {
+            closeFolderModal();
+            openApp(appId);
+          };
+
+          const nameSpan = document.createElement('span');
+          nameSpan.style.fontSize = '0.72rem';
+          nameSpan.style.color = '#cbd5e1';
+          nameSpan.style.textAlign = 'center';
+          nameSpan.textContent = feat.name;
+
+          tileWrap.appendChild(tile);
+          tileWrap.appendChild(nameSpan);
+          grid.appendChild(tileWrap);
+        });
+
+        modal.style.display = 'flex';
+        if (navigator.vibrate) navigator.vibrate(15);
+      }
+
+      function closeFolderModal() {
+        const modal = document.getElementById('sovraFolderViewModal');
+        if (modal) modal.style.display = 'none';
+        activeFolderId = null;
+      }
+
+      function renameActiveFolder(newTitle) {
+        if (!activeFolderId || !workspaceFolders[activeFolderId]) return;
+        const trimmed = (newTitle || '').trim();
+        workspaceFolders[activeFolderId].title = trimmed || 'Folder';
+        saveMultiPageState();
+        renderHomeScreen();
+      }
+
+      function removeAppFromFolder(folderId, appId) {
+        const folder = workspaceFolders[folderId];
+        if (!folder) return;
+        const idx = folder.apps.indexOf(appId);
+        if (idx !== -1) {
+          folder.apps.splice(idx, 1);
+          if (folder.apps.length <= 1) {
+            for (let p = 0; p < workspacePages.length; p++) {
+              const fIdx = workspacePages[p].indexOf(folderId);
+              if (fIdx !== -1) {
+                if (folder.apps.length === 1) {
+                  workspacePages[p][fIdx] = folder.apps[0];
+                } else {
+                  workspacePages[p].splice(fIdx, 1);
+                }
+                break;
+              }
+            }
+            delete workspaceFolders[folderId];
+            closeFolderModal();
+          }
+          saveMultiPageState();
+          renderHomeScreen();
+          if (activeFolderId === folderId) {
+            openFolderModal(folderId);
+          }
+        }
+      }
+
+      // 9. HomeScreen Long-Press Context Menu & Quick Actions
+      const APP_QUICK_ACTIONS = {
+        chat: [
+          { icon: '💬', label: 'New Message', action: 'new_message' },
+          { icon: '📞', label: 'Audio / Video Call', action: 'call' }
+        ],
+        feed: [
+          { icon: '✍️', label: 'New Post', action: 'new_post' },
+          { icon: '🔥', label: 'Trending Stories', action: 'trending' }
+        ],
+        reels: [
+          { icon: '📹', label: 'Record Reel', action: 'record' },
+          { icon: '✨', label: 'Explore Shorts', action: 'explore' }
+        ],
+        watch: [
+          { icon: '▶️', label: 'Continue Watching', action: 'continue' },
+          { icon: '🔍', label: 'Search Videos', action: 'search' }
+        ],
+        upload: [
+          { icon: '📸', label: 'Quick Snap', action: 'snap' },
+          { icon: '📁', label: 'Browse Storage', action: 'browse' }
+        ],
+        wallet: [
+          { icon: '💸', label: 'Send SOV', action: 'send' },
+          { icon: '📥', label: 'Receive / QR Code', action: 'receive' }
+        ],
+        studio: [
+          { icon: '📊', label: 'Audience Analytics', action: 'analytics' },
+          { icon: '🎙️', label: 'Go Live Broadcast', action: 'live' }
+        ],
+        settings: [
+          { icon: '🔒', label: 'Security & Knox', action: 'knox' },
+          { icon: '🎨', label: 'Wallpapers & Themes', action: 'wallpaper' }
+        ],
+        profile: [
+          { icon: '✏️', label: 'Edit Identity', action: 'edit' },
+          { icon: '🪪', label: 'Sovereign DID Card', action: 'did' }
+        ],
+        mesh_node: [
+          { icon: '📡', label: 'Ping Swarm Radar', action: 'ping' },
+          { icon: '👥', label: 'Nearby Bluetooth Peers', action: 'peers' }
+        ]
+      };
+
+      function openAppContextMenu(appId, x, y, pageIdx, slotIdx) {
+        closeHomeContextMenu();
+        const menu = document.getElementById('sovraAppContextMenu');
+        if (!menu) return;
+
+        activeContextAppId = appId;
+        activeContextPage = typeof pageIdx === 'number' ? pageIdx : currentPage;
+        activeContextSlot = typeof slotIdx === 'number' ? slotIdx : 0;
+
+        const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+        const iconEl = document.getElementById('sovraCtxAppIcon');
+        const nameEl = document.getElementById('sovraCtxAppName');
+        const descEl = document.getElementById('sovraCtxAppDesc');
+
+        if (iconEl) iconEl.textContent = feat ? feat.icon : '📱';
+        if (nameEl) nameEl.textContent = feat ? feat.name : appId;
+        if (descEl) descEl.textContent = feat ? feat.desc : 'Sovereign Application';
+
+        const actions = APP_QUICK_ACTIONS[appId] || [
+          { icon: '⚡', label: 'Quick Action 1', action: 'action_1' },
+          { icon: '✨', label: 'Quick Action 2', action: 'action_2' }
+        ];
+
+        const icon1 = document.getElementById('sovraCtxActionQuickIcon1');
+        const label1 = document.getElementById('sovraCtxActionQuickLabel1');
+        const icon2 = document.getElementById('sovraCtxActionQuickIcon2');
+        const label2 = document.getElementById('sovraCtxActionQuickLabel2');
+
+        if (icon1 && label1) {
+          icon1.textContent = actions[0].icon;
+          label1.textContent = actions[0].label;
+        }
+        if (icon2 && label2) {
+          icon2.textContent = actions[1].icon;
+          label2.textContent = actions[1].label;
+        }
+
+        const posX = Math.min(Math.max(16, (x || 50) - 100), Math.max(16, window.innerWidth - 240));
+        const posY = Math.min(Math.max(60, (y || 120) - 40), Math.max(60, window.innerHeight - 300));
+        menu.style.left = posX + 'px';
+        menu.style.top = posY + 'px';
+        menu.style.display = 'block';
+
+        if (navigator.vibrate) navigator.vibrate(25);
+      }
+
+      function closeAppContextMenu() {
+        const menu = document.getElementById('sovraAppContextMenu');
+        if (menu) menu.style.display = 'none';
+      }
+
+      function handleContextQuickAction(actionNum) {
+        const targetApp = activeContextAppId;
+        closeAppContextMenu();
+        if (targetApp) {
+          openApp(targetApp);
+          const actions = APP_QUICK_ACTIONS[targetApp];
+          const act = actions && actions[actionNum - 1];
+          if (act && typeof showAccountToast === 'function') {
+            showAccountToast(act.label + ' triggered');
+          }
+        }
+      }
+
+      function removeActiveContextApp() {
+        if (!activeContextAppId) return;
+        const target = activeContextAppId;
+        const page = activeContextPage;
+        const slot = activeContextSlot;
+        closeAppContextMenu();
+
+        if (workspacePages[page] && workspacePages[page][slot] === target) {
+          workspacePages[page].splice(slot, 1);
+          saveMultiPageState();
+          renderHomeScreen();
+          if (navigator.vibrate) navigator.vibrate(20);
+          if (typeof showAccountToast === 'function') {
+            const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(target) : null;
+            showAccountToast('Removed ' + (feat ? feat.name : target) + ' from Home Screen');
+          }
+        } else {
+          removeFromHome(target);
+        }
+      }
+
+      function removeAppFromPage(pageIdx, slotIdx) {
+        if (!workspacePages[pageIdx]) return;
+        const removed = workspacePages[pageIdx].splice(slotIdx, 1);
+        saveMultiPageState();
+        renderHomeScreen();
+        if (navigator.vibrate) navigator.vibrate(20);
+        return removed[0];
+      }
+
+      // 10. App Info & Knox Security Modal
+      function openAppInfoModal(appId) {
+        closeAppContextMenu();
+        const targetApp = appId || activeContextAppId;
+        if (!targetApp) return;
+        activeContextAppId = targetApp;
+
+        const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(targetApp) : null;
+        const modal = document.getElementById('sovraAppInfoModal');
+        if (!modal) return;
+
+        const iconEl = document.getElementById('appInfoIcon');
+        const nameEl = document.getElementById('appInfoName');
+        const catEl = document.getElementById('appInfoCategory');
+        const descEl = document.getElementById('appInfoDesc');
+        const storageEl = document.getElementById('appInfoStorage');
+        const secEl = document.getElementById('appInfoSecurity');
+
+        if (iconEl) iconEl.textContent = feat ? feat.icon : '📱';
+        if (nameEl) nameEl.textContent = feat ? feat.name : targetApp;
+        if (catEl) catEl.textContent = feat ? feat.category.toUpperCase() : 'APPLICATION';
+        if (descEl) descEl.textContent = feat ? feat.desc : 'Sovereign distributed web runtime module.';
+
+        if (storageEl) {
+          const sizes = { chat: '3.4 MB', feed: '4.8 MB', reels: '12.1 MB', watch: '18.6 MB', wallet: '1.1 MB', studio: '2.5 MB' };
+          storageEl.textContent = (sizes[targetApp] || '1.8 MB') + ' (SQLite WAL)';
+        }
+        if (secEl) {
+          secEl.textContent = targetApp === 'chat' || targetApp === 'wallet' ? 'Noise_XX E2EE' : 'Ed25519 Signed';
+        }
+
+        modal.style.display = 'flex';
+        if (navigator.vibrate) navigator.vibrate(15);
+      }
+
+      function closeAppInfoModal() {
+        const modal = document.getElementById('sovraAppInfoModal');
+        if (modal) modal.style.display = 'none';
+      }
+
+      function launchFromAppInfo() {
+        const targetApp = activeContextAppId;
+        closeAppInfoModal();
+        if (targetApp) {
+          openApp(targetApp);
+        }
+      }
+
+      // 11. Drawer-to-Home Drop & Ghost Dragging
+      function handleDropFromDrawer(pageIdx, slotIdx, appId) {
+        const app = appId || window._spatialDraggingAppId;
+        if (!app) return;
+        window._spatialDraggingAppId = null;
+
+        if (!workspacePages[pageIdx]) workspacePages[pageIdx] = [];
+
+        if (typeof slotIdx === 'number' && workspacePages[pageIdx][slotIdx]) {
+          createOrMergeFolder(pageIdx, slotIdx, app);
+          return;
+        }
+
+        if (!workspacePages[pageIdx].includes(app)) {
+          workspacePages[pageIdx].push(app);
+          saveMultiPageState();
+          renderHomeScreen();
+          if (navigator.vibrate) navigator.vibrate(20);
+          if (typeof showAccountToast === 'function') {
+            const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(app) : null;
+            showAccountToast('Pinned ' + (feat ? feat.name : app) + ' to Page ' + (pageIdx + 1));
+          }
+        }
+      }
+
+      function startGhostDrag(appId, touchOrMouseEvent) {
+        const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
+        if (!feat) return;
+
+        window._spatialDraggingAppId = appId;
+        if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.closeDrawer === 'function') {
+          window.SovraModularGlassOS.closeDrawer();
+        }
+
+        const prior = document.querySelector('.sovra-drag-ghost-clone');
+        if (prior && prior.parentNode) prior.parentNode.removeChild(prior);
+
+        const ghost = document.createElement('div');
+        ghost.className = 'sovra-drag-ghost-clone';
+        ghost.textContent = feat.icon;
+        document.body.appendChild(ghost);
+
+        const startX = touchOrMouseEvent.clientX || (touchOrMouseEvent.touches && touchOrMouseEvent.touches[0].clientX) || 100;
+        const startY = touchOrMouseEvent.clientY || (touchOrMouseEvent.touches && touchOrMouseEvent.touches[0].clientY) || 100;
+        ghost.style.left = (startX - 36) + 'px';
+        ghost.style.top = (startY - 36) + 'px';
+
+        function onMove(e) {
+          const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+          const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+          ghost.style.left = (clientX - 36) + 'px';
+          ghost.style.top = (clientY - 36) + 'px';
+          handleDragOverEdge(clientX);
+        }
+
+        function onEnd(e) {
+          clearEdgeScroll();
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onEnd);
+          window.removeEventListener('touchmove', onMove);
+          window.removeEventListener('touchend', onEnd);
+
+          if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+
+          const clientX = e.clientX || (e.changedTouches && e.changedTouches[0].clientX) || 0;
+          const clientY = e.clientY || (e.changedTouches && e.changedTouches[0].clientY) || 0;
+
+          if (document.elementFromPoint) {
+            const targetEl = document.elementFromPoint(clientX, clientY);
+            if (targetEl) {
+              const tileWrap = targetEl.closest('.sovra-home-tile-wrap');
+              if (tileWrap) {
+                const page = parseInt(tileWrap.getAttribute('data-page-index') || '0', 10);
+                const slot = parseInt(tileWrap.getAttribute('data-slot-index') || '0', 10);
+                handleDropFromDrawer(page, slot, appId);
+                return;
+              }
+              const pageEl = targetEl.closest('.sovra-workspace-page');
+              if (pageEl) {
+                const pageId = pageEl.id || '';
+                const p = parseInt(pageId.replace('sovraWorkspacePage_', ''), 10) || currentPage;
+                handleDropFromDrawer(p, null, appId);
+                return;
+              }
+            }
+          }
+
+          handleDropFromDrawer(currentPage, null, appId);
+        }
+
+        window.addEventListener('mousemove', onMove, { passive: true });
+        window.addEventListener('mouseup', onEnd);
+        window.addEventListener('touchmove', onMove, { passive: true });
+        window.addEventListener('touchend', onEnd);
+      }
+
+      function resetHomeScreenDefaults() {
+        workspacePages = JSON.parse(JSON.stringify(DEFAULT_PAGES));
+        workspaceFolders = {};
+        try {
+          localStorage.removeItem(MULTIPAGE_KEY);
+          localStorage.removeItem(FOLDERS_KEY);
+          localStorage.removeItem(HOME_APPS_KEY);
+        } catch (_) {}
+        saveMultiPageState();
+        renderHomeScreen();
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('Home Screen reset to factory defaults');
+        }
       }
 
       // 8. Multi-Page Navigation & Pagination Controls
@@ -83708,20 +84588,17 @@ function renderHtml(
           grid.innerHTML = '';
 
           const pageApps = workspacePages[p] || [];
-          pageApps.forEach((appId, slotIdx) => {
-            const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(appId) : null;
-            if (!feat) return;
-
+          pageApps.forEach((item, slotIdx) => {
             const wrap = document.createElement('div');
             wrap.className = 'sovra-home-tile-wrap' + (isEditMode ? ' is-editing' : '');
             wrap.setAttribute('draggable', 'true');
             wrap.setAttribute('data-page-index', String(p));
             wrap.setAttribute('data-slot-index', String(slotIdx));
-            wrap.setAttribute('data-app-id', appId);
+            wrap.setAttribute('data-app-id', item);
 
-            // Drag-and-drop spatial events
+            // Drag-and-drop spatial events on tile wrap
             wrap.ondragstart = (e) => {
-              draggedApp = { page: p, slot: slotIdx, appId: appId };
+              draggedApp = { page: p, slot: slotIdx, appId: item };
               wrap.classList.add('is-dragging');
               if (e.dataTransfer) {
                 e.dataTransfer.setData('text/plain', JSON.stringify(draggedApp));
@@ -83735,19 +84612,30 @@ function renderHtml(
             };
             wrap.ondragleave = () => {
               wrap.classList.remove('is-drag-over');
+              wrap.classList.remove('is-folder-target');
               clearEdgeScroll();
             };
             wrap.ondrop = (e) => {
               e.preventDefault();
               wrap.classList.remove('is-drag-over');
+              wrap.classList.remove('is-folder-target');
               clearEdgeScroll();
-              if (draggedApp) {
-                swapApps(draggedApp.page, draggedApp.slot, p, slotIdx);
+              if (window._spatialDraggingAppId) {
+                handleDropFromDrawer(p, slotIdx, window._spatialDraggingAppId);
+                window._spatialDraggingAppId = null;
+              } else if (draggedApp) {
+                if (e.ctrlKey || e.altKey || wrap.classList.contains('is-folder-target')) {
+                  createOrMergeFolder(p, slotIdx, draggedApp.appId);
+                } else {
+                  swapApps(draggedApp.page, draggedApp.slot, p, slotIdx);
+                }
                 draggedApp = null;
               }
             };
             wrap.ondragend = () => {
               wrap.classList.remove('is-dragging');
+              wrap.classList.remove('is-drag-over');
+              wrap.classList.remove('is-folder-target');
               clearEdgeScroll();
               draggedApp = null;
               const overEls = document.querySelectorAll('.sovra-home-tile-wrap.is-drag-over');
@@ -83756,14 +84644,104 @@ function renderHtml(
               }
             };
 
+            // CASE 1: Item is an App Folder
+            if (isFolderId(item)) {
+              const folder = workspaceFolders[item] || { title: 'Folder', apps: [] };
+              const tile = document.createElement('div');
+              tile.className = 'sovra-app-tile sovra-folder-tile';
+              tile.setAttribute('data-folder-id', item);
+              tile.setAttribute('title', folder.title + ' (' + folder.apps.length + ' apps)');
+              tile.setAttribute('role', 'button');
+              tile.setAttribute('tabindex', '0');
+
+              // 2x2 preview grid inside the folder tile
+              const miniGrid = document.createElement('div');
+              miniGrid.style.display = 'grid';
+              miniGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+              miniGrid.style.gap = '3px';
+              miniGrid.style.width = '42px';
+              miniGrid.style.height = '42px';
+              miniGrid.style.alignItems = 'center';
+              miniGrid.style.justifyItems = 'center';
+
+              const previewApps = folder.apps.slice(0, 4);
+              previewApps.forEach(subId => {
+                const subFeat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(subId) : null;
+                const mini = document.createElement('div');
+                mini.className = 'sovra-folder-mini-icon';
+                mini.textContent = subFeat ? subFeat.icon : '📱';
+                miniGrid.appendChild(mini);
+              });
+              tile.appendChild(miniGrid);
+
+              if (isEditMode) {
+                const unpinBtn = document.createElement('button');
+                unpinBtn.type = 'button';
+                unpinBtn.className = 'sovra-tile-unpin-btn';
+                unpinBtn.style.display = 'flex';
+                unpinBtn.innerHTML = '&times;';
+                unpinBtn.title = 'Remove Folder';
+                unpinBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  removeAppFromPage(p, slotIdx);
+                };
+                tile.appendChild(unpinBtn);
+              }
+
+              tile.onclick = () => {
+                if (isEditMode) return;
+                openFolderModal(item);
+              };
+
+              tile.oncontextmenu = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleEditMode();
+              };
+
+              tile.ondragover = (e) => {
+                e.stopPropagation();
+                wrap.classList.add('is-folder-target');
+              };
+
+              tile.ondrop = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                wrap.classList.remove('is-folder-target');
+                if (window._spatialDraggingAppId) {
+                  createOrMergeFolder(p, slotIdx, window._spatialDraggingAppId);
+                  window._spatialDraggingAppId = null;
+                } else if (draggedApp) {
+                  createOrMergeFolder(p, slotIdx, draggedApp.appId);
+                  draggedApp = null;
+                }
+              };
+
+              wrap.appendChild(tile);
+
+              const labelSpan = document.createElement('span');
+              labelSpan.className = 'sovra-app-tile-label';
+              labelSpan.style.maxWidth = '72px';
+              labelSpan.style.fontSize = '0.72rem';
+              labelSpan.textContent = folder.title;
+              wrap.appendChild(labelSpan);
+
+              grid.appendChild(wrap);
+              return;
+            }
+
+            // CASE 2: Item is a standard App
+            const feat = window.SovraModularGlassOS ? window.SovraModularGlassOS.getFeature(item) : null;
+            if (!feat) return;
+
             const tile = document.createElement('div');
             tile.className = 'sovra-app-tile';
-            tile.setAttribute('data-feature-id', appId);
+            tile.setAttribute('data-feature-id', item);
             tile.setAttribute('title', feat.name + ' - ' + feat.desc);
             tile.setAttribute('role', 'button');
             tile.setAttribute('tabindex', '0');
 
-            const theme = (window.SOVRA_FEATURE_THEMES && window.SOVRA_FEATURE_THEMES[appId]) || { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(0,0,0,0.4)' };
+            const theme = (window.SOVRA_FEATURE_THEMES && window.SOVRA_FEATURE_THEMES[item]) || { gradient: 'linear-gradient(135deg, #1e293b, #334155)', shadow: 'rgba(0,0,0,0.4)' };
             tile.style.background = theme.gradient;
             tile.style.boxShadow = '0 10px 24px -4px ' + theme.shadow + ', inset 0 1px 1px 0 rgba(255, 255, 255, 0.45)';
             tile.style.border = '1px solid rgba(255, 255, 255, 0.22)';
@@ -83777,7 +84755,7 @@ function renderHtml(
               unpinBtn.title = 'Remove from Home Screen';
               unpinBtn.onclick = (e) => {
                 e.stopPropagation();
-                removeFromHome(appId);
+                removeFromHome(item);
               };
               tile.appendChild(unpinBtn);
             }
@@ -83797,25 +84775,46 @@ function renderHtml(
 
             tile.onclick = () => {
               if (isEditMode) return;
-              openApp(appId);
+              openApp(item);
             };
 
             tile.oncontextmenu = (e) => {
               e.preventDefault();
               e.stopPropagation();
               if (navigator.vibrate) navigator.vibrate(20);
-              toggleEditMode();
+              openAppContextMenu(item, e.clientX, e.clientY, p, slotIdx);
             };
 
-            let timer = null;
-            tile.ontouchstart = () => {
-              timer = setTimeout(() => {
+            let touchTimer = null;
+            tile.ontouchstart = (e) => {
+              const touch = e.touches ? e.touches[0] : e;
+              const tx = touch.clientX;
+              const ty = touch.clientY;
+              touchTimer = setTimeout(() => {
                 if (navigator.vibrate) navigator.vibrate(25);
-                toggleEditMode();
-              }, 450);
+                openAppContextMenu(item, tx, ty, p, slotIdx);
+              }, 400);
             };
-            tile.ontouchend = () => { if (timer) clearTimeout(timer); };
-            tile.ontouchmove = () => { if (timer) clearTimeout(timer); };
+            tile.ontouchend = () => { if (touchTimer) clearTimeout(touchTimer); };
+            tile.ontouchmove = () => { if (touchTimer) clearTimeout(touchTimer); };
+
+            tile.ondragover = (e) => {
+              e.stopPropagation();
+              wrap.classList.add('is-folder-target');
+            };
+
+            tile.ondrop = (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              wrap.classList.remove('is-folder-target');
+              if (window._spatialDraggingAppId) {
+                createOrMergeFolder(p, slotIdx, window._spatialDraggingAppId);
+                window._spatialDraggingAppId = null;
+              } else if (draggedApp) {
+                createOrMergeFolder(p, slotIdx, draggedApp.appId);
+                draggedApp = null;
+              }
+            };
 
             wrap.appendChild(tile);
 
@@ -83888,6 +84887,26 @@ function renderHtml(
         getCurrentPage: () => currentPage,
         getWorkspacePages: () => workspacePages,
         getPageApps: (p) => workspacePages[p] || [],
+        getFolders: () => workspaceFolders,
+        getFolder,
+        createFolder,
+        createOrMergeFolder,
+        openFolderModal,
+        closeFolderModal,
+        renameActiveFolder,
+        removeAppFromFolder,
+        openAppContextMenu,
+        closeAppContextMenu,
+        handleContextQuickAction,
+        removeActiveContextApp,
+        removeAppFromPage,
+        openAppInfoModal,
+        closeAppInfoModal,
+        launchFromAppInfo,
+        handleDropFromDrawer,
+        startGhostDrag,
+        resetHomeScreenDefaults,
+        isEditMode: () => isEditMode,
         goToPage,
         nextPage,
         prevPage,
