@@ -19137,9 +19137,7 @@ function renderHtml(
           </div>
         </div>
         <div id="sovraNativeAppRightActions" style="display: flex; align-items: center; gap: 8px;">
-          <button type="button" onclick="window.SovraAndroidOS &amp;&amp; window.SovraAndroidOS.goHome()" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px; padding: 5px 12px; color: #94a3b8; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px;" title="Home Desktop">
-            <span>○</span> <span>Home</span>
-          </button>
+          <!-- Dedicated app bar actions (system home/back handled by Android 3-button navigation floor) -->
         </div>
       </header>
       <!-- 💬 Non-Intrusive Floating Top Chat Message Capsule (Dynamic Heads-Up) -->
