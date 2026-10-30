@@ -1,0 +1,142 @@
+/**
+ * 👑 SOVRA SOVEREIGN OS - DEDICATED APPS & PURGE RULES
+ * File: public/css/sovra-apps.css
+ * 100% Fullscreen Viewport App Isolation, Total Clutter Purge & Auth Gateway Modal.
+ */
+
+/* =========================================================================
+   1. TOTAL EXTERIOR WEBSITE SHELL PURGE
+   ========================================================================= */
+body.sovra-mode-home .app-top-header,
+body.sovra-mode-app .app-top-header,
+.app-top-header,
+.app-left-rail,
+.app-right-rail,
+#appStageFooter,
+#guestModeRibbon,
+.mobile-bottom-nav,
+.fb-contacts-card,
+#insecureContextNotice,
+#feed-view #sovraHeroAnchorCard {
+  display: none !important;
+}
+
+/* =========================================================================
+   2. MODE-SPECIFIC VISIBILITY RULES
+   ========================================================================= */
+body.sovra-mode-home .app-layout {
+  display: none !important;
+}
+
+body.sovra-mode-home .sovra-home-screen-view {
+  display: flex !important;
+}
+
+body.sovra-mode-home .sovra-android-nav-bar {
+  display: flex !important;
+}
+
+body.sovra-mode-home .sovra-native-app-bar {
+  display: none !important;
+}
+
+body.sovra-mode-app .sovra-home-screen-view {
+  display: none !important;
+}
+
+body.sovra-mode-app .sovra-floating-glass-dock,
+body.sovra-mode-app #sovraFloatingGlassDock,
+body.sovra-mode-app #sovraModularGlassDock,
+body.sovra-mode-app #sovraFloatingDockPill {
+  display: none !important;
+}
+
+body.sovra-mode-app .sovra-android-nav-bar {
+  display: flex !important;
+}
+
+body.sovra-mode-app .sovra-native-app-bar {
+  display: flex !important;
+}
+
+body.sovra-mode-app .app-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100vw !important;
+  height: calc(100vh - 48px) !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  position: fixed !important;
+  inset: 0 !important;
+  bottom: 48px !important;
+  z-index: 20 !important;
+  background: #050811 !important;
+  animation: sovraAppFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sovraAppFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+body.sovra-mode-app .app-center-stage {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* =========================================================================
+   3. AUTHENTICATION LANDING GATEWAY MODAL
+   ========================================================================= */
+.sovra-auth-landing-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 17, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 10020;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+.sovra-auth-landing-card {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 32px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+  padding: 2.25rem;
+  box-sizing: border-box;
+  animation: modalScaleUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* =========================================================================
+   4. WALLET FULLSCREEN MODAL
+   ========================================================================= */
+#fullPageWalletModal {
+  position: fixed !important;
+  inset: 0 !important;
+  bottom: 48px !important;
+  width: 100vw !important;
+  height: calc(100vh - 48px) !important;
+  background: #050811 !important;
+  z-index: 10001 !important;
+  overflow-y: auto !important;
+}
