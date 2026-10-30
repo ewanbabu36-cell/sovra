@@ -4145,7 +4145,7 @@ function renderHtml(
         border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
       }
       .composer-top-publish-btn {
-        display: inline-flex !important;
+        display: none !important;
         align-items: center !important;
         justify-content: center !important;
         background: linear-gradient(135deg, #0284c7, #38bdf8) !important;
@@ -10141,6 +10141,7 @@ function renderHtml(
     #appStageFooter,
     #guestModeRibbon,
     .mobile-bottom-nav,
+    #mobileFloatingActionBtn,
     .fb-contacts-card,
     #insecureContextNotice,
     #feed-view #sovraHeroAnchorCard {
@@ -22319,8 +22320,7 @@ function renderHtml(
                       <button class="yt-btn" id="btnShortcutsHelp" onclick="openYtKeyboardShortcutsModal()" title="Keyboard Shortcuts (Shift + ?)">⌨️</button>
                     </div>
 
-                    <!-- Mobile Settings Button (Opens Bottom Sheet Modal) -->
-                    <button class="yt-btn yt-mobile-settings-btn" onclick="openYtModal('mobilePlayerSettingsModal')" title="Video Settings">⚙️</button>
+                    <!-- Mobile settings consolidated in top-right header overlay -->
 
                     <!-- Fullscreen Toggle -->
                     <button class="yt-btn" id="btnFullscreen" onclick="toggleFullscreen()" title="Fullscreen (f)">⛶</button>
@@ -22431,10 +22431,7 @@ function renderHtml(
 
                 <button class="btn-subscribe" id="btnSubscribe" onclick="toggleYtSubscribe()">Subscribe</button>
 
-                <!-- Super Thanks Button -->
-                <button type="button" class="btn btn-secondary yt-super-thanks-btn" onclick="openSuperThanksModal()" title="Send Super Thanks" style="display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(234, 88, 12, 0.2)); border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24; border-radius: 20px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
-                  <span>⚡</span> <span>Super Thanks</span>
-                </button>
+                <!-- Super Thanks consolidated in action bar -->
 
                 <button class="yt-btn" id="btnBellNotify" style="background: rgba(255,255,255,0.1); border-radius: 50%; width: 36px; height: 36px; display: none;" onclick="cycleBellNotification()" title="Notification Preference">
                   <span id="bellIcon">🔔</span>
