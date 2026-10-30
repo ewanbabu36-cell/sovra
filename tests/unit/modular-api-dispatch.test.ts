@@ -157,4 +157,150 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
     expect(body.systemTelemetry).toBeDefined();
     expect(body.systemTelemetry.version).toBe('1.0.0-ENTERPRISE');
   });
+
+  it('6. Social Controller: manages post creation, reactions, comments, and soft deletion', async () => {
+    // 1. Create a new post
+    const { req: createReq, res: createRes } = createMockHttp(
+      'POST',
+      '/api/posts',
+      {
+        content: 'Enterprise decentralized feed architecture verified.',
+        authorHandle: 'lead_architect',
+        authorName: 'Lead Architect',
+      },
+      { 'x-sovra-did': 'did:sovra:architect_test' }
+    );
+    await dispatchApiRequest(createReq, createRes, '/api/posts');
+    expect(createRes.statusCode).toBe(201);
+    const createData = JSON.parse(createRes.body);
+    expect(createData.ok).toBe(true);
+    expect(createData.post.authorHandle).toBe('lead_architect');
+    expect(createData.post.content).toBe('Enterprise decentralized feed architecture verified.');
+    const postId = createData.post.id;
+
+    // 2. Query Feed (includes new post)
+    const { req: feedReq, res: feedRes } = createMockHttp('GET', '/api/posts?limit=10');
+    await dispatchApiRequest(feedReq, feedRes, '/api/posts');
+    expect(feedRes.statusCode).toBe(200);
+    const feedData = JSON.parse(feedRes.body);
+    expect(feedData.ok).toBe(true);
+    expect(feedData.posts.some((p: any) => p.id === postId)).toBe(true);
+
+    // 3. Add Micro-reaction (Like)
+    const { req: reactReq, res: reactRes } = createMockHttp(
+      'POST',
+      `/api/posts/${postId}/reactions`,
+      { reaction: 'like' },
+      { 'x-sovra-did': 'did:sovra:architect_test' }
+    );
+    await dispatchApiRequest(reactReq, reactRes, `/api/posts/${postId}/reactions`);
+    expect(reactRes.statusCode).toBe(200);
+    const reactData = JSON.parse(reactRes.body);
+    expect(reactData.likesCount).toBe(1);
+    expect(reactData.reactions.like).toBe(1);
+
+    // 4. Add Comment
+    const { req: commentReq, res: commentRes } = createMockHttp(
+      'POST',
+      `/api/posts/${postId}/comments`,
+      {
+        content: 'Verified by autonomous QA pipeline.',
+        authorHandle: 'qa_engineer',
+      },
+      { 'x-sovra-did': 'did:sovra:qa_bot' }
+    );
+    await dispatchApiRequest(commentReq, commentRes, `/api/posts/${postId}/comments`);
+    expect(commentRes.statusCode).toBe(201);
+    const commentData = JSON.parse(commentRes.body);
+    expect(commentData.comment.content).toBe('Verified by autonomous QA pipeline.');
+
+    // 5. Query Comments
+    const { req: getCommentsReq, res: getCommentsRes } = createMockHttp(
+      'GET',
+      `/api/posts/${postId}/comments`
+    );
+    await dispatchApiRequest(getCommentsReq, getCommentsRes, `/api/posts/${postId}/comments`);
+    expect(getCommentsRes.statusCode).toBe(200);
+    const commentsList = JSON.parse(getCommentsRes.body);
+    expect(commentsList.totalCount).toBe(1);
+
+    // 6. Soft Delete Post
+    const { req: delReq, res: delRes } = createMockHttp(
+      'DELETE',
+      `/api/posts/${postId}`,
+      undefined,
+      { 'x-sovra-did': 'did:sovra:architect_test' }
+    );
+    await dispatchApiRequest(delReq, delRes, `/api/posts/${postId}`);
+    expect(delRes.statusCode).toBe(200);
+
+    // Verify post is excluded from active feed
+    const { req: feedAfterReq, res: feedAfterRes } = createMockHttp('GET', '/api/posts?limit=10');
+    await dispatchApiRequest(feedAfterReq, feedAfterRes, '/api/posts');
+    const feedAfterData = JSON.parse(feedAfterRes.body);
+    expect(feedAfterData.posts.some((p: any) => p.id === postId)).toBe(false);
+  });
+
+  it('7. Chat Controller: manages end-to-end direct messages, thread retrieval, and read receipts', async () => {
+    const senderDid = 'did:sovra:alice_peer';
+    const recipientDid = 'did:sovra:bob_peer';
+
+    // 1. Send direct message
+    const { req: sendReq, res: sendRes } = createMockHttp(
+      'POST',
+      '/api/chat/messages',
+      {
+        recipientDid,
+        content: 'Decentralized message via sovereign mesh.',
+        attachmentCid: 'bafybeic52...sample',
+        disappearingSeconds: 86400,
+      },
+      { 'x-sovra-did': senderDid }
+    );
+    await dispatchApiRequest(sendReq, sendRes, '/api/chat/messages');
+    expect(sendRes.statusCode).toBe(201);
+    const sendData = JSON.parse(sendRes.body);
+    expect(sendData.ok).toBe(true);
+    expect(sendData.message.senderDid).toBe(senderDid);
+    expect(sendData.message.recipientDid).toBe(recipientDid);
+    expect(sendData.message.isDelivered).toBe(true);
+    expect(sendData.message.isRead).toBe(false);
+    expect(sendData.message.disappearingSeconds).toBe(86400);
+
+    const messageId = sendData.message.id;
+    const threadId = sendData.message.threadId;
+
+    // 2. Fetch thread messages
+    const { req: getMsgReq, res: getMsgRes } = createMockHttp(
+      'GET',
+      `/api/chat/messages/${threadId}`
+    );
+    await dispatchApiRequest(getMsgReq, getMsgRes, `/api/chat/messages/${threadId}`);
+    expect(getMsgRes.statusCode).toBe(200);
+    const msgList = JSON.parse(getMsgRes.body);
+    expect(msgList.messages.length).toBeGreaterThanOrEqual(1);
+
+    // 3. Mark message as read
+    const { req: readReq, res: readRes } = createMockHttp(
+      'POST',
+      `/api/chat/messages/${messageId}/read`
+    );
+    await dispatchApiRequest(readReq, readRes, `/api/chat/messages/${messageId}/read`);
+    expect(readRes.statusCode).toBe(200);
+    const readData = JSON.parse(readRes.body);
+    expect(readData.isRead).toBe(true);
+
+    // 4. Fetch threads list for recipient
+    const { req: threadsReq, res: threadsRes } = createMockHttp(
+      'GET',
+      '/api/chat/threads',
+      undefined,
+      { 'x-sovra-did': recipientDid }
+    );
+    await dispatchApiRequest(threadsReq, threadsRes, '/api/chat/threads');
+    expect(threadsRes.statusCode).toBe(200);
+    const threadsData = JSON.parse(threadsRes.body);
+    expect(threadsData.ok).toBe(true);
+    expect(threadsData.threads.some((t: any) => t.threadId === threadId)).toBe(true);
+  });
 });

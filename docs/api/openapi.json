@@ -1,0 +1,916 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SOVRA Sovereign Protocol & Smartphone OS API",
+    "version": "1.0.0-ENTERPRISE",
+    "description": "Production-grade RESTful and P2P API specification for Sovra: the world's first decentralized sovereign smartphone OS and social protocol. Featuring W3C Decentralized Identifiers (DIDs), zero-knowledge peer sessions, double-entry sovereign token vaults, content-addressed IPFS/UnixFS media pipelines, and end-to-end encrypted direct messaging.",
+    "contact": {
+      "name": "Sovra Protocol Engineering Team",
+      "url": "https://sovra.network",
+      "email": "security@sovra.network"
+    },
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Local Development Node"
+    },
+    {
+      "url": "https://localhost:3443",
+      "description": "Local Secure WebRTC/P2P Gateway"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication & Identity",
+      "description": "W3C Cryptographic DIDs, Session Tokens, and Sovereign Profiles"
+    },
+    {
+      "name": "Wallet & Ledger",
+      "description": "Sovereign SOV Token Balances, Atomic P2P Transfers, and Audit Trail"
+    },
+    {
+      "name": "Social & Media",
+      "description": "Decentralized Feed, Signed Posts, Micro-Reactions, and Threaded Comments"
+    },
+    {
+      "name": "Chat & Messaging",
+      "description": "Noise_XX End-to-End Encrypted Peer Messaging, Delivery Receipts, and Attachments"
+    },
+    {
+      "name": "System Telemetry",
+      "description": "Node Health, Uptime, Memory Statistics, and Live System Telemetry"
+    }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Authentication & Identity"],
+        "summary": "Register a new sovereign user with cryptographic DID",
+        "operationId": "registerUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User successfully registered with DID and session token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Authentication & Identity"],
+        "summary": "Authenticate user session via handle or DID signature",
+        "operationId": "loginUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Authentication & Identity"],
+        "summary": "Terminate current sovereign session",
+        "operationId": "logoutUser",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Session revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericOkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/me": {
+      "get": {
+        "tags": ["Authentication & Identity"],
+        "summary": "Get authenticated user profile and DID attributes",
+        "operationId": "getCurrentUser",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User profile resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/wallet/balance": {
+      "get": {
+        "tags": ["Wallet & Ledger"],
+        "summary": "Query sovereign vault balance for active DID",
+        "operationId": "getWalletBalance",
+        "security": [{ "BearerAuth": [] }, { "SovraDidHeader": [] }],
+        "responses": {
+          "200": {
+            "description": "Current balance and staking status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletBalanceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wallet/transfer": {
+      "post": {
+        "tags": ["Wallet & Ledger"],
+        "summary": "Execute double-entry sovereign token transfer between DIDs",
+        "operationId": "transferTokens",
+        "security": [{ "BearerAuth": [] }, { "SovraDidHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transfer executed atomically",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          }
+        }
+      }
+    },
+    "/api/wallet/transactions": {
+      "get": {
+        "tags": ["Wallet & Ledger"],
+        "summary": "Retrieve transaction history and ledger receipts",
+        "operationId": "getTransactions",
+        "security": [{ "BearerAuth": [] }, { "SovraDidHeader": [] }],
+        "responses": {
+          "200": {
+            "description": "List of ledger transactions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionsListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/posts": {
+      "get": {
+        "tags": ["Social & Media"],
+        "summary": "Fetch chronological feed posts with cursor-based pagination",
+        "operationId": "getFeedPosts",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 20, "maximum": 50 }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feed posts retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPostsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Social & Media"],
+        "summary": "Publish a cryptographically attributed post with media CID",
+        "operationId": "createPost",
+        "security": [{ "BearerAuth": [] }, { "SovraDidHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Post published to decentralized graph",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatePostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          }
+        }
+      }
+    },
+    "/api/posts/{id}": {
+      "delete": {
+        "tags": ["Social & Media"],
+        "summary": "Soft delete a post by authorized author DID or admin",
+        "operationId": "deletePost",
+        "security": [{ "BearerAuth": [] }, { "SovraDidHeader": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post soft-deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericOkResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
+    "/api/posts/{id}/reactions": {
+      "post": {
+        "tags": ["Social & Media"],
+        "summary": "Toggle micro-reaction (like, love, rocket, fire) on a post",
+        "operationId": "toggleReaction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reaction updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReactionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/posts/{id}/comments": {
+      "get": {
+        "tags": ["Social & Media"],
+        "summary": "Retrieve comments for a post",
+        "operationId": "getPostComments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comments list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentsListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Social & Media"],
+        "summary": "Add a comment to a post",
+        "operationId": "addPostComment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCommentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Comment added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddCommentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/threads": {
+      "get": {
+        "tags": ["Chat & Messaging"],
+        "summary": "Get direct messaging threads for authenticated DID",
+        "operationId": "getChatThreads",
+        "security": [{ "BearerAuth": [] }, { "SovraDidHeader": [] }],
+        "responses": {
+          "200": {
+            "description": "Active threads returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatThreadsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/messages": {
+      "post": {
+        "tags": ["Chat & Messaging"],
+        "summary": "Send end-to-end encrypted direct message",
+        "operationId": "sendMessage",
+        "security": [{ "BearerAuth": [] }, { "SovraDidHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message queued and delivered to peer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendMessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/messages/{threadId}": {
+      "get": {
+        "tags": ["Chat & Messaging"],
+        "summary": "Fetch message history for specific thread",
+        "operationId": "getThreadMessages",
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thread messages retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadMessagesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/messages/{id}/read": {
+      "post": {
+        "tags": ["Chat & Messaging"],
+        "summary": "Acknowledge read receipt for message",
+        "operationId": "markMessageRead",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericOkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "tags": ["System Telemetry"],
+        "summary": "Get local node status, uptime, and system diagnostics",
+        "operationId": "getNodeStatus",
+        "responses": {
+          "200": {
+            "description": "Node is healthy and operating within SLA parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alerts/active": {
+      "get": {
+        "tags": ["System Telemetry"],
+        "summary": "Retrieve active security and performance alerts",
+        "operationId": "getActiveAlerts",
+        "responses": {
+          "200": {
+            "description": "List of active operational alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveAlertsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "sov_sess_*"
+      },
+      "SovraDidHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-sovra-did"
+      }
+    },
+    "schemas": {
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["handle"],
+        "properties": {
+          "handle": { "type": "string", "example": "satoshi_sovereign" },
+          "displayName": { "type": "string", "example": "Satoshi Nakamoto" },
+          "avatar": { "type": "string", "example": "https://api.dicebear.com/7.x/identicon/svg?seed=satoshi" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["handle"],
+        "properties": {
+          "handle": { "type": "string", "example": "satoshi_sovereign" }
+        }
+      },
+      "AuthSuccessResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "user": { "$ref": "#/components/schemas/UserRecord" },
+          "token": { "type": "string", "example": "sov_sess_a1b2c3d4..." }
+        }
+      },
+      "UserProfileResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "authenticated": { "type": "boolean", "example": true },
+          "user": { "$ref": "#/components/schemas/UserRecord" }
+        }
+      },
+      "UserRecord": {
+        "type": "object",
+        "properties": {
+          "did": { "type": "string", "example": "did:sovra:e2f4a56b..." },
+          "handle": { "type": "string", "example": "satoshi_sovereign" },
+          "displayName": { "type": "string", "example": "Satoshi Nakamoto" },
+          "avatar": { "type": "string", "example": "https://api.dicebear.com/..." },
+          "createdAt": { "type": "integer", "example": 1730000000000 }
+        }
+      },
+      "WalletBalanceResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "did": { "type": "string", "example": "did:sovra:e2f4a56b..." },
+          "balance": { "type": "number", "example": 500.0 },
+          "staked": { "type": "number", "example": 50.0 },
+          "currency": { "type": "string", "example": "SOV" }
+        }
+      },
+      "TransferRequest": {
+        "type": "object",
+        "required": ["recipientDid", "amount"],
+        "properties": {
+          "recipientDid": { "type": "string", "example": "did:sovra:bob_node" },
+          "amount": { "type": "number", "example": 25.0 },
+          "memo": { "type": "string", "example": "P2P network bandwidth contribution" }
+        }
+      },
+      "TransferResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "transaction": { "$ref": "#/components/schemas/TransactionRecord" },
+          "newBalance": { "type": "number", "example": 475.0 }
+        }
+      },
+      "TransactionRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "tx_a1b2c3..." },
+          "senderDid": { "type": "string" },
+          "recipientDid": { "type": "string" },
+          "amount": { "type": "number" },
+          "memo": { "type": "string" },
+          "status": { "type": "string", "example": "CONFIRMED" },
+          "timestamp": { "type": "integer" }
+        }
+      },
+      "TransactionsListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "transactions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TransactionRecord" }
+          }
+        }
+      },
+      "CreatePostRequest": {
+        "type": "object",
+        "required": ["content"],
+        "properties": {
+          "content": { "type": "string", "maxLength": 5000, "example": "Sovereign network online." },
+          "mediaCid": { "type": "string", "example": "bafybeic52..." },
+          "mediaType": { "type": "string", "enum": ["image", "video", "audio", "text"] }
+        }
+      },
+      "CreatePostResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "post": { "$ref": "#/components/schemas/PostRecord" }
+        }
+      },
+      "PostRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "authorDid": { "type": "string" },
+          "authorHandle": { "type": "string" },
+          "authorName": { "type": "string" },
+          "content": { "type": "string" },
+          "mediaCid": { "type": "string" },
+          "likesCount": { "type": "integer" },
+          "commentsCount": { "type": "integer" },
+          "reactions": { "type": "object" },
+          "createdAt": { "type": "integer" }
+        }
+      },
+      "FeedPostsResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "posts": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PostRecord" }
+          },
+          "nextCursor": { "type": "string", "nullable": true },
+          "totalCount": { "type": "integer" }
+        }
+      },
+      "ReactionRequest": {
+        "type": "object",
+        "required": ["reaction"],
+        "properties": {
+          "reaction": { "type": "string", "example": "like" }
+        }
+      },
+      "ReactionResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "reactions": { "type": "object" },
+          "userReaction": { "type": "string", "nullable": true },
+          "likesCount": { "type": "integer" }
+        }
+      },
+      "AddCommentRequest": {
+        "type": "object",
+        "required": ["content"],
+        "properties": {
+          "content": { "type": "string", "example": "Great work on the protocol release!" }
+        }
+      },
+      "AddCommentResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "comment": { "$ref": "#/components/schemas/CommentRecord" }
+        }
+      },
+      "CommentRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "postId": { "type": "string" },
+          "authorDid": { "type": "string" },
+          "authorHandle": { "type": "string" },
+          "content": { "type": "string" },
+          "createdAt": { "type": "integer" }
+        }
+      },
+      "CommentsListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "comments": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CommentRecord" }
+          },
+          "totalCount": { "type": "integer" }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "required": ["recipientDid", "content"],
+        "properties": {
+          "recipientDid": { "type": "string", "example": "did:sovra:bob_peer" },
+          "content": { "type": "string", "example": "Decentralized message over Noise_XX" },
+          "attachmentCid": { "type": "string" },
+          "disappearingSeconds": { "type": "integer", "example": 86400 }
+        }
+      },
+      "SendMessageResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "message": { "$ref": "#/components/schemas/ChatMessageRecord" }
+        }
+      },
+      "ChatMessageRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "threadId": { "type": "string" },
+          "senderDid": { "type": "string" },
+          "recipientDid": { "type": "string" },
+          "content": { "type": "string" },
+          "isDelivered": { "type": "boolean" },
+          "isRead": { "type": "boolean" },
+          "timestamp": { "type": "integer" }
+        }
+      },
+      "ChatThreadsResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": { "type": "string" },
+                "participants": { "type": "array", "items": { "type": "string" } },
+                "lastMessageSnippet": { "type": "string" },
+                "lastMessageTimestamp": { "type": "integer" },
+                "unreadCount": { "type": "integer" }
+              }
+            }
+          }
+        }
+      },
+      "ThreadMessagesResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "threadId": { "type": "string" },
+          "messages": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ChatMessageRecord" }
+          }
+        }
+      },
+      "NodeStatusResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "status": { "type": "string", "example": "ONLINE" },
+          "nodeDid": { "type": "string" },
+          "systemTelemetry": {
+            "type": "object",
+            "properties": {
+              "version": { "type": "string", "example": "1.0.0-ENTERPRISE" },
+              "uptimeSeconds": { "type": "number" },
+              "memoryUsage": { "type": "object" },
+              "activePeers": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "ActiveAlertsResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "alerts": { "type": "array", "items": { "type": "object" } },
+          "count": { "type": "integer" }
+        }
+      },
+      "GenericOkResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "message": { "type": "string", "example": "Operation completed successfully." }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": false },
+          "error": { "type": "string", "example": "Detailed error explanation." }
+        }
+      }
+    },
+    "responses": {
+      "400BadRequest": {
+        "description": "Malformed request or validation error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "401Unauthorized": {
+        "description": "Missing or invalid session credentials",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "403Forbidden": {
+        "description": "Insufficient permissions or unauthorized action",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "404NotFound": {
+        "description": "Requested resource could not be found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "409Conflict": {
+        "description": "Resource conflict (e.g. handle already registered)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      }
+    }
+  }
+}

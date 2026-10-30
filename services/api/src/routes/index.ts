@@ -9,6 +9,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { authController } from '../controllers/auth.controller.ts';
 import { walletController } from '../controllers/wallet.controller.ts';
 import { telemetryController } from '../controllers/telemetry.controller.ts';
+import { socialController } from '../controllers/social.controller.ts';
+import { chatController } from '../controllers/chat.controller.ts';
 import { securityMiddleware } from '../middleware/security.middleware.ts';
 
 export async function dispatchApiRequest(
@@ -65,7 +67,58 @@ export async function dispatchApiRequest(
     return true;
   }
 
-  // 3. System Telemetry & Status Routes
+  // 3. Social & Content Routes
+  if (pathname === '/api/posts' && req.method === 'GET') {
+    socialController.handleGetFeed(req, res);
+    return true;
+  }
+  if (pathname === '/api/posts' && req.method === 'POST') {
+    await socialController.handleCreatePost(req, res);
+    return true;
+  }
+  const deletePostMatch = pathname.match(/^\/api\/posts\/([^/]+)$/);
+  if (deletePostMatch && req.method === 'DELETE') {
+    socialController.handleDeletePost(req, res, deletePostMatch[1]);
+    return true;
+  }
+  const reactionMatch = pathname.match(/^\/api\/posts\/([^/]+)\/reactions$/);
+  if (reactionMatch && req.method === 'POST') {
+    await socialController.handleReaction(req, res, reactionMatch[1]);
+    return true;
+  }
+  const commentsMatch = pathname.match(/^\/api\/posts\/([^/]+)\/comments$/);
+  if (commentsMatch) {
+    if (req.method === 'GET') {
+      socialController.handleGetComments(res, commentsMatch[1]);
+      return true;
+    }
+    if (req.method === 'POST') {
+      await socialController.handleAddComment(req, res, commentsMatch[1]);
+      return true;
+    }
+  }
+
+  // 4. Chat & E2EE Messaging Routes
+  if (pathname === '/api/chat/threads' && req.method === 'GET') {
+    chatController.handleGetThreads(req, res);
+    return true;
+  }
+  if (pathname === '/api/chat/messages' && req.method === 'POST') {
+    await chatController.handleSendMessage(req, res);
+    return true;
+  }
+  const chatMessagesMatch = pathname.match(/^\/api\/chat\/messages\/([^/]+)$/);
+  if (chatMessagesMatch && req.method === 'GET') {
+    chatController.handleGetMessages(res, chatMessagesMatch[1]);
+    return true;
+  }
+  const chatReadMatch = pathname.match(/^\/api\/chat\/messages\/([^/]+)\/read$/);
+  if (chatReadMatch && req.method === 'POST') {
+    chatController.handleMarkRead(res, chatReadMatch[1]);
+    return true;
+  }
+
+  // 5. System Telemetry & Status Routes
   if (pathname === '/api/status' && req.method === 'GET') {
     telemetryController.handleGetStatus(req, res);
     return true;
@@ -75,5 +128,5 @@ export async function dispatchApiRequest(
     return true;
   }
 
-  return false; // Not handled by modular dispatcher, fallback to legacy handlers
+  return false;
 }
