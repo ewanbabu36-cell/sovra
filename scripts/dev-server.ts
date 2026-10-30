@@ -9812,40 +9812,84 @@ function renderHtml(
     }
 
     /* ========================================================================= */
-    /* 🔮 SOVRA MODULAR GLASS OS: 3D LIQUID GLASS TILES & CUSTOMIZABLE DOCK     */
+    /* 🔮 SOVRA MODULAR GLASS OS: 3D LIQUID GLASS TILES & SAMSUNG EDGE PANEL DOCK */
     /* ========================================================================= */
     .sovra-floating-glass-dock {
       position: fixed;
-      bottom: 58px;
-      left: 50%;
-      transform: translateX(-50%);
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      bottom: auto;
+      left: auto;
       z-index: 9998;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-radius: 26px;
-      background: rgba(15, 23, 42, 0.72);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.14);
+      gap: 10px;
+      padding: 12px 8px;
+      border-radius: 28px;
+      background: rgba(10, 15, 29, 0.72);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.16);
       box-shadow: 
-        0 12px 40px rgba(0, 0, 0, 0.5),
+        0 16px 40px rgba(0, 0, 0, 0.6),
         inset 0 1px 1px rgba(255, 255, 255, 0.25);
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      max-width: calc(100vw - 32px);
       box-sizing: border-box;
     }
     body.theme-normal .sovra-floating-glass-dock {
-      background: rgba(255, 255, 255, 0.88) !important;
-      border: 1px solid rgba(203, 213, 225, 0.9) !important;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12) !important;
+      background: rgba(10, 15, 29, 0.78) !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5) !important;
     }
 
     .sovra-dock-slots-container {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
+    }
+
+    .sovra-dock-tile {
+      width: 48px !important;
+      height: 48px !important;
+      border-radius: 16px !important;
+    }
+    .sovra-dock-tile .sovra-app-tile-icon {
+      font-size: 1.4rem !important;
+    }
+    .sovra-dock-tile .sovra-app-tile-label {
+      display: none !important;
+    }
+    #dockLauncherBtn {
+      width: 48px !important;
+      height: 48px !important;
+      border-radius: 16px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    #dockLauncherBtn .sovra-app-tile-label {
+      display: none !important;
+    }
+
+    @media (max-width: 640px) {
+      .sovra-floating-glass-dock {
+        right: 8px;
+        padding: 8px 6px;
+        gap: 6px;
+      }
+      .sovra-dock-tile,
+      #dockLauncherBtn {
+        width: 40px !important;
+        height: 40px !important;
+        border-radius: 13px !important;
+      }
+      .sovra-dock-tile .sovra-app-tile-icon {
+        font-size: 1.2rem !important;
+      }
     }
 
     .sovra-app-tile {
@@ -9875,13 +9919,11 @@ function renderHtml(
       transform: scale(0.95);
     }
     body.theme-normal .sovra-app-tile {
-      background: rgba(241, 245, 249, 0.9) !important;
-      border: 1px solid #cbd5e1 !important;
-      color: #0f172a !important;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #ffffff;
     }
     body.theme-normal .sovra-app-tile:hover {
-      background: #e2e8f0 !important;
-      border-color: #0284c7 !important;
+      border-color: rgba(56, 189, 248, 0.6);
     }
 
     .sovra-app-tile-icon {
@@ -9901,7 +9943,7 @@ function renderHtml(
       text-align: center;
     }
     body.theme-normal .sovra-app-tile-label {
-      color: #334155 !important;
+      color: #f1f5f9 !important;
     }
 
     /* Living Micro-Widgets Badges */
@@ -10059,7 +10101,7 @@ function renderHtml(
       transition: background 0.3s ease, backdrop-filter 0.3s ease;
     }
     body.theme-normal .sovra-wallpaper-dimmer {
-      background: rgba(255, 255, 255, calc(var(--wallpaper-dim) * 0.7));
+      background: rgba(0, 0, 0, var(--wallpaper-dim));
     }
 
     /* Layer 1: Dedicated Android Home Screen Desktop */
@@ -10234,13 +10276,13 @@ function renderHtml(
       color: #ffffff;
       line-height: 1;
       letter-spacing: -1px;
-      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.85), 0 0 40px rgba(56, 189, 248, 0.3);
       font-variant-numeric: tabular-nums;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Google Sans", sans-serif;
     }
     body.theme-normal .android-glance-clock {
-      color: #0f172a !important;
-      text-shadow: 0 2px 10px rgba(255, 255, 255, 0.8);
+      color: #ffffff !important;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.85), 0 0 40px rgba(56, 189, 248, 0.3) !important;
     }
     .android-glance-date {
       font-size: 1.15rem;
@@ -10251,7 +10293,8 @@ function renderHtml(
       letter-spacing: 0.2px;
     }
     body.theme-normal .android-glance-date {
-      color: #334155 !important;
+      color: #94a3b8 !important;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8) !important;
     }
     .android-glance-status-pill {
       margin-top: 12px;
@@ -10277,10 +10320,10 @@ function renderHtml(
       box-shadow: 0 8px 25px rgba(56, 189, 248, 0.35);
     }
     body.theme-normal .android-glance-status-pill {
-      background: rgba(255, 255, 255, 0.88) !important;
-      border-color: #cbd5e1 !important;
-      color: #0f172a !important;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+      background: rgba(15, 23, 42, 0.75) !important;
+      border-color: rgba(56, 189, 248, 0.3) !important;
+      color: #f8fafc !important;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
     }
     .glance-status-dot {
       width: 8px;
@@ -10317,9 +10360,9 @@ function renderHtml(
       box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
     }
     body.theme-normal .android-search-pill {
-      background: rgba(255, 255, 255, 0.9) !important;
-      border-color: #cbd5e1 !important;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
+      background: rgba(15, 23, 42, 0.65) !important;
+      border-color: rgba(255, 255, 255, 0.16) !important;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35) !important;
     }
     .android-search-icon {
       font-size: 1.15rem;
@@ -10333,7 +10376,7 @@ function renderHtml(
       font-weight: 500;
     }
     body.theme-normal .android-search-placeholder {
-      color: #64748b !important;
+      color: #94a3b8 !important;
     }
     .android-search-mic {
       font-size: 1.1rem;
@@ -10410,26 +10453,26 @@ function renderHtml(
     /* Dynamic Pagination Dot Indicator */
     .sovra-page-dots-indicator {
       position: fixed;
-      bottom: 122px;
+      bottom: 64px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       z-index: 100;
       pointer-events: auto;
-      padding: 5px 12px;
+      padding: 6px 14px;
       border-radius: 999px;
-      background: rgba(10, 14, 26, 0.65);
+      background: rgba(10, 14, 26, 0.6);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
     }
     body.theme-normal .sovra-page-dots-indicator {
-      background: rgba(255, 255, 255, 0.85) !important;
-      border-color: #cbd5e1 !important;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+      background: rgba(10, 14, 26, 0.65) !important;
+      border-color: rgba(255, 255, 255, 0.16) !important;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5) !important;
     }
     .sovra-page-dot {
       width: 7px;
@@ -10529,8 +10572,8 @@ function renderHtml(
       max-width: 80px;
     }
     body.theme-normal .sovra-home-tile-wrap .sovra-app-tile-label {
-      color: #0f172a !important;
-      text-shadow: 0 1px 4px rgba(255, 255, 255, 0.8) !important;
+      color: #f1f5f9 !important;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9) !important;
     }
 
     .sovra-home-tile-wrap.is-editing .sovra-app-tile {
@@ -29815,7 +29858,7 @@ function renderHtml(
     <div id="floatingDockSlotsContainer" class="sovra-dock-slots-container">
       <!-- Dynamically hydrated by SovraModularGlassOS.renderDock() -->
     </div>
-    <div style="width: 1px; height: 28px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
+    <div style="width: 24px; height: 1px; background: rgba(255,255,255,0.18); margin: 4px 0;"></div>
     <!-- Master App Drawer Launcher Tile -->
     <button type="button" id="dockLauncherBtn" class="sovra-app-tile" onclick="window.SovraModularGlassOS.toggleDrawer()" title="Open App Drawer &amp; Customize" aria-label="Open App Drawer &amp; Customize" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;">
       <span class="sovra-app-tile-icon">✨</span>
@@ -83337,6 +83380,11 @@ function renderHtml(
       // 1. Wallpaper Presets
       const WALLPAPER_PRESETS = [
         {
+          id: 'sapphire',
+          name: 'Midnight Sapphire',
+          gradient: 'radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.28) 0%, transparent 55%), radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.22) 0%, transparent 50%), radial-gradient(circle at 15% 85%, rgba(14, 165, 233, 0.2) 0%, transparent 50%), linear-gradient(180deg, #050811 0%, #0a0f1e 40%, #03050c 100%)'
+        },
+        {
           id: 'nebula',
           name: 'Cosmic Nebula',
           gradient: 'radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.45) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(56, 189, 248, 0.35) 0%, transparent 50%), linear-gradient(135deg, #090614 0%, #130924 40%, #1e1145 75%, #0a1128 100%)'
@@ -83390,10 +83438,10 @@ function renderHtml(
       let activeContextSlot = 0;
 
       let wallpaperConfig = {
-        id: 'nebula',
+        id: 'sapphire',
         type: 'preset',
         blur: 0,
-        dim: 20,
+        dim: 0,
         customDataUrl: ''
       };
 
@@ -83448,7 +83496,7 @@ function renderHtml(
           const rawWp = localStorage.getItem(WALLPAPER_KEY);
           if (rawWp) {
             const parsed = JSON.parse(rawWp);
-            if (parsed && parsed.id) wallpaperConfig = { ...wallpaperConfig, ...parsed };
+            if (parsed && parsed.id && parsed.id !== 'nebula') wallpaperConfig = { ...wallpaperConfig, ...parsed };
           }
         } catch (_) {}
 
