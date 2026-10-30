@@ -19068,7 +19068,7 @@ function renderHtml(
         <!-- Creator & Spaces Section (Consolidated: Zero Duplication) -->
         <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 6px 14px; padding-top: 6px;">
           <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 4px 6px;">Creator &amp; Spaces</div>
-          <div class="dev-drawer-item" onclick="switchTab('studio'); toggleDevMainMenu(false);">
+          <div class="dev-drawer-item" onclick="openCreatorStudioModal(); switchTab('studio'); toggleDevMainMenu(false);">
             <span>🎬</span> <span style="color: #fb7185; font-weight: 600;">Creator Studio Pro</span>
           </div>
           <div class="dev-drawer-item" onclick="if(typeof openSpatialChannelsPagesSurface==='function')openSpatialChannelsPagesSurface(this);else switchTab('me'); toggleDevMainMenu(false);">
