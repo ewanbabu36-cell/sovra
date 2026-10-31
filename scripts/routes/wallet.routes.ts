@@ -466,13 +466,57 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
       const targetDid = parsed.did || (principal ? principal.did : 'did:sovra:guest');
       const amount = Number(parsed.amount || 50);
 
-      const result = (sovraDb as any).depositFunds({
+      // Cryptographic 24-hour rate limiting
+      const sqlite = (sovraDb as any).getSqliteEngine?.()?.getRawDb?.() || (sovraDb as any).sqliteEngine?.getRawDb?.();
+      if (sqlite) {
+        try {
+          const lastClaim = sqlite.prepare(`
+            SELECT created_at FROM analytics_events 
+            WHERE event_type = 'FAUCET_CLAIM' AND user_did = ? 
+            ORDER BY created_at DESC LIMIT 1
+          `).get(targetDid) as any;
+
+          if (lastClaim) {
+            const lastTime = new Date(lastClaim.created_at).getTime();
+            if (Date.now() - lastTime < 24 * 60 * 60 * 1000) {
+              const waitHours = Math.ceil((24 * 60 * 60 * 1000 - (Date.now() - lastTime)) / 3600000);
+              res.writeHead(429, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Faucet rate limit reached. Please wait ' + waitHours + ' hours before claiming again.' }));
+              return true;
+            }
+          }
+        } catch (_) {}
+      }
+
+      let result = (sovraDb as any).depositFunds({
         did: targetDid,
         amount,
         sourceTx: 'faucet_claim_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'),
       });
 
+      if (!result.ok && result.error === 'User account not found') {
+        const handle = targetDid.replace('did:sovra:', '@');
+        (sovraDb as any).registerUser({
+          did: targetDid,
+          handle,
+          displayName: handle.replace('@', ''),
+          balanceSov: 0.0
+        });
+        result = (sovraDb as any).depositFunds({
+          did: targetDid,
+          amount,
+          sourceTx: 'faucet_claim_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'),
+        });
+      }
+
       if (result.ok) {
+        try {
+          sovraDb.recordAnalyticsEvent({
+            eventType: 'FAUCET_CLAIM',
+            userDid: targetDid,
+            metadataJson: JSON.stringify({ amount, txType: 'GENESIS_TESTNET_FAUCET' })
+          });
+        } catch (_) {}
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           ok: true,

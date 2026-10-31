@@ -326,14 +326,27 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
   if ((url.pathname === '/api/youtube/video' || url.pathname === '/api/watch/video') && req.method === 'GET') {
     const allVideos = sovraDb.getAllVideos();
     const vidId = url.searchParams.get('id') || allVideos[0]?.id;
-    const found = allVideos.find(v => v.id === vidId) || allVideos[0];
+    const found = allVideos.find(v => v.id === vidId) || allVideos[0] || (vidId ? sovraDb.getVideoById(vidId) : null);
     const comments = found ? sovraDb.getVideoComments(found.id) : [];
     const recommended = allVideos.filter(v => found && v.id !== found.id);
+
+    let dynamicVideo = found;
+    if (found) {
+      const realViews = sovraDb.getVideoViewsCount(found.id);
+      dynamicVideo = {
+        ...found,
+        views: realViews > 0 ? realViews : (found.views || 0),
+        viewsText: realViews > 0
+          ? (realViews >= 1000 ? `${(realViews / 1000).toFixed(1)}K views` : `${realViews} views`)
+          : (found.viewsText || '0 views'),
+      };
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
       JSON.stringify({
         ok: true,
-        video: found,
+        video: dynamicVideo,
         comments,
         recommended,
       }),
