@@ -19200,11 +19200,11 @@ function renderHtml(
         <div id="mobileSearchDropdown" style="display: none; max-height: 320px; overflow-y: auto; margin-top: 8px; border-radius: 12px; background: rgba(15, 23, 42, 0.98); border: 1px solid rgba(255, 255, 255, 0.1); padding: 6px;"></div>
       </div>
       <!-- 💬 Non-Intrusive Floating Top Chat Message Capsule (Dynamic Heads-Up) -->
-      <div id="floatingChatToast" class="floating-chat-toast" onclick="handleFloatingToastClick(event)" aria-live="polite">
+      <div id="floatingChatToast" class="floating-chat-toast" onclick="handleFloatingToastClick(event)" aria-live="polite" style="display: none;">
         <div class="toast-avatar" id="toastAvatar">👤</div>
         <div class="toast-body">
-          <div class="toast-sender" id="toastSender">Alice</div>
-          <div class="toast-msg" id="toastMsg">Hey, are you free right now?</div>
+          <div class="toast-sender" id="toastSender"></div>
+          <div class="toast-msg" id="toastMsg"></div>
         </div>
         <button type="button" class="toast-reply-btn" onclick="openQuickReplyDrawer(event)">Reply</button>
         <button type="button" class="toast-close-btn" onclick="dismissFloatingChatToast(event)" aria-label="Dismiss">✕</button>
@@ -30694,8 +30694,8 @@ function renderHtml(
             <div>
               <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.04em; margin-bottom: 4px;">Total Cryptographic Balance</div>
               <div style="display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
-                <span class="wallet-balance-sov" id="walletBalanceSovDisplay" style="font-size: 2.2rem; font-weight: 800; color: #10b981; letter-spacing: -0.02em;">500.00 SOV</span>
-                <span class="wallet-balance-fiat" id="walletBalanceFiatDisplay" style="font-size: 1.15rem; color: #94a3b8; font-weight: 600;">≈ $1500.00 USD</span>
+                <span class="wallet-balance-sov" id="walletBalanceSovDisplay" style="font-size: 2.2rem; font-weight: 800; color: #10b981; letter-spacing: -0.02em;">0.00 SOV</span>
+                <span class="wallet-balance-fiat" id="walletBalanceFiatDisplay" style="font-size: 1.15rem; color: #94a3b8; font-weight: 600;">≈ $0.00 USD</span>
               </div>
             </div>
             <div class="wallet-peg-pill" title="Oracle Mesh Consensus Peg: 1 SOV = $3.00 USD" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 12px; color: #34d399; font-size: 0.82rem; font-weight: 700;">
@@ -30741,6 +30741,9 @@ function renderHtml(
 
           <!-- Core Financial Action Buttons -->
           <div class="wallet-action-hub" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1.5rem;">
+            <button type="button" class="wallet-action-btn" id="btnClaimTestnetFaucet" onclick="claimTestnetFaucetAction()" title="Claim 50 SOV Testnet Faucet" aria-label="Testnet Faucet" style="flex: 1; min-width: 140px; padding: 10px 14px; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); color: #fff; font-weight: 800; font-size: 0.88rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);">
+              <span>💧 Claim Faucet (+50 SOV)</span>
+            </button>
             <button class="wallet-action-btn wallet-btn-primary" onclick="openWithdrawModal()" title="Withdraw SOV earnings to external account" aria-label="Cash Out" style="flex: 1; min-width: 120px; padding: 10px 14px; border-radius: 12px; background: #10b981; color: #080d14; font-weight: 800; font-size: 0.88rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
               <span>Cash Out</span>
@@ -32213,7 +32216,7 @@ function renderHtml(
     var myProfile = null;
     var friendsData = null;
     var currentProfileGridTab = 'posts';
-    var walletBalanceSov = 500.0;
+    var walletBalanceSov = 0.0;
     var cachedRightRailSuggestions = [];
     var isFetchingRightRailSuggestions = false;
     var reelsData = ${safeJsonForScript(reelsStore)};
@@ -47129,41 +47132,76 @@ function renderHtml(
     // Tab switching for all modes + admin console + friends discovery
 
     // --- 📞 SOVRA ENCRYPTED CALLS & CALL LOG ENGINE ---
-    let _callHistoryData = [
-      { id: 'c1', name: 'Alice (Core Dev)', did: 'did:sovra:alice', type: 'incoming', time: 'Today 14:20', duration: '12m 45s', avatar: '👩‍💻', avatarBg: '#3b82f6' },
-      { id: 'c2', name: 'Bob (Sovereign Node)', did: 'did:sovra:bob', type: 'outgoing', time: 'Yesterday 19:05', duration: '05m 12s', avatar: '👨‍🚀', avatarBg: '#8b5cf6' },
-      { id: 'c3', name: 'Charlie (ZK Sentinel)', did: 'did:sovra:charlie', type: 'missed', time: 'Oct 29 11:15', duration: 'Missed', avatar: '🛡️', avatarBg: '#ec4899' },
-      { id: 'c4', name: 'Dana (P2P Mesh Validator)', did: 'did:sovra:dana', type: 'incoming', time: 'Oct 28 16:30', duration: '28m 10s', avatar: '🌐', avatarBg: '#10b981' }
-    ];
+    let _callHistoryData = [];
     let _currentCallsFilter = 'all';
+
+    async function syncCallHistoryLogs() {
+      try {
+        const res = await fetch('/api/calls/history');
+        const data = await res.json();
+        if (data && data.ok && Array.isArray(data.calls)) {
+          _callHistoryData = data.calls.map(function(c) {
+            return {
+              id: c.id,
+              name: (c.callee_did || '').replace('did:sovra:', '') || 'Sovereign Peer',
+              did: c.callee_did,
+              type: c.status === 'missed' ? 'missed' : (c.caller_did === 'did:sovra:host' ? 'outgoing' : 'incoming'),
+              time: new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              duration: c.status === 'missed' ? 'Missed' : ((c.duration_seconds || 0) + 's'),
+              avatar: '📞',
+              avatarBg: '#3b82f6'
+            };
+          });
+        }
+      } catch (_) {}
+      renderCallHistoryLog();
+    }
+    window.syncCallHistoryLogs = syncCallHistoryLogs;
 
     function initCallsDashboard() {
       renderCallsContacts('');
-      renderCallHistoryLog();
+      syncCallHistoryLogs();
     }
     window.initCallsDashboard = initCallsDashboard;
 
-    function renderCallsContacts(filterQuery) {
+    async function renderCallsContacts(filterQuery) {
       const grid = document.getElementById('callsContactsGrid');
       if (!grid) return;
       const q = (filterQuery || '').toLowerCase().trim();
-      let contacts = [
-        { name: 'Alice', did: 'did:sovra:alice', role: 'Core Dev', avatar: '👩‍💻', bg: '#3b82f6' },
-        { name: 'Bob', did: 'did:sovra:bob', role: 'Node Operator', avatar: '👨‍🚀', bg: '#8b5cf6' },
-        { name: 'Charlie', did: 'did:sovra:charlie', role: 'Security Sentinel', avatar: '🛡️', bg: '#ec4899' },
-        { name: 'Dana', did: 'did:sovra:dana', role: 'Mesh Validator', avatar: '🌐', bg: '#10b981' }
-      ];
-      if (q) {
-        contacts = contacts.filter(c => c.name.toLowerCase().includes(q) || c.did.toLowerCase().includes(q) || c.role.toLowerCase().includes(q));
+      let contacts = [];
+      try {
+        const res = await fetch('/api/identity/peers/search?q=' + encodeURIComponent(q));
+        const data = await res.json();
+        if (data && data.ok && Array.isArray(data.peers) && data.peers.length > 0) {
+          contacts = data.peers.map(p => ({
+            name: p.name || p.handle || p.did?.slice(0, 16),
+            did: p.did,
+            role: p.role || 'Sovereign Peer',
+            avatar: p.avatar || '👤',
+            bg: p.avatarBg || '#3b82f6'
+          }));
+        }
+      } catch (_) {}
+      if (contacts.length === 0 && typeof contactsData !== 'undefined' && Array.isArray(contactsData) && contactsData.length > 0) {
+        contacts = contactsData.map(c => ({
+          name: c.name,
+          did: c.did || ('did:sovra:' + c.name.toLowerCase()),
+          role: c.role || 'Contact Peer',
+          avatar: c.avatar || '👤',
+          bg: c.bg || '#3b82f6'
+        }));
+      }
+      if (q && contacts.length > 0) {
+        contacts = contacts.filter(c => c.name.toLowerCase().includes(q) || c.did.toLowerCase().includes(q) || (c.role && c.role.toLowerCase().includes(q)));
       }
       if (contacts.length === 0) {
-        grid.innerHTML = '<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 0.82rem; padding: 12px; text-align: center;">No matching sovereign peers found.</div>';
+        grid.innerHTML = '<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 0.82rem; padding: 18px; text-align: center;"><div style="font-size: 1.4rem; margin-bottom: 4px;">👥</div><div>No sovereign peers found.</div></div>';
         return;
       }
       grid.innerHTML = contacts.map(c => (
         '<div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">' +
           '<div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">' +
-            '<div style="width: 34px; height: 34px; border-radius: 50%; background: ' + c.bg + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;">' + c.avatar + '</div>' +
+            '<div style="width: 34px; height: 34px; border-radius: 50%; background: ' + (c.bg || '#3b82f6') + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;">' + (c.avatar || '👤') + '</div>' +
             '<div style="overflow: hidden;">' +
               '<div style="font-weight: 700; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + c.name + '</div>' +
               '<div style="font-size: 0.7rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + c.role + '</div>' +
@@ -47297,6 +47335,39 @@ function renderHtml(
       }
     }
     window.terminateActiveCall = terminateActiveCall;
+
+    async function claimTestnetFaucetAction() {
+      const btn = document.getElementById('btnClaimTestnetFaucet');
+      if (btn) btn.disabled = true;
+      try {
+        const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
+        const res = await fetch('/api/wallet/faucet/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ did: myDid })
+        });
+        const data = await res.json();
+        if (data && data.ok) {
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('🎉 ' + data.message);
+          }
+          if (typeof refreshWalletBalanceLive === 'function') {
+            refreshWalletBalanceLive();
+          }
+        } else {
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('⚠️ ' + (data.error || 'Failed to claim faucet'));
+          }
+        }
+      } catch (err) {
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('Network error while claiming faucet');
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+    window.claimTestnetFaucetAction = claimTestnetFaucetAction;
     function switchTab(tab) {
       // Pre-flight Auth Guard for navigation links & tab switches
       var isAuth = (typeof window.isUserAuthenticated === 'function')
@@ -48734,68 +48805,7 @@ function renderHtml(
     let dedicatedNotificationsStore = [];
     let _activeNotifType = 'all';
 
-    const defaultSeedNotifications = [
-      {
-        id: 'notif-1',
-        type: 'likes',
-        title: 'Elena Rostova',
-        body: 'liked your post "Cellular CGNAT Traversal Benchmarks on 5G".',
-        avatar: '',
-        icon: '❤️',
-        iconColor: '#f43f5e',
-        time: '5m ago',
-        unread: true,
-        actionTab: 'feed'
-      },
-      {
-        id: 'notif-2',
-        type: 'comments',
-        title: 'Aarav Sharma',
-        body: 'commented: "Incredible latency drop with WebRTC data channels! What was the packet loss rate?"',
-        avatar: '',
-        icon: '💬',
-        iconColor: '#38bdf8',
-        time: '24m ago',
-        unread: true,
-        actionTab: 'feed'
-      },
-      {
-        id: 'notif-3',
-        type: 'follows',
-        title: 'Maya Lin',
-        body: 'started following your sovereign channel and subscribed to alerts.',
-        avatar: '',
-        icon: '👤',
-        iconColor: '#a855f7',
-        time: '2h ago',
-        unread: true,
-        actionTab: 'me'
-      },
-      {
-        id: 'notif-4',
-        type: 'mentions',
-        title: 'Tech & Gadgets Community',
-        body: '@rohit_live mentioned you in a discussion on Sovereign Personal Hardware Nodes.',
-        avatar: '',
-        icon: '🏷️',
-        iconColor: '#f59e0b',
-        time: '5h ago',
-        unread: false,
-        actionTab: 'communities'
-      },
-      {
-        id: 'notif-5',
-        type: 'network',
-        title: 'Mesh Node Dispatched',
-        body: 'Your node successfully relayed 1.4 GB of decentralized zero-knowledge proofs.',
-        avatar: '',
-        icon: '⚡',
-        iconColor: '#10b981',
-        time: '1d ago',
-        unread: false,
-        actionTab: 'settings'
-      }
-    ];
+    const defaultSeedNotifications = [];
 
     function initDedicatedNotifications() {
       try {
@@ -48808,7 +48818,7 @@ function renderHtml(
           }
         }
       } catch (_) {}
-      dedicatedNotificationsStore = JSON.parse(JSON.stringify(defaultSeedNotifications));
+      dedicatedNotificationsStore = [];
     }
 
     function syncDedicatedNotificationsFeed() {
@@ -77527,13 +77537,29 @@ function renderHtml(
     // ========================================================
     // 💬 FACEBOOK STANDARD MESSENGER DROPDOWN LOGIC
     // ========================================================
-    var _allMessengerChats = [
-      { did: 'did:sovra:alice', name: 'Alice', handle: '@alice.node', avatar: '👩', bg: '#ec4899', lastMsg: 'Hey! Are you connected to the mesh?', time: '2m', unread: true },
-      { did: 'did:sovra:bob', name: 'Bob', handle: '@bob.sovra', avatar: '👨', bg: '#3b82f6', lastMsg: 'Quantum keys synced successfully.', time: '15m', unread: false },
-      { did: 'did:sovra:charlie', name: 'Charlie', handle: '@charlie', avatar: '🧑', bg: '#10b981', lastMsg: 'Verified transaction on chain.', time: '1h', unread: false },
-      { did: 'did:sovra:quantum-swarm', name: 'Quantum Core Swarm', handle: '@quantum.swarm', avatar: '⚡', bg: '#8b5cf6', lastMsg: '#general-mesh: 12 peers active', time: '3h', unread: false },
-      { did: 'did:sovra:channel:local-mesh', name: 'Local Mesh Broadcast', handle: '#local-mesh', avatar: '📡', bg: '#f59e0b', lastMsg: 'Broadcast packet relay online', time: 'Yesterday', unread: false }
-    ];
+    var _allMessengerChats = [];
+    async function syncMessengerConversations() {
+      try {
+        const res = await fetch('/api/chat/conversations');
+        const data = await res.json();
+        if (data && data.ok && Array.isArray(data.conversations)) {
+          _allMessengerChats = data.conversations.map(function(c) {
+            return {
+              did: c.contact_did || c.did,
+              name: c.name || c.contact_did?.slice(0, 16) || 'Peer',
+              handle: c.handle || '@peer',
+              avatar: c.avatar || '💬',
+              bg: c.bg || '#3b82f6',
+              lastMsg: c.lastMsg || c.last_message || 'Active conversation',
+              time: c.time || 'now',
+              unread: Boolean(c.unread_count > 0 || c.unread)
+            };
+          });
+        }
+      } catch (_) {}
+    }
+    window.syncMessengerConversations = syncMessengerConversations;
+
 
     function handleHeaderChatClick(event) {
       if (event && event.stopPropagation) event.stopPropagation();
@@ -88004,6 +88030,28 @@ async function startDevServer() {
         const targetDid = parsed.did || (principal ? principal.did : masterKey.did);
         const amount = Number(parsed.amount || 50);
 
+        // Cryptographic 24-hour rate limiting
+        const sqlite = sovraDb.getSqliteEngine()?.getRawDb();
+        if (sqlite) {
+          try {
+            const lastClaim = sqlite.prepare(`
+              SELECT created_at FROM analytics_events 
+              WHERE event_type = 'FAUCET_CLAIM' AND user_did = ? 
+              ORDER BY created_at DESC LIMIT 1
+            `).get(targetDid);
+
+            if (lastClaim) {
+              const lastTime = new Date(lastClaim.created_at).getTime();
+              if (Date.now() - lastTime < 24 * 60 * 60 * 1000) {
+                const waitHours = Math.ceil((24 * 60 * 60 * 1000 - (Date.now() - lastTime)) / 3600000);
+                res.writeHead(429, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: 'Faucet rate limit reached. Please wait ' + waitHours + ' hours before claiming again.' }));
+                return;
+              }
+            }
+          } catch (_) {}
+        }
+
         const result = sovraDb.depositFunds({
           did: targetDid,
           amount,
@@ -88011,6 +88059,13 @@ async function startDevServer() {
         });
 
         if (result.ok) {
+          try {
+            sovraDb.recordAnalyticsEvent({
+              eventType: 'FAUCET_CLAIM',
+              userDid: targetDid,
+              metadataJson: JSON.stringify({ amount, txType: 'GENESIS_TESTNET_FAUCET' })
+            });
+          } catch (_) {}
           sovraDb.logAudit({
             type: 'WALLET_FAUCET_CLAIM',
             action: 'GENESIS_GRANT',
@@ -91092,6 +91147,179 @@ async function startDevServer() {
         const joined = sovraDb.joinCommunity(communityId, memberDid);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: joined }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // 💬 REAL MESSENGER CONVERSATIONS ENDPOINT
+    // ==========================================
+    if (url.pathname === '/api/chat/conversations' && req.method === 'GET') {
+      try {
+        const principal = resolvePrincipal(req);
+        const userDid = principal?.did || url.searchParams.get('did') || 'did:sovra:host';
+        let conversations = [];
+        const sqlite = sovraDb.sqliteEngine?.getRawDb?.() || sovraDb.sqliteEngine?.db;
+        if (sqlite) {
+          try {
+            conversations = sqlite.prepare(`
+              SELECT 
+                CASE WHEN sender_did = ? THEN recipient_did ELSE sender_did END as contact_did,
+                MAX(created_at) as last_time,
+                COUNT(CASE WHEN recipient_did = ? AND read = 0 THEN 1 END) as unread_count
+              FROM direct_messages
+              WHERE sender_did = ? OR recipient_did = ?
+              GROUP BY contact_did
+              ORDER BY last_time DESC
+            `).all(userDid, userDid, userDid, userDid);
+          } catch (_) {}
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, conversations, count: conversations.length }));
+      } catch (err) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, conversations: [], count: 0 }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // 📞 PERSISTENT CALL HISTORY & LOGGING ENDPOINTS
+    // ==========================================
+    if (url.pathname === '/api/calls/history' && req.method === 'GET') {
+      try {
+        const did = url.searchParams.get('did') || undefined;
+        const limit = Number(url.searchParams.get('limit') || 30);
+        const history = sovraDb.getCallLogs({ did }, limit);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, calls: history, count: history.length }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: e?.message || 'Failed to fetch call history' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/calls/log' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = resolvePrincipal(req, parsed);
+        const callerDid = principal?.did || parsed.callerDid || parsed.caller_did || 'did:sovra:host';
+        const calleeDid = parsed.calleeDid || parsed.callee_did;
+        if (!calleeDid) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'calleeDid required' }));
+          return;
+        }
+        const callId = parsed.id || ('call_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9));
+        const logged = sovraDb.recordCallLog({
+          id: callId,
+          callerDid,
+          calleeDid,
+          callType: parsed.callType || parsed.call_type || 'audio',
+          status: parsed.status || 'completed',
+          durationSeconds: Number(parsed.durationSeconds || parsed.duration_seconds || 0),
+          createdAt: parsed.createdAt || parsed.created_at || new Date().toISOString()
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: logged, id: callId }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // 💎 TESTNET CRYPTOGRAPHIC FAUCET CLAIM
+    // ==========================================
+    if (url.pathname === '/api/wallet/faucet/claim' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const principal = resolvePrincipal(req, parsed);
+        const userDid = principal?.did || parsed.did || (typeof currentUserHandle !== 'undefined' ? currentUserHandle : 'did:sovra:guest');
+        
+        const sqlite = sovraDb.getSqliteEngine()?.getRawDb();
+        const now = Date.now();
+        const FAUCET_AMOUNT = 50.0;
+        
+        if (sqlite) {
+          const lastClaim = sqlite.prepare(`
+            SELECT created_at FROM analytics_events 
+            WHERE event_type = 'FAUCET_CLAIM' AND user_did = ? 
+            ORDER BY created_at DESC LIMIT 1
+          `).get(userDid);
+
+          if (lastClaim) {
+            const lastTime = new Date(lastClaim.created_at).getTime();
+            if (now - lastTime < 24 * 60 * 60 * 1000) {
+              const waitHours = Math.ceil((24 * 60 * 60 * 1000 - (now - lastTime)) / 3600000);
+              res.writeHead(429, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Faucet rate limit reached. Please wait ' + waitHours + ' hours before claiming again.' }));
+              return;
+            }
+          }
+
+          const existing = sqlite.prepare('SELECT did FROM users WHERE did = ?').get(userDid);
+          if (!existing) {
+            const handle = userDid.replace('did:sovra:', '@');
+            sqlite.prepare(`
+              INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, created_at, updated_at)
+              VALUES (?, ?, ?, '👤', '#6366f1', ?, ?, ?)
+            `).run(userDid, handle, handle.replace('@', ''), FAUCET_AMOUNT, now, now);
+          } else {
+            sqlite.prepare('UPDATE users SET balance_sov = balance_sov + ? WHERE did = ?').run(FAUCET_AMOUNT, userDid);
+          }
+
+          sovraDb.recordAnalyticsEvent({
+            eventType: 'FAUCET_CLAIM',
+            userDid,
+            metadataJson: JSON.stringify({ amount: FAUCET_AMOUNT, txType: 'GENESIS_TESTNET_FAUCET' })
+          });
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, claimedAmount: FAUCET_AMOUNT, message: 'Testnet faucet claimed successfully! +50.0 SOV credited.' }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to claim faucet' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // 👁️ WATCH VIDEO VIEW TRACKING & METRICS
+    // ==========================================
+    if (url.pathname === '/api/watch/view' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = resolvePrincipal(req, parsed);
+        const viewerDid = principal?.did || parsed.viewerDid || 'did:sovra:anonymous';
+        const videoId = parsed.videoId || parsed.id;
+        if (!videoId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'videoId required' }));
+          return;
+        }
+        const clientIp = req.socket.remoteAddress || '127.0.0.1';
+        const ipHash = crypto.createHash('sha256').update(clientIp).digest('hex').slice(0, 16);
+        const recorded = sovraDb.recordVideoView({
+          videoId,
+          viewerDid,
+          ipHash
+        });
+        const count = sovraDb.getVideoViewsCount(videoId);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: recorded, videoId, viewsCount: count }));
       } catch {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));

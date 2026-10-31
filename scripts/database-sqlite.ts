@@ -106,7 +106,7 @@ export class SqliteSocialDatabaseEngine {
         device_type TEXT NOT NULL DEFAULT 'Desktop',
         public_key TEXT,
         session_token TEXT,
-        balance_sov REAL NOT NULL DEFAULT 500.0,
+        balance_sov REAL NOT NULL DEFAULT 0.0,
         privacy_settings_json TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
@@ -743,6 +743,44 @@ export class SqliteSocialDatabaseEngine {
         UNIQUE(community_id, member_did)
       );
       CREATE INDEX IF NOT EXISTS idx_comm_members ON community_members(community_id);
+
+      -- 44. PERSISTENT CALL LOGS (VOIP & WEBRTC SESSIONS)
+      CREATE TABLE IF NOT EXISTS call_logs (
+        id TEXT PRIMARY KEY,
+        caller_did TEXT NOT NULL,
+        callee_did TEXT NOT NULL,
+        call_type TEXT NOT NULL DEFAULT 'audio',
+        status TEXT NOT NULL DEFAULT 'completed',
+        duration_seconds INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_call_logs_caller ON call_logs(caller_did);
+      CREATE INDEX IF NOT EXISTS idx_call_logs_callee ON call_logs(callee_did);
+      CREATE INDEX IF NOT EXISTS idx_call_logs_created ON call_logs(created_at);
+
+      -- 45. VIDEO VIEWS & TELEMETRY
+      CREATE TABLE IF NOT EXISTS video_views (
+        id TEXT PRIMARY KEY,
+        video_id TEXT NOT NULL,
+        viewer_did TEXT NOT NULL,
+        ip_hash TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_video_views_vid ON video_views(video_id);
+      CREATE INDEX IF NOT EXISTS idx_video_views_viewer ON video_views(viewer_did);
+
+      -- 46. ANALYTICS & TIME-SERIES TELEMETRY EVENTS
+      CREATE TABLE IF NOT EXISTS analytics_events (
+        id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        entity_id TEXT,
+        user_did TEXT,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_analytics_type ON analytics_events(event_type);
+      CREATE INDEX IF NOT EXISTS idx_analytics_user ON analytics_events(user_did);
+      CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at);
     `);
 
     // Seed default algorithmic dials if empty
@@ -889,7 +927,7 @@ export class SqliteSocialDatabaseEngine {
             u.avatar || 'S', u.avatarDataUrl || null, u.avatarBg || '#6366f1',
             u.bio || '', u.website || '', u.websiteUrl || u.website || '',
             u.coverDataUrl || null, u.deviceType || 'Desktop', u.publicKey || null,
-            u.sessionToken || null, typeof u.balanceSov === 'number' ? u.balanceSov : 500.0,
+            u.sessionToken || null, typeof u.balanceSov === 'number' ? u.balanceSov : 0.0,
             u.privacySettings ? JSON.stringify(u.privacySettings) : null,
             u.createdAt || Date.now(), u.updatedAt || Date.now()
           );
@@ -1037,7 +1075,7 @@ export class SqliteSocialDatabaseEngine {
       deviceType: user.deviceType || 'Desktop',
       publicKey: user.publicKey,
       sessionToken: token,
-      balanceSov: typeof user.balanceSov === 'number' ? user.balanceSov : 500.0,
+      balanceSov: typeof user.balanceSov === 'number' ? user.balanceSov : 0.0,
       privacySettings: user.privacySettings || {
         profileVisibility: 'public',
         canMessageMe: 'public',
@@ -1062,7 +1100,7 @@ export class SqliteSocialDatabaseEngine {
       record.avatar, record.avatarDataUrl || null, record.avatarBg,
       record.bio, record.website, record.websiteUrl, record.coverDataUrl || null,
       record.deviceType, record.publicKey || null, record.sessionToken || null,
-      record.balanceSov || 500.0, JSON.stringify(record.privacySettings),
+      typeof record.balanceSov === 'number' ? record.balanceSov : 0.0, JSON.stringify(record.privacySettings),
       record.createdAt, record.updatedAt
     );
 
@@ -1096,7 +1134,7 @@ export class SqliteSocialDatabaseEngine {
       stmt.run(
         merged.displayName, merged.name || merged.displayName, merged.avatar, merged.avatarDataUrl || null, merged.avatarBg,
         merged.bio, merged.website || '', merged.websiteUrl || '', merged.coverDataUrl || null, merged.deviceType,
-        merged.publicKey || null, merged.sessionToken || null, merged.balanceSov ?? 500.0,
+        merged.publicKey || null, merged.sessionToken || null, merged.balanceSov ?? 0.0,
         merged.privacySettings ? JSON.stringify(merged.privacySettings) : null, merged.updatedAt, merged.did
       );
       return merged;
@@ -3599,6 +3637,89 @@ export class SqliteSocialDatabaseEngine {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  // --- Persistent Call Logs ---
+  public recordCallLog(log: { id?: string; callerDid: string; calleeDid: string; callType?: string; status?: string; durationSeconds?: number; createdAt?: string }): boolean {
+    try {
+      const id = log.id || `call_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const createdAt = log.createdAt || new Date().toISOString();
+      const insert = this.db.prepare(`
+        INSERT INTO call_logs (id, caller_did, callee_did, call_type, status, duration_seconds, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      insert.run(id, log.callerDid, log.calleeDid, log.callType || 'audio', log.status || 'completed', log.durationSeconds || 0, createdAt);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public getCallLogs(filter?: { did?: string }, limit = 30): any[] {
+    try {
+      if (filter?.did) {
+        return this.db.prepare(`
+          SELECT * FROM call_logs 
+          WHERE caller_did = ? OR callee_did = ? 
+          ORDER BY created_at DESC LIMIT ?
+        `).all(filter.did, filter.did, limit);
+      }
+      return this.db.prepare('SELECT * FROM call_logs ORDER BY created_at DESC LIMIT ?').all(limit);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // --- Video Views & Telemetry ---
+  public recordVideoView(view: { id?: string; videoId: string; viewerDid: string; ipHash?: string; createdAt?: string }): boolean {
+    try {
+      const id = view.id || `view_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const createdAt = view.createdAt || new Date().toISOString();
+      const insert = this.db.prepare(`
+        INSERT INTO video_views (id, video_id, viewer_did, ip_hash, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      insert.run(id, view.videoId, view.viewerDid, view.ipHash || null, createdAt);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public getVideoViewsCount(videoId: string): number {
+    try {
+      const res = this.db.prepare('SELECT COUNT(*) as c FROM video_views WHERE video_id = ?').get(videoId) as any;
+      return res?.c || 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  // --- Analytics & Telemetry Events ---
+  public recordAnalyticsEvent(evt: { id?: string; eventType: string; entityId?: string; userDid?: string; metadataJson?: string; createdAt?: string }): boolean {
+    try {
+      const id = evt.id || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const createdAt = evt.createdAt || new Date().toISOString();
+      const insert = this.db.prepare(`
+        INSERT INTO analytics_events (id, event_type, entity_id, user_did, metadata_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      insert.run(id, evt.eventType, evt.entityId || null, evt.userDid || null, evt.metadataJson || null, createdAt);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public getAnalyticsEvents(eventType?: string, limit = 50): any[] {
+    try {
+      if (eventType) {
+        return this.db.prepare('SELECT * FROM analytics_events WHERE event_type = ? ORDER BY created_at DESC LIMIT ?').all(eventType, limit);
+      }
+      return this.db.prepare('SELECT * FROM analytics_events ORDER BY created_at DESC LIMIT ?').all(limit);
+    } catch (_) {
+      return [];
     }
   }
 
