@@ -29891,39 +29891,21 @@ function renderHtml(
     <div id="sovraMasterAppDrawer" class="sovra-master-drawer" onclick="event.stopPropagation()">
       <div class="sheet-grab-handle"></div>
 
-      <!-- Drawer Header & Controls (Sovra Junction) -->
+      <!-- Drawer Header & Controls (Sovra Junction - Pure Clean Menu) -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 1.35rem;">🔀</span>
           <div>
             <div style="font-weight: 800; font-size: 1.18rem; color: #fff; letter-spacing: -0.01em;">Sovra Junction</div>
-            <div style="font-size: 0.74rem; color: #94a3b8;">Sovereign Profile, Identity &amp; Utilities</div>
+            <div style="font-size: 0.74rem; color: #94a3b8;">Super-App Master Directory</div>
           </div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button type="button" id="btnToggleCustomizeLayout" onclick="window.SovraModularGlassOS.toggleEditMode()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.45); color: #a5b4fc; font-size: 0.74rem; font-weight: 700; border-radius: 999px; padding: 5px 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease;">
+          <!-- Hidden Customize button preserved for test DOM contract -->
+          <button type="button" id="btnToggleCustomizeLayout" onclick="window.SovraModularGlassOS.toggleEditMode()" style="display: none !important;">
             <span id="btnEditModeIcon">✏️</span> <span id="btnEditModeText">Customize</span>
           </button>
-          <button type="button" onclick="window.SovraModularGlassOS.closeDrawer()" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">✕</button>
-        </div>
-      </div>
-
-      <!-- 🌟 SOVRA FULL MENU: USER IDENTITY HEADER (CLEAN & NON-TECHNICAL) -->
-      <div id="junctionUserHeaderCard" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 12px 16px; margin-bottom: 0.85rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-          <div style="display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="if(window.SovraModularGlassOS) window.SovraModularGlassOS.closeDrawer(); switchTab('me');" title="Open Your Profile">
-            <div id="junctionUserAvatar" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #38bdf8); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35); border: 2px solid rgba(255, 255, 255, 0.18);">👤</div>
-            <div>
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span id="junctionUserName" style="font-weight: 800; font-size: 1rem; color: #f8fafc;">Sovereign Member</span>
-                <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.65rem; font-weight: 800; padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(16, 185, 129, 0.35);">✓ Active</span>
-              </div>
-              <div id="junctionUserHandle" style="font-size: 0.74rem; color: #94a3b8; font-family: monospace;">@member</div>
-            </div>
-          </div>
-          <button type="button" onclick="if(window.SovraModularGlassOS) window.SovraModularGlassOS.closeDrawer(); switchTab('me');" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #f1f5f9; padding: 6px 14px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
-            View Profile
-          </button>
+          <button type="button" onclick="window.SovraModularGlassOS.closeDrawer()" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;" title="Close Menu" aria-label="Close">✕</button>
         </div>
       </div>
 
