@@ -10140,11 +10140,12 @@ function renderHtml(
     .app-right-rail,
     #appStageFooter,
     #guestModeRibbon,
-    .mobile-bottom-nav,
     #mobileFloatingActionBtn,
     .fb-contacts-card,
     #insecureContextNotice,
-    #feed-view #sovraHeroAnchorCard {
+    #feed-view #sovraHeroAnchorCard,
+    #sovraFloatingGlassDock,
+    .sovra-floating-glass-dock {
       display: none !important;
     }
 
@@ -10160,6 +10161,12 @@ function renderHtml(
     body.sovra-mode-home .sovra-native-app-bar {
       display: none !important;
     }
+    body.sovra-mode-home .sovra-page-dots-indicator {
+      bottom: 96px !important;
+    }
+    body.sovra-mode-home .android-home-hint {
+      margin-bottom: 24px !important;
+    }
 
     body.sovra-mode-app .sovra-home-screen-view {
       display: none !important;
@@ -10170,6 +10177,9 @@ function renderHtml(
       display: none !important;
     }
     body.sovra-mode-app .sovra-android-nav-bar {
+      display: none !important;
+    }
+    body.sovra-mode-app .mobile-bottom-nav {
       display: flex !important;
     }
     body.sovra-mode-app .sovra-native-app-bar {
@@ -10179,17 +10189,14 @@ function renderHtml(
       display: flex !important;
       flex-direction: column !important;
       width: 100vw !important;
-      height: calc(100vh - 48px) !important;
+      height: 100vh !important;
       max-width: 100vw !important;
       margin: 0 !important;
-      padding: 0 !important;
-      overflow: hidden !important;
+      padding: 0 0 76px 0 !important;
+      overflow-y: auto !important;
+      box-sizing: border-box !important;
       position: fixed !important;
       inset: 0 !important;
-      bottom: 48px !important;
-      z-index: 20 !important;
-      background: #080c18 !important;
-      animation: sovraAppFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }
     body.sovra-mode-app .app-center-stage {
       display: flex !important;
@@ -10842,8 +10849,8 @@ function renderHtml(
       user-select: none;
     }
     body.theme-normal .sovra-android-nav-bar {
-      background: rgba(255, 255, 255, 0.94) !important;
-      border-top: 1px solid #cbd5e1 !important;
+      background: rgba(10, 14, 26, 0.95) !important;
+      border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
     }
     .android-nav-btn {
       background: transparent;
@@ -22944,6 +22951,20 @@ function renderHtml(
     <!-- Tab 5: Profile & Sovereign Identity (Instagram Profile + Wallet + Creator Tools) -->
     <main class="main-content" id="profile-view" style="display: none;">
       <div class="profile-container">
+        <!-- 🎙️ CREATOR / PROFESSIONAL MODE BANNER & SWITCH -->
+        <div id="creatorProfileBanner" style="margin: 0.75rem 0 1.25rem; padding: 14px 18px; border-radius: 18px; background: linear-gradient(135deg, rgba(244, 63, 94, 0.12), rgba(168, 85, 247, 0.12)); border: 1px solid rgba(244, 63, 94, 0.3); display: flex; align-items: center; justify-content: space-between; gap: 12px; backdrop-filter: blur(16px); box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, #f43f5e, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; box-shadow: 0 4px 12px rgba(244, 63, 94, 0.35);">🎙️</div>
+            <div>
+              <div id="creatorStatusTitle" style="font-weight: 700; font-size: 0.95rem; color: #fff;">Become a Sovra Creator</div>
+              <div id="creatorStatusSubtitle" style="font-size: 0.76rem; color: #cbd5e1;">Earn 95% micropayments & publish 4K swarmed video</div>
+            </div>
+          </div>
+          <button type="button" id="btnToggleCreatorMode" onclick="toggleCreatorModeAction()" style="background: linear-gradient(135deg, #f43f5e, #ec4899); border: none; color: #fff; font-weight: 700; font-size: 0.8rem; padding: 8px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 14px rgba(244, 63, 94, 0.4); transition: transform 0.18s ease;">
+            Switch Mode
+          </button>
+        </div>
+
         <!-- Airtel-Inspired Top Sovereign Node & Wallet Hero Anchor Card (Profile View) -->
         <div id="sovraHeroAnchorCardProfile" class="sovra-hero-anchor-card" style="margin-bottom: 1.25rem;">
           <!-- Top Row: Balance & Privacy Toggle + P2P Health Pill -->
@@ -26969,26 +26990,30 @@ function renderHtml(
 
   <!-- Fixed Mobile & Desktop Synchronized Glassmorphic Bottom Navigation Bar -->
   <nav class="mobile-bottom-nav">
-    <button class="bottom-nav-item active" id="bnav-feed" data-action="switch-tab" data-tab="feed" onclick="switchTab('feed')" title="Home" aria-label="Home">
-      <span class="bnav-icon">🏠</span>
-      <span class="bnav-label">Home</span>
+    <button class="bottom-nav-item active" id="bnav-feed" data-action="switch-tab" data-tab="feed" onclick="switchTab('feed')" title="Feed" aria-label="Feed">
+      <span class="bnav-icon">📰</span>
+      <span class="bnav-label">Feed</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-chat" data-action="switch-tab" data-tab="chat" onclick="switchTab('chat')" title="Chats" aria-label="Chats">
+      <span class="bnav-icon">💬</span>
+      <span class="bnav-label">Chat</span>
     </button>
     <button class="bottom-nav-item" id="bnav-youtube" data-action="switch-tab" data-tab="youtube" onclick="switchTab('watch')" title="Watch" aria-label="Watch Videos and Shorts">
       <span class="bnav-icon">🎬</span>
       <span class="bnav-label">Watch</span>
     </button>
-    <button class="bottom-nav-create" id="bnav-create" data-action="create-post" onclick="openUniversalCreateModal(this)" title="Create" aria-label="Create Post, Short, or Video" style="display: flex !important; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
-      <span style="pointer-events: none; user-select: none; font-size: 1.6rem; font-weight: 800; line-height: 1; display: flex; align-items: center; justify-content: center;">+</span>
-    </button>
-    <button class="bottom-nav-item" id="bnav-chat" data-action="switch-tab" data-tab="chat" onclick="switchTab('chat')" title="Chats" aria-label="Chats" style="display: flex !important;">
-      <span class="bnav-icon">💬</span>
-      <span class="bnav-label">Chats</span>
-    </button>
-    <button class="bottom-nav-item" id="bnav-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" title="You" aria-label="You and Channel">
+    <button class="bottom-nav-item" id="bnav-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" title="Profile" aria-label="Profile and Identity">
       <span class="bnav-icon">👤</span>
-      <span class="bnav-label">You</span>
+      <span class="bnav-label">Profile</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-apps" data-action="open-drawer" onclick="if(window.SovraModularGlassOS) window.SovraModularGlassOS.toggleDrawer(); else if(window.SovraAndroidOS) window.SovraAndroidOS.openAppDrawer();" title="All Apps & Utilities" aria-label="All Apps & Utilities">
+      <span class="bnav-icon">⊞</span>
+      <span class="bnav-label">Apps</span>
     </button>
     <!-- Backwards compatible IDs maintained in DOM -->
+    <button class="bottom-nav-create" id="bnav-create" data-action="create-post" onclick="openUniversalCreateModal(this)" title="Create" aria-label="Create Post, Short, or Video" style="display: none !important;">
+      <span style="pointer-events: none; user-select: none; font-size: 1.6rem; font-weight: 800; line-height: 1; display: flex; align-items: center; justify-content: center;">+</span>
+    </button>
     <button class="bottom-nav-item" id="bnav-reels" data-action="switch-tab" data-tab="reels" onclick="switchTab('reels')" style="display: none;" title="Shorts" aria-label="Shorts">
       <span class="bnav-icon">🎞️</span>
       <span class="bnav-label">Shorts</span>
@@ -26998,7 +27023,7 @@ function renderHtml(
       <span class="bnav-label">Hub</span>
     </button>
     <button class="bottom-nav-item" id="bnav-studio" data-action="switch-tab" data-tab="studio" onclick="switchTab('studio')" style="display: none;" title="Studio" aria-label="Creator Studio">
-      <span class="bnav-icon">🎬</span>
+      <span class="bnav-icon">🎙️</span>
       <span class="bnav-label">Studio</span>
     </button>
   </nav>
@@ -42459,69 +42484,44 @@ function renderHtml(
       const ribbon = document.getElementById('guestModeRibbon');
       if (ribbon) ribbon.style.display = isGuest ? 'flex' : 'none';
       if (typeof updateOnboardingChecklistUI === 'function') updateOnboardingChecklistUI();
+      document.body.classList.remove('sovra-mode-home');
+      document.body.classList.add('sovra-mode-app');
+      if (typeof updateCreatorProfileUI === 'function') updateCreatorProfileUI();
+      if (typeof switchTab === 'function') switchTab('feed');
     }
-    window.showAuthenticatedAppView = showAuthenticatedAppView;
-
-    function closeOnboardingModal() {
-      const wom = document.getElementById('welcomeOnboardingModal');
-      if (wom) {
-        wom.classList.add('modal-dismissed');
-        wom.style.display = 'none';
+        function showCreatorUpgradeModal() {
+      let modal = document.getElementById('sovraCreatorUpgradeModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'sovraCreatorUpgradeModal';
+        modal.className = 'sovra-modal-overlay';
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 1.25rem;';
+        modal.innerHTML = '' +
+          '<div style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(244, 63, 94, 0.35); border-radius: 24px; max-width: 480px; width: 100%; padding: 2rem; box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(244,63,94,0.2); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; position: relative;">' +
+            '<button type="button" id="btnCloseCreatorUpgradeModal" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">✕</button>' +
+            '<div style="text-align: center; margin-bottom: 1.25rem;">' +
+              '<div style="width: 58px; height: 58px; border-radius: 18px; background: linear-gradient(135deg, #f43f5e, #a855f7); display: inline-flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 8px 24px rgba(244, 63, 94, 0.4); margin-bottom: 0.85rem;">🎙️</div>' +
+              '<h2 style="font-size: 1.35rem; font-weight: 800; margin: 0 0 0.35rem 0; color: #fff;">Switch to Creator Profile</h2>' +
+              '<p style="font-size: 0.84rem; color: #94a3b8; margin: 0;">Unlock professional video broadcasting, micropayment vouchers, and RFC 8216 transcoder.</p>' +
+            '</div>' +
+            '<div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; background: rgba(2, 6, 23, 0.5); padding: 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.06);">' +
+              '<div style="display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #e2e8f0;"><span style="font-size: 1.1rem;">💰</span> <span><strong>95% Creator Revenue Split:</strong> Direct P2P micro-tips & vouchers</span></div>' +
+              '<div style="display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #e2e8f0;"><span style="font-size: 1.1rem;">📡</span> <span><strong>4K RFC 8216 Transcoder:</strong> Decentralized BitSwap swarm streaming</span></div>' +
+              '<div style="display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #e2e8f0;"><span style="font-size: 1.1rem;">📊</span> <span><strong>Audience & Seeder Telemetry:</strong> Real-time swarm bandwidth metrics</span></div>' +
+            '</div>' +
+            '<button type="button" id="btnConfirmCreatorUpgrade" style="width: 100%; background: linear-gradient(135deg, #f43f5e, #ec4899); border: none; color: #fff; font-weight: 800; font-size: 0.95rem; padding: 14px; border-radius: 14px; cursor: pointer; box-shadow: 0 8px 25px rgba(244, 63, 94, 0.45); transition: transform 0.15s ease;">✨ Enable Creator Mode (Instant & Free)</button>' +
+          '</div>';
+        document.body.appendChild(modal);
+        const closeBtn = document.getElementById('btnCloseCreatorUpgradeModal');
+        if (closeBtn) closeBtn.onclick = function() { modal.style.display = 'none'; };
+        const confirmBtn = document.getElementById('btnConfirmCreatorUpgrade');
+        if (confirmBtn) confirmBtn.onclick = function() { window.enableCreatorMode(); };
       }
-      if (!myProfile || !myProfile.sessionToken || myProfile.isGuest) {
-        if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
-          window.SovraAndroidOS.goHome();
-        }
-        return;
-      }
-      showAuthenticatedAppView();
-      try { sessionStorage.setItem('sovra_onboarding_dismissed', 'true'); } catch(e) {}
+      modal.style.display = 'flex';
     }
-
-    function enterAsGuest() {
-      const guestSeed = Math.random().toString(36).substring(2, 7);
-      const guestHandle = '@guest_' + guestSeed;
-      const guestUser = {
-        did: 'did:sovra:guest_' + guestSeed,
-        handle: guestHandle,
-        name: 'Guest Peer',
-        displayName: 'Guest Peer',
-        avatar: 'G',
-        avatarBg: '#475569',
-        isGuest: true,
-        sessionToken: 'stk_guest_' + guestSeed,
-        balanceSov: 50,
-        role: 'Guest Explorer'
-      };
-      myProfile = guestUser;
-      currentUserHandle = guestUser.handle;
-      try {
-        localStorage.setItem('sovra_user_profile', JSON.stringify(guestUser));
-        localStorage.setItem('sovra_session_token', guestUser.sessionToken);
-        localStorage.setItem('sovra_is_guest', 'true');
-        sessionStorage.setItem('sovra_onboarding_dismissed', 'true');
-      } catch(e) {}
-      showAuthenticatedAppView();
-      const ribbon = document.getElementById('guestModeRibbon');
-      if (ribbon) ribbon.style.display = 'flex';
-      showAccountToast('👋 Exploring Sovra in Guest Mode! Zero setup, full feed & reels access.');
-    }
-    window.enterAsGuest = enterAsGuest;
-
     function openMobileDeviceSetupModal() {
       const modal = document.getElementById('mobileDeviceSetupModal');
-      if (!modal) return;
-      fetch('/api/status').then(r => r.json()).then(data => {
-        const urlElem = document.getElementById('mobileSetupHttpsUrl');
-        if (urlElem) {
-          const httpsUrl = data.httpsUrl || ('https://' + (data.lanIp || window.location.hostname) + ':3443');
-          urlElem.textContent = httpsUrl;
-        }
-      }).catch(() => {
-        const urlElem = document.getElementById('mobileSetupHttpsUrl');
-        if (urlElem) urlElem.textContent = 'https://' + window.location.hostname + ':3443';
-      });
-      modal.style.display = 'flex';
+      if (modal) modal.style.display = 'flex';
     }
     window.openMobileDeviceSetupModal = openMobileDeviceSetupModal;
 
@@ -46997,6 +46997,26 @@ function renderHtml(
       if (tab === 'you') tab = 'me';
       if (tab === 'shorts') tab = 'reels';
       if (tab === 'chats') tab = 'chat';
+      document.body.classList.remove('sovra-mode-home');
+      document.body.classList.add('sovra-mode-app');
+      if (tab === 'studio') {
+        const p = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
+        const isCreator = Boolean(p && (
+          p.isCreator === true ||
+          p.role === 'CREATOR' ||
+          p.role === 'ADMIN' ||
+          p.role === 'SUPER_ADMIN' ||
+          p.role === 'OPERATOR'
+        ));
+        if (!isCreator) {
+          if (typeof window.showCreatorUpgradeModal === 'function') {
+            window.showCreatorUpgradeModal();
+          } else if (typeof showAccountToast === 'function') {
+            showAccountToast('🎙️ Switch to a Creator Account in Profile to access Creator Studio Pro & 95% revenue.');
+          }
+          return;
+        }
+      }
       if (tab === 'saved') {
         switchTab('me');
         if (typeof switchProfileGridTab === 'function') {
@@ -65570,9 +65590,9 @@ function renderHtml(
     // ==========================================
     // 2. WHATSAPP E2EE CHAT SCRIPT ENGINE
     // ==========================================
-    let contactsData = [];
-    let bitchatPeersData = ${safeJsonForScript(bitchatPeersStore.slice(0, 30))};
-    let chatMessages = [];
+    var contactsData = [];
+    var bitchatPeersData = ${safeJsonForScript(bitchatPeersStore.slice(0, 30))};
+    var chatMessages = [];
     let bitchatModeActive = false;
     let activeContactDid = '';
     let isRecordingVoice = false;
@@ -83513,10 +83533,10 @@ function renderHtml(
           if (rawMode === 'app' || rawMode === 'home') {
             currentMode = rawMode;
           } else {
-            currentMode = 'home';
+            currentMode = 'app';
           }
         } catch (_) {
-          currentMode = 'home';
+          currentMode = 'app';
         }
       }
 
