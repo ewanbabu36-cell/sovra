@@ -27002,13 +27002,13 @@ function renderHtml(
       <span class="bnav-icon">🎬</span>
       <span class="bnav-label">Watch</span>
     </button>
-    <button class="bottom-nav-item" id="bnav-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" title="Profile" aria-label="Profile and Identity">
+    <button class="bottom-nav-item" id="bnav-apps" data-action="open-drawer" onclick="if(window.SovraModularGlassOS) window.SovraModularGlassOS.toggleDrawer(); else if(window.SovraAndroidOS) window.SovraAndroidOS.openAppDrawer();" title="Sovra Junction (Profile, Identity &amp; Utilities)" aria-label="Sovra Junction">
+      <span class="bnav-icon">🔀</span>
+      <span class="bnav-label">Junction</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" style="display: none !important;" title="Profile" aria-label="Profile and Identity">
       <span class="bnav-icon">👤</span>
       <span class="bnav-label">Profile</span>
-    </button>
-    <button class="bottom-nav-item" id="bnav-apps" data-action="open-drawer" onclick="if(window.SovraModularGlassOS) window.SovraModularGlassOS.toggleDrawer(); else if(window.SovraAndroidOS) window.SovraAndroidOS.openAppDrawer();" title="All Apps & Utilities" aria-label="All Apps & Utilities">
-      <span class="bnav-icon">⊞</span>
-      <span class="bnav-label">Apps</span>
     </button>
     <!-- Backwards compatible IDs maintained in DOM -->
     <button class="bottom-nav-create" id="bnav-create" data-action="create-post" onclick="openUniversalCreateModal(this)" title="Create" aria-label="Create Post, Short, or Video" style="display: none !important;">
@@ -29891,13 +29891,13 @@ function renderHtml(
     <div id="sovraMasterAppDrawer" class="sovra-master-drawer" onclick="event.stopPropagation()">
       <div class="sheet-grab-handle"></div>
 
-      <!-- Drawer Header & Controls -->
+      <!-- Drawer Header & Controls (Sovra Junction) -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 1.3rem;">✨</span>
+          <span style="font-size: 1.35rem;">🔀</span>
           <div>
-            <div style="font-weight: 800; font-size: 1.15rem; color: #fff;">Sovra Glass OS</div>
-            <div style="font-size: 0.74rem; color: #94a3b8;">Modular Sovereign Apps &amp; Workspace</div>
+            <div style="font-weight: 800; font-size: 1.18rem; color: #fff; letter-spacing: -0.01em;">Sovra Junction</div>
+            <div style="font-size: 0.74rem; color: #94a3b8;">Sovereign Profile, Identity &amp; Utilities</div>
           </div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
@@ -29908,7 +29908,49 @@ function renderHtml(
         </div>
       </div>
 
-      <!-- Quick Preset Selector Bar -->
+      <!-- 🌟 SOVRA JUNCTION: SOVEREIGN PROFILE HERO CARD -->
+      <div id="junctionProfileHeroCard" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 18px; padding: 14px 16px; margin-bottom: 1rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); position: relative; overflow: hidden;">
+        <div style="position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, transparent 70%); pointer-events: none;"></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px;">
+          <div style="display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="if(window.SovraModularGlassOS) window.SovraModularGlassOS.closeDrawer(); switchTab('me');" title="Open Full Profile">
+            <div id="junctionUserAvatar" style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #38bdf8); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); border: 2px solid rgba(255, 255, 255, 0.2);">👤</div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span id="junctionUserName" style="font-weight: 800; font-size: 1.02rem; color: #f8fafc;">Sovereign Member</span>
+                <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.65rem; font-weight: 800; padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(16, 185, 129, 0.4);">✓ VERIFIED</span>
+              </div>
+              <div id="junctionUserHandle" style="font-size: 0.74rem; color: #94a3b8; font-family: monospace;">@sovereign • DID:sovra...</div>
+            </div>
+          </div>
+          <button type="button" onclick="if(window.SovraModularGlassOS) window.SovraModularGlassOS.closeDrawer(); switchTab('me');" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #f1f5f9; padding: 6px 14px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+            View Profile
+          </button>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; background: rgba(0, 0, 0, 0.25); border-radius: 12px; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.06);">
+          <div>
+            <div style="font-size: 0.66rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Balance</div>
+            <div id="junctionBalanceValue" style="font-size: 0.95rem; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 4px;">💎 500.00 SOV</div>
+          </div>
+          <div>
+            <div style="font-size: 0.66rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">P2P Mesh Node</div>
+            <div style="font-size: 0.95rem; font-weight: 800; color: #34d399; display: flex; align-items: center; gap: 4px;">● 100% Solvency</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(99, 102, 241, 0.12); border: 1px dashed rgba(99, 102, 241, 0.35); border-radius: 12px; padding: 8px 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.1rem;">🎙️</span>
+            <div>
+              <div style="font-size: 0.78rem; font-weight: 800; color: #e2e8f0;">Creator Studio Mode</div>
+              <div style="font-size: 0.68rem; color: #94a3b8;">95% revenue split • 4K transcoding</div>
+            </div>
+          </div>
+          <button type="button" id="junctionCreatorSwitchBtn" onclick="if(window.SovraModularGlassOS) window.SovraModularGlassOS.closeDrawer(); if(window.toggleCreatorModeAction) window.toggleCreatorModeAction(); else if(window.showCreatorUpgradeModal) window.showCreatorUpgradeModal();" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35); white-space: nowrap;">
+            Switch Mode
+          </button>
+        </div>
+      </div>
+
+<!-- Quick Preset Selector Bar -->
       <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 0.75rem; scrollbar-width: none;">
         <button type="button" class="preset-pill-btn" onclick="window.SovraModularGlassOS.applyPreset('social')" style="padding: 4px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">⚡ Social Classic</button>
         <button type="button" class="preset-pill-btn" onclick="window.SovraModularGlassOS.applyPreset('creator')" style="padding: 4px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">🎬 Creator Studio</button>
@@ -83199,12 +83241,51 @@ function renderHtml(
         }
       }
 
+      function syncJunctionProfileHero() {
+        try {
+          const avatarEl = document.getElementById('junctionUserAvatar');
+          const nameEl = document.getElementById('junctionUserName');
+          const handleEl = document.getElementById('junctionUserHandle');
+          const balanceEl = document.getElementById('junctionBalanceValue');
+          const switchBtn = document.getElementById('junctionCreatorSwitchBtn');
+
+          const profile = (typeof myProfile !== 'undefined' && myProfile) ? myProfile : ((window.SovraState && window.SovraState.currentUser) ? window.SovraState.currentUser : null);
+          const handle = (typeof currentUserHandle !== 'undefined' && currentUserHandle && currentUserHandle !== '@guest') ? currentUserHandle : ((profile && profile.handle) ? profile.handle : '@sovereign');
+          const name = profile && (profile.displayName || profile.name) ? (profile.displayName || profile.name) : 'Sovereign Member';
+          const avatar = profile && profile.avatar ? profile.avatar : '👤';
+          const balance = (typeof window.walletBalanceSov === 'number') ? window.walletBalanceSov.toFixed(2) : '500.00';
+          const isCreator = (typeof checkCreatorStatus === 'function' ? checkCreatorStatus() : false) || Boolean(profile && (profile.isCreator || profile.role === 'CREATOR'));
+
+          if (avatarEl) avatarEl.textContent = avatar;
+          if (nameEl) nameEl.textContent = name;
+          if (handleEl) handleEl.textContent = handle + ' • DID:sovra...' + (handle.replace('@', '').slice(0, 6));
+          if (balanceEl) balanceEl.textContent = '💎 ' + balance + ' SOV';
+          if (switchBtn) {
+            if (isCreator) {
+              switchBtn.textContent = 'Active Creator ✓';
+              switchBtn.style.background = 'rgba(16, 185, 129, 0.25)';
+              switchBtn.style.border = '1px solid rgba(16, 185, 129, 0.45)';
+              switchBtn.style.color = '#34d399';
+            } else {
+              switchBtn.textContent = 'Switch Mode';
+              switchBtn.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+              switchBtn.style.border = 'none';
+              switchBtn.style.color = '#fff';
+            }
+          }
+        } catch (e) {
+          console.warn('[Junction] sync hero error:', e);
+        }
+      }
+      window.syncJunctionProfileHero = syncJunctionProfileHero;
+
       function toggleDrawer(show) {
         const overlay = document.getElementById('sovraMasterDrawerOverlay');
         if (!overlay) return;
         const willShow = typeof show === 'boolean' ? show : !overlay.classList.contains('active');
         if (willShow) {
           overlay.classList.add('active');
+          syncJunctionProfileHero();
           renderDrawerGrid();
           const searchInput = document.getElementById('masterDrawerSearchInput');
           if (searchInput) {
