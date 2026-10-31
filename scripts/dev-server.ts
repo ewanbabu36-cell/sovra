@@ -29916,12 +29916,11 @@ function renderHtml(
 
       <!-- Category Filter Pills -->
       <div id="drawerCategoryPills" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 0.85rem; scrollbar-width: none;">
-        <button type="button" class="drawer-cat-pill active" onclick="window.SovraModularGlassOS.setCategoryFilter('all')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.2); color: #38bdf8; cursor: pointer; white-space: nowrap;">All</button>
-        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('social')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Social</button>
-        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('media')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Media</button>
-        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('creator')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Creator</button>
-        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('finance')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Finance</button>
-        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('utility')" style="padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">Utility</button>
+        <button type="button" class="drawer-cat-pill active" onclick="window.SovraModularGlassOS.setCategoryFilter('all')" style="padding: 3px 12px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.2); color: #38bdf8; cursor: pointer; white-space: nowrap;">All</button>
+        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('media')" style="padding: 3px 12px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">🎬 Media</button>
+        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('social')" style="padding: 3px 12px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">👥 Social</button>
+        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('creator')" style="padding: 3px 12px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">🎙️ Creator</button>
+        <button type="button" class="drawer-cat-pill" onclick="window.SovraModularGlassOS.setCategoryFilter('utility')" style="padding: 3px 12px; font-size: 0.72rem; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; cursor: pointer; white-space: nowrap;">⚙️ Tools</button>
       </div>
 
       <!-- 24-App Grid Container -->
@@ -82896,6 +82895,9 @@ function renderHtml(
         const q = (typeof filter === 'string' ? filter : activeSearchQuery).toLowerCase().trim();
 
         const filtered = SOVRA_FEATURE_REGISTRY.filter(feat => {
+          // 🚀 Production Grade: Exclude duplicate buttons already on bottom dock / top header, and technical mockups
+          const DUPLICATES = ['feed', 'chat', 'watch', 'profile', 'wallet', 'bridge', 'mesh_node', 'key_vault', 'backup', 'qr_scan'];
+          if (DUPLICATES.includes(feat.id)) return false;
           const matchCategory = activeCategoryFilter === 'all' || feat.category === activeCategoryFilter;
           const matchQuery = !q || feat.name.toLowerCase().includes(q) || feat.desc.toLowerCase().includes(q) || feat.category.toLowerCase().includes(q);
           return matchCategory && matchQuery;
@@ -82955,20 +82957,7 @@ function renderHtml(
             tile.appendChild(badgeSpan);
           }
 
-          const isPinnedInDock = layoutConfig.dockSlots.includes(feat.id);
-          const isPinnedInHeader = layoutConfig.headerSlots.includes(feat.id);
-          if (isPinnedInDock || isPinnedInHeader) {
-            const pinnedDot = document.createElement('span');
-            pinnedDot.style.position = 'absolute';
-            pinnedDot.style.bottom = '4px';
-            pinnedDot.style.right = '4px';
-            pinnedDot.style.width = '6px';
-            pinnedDot.style.height = '6px';
-            pinnedDot.style.borderRadius = '50%';
-            pinnedDot.style.background = '#38bdf8';
-            pinnedDot.title = 'Pinned';
-            tile.appendChild(pinnedDot);
-          }
+          // Blue pinnedDot removed for clean production visual polish
 
           const iconSpan = document.createElement('span');
           iconSpan.className = 'sovra-app-tile-icon';
