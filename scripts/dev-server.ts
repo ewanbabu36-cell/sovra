@@ -18363,6 +18363,7 @@ function renderHtml(
     }
   </style>
 </head>
+<!-- Archetype reference: <body class="nav-mode-auto theme-normal" data-active-tab="feed"> -->
 <body class="nav-mode-auto theme-black sovra-mode-home" data-active-tab="home">
   <!-- 🖼️ SOVRA ANDROID OS: DYNAMIC WALLPAPER CANVAS -->
   <div id="sovraWallpaperCanvas" class="sovra-wallpaper-canvas" aria-hidden="true">
@@ -18808,6 +18809,11 @@ function renderHtml(
         <span>🖼️</span> <span>Theme</span>
       </button>
 
+      <!-- 🔍 Header Search Trigger Icon Button -->
+      <button id="headerMobileSearchBtn" type="button" class="header-action-icon-btn" onclick="toggleHeaderSearchOverlay(event)" title="Search SOVRA" aria-label="Search" style="width: 38px; height: 38px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #f1f5f9; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.05rem; transition: all 0.2s ease; margin-right: 4px;">
+        🔍
+      </button>
+
       <!-- 4. User Profile Avatar with Integrated Presence Badge -->
       <div id="currentUserPill" class="header-avatar-wrap is-online" role="button" tabindex="0" onclick="switchTab('me'); event.stopPropagation();" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" title="Open Your Profile (Click to View / Toggle Ghost Mode)" aria-label="Your Sovereign Profile">
         <span id="currentUserAvatar" class="header-avatar-circle">👤</span>
@@ -19133,21 +19139,61 @@ function renderHtml(
 
     <!-- Column 2: Center Stage -->
     <div class="app-center-stage">
-      <!-- 📱 SOVRA NATIVE ANDROID APP BAR (Visible when an App is Open) -->
-      <header id="sovraNativeAppBar" class="sovra-native-app-bar" style="position: sticky; top: 0; z-index: 100; height: 50px; background: rgba(8, 12, 24, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; padding: 0 16px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <button type="button" class="sovra-app-bar-back-btn" onclick="window.SovraAndroidOS &amp;&amp; window.SovraAndroidOS.goBack()" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; color: #f8fafc; cursor: pointer; transition: all 0.2s ease;" title="Back (◂)">
+      <!-- 📱 SOVRA NATIVE APP BAR: SOVRA BRANDING, SEARCH & PROFILE -->
+      <header id="sovraNativeAppBar" class="sovra-native-app-bar" style="position: sticky; top: 0; z-index: 1000; height: 54px; background: rgba(10, 14, 26, 0.94); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; padding: 0 14px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);">
+        <!-- Zone 1: Left - Back Button + SOVRA Branding -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" class="sovra-app-bar-back-btn" onclick="window.SovraAndroidOS &amp;&amp; window.SovraAndroidOS.goBack()" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; color: #94a3b8; cursor: pointer; transition: all 0.2s ease;" title="Back (◂)" aria-label="Go Back">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
           </button>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span id="sovraNativeAppIcon" style="font-size: 1.25rem;">📱</span>
-            <span id="sovraNativeAppTitle" style="font-weight: 800; font-size: 1.05rem; color: #ffffff; letter-spacing: -0.01em;">App</span>
+          
+          <!-- Master SOVRA Brand Emblem & Name -->
+          <div id="sovraNativeBrandBadge" onclick="switchTab('feed'); event.stopPropagation();" role="button" tabindex="0" title="SOVRA Mesh Home" style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+            <div style="width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg, #0b1329 0%, #1e1b4b 100%); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 14px rgba(56, 189, 248, 0.2);">
+              <svg viewBox="0 0 512 512" width="20" height="20" aria-hidden="true">
+                <defs>
+                  <linearGradient id="sovraNativeSvgG" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00f5ff"/>
+                    <stop offset="50%" stop-color="#6366f1"/>
+                    <stop offset="100%" stop-color="#ec4899"/>
+                  </linearGradient>
+                </defs>
+                <path d="M 335 195 C 335 135 300 110 256 110 C 195 110 165 145 165 195 C 165 240 215 260 256 275" fill="none" stroke="url(#sovraNativeSvgG)" stroke-width="68" stroke-linecap="round"/>
+                <path d="M 256 275 C 298 290 347 310 347 355 C 347 405 315 440 256 440 C 200 440 165 415 165 360" fill="none" stroke="url(#sovraNativeSvgG)" stroke-width="68" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-weight: 900; font-size: 1.18rem; letter-spacing: -0.02em; background: linear-gradient(135deg, #ffffff 40%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">SOVRA</span>
+              <span id="sovraNativeAppTitle" style="font-weight: 600; font-size: 0.8rem; color: #64748b; letter-spacing: 0.02em; text-transform: uppercase;"></span>
+            </div>
+            <span id="sovraNativeAppIcon" style="display: none;"></span>
           </div>
         </div>
+
+        <!-- Zone 2: Right Actions - Search & Profile -->
         <div id="sovraNativeAppRightActions" style="display: flex; align-items: center; gap: 8px;">
-          <!-- Dedicated app bar actions (system home/back handled by Android 3-button navigation floor) -->
+          <!-- 🔍 Search Icon Button -->
+          <button id="sovraNativeAppBarSearchBtn" type="button" class="sovra-header-action-btn" onclick="toggleHeaderSearchOverlay(event)" title="Search SOVRA" aria-label="Search posts, friends, tags" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; color: #f1f5f9; cursor: pointer; font-size: 1rem; transition: all 0.2s ease;">
+            🔍
+          </button>
+
+          <!-- 👤 Profile Avatar Button -->
+          <button id="sovraNativeAppBarProfileBtn" type="button" class="sovra-header-action-btn" onclick="switchTab('me'); event.stopPropagation();" title="View Sovereign Profile" aria-label="Profile" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; color: #818cf8; cursor: pointer; font-size: 1.05rem; position: relative; transition: all 0.2s ease; overflow: visible;">
+            <span id="sovraNativeAvatarIcon" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">👤</span>
+            <span style="position: absolute; bottom: 0; right: 0; width: 9px; height: 9px; background: #22c55e; border-radius: 50%; border: 2px solid #0a0e1a; box-shadow: 0 0 6px #22c55e;"></span>
+          </button>
         </div>
       </header>
+
+      <!-- 🔎 Dynamic Collapsible Search Overlay -->
+      <div id="nativeHeaderSearchOverlay" style="display: none; position: sticky; top: 54px; z-index: 999; padding: 10px 14px; background: rgba(10, 14, 26, 0.98); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <div style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 999px; padding: 6px 14px;">
+          <span style="color: #38bdf8; font-size: 0.95rem;">🔍</span>
+          <input type="text" id="mobileSearchInput" placeholder="Search posts, friends, tags..." style="flex: 1; background: transparent; border: none; outline: none; color: #f8fafc; font-size: 0.9rem;" oninput="handleMobileSearchInput(this.value)" />
+          <button type="button" onclick="toggleHeaderSearchOverlay(event)" style="background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer; padding: 0 4px;" aria-label="Close search">✕</button>
+        </div>
+        <div id="mobileSearchDropdown" style="display: none; max-height: 320px; overflow-y: auto; margin-top: 8px; border-radius: 12px; background: rgba(15, 23, 42, 0.98); border: 1px solid rgba(255, 255, 255, 0.1); padding: 6px;"></div>
+      </div>
       <!-- 💬 Non-Intrusive Floating Top Chat Message Capsule (Dynamic Heads-Up) -->
       <div id="floatingChatToast" class="floating-chat-toast" onclick="handleFloatingToastClick(event)" aria-live="polite">
         <div class="toast-avatar" id="toastAvatar">👤</div>
@@ -42178,6 +42224,14 @@ function renderHtml(
         } else {
           avatarEl.innerText = myProfile.avatar || 'S';
           avatarEl.style.background = myProfile.avatarBg || '#6366f1';
+        }
+      }
+      const nativeAvatar = document.getElementById('sovraNativeAvatarIcon');
+      if (nativeAvatar) {
+        if (myProfile.avatarDataUrl) {
+          nativeAvatar.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;" />';
+        } else {
+          nativeAvatar.innerText = myProfile.avatar || '👤';
         }
       }
 
@@ -75732,6 +75786,52 @@ function renderHtml(
       if (dd) renderDefaultSearchSuggestions(dd);
     }
 
+
+    function toggleHeaderSearchOverlay(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      const nativeOverlay = document.getElementById('nativeHeaderSearchOverlay');
+      const mobileInput = document.getElementById('mobileSearchInput');
+      const desktopSearchWrap = document.querySelector('.header-search-wrap');
+      const desktopInput = document.getElementById('headerFriendSearchInput');
+
+      if (nativeOverlay) {
+        if (nativeOverlay.style.display === 'none' || !nativeOverlay.style.display) {
+          nativeOverlay.style.display = 'block';
+          if (mobileInput) setTimeout(() => mobileInput.focus(), 80);
+        } else {
+          nativeOverlay.style.display = 'none';
+        }
+      }
+      if (desktopSearchWrap) {
+        if (desktopSearchWrap.classList.contains('mobile-active')) {
+          desktopSearchWrap.classList.remove('mobile-active');
+        } else {
+          desktopSearchWrap.classList.add('mobile-active');
+          if (desktopInput) {
+            setTimeout(() => desktopInput.focus(), 80);
+            if (typeof showHeaderSearchDropdown === 'function') showHeaderSearchDropdown();
+          }
+        }
+      }
+    }
+    window.toggleHeaderSearchOverlay = toggleHeaderSearchOverlay;
+
+    function handleMobileSearchInput(val) {
+      const desktopInput = document.getElementById('headerFriendSearchInput');
+      if (desktopInput) desktopInput.value = val;
+      if (typeof handleHeaderFriendSearch === 'function') handleHeaderFriendSearch(val);
+      const desktopDd = document.getElementById('headerSearchDropdown');
+      const mobileDd = document.getElementById('mobileSearchDropdown');
+      if (desktopDd && mobileDd) {
+        if (val && val.trim()) {
+          mobileDd.style.display = 'block';
+          mobileDd.innerHTML = desktopDd.innerHTML;
+        } else {
+          mobileDd.style.display = 'none';
+        }
+      }
+    }
+    window.handleMobileSearchInput = handleMobileSearchInput;
     // Top Header Search Live Engine
     function handleHeaderFriendSearch(query) {
       const q = (query || '').toLowerCase().trim();
@@ -83534,7 +83634,7 @@ function renderHtml(
           if (rawMode === 'app' || rawMode === 'home') {
             currentMode = rawMode;
           } else {
-            currentMode = 'app';
+            currentMode = 'home';
           }
         } catch (_) {
           currentMode = 'app';
@@ -83971,7 +84071,7 @@ function renderHtml(
         };
         const appInfo = appTitles[appId] || { title: (appId ? (appId.charAt(0).toUpperCase() + appId.slice(1)) : 'App'), icon: '📱' };
         const appTitleEl = document.getElementById('sovraNativeAppTitle');
-        if (appTitleEl) appTitleEl.textContent = appInfo.title;
+        if (appTitleEl) appTitleEl.textContent = (appId === 'feed' || !appInfo.title) ? '' : ('• ' + appInfo.title);
         const appIconEl = document.getElementById('sovraNativeAppIcon');
         if (appIconEl) appIconEl.textContent = appInfo.icon;
 
