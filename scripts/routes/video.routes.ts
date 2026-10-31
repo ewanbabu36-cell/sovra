@@ -62,14 +62,21 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
 
   // List Reels
   if (url.pathname === '/api/reels/list' && req.method === 'GET') {
-    const allReels = sovraDb.getAllReels();
-    const reels = allReels.map(r => ({
+    const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 15;
+    const cursor = url.searchParams.get('cursor');
+    let allReels = sovraDb.getAllReels();
+    if (cursor) {
+      allReels = allReels.filter(r => String(r.id) < cursor);
+    }
+    const paginated = (typeof limit === 'number' && !isNaN(limit) && limit > 0) ? allReels.slice(0, limit) : allReels;
+    const reels = paginated.map(r => ({
       ...r,
       title: r.caption || 'Reel',
       likes: r.likesCount,
     }));
+    const nextCursor = (typeof limit === 'number' && reels.length === limit) ? reels[reels.length - 1].id : null;
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, reels }));
+    res.end(JSON.stringify({ ok: true, reels, count: reels.length, nextCursor }));
     return true;
   }
 

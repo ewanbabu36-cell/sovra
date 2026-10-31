@@ -721,11 +721,51 @@ export class SqliteSocialDatabaseEngine {
       CREATE INDEX IF NOT EXISTS idx_orders_buyer ON store_orders(buyer_did);
       CREATE INDEX IF NOT EXISTS idx_orders_seller ON store_orders(seller_did);
       CREATE INDEX IF NOT EXISTS idx_orders_status ON store_orders(status);
+
+      -- 43. SOVEREIGN COMMUNITIES & COMMUNITY MEMBERS
+      CREATE TABLE IF NOT EXISTS communities (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        avatar TEXT NOT NULL DEFAULT '🌐',
+        category TEXT NOT NULL DEFAULT 'General',
+        creator_did TEXT NOT NULL,
+        member_count INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_communities_cat ON communities(category);
+
+      CREATE TABLE IF NOT EXISTS community_members (
+        id TEXT PRIMARY KEY,
+        community_id TEXT NOT NULL,
+        member_did TEXT NOT NULL,
+        joined_at INTEGER NOT NULL,
+        UNIQUE(community_id, member_did)
+      );
+      CREATE INDEX IF NOT EXISTS idx_comm_members ON community_members(community_id);
     `);
 
     // Seed default algorithmic dials if empty
     try {
-      const dialsCount = (this.db.prepare('SELECT COUNT(*) as c FROM admin_algo_dials').get() as any)?.c || 0;
+      // Seed default communities if empty
+      try {
+        const commCount = (this.db.prepare('SELECT COUNT(*) as c FROM communities').get() as any)?.c || 0;
+        if (commCount === 0) {
+          const seedCommunities = [
+            ['comm_sovra_builders', 'Sovereign Protocol Devs', 'Building decentralized social and P2P mesh primitives', '🛠️', 'Technology', 'did:sovra:system', 124],
+            ['comm_crypto_alpha', 'Crypto & ZK Research', 'Zero-knowledge proofs, cryptography and DeFi consensus', '🔐', 'Finance', 'did:sovra:system', 89],
+            ['comm_digital_creators', 'Sovereign Creators Hub', 'Independent artists, writers, filmmakers and video publishers', '🎨', 'Creative', 'did:sovra:system', 210],
+            ['comm_mesh_operators', 'Local DePIN Node Operators', 'Hardware operators running local Wi-Fi / BLE mesh repeaters', '📡', 'Infrastructure', 'did:sovra:system', 76]
+          ];
+          const insertComm = this.db.prepare('INSERT OR REPLACE INTO communities (id, name, description, avatar, category, creator_did, member_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+          const now = Date.now();
+          for (const [id, name, desc, avatar, cat, creator, count] of seedCommunities) {
+            insertComm.run(id, name, desc, avatar, cat, creator, count, now);
+          }
+        }
+      } catch (_) {}
+
+            const dialsCount = (this.db.prepare('SELECT COUNT(*) as c FROM admin_algo_dials').get() as any)?.c || 0;
       if (dialsCount === 0) {
         const seedDials = [
           ['breaking_news', 2.0, 'Breaking News & Live Swarms', 'Multiplies propagation velocity during live community events'],
@@ -3517,6 +3557,48 @@ export class SqliteSocialDatabaseEngine {
       }));
     } catch (_) {
       return [];
+    }
+  }
+
+  public getCommunitiesList(): any[] {
+    try {
+      return this.db.prepare('SELECT * FROM communities ORDER BY created_at DESC').all();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public createCommunity(comm: { id: string; name: string; description: string; avatar?: string; category?: string; creatorDid: string }): boolean {
+    try {
+      const now = Date.now();
+      const insert = this.db.prepare(`
+        INSERT INTO communities (id, name, description, avatar, category, creator_did, member_count, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+      `);
+      insert.run(comm.id, comm.name, comm.description, comm.avatar || '🌐', comm.category || 'General', comm.creatorDid, now);
+      this.joinCommunity(comm.id, comm.creatorDid);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public joinCommunity(communityId: string, memberDid: string): boolean {
+    try {
+      const id = `${communityId}_${memberDid}`;
+      const now = Date.now();
+      this.db.prepare(`
+        INSERT OR IGNORE INTO community_members (id, community_id, member_did, joined_at)
+        VALUES (?, ?, ?, ?)
+      `).run(id, communityId, memberDid, now);
+      this.db.prepare(`
+        UPDATE communities SET member_count = (
+          SELECT COUNT(*) FROM community_members WHERE community_id = ?
+        ) WHERE id = ?
+      `).run(communityId, communityId);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
