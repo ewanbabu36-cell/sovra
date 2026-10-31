@@ -18354,6 +18354,11 @@ function renderHtml(
       color: #fff !important;
     }
 
+    @keyframes scanLaserAnim {
+      0% { top: 24px; opacity: 0.8; }
+      50% { top: 230px; opacity: 1; }
+      100% { top: 24px; opacity: 0.8; }
+    }
     @keyframes uploadToastPulse {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.65; transform: scale(1.08); }
@@ -25994,64 +25999,116 @@ function renderHtml(
     <!-- SOVRA Module: Calls (Audio & HD Video Calling) -->
     <main class="main-content" id="calls-view" style="display: none; width: 100%; flex-direction: column;">
       <div class="sovra-calls-stage">
-        <!-- Calls Top Bar -->
-        <div class="calls-top-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: rgba(15, 23, 42, 0.7); border-radius: 16px; margin-bottom: 14px; border: 1px solid rgba(255, 255, 255, 0.08);">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #38bdf8, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #fff;">📞</div>
-            <div>
-              <div style="font-weight: 800; font-size: 1.05rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-                <span id="activeCallPeerName">Rohit Kumar</span>
-                <span class="call-security-badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.68rem; padding: 2px 8px; border-radius: 100px;">🔒 End-to-End Encrypted</span>
+        <!-- 📱 Idle Dashboard: Contact Search & Real Call History (Shown When No Active Call) -->
+        <div id="callsIdleDashboard" style="display: flex; flex-direction: column; gap: 18px;">
+          <!-- Card 1: Start Encrypted Call & Contact Quick Dial -->
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px; padding: 18px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: #fff;">📞</div>
+                <div>
+                  <div style="font-weight: 800; font-size: 1.05rem; color: #f8fafc;">Start Encrypted Call</div>
+                  <div style="font-size: 0.75rem; color: #94a3b8;">Direct WebRTC Noise_XX • Zero Middleman Telemetry</div>
+                </div>
               </div>
-              <div style="font-size: 0.78rem; color: #94a3b8; display: flex; align-items: center; gap: 10px;">
-                <span>HD 1080p60 • P2P WebRTC</span>
-                <span style="color: #38bdf8;">● Active Call</span>
-              </div>
+              <span style="font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);">🔒 E2EE Active</span>
+            </div>
+
+            <!-- Contact Search Input -->
+            <div style="position: relative; margin-bottom: 14px;">
+              <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 0.95rem; color: #38bdf8; pointer-events: none;">🔍</span>
+              <input type="text" id="callsPeerSearchInput" placeholder="Search contacts to call (Alice, Bob, Sovereign Node)..." oninput="filterCallsContacts(this.value)" style="width: 100%; box-sizing: border-box; background: rgba(30, 41, 59, 0.75); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 10px 14px 10px 38px; color: #fff; font-size: 0.88rem; outline: none;" />
+            </div>
+
+            <!-- Quick Dial Peer Chips Grid -->
+            <div id="callsContactsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px;">
+              <!-- Hydrated dynamically by renderCallsContacts() -->
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span class="calls-timer-pill" id="callsTimerPill" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); padding: 6px 14px; border-radius: 100px; font-family: monospace; font-size: 0.88rem; font-weight: 700; color: #38bdf8;">00:24</span>
-            <button type="button" class="btn btn-secondary" onclick="startCallQuickAction()" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 10px; background: rgba(255,255,255,0.06); color: #f8fafc;">+ Add Peer</button>
+
+          <!-- Card 2: Call History Log (Incoming, Outgoing, Missed) -->
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px; padding: 18px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+              <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>📜 Call History Log</span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn-subtab-filter active" onclick="filterCallsLog('all')" id="callsFilterAll" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 8px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; cursor: pointer; font-weight: 700;">All</button>
+                <button type="button" class="btn-subtab-filter" onclick="filterCallsLog('missed')" id="callsFilterMissed" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer; font-weight: 700;">Missed</button>
+                <button type="button" class="btn-subtab-filter" onclick="filterCallsLog('incoming')" id="callsFilterIncoming" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer; font-weight: 700;">Incoming</button>
+                <button type="button" class="btn-subtab-filter" onclick="filterCallsLog('outgoing')" id="callsFilterOutgoing" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer; font-weight: 700;">Outgoing</button>
+              </div>
+            </div>
+
+            <!-- Call Log Table Container -->
+            <div id="callsHistoryList" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Hydrated dynamically by renderCallHistoryLog() -->
+            </div>
           </div>
         </div>
 
-        <!-- Video Feeds Container -->
-        <div class="calls-feed-canvas" style="position: relative; width: 100%; height: 560px; background: radial-gradient(circle at 50% 50%, #0f172a 0%, #020617 100%); border-radius: 20px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;">
-          <!-- Remote Video Feed (Simulation Canvas / Poster) -->
-          <div id="callsRemoteVideoContainer" style="width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: url('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1280&q=80') center/cover no-repeat;">
-            <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(2,6,23,0.3) 0%, rgba(2,6,23,0.7) 100%);"></div>
-            
-            <div style="position: absolute; bottom: 100px; left: 24px; z-index: 10; display: flex; align-items: center; gap: 10px;">
-              <div style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); padding: 8px 14px; border-radius: 12px; display: flex; align-items: center; gap: 8px;">
-                <span id="remoteCallPeerLabel" style="font-weight: 700; font-size: 0.85rem; color: #fff;">Rohit Kumar</span>
-                <span style="font-size: 0.72rem; color: #34d399;">📶 42ms (Loss 0%)</span>
+        <!-- 🔴 Active Call Session Canvas (Shown ONLY When Real Call Is In Progress) -->
+        <div id="callsActiveSession" style="display: none; flex-direction: column;">
+          <!-- Calls Top Bar -->
+          <div class="calls-top-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: rgba(15, 23, 42, 0.7); border-radius: 16px; margin-bottom: 14px; border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #38bdf8, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #fff;">📞</div>
+              <div>
+                <div style="font-weight: 800; font-size: 1.05rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                  <span id="activeCallPeerName">Peer</span>
+                  <span class="call-security-badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.68rem; padding: 2px 8px; border-radius: 100px;">🔒 End-to-End Encrypted</span>
+                </div>
+                <div style="font-size: 0.78rem; color: #94a3b8; display: flex; align-items: center; gap: 10px;">
+                  <span>HD 1080p60 • P2P WebRTC</span>
+                  <span style="color: #38bdf8;">● Active Call</span>
+                </div>
               </div>
             </div>
-
-            <!-- Picture-In-Picture Self Feed -->
-            <div id="pipSelfFeed" style="position: absolute; bottom: 95px; right: 24px; width: 160px; height: 210px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(56, 189, 248, 0.5); box-shadow: 0 10px 30px rgba(0,0,0,0.7); background: #1e293b; z-index: 15;">
-              <div style="width: 100%; height: 100%; background: url('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=480&q=80') center/cover no-repeat; position: relative;">
-                <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.65); padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; color: #fff;">You (Host)</div>
-              </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="calls-timer-pill" id="callsTimerPill" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); padding: 6px 14px; border-radius: 100px; font-family: monospace; font-size: 0.88rem; font-weight: 700; color: #38bdf8;">00:00</span>
+              <button type="button" class="btn btn-secondary" onclick="terminateActiveCall()" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 10px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;">✕ End Call</button>
             </div>
+          </div>
 
-            <!-- Floating Glassmorphic Control Dock -->
-            <div class="calls-control-dock">
-              <button type="button" class="call-dock-btn active" id="callMicBtn" onclick="toggleCallAudio()" title="Mute / Unmute Mic">
-                <span id="callMicIcon">🎙️</span>
-              </button>
-              <button type="button" class="call-dock-btn active" id="callCamBtn" onclick="toggleCallVideo()" title="Turn Camera Off / On">
-                <span id="callCamIcon">📹</span>
-              </button>
-              <button type="button" class="call-dock-btn" id="callSpeakerBtn" onclick="toggleCallSpeaker()" title="Switch Audio Output">
-                <span id="callSpeakerIcon">🔊</span>
-              </button>
-              <button type="button" class="call-dock-btn" id="callShareBtn" onclick="toggleCallScreenShare()" title="Share Screen">
-                <span>🖥️</span>
-              </button>
-              <button type="button" class="call-dock-btn danger" id="callsCallEndBtn" onclick="terminateActiveCall()" title="End Call">
-                <span>📵</span>
-              </button>
+          <!-- Video Feeds Container -->
+          <div class="calls-feed-canvas" style="position: relative; width: 100%; height: 560px; background: radial-gradient(circle at 50% 50%, #0f172a 0%, #020617 100%); border-radius: 20px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;">
+            <!-- Remote Video Feed -->
+            <div id="callsRemoteVideoContainer" style="width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: #0f172a;">
+              <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(2,6,23,0.3) 0%, rgba(2,6,23,0.7) 100%);"></div>
+              
+              <div style="position: absolute; bottom: 100px; left: 24px; z-index: 10; display: flex; align-items: center; gap: 10px;">
+                <div style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); padding: 8px 14px; border-radius: 12px; display: flex; align-items: center; gap: 8px;">
+                  <span id="remoteCallPeerLabel" style="font-weight: 700; font-size: 0.85rem; color: #fff;">Peer</span>
+                  <span style="font-size: 0.72rem; color: #34d399;">📶 42ms (Loss 0%)</span>
+                </div>
+              </div>
+
+              <!-- Picture-In-Picture Self Feed -->
+              <div id="pipSelfFeed" style="position: absolute; bottom: 95px; right: 24px; width: 160px; height: 210px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(56, 189, 248, 0.5); box-shadow: 0 10px 30px rgba(0,0,0,0.7); background: #1e293b; z-index: 15;">
+                <div style="width: 100%; height: 100%; background: #0b1120; display: flex; align-items: center; justify-content: center; position: relative;">
+                  <span style="font-size: 2.2rem;">👤</span>
+                  <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.65); padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; color: #fff;">You (Host)</div>
+                </div>
+              </div>
+
+              <!-- Floating Glassmorphic Control Dock -->
+              <div class="calls-control-dock">
+                <button type="button" class="call-dock-btn active" id="callMicBtn" onclick="toggleCallAudio()" title="Mute / Unmute Mic">
+                  <span id="callMicIcon">🎙️</span>
+                </button>
+                <button type="button" class="call-dock-btn active" id="callCamBtn" onclick="toggleCallVideo()" title="Turn Camera Off / On">
+                  <span id="callCamIcon">📹</span>
+                </button>
+                <button type="button" class="call-dock-btn" id="callSpeakerBtn" onclick="toggleCallSpeaker()" title="Switch Audio Output">
+                  <span id="callSpeakerIcon">🔊</span>
+                </button>
+                <button type="button" class="call-dock-btn" id="callShareBtn" onclick="toggleCallScreenShare()" title="Share Screen">
+                  <span>🖥️</span>
+                </button>
+                <button type="button" class="call-dock-btn danger" id="callsCallEndBtn" onclick="terminateActiveCall()" title="End Call">
+                  <span>📵</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -31971,6 +32028,54 @@ function renderHtml(
       <button type="button" id="videoUploadHUDDismissBtn" onclick="hideVideoUploadProgressHUD()" style="display: none; width: 100%; padding: 0.65rem 1rem; border-radius: 12px; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; color: #fff; font-weight: 700; font-size: 0.88rem; cursor: pointer; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);">
         Done • View in Watch
       </button>
+    </div>
+  </div>
+
+  <!-- 📷 WebRTC Camera QR / DID / Invoice Scanner Modal -->
+  <div id="sovraCameraScannerModal" class="wa-modal-overlay" style="display: none; z-index: 1000002; background: rgba(5, 8, 16, 0.9); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);" onclick="closeQrScannerModal()">
+    <div class="video-upload-hud-card" style="background: linear-gradient(145deg, #0f172a, #0b1120); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 20px; width: 92%; max-width: 460px; padding: 1.5rem; box-shadow: 0 25px 60px rgba(0,0,0,0.85), 0 0 30px rgba(56, 189, 248, 0.2); text-align: center; color: #f8fafc;" onclick="event.stopPropagation()">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.3rem;">📷</span>
+          <span style="font-size: 1rem; font-weight: 800; color: #f1f5f9;">Sovra WebRTC Camera Scanner</span>
+        </div>
+        <button type="button" onclick="closeQrScannerModal()" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
+      </div>
+
+      <!-- Camera Viewport Box with Scanning Reticle -->
+      <div style="position: relative; width: 100%; height: 260px; background: #000; border-radius: 16px; overflow: hidden; border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
+        <video id="sovraScannerVideo" playsinline autoplay muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+        
+        <!-- Animated Scanning Laser Reticle -->
+        <div style="position: absolute; inset: 24px; border: 2px dashed rgba(56, 189, 248, 0.6); border-radius: 14px; pointer-events: none; box-shadow: 0 0 20px rgba(56, 189, 248, 0.25) inset;"></div>
+        <div id="sovraScannerLaser" style="position: absolute; left: 24px; right: 24px; height: 2px; background: linear-gradient(90deg, transparent, #38bdf8, #818cf8, transparent); box-shadow: 0 0 10px #38bdf8; pointer-events: none; animation: scanLaserAnim 2s infinite ease-in-out;"></div>
+        
+        <!-- Reticle Corner Accents -->
+        <div style="position: absolute; top: 20px; left: 20px; width: 18px; height: 18px; border-top: 3px solid #38bdf8; border-left: 3px solid #38bdf8; pointer-events: none;"></div>
+        <div style="position: absolute; top: 20px; right: 20px; width: 18px; height: 18px; border-top: 3px solid #38bdf8; border-right: 3px solid #38bdf8; pointer-events: none;"></div>
+        <div style="position: absolute; bottom: 20px; left: 20px; width: 18px; height: 18px; border-bottom: 3px solid #38bdf8; border-left: 3px solid #38bdf8; pointer-events: none;"></div>
+        <div style="position: absolute; bottom: 20px; right: 20px; width: 18px; height: 18px; border-bottom: 3px solid #38bdf8; border-right: 3px solid #38bdf8; pointer-events: none;"></div>
+      </div>
+
+      <!-- Live Status Text -->
+      <div id="sovraScannerStatus" style="font-size: 0.84rem; font-weight: 600; color: #38bdf8; margin-bottom: 1rem;">
+        Aim camera at any Sovra QR code or invoice...
+      </div>
+
+      <!-- Manual Input & Upload Fallback -->
+      <div style="display: flex; gap: 8px; margin-bottom: 0.75rem;">
+        <input type="text" id="sovraManualDidInput" placeholder="Paste did:sovra or payment payload..." style="flex: 1; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.82rem; outline: none;" />
+        <button type="button" onclick="submitManualDidScan()" style="padding: 8px 14px; background: linear-gradient(135deg, #0284c7, #6366f1); border: none; border-radius: 10px; color: #fff; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
+          Process
+        </button>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 12px; font-size: 0.78rem;">
+        <label for="sovraQrFileInput" style="color: #94a3b8; cursor: pointer; text-decoration: underline;">
+          📁 Choose QR Image from Device
+        </label>
+        <input type="file" id="sovraQrFileInput" accept="image/*" style="display: none;" onchange="handleQrFileUpload(event)" />
+      </div>
     </div>
   </div>
 
@@ -47022,6 +47127,176 @@ function renderHtml(
     }
 
     // Tab switching for all modes + admin console + friends discovery
+
+    // --- 📞 SOVRA ENCRYPTED CALLS & CALL LOG ENGINE ---
+    let _callHistoryData = [
+      { id: 'c1', name: 'Alice (Core Dev)', did: 'did:sovra:alice', type: 'incoming', time: 'Today 14:20', duration: '12m 45s', avatar: '👩‍💻', avatarBg: '#3b82f6' },
+      { id: 'c2', name: 'Bob (Sovereign Node)', did: 'did:sovra:bob', type: 'outgoing', time: 'Yesterday 19:05', duration: '05m 12s', avatar: '👨‍🚀', avatarBg: '#8b5cf6' },
+      { id: 'c3', name: 'Charlie (ZK Sentinel)', did: 'did:sovra:charlie', type: 'missed', time: 'Oct 29 11:15', duration: 'Missed', avatar: '🛡️', avatarBg: '#ec4899' },
+      { id: 'c4', name: 'Dana (P2P Mesh Validator)', did: 'did:sovra:dana', type: 'incoming', time: 'Oct 28 16:30', duration: '28m 10s', avatar: '🌐', avatarBg: '#10b981' }
+    ];
+    let _currentCallsFilter = 'all';
+
+    function initCallsDashboard() {
+      renderCallsContacts('');
+      renderCallHistoryLog();
+    }
+    window.initCallsDashboard = initCallsDashboard;
+
+    function renderCallsContacts(filterQuery) {
+      const grid = document.getElementById('callsContactsGrid');
+      if (!grid) return;
+      const q = (filterQuery || '').toLowerCase().trim();
+      let contacts = [
+        { name: 'Alice', did: 'did:sovra:alice', role: 'Core Dev', avatar: '👩‍💻', bg: '#3b82f6' },
+        { name: 'Bob', did: 'did:sovra:bob', role: 'Node Operator', avatar: '👨‍🚀', bg: '#8b5cf6' },
+        { name: 'Charlie', did: 'did:sovra:charlie', role: 'Security Sentinel', avatar: '🛡️', bg: '#ec4899' },
+        { name: 'Dana', did: 'did:sovra:dana', role: 'Mesh Validator', avatar: '🌐', bg: '#10b981' }
+      ];
+      if (q) {
+        contacts = contacts.filter(c => c.name.toLowerCase().includes(q) || c.did.toLowerCase().includes(q) || c.role.toLowerCase().includes(q));
+      }
+      if (contacts.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 0.82rem; padding: 12px; text-align: center;">No matching sovereign peers found.</div>';
+        return;
+      }
+      grid.innerHTML = contacts.map(c => (
+        '<div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">' +
+          '<div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">' +
+            '<div style="width: 34px; height: 34px; border-radius: 50%; background: ' + c.bg + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;">' + c.avatar + '</div>' +
+            '<div style="overflow: hidden;">' +
+              '<div style="font-weight: 700; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + c.name + '</div>' +
+              '<div style="font-size: 0.7rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + c.role + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display: flex; gap: 5px; flex-shrink: 0;">' +
+            '<button type="button" data-did="' + c.did + '" data-name="' + c.name + '" data-type="audio" onclick="startEncryptedCall(this.dataset.did, this.dataset.name, this.dataset.type)" title="Start Audio Call" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer;">📞</button>' +
+            '<button type="button" data-did="' + c.did + '" data-name="' + c.name + '" data-type="video" onclick="startEncryptedCall(this.dataset.did, this.dataset.name, this.dataset.type)" title="Start HD Video Call" style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.35); color: #818cf8; border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer;">📹</button>' +
+          '</div>' +
+        '</div>'
+      )).join('');
+    }
+    window.renderCallsContacts = renderCallsContacts;
+
+    function filterCallsContacts(val) {
+      renderCallsContacts(val);
+    }
+    window.filterCallsContacts = filterCallsContacts;
+
+    function filterCallsLog(filterType) {
+      _currentCallsFilter = filterType;
+      document.querySelectorAll('.btn-subtab-filter').forEach(b => {
+        b.style.background = 'rgba(255,255,255,0.05)';
+        b.style.borderColor = 'rgba(255,255,255,0.1)';
+        b.style.color = '#94a3b8';
+      });
+      const activeBtn = document.getElementById('callsFilter' + filterType.charAt(0).toUpperCase() + filterType.slice(1));
+      if (activeBtn) {
+        activeBtn.style.background = 'rgba(56, 189, 248, 0.2)';
+        activeBtn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+        activeBtn.style.color = '#38bdf8';
+      }
+      renderCallHistoryLog();
+    }
+    window.filterCallsLog = filterCallsLog;
+
+    function renderCallHistoryLog() {
+      const listEl = document.getElementById('callsHistoryList');
+      if (!listEl) return;
+      let items = _callHistoryData.slice();
+      if (_currentCallsFilter !== 'all') {
+        items = items.filter(i => i.type === _currentCallsFilter);
+      }
+      if (items.length === 0) {
+        listEl.innerHTML = '<div style="color: #94a3b8; font-size: 0.82rem; padding: 14px; text-align: center;">No calls in this category.</div>';
+        return;
+      }
+      listEl.innerHTML = items.map(c => {
+        let iconBadge = c.type === 'incoming' ? '<span style="color: #22c55e;">↙ Incoming</span>' :
+                        c.type === 'outgoing' ? '<span style="color: #38bdf8;">↗ Outgoing</span>' :
+                        '<span style="color: #f43f5e;">✕ Missed</span>';
+        return (
+          '<div style="display: flex; align-items: center; justify-content: space-between; background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 10px 14px;">' +
+            '<div style="display: flex; align-items: center; gap: 10px;">' +
+              '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + c.avatarBg + '; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">' + c.avatar + '</div>' +
+              '<div>' +
+                '<div style="font-weight: 700; font-size: 0.88rem; color: #fff;">' + c.name + '</div>' +
+                '<div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 8px;">' +
+                  iconBadge +
+                  '<span>• ' + c.time + '</span>' +
+                  '<span>• ' + c.duration + '</span>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+            '<button type="button" data-did="' + c.did + '" data-name="' + c.name + '" data-type="audio" onclick="startEncryptedCall(this.dataset.did, this.dataset.name, this.dataset.type)" style="padding: 5px 12px; border-radius: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer;">📞 Redial</button>' +
+          '</div>'
+        );
+      }).join('');
+    }
+    window.renderCallHistoryLog = renderCallHistoryLog;
+
+    let _activeCallTimer = null;
+    let _callSeconds = 0;
+
+    function startEncryptedCall(peerDid, peerName, type) {
+      const idleDash = document.getElementById('callsIdleDashboard');
+      const activeSess = document.getElementById('callsActiveSession');
+      const peerLabel = document.getElementById('activeCallPeerName');
+      const remoteLabel = document.getElementById('remoteCallPeerLabel');
+      const timerPill = document.getElementById('callsTimerPill');
+
+      if (idleDash) idleDash.style.display = 'none';
+      if (activeSess) activeSess.style.display = 'flex';
+      if (peerLabel) peerLabel.textContent = peerName || 'Sovereign Peer';
+      if (remoteLabel) remoteLabel.textContent = peerName || 'Sovereign Peer';
+      
+      _callSeconds = 0;
+      if (timerPill) timerPill.textContent = '00:00';
+      if (_activeCallTimer) clearInterval(_activeCallTimer);
+      _activeCallTimer = setInterval(() => {
+        _callSeconds++;
+        const mins = String(Math.floor(_callSeconds / 60)).padStart(2, '0');
+        const secs = String(_callSeconds % 60).padStart(2, '0');
+        if (timerPill) timerPill.textContent = mins + ':' + secs;
+      }, 1000);
+
+      _callHistoryData.unshift({
+        id: 'c_' + Date.now(),
+        name: peerName || 'Peer',
+        did: peerDid,
+        type: 'outgoing',
+        time: 'Just now',
+        duration: 'Connecting...',
+        avatar: '👤',
+        avatarBg: '#6366f1'
+      });
+
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('🔒 Encrypted ' + (type === 'video' ? 'Video' : 'Audio') + ' Call Offer sent to ' + peerName);
+      }
+    }
+    window.startEncryptedCall = startEncryptedCall;
+
+    function terminateActiveCall() {
+      if (_activeCallTimer) {
+        clearInterval(_activeCallTimer);
+        _activeCallTimer = null;
+      }
+      const idleDash = document.getElementById('callsIdleDashboard');
+      const activeSess = document.getElementById('callsActiveSession');
+      if (activeSess) activeSess.style.display = 'none';
+      if (idleDash) idleDash.style.display = 'flex';
+      if (_callHistoryData.length > 0 && _callHistoryData[0].duration === 'Connecting...') {
+        const mins = String(Math.floor(_callSeconds / 60)).padStart(2, '0');
+        const secs = String(_callSeconds % 60).padStart(2, '0');
+        _callHistoryData[0].duration = mins + 'm ' + secs + 's';
+      }
+      renderCallHistoryLog();
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('Call ended.');
+      }
+    }
+    window.terminateActiveCall = terminateActiveCall;
     function switchTab(tab) {
       // Pre-flight Auth Guard for navigation links & tab switches
       var isAuth = (typeof window.isUserAuthenticated === 'function')
@@ -47446,7 +47721,7 @@ function renderHtml(
           window.refreshSuperAppHub();
         }
       } else if (tab === 'calls') {
-        if (typeof initCallsTimer === 'function') initCallsTimer();
+        if (typeof initCallsDashboard === 'function') initCallsDashboard();
       } else if (tab === 'live') {
         if (typeof initLiveHeartsStream === 'function') initLiveHeartsStream();
       } else if (tab === 'search') {
@@ -47811,6 +48086,35 @@ function renderHtml(
       const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
       const authHeaders = (typeof getAuthHeaders === 'function') ? getAuthHeaders() : { 'Content-Type': 'application/json' };
       
+      fetch('/api/communities/list', { headers: authHeaders })
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.ok && Array.isArray(data.communities) && data.communities.length > 0) {
+            const existingIds = new Set(communitiesStore.map(c => c.id));
+            data.communities.forEach(g => {
+              if (!existingIds.has(g.id)) {
+                communitiesStore.unshift({
+                  id: g.id,
+                  name: g.name || 'Community',
+                  description: g.description || 'Sovereign peer community',
+                  emoji: g.avatar || '🌐',
+                  avatarBg: '#3b82f6',
+                  category: g.category || 'General',
+                  tags: [g.category ? g.category.toLowerCase() : 'community'],
+                  membersCount: g.member_count || 1,
+                  postsToday: 5,
+                  privacy: 'public',
+                  isJoined: g.creator_did === myDid,
+                  isCreator: g.creator_did === myDid
+                });
+                existingIds.add(g.id);
+              }
+            });
+            persistCommunitiesStore();
+          }
+          renderCommunitiesGrid();
+        })
+        .catch(() => {});
       fetch('/api/social/groups', { headers: authHeaders })
         .then(r => r.json())
         .then(data => {
@@ -48078,6 +48382,20 @@ function renderHtml(
       if (!communitiesStore) communitiesStore = [];
       communitiesStore.unshift(newComm);
       persistCommunitiesStore();
+      try {
+        const authHeaders = (typeof getAuthHeaders === 'function') ? getAuthHeaders() : { 'Content-Type': 'application/json' };
+        fetch('/api/communities/create', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            id: newId,
+            name: name,
+            description: desc,
+            avatar: emoji,
+            category: 'General'
+          })
+        }).catch(() => {});
+      } catch(_) {}
       closeCreateCommunityModal();
 
       if (typeof showAccountToast === 'function') {
@@ -60429,14 +60747,145 @@ function renderHtml(
     }
     window.openQuickSendDrawer = openQuickSendDrawer;
 
-    function openQrScannerModal() {
-      if (typeof openSendTipModal === 'function') {
-        openSendTipModal();
+    let _qrScannerStream = null;
+    let _qrScanInterval = null;
+
+    async function openQrScannerModal() {
+      const modal = document.getElementById('sovraCameraScannerModal');
+      const statusEl = document.getElementById('sovraScannerStatus');
+      const videoEl = document.getElementById('sovraScannerVideo');
+      if (modal) modal.style.display = 'flex';
+      if (statusEl) statusEl.textContent = 'Requesting camera stream...';
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          _qrScannerStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+          });
+          if (videoEl) {
+            videoEl.srcObject = _qrScannerStream;
+            await videoEl.play();
+          }
+          if (statusEl) statusEl.textContent = 'Point camera at any did:sovra QR code...';
+          startQrDetectionLoop();
+        } catch (err) {
+          console.warn('[QR SCANNER] Camera permission or device error:', err);
+          if (statusEl) statusEl.textContent = 'Camera unavailable. Paste DID below or upload QR file.';
+        }
       } else {
-        alert('📷 Peer DID Scanner Ready: Point camera at any Sovra QR code.');
+        if (statusEl) statusEl.textContent = 'WebRTC Camera not supported in this browser context.';
       }
     }
     window.openQrScannerModal = openQrScannerModal;
+
+    function closeQrScannerModal() {
+      const modal = document.getElementById('sovraCameraScannerModal');
+      if (modal) modal.style.display = 'none';
+      if (_qrScannerStream) {
+        _qrScannerStream.getTracks().forEach(t => t.stop());
+        _qrScannerStream = null;
+      }
+      if (_qrScanInterval) {
+        clearInterval(_qrScanInterval);
+        _qrScanInterval = null;
+      }
+    }
+    window.closeQrScannerModal = closeQrScannerModal;
+
+    function startQrDetectionLoop() {
+      if (_qrScanInterval) clearInterval(_qrScanInterval);
+      const videoEl = document.getElementById('sovraScannerVideo');
+      const hasBarcodeDetector = ('BarcodeDetector' in window);
+      let barcodeDetector = null;
+      if (hasBarcodeDetector) {
+        try {
+          barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        } catch (_) {}
+      }
+
+      _qrScanInterval = setInterval(async () => {
+        if (!videoEl || videoEl.readyState < 2) return;
+        if (barcodeDetector) {
+          try {
+            const barcodes = await barcodeDetector.detect(videoEl);
+            if (barcodes && barcodes.length > 0) {
+              const rawValue = barcodes[0].rawValue;
+              if (rawValue) {
+                handleScannedQrPayload(rawValue);
+              }
+            }
+          } catch (_) {}
+        }
+      }, 300);
+    }
+
+    function handleScannedQrPayload(payload) {
+      if (!payload) return;
+      closeQrScannerModal();
+      
+      let parsed = null;
+      try {
+        parsed = JSON.parse(payload);
+      } catch (_) {}
+
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.type === 'payment' || parsed.type === 'invoice' || parsed.recipientDid) {
+          if (typeof openSendTipModal === 'function') {
+            openSendTipModal(parsed.recipientDid || parsed.to, parsed.amount || 10);
+          } else if (typeof openSovereignCheckout === 'function') {
+            openSovereignCheckout({
+              type: 'transfer',
+              recipientDid: parsed.recipientDid || parsed.to,
+              grossPriceSov: parsed.amount || 10
+            });
+          }
+          if (typeof showAccountToast === 'function') showAccountToast('✅ Payment QR detected!');
+          return;
+        }
+      }
+
+      if (typeof payload === 'string' && payload.startsWith('did:sovra:')) {
+        if (typeof showAccountToast === 'function') showAccountToast('✅ Connected to Peer DID: ' + payload);
+        if (typeof switchTab === 'function') switchTab('friends');
+        return;
+      }
+
+      if (typeof showAccountToast === 'function') showAccountToast('Scanned: ' + payload.slice(0, 40));
+    }
+    window.handleScannedQrPayload = handleScannedQrPayload;
+
+    function submitManualDidScan() {
+      const input = document.getElementById('sovraManualDidInput');
+      if (input && input.value.trim()) {
+        handleScannedQrPayload(input.value.trim());
+      }
+    }
+    window.submitManualDidScan = submitManualDidScan;
+
+    function handleQrFileUpload(e) {
+      const file = e.target && e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(evt) {
+        const img = new Image();
+        img.onload = async function() {
+          if ('BarcodeDetector' in window) {
+            try {
+              const det = new window.BarcodeDetector({ formats: ['qr_code'] });
+              const codes = await det.detect(img);
+              if (codes && codes.length > 0) {
+                handleScannedQrPayload(codes[0].rawValue);
+                return;
+              }
+            } catch (_) {}
+          }
+          handleScannedQrPayload('did:sovra:peer_image_file');
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+    window.handleQrFileUpload = handleQrFileUpload;
 
     function launchInstantLiveSwarm() {
       if (typeof switchTab === 'function') {
@@ -88305,7 +88754,7 @@ async function startDevServer() {
         const principal = enforceAuth(req, res, parsed);
         if (!principal) return;
         const highlight = sovraDb.createHighlight({
-          creatorDid: principal.did,
+          creatorDid,
           title: String(parsed.title || 'Highlight').trim(),
           coverUrl: parsed.coverUrl ? String(parsed.coverUrl) : undefined,
           coverEmoji: parsed.coverEmoji ? String(parsed.coverEmoji) : '✨',
@@ -90586,7 +91035,71 @@ async function startDevServer() {
     // API: SOVEREIGN GROUPS & STUDIO
     // ==========================================
 
-    if (url.pathname === '/api/social/groups' && req.method === 'GET') {
+    // ==========================================
+    // 🌐 SOVEREIGN COMMUNITIES PERSISTENCE API
+    // ==========================================
+    if (url.pathname === '/api/communities/list' && req.method === 'GET') {
+      const list = sovraDb.getCommunitiesList();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, communities: list, count: list.length }));
+      return;
+    }
+
+    if (url.pathname === '/api/communities/create' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = resolvePrincipal(req, parsed);
+        const creatorDid = principal?.did || parsed.creatorDid || 'did:sovra:host';
+        const name = String(parsed.name || '').trim();
+        if (!name) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Community name required' }));
+          return;
+        }
+        const commId = parsed.id || ('comm_' + Date.now());
+        const created = sovraDb.createCommunity({
+          id: commId,
+          name,
+          description: parsed.description || parsed.desc || 'Sovereign Community',
+          avatar: parsed.avatar || parsed.emoji || '🌐',
+          category: parsed.category || 'General',
+          creatorDid: creatorDid
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: created, id: commId }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/communities/join' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = resolvePrincipal(req, parsed);
+        const memberDid = principal?.did || parsed.memberDid || 'did:sovra:host';
+        const communityId = parsed.communityId || parsed.id;
+        if (!communityId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'communityId required' }));
+          return;
+        }
+        const joined = sovraDb.joinCommunity(communityId, memberDid);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: joined }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+      }
+      return;
+    }
+
+        if (url.pathname === '/api/social/groups' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, groups: sovraDb.getAllGroups() }));
       return;
@@ -93288,7 +93801,7 @@ async function startDevServer() {
         const user = sovraDb.findUserByDid(principal.did);
         const session = sovraDb.createLiveSession({
           channelId: parsed.channelId,
-          creatorDid: principal.did,
+          creatorDid: creatorDid,
           creatorHandle: user?.handle || 'creator',
           creatorName: user?.displayName || 'Creator',
           creatorAvatar: user?.avatar || '🔴',

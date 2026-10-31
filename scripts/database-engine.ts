@@ -16895,6 +16895,27 @@ export class SovraDatabaseEngine {
     return all.filter(c => c.creatorDid === creatorDid);
   }
 
+  public getCommunitiesList(): any[] {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.getCommunitiesList();
+    }
+    return [];
+  }
+
+  public createCommunity(comm: any): boolean {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.createCommunity(comm);
+    }
+    return false;
+  }
+
+  public joinCommunity(communityId: string, memberDid: string): boolean {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.joinCommunity(communityId, memberDid);
+    }
+    return false;
+  }
+
 }
 
 // Singleton database instance exported for application-wide use

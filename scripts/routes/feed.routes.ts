@@ -112,20 +112,25 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
   // 3. Feed List
   if ((url.pathname === '/api/feed/list' || url.pathname === '/api/feed/posts') && req.method === 'GET') {
     const principal = resolvePrincipal(req);
-    const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : undefined;
+    const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 15;
     const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : undefined;
+    const cursor = url.searchParams.get('cursor');
     let posts = sovraDb.getFeedPosts(principal?.did);
+    if (cursor) {
+      posts = posts.filter(p => String(p.id) < cursor);
+    }
     if (typeof offset === 'number' && !isNaN(offset) && offset > 0) {
       posts = posts.slice(offset);
     }
     if (typeof limit === 'number' && !isNaN(limit) && limit > 0) {
       posts = posts.slice(0, limit);
     }
+    const nextCursor = (typeof limit === 'number' && posts.length === limit) ? posts[posts.length - 1].id : null;
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
     });
-    res.end(JSON.stringify({ ok: true, posts, count: posts.length }));
+    res.end(JSON.stringify({ ok: true, posts, count: posts.length, nextCursor }));
     return true;
   }
 
