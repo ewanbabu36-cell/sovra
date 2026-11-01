@@ -69,6 +69,8 @@ scripts/cloudflare-url.txt
 .test-bench-*
 .test-bench-sqlite-*
 .test-final-restore-*
+.sovra_test_*
+.sovra-test-*
 *.apk
 *.aab
 *.jks
