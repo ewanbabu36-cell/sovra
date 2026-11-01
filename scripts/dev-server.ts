@@ -20981,7 +20981,7 @@ function renderHtml(
           </div>
           <div style="text-align: right;">
             <div style="font-size: 0.68rem; color: #94a3b8;">Wallet Balance</div>
-            <div id="tipModalWalletBalance" style="font-size: 0.85rem; font-weight: 800; color: #34d399;">500.00 SOV</div>
+            <div id="tipModalWalletBalance" style="font-size: 0.85rem; font-weight: 800; color: #34d399;">0.00 SOV</div>
           </div>
         </div>
 
@@ -22525,7 +22525,7 @@ function renderHtml(
                 </span>
                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                   <span style="font-size: 0.76rem; color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 2px 10px; border-radius: 12px; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.25);">
-                    Balance: <b id="ytWalletBalanceDisplay">500.00 SOV</b>
+                    Balance: <b id="ytWalletBalanceDisplay">0.00 SOV</b>
                   </span>
                   <span style="font-size: 0.72rem; color: #34d399; background: rgba(16, 185, 129, 0.15); padding: 2px 10px; border-radius: 12px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3);">
                     95% Creator / 5% Seeder Split
@@ -22774,7 +22774,7 @@ function renderHtml(
 
           <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem;">
             <span style="color: #cbd5e1;">Available Wallet Balance:</span>
-            <span style="color: #38bdf8; font-weight: 700; font-family: monospace;" id="superThanksAvailableBalance">500.00 SOV</span>
+            <span style="color: #38bdf8; font-weight: 700; font-family: monospace;" id="superThanksAvailableBalance">0.00 SOV</span>
           </div>
 
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -23673,7 +23673,7 @@ function renderHtml(
                 <div>
                   <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 2px;">Available Balance</div>
                   <div style="display: flex; align-items: baseline; gap: 8px;">
-                    <span style="font-size: 1.45rem; font-weight: 800; color: #10b981;" id="walletSettingsBalanceSovDisplay">500.00 SOV</span>
+                    <span style="font-size: 1.45rem; font-weight: 800; color: #10b981;" id="walletSettingsBalanceSovDisplay">0.00 SOV</span>
                     <span style="font-size: 0.88rem; color: #94a3b8;" id="walletSettingsBalanceFiatDisplay">≈ $1500.00 USD</span>
                   </div>
                 </div>
@@ -30262,7 +30262,7 @@ function renderHtml(
               <div id="personaCitizenActiveIndicator" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; color: #10b981;">
                 <span>●</span> <span>Active</span>
               </div>
-              <div id="personaCitizenBalance" style="font-size: 0.82rem; font-weight: 700; color: #94a3b8;">500.00 SOV</div>
+              <div id="personaCitizenBalance" style="font-size: 0.82rem; font-weight: 700; color: #94a3b8;">0.00 SOV</div>
             </div>
           </div>
         </div>
@@ -42640,8 +42640,12 @@ function renderHtml(
       if (typeof updateOnboardingChecklistUI === 'function') updateOnboardingChecklistUI();
       document.body.classList.remove('sovra-mode-home');
       document.body.classList.add('sovra-mode-app');
+      if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+        window.SovraAndroidOS.openApp('feed');
+      } else if (typeof switchTab === 'function') {
+        switchTab('feed');
+      }
       if (typeof updateCreatorProfileUI === 'function') updateCreatorProfileUI();
-      if (typeof switchTab === 'function') switchTab('feed');
     }
         function showCreatorUpgradeModal() {
       let modal = document.getElementById('sovraCreatorUpgradeModal');
@@ -42829,8 +42833,10 @@ function renderHtml(
           const pendingApp = window._pendingTargetAppId;
           window._pendingTargetAppId = null;
           window.SovraAndroidOS.openApp(pendingApp);
-        } else if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
-          window.SovraAndroidOS.goHome();
+        } else if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+          window.SovraAndroidOS.openApp('feed');
+        } else if (typeof switchTab === 'function') {
+          switchTab('feed');
         } else {
           routeByRespectedProfileRole(myProfile.role);
         }
@@ -43340,10 +43346,12 @@ function renderHtml(
                 localStorage.removeItem('sovra_logged_out');
               } catch(e) {}
               showAuthenticatedAppView();
-              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
-                window.SovraAndroidOS.goHome();
-              } else {
-                routeByRespectedProfileRole(myProfile.role);
+              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+          window.SovraAndroidOS.openApp('feed');
+        } else if (typeof switchTab === 'function') {
+          switchTab('feed');
+        } else {
+          routeByRespectedProfileRole(myProfile.role);
               }
               if (typeof fetchNotifications === 'function') fetchNotifications();
               if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
@@ -43369,10 +43377,12 @@ function renderHtml(
                 myProfile = JSON.parse(savedProfile);
                 currentUserHandle = myProfile.handle;
                 showAuthenticatedAppView();
-                if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
-                  window.SovraAndroidOS.goHome();
-                } else {
-                  routeByRespectedProfileRole(myProfile.role);
+                if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+          window.SovraAndroidOS.openApp('feed');
+        } else if (typeof switchTab === 'function') {
+          switchTab('feed');
+        } else {
+          routeByRespectedProfileRole(myProfile.role);
                 }
               } catch(e) {
                 showAuthLandingGate(true);
@@ -45245,8 +45255,8 @@ function renderHtml(
         const pendingApp = window._pendingTargetAppId;
         window._pendingTargetAppId = null;
         window.SovraAndroidOS.openApp(pendingApp);
-      } else if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
-        window.SovraAndroidOS.goHome();
+      } else if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+        window.SovraAndroidOS.openApp('feed');
       } else {
         switchTab('feed');
       }
@@ -83146,6 +83156,7 @@ function renderHtml(
         { id: 'mesh_node', name: 'Mesh', icon: '🌐', category: 'utility', badge: 'mesh', action: () => { if (typeof toggleDepinHotspot === 'function') toggleDepinHotspot(); }, desc: 'DePIN Hotspot & libp2p Mesh' },
         { id: 'ghost_mode', name: 'Ghost', icon: '👻', category: 'utility', badge: '', action: () => { if (typeof toggleGhostMode === 'function') toggleGhostMode(); else if (typeof showAccountToast === 'function') showAccountToast('Ghost Mode Toggled'); }, desc: 'Incognito Ephemeral Routing' },
         { id: 'backup', name: 'Backup', icon: '🛡️', category: 'finance', badge: '', action: () => { if (typeof openSovereignBackupModal === 'function') openSovereignBackupModal(); }, desc: 'Encrypted Seed & Keys Backup' },
+        { id: 'desktop_launcher', name: 'OS Mode', icon: '📱', category: 'utility', badge: '', action: () => { if (typeof localStorage !== 'undefined') localStorage.setItem('sovra_explicit_os_mode', 'home'); if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') window.SovraAndroidOS.goHome(); }, desc: 'Switch to Android OS Launcher View' },
         { id: 'settings', name: 'Settings', icon: '🛠️', category: 'utility', badge: '', action: () => switchTab('settings'), desc: 'Preferences, Themes & Privacy' }
       ];
 
@@ -83970,11 +83981,7 @@ function renderHtml(
     (function initSovraAndroidOS() {
       // 1. Wallpaper Presets
       const WALLPAPER_PRESETS = [
-        {
-          id: 'sapphire',
-          name: 'Midnight Sapphire',
-          gradient: 'radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.28) 0%, transparent 55%), radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.22) 0%, transparent 50%), radial-gradient(circle at 15% 85%, rgba(14, 165, 233, 0.2) 0%, transparent 50%), linear-gradient(180deg, #050811 0%, #0a0f1e 40%, #03050c 100%)'
-        },
+        
         {
           id: 'nebula',
           name: 'Cosmic Nebula',
@@ -84112,7 +84119,7 @@ function renderHtml(
             currentMode = 'home';
           }
         } catch (_) {
-          currentMode = 'app';
+          currentMode = 'home';
         }
       }
 
@@ -85830,6 +85837,15 @@ function renderHtml(
         renderHomeScreen();
         initTouchSwipe();
         refreshTelemetry();
+
+        // 🌟 Social Media First: If user is authenticated or has active session, boot directly into feed
+        if (typeof isUserAuthenticated === 'function' && isUserAuthenticated() && typeof localStorage !== 'undefined' && localStorage.getItem('sovra_session_token')) {
+          const explicitChoice = localStorage.getItem('sovra_explicit_os_mode');
+          if (explicitChoice !== 'home') {
+            if (typeof openApp === 'function') openApp('feed');
+            else if (typeof switchTab === 'function') switchTab('feed');
+          }
+        }
       }
 
       if (document.readyState === 'loading') {
