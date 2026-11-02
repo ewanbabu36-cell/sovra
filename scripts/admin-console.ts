@@ -137,6 +137,25 @@ export interface AdminConsoleOptions {
     recommendedPosture: string;
     auditedAt: number;
   };
+  platformFeatures?: Array<{
+    id: string;
+    name: string;
+    icon: string;
+    category: string;
+    desc: string;
+    enabled: boolean;
+    display_order: number;
+  }>;
+  miniDapps?: Array<{
+    id: string;
+    name: string;
+    author_did: string;
+    category: string;
+    status?: string;
+    rating?: number;
+    installs_count?: number;
+    description?: string;
+  }>;
 }
 
 export function renderAdminHtml(opts: AdminConsoleOptions): string {
@@ -191,6 +210,8 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       eventLoopLatencyMs: 1.8,
       p2pPeersCount: connectedPeers.length,
     },
+    platformFeatures = [],
+    miniDapps = [],
   } = opts;
 
   return `<!DOCTYPE html>
@@ -913,6 +934,12 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <span class="admin-nav-icon">🚩</span>
         <span>Canary Feature Flags</span>
         <span class="admin-nav-badge" style="background: #a855f7; color: #fff;">Rollouts</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('apps-directory')">
+        <span class="admin-nav-icon">📦</span>
+        <span>App &amp; DApp Directory</span>
+        <span class="admin-nav-badge" style="background: #38bdf8; color: #000;">${platformFeatures.length} Apps</span>
       </button>
 
       <button class="admin-nav-item" onclick="switchAdminTab('broadcast-alerts')">
@@ -2566,6 +2593,166 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               `).join('')
               : '<div style="color: #64748b; text-align: center; padding: 2rem;">No dynamic flags registered.</div>'
           }
+        </div>
+      </section>
+
+      <!-- ==============================================
+           MODULE: APP & DAPP DIRECTORY STATION (PHASE 2)
+           ============================================== -->
+      <section class="ops-section" id="view-apps-directory" style="display: none;">
+        <div class="ops-section-header">
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>📦</span> App &amp; DApp Directory Station
+            </h2>
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+              Enterprise Control Plane: Full CRUD lifecycle management for Junction launcher tiles and decentralized Mini-DApps store moderation.
+            </div>
+          </div>
+          <button class="btn-ops" style="background: linear-gradient(135deg, #0284c7, #6366f1); color: #fff; font-weight: 700;" onclick="var el = document.getElementById('newFeatureTileForm'); el.style.display = (el.style.display === 'none' ? 'block' : 'none');">
+            + Add Platform App
+          </button>
+        </div>
+
+        <!-- Add Feature Form (Collapsible) -->
+        <div id="newFeatureTileForm" class="ops-card" style="display: none; background: #111827; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; padding: 1.25rem; margin-top: 1rem;">
+          <h4 style="color: #38bdf8; margin-bottom: 12px; font-weight: 800;">Register New Platform Launcher App</h4>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
+            <div>
+              <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">App ID (e.g. podcast)</label>
+              <input type="text" id="newFeatureId" class="settings-input" style="width: 100%; background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px;" placeholder="podcast" />
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">Display Name</label>
+              <input type="text" id="newFeatureName" class="settings-input" style="width: 100%; background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px;" placeholder="Podcasts" />
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">Icon Emoji</label>
+              <input type="text" id="newFeatureIcon" class="settings-input" style="width: 100%; background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px;" placeholder="🎙️" />
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">Category</label>
+              <select id="newFeatureCategory" class="settings-input" style="width: 100%; background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px;">
+                <option value="social">Social</option>
+                <option value="media">Media</option>
+                <option value="creator">Creator</option>
+                <option value="finance">Finance</option>
+                <option value="utility" selected>Utility</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">Display Order</label>
+              <input type="number" id="newFeatureOrder" class="settings-input" style="width: 100%; background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px;" value="26" min="1" max="99" />
+            </div>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">Description</label>
+            <input type="text" id="newFeatureDesc" class="settings-input" style="width: 100%; background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px;" placeholder="Decentralized sovereign podcast streaming" />
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-ops" style="background: #10b981; color: #000; font-weight: 700;" onclick="createNewPlatformFeature()">Save &amp; Publish</button>
+            <button class="btn-ops" style="background: rgba(255,255,255,0.1); color: #94a3b8;" onclick="document.getElementById('newFeatureTileForm').style.display='none'">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Master App Directory Table -->
+        <div class="ops-table-card" style="margin-top: 1.25rem;">
+          <div class="ops-table-header">
+            <span class="ops-table-title">Platform Feature Registry (${platformFeatures.length} Native Modules)</span>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="ops-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Icon</th>
+                  <th>App Name</th>
+                  <th>Module ID</th>
+                  <th>Category</th>
+                  <th>Description</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${
+                  platformFeatures.map(feat => `
+                    <tr>
+                      <td style="font-family: var(--font-mono); font-weight: 700; color: #64748b;">#${feat.display_order}</td>
+                      <td style="font-size: 1.25rem;">${feat.icon}</td>
+                      <td style="font-weight: 700; color: #f8fafc;">${feat.name}</td>
+                      <td><code style="color: #38bdf8; background: rgba(56,189,248,0.1); padding: 2px 6px; border-radius: 4px;">${feat.id}</code></td>
+                      <td><span class="badge" style="background: rgba(99,102,241,0.15); color: #818cf8;">${feat.category}</span></td>
+                      <td style="color: #94a3b8; font-size: 0.8rem; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${feat.desc}</td>
+                      <td>
+                        <span class="badge" style="${feat.enabled ? 'background:rgba(16,185,129,0.15); color:#34d399;' : 'background:rgba(239,68,68,0.15); color:#f87171;'}">
+                          ${feat.enabled ? 'ACTIVE' : 'DISABLED'}
+                        </span>
+                      </td>
+                      <td style="white-space: nowrap;">
+                        <button class="btn-ops" style="padding: 4px 8px; font-size: 0.75rem; ${feat.enabled ? 'background:rgba(239,68,68,0.15); color:#f87171;' : 'background:rgba(16,185,129,0.15); color:#34d399;'}" onclick="toggleFeatureTile('${feat.id}', ${feat.enabled})">
+                          ${feat.enabled ? 'Disable' : 'Enable'}
+                        </button>
+                        <button class="btn-ops" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239,68,68,0.2); color: #fca5a5; margin-left: 4px;" onclick="deleteFeatureTile('${feat.id}')">
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  `).join('')
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Curated Mini-DApps Moderation Queue -->
+        <div class="ops-table-card" style="margin-top: 1.5rem;">
+          <div class="ops-table-header">
+            <span class="ops-table-title">Curated Mini-DApps Moderation Queue (${miniDapps.length} DApps)</span>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="ops-table">
+              <thead>
+                <tr>
+                  <th>DApp ID</th>
+                  <th>Name</th>
+                  <th>Author DID</th>
+                  <th>Category</th>
+                  <th>Installs</th>
+                  <th>Rating</th>
+                  <th>Status</th>
+                  <th>Moderation Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${
+                  miniDapps.length === 0
+                    ? '<tr><td colspan="8" style="text-align: center; color: #64748b; padding: 1.5rem;">No mini-dapps submitted yet.</td></tr>'
+                    : miniDapps.map(dapp => `
+                      <tr>
+                        <td><code style="color: #38bdf8;">${dapp.id}</code></td>
+                        <td style="font-weight: 700; color: #fff;">${dapp.name}</td>
+                        <td style="font-size: 0.75rem; color: #94a3b8;">${dapp.author_did ? dapp.author_did.slice(0, 16) + '...' : 'System'}</td>
+                        <td><span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8;">${dapp.category}</span></td>
+                        <td>${dapp.installs_count || 0}</td>
+                        <td>⭐ ${Number(dapp.rating || 5).toFixed(1)}</td>
+                        <td>
+                          <span class="badge" style="${(dapp.status === 'featured') ? 'background:rgba(245,158,11,0.2); color:#fbbf24;' : ((dapp.status === 'rejected') ? 'background:rgba(239,68,68,0.2); color:#f87171;' : 'background:rgba(16,185,129,0.2); color:#34d399;')}">
+                            ${(dapp.status || 'APPROVED').toUpperCase()}
+                          </span>
+                        </td>
+                        <td style="white-space: nowrap;">
+                          <button class="btn-ops" style="padding: 4px 8px; font-size: 0.72rem; background: rgba(16,185,129,0.15); color: #34d399;" onclick="moderateDAppAction('${dapp.id}', 'approve')">Approve</button>
+                          <button class="btn-ops" style="padding: 4px 8px; font-size: 0.72rem; background: rgba(245,158,11,0.15); color: #fbbf24; margin-left: 2px;" onclick="moderateDAppAction('${dapp.id}', 'feature')">Feature</button>
+                          <button class="btn-ops" style="padding: 4px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.15); color: #f87171; margin-left: 2px;" onclick="moderateDAppAction('${dapp.id}', 'reject')">Reject</button>
+                          <button class="btn-ops" style="padding: 4px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.25); color: #fca5a5; margin-left: 2px;" onclick="moderateDAppAction('${dapp.id}', 'delete')">Delete</button>
+                        </td>
+                      </tr>
+                    `).join('')
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -5046,6 +5233,86 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         if (d && d.ok) {
           showAdminToast('Legal hold status updated');
           setTimeout(function() { window.location.reload(); }, 1000);
+        }
+      });
+    }
+
+    // ==========================================
+    // APP & DAPP DIRECTORY ACTIONS (PHASE 2)
+    // ==========================================
+    function toggleFeatureTile(id, currentEnabled) {
+      fetch('/api/admin/features/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, enabled: !currentEnabled })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('Feature [' + id + '] ' + (!currentEnabled ? 'ENABLED' : 'DISABLED'));
+          setTimeout(function() { window.location.reload(); }, 800);
+        } else {
+          alert('Failed to update feature: ' + (d.error || 'Unknown error'));
+        }
+      });
+    }
+
+    function deleteFeatureTile(id) {
+      if (!confirm('Are you sure you want to permanently remove feature [' + id + '] from platform registry?')) return;
+      fetch('/api/admin/features/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('Feature [' + id + '] deleted');
+          setTimeout(function() { window.location.reload(); }, 800);
+        } else {
+          alert('Failed to delete feature: ' + (d.error || 'Unknown error'));
+        }
+      });
+    }
+
+    function createNewPlatformFeature() {
+      var id = (document.getElementById('newFeatureId').value || '').trim();
+      var name = (document.getElementById('newFeatureName').value || '').trim();
+      var icon = (document.getElementById('newFeatureIcon').value || '').trim() || '⚡';
+      var category = document.getElementById('newFeatureCategory').value;
+      var desc = (document.getElementById('newFeatureDesc').value || '').trim();
+      var order = Number(document.getElementById('newFeatureOrder').value || 99);
+      if (!id || !name) { alert('Feature ID and Name are required'); return; }
+
+      fetch('/api/admin/features/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, name: name, icon: icon, category: category, desc: desc, display_order: order, enabled: 1 })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('Platform feature [' + name + '] created!');
+          setTimeout(function() { window.location.reload(); }, 800);
+        } else {
+          alert('Failed to create feature: ' + (d.error || 'Unknown error'));
+        }
+      });
+    }
+
+    function moderateDAppAction(id, action) {
+      fetch('/api/admin/dapps/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, action: action })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          showAdminToast('DApp [' + id + '] ' + action.toUpperCase());
+          setTimeout(function() { window.location.reload(); }, 800);
+        } else {
+          alert('Moderation action failed: ' + (d.error || 'Unknown error'));
         }
       });
     }
