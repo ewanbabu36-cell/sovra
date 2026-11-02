@@ -27,12 +27,146 @@ import type {
   StoryRecord,
 } from './database-engine.ts';
 
+
+export interface RingBufferItem {
+  type: 'post_view' | 'post_reaction' | 'user_counter' | 'raw_sql';
+  sql?: string;
+  params?: any[];
+  targetId?: string;
+  increment?: number;
+}
+
+export class WriteRingBuffer {
+  private queue: RingBufferItem[] = [];
+  private viewAggregates = new Map<string, number>();
+  private reactionAggregates = new Map<string, number>();
+  private dbEngine: SqliteSocialDatabaseEngine;
+  private flushTimer: NodeJS.Timeout | null = null;
+  private isFlushing = false;
+  private flushIntervalMs = 500;
+  private totalFlushed = 0;
+
+  constructor(dbEngine: SqliteSocialDatabaseEngine, flushIntervalMs = 500) {
+    this.dbEngine = dbEngine;
+    this.flushIntervalMs = flushIntervalMs;
+    this.startTimer();
+  }
+
+  private startTimer(): void {
+    if (this.flushTimer) clearInterval(this.flushTimer);
+    this.flushTimer = setInterval(() => {
+      this.flush();
+    }, this.flushIntervalMs);
+    if (this.flushTimer.unref) this.flushTimer.unref();
+  }
+
+  public enqueue(item: RingBufferItem): void {
+    if (item.type === 'post_view' && item.targetId) {
+      const cur = this.viewAggregates.get(item.targetId) || 0;
+      this.viewAggregates.set(item.targetId, cur + (item.increment || 1));
+      return;
+    }
+    if (item.type === 'post_reaction' && item.targetId) {
+      const cur = this.reactionAggregates.get(item.targetId) || 0;
+      this.reactionAggregates.set(item.targetId, cur + (item.increment || 1));
+      return;
+    }
+    this.queue.push(item);
+  }
+
+  public incrementPostView(postId: string, count = 1): void {
+    this.enqueue({ type: 'post_view', targetId: postId, increment: count });
+  }
+
+  public incrementPostReaction(postId: string, count = 1): void {
+    this.enqueue({ type: 'post_reaction', targetId: postId, increment: count });
+  }
+
+  public getPendingCount(): number {
+    return this.queue.length + this.viewAggregates.size + this.reactionAggregates.size;
+  }
+
+  public getTotalFlushed(): number {
+    return this.totalFlushed;
+  }
+
+  public flush(): { flushedCount: number; timeMs: number } {
+    if (this.isFlushing) return { flushedCount: 0, timeMs: 0 };
+    if (this.queue.length === 0 && this.viewAggregates.size === 0 && this.reactionAggregates.size === 0) {
+      return { flushedCount: 0, timeMs: 0 };
+    }
+
+    this.isFlushing = true;
+    const start = performance.now();
+    let flushedCount = 0;
+
+    const itemsToProcess = this.queue.splice(0, this.queue.length);
+    const viewsToProcess = new Map(this.viewAggregates);
+    this.viewAggregates.clear();
+    const reactionsToProcess = new Map(this.reactionAggregates);
+    this.reactionAggregates.clear();
+
+    const rawDb = this.dbEngine.getRawDb();
+    try {
+      rawDb.exec('BEGIN IMMEDIATE');
+
+      for (const [postId, inc] of viewsToProcess.entries()) {
+        const stmt = this.dbEngine.prepareCached(
+          'UPDATE posts SET views_count = COALESCE(views_count, 0) + ? WHERE id = ?'
+        );
+        stmt.run(inc, postId);
+        flushedCount++;
+      }
+
+      for (const [postId, inc] of reactionsToProcess.entries()) {
+        const stmt = this.dbEngine.prepareCached(
+          'UPDATE posts SET likes_count = COALESCE(likes_count, 0) + ? WHERE id = ?'
+        );
+        stmt.run(inc, postId);
+        flushedCount++;
+      }
+
+      for (const item of itemsToProcess) {
+        if (item.sql) {
+          const stmt = this.dbEngine.prepareCached(item.sql);
+          if (item.params && item.params.length > 0) {
+            stmt.run(...item.params);
+          } else {
+            stmt.run();
+          }
+          flushedCount++;
+        }
+      }
+
+      rawDb.exec('COMMIT');
+      this.totalFlushed += flushedCount;
+    } catch (err) {
+      try { rawDb.exec('ROLLBACK'); } catch (_) {}
+      console.warn('[WriteRingBuffer] Batch commit notice:', err);
+    } finally {
+      this.isFlushing = false;
+    }
+
+    const timeMs = Math.round((performance.now() - start) * 10) / 10;
+    return { flushedCount, timeMs };
+  }
+
+  public stop(): void {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.flush();
+  }
+}
+
 export class SqliteSocialDatabaseEngine {
   private db: DatabaseSync;
   private readonly dbPath: string;
   private readonly storageDir: string;
   private stmtCache = new Map<string, StatementSync>();
   private migrationRunner: SqliteMigrationRunner;
+  private writeRingBuffer: WriteRingBuffer;
   private wiretapBuffer: Array<{
     id: string;
     method: string;
@@ -54,6 +188,7 @@ export class SqliteSocialDatabaseEngine {
     this.initSchema();
     this.migrationRunner = new SqliteMigrationRunner(this.db);
     this.migrationRunner.applyPending();
+    this.writeRingBuffer = new WriteRingBuffer(this, 500);
   }
 
   public getMigrationRunner(): SqliteMigrationRunner {
@@ -62,6 +197,10 @@ export class SqliteSocialDatabaseEngine {
 
   public getRawDb(): DatabaseSync {
     return this.db;
+  }
+
+  public getWriteRingBuffer(): WriteRingBuffer {
+    return this.writeRingBuffer;
   }
 
   public prepareCached(sql: string): StatementSync {
@@ -85,7 +224,8 @@ export class SqliteSocialDatabaseEngine {
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = NORMAL;
       PRAGMA foreign_keys = ON;
-      PRAGMA busy_timeout = 5000;
+      PRAGMA busy_timeout = 10000;
+      PRAGMA wal_autocheckpoint = 1000;
       PRAGMA temp_store = MEMORY;
       PRAGMA mmap_size = 268435456;
       PRAGMA cache_size = -64000;
@@ -4123,6 +4263,9 @@ export class SqliteSocialDatabaseEngine {
   }
 
   public close(): void {
+    if (this.writeRingBuffer) {
+      this.writeRingBuffer.stop();
+    }
     this.stmtCache.clear();
     try {
       this.db.close();

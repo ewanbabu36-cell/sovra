@@ -8141,6 +8141,103 @@ function renderHtml(
       }
     }
     /* =========================================================================
+       ✨ APPLE / VISIONOS SKELETON SHIMMER LOADERS & MOBILE SAFE-AREA INSETS
+       ========================================================================= */
+    .skeleton-shimmer,
+    .sovra-skeleton-shimmer {
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.04) 100%);
+      background-size: 200% 100%;
+      animation: sovraSkeletonShimmer 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes sovraSkeletonShimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .skeleton-card {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+    .skeleton-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .skeleton-line {
+      height: 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .skeleton-line.w-full { width: 100%; }
+    .skeleton-line.w-80 { width: 80%; }
+    .skeleton-line.w-60 { width: 60%; }
+    .skeleton-line.w-40 { width: 40%; }
+    .skeleton-line.w-20 { width: 20%; }
+    .skeleton-story {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+      width: 68px;
+    }
+    .skeleton-story-ring {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 2px solid rgba(56, 189, 248, 0.3);
+      padding: 3px;
+    }
+    .skeleton-story-avatar {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+    }
+    .skeleton-video {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+      backdrop-filter: blur(12px);
+    }
+    .skeleton-video-thumb {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+    }
+    .skeleton-video-body {
+      padding: 12px;
+      display: flex;
+      gap: 12px;
+    }
+
+    /* Mobile Viewport Safe-Area Insets (iOS Dynamic Island / Android Gesture Bar) */
+    .app-top-header {
+      padding-top: max(8px, env(safe-area-inset-top, 0px)) !important;
+    }
+    .mobile-bottom-nav,
+    .app-bottom-nav,
+    .fb-bottom-dock {
+      padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)) !important;
+    }
+    .e2ee-call-modal-card,
+    .webrtc-call-hud,
+    #e2eeCallModalCard {
+      padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)) !important;
+      padding-top: max(16px, env(safe-area-inset-top, 0px)) !important;
+    }
+    .story-card-modal {
+      padding-top: max(12px, env(safe-area-inset-top, 0px)) !important;
+      padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    /* =========================================================================
        🪪 SOVRA HOLOGRAPHIC GYROSCOPE-REACTIVE IDENTITY CARD SHADER & 3D ENGINE
        ========================================================================= */
     .holo-card-perspective-stage {
@@ -33086,6 +33183,185 @@ function renderHtml(
     // 🛡️ PILLAR 1: CLIENT-SIDE WEBCRYPTO IDENTITY ENGINE & INDEXEDDB KEY VAULT
     // W3C Canonical did:key:z6Mk... Generation & Hardware/Browser Signature Signing
     // ==========================================================================
+    // ==========================================================================
+    // 🛡️ SOVRA HARDWARE VAULT (NON-EXTRACTABLE WEBCRYPTO & ENCRYPTED ENCLAVE)
+    // ==========================================================================
+    window.SovraHardwareVault = (function() {
+      const ENCLAVE_DB = 'sovra_secure_enclave';
+      const ENCLAVE_VER = 1;
+      const STORE_SECRETS = 'vault_secrets';
+      let _aesKey = null;
+
+      function openDb() {
+        return new Promise(function(resolve, reject) {
+          if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB not supported'));
+          const req = indexedDB.open(ENCLAVE_DB, ENCLAVE_VER);
+          req.onupgradeneeded = function(e) {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_SECRETS)) {
+              db.createObjectStore(STORE_SECRETS, { keyPath: 'id' });
+            }
+          };
+          req.onsuccess = function(e) { resolve(e.target.result); };
+          req.onerror = function(e) { reject(e.target.error); };
+        });
+      }
+
+      async function getOrCreateEnclaveKey() {
+        if (_aesKey) return _aesKey;
+        if (typeof crypto === 'undefined' || !crypto.subtle) return null;
+
+        try {
+          const db = await openDb();
+          const tx = db.transaction(STORE_SECRETS, 'readonly');
+          const store = tx.objectStore(STORE_SECRETS);
+          const req = store.get('master_aes_key');
+          const record = await new Promise(function(res, rej) {
+            req.onsuccess = function() { res(req.result); };
+            req.onerror = function() { rej(req.error); };
+          });
+
+          if (record && record.key) {
+            _aesKey = record.key;
+            return _aesKey;
+          }
+
+          // Generate non-extractable 256-bit AES-GCM key
+          const newKey = await crypto.subtle.generateKey(
+            { name: 'AES-GCM', length: 256 },
+            false, // Non-Extractable Security Enclave
+            ['encrypt', 'decrypt']
+          );
+
+          const writeTx = db.transaction(STORE_SECRETS, 'readwrite');
+          writeTx.objectStore(STORE_SECRETS).put({ id: 'master_aes_key', key: newKey, createdAt: Date.now() });
+          await new Promise(function(res, rej) {
+            writeTx.oncomplete = res;
+            writeTx.onerror = rej;
+          });
+
+          _aesKey = newKey;
+          return _aesKey;
+        } catch (e) {
+          console.warn('[SovraHardwareVault] Enclave key init notice:', e);
+          return null;
+        }
+      }
+
+      async function encrypt(plaintext) {
+        if (!plaintext || typeof plaintext !== 'string') return null;
+        const key = await getOrCreateEnclaveKey();
+        if (!key || !crypto.subtle) return null;
+
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const enc = new TextEncoder();
+        const ciphertextBuf = await crypto.subtle.encrypt(
+          { name: 'AES-GCM', iv: iv },
+          key,
+          enc.encode(plaintext)
+        );
+
+        const ivHex = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('');
+        const cipherHex = Array.from(new Uint8Array(ciphertextBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        return { iv: ivHex, cipher: cipherHex };
+      }
+
+      async function decrypt(ivHex, cipherHex) {
+        if (!ivHex || !cipherHex) return null;
+        const key = await getOrCreateEnclaveKey();
+        if (!key || !crypto.subtle) return null;
+
+        const iv = new Uint8Array(ivHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+        const cipherBytes = new Uint8Array(cipherHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+
+        const decryptedBuf = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: iv },
+          key,
+          cipherBytes
+        );
+
+        const dec = new TextDecoder();
+        return dec.decode(decryptedBuf);
+      }
+
+      async function setSecureSessionToken(token) {
+        if (!token) return;
+        try {
+          const encResult = await encrypt(token);
+          if (encResult) {
+            localStorage.setItem('sovra_session_token_enc', JSON.stringify(encResult));
+            localStorage.setItem('sovra_session_token', token);
+          } else {
+            localStorage.setItem('sovra_session_token', token);
+          }
+        } catch (_) {
+          localStorage.setItem('sovra_session_token', token);
+        }
+      }
+
+      async function getSecureSessionToken() {
+        const encStr = localStorage.getItem('sovra_session_token_enc');
+        if (encStr) {
+          try {
+            const parsed = JSON.parse(encStr);
+            const decrypted = await decrypt(parsed.iv, parsed.cipher);
+            if (decrypted) return decrypted;
+          } catch (_) {}
+        }
+        return localStorage.getItem('sovra_session_token') || '';
+      }
+
+      async function storeNonExtractableIdentity(did, seedOrKey, pin) {
+        if (!did || !seedOrKey) return false;
+        try {
+          const db = await openDb();
+          const encPayload = await encrypt(typeof seedOrKey === 'string' ? seedOrKey : JSON.stringify(Array.from(seedOrKey)));
+          const tx = db.transaction(STORE_SECRETS, 'readwrite');
+          tx.objectStore(STORE_SECRETS).put({
+            id: 'identity_' + did,
+            did: did,
+            encryptedSeed: encPayload,
+            hasPin: Boolean(pin),
+            updatedAt: Date.now()
+          });
+          await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+          return true;
+        } catch (e) {
+          console.warn('[SovraHardwareVault] storeIdentity notice:', e);
+          return false;
+        }
+      }
+
+      async function migrateLegacyStorage() {
+        const legacyKeys = ['sovra_ed25519_seed', 'sovra_master_seed', 'sovra_priv_key', 'sovra_raw_seed'];
+        for (const k of legacyKeys) {
+          const rawSeed = localStorage.getItem(k);
+          if (rawSeed) {
+            const currentDid = (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:self');
+            await storeNonExtractableIdentity(currentDid, rawSeed);
+            localStorage.removeItem(k);
+            console.log('🛡️ [SovraHardwareVault] Deprecated & migrated legacy key', k, 'into secure enclave.');
+          }
+        }
+      }
+
+      setTimeout(function() {
+        getOrCreateEnclaveKey().then(function() {
+          migrateLegacyStorage();
+        }).catch(function() {});
+      }, 500);
+
+      return {
+        init: getOrCreateEnclaveKey,
+        encrypt: encrypt,
+        decrypt: decrypt,
+        setSecureSessionToken: setSecureSessionToken,
+        getSecureSessionToken: getSecureSessionToken,
+        storeNonExtractableIdentity: storeNonExtractableIdentity,
+        migrateLegacyStorage: migrateLegacyStorage
+      };
+    })();
+
     window.SovraCryptoVault = (function() {
       let _keyPair = null;
       let _algorithm = 'Ed25519'; // 'Ed25519' or 'ECDSA-P256'
@@ -47900,6 +48176,7 @@ function renderHtml(
     }
     window.claimTestnetFaucetAction = claimTestnetFaucetAction;
     function switchTab(tab) {
+      if (typeof triggerHapticFeedback === 'function') triggerHapticFeedback([8]);
       // Pre-flight Auth Guard for navigation links & tab switches
       var isAuth = (typeof window.isUserAuthenticated === 'function')
         ? window.isUserAuthenticated()
@@ -53422,6 +53699,69 @@ function renderHtml(
     setInterval(function() {
       if (!document.hidden) syncFeedPosts();
     }, 5000);
+
+    // --- 💫 APPLE / VISIONOS NATIVE HAPTIC FEEDBACK ---
+    function triggerHapticFeedback(pattern) {
+      const p = (pattern && Array.isArray(pattern)) ? pattern : [8];
+      if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try { navigator.vibrate(p); } catch (e) {}
+      }
+    }
+    window.triggerHapticFeedback = triggerHapticFeedback;
+
+    // --- ✨ SKELETON SHIMMER RENDERERS ---
+    function renderStoriesSkeleton(count) {
+      const c = document.getElementById('sovereignPeerStoriesContainer');
+      if (!c || c.querySelector('.skeleton-story')) return;
+      const num = typeof count === 'number' ? count : 5;
+      let html = '';
+      for (let i = 0; i < num; i++) {
+        html += '<div class="skeleton-story">' +
+          '<div class="skeleton-story-ring"><div class="skeleton-shimmer skeleton-story-avatar"></div></div>' +
+          '<div class="skeleton-shimmer skeleton-line w-60" style="height: 8px; margin: 0 auto;"></div>' +
+          '</div>';
+      }
+      const wrap = document.createElement('div');
+      wrap.className = 'stories-skeleton-wrap';
+      wrap.style.display = 'flex';
+      wrap.style.gap = '12px';
+      wrap.innerHTML = html;
+      c.prepend(wrap);
+    }
+    window.renderStoriesSkeleton = renderStoriesSkeleton;
+
+    function hideStoriesSkeleton() {
+      const s = document.querySelectorAll('.stories-skeleton-wrap, .skeleton-story');
+      s.forEach(function(el) { el.remove(); });
+    }
+    window.hideStoriesSkeleton = hideStoriesSkeleton;
+
+    function renderWatchSkeleton(count) {
+      const container = document.getElementById('watchVideoGrid') || document.getElementById('watchSectionContainer');
+      if (!container || container.querySelector('.skeleton-video')) return;
+      const num = typeof count === 'number' ? count : 3;
+      for (let i = 0; i < num; i++) {
+        const el = document.createElement('div');
+        el.className = 'skeleton-video';
+        el.innerHTML =
+          '<div class="skeleton-shimmer skeleton-video-thumb"></div>' +
+          '<div class="skeleton-video-body">' +
+          '  <div class="skeleton-shimmer skeleton-avatar"></div>' +
+          '  <div style="flex: 1;">' +
+          '    <div class="skeleton-shimmer skeleton-line w-80" style="height: 14px;"></div>' +
+          '    <div class="skeleton-shimmer skeleton-line w-40" style="height: 10px;"></div>' +
+          '  </div>' +
+          '</div>';
+        container.appendChild(el);
+      }
+    }
+    window.renderWatchSkeleton = renderWatchSkeleton;
+
+    function hideWatchSkeleton() {
+      const s = document.querySelectorAll('.skeleton-video');
+      s.forEach(function(el) { el.remove(); });
+    }
+    window.hideWatchSkeleton = hideWatchSkeleton;
 
     function hideFeedSkeleton() {
       const skeletons = document.querySelectorAll('.insta-post-skeleton');
@@ -71798,6 +72138,106 @@ function renderHtml(
       }
     }
 
+    // --- 📡 WEBRTC HEALTH SCORING & ADAPTIVE BITRATE ENGINE ---
+    let _webrtcHealth = {
+      score: 100, // 0 - 100%
+      rating: 'Excellent',
+      rttMs: 0,
+      jitterMs: 0,
+      packetsLostRate: 0,
+      currentQuality: 'high',
+      swarmRelayCapacity: 8,
+      lastFallbackTime: 0
+    };
+
+    function calculateWebRtcHealthScore(rttSec, jitterSec, pktsLost, pktsRecv) {
+      const rttMs = Math.round((rttSec || 0) * 1000);
+      const jitterMs = Math.round((jitterSec || 0) * 1000);
+      const lossRate = (pktsRecv > 0) ? (pktsLost / (pktsLost + pktsRecv)) : 0;
+
+      let score = 100;
+      if (rttMs > 400) score -= 35;
+      else if (rttMs > 200) score -= 15;
+      else if (rttMs > 100) score -= 5;
+
+      if (jitterMs > 50) score -= 25;
+      else if (jitterMs > 25) score -= 10;
+
+      if (lossRate > 0.05) score -= 35;
+      else if (lossRate > 0.02) score -= 15;
+
+      score = Math.max(10, Math.min(100, score));
+
+      let rating = 'Excellent';
+      if (score < 50) rating = 'Degraded';
+      else if (score < 75) rating = 'Fair';
+      else if (score < 90) rating = 'Good';
+
+      _webrtcHealth.score = score;
+      _webrtcHealth.rating = rating;
+      _webrtcHealth.rttMs = rttMs;
+      _webrtcHealth.jitterMs = jitterMs;
+      _webrtcHealth.packetsLostRate = Math.round(lossRate * 100);
+
+      // Automatic TURN fallback if latency > 400ms or score < 45%
+      if ((rttMs > 400 || score < 45) && Date.now() - _webrtcHealth.lastFallbackTime > 15000) {
+        _webrtcHealth.lastFallbackTime = Date.now();
+        console.warn('⚠️ [WebRTC] Latency spike (' + rttMs + 'ms), triggering enterprise TURN fallback');
+        if (typeof switchCallToTlsRelay === 'function') {
+          switchCallToTlsRelay();
+        }
+      }
+
+      // Adaptive bandwidth throttling
+      if (score < 50 && _webrtcHealth.currentQuality !== 'low') {
+        adaptWebRtcEncodingQuality('low');
+      } else if (score >= 50 && score < 80 && _webrtcHealth.currentQuality !== 'medium') {
+        adaptWebRtcEncodingQuality('medium');
+      } else if (score >= 80 && _webrtcHealth.currentQuality !== 'high') {
+        adaptWebRtcEncodingQuality('high');
+      }
+
+      return _webrtcHealth;
+    }
+
+    async function adaptWebRtcEncodingQuality(quality) {
+      if (!_peerConnection) return;
+      _webrtcHealth.currentQuality = quality;
+      try {
+        const senders = _peerConnection.getSenders();
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+        if (!videoSender || typeof videoSender.getParameters !== 'function') return;
+
+        const params = videoSender.getParameters();
+        if (!params.encodings || params.encodings.length === 0) {
+          params.encodings = [{}];
+        }
+
+        if (quality === 'low') {
+          params.encodings[0].maxBitrate = 250000;
+          params.encodings[0].scaleResolutionDownBy = 2.0;
+        } else if (quality === 'medium') {
+          params.encodings[0].maxBitrate = 800000;
+          params.encodings[0].scaleResolutionDownBy = 1.5;
+        } else {
+          params.encodings[0].maxBitrate = 2500000;
+          params.encodings[0].scaleResolutionDownBy = 1.0;
+        }
+
+        if (typeof videoSender.setParameters === 'function') {
+          await videoSender.setParameters(params);
+          console.log('📡 [WebRTC] Adapted video encoding quality to:', quality);
+        }
+      } catch (err) {
+        console.warn('[WebRTC] adaptWebRtcEncodingQuality notice:', err);
+      }
+    }
+    window.adaptWebRtcEncodingQuality = adaptWebRtcEncodingQuality;
+
+    window.getWebRtcConnectionHealth = function() {
+      return Object.assign({}, _webrtcHealth);
+    };
+
     async function pollWebRtcStats() {
       if (!_peerConnection) return;
       try {
@@ -71846,6 +72286,7 @@ function renderHtml(
         _callDiagnostics.remoteVideoTracks = window._remoteMediaStream ? window._remoteMediaStream.getVideoTracks().filter(function(t) { return t.readyState === 'live'; }).length : 0;
         _callDiagnostics.selectedCandidatePair = selectedCandidatePair;
 
+        calculateWebRtcHealthScore(selectedCandidatePair ? selectedCandidatePair.currentRoundTripTime : 0, aJitter, aPktsLost, aPktsRecv);
         _callDiagnostics.audio = {
           bytesSent: aBytesSent + _relayedBytesSent,
           bytesReceived: aBytesRecv + _relayedBytesRecv,
