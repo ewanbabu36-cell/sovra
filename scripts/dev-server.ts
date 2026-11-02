@@ -8140,6 +8140,470 @@ function renderHtml(
         transition: opacity 0.1s ease !important;
       }
     }
+    /* =========================================================================
+       🪪 SOVRA HOLOGRAPHIC GYROSCOPE-REACTIVE IDENTITY CARD SHADER & 3D ENGINE
+       ========================================================================= */
+    .holo-card-perspective-stage {
+      perspective: 1200px;
+      max-width: 500px;
+      width: 100%;
+      position: relative;
+      z-index: 10;
+      margin: 0 auto;
+    }
+    .holo-card-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 0 4px;
+    }
+    .holo-card-toolbar-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #38bdf8;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .holo-card-radar-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00f0ff;
+      box-shadow: 0 0 10px #00f0ff;
+      animation: holoRadarPulse 1.8s ease-in-out infinite;
+    }
+    @keyframes holoRadarPulse {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.6); opacity: 1; box-shadow: 0 0 16px #00f0ff, 0 0 24px rgba(0,240,255,0.6); }
+    }
+    .holo-tool-btn {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #cbd5e1;
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .holo-tool-btn:hover {
+      background: rgba(56, 189, 248, 0.24);
+      color: #ffffff;
+      border-color: #38bdf8;
+    }
+    .holo-close-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #94a3b8;
+      font-size: 1.1rem;
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .holo-close-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+      color: #ffffff;
+    }
+    .holo-card-3d {
+      position: relative;
+      border-radius: 24px;
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0d1527 60%, #030712 100%);
+      border: 1.5px solid rgba(56, 189, 248, 0.5);
+      box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.85),
+                  0 0 35px rgba(56, 189, 248, 0.25),
+                  0 0 70px rgba(139, 92, 246, 0.18),
+                  inset 0 1px 2px rgba(255, 255, 255, 0.35);
+      transform-style: preserve-3d;
+      transition: box-shadow 0.25s ease, border-color 0.25s ease;
+      overflow: hidden;
+      padding: 1.5rem;
+      color: #f8fafc;
+      user-select: none;
+      will-change: transform;
+    }
+    /* Iridescent Prismatic Hologram Diffraction Foil Shader */
+    .holo-card-foil-shader {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3;
+      mix-blend-mode: color-dodge;
+      opacity: 0.65;
+      background: linear-gradient(
+        var(--holo-foil-deg, 115deg),
+        transparent 0%,
+        rgba(255, 0, 128, 0.28) 18%,
+        rgba(0, 240, 255, 0.42) 36%,
+        rgba(168, 85, 247, 0.35) 55%,
+        rgba(250, 204, 21, 0.32) 75%,
+        rgba(16, 185, 129, 0.25) 88%,
+        transparent 100%
+      );
+      background-size: 200% 200%;
+      background-position: var(--holo-foil-pos, 50% 50%);
+      transition: opacity 0.3s ease;
+    }
+    /* Specular Light Flare */
+    .holo-card-specular-flare {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+      mix-blend-mode: overlay;
+      background: radial-gradient(
+        circle at var(--holo-glare-x, 50%) var(--holo-glare-y, 50%),
+        rgba(255, 255, 255, 0.8) 0%,
+        rgba(255, 255, 255, 0.2) 30%,
+        transparent 65%
+      );
+      opacity: 0.85;
+      transition: opacity 0.2s ease;
+    }
+    /* Micro-Prism Laser Guilloché Security Watermark */
+    .holo-card-laser-guilloche {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0.16;
+      background-image:
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 6px),
+        repeating-linear-gradient(-45deg, rgba(56,189,248,0.14) 0px, rgba(56,189,248,0.14) 1px, transparent 1px, transparent 6px);
+    }
+    /* Holographic Scanline Wave */
+    .holo-card-scanline {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 40px;
+      pointer-events: none;
+      z-index: 2;
+      background: linear-gradient(180deg, transparent 0%, rgba(56, 189, 248, 0.15) 50%, transparent 100%);
+      animation: holoCardScanline 5s linear infinite;
+    }
+    @keyframes holoCardScanline {
+      0% { top: -40px; }
+      100% { top: 110%; }
+    }
+    /* Floating 3D Layers */
+    .holo-card-content {
+      position: relative;
+      z-index: 6;
+      transform-style: preserve-3d;
+    }
+    .holo-card-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      transform: translateZ(22px);
+    }
+    /* Realistic EMV Smart Chip */
+    .holo-emv-chip {
+      width: 48px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #d97706 0%, #fbbf24 50%, #b45309 100%);
+      border: 1px solid rgba(251, 191, 36, 0.6);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.6);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .holo-emv-chip::before {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border: 1px solid rgba(0,0,0,0.25);
+      border-radius: 4px;
+    }
+    .holo-emv-chip::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 1px;
+      background: rgba(0,0,0,0.3);
+    }
+    .holo-network-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 999px;
+      color: #38bdf8;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+    }
+    .holo-card-id-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(15, 23, 42, 0.82);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 18px;
+      padding: 1rem 1.15rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+      transform: translateZ(32px);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .holo-avatar-frame {
+      position: relative;
+      width: 68px;
+      height: 68px;
+      flex-shrink: 0;
+    }
+    .holo-avatar-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 2.5px solid #38bdf8;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      font-weight: 800;
+      background: #6366f1;
+      color: #fff;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+    .holo-id-details {
+      flex: 1;
+      min-width: 0;
+    }
+    .holo-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .holo-user-name {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.2;
+    }
+    .holo-verified-seal {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      background: linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(14, 165, 233, 0.2));
+      border: 1px solid rgba(52, 211, 153, 0.5);
+      border-radius: 999px;
+      color: #34d399;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.3);
+      transform: translateZ(10px);
+    }
+    .holo-user-handle {
+      font-size: 0.85rem;
+      color: #38bdf8;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+    .holo-did-snippet {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* 3D Floating QR Plate */
+    .holo-qr-plate {
+      background: #ffffff;
+      border: 1.5px solid rgba(56, 189, 248, 0.5);
+      border-radius: 18px;
+      padding: 0.85rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      transform: translateZ(28px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), 0 0 25px rgba(56, 189, 248, 0.3);
+      position: relative;
+    }
+    .holo-qr-wrap {
+      width: 150px;
+      height: 150px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .holo-qr-meta {
+      margin-top: 6px;
+    }
+    .holo-qr-label {
+      display: block;
+      font-size: 0.72rem;
+      color: #0f172a;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+    .holo-qr-sub {
+      display: block;
+      font-size: 0.65rem;
+      color: #64748b;
+      font-weight: 600;
+    }
+    /* Cryptographic Proof Terminal */
+    .holo-crypto-panel {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 0.85rem 1rem;
+      font-size: 0.74rem;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 1rem;
+      transform: translateZ(18px);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .holo-crypto-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      word-break: break-all;
+    }
+    .holo-k {
+      color: #64748b;
+      font-weight: 800;
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
+      min-width: 72px;
+      flex-shrink: 0;
+    }
+    .holo-v {
+      flex: 1;
+      color: #cbd5e1;
+    }
+    .holo-accent-cyan { color: #38bdf8 !important; }
+    .holo-accent-purple { color: #c084fc !important; }
+    .holo-copy-btn {
+      background: none;
+      border: none;
+      color: #38bdf8;
+      font-size: 0.68rem;
+      cursor: pointer;
+      padding: 0;
+      font-weight: 700;
+      text-decoration: underline;
+      flex-shrink: 0;
+    }
+    .holo-crypto-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 6px;
+      margin-top: 2px;
+      font-size: 0.7rem;
+    }
+    .holo-sig-verified {
+      color: #34d399;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .holo-tilt-hint {
+      color: #94a3b8;
+      font-size: 0.68rem;
+      font-weight: 600;
+    }
+    /* Action Buttons */
+    .holo-actions-bar {
+      display: flex;
+      gap: 8px;
+      transform: translateZ(24px);
+    }
+    .holo-act-btn {
+      flex: 1;
+      padding: 0.75rem 0.5rem;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+    .holo-act-verify {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+    }
+    .holo-act-verify:hover {
+      background: rgba(56, 189, 248, 0.28);
+      color: #ffffff;
+    }
+    .holo-act-export {
+      background: rgba(167, 139, 250, 0.15);
+      border-color: rgba(167, 139, 250, 0.4);
+      color: #a78bfa;
+    }
+    .holo-act-export:hover {
+      background: rgba(167, 139, 250, 0.28);
+      color: #ffffff;
+    }
+    .holo-act-multiaddr {
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #ffffff;
+      border: none;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    }
+    .holo-act-multiaddr:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+    @media (max-width: 480px) {
+      .holo-card-3d {
+        padding: 1.15rem;
+      }
+      .holo-qr-wrap {
+        width: 125px;
+        height: 125px;
+      }
+      .holo-card-id-row {
+        padding: 0.75rem 0.85rem;
+      }
+      .holo-actions-bar {
+        flex-direction: column;
+      }
+    }
+
     @keyframes callWave {
       0% { height: 6px; }
       100% { height: 26px; }
@@ -28177,80 +28641,123 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- 🪪 4. SOVEREIGN IDENTITY CARD & QR MODAL -->
-  <div id="sovereignIdCardModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(16px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;" onclick="closeSovereignIdCardModal(event)">
-    <div style="background: linear-gradient(145deg, #0f172a, #1e1b4b); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 24px; max-width: 480px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.25); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;" onclick="event.stopPropagation()">
-      
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-        <div style="font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; color: #a5b4fc;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 10h4"/><path d="M14 14h4"/></svg>
-          <span>Cryptographic Identity Inspection</span>
+  <!-- 🪪 4. SOVEREIGN IDENTITY CARD & QR MODAL (HOLOGRAPHIC 3D & GYROSCOPE SHADER) -->
+  <div id="sovereignIdCardModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100000; align-items: center; justify-content: center; padding: 1.25rem; perspective: 1200px; overflow-y: auto;" onclick="closeSovereignIdCardModal(event)">
+    <div class="holo-card-perspective-stage" id="holoCardPerspectiveStage" onclick="event.stopPropagation()">
+      <!-- Top Holographic Toolbar -->
+      <div class="holo-card-toolbar">
+        <div class="holo-card-toolbar-title">
+          <span class="holo-card-radar-pulse"></span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 10h4"/><path d="M14 14h4"/></svg>
+          <span>Sovereign Holographic Credential</span>
         </div>
-        <button onclick="closeSovereignIdCardModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; padding: 4px;" title="Close modal" aria-label="Close modal">✕</button>
-      </div>
-
-      <!-- Identity Badge -->
-      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.25rem; margin-bottom: 1rem; text-align: center;">
-        <div style="width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 0.75rem auto; border: 3px solid #38bdf8; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 800; background: #6366f1;" id="idCardAvatar">
-          S
-        </div>
-        <div style="font-size: 1.15rem; font-weight: 800;" id="idCardName">Sovereign Node</div>
-        <div style="font-size: 0.85rem; color: #38bdf8; font-weight: 600;" id="idCardHandle">@sovereign.mesh</div>
-        <div style="display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 4px 12px; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.4); border-radius: 999px; color: #34d399; font-size: 0.74rem; font-weight: 700;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>Ed25519 Verified W3C DID</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="holoGyroToggleBtn" onclick="toggleHoloGyroscope()" class="holo-tool-btn" title="Toggle Gyroscope / Mouse Reactive Tilt">
+            <span>💫 <b id="holoTiltModeStatus">Live 3D ⚡</b></span>
+          </button>
+          <button onclick="closeSovereignIdCardModal()" class="holo-close-btn" aria-label="Close modal" title="Close modal">✕</button>
         </div>
       </div>
 
-      <!-- Clean QR Code Visual Representation -->
-      <div style="background: #ffffff; border-radius: 16px; padding: 1rem; text-align: center; margin-bottom: 1rem;">
-        <div id="idCardQrContainer" style="width: 160px; height: 160px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
-          <!-- SVG QR Code generated on open -->
-        </div>
-        <div style="font-size: 0.75rem; color: #334155; font-weight: 700; margin-top: 6px;">Scan to Pair via BLE / Local Mesh</div>
-      </div>
+      <!-- The 3D Reactive Holographic Card Container -->
+      <div id="holoIdCardContainer" class="holo-card-3d">
+        <!-- 1. Holographic Rainbow Prismatic Foil Overlay (color-dodge diffraction grating) -->
+        <div class="holo-card-foil-shader" id="holoFoilShader" aria-hidden="true"></div>
 
-      <!-- Cryptographic Proof Details -->
-      <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 0.85rem; font-size: 0.75rem; color: #94a3b8; font-family: monospace; display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem; word-break: break-all;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
-          <div><b>DID:</b> <span id="idCardDid" style="color: #cbd5e1;"></span></div>
-          <button onclick="copyIdCardField('did')" title="Copy DID" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; padding: 0; text-decoration: underline; flex-shrink: 0;">Copy</button>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
-          <div><b>Ed25519 Public Key:</b> <span id="idCardPublicKey" style="color: #38bdf8;"></span></div>
-          <button onclick="copyIdCardField('pubkey')" title="Copy Public Key" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; padding: 0; text-decoration: underline; flex-shrink: 0;">Copy</button>
-        </div>
-        <div><b>Signature Validation:</b> <div id="idCardSigStatus" style="color: #34d399; font-weight: 700; margin-top: 2px;">✓ Valid RFC 8032 Ed25519 Signature</div></div>
-        <div><b>Multicodec:</b> <span style="color: #38bdf8;">0xed01 (ed25519-pub, 32 bytes)</span></div>
-        <div><b>Multibase:</b> <span style="color: #cbd5e1;">base58btc (prefix: 'z')</span></div>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
-          <div><b>Peer ID:</b> <span id="idCardPeerId" style="color: #cbd5e1;"></span></div>
-          <button onclick="copyIdCardField('peerid')" title="Copy Peer ID" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; padding: 0; text-decoration: underline; flex-shrink: 0;">Copy</button>
-        </div>
-        <div><b>Transport Protocol:</b> <span style="color: #34d399;">Noise_XX + Yamux (libp2p TCP)</span></div>
-      </div>
+        <!-- 2. Dynamic Specular Light Flare Reflection -->
+        <div class="holo-card-specular-flare" id="holoSpecularFlare" aria-hidden="true"></div>
 
-      <!-- Action Buttons -->
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 0.65rem;">
-        <button id="verifyKeypairBtn" onclick="runLiveCryptographicVerification()" style="flex: 1; padding: 0.75rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>⚡ Verify Keypair &amp; Signature</span>
-        </button>
-        <button onclick="exportDidDocumentJson()" style="flex: 1; padding: 0.75rem; background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.4); color: #a78bfa; border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-          <span>📄 Export W3C DID (JSON)</span>
-        </button>
-      </div>
+        <!-- 3. Micro-Prism Laser Guilloché Mesh Pattern -->
+        <div class="holo-card-laser-guilloche" aria-hidden="true"></div>
 
-      <div style="display: flex; gap: 0.5rem;">
-        <button onclick="copyFullIdentityString()" style="flex: 1; padding: 0.75rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-          <span>Copy Identity Multiaddr</span>
-        </button>
-        <button onclick="copyProfileDid()" style="padding: 0.75rem 1rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e2e8f0; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-          <span>Copy DID</span>
-        </button>
+        <!-- 4. Holographic Scanline Wave -->
+        <div class="holo-card-scanline" aria-hidden="true"></div>
+
+        <!-- Elevated 3D Content Layers (translateZ) -->
+        <div class="holo-card-content">
+          <!-- Header row: Sovra Hologram Microchip & Network Badge -->
+          <div class="holo-card-top-row">
+            <div class="holo-emv-chip" title="Hardware Security Enclave (Curve25519 / Ed25519)">
+              <div class="holo-chip-core"></div>
+            </div>
+            <div class="holo-network-badge">
+              <span class="holo-radar-pulse" style="width: 6px; height: 6px;"></span>
+              <span>SOVRA MESH &bull; ED25519</span>
+            </div>
+          </div>
+
+          <!-- Identity Section (Avatar, Name, Handle, Floating Holographic Verified Seal) -->
+          <div class="holo-card-id-row">
+            <div class="holo-avatar-frame">
+              <div id="idCardAvatar" class="holo-avatar-inner">S</div>
+            </div>
+            <div class="holo-id-details">
+              <div class="holo-name-row">
+                <span id="idCardName" class="holo-user-name">Sovereign Node</span>
+                <div class="holo-verified-seal" title="Cryptographically Anchored W3C DID">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>ED25519 VERIFIED</span>
+                </div>
+              </div>
+              <div id="idCardHandle" class="holo-user-handle">@sovereign.mesh</div>
+              <div class="holo-did-snippet" id="idCardDidSnippet">did:key:z6Mku...</div>
+            </div>
+          </div>
+
+          <!-- QR Code Plate (3D floating frosted plate with laser edge highlight) -->
+          <div class="holo-qr-plate">
+            <div id="idCardQrContainer" class="holo-qr-wrap">
+              <!-- Dynamic SVG QR Code generated on open -->
+            </div>
+            <div class="holo-qr-meta">
+              <span class="holo-qr-label">PEER DISCOVERY &bull; BLE / P2P NOISE PROTOCOL</span>
+              <span class="holo-qr-sub">Scan to pair and establish zero-knowledge channel</span>
+            </div>
+          </div>
+
+          <!-- Cryptographic Proof Data Panel -->
+          <div class="holo-crypto-panel">
+            <div class="holo-crypto-row">
+              <span class="holo-k">W3C DID:</span>
+              <span class="holo-v" id="idCardDid"></span>
+              <button class="holo-copy-btn" onclick="copyIdCardField('did')" title="Copy DID">Copy</button>
+            </div>
+            <div class="holo-crypto-row">
+              <span class="holo-k">PUBKEY:</span>
+              <span class="holo-v holo-accent-cyan" id="idCardPublicKey"></span>
+              <button class="holo-copy-btn" onclick="copyIdCardField('pubkey')" title="Copy Public Key">Copy</button>
+            </div>
+            <div class="holo-crypto-row">
+              <span class="holo-k">PEER ID:</span>
+              <span class="holo-v holo-accent-purple" id="idCardPeerId"></span>
+              <button class="holo-copy-btn" onclick="copyIdCardField('peerid')" title="Copy Peer ID">Copy</button>
+            </div>
+            <div class="holo-crypto-footer">
+              <div id="idCardSigStatus" class="holo-sig-verified">
+                <span>✓ Valid RFC 8032 Ed25519 Signature</span>
+              </div>
+              <div class="holo-tilt-hint" id="holoTiltAngleDisplay">
+                <span>📐 3D Tilt: 0.0° / 0.0° &bull; Live Gyro/Mouse</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons Bar -->
+          <div class="holo-actions-bar">
+            <button id="verifyKeypairBtn" onclick="runLiveCryptographicVerification()" class="holo-act-btn holo-act-verify" title="Verify cryptographic keypair">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Live Verify</span>
+            </button>
+            <button onclick="exportDidDocumentJson()" class="holo-act-btn holo-act-export" title="Export W3C DID document in JSON format">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              <span>Export DID</span>
+            </button>
+            <button onclick="copyFullIdentityString()" class="holo-act-btn holo-act-multiaddr" title="Copy full identity multiaddr">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <span>Multiaddr</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -55462,7 +55969,189 @@ function renderHtml(
       }
     };
 
-    // --- Sovereign Identity Card & QR Logic ---
+    // --- 🪪 SOVRA HOLOGRAPHIC GYROSCOPE-REACTIVE IDENTITY CARD ENGINE ---
+    let holoCardTiltState = {
+      mode: 'live', // 'live' | 'orbit' | 'flat'
+      targetRotX: 0,
+      targetRotY: 0,
+      curRotX: 0,
+      curRotY: 0,
+      glareX: 50,
+      glareY: 50,
+      curGlareX: 50,
+      curGlareY: 50,
+      targetFoilDeg: 115,
+      curFoilDeg: 115,
+      rafId: null,
+      gyroBound: false,
+      lastInteractionTime: 0,
+      isHovered: false
+    };
+
+    function initHolographicIdCardTilt() {
+      const card = document.getElementById('holoIdCardContainer');
+      if (!card || card.dataset.holoBound === 'true') return;
+      card.dataset.holoBound = 'true';
+
+      function handlePointerMove(e) {
+        if (holoCardTiltState.mode === 'flat') return;
+        holoCardTiltState.lastInteractionTime = Date.now();
+        holoCardTiltState.isHovered = true;
+
+        const rect = card.getBoundingClientRect();
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : rect.left + rect.width / 2);
+        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : rect.top + rect.height / 2);
+
+        const relX = clientX - rect.left;
+        const relY = clientY - rect.top;
+
+        const normX = Math.max(-1, Math.min(1, (relX - rect.width / 2) / (rect.width / 2)));
+        const normY = Math.max(-1, Math.min(1, (relY - rect.height / 2) / (rect.height / 2)));
+
+        holoCardTiltState.targetRotY = normX * 22;
+        holoCardTiltState.targetRotX = -normY * 22;
+
+        holoCardTiltState.glareX = Math.round((relX / rect.width) * 100);
+        holoCardTiltState.glareY = Math.round((relY / rect.height) * 100);
+
+        holoCardTiltState.targetFoilDeg = Math.round(115 + normX * 45);
+      }
+
+      function handlePointerLeave() {
+        holoCardTiltState.isHovered = false;
+        if (holoCardTiltState.mode === 'live') {
+          holoCardTiltState.targetRotX = 0;
+          holoCardTiltState.targetRotY = 0;
+          holoCardTiltState.glareX = 50;
+          holoCardTiltState.glareY = 50;
+          holoCardTiltState.targetFoilDeg = 115;
+        }
+      }
+
+      card.addEventListener('mousemove', handlePointerMove, { passive: true });
+      card.addEventListener('mouseleave', handlePointerLeave, { passive: true });
+      card.addEventListener('touchmove', handlePointerMove, { passive: true });
+      card.addEventListener('touchend', handlePointerLeave, { passive: true });
+
+      // Mobile DeviceOrientation Gyroscope
+      bindHoloGyroscope();
+
+      startHoloCardAnimationLoop();
+    }
+
+    function bindHoloGyroscope() {
+      if (holoCardTiltState.gyroBound) return;
+      if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
+        function handleOrientation(e) {
+          if (holoCardTiltState.mode !== 'live' || holoCardTiltState.isHovered) return;
+          if (e.gamma === null && e.beta === null) return;
+          holoCardTiltState.lastInteractionTime = Date.now();
+
+          // Gamma is left/right tilt [-90, 90]
+          // Beta is front/back tilt [-180, 180], holding device at ~45deg is neutral
+          const gamma = Math.max(-30, Math.min(30, e.gamma || 0));
+          const beta = Math.max(-30, Math.min(30, (e.beta || 45) - 45));
+
+          holoCardTiltState.targetRotY = gamma * 0.75;
+          holoCardTiltState.targetRotX = -beta * 0.75;
+
+          const normX = gamma / 30;
+          const normY = beta / 30;
+
+          holoCardTiltState.glareX = Math.round(50 + normX * 40);
+          holoCardTiltState.glareY = Math.round(50 + normY * 40);
+          holoCardTiltState.targetFoilDeg = Math.round(115 + normX * 45);
+        }
+
+        window.addEventListener('deviceorientation', handleOrientation, { passive: true });
+        holoCardTiltState.gyroBound = true;
+      }
+    }
+
+    function toggleHoloGyroscope() {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission().then(function(res) {
+          if (res === 'granted') {
+            bindHoloGyroscope();
+          }
+        }).catch(function() {});
+      }
+
+      const statusEl = document.getElementById('holoTiltModeStatus');
+      if (holoCardTiltState.mode === 'live') {
+        holoCardTiltState.mode = 'orbit';
+        if (statusEl) statusEl.innerText = 'Orbit 🪐';
+        showAccountToast('💫 Hologram Shimmer: Continuous Orbital Float enabled', 'info');
+      } else if (holoCardTiltState.mode === 'orbit') {
+        holoCardTiltState.mode = 'flat';
+        holoCardTiltState.targetRotX = 0;
+        holoCardTiltState.targetRotY = 0;
+        holoCardTiltState.curRotX = 0;
+        holoCardTiltState.curRotY = 0;
+        if (statusEl) statusEl.innerText = '2D Flat';
+        showAccountToast('📐 Hologram: 2D Flat Mode enabled', 'info');
+      } else {
+        holoCardTiltState.mode = 'live';
+        if (statusEl) statusEl.innerText = 'Live 3D ⚡';
+        showAccountToast('✨ Hologram: Live 3D Gyroscope & Mouse Tilt enabled', 'success');
+      }
+      startHoloCardAnimationLoop();
+    }
+
+    function startHoloCardAnimationLoop() {
+      if (holoCardTiltState.rafId) return;
+
+      const card = document.getElementById('holoIdCardContainer');
+      const tiltDisplay = document.getElementById('holoTiltAngleDisplay');
+
+      function tick(now) {
+        const modal = document.getElementById('sovereignIdCardModal');
+        if (!card || !modal || modal.style.display === 'none') {
+          holoCardTiltState.rafId = null;
+          return;
+        }
+
+        // Idle orbit animation if in orbit mode OR if live mode with no interaction for > 2.5s
+        if (holoCardTiltState.mode === 'orbit' || (holoCardTiltState.mode === 'live' && !holoCardTiltState.isHovered && Date.now() - holoCardTiltState.lastInteractionTime > 2500)) {
+          const t = now * 0.0018;
+          holoCardTiltState.targetRotX = Math.sin(t) * 9;
+          holoCardTiltState.targetRotY = Math.cos(t * 0.85) * 12;
+          holoCardTiltState.glareX = 50 + Math.sin(t) * 35;
+          holoCardTiltState.glareY = 50 + Math.cos(t) * 35;
+          holoCardTiltState.targetFoilDeg = 115 + Math.sin(t) * 35;
+        }
+
+        // Spring lerp
+        const lerpFactor = 0.14;
+        holoCardTiltState.curRotX += (holoCardTiltState.targetRotX - holoCardTiltState.curRotX) * lerpFactor;
+        holoCardTiltState.curRotY += (holoCardTiltState.targetRotY - holoCardTiltState.curRotY) * lerpFactor;
+        holoCardTiltState.curGlareX += (holoCardTiltState.glareX - holoCardTiltState.curGlareX) * lerpFactor;
+        holoCardTiltState.curGlareY += (holoCardTiltState.glareY - holoCardTiltState.curGlareY) * lerpFactor;
+        holoCardTiltState.curFoilDeg += (holoCardTiltState.targetFoilDeg - holoCardTiltState.curFoilDeg) * lerpFactor;
+
+        // Apply 3D transforms
+        if (holoCardTiltState.mode === 'flat') {
+          card.style.transform = 'none';
+        } else {
+          card.style.transform = 'rotateX(' + holoCardTiltState.curRotX.toFixed(2) + 'deg) rotateY(' + holoCardTiltState.curRotY.toFixed(2) + 'deg) scale3d(1.02, 1.02, 1.02)';
+        }
+
+        card.style.setProperty('--holo-glare-x', holoCardTiltState.curGlareX.toFixed(1) + '%');
+        card.style.setProperty('--holo-glare-y', holoCardTiltState.curGlareY.toFixed(1) + '%');
+        card.style.setProperty('--holo-foil-deg', holoCardTiltState.curFoilDeg.toFixed(1) + 'deg');
+        card.style.setProperty('--holo-foil-pos', holoCardTiltState.curGlareX.toFixed(1) + '% ' + holoCardTiltState.curGlareY.toFixed(1) + '%');
+
+        if (tiltDisplay) {
+          const modeLabel = holoCardTiltState.mode === 'flat' ? 'Flat 2D' : (holoCardTiltState.mode === 'orbit' ? 'Orbit Float' : 'Live Gyro/Mouse');
+          tiltDisplay.innerHTML = '<span>📐 3D Tilt: ' + holoCardTiltState.curRotX.toFixed(1) + '° / ' + holoCardTiltState.curRotY.toFixed(1) + '° &bull; ' + modeLabel + '</span>';
+        }
+
+        holoCardTiltState.rafId = requestAnimationFrame(tick);
+      }
+
+      holoCardTiltState.rafId = requestAnimationFrame(tick);
+    }
+
     function openSovereignIdCardModal() {
       const event = arguments[0];
       if (event && event.stopPropagation) event.stopPropagation();
@@ -55478,6 +56167,7 @@ function renderHtml(
       const nameEl = document.getElementById('idCardName');
       const handleEl = document.getElementById('idCardHandle');
       const didEl = document.getElementById('idCardDid');
+      const didSnippetEl = document.getElementById('idCardDidSnippet');
       const peerIdEl = document.getElementById('idCardPeerId');
       const pubKeyEl = document.getElementById('idCardPublicKey');
       const sigEl = document.getElementById('idCardSigStatus');
@@ -55486,6 +56176,9 @@ function renderHtml(
       if (nameEl) nameEl.innerText = myName;
       if (handleEl) handleEl.innerText = myHandle;
       if (didEl) didEl.innerText = myDid;
+      if (didSnippetEl) {
+        didSnippetEl.innerText = (myDid && myDid.length > 24) ? (myDid.slice(0, 16) + '...' + myDid.slice(-8)) : myDid;
+      }
       if (peerIdEl) peerIdEl.innerText = myPeerId;
 
       var rawPubKey = (window.SovraCryptoVault ? window.SovraCryptoVault.getPublicKeyHex() : '') || (myProfile && (myProfile.devicePublicKeyHex || myProfile.publicKey || myProfile.deviceKey)) || '';
@@ -55513,6 +56206,10 @@ function renderHtml(
       if (qrContainer) {
         qrContainer.innerHTML = generateSvgQrCode(myDid);
       }
+
+      // Initialize Hologram 3D & Gyroscope Physics
+      initHolographicIdCardTilt();
+      startHoloCardAnimationLoop();
     }
 
     function closeSovereignIdCardModal(e) {
@@ -55521,6 +56218,13 @@ function renderHtml(
       }
       const m = document.getElementById('sovereignIdCardModal');
       if (m) m.style.display = 'none';
+
+      // Cancel animation loop to save resources
+      if (holoCardTiltState.rafId) {
+        cancelAnimationFrame(holoCardTiltState.rafId);
+        holoCardTiltState.rafId = null;
+      }
+
       const trigger = document.getElementById('meVerifiedBadgeBtn');
       if (trigger) trigger.focus();
     }
