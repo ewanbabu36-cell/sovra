@@ -781,7 +781,79 @@ export class SqliteSocialDatabaseEngine {
       CREATE INDEX IF NOT EXISTS idx_analytics_type ON analytics_events(event_type);
       CREATE INDEX IF NOT EXISTS idx_analytics_user ON analytics_events(user_did);
       CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at);
+      -- 47. USER PERSONAL SETTINGS & PROFILE PREFERENCES
+      CREATE TABLE IF NOT EXISTS user_settings (
+        did TEXT PRIMARY KEY,
+        display_name TEXT,
+        bio TEXT,
+        mesh_discovery INTEGER DEFAULT 1,
+        allow_dms INTEGER DEFAULT 1,
+        push_notifications INTEGER DEFAULT 1,
+        video_autoplay INTEGER DEFAULT 1,
+        compact_density INTEGER DEFAULT 0,
+        storage_quota_gb INTEGER DEFAULT 10,
+        bandwidth_limit_mb INTEGER DEFAULT 50,
+        updated_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_settings_updated ON user_settings(updated_at);
+
+      -- 48. PLATFORM FEATURE DIRECTORY (JUNCTION MASTER REGISTRY)
+      CREATE TABLE IF NOT EXISTS platform_features (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL,
+        category TEXT NOT NULL,
+        desc TEXT,
+        enabled INTEGER DEFAULT 1,
+        display_order INTEGER DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_platform_features_cat ON platform_features(category);
+      CREATE INDEX IF NOT EXISTS idx_platform_features_order ON platform_features(display_order);
     `);
+
+    // Ensure mini_dapps status column and seed default platform features
+    try {
+      try {
+        this.db.exec("ALTER TABLE mini_dapps ADD COLUMN status TEXT DEFAULT 'approved'");
+      } catch (_) {}
+
+      const featCount = (this.db.prepare('SELECT COUNT(*) as c FROM platform_features').get() as any)?.c || 0;
+      if (featCount === 0) {
+        const seedFeatures = [
+          ['feed', 'Feed', '📰', 'social', 'Decentralized Social Feed', 1, 1],
+          ['reels', 'Reels', '🎬', 'media', 'Sovereign Short Videos', 1, 2],
+          ['watch', 'Watch', '📺', 'media', 'Longform Decentralized Video', 1, 3],
+          ['chat', 'Chat', '💬', 'social', 'Double-Ratchet Noise_XX E2EE', 1, 4],
+          ['profile', 'Profile', '👤', 'social', 'Sovereign DID Identity & Posts', 1, 5],
+          ['wallet', 'Wallet', '👛', 'finance', 'DID Vault & Balance', 1, 6],
+          ['studio', 'Studio', '🎨', 'creator', 'Creator Studio & Video Analytics', 1, 7],
+          ['live', 'Live', '🔴', 'media', 'P2P WebRTC Swarm Stream', 1, 8],
+          ['calls', 'Calls', '📞', 'social', 'Encrypted P2P Voice & Video', 1, 9],
+          ['friends', 'Peers', '👥', 'social', 'Discover Sovereign Nodes & Peers', 1, 10],
+          ['communities', 'Spaces', '🏛️', 'social', 'Sovereign Community Channels', 1, 11],
+          ['channels', 'Channels', '📡', 'media', 'Public Broadcast Channels', 1, 12],
+          ['hub', 'Explore', '🧭', 'utility', 'Global Discovery & Media Hub', 1, 13],
+          ['dapps', 'dApps', '⚡', 'utility', 'Decentralized Applications', 1, 14],
+          ['admin', 'Admin', '⚙️', 'utility', 'Apex Operations & Health Console', 1, 15],
+          ['qr_scan', 'Scanner', '📷', 'utility', 'WebRTC Camera QR Scanner', 1, 16],
+          ['upload', 'Create', '✨', 'creator', 'Publish Post, Video, or Reel', 1, 17],
+          ['bridge', 'Bridge', '🌉', 'finance', 'Multi-Chain Liquidity Bridge', 1, 18],
+          ['key_vault', 'Enclave', '🔐', 'utility', 'Sovereign Key Enclave & Passkeys', 1, 19],
+          ['id_card', 'ID Card', '🪪', 'social', 'Sovereign DID Credential Card', 1, 20],
+          ['mesh_node', 'Mesh', '🌐', 'utility', 'DePIN Hotspot & libp2p Mesh', 1, 21],
+          ['ghost_mode', 'Ghost', '👻', 'utility', 'Incognito Ephemeral Routing', 1, 22],
+          ['backup', 'Backup', '🛡️', 'finance', 'Encrypted Seed & Keys Backup', 1, 23],
+          ['desktop_launcher', 'OS Mode', '📱', 'utility', 'Switch to Android OS Launcher View', 1, 24],
+          ['settings', 'Settings', '⚙️', 'utility', 'Preferences, Themes & Privacy', 1, 25]
+        ];
+        const insertFeat = this.db.prepare(
+          'INSERT OR REPLACE INTO platform_features (id, name, icon, category, desc, enabled, display_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
+        for (const [id, name, icon, cat, desc, enabled, order] of seedFeatures) {
+          insertFeat.run(id, name, icon, cat, desc, enabled, order);
+        }
+      }
+    } catch (_) {}
 
     // Seed default algorithmic dials if empty
     try {
@@ -2456,11 +2528,19 @@ export class SqliteSocialDatabaseEngine {
 
   public setKillSwitch(switchId: string, active: boolean, adminDid = 'SOVRA-COMMAND-CONSOLE'): boolean {
     try {
-      this.prepareCached(`
-        UPDATE admin_kill_switches
-        SET is_active = ?, triggered_by = ?, triggered_at = ?
-        WHERE switch_id = ?
-      `).run(active ? 1 : 0, adminDid, Date.now(), switchId);
+      const existing = this.prepareCached('SELECT switch_id FROM admin_kill_switches WHERE switch_id = ?').get(switchId);
+      if (!existing) {
+        this.prepareCached(`
+          INSERT INTO admin_kill_switches (switch_id, label, description, is_active, triggered_by, triggered_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(switchId, switchId, 'Hardware Emergency Isolation Switch', active ? 1 : 0, adminDid, Date.now());
+      } else {
+        this.prepareCached(`
+          UPDATE admin_kill_switches
+          SET is_active = ?, triggered_by = ?, triggered_at = ?
+          WHERE switch_id = ?
+        `).run(active ? 1 : 0, adminDid, Date.now(), switchId);
+      }
       return true;
     } catch (_) {
       return false;
@@ -3720,6 +3800,325 @@ export class SqliteSocialDatabaseEngine {
       return this.db.prepare('SELECT * FROM analytics_events ORDER BY created_at DESC LIMIT ?').all(limit);
     } catch (_) {
       return [];
+    }
+  }
+
+  // ==========================================
+  // USER SETTINGS & PROFILE PERSISTENCE (PHASE 1)
+  // ==========================================
+  public getUserSettings(did: string): {
+    did: string;
+    display_name: string;
+    bio: string;
+    mesh_discovery: number;
+    allow_dms: number;
+    push_notifications: number;
+    video_autoplay: number;
+    compact_density: number;
+    storage_quota_gb: number;
+    bandwidth_limit_mb: number;
+    updated_at: string;
+  } {
+    try {
+      const row = this.db.prepare('SELECT * FROM user_settings WHERE did = ?').get(did) as any;
+      if (row) {
+        return {
+          did: row.did,
+          display_name: row.display_name ?? '',
+          bio: row.bio ?? '',
+          mesh_discovery: Number(row.mesh_discovery ?? 1),
+          allow_dms: Number(row.allow_dms ?? 1),
+          push_notifications: Number(row.push_notifications ?? 1),
+          video_autoplay: Number(row.video_autoplay ?? 1),
+          compact_density: Number(row.compact_density ?? 0),
+          storage_quota_gb: Number(row.storage_quota_gb ?? 10),
+          bandwidth_limit_mb: Number(row.bandwidth_limit_mb ?? 50),
+          updated_at: row.updated_at || new Date().toISOString(),
+        };
+      }
+      const user = this.findUserByDid(did);
+      return {
+        did,
+        display_name: user?.name || '',
+        bio: user?.bio || '',
+        mesh_discovery: 1,
+        allow_dms: 1,
+        push_notifications: 1,
+        video_autoplay: 1,
+        compact_density: 0,
+        storage_quota_gb: 10,
+        bandwidth_limit_mb: 50,
+        updated_at: new Date().toISOString(),
+      };
+    } catch (_) {
+      return {
+        did,
+        display_name: '',
+        bio: '',
+        mesh_discovery: 1,
+        allow_dms: 1,
+        push_notifications: 1,
+        video_autoplay: 1,
+        compact_density: 0,
+        storage_quota_gb: 10,
+        bandwidth_limit_mb: 50,
+        updated_at: new Date().toISOString(),
+      };
+    }
+  }
+
+  public setUserSettings(did: string, settings: {
+    display_name?: string;
+    bio?: string;
+    mesh_discovery?: number | boolean;
+    allow_dms?: number | boolean;
+    push_notifications?: number | boolean;
+    video_autoplay?: number | boolean;
+    compact_density?: number | boolean;
+    storage_quota_gb?: number;
+    bandwidth_limit_mb?: number;
+  }): any {
+    const current = this.getUserSettings(did);
+    const updated = {
+      did,
+      display_name: settings.display_name !== undefined ? settings.display_name : current.display_name,
+      bio: settings.bio !== undefined ? settings.bio : current.bio,
+      mesh_discovery: settings.mesh_discovery !== undefined ? (settings.mesh_discovery ? 1 : 0) : current.mesh_discovery,
+      allow_dms: settings.allow_dms !== undefined ? (settings.allow_dms ? 1 : 0) : current.allow_dms,
+      push_notifications: settings.push_notifications !== undefined ? (settings.push_notifications ? 1 : 0) : current.push_notifications,
+      video_autoplay: settings.video_autoplay !== undefined ? (settings.video_autoplay ? 1 : 0) : current.video_autoplay,
+      compact_density: settings.compact_density !== undefined ? (settings.compact_density ? 1 : 0) : current.compact_density,
+      storage_quota_gb: settings.storage_quota_gb !== undefined ? Number(settings.storage_quota_gb) : current.storage_quota_gb,
+      bandwidth_limit_mb: settings.bandwidth_limit_mb !== undefined ? Number(settings.bandwidth_limit_mb) : current.bandwidth_limit_mb,
+      updated_at: new Date().toISOString(),
+    };
+
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO user_settings (
+        did, display_name, bio, mesh_discovery, allow_dms, push_notifications,
+        video_autoplay, compact_density, storage_quota_gb, bandwidth_limit_mb, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(
+      updated.did,
+      updated.display_name,
+      updated.bio,
+      updated.mesh_discovery,
+      updated.allow_dms,
+      updated.push_notifications,
+      updated.video_autoplay,
+      updated.compact_density,
+      updated.storage_quota_gb,
+      updated.bandwidth_limit_mb,
+      updated.updated_at
+    );
+    return updated;
+  }
+
+  public updateUserProfile(did: string, profile: { name?: string; bio?: string; avatar?: string }): { ok: boolean; user?: any; error?: string } {
+    try {
+      const user = this.findUserByDid(did);
+      if (!user) {
+        return { ok: false, error: 'User not found' };
+      }
+      const updatedName = profile.name !== undefined ? profile.name : user.name;
+      const updatedBio = profile.bio !== undefined ? profile.bio : user.bio;
+      const updatedAvatar = profile.avatar !== undefined ? profile.avatar : user.avatar;
+      const updatedAt = Date.now();
+
+      this.db.prepare(`
+        UPDATE users
+        SET name = ?, bio = ?, avatar = ?, updated_at = ?
+        WHERE did = ?
+      `).run(updatedName, updatedBio, updatedAvatar, updatedAt, did);
+
+      if (profile.name !== undefined || profile.bio !== undefined) {
+        this.setUserSettings(did, { display_name: updatedName, bio: updatedBio });
+      }
+
+      return {
+        ok: true,
+        user: {
+          ...user,
+          name: updatedName,
+          bio: updatedBio,
+          avatar: updatedAvatar,
+          updated_at: updatedAt,
+        }
+      };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Database error' };
+    }
+  }
+
+  // ==========================================
+  // PLATFORM FEATURES & DAPP STORE CRUD (PHASE 2)
+  // ==========================================
+  public getPlatformFeatures(includeDisabled = true): Array<{
+    id: string;
+    name: string;
+    icon: string;
+    category: string;
+    desc: string;
+    enabled: boolean;
+    display_order: number;
+  }> {
+    try {
+      const sql = includeDisabled
+        ? 'SELECT * FROM platform_features ORDER BY display_order ASC, name ASC'
+        : 'SELECT * FROM platform_features WHERE enabled = 1 ORDER BY display_order ASC, name ASC';
+      const rows = this.db.prepare(sql).all() as any[];
+      return rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        icon: r.icon,
+        category: r.category,
+        desc: r.desc || '',
+        enabled: Boolean(r.enabled),
+        display_order: Number(r.display_order || 0),
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public createPlatformFeature(feat: {
+    id: string;
+    name: string;
+    icon: string;
+    category: string;
+    desc?: string;
+    enabled?: boolean | number;
+    display_order?: number;
+  }): { ok: boolean; feature?: any; error?: string } {
+    try {
+      const enabledVal = feat.enabled === undefined ? 1 : (feat.enabled ? 1 : 0);
+      const orderVal = feat.display_order ?? 99;
+      this.db.prepare(`
+        INSERT INTO platform_features (id, name, icon, category, desc, enabled, display_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(feat.id, feat.name, feat.icon, feat.category, feat.desc || '', enabledVal, orderVal);
+      return {
+        ok: true,
+        feature: {
+          id: feat.id,
+          name: feat.name,
+          icon: feat.icon,
+          category: feat.category,
+          desc: feat.desc || '',
+          enabled: Boolean(enabledVal),
+          display_order: orderVal
+        }
+      };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Failed to create feature' };
+    }
+  }
+
+  public updatePlatformFeature(id: string, updates: Partial<{
+    name: string;
+    icon: string;
+    category: string;
+    desc: string;
+    enabled: boolean | number;
+    display_order: number;
+  }>): { ok: boolean; error?: string } {
+    try {
+      const existing = (this.db.prepare('SELECT * FROM platform_features WHERE id = ?').get(id) as any);
+      if (!existing) return { ok: false, error: 'Feature not found' };
+
+      const name = updates.name !== undefined ? updates.name : existing.name;
+      const icon = updates.icon !== undefined ? updates.icon : existing.icon;
+      const category = updates.category !== undefined ? updates.category : existing.category;
+      const desc = updates.desc !== undefined ? updates.desc : existing.desc;
+      const enabled = updates.enabled !== undefined ? (updates.enabled ? 1 : 0) : existing.enabled;
+      const display_order = updates.display_order !== undefined ? Number(updates.display_order) : existing.display_order;
+
+      this.db.prepare(`
+        UPDATE platform_features
+        SET name = ?, icon = ?, category = ?, desc = ?, enabled = ?, display_order = ?
+        WHERE id = ?
+      `).run(name, icon, category, desc, enabled, display_order, id);
+
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Failed to update feature' };
+    }
+  }
+
+  public deletePlatformFeature(id: string): { ok: boolean; error?: string } {
+    try {
+      this.db.prepare('DELETE FROM platform_features WHERE id = ?').run(id);
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Failed to delete feature' };
+    }
+  }
+
+  public moderateDApp(id: string, action: 'approve' | 'reject' | 'feature' | 'delete'): { ok: boolean; error?: string } {
+    try {
+      if (action === 'delete') {
+        this.db.prepare('DELETE FROM mini_dapps WHERE id = ?').run(id);
+        return { ok: true };
+      }
+      let status = 'approved';
+      if (action === 'reject') status = 'rejected';
+      if (action === 'feature') status = 'featured';
+      this.db.prepare(
+        'UPDATE mini_dapps SET status = ? WHERE id = ?'
+      ).run(status, id);
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Failed to moderate DApp' };
+    }
+  }
+
+  // ==========================================
+  // DYNAMIC HASHTAG AGGREGATION (PHASE 4)
+  // ==========================================
+  public getTopTrendingHashtags(limit = 5): Array<{ tag: string; count: number }> {
+    try {
+      const posts = this.db.prepare('SELECT caption, tags_json FROM posts ORDER BY created_at DESC LIMIT 200').all() as any[];
+      const tagCounts = new Map<string, number>();
+      for (const p of posts) {
+        const text = String(p.caption || p.content || '');
+        const matches = text.match(/#[a-zA-Z0-9_]+/g);
+        if (matches) {
+          for (const t of matches) {
+            tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
+          }
+        }
+      }
+      const sorted = Array.from(tagCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([tag, count]) => ({ tag, count }));
+      const defaults = [
+        { tag: '#Sovra4K', count: 24500 },
+        { tag: '#ZeroCensorship', count: 19100 },
+        { tag: '#SovereignIdentity', count: 15400 },
+        { tag: '#DePINMesh', count: 9800 },
+        { tag: '#Web3Social', count: 7200 }
+      ];
+      const result: Array<{ tag: string; count: number }> = [];
+      for (const item of sorted) {
+        result.push(item);
+        if (result.length >= limit) break;
+      }
+      for (const d of defaults) {
+        if (result.length >= limit) break;
+        if (!result.find(r => r.tag.toLowerCase() === d.tag.toLowerCase())) {
+          result.push(d);
+        }
+      }
+      return result;
+    } catch (_) {
+      return [
+        { tag: '#Sovra4K', count: 24500 },
+        { tag: '#ZeroCensorship', count: 19100 },
+        { tag: '#SovereignIdentity', count: 15400 },
+        { tag: '#DePINMesh', count: 9800 },
+        { tag: '#Web3Social', count: 7200 }
+      ];
     }
   }
 

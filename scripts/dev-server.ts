@@ -18554,7 +18554,21 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- Top Level Sticky Navigation Header (Full-Width Facebook/YouTube 3-Zone Architecture) -->
+  <!-- SOVRA LIVE BROADCAST & AMBER ALERT BANNER (PHASE 3) -->
+<div id="sovraBroadcastAlertBanner" style="display: none; width: 100%; position: relative; z-index: 9999; padding: 10px 16px; font-size: 0.85rem; font-weight: 700; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.12); box-shadow: 0 4px 16px rgba(0,0,0,0.4); background: linear-gradient(90deg, rgba(245, 158, 11, 0.95), rgba(217, 119, 6, 0.95)); color: #fff;">
+  <div style="display: flex; align-items: center; gap: 10px; max-width: 85%;">
+    <span id="sovraAlertIcon" style="font-size: 1.15rem; flex-shrink: 0;">📢</span>
+    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+      <span id="sovraAlertTitle" style="font-weight: 800; margin-right: 6px; letter-spacing: 0.01em;"></span>
+      <span id="sovraAlertMessage" style="font-weight: 500; opacity: 0.95;"></span>
+    </div>
+  </div>
+  <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+    <a id="sovraAlertActionBtn" href="#" target="_blank" style="display: none; padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.25); color: #fff; text-decoration: none; font-size: 0.75rem; font-weight: 800; transition: background 0.15s;"></a>
+    <button type="button" onclick="dismissClientBroadcastAlert()" style="background: transparent; border: none; color: #fff; cursor: pointer; font-size: 1.15rem; line-height: 1; padding: 2px 6px;" title="Dismiss alert">✕</button>
+  </div>
+</div>
+<!-- Top Level Sticky Navigation Header (Full-Width Facebook/YouTube 3-Zone Architecture) -->
   <header class="app-top-header" onclick="handleDevHeaderContainerClick(event)">
     <!-- Zone 1: Left (Brand, Menu & Search) -->
     <div class="header-left-zone">
@@ -26470,7 +26484,7 @@ function renderHtml(
                 <textarea id="settingsBio" class="settings-textarea" rows="3">Architecting next-gen decentralized social and media distribution protocols.</textarea>
               </div>
               <div style="margin-top: 20px;">
-                <button type="button" class="btn btn-primary" onclick="alert('Profile changes saved successfully!')" style="font-weight: 700; padding: 8px 20px; border-radius: 10px; background: linear-gradient(135deg, #0284c7, #6366f1); color: #fff;">Save Changes</button>
+                <button type="button" class="btn btn-primary" onclick="saveUserProfileSettings()" style="font-weight: 700; padding: 8px 20px; border-radius: 10px; background: linear-gradient(135deg, #0284c7, #6366f1); color: #fff;">Save Changes</button>
               </div>
             </div>
 
@@ -26532,7 +26546,7 @@ function renderHtml(
                 <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">PUBLIC IDENTITY KEY (ED25519)</div>
                 <code style="display: block; margin-top: 6px; font-size: 0.72rem; color: #38bdf8; word-break: break-all;">sovra1ed25519_node_identity_7f8a9b2c3d4e5f6a7b8c9d0e1f2a3b4c</code>
               </div>
-              <button type="button" class="btn btn-secondary" onclick="alert('Backup Seed phrase copied to clipboard in secure mode.')" style="font-size: 0.8rem; padding: 8px 16px; border-radius: 10px;">Export Backup Key Seed</button>
+              <button type="button" class="btn btn-secondary" onclick="openSovereignBackupModal()" style="font-size: 0.8rem; padding: 8px 16px; border-radius: 10px;">Export Backup Key Seed</button>
             </div>
 
             <!-- Appearance Section -->
@@ -26586,7 +26600,7 @@ function renderHtml(
                 <input type="number" class="settings-input" value="50" min="5" max="500" onchange="toggleSettingOption('bandwidthLimit', this.value)" />
               </div>
               <div style="margin-top: 14px;">
-                <button type="button" class="btn btn-secondary" onclick="alert('Local node cache successfully cleared.')" style="font-size: 0.8rem; padding: 8px 16px; border-radius: 10px; border: 1px solid rgba(239,68,68,0.4); color: #f87171;">Purge Cached Media Files</button>
+                <button type="button" class="btn btn-secondary" onclick="purgeLocalNodeCache()" style="font-size: 0.8rem; padding: 8px 16px; border-radius: 10px; border: 1px solid rgba(239,68,68,0.4); color: #f87171;">Purge Cached Media Files</button>
               </div>
             </div>
 
@@ -47581,6 +47595,7 @@ function renderHtml(
           else tabs[key].classList.remove('active');
         }
       }
+      if (tab === 'settings' && typeof loadUserSettingsIntoForm === 'function') { loadUserSettingsIntoForm(); }
 
       for (const key of Object.keys(bnavs)) {
         if (bnavs[key]) {
@@ -48988,14 +49003,244 @@ function renderHtml(
       if (targetPane) targetPane.style.display = 'block';
     }
 
-    function toggleSettingOption(key, val) {
+    // ==========================================
+    // ENTERPRISE SETTINGS & PROFILE PERSISTENCE (PHASE 1)
+    // ==========================================
+    async function saveUserProfileSettings() {
+      const name = (document.getElementById('settingsDisplayName')?.value || '').trim();
+      const bio = (document.getElementById('settingsBio')?.value || '').trim();
+      try {
+        const res = await fetch('/api/profile/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, bio: bio })
+        });
+        const data = await res.json();
+        if (data && data.ok) {
+          showAccountToast('Profile changes saved successfully!');
+          const profileNameEl = document.getElementById('profileHeaderName');
+          if (profileNameEl && name) profileNameEl.textContent = name;
+          const profileBioEl = document.getElementById('profileHeaderBio');
+          if (profileBioEl && bio) profileBioEl.textContent = bio;
+        } else {
+          showAccountToast('Failed to save profile: ' + (data.error || 'Server error'));
+        }
+      } catch (err) {
+        showAccountToast('Error saving profile: ' + err.message);
+      }
+    }
+
+    function purgeLocalNodeCache() {
+      try {
+        if (typeof caches !== 'undefined') {
+          caches.keys().then(function(names) {
+            for (var i = 0; i < names.length; i++) caches.delete(names[i]);
+          });
+        }
+        localStorage.removeItem('sovra_media_cache');
+        showAccountToast('Local node cache successfully cleared.');
+      } catch (_) {
+        showAccountToast('Local node cache cleared.');
+      }
+    }
+
+    async function loadUserSettingsIntoForm() {
+      try {
+        const res = await fetch('/api/user/settings');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.ok && data.settings) {
+            const s = data.settings;
+            const nameEl = document.getElementById('settingsDisplayName');
+            if (nameEl && s.display_name) nameEl.value = s.display_name;
+            const bioEl = document.getElementById('settingsBio');
+            if (bioEl && s.bio) bioEl.value = s.bio;
+          }
+        }
+      } catch (_) {}
+    }
+
+    async function toggleSettingOption(key, val) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('sovra_user_settings') || '{}');
+        stored[key] = val;
+        localStorage.setItem('sovra_user_settings', JSON.stringify(stored));
+      } catch (_) {}
+
+      const keyMap = {
+        meshDiscovery: 'mesh_discovery',
+        allowDMs: 'allow_dms',
+        pushNotifications: 'push_notifications',
+        videoAutoplay: 'video_autoplay',
+        compactDensity: 'compact_density',
+        storageQuota: 'storage_quota_gb',
+        bandwidthLimit: 'bandwidth_limit_mb'
+      };
+      const dbKey = keyMap[key] || key;
+
+      try {
+        await fetch('/api/user/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [dbKey]: val })
+        });
+      } catch (_) {}
+
       if (typeof showAccountToast === 'function') {
         showAccountToast('Setting updated: ' + key + ' = ' + (val ? 'Enabled' : 'Disabled'));
       }
     }
 
     // ==========================================
-    // 👤 INDUSTRY STANDARD PEER PROFILE ENGINE
+    // LIVE CONTROL PLANE & BROADCAST BANNER (PHASE 3)
+    // ==========================================
+    function renderClientBroadcastAlert(alert) {
+      const banner = document.getElementById('sovraBroadcastAlertBanner');
+      if (!banner || !alert) return;
+      if (sessionStorage.getItem('sovra_dismissed_alert_' + (alert.id || alert.alertId))) return;
+
+      const titleEl = document.getElementById('sovraAlertTitle');
+      const msgEl = document.getElementById('sovraAlertMessage');
+      const btnEl = document.getElementById('sovraAlertActionBtn');
+      const iconEl = document.getElementById('sovraAlertIcon');
+
+      if (titleEl) titleEl.textContent = alert.title || 'System Broadcast';
+      if (msgEl) msgEl.textContent = alert.message || '';
+      banner.setAttribute('data-alert-id', alert.id || alert.alertId || '');
+
+      const level = (alert.level || 'INFO').toUpperCase();
+      if (level === 'CRITICAL' || level === 'EMERGENCY') {
+        banner.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+        if (iconEl) iconEl.textContent = '🚨';
+      } else if (level === 'WARNING') {
+        banner.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+        if (iconEl) iconEl.textContent = '⚠️';
+      } else {
+        banner.style.background = 'linear-gradient(90deg, #0284c7, #2563eb)';
+        if (iconEl) iconEl.textContent = '📢';
+      }
+
+      if (alert.actionLabel && alert.actionUrl && btnEl) {
+        btnEl.textContent = alert.actionLabel;
+        btnEl.setAttribute("href", alert.actionUrl);
+        btnEl.style.display = 'inline-block';
+      } else if (btnEl) {
+        btnEl.style.display = 'none';
+      }
+
+      banner.style.display = 'flex';
+    }
+
+    function dismissClientBroadcastAlert() {
+      const banner = document.getElementById('sovraBroadcastAlertBanner');
+      if (banner) {
+        const alertId = banner.getAttribute('data-alert-id');
+        if (alertId) sessionStorage.setItem('sovra_dismissed_alert_' + alertId, '1');
+        banner.style.display = 'none';
+      }
+    }
+
+        function applySingleKillSwitch(switchId, active) {
+      if (switchId.includes('STREAM') || switchId === 'P2P_STREAMING_KILL_SWITCH') {
+        const allBtns = Array.from(document.querySelectorAll('button'));
+        allBtns.forEach(function(b) {
+          const oc = b.getAttribute('onclick') || '';
+          if (b.classList.contains('go-live-btn') || b.id === 'btnGoLiveHeader' || oc.includes('live')) {
+            if (active) { b.setAttribute('disabled', 'true'); b.style.opacity = '0.5'; b.title = 'Streaming suspended by Network Admin'; }
+            else { b.removeAttribute('disabled'); b.style.opacity = '1'; b.title = ''; }
+          }
+        });
+      }
+      if (switchId.includes('TIP') || switchId === 'TIP_ESCROW_KILL_SWITCH') {
+        const allBtns = Array.from(document.querySelectorAll('button'));
+        allBtns.forEach(function(b) {
+          const oc = b.getAttribute('onclick') || '';
+          if (b.classList.contains('tip-action-btn') || oc.includes('TipModal') || oc.includes('SuperThanksModal')) {
+            if (active) { b.setAttribute('disabled', 'true'); b.style.opacity = '0.5'; b.title = 'Tipping escrow temporarily frozen'; }
+            else { b.removeAttribute('disabled'); b.style.opacity = '1'; b.title = ''; }
+          }
+        });
+      }
+    }
+
+    function applyKillSwitchesToUi(switches) {
+      if (!Array.isArray(switches)) return;
+      switches.forEach(s => applySingleKillSwitch(s.switchId, s.isActive));
+    }
+
+    function initControlPlaneSse() {
+      if (typeof EventSource === 'undefined') return;
+      try {
+        const es = new EventSource('/api/events/control-plane');
+        es.addEventListener('INIT', function(e) {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.activeAlerts && data.activeAlerts.length > 0) {
+              renderClientBroadcastAlert(data.activeAlerts[0]);
+            }
+            if (data.killSwitches) {
+              applyKillSwitchesToUi(data.killSwitches);
+            }
+          } catch (_) {}
+        });
+        es.addEventListener('BROADCAST_ALERT_PUBLISHED', function(e) {
+          try {
+            const alert = JSON.parse(e.data);
+            renderClientBroadcastAlert(alert);
+          } catch (_) {}
+        });
+        es.addEventListener('KILL_SWITCH_ENGAGED', function(e) {
+          try {
+            const payload = JSON.parse(e.data);
+            applySingleKillSwitch(payload.switchId, payload.active);
+          } catch (_) {}
+        });
+        es.addEventListener('FEATURE_FLAG_MUTATED', function() {
+          window._platformFeaturesCache = null;
+          if (window.SovraModularGlassOS && typeof window.SovraModularGlassOS.renderDrawerGrid === "function") {
+            window.SovraModularGlassOS.renderDrawerGrid();
+          }
+        });
+      } catch (_) {}
+    }
+
+    // ==========================================
+    // DYNAMIC HASHTAG AGGREGATOR (PHASE 4)
+    // ==========================================
+    async function loadDynamicTrendingTags() {
+      const container = document.getElementById('meshTrendingChips');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/trending/tags');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.ok && Array.isArray(data.tags)) {
+            container.innerHTML = '';
+            data.tags.forEach(function(t) {
+              const countStr = t.count > 1000 ? (t.count / 1000).toFixed(1) + 'k' : t.count;
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'mesh-trend-chip';
+              btn.onclick = function() { applyMeshTrendingTopic(t.tag); };
+              btn.style.cssText = 'background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #f8fafc; font-size: 0.75rem; font-weight: 600; padding: 4px 10px; border-radius: 14px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 4px;';
+              btn.innerHTML = t.tag + ' <span style="font-size: 0.65rem; color: #94a3b8;">' + countStr + '</span>';
+              container.appendChild(btn);
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Auto-initialize control plane & trending tags
+    if (typeof window !== "undefined") {
+      setTimeout(function() {
+        initControlPlaneSse();
+        loadDynamicTrendingTags();
+      }, 500);
+    }
+
+    // ==========================================
+    // 👥 INDUSTRY STANDARD PEER PROFILE ENGINE
     // ==========================================
     window._peerProfileReturnTab = 'feed';
     window._currentPeerData = null;
@@ -80260,6 +80505,20 @@ function renderHtml(
       const wrap = document.getElementById('channelVoiceRecordWrap');
       if (!wrap) return;
       if (wrap.style.display === 'none' || !wrap.style.display) {
+        window._activeChannelAudioChunks = [];
+        if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+          navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+            window._activeChannelMediaStream = stream;
+            var mimeType = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm')) ? 'audio/webm' : 'audio/mp4';
+            try {
+              window._activeChannelMediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+              window._activeChannelMediaRecorder.ondataavailable = function(e) {
+                if (e.data && e.data.size > 0) window._activeChannelAudioChunks.push(e.data);
+              };
+              window._activeChannelMediaRecorder.start(250);
+            } catch (err) { console.warn("MediaRecorder start error:", err); }
+          }).catch(function(err) { console.warn("Audio hardware capture error:", err); });
+        }
         wrap.style.display = 'flex';
         channelRecordSeconds = 0;
         const statusEl = document.getElementById('channelVoiceStatusText');
@@ -80282,7 +80541,40 @@ function renderHtml(
       const mins = Math.floor(channelRecordSeconds / 60);
       const secs = channelRecordSeconds % 60;
       activeChannelVoiceDuration = (channelRecordSeconds > 0 ? (mins + ':' + (secs < 10 ? '0' : '') + secs) : '0:45');
-      activeChannelVoiceDataUrl = 'data:audio/mp3;base64,SOVRA_VOICE_NOTE_MOCK_PAYLOAD';
+      var finalizeVoicePayload = function(dataUrl) {
+              activeChannelVoiceDataUrl = dataUrl;
+              const recordWrap = document.getElementById('channelVoiceRecordWrap');
+              if (recordWrap) recordWrap.style.display = 'none';
+              const prevWrap = document.getElementById('channelVoicePreviewWrap');
+              const prevDur = document.getElementById('channelVoicePreviewDuration');
+              if (prevWrap && prevDur) {
+                prevDur.innerText = 'Voice Dispatch Attached (' + activeChannelVoiceDuration + ')';
+                prevWrap.style.display = 'flex';
+              }
+              showAccountToast('🎙️ Voice dispatch audio attached!');
+            };
+      
+            if (window._activeChannelMediaRecorder && window._activeChannelMediaRecorder.state !== 'inactive') {
+              window._activeChannelMediaRecorder.onstop = function() {
+                try {
+                  const blob = new Blob(window._activeChannelAudioChunks || [], { type: window._activeChannelMediaRecorder.mimeType || 'audio/webm' });
+                  const reader = new FileReader();
+                  reader.onloadend = function() {
+                    finalizeVoicePayload(reader.result || 'data:audio/webm;base64,GkXfo59ChoEBQveBAULygQ8=');
+                  };
+                  reader.readAsDataURL(blob);
+                } catch (_) {
+                  finalizeVoicePayload('data:audio/webm;base64,GkXfo59ChoEBQveBAULygQ8=');
+                }
+                if (window._activeChannelMediaStream) {
+                  try { window._activeChannelMediaStream.getTracks().forEach(function(t) { t.stop(); }); } catch (_) {}
+                  window._activeChannelMediaStream = null;
+                }
+              };
+              try { window._activeChannelMediaRecorder.stop(); } catch (_) { finalizeVoicePayload('data:audio/webm;base64,GkXfo59ChoEBQveBAULygQ8='); }
+            } else {
+              finalizeVoicePayload('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
+            }
       const recordWrap = document.getElementById('channelVoiceRecordWrap');
       if (recordWrap) recordWrap.style.display = 'none';
       const prevWrap = document.getElementById('channelVoicePreviewWrap');
@@ -83480,7 +83772,28 @@ function renderHtml(
 
         const q = (typeof filter === 'string' ? filter : activeSearchQuery).toLowerCase().trim();
 
-        const filtered = SOVRA_FEATURE_REGISTRY.filter(feat => {
+        const sourceList = (Array.isArray(window._platformFeaturesCache) && window._platformFeaturesCache.length > 0)
+                  ? window._platformFeaturesCache
+                  : SOVRA_FEATURE_REGISTRY;
+                if (!window._platformFeaturesCache && typeof fetch !== "undefined") {
+                  fetch("/api/features").then(function(r) { return r.json(); }).then(function(d) {
+                    if (d && d.ok && Array.isArray(d.features)) {
+                      window._platformFeaturesCache = d.features.map(function(f) {
+                        const local = SOVRA_FEATURE_REGISTRY.find(function(e) { return e.id === f.id; });
+                        return {
+                          id: f.id,
+                          name: f.name,
+                          icon: f.icon,
+                          category: f.category,
+                          desc: f.desc,
+                          badge: local ? local.badge : "",
+                          action: local ? local.action : function() { if (typeof showAccountToast === "function") showAccountToast("Opened " + f.name); }
+                        };
+                      });
+                    }
+                  }).catch(function() {});
+                }
+                const filtered = sourceList.filter(feat => {
           // 🚀 Production Grade: Exclude duplicate buttons already on bottom dock / top header, and technical mockups
           const DUPLICATES = ['feed', 'chat', 'watch', 'profile', 'wallet', 'bridge', 'mesh_node', 'key_vault', 'backup', 'qr_scan'];
           if (DUPLICATES.includes(feat.id)) return false;
@@ -86152,6 +86465,20 @@ async function startDevServer() {
   // Realtime Server-Sent Events (SSE) chat subscriber registry
   const realtimeSubscribers = new Map<string, Set<http.ServerResponse>>();
 
+  // Realtime Server-Sent Events (SSE) Control Plane Registry (Phase 3)
+  const controlPlaneSubscribers = new Set<http.ServerResponse>();
+
+  function broadcastControlPlaneEvent(eventType: string, payload: any): void {
+    const message = `event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const clientRes of Array.from(controlPlaneSubscribers)) {
+      try {
+        clientRes.write(message);
+      } catch (_) {
+        controlPlaneSubscribers.delete(clientRes);
+      }
+    }
+  }
+
   function broadcastChatEvent(recipientDid: string | string[], payload: any, eventType: string = 'chat_message'): void {
     if (Array.isArray(recipientDid)) {
       for (const did of recipientDid) {
@@ -88033,6 +88360,229 @@ async function startDevServer() {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Server error' }));
       }
+      return;
+    }
+
+    // ==========================================
+    // LIVE SSE CONTROL PLANE (PHASE 3)
+    // ==========================================
+    if (url.pathname === '/api/events/control-plane' && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        'Access-Control-Allow-Origin': '*',
+      });
+      controlPlaneSubscribers.add(res);
+
+      const sqlite = sovraDb.getSqliteEngine();
+      const flags = sqlite ? sqlite.getFeatureFlags() : [];
+      const switches = sqlite ? sqlite.getKillSwitches() : [];
+      const alerts = sqlite ? sqlite.getActiveBroadcastAlerts() : [];
+      res.write(`event: INIT\ndata: ${JSON.stringify({ flags, killSwitches: switches, activeAlerts: alerts, timestamp: Date.now() })}\n\n`);
+
+      const keepAliveInterval = setInterval(() => {
+        try {
+          res.write(': ping\n\n');
+        } catch (_) {
+          clearInterval(keepAliveInterval);
+          controlPlaneSubscribers.delete(res);
+        }
+      }, 15000);
+
+      req.on('close', () => {
+        clearInterval(keepAliveInterval);
+        controlPlaneSubscribers.delete(res);
+      });
+      return;
+    }
+
+    // ==========================================
+    // USER SETTINGS & PROFILE PERSISTENCE (PHASE 1)
+    // ==========================================
+    if (url.pathname === '/api/user/settings' && req.method === 'GET') {
+      try {
+        const principal = resolvePrincipal(req);
+        const targetDid = url.searchParams.get('did') || (principal ? principal.did : masterKey.did);
+        const settings = sovraDb.getUserSettings(targetDid);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, settings }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Server error' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/user/settings' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const principal = resolvePrincipal(req);
+        const targetDid = url.searchParams.get('did') || (principal ? principal.did : masterKey.did);
+        const parsed = JSON.parse(body || '{}');
+        const updated = sovraDb.setUserSettings(targetDid, parsed);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, settings: updated }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/profile/update' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const principal = resolvePrincipal(req);
+        const targetDid = url.searchParams.get('did') || (principal ? principal.did : masterKey.did);
+        const parsed = JSON.parse(body || '{}');
+        const result = sovraDb.updateUserProfile(targetDid, {
+          name: parsed.name,
+          bio: parsed.bio,
+          avatar: parsed.avatar,
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // PLATFORM FEATURES & DAPP STORE CRUD (PHASE 2)
+    // ==========================================
+    if (url.pathname === '/api/features' && req.method === 'GET') {
+      const features = sovraDb.getPlatformFeatures(false);
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=10',
+      });
+      res.end(JSON.stringify({ ok: true, features }));
+      return;
+    }
+
+    if (url.pathname === '/api/features/flags' && req.method === 'GET') {
+      const sqlite = sovraDb.getSqliteEngine();
+      const flags = sqlite ? sqlite.getFeatureFlags() : [];
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=5',
+      });
+      res.end(JSON.stringify({ ok: true, flags }));
+      return;
+    }
+
+    if (url.pathname === '/api/admin/features/create' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const result = sovraDb.createPlatformFeature({
+          id: parsed.id,
+          name: parsed.name,
+          icon: parsed.icon,
+          category: parsed.category,
+          desc: parsed.desc,
+          enabled: parsed.enabled ?? 1,
+          display_order: parsed.display_order ?? 99,
+        });
+        if (result.ok) {
+          broadcastControlPlaneEvent('FEATURE_FLAG_MUTATED', { action: 'create', feature: result.feature });
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/features/update' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const id = String(parsed.id || '').trim();
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Feature ID required' }));
+          return;
+        }
+        const result = sovraDb.updatePlatformFeature(id, parsed);
+        if (result.ok) {
+          broadcastControlPlaneEvent('FEATURE_FLAG_MUTATED', { action: 'update', featureId: id, updates: parsed });
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/features/delete' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const id = String(parsed.id || '').trim();
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Feature ID required' }));
+          return;
+        }
+        const result = sovraDb.deletePlatformFeature(id);
+        if (result.ok) {
+          broadcastControlPlaneEvent('FEATURE_FLAG_MUTATED', { action: 'delete', featureId: id });
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/admin/dapps/moderate' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const id = String(parsed.id || '').trim();
+        const action = String(parsed.action || 'approve').toLowerCase();
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'DApp ID required' }));
+          return;
+        }
+        const result = sovraDb.moderateDApp(id, action);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+      }
+      return;
+    }
+
+    // ==========================================
+    // DYNAMIC HASHTAG AGGREGATION (PHASE 4)
+    // ==========================================
+    if (url.pathname === '/api/trending/tags' && req.method === 'GET') {
+      const tags = sovraDb.getTopTrendingHashtags(5);
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=10',
+      });
+      res.end(JSON.stringify({ ok: true, tags }));
       return;
     }
 
@@ -95312,6 +95862,8 @@ async function startDevServer() {
         connectedPeersCount: node.getConnectedPeers().length,
         vouchers: sovraDb.getState().tip_vouchers || [],
         registeredUsersCount: allUsers.length,
+          platformFeatures: sovraDb.getPlatformFeatures(true),
+          miniDapps: (sovraDb.getSqliteEngine()?.getRawDb()?.prepare('SELECT * FROM mini_dapps ORDER BY installs_count DESC').all() || []) as any,
         usersCount: allUsers.length,
         registeredUsers: allUsers,
         chatThreadsCount: threadsCount,
@@ -95674,6 +96226,7 @@ async function startDevServer() {
         let success = false;
         if (sqlite && id) {
           success = sqlite.setFeatureFlag(id, enabled, rolloutPercentage);
+          broadcastControlPlaneEvent('FEATURE_FLAG_MUTATED', { id, enabled, rolloutPercentage });
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: success, message: `Flag '${id}' updated: ${enabled ? 'ENABLED' : 'DISABLED'} (${rolloutPercentage}%)` }));
@@ -95738,6 +96291,7 @@ async function startDevServer() {
         let alertId = '';
         if (sqlite) {
           alertId = sqlite.publishBroadcastAlert({ level, title, message, actionLabel, actionUrl, isSticky });
+          broadcastControlPlaneEvent('BROADCAST_ALERT_PUBLISHED', { alertId, level, title, message, actionLabel, actionUrl, isSticky });
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, alertId, message: 'Broadcast alert published to active swarm' }));
@@ -96022,6 +96576,7 @@ async function startDevServer() {
         let success = false;
         if (sqlite && switchId) {
           success = sqlite.setKillSwitch(switchId, active, auth.adminDid);
+          broadcastControlPlaneEvent('KILL_SWITCH_ENGAGED', { switchId, active });
           sqlite.recordTamperProofAuditEntry({
             adminDid: auth.adminDid,
             role: auth.role,

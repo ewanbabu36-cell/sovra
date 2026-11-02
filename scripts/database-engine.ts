@@ -17015,6 +17015,81 @@ export class SovraDatabaseEngine {
     return [];
   }
 
+  public getUserSettings(did: string): any {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.getUserSettings(did);
+    }
+    return null;
+  }
+
+  public setUserSettings(did: string, settings: any): any {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.setUserSettings(did, settings);
+    }
+    return null;
+  }
+
+  public updateUserProfile(did: string, profile: any): any {
+    if (this.sqliteEngine) {
+      const res = this.sqliteEngine.updateUserProfile(did, profile);
+      if (res && res.ok && res.user) {
+        // Keep in-memory store in sync if present
+        try {
+          const memUser = this.getUserByDid(did);
+          if (memUser) {
+            if (profile.name) memUser.name = profile.name;
+            if (profile.bio) memUser.bio = profile.bio;
+            if (profile.avatar) memUser.avatar = profile.avatar;
+          }
+        } catch (_) {}
+      }
+      return res;
+    }
+    return { ok: false, error: "SQLite engine unavailable" };
+  }
+
+  public getPlatformFeatures(includeDisabled = true): any[] {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.getPlatformFeatures(includeDisabled);
+    }
+    return [];
+  }
+
+  public createPlatformFeature(feat: any): any {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.createPlatformFeature(feat);
+    }
+    return { ok: false, error: "SQLite engine unavailable" };
+  }
+
+  public updatePlatformFeature(id: string, updates: any): any {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.updatePlatformFeature(id, updates);
+    }
+    return { ok: false, error: "SQLite engine unavailable" };
+  }
+
+  public deletePlatformFeature(id: string): any {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.deletePlatformFeature(id);
+    }
+    return { ok: false, error: "SQLite engine unavailable" };
+  }
+
+  public moderateDApp(id: string, action: string): any {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.moderateDApp(id, action as any);
+    }
+    return { ok: false, error: "SQLite engine unavailable" };
+  }
+
+  public getTopTrendingHashtags(limit = 5): any[] {
+    if (this.sqliteEngine) {
+      return this.sqliteEngine.getTopTrendingHashtags(limit);
+    }
+    return [];
+  }
+
 }
 
 // Singleton database instance exported for application-wide use
