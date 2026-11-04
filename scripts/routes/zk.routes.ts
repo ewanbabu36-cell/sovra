@@ -1,3 +1,4 @@
+import { verifyGroth16Proof, DEFAULT_SEMAPHORE_HUMANITY_VKEY } from '../../packages/crypto/src/zk.ts';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { sovraDb, type ZkAttestationRecord } from '../database-engine.ts';
@@ -56,8 +57,7 @@ export async function handleZkRoutes(
     try {
       const body = await parseJsonBody(req);
       const subjectDid = body.subjectDid;
-      const proofSnark = body.proofSnarkJson || JSON.stringify({ pi_a: ['0x1', '0x2'], pi_b: [['0x3'], ['0x4']], pi_c: ['0x5'] });
-      const nullifier = body.nullifierHash || `nul_${crypto.createHash('sha256').update(subjectDid + (body.nonce || '')).digest('hex')}`;
+      const nullifier = body.nullifierHash;
       const issuerDid = body.issuerDid || 'did:sovra:zk_identity_authority';
 
       if (!subjectDid) {
@@ -65,6 +65,12 @@ export async function handleZkRoutes(
         return true;
       }
 
+      if (!nullifier) {
+        sendJson(res, 400, { ok: false, error: 'nullifierHash is required for double-spend prevention' });
+        return true;
+      }
+
+      // Strict Nullifier Replay Defense
       if (sovraDb.getZkAttestationByNullifier(nullifier)) {
         sendJson(res, 409, {
           ok: false,
@@ -73,12 +79,51 @@ export async function handleZkRoutes(
         return true;
       }
 
-      const id = `zk_att_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+      // Parse and strictly validate cryptographic proof object
+      let proofObj: any = null;
+      try {
+        if (body.proof && typeof body.proof === 'object') {
+          proofObj = body.proof;
+        } else if (body.proofSnarkJson && typeof body.proofSnarkJson === 'string') {
+          proofObj = JSON.parse(body.proofSnarkJson);
+        } else {
+          sendJson(res, 400, {
+            ok: false,
+            error: 'Cryptographic ZK-SNARK proof (proofSnarkJson or proof object) is required',
+          });
+          return true;
+        }
+      } catch (e: any) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Malformed proofSnarkJson: ' + e.message,
+        });
+        return true;
+      }
+
+      // Public inputs alignment: [nullifier, externalNullifier / signalHash]
+      const publicSignals = Array.isArray(body.publicSignals)
+        ? body.publicSignals
+        : [nullifier, crypto.createHash('sha256').update(subjectDid).digest('hex').slice(0, 16)];
+
+      // Mathematical bilinear pairing check on BN254 elliptic curve
+      const vKey = (body.vKey && typeof body.vKey === "object") ? body.vKey : DEFAULT_SEMAPHORE_HUMANITY_VKEY;
+      const verificationResult = verifyGroth16Proof(proofObj, publicSignals, vKey);
+
+      if (!verificationResult.valid) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Cryptographic ZK-SNARK proof verification failed: ' + (verificationResult.reason || 'Invalid bilinear pairing'),
+        });
+        return true;
+      }
+
+      const id = `zk_att_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`;
       const attestation: ZkAttestationRecord = {
         id,
         subjectDid,
         attestationType: 'proof_of_humanity',
-        proofSnarkJson: proofSnark,
+        proofSnarkJson: JSON.stringify(proofObj),
         issuerDid,
         nullifierHash: nullifier,
         expiresAt: Date.now() + 365 * 86400 * 1000, // 1-year validity
@@ -97,7 +142,7 @@ export async function handleZkRoutes(
         isHuman: true,
         isVerifiedHuman: true,
         attestation: result.attestation,
-        privacyNotice: 'Zero biometric scans collected. Cryptographically proven via Semaphore zero-knowledge set membership.',
+        privacyNotice: 'Zero biometric scans collected. Cryptographically proven via Semaphore zero-knowledge set membership on BN254.',
       });
       return true;
     } catch (err: any) {
@@ -106,7 +151,7 @@ export async function handleZkRoutes(
     }
   }
 
-  // 2. POST /api/zk/attest/selective-disclosure - Issues zero-knowledge selective credential
+    // 2. POST /api/zk/attest/selective-disclosure - Issues zero-knowledge selective credential
   if (method === 'POST' && url === '/api/zk/attest/selective-disclosure') {
     try {
       const body = await parseJsonBody(req);

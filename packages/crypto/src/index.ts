@@ -7,3 +7,4 @@ export * from './steganography.js';
 export * from './prf.js';
 export * from './pqc.js';
 export * from './mpc.js';
+export * from './zk.js';

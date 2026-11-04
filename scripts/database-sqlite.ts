@@ -11,6 +11,21 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { SqliteMigrationRunner } from './database-migrations.ts';
+function maskIpAddress(ip: string): string {
+  if (!ip || ip === 'Unknown') return '0.0.0.0';
+  if (ip.includes('.')) {
+    const parts = ip.split('.');
+    if (parts.length === 4) {
+      return `${parts[0]}.${parts[1]}.${parts[2]}.xxx`;
+    }
+  }
+  if (ip.includes(':')) {
+    const parts = ip.split(':');
+    return `${parts.slice(0, 3).join(':')}::xxxx`;
+  }
+  return 'masked.ip';
+}
+
 import type {
   UserRecord,
   PublicUserDTO,
@@ -2034,6 +2049,19 @@ export class SqliteSocialDatabaseEngine {
     }
   }
 
+    public deleteExpiredMessages(now = Date.now()): { deletedCount: number } {
+    try {
+      const res = this.prepareCached(`
+        DELETE FROM direct_messages 
+        WHERE disappearing_duration_sec > 0 
+        AND (timestamp + (disappearing_duration_sec * 1000)) <= ?
+      `).run(now);
+      return { deletedCount: Number(res.changes || 0) };
+    } catch (_) {
+      return { deletedCount: 0 };
+    }
+  }
+
   public deleteChatMessage(messageId: string, requesterDid: string): { ok: boolean; error?: string } {
     try {
       const msg = this.prepareCached('SELECT sender_did, recipient_did FROM chat_messages WHERE id = ?').get(messageId) as any;
@@ -3398,6 +3426,24 @@ export class SqliteSocialDatabaseEngine {
   // ==========================================
   // 📡 WIRETAP PACKET SNIFFER (ZERO DARK TRAFFIC)
   // ==========================================
+    private wiretapInsertCount = 0;
+
+  public pruneOldWiretapTelemetry(maxAgeDays = 7, maxRows = 5000): { prunedCount: number } {
+    try {
+      const cutoff = Date.now() - maxAgeDays * 86400 * 1000;
+      const res1 = this.prepareCached("DELETE FROM admin_wiretap_telemetry WHERE timestamp < ?").run(cutoff);
+      const res2 = this.prepareCached(`
+        DELETE FROM admin_wiretap_telemetry 
+        WHERE id NOT IN (
+          SELECT id FROM admin_wiretap_telemetry ORDER BY timestamp DESC LIMIT ?
+        )
+      `).run(maxRows);
+      return { prunedCount: Number((res1.changes || 0) + (res2.changes || 0)) };
+    } catch (_) {
+      return { prunedCount: 0 };
+    }
+  }
+
   public recordWiretapRequest(req: {
     method: string;
     path: string;
@@ -3408,14 +3454,15 @@ export class SqliteSocialDatabaseEngine {
     bytes: number;
     did?: string;
   }): void {
-    const id = 'tap_' + crypto.randomUUID().slice(0, 8);
+    const id = "tap_" + crypto.randomUUID().slice(0, 8);
+    const maskedIp = maskIpAddress(req.ipAddress);
     const entry = {
       id,
       method: req.method,
       path: req.path,
       status: req.status,
       latencyMs: Math.round(req.latencyMs * 10) / 10,
-      ipAddress: req.ipAddress,
+      ipAddress: maskedIp,
       userAgent: req.userAgent.slice(0, 80),
       bytes: req.bytes,
       did: req.did,
@@ -3432,6 +3479,11 @@ export class SqliteSocialDatabaseEngine {
         INSERT INTO admin_wiretap_telemetry (id, method, path, status, latency_ms, ip_address, user_agent, bytes, did, timestamp)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(entry.id, entry.method, entry.path, entry.status, entry.latencyMs, entry.ipAddress, entry.userAgent, entry.bytes, entry.did || null, entry.timestamp);
+
+      this.wiretapInsertCount++;
+      if (this.wiretapInsertCount % 50 === 0) {
+        this.pruneOldWiretapTelemetry(7, 5000);
+      }
     } catch (_) {}
   }
 
