@@ -3378,19 +3378,48 @@ export class SovraDatabaseEngine {
     this.load();
     const now = Date.now();
     let purgedCount = 0;
-    for (const msg of (this.db.chatMessages || [])) {
-      if (msg.expiresAt && msg.expiresAt <= now && !msg.isDisappeared) {
-        msg.isDisappeared = true;
-        msg.text = '💨 Message disappeared';
-        if (msg.attachment) {
-          msg.attachment.dataUrl = undefined;
-          msg.attachment.url = undefined;
+    const purgedMsgIds = new Set<string>();
+
+    // Physical purge: remove expired messages completely from active memory
+    if (Array.isArray(this.db.chatMessages)) {
+      this.db.chatMessages = this.db.chatMessages.filter(msg => {
+        const isExpired = (msg.expiresAt && msg.expiresAt <= now) ||
+                          (msg.disappearingDurationSec && msg.timestamp && (msg.timestamp + msg.disappearingDurationSec * 1000) <= now);
+        if (isExpired) {
+          purgedCount++;
+          if (msg.id) purgedMsgIds.add(msg.id);
+          // Physical cleanup of attachment files if present on disk
+          if (msg.attachment && msg.attachment.url && msg.attachment.url.startsWith('/api/chat/attachment/')) {
+            try {
+              const cid = msg.attachment.url.split('/').pop()?.split('?')[0];
+              if (cid && /^[a-zA-Z0-9_-]+$/.test(cid)) {
+                const filePath = path.join(this.storageDir, 'attachments', cid);
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+              }
+            } catch (_) {}
+          }
+          return false;
         }
-        purgedCount++;
-      }
+        return true;
+      });
     }
+
+    // Clean up corresponding ephemeral notifications
+    if (purgedMsgIds.size > 0 && Array.isArray(this.db.notifications)) {
+      this.db.notifications = this.db.notifications.filter(n => {
+        return !(n.data && n.data.messageId && purgedMsgIds.has(n.data.messageId));
+      });
+    }
+
+    // Also purge from SQLite relational engine
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).deleteExpiredMessages === 'function') {
+      try {
+        (this.sqliteEngine as any).deleteExpiredMessages(now);
+      } catch (_) {}
+    }
+
     if (purgedCount > 0) {
-      this.save();
+      this.save(true);
     }
     return { purgedCount };
   }
