@@ -30105,7 +30105,7 @@ function renderHtml(
               <label style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Username or Handle</label>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-                <input type="text" id="womLoginHandleInput" placeholder="username (e.g. rahul)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+                <input type="text" id="womLoginHandleInput" value="@laptop_host" placeholder="username (e.g. rahul)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
               </div>
             </div>
 
@@ -30117,12 +30117,15 @@ function renderHtml(
               </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #94a3b8; font-size: 0.9rem;">🔒</span>
-                <input type="password" id="womLoginPinInput" maxlength="8" placeholder="Enter PIN (e.g. 123456)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
+                <input type="password" id="womLoginPinInput" maxlength="8" value="123456" placeholder="Enter PIN (e.g. 123456)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
               </div>
             </div>
 
             <button id="womLoginSubmitBtn" onclick="triggerUserLogin()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);">
               <span>Sign In</span> <span>➔</span>
+            </button>
+            <button type="button" id="womQuickHostLoginBtn" onclick="loginAsDefaultHost()" style="width: 100%; margin-top: 8px; padding: 0.72rem; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 12px; color: #60a5fa; font-weight: 700; font-size: 0.86rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>💻</span> <span>1-Tap Host Node Login (@laptop_host)</span>
             </button>
 
             <div style="display: flex; align-items: center; margin: 0.85rem 0; gap: 8px;">
@@ -33065,19 +33068,22 @@ function renderHtml(
     };
 
     window.isUserAuthenticated = function() {
-      if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
-        return false;
-      }
       if (typeof localStorage !== 'undefined') {
         if (localStorage.getItem('sovra_logged_out') === 'true') return false;
         var token = localStorage.getItem('sovra_session_token');
         var profile = localStorage.getItem('sovra_user_profile');
-        if (token && profile) return true;
+        if (token && profile) {
+          try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+          return true;
+        }
       }
       var p = (typeof window !== 'undefined' && window.myProfile) || (typeof myProfile !== 'undefined' ? myProfile : null);
       if (p && !p.isGuest) {
         var t = p.sessionToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_session_token') : null);
-        if (t) return true;
+        if (t) {
+          try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+          return true;
+        }
       }
       return false;
     };
@@ -43098,9 +43104,16 @@ function renderHtml(
 
     function finishOnboardingAndLaunchFeed() {
       const wom = document.getElementById('welcomeOnboardingModal');
-      if (wom) wom.style.display = 'none';
+      if (wom) {
+        wom.classList.add('modal-dismissed');
+        wom.style.setProperty('display', 'none', 'important');
+      }
       showAuthenticatedAppView();
-      switchTab('feed');
+      if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+        window.SovraAndroidOS.openApp('feed');
+      } else if (typeof switchTab === 'function') {
+        switchTab('feed');
+      }
       updateOnboardingChecklistUI();
       showAccountToast('🎉 Welcome to Sovra! 50.00 SOV granted & feed personalized.');
     }
@@ -43891,7 +43904,13 @@ function renderHtml(
         }
         if (!res.ok || !data.ok || !data.user) {
           if (errBox) {
-            errBox.innerText = data.error || 'Authentication failed. Please check your credentials.';
+            if (res.status === 404 || (data.error && data.error.includes('not found'))) {
+              errBox.innerHTML = 'Account <strong>' + identifier + '</strong> not found. <button type="button" id="btnAutoRegisterFallback" style="margin-top: 6px; width: 100%; padding: 6px 12px; background: #3b82f6; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.8rem;">✨ 1-Click Auto-Create & Log In</button>';
+              var fallbackBtn = document.getElementById('btnAutoRegisterFallback');
+              if (fallbackBtn) fallbackBtn.onclick = function() { autoRegisterAndLogin(identifier, pinVal); };
+            } else {
+              errBox.innerText = data.error || 'Authentication failed. Please check your credentials.';
+            }
             errBox.style.display = 'block';
           }
           return;
@@ -44177,6 +44196,91 @@ function renderHtml(
     }
     window.enterAsGuest = enterAsGuest;
 
+    function loginAsDefaultHost() {
+      var handleInput = document.getElementById('womLoginHandleInput');
+      var pinInput = document.getElementById('womLoginPinInput');
+      if (handleInput) handleInput.value = '@laptop_host';
+      if (pinInput) pinInput.value = '123456';
+      triggerUserLogin();
+    }
+    window.loginAsDefaultHost = loginAsDefaultHost;
+
+    async function autoRegisterAndLogin(handle, pin) {
+      const errBox = document.getElementById('womLoginErrorMsg');
+      const btn = document.getElementById('womLoginSubmitBtn');
+      if (errBox) {
+        errBox.innerText = 'Creating account for ' + handle + '... ⏳';
+        errBox.style.display = 'block';
+      }
+      try {
+        const cleanH = handle.startsWith('@') ? handle : '@' + handle;
+        const namePart = cleanH.replace(/^@/, '');
+        const fullName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+        const pinVal = pin || '123456';
+        
+        let pow = {};
+        try {
+          const chRes = await fetch('/api/auth/challenge', { headers: { 'bypass-tunnel-reminder': 'true' } });
+          if (chRes.ok) {
+            const ch = await chRes.json();
+            if (ch.ok && ch.challengeId && ch.prefix) {
+              const target = '0'.repeat(ch.difficulty || 3);
+              for (let i = 0; i < 50000; i++) {
+                if (window.crypto && crypto.subtle) {
+                  const mb = new TextEncoder().encode(ch.prefix + i);
+                  const hb = await crypto.subtle.digest('SHA-256', mb);
+                  const hex = Array.from(new Uint8Array(hb)).map(b => b.toString(16).padStart(2, '0')).join('');
+                  if (hex.startsWith(target)) {
+                    pow = { challengeId: ch.challengeId, solutionNonce: String(i) };
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+
+        const regRes = await fetch('/api/user/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
+          body: JSON.stringify({
+            handle: cleanH,
+            name: fullName,
+            device: isMobileDevice ? 'Mobile' : 'Desktop',
+            securityPin: pinVal,
+            ...pow
+          })
+        });
+        const regData = await regRes.json();
+        if (regRes.ok && regData.ok && regData.user) {
+          myProfile = regData.user;
+          if (regData.sessionToken) myProfile.sessionToken = regData.sessionToken;
+          window.myProfile = myProfile;
+          currentUserHandle = myProfile.handle;
+          localStorage.removeItem('sovra_logged_out');
+          localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+          if (regData.sessionToken) localStorage.setItem('sovra_session_token', regData.sessionToken);
+          var womEl = document.getElementById('welcomeOnboardingModal');
+          if (womEl) {
+            womEl.classList.add('modal-dismissed');
+            womEl.style.setProperty('display', 'none', 'important');
+          }
+          showAuthenticatedAppView();
+          if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+            window.SovraAndroidOS.openApp('feed');
+          } else if (typeof switchTab === 'function') {
+            switchTab('feed');
+          }
+          showAccountToast('✨ Account created & logged in as ' + myProfile.handle + '!');
+        } else {
+          if (errBox) errBox.innerText = regData.error || 'Failed to auto-create account.';
+        }
+      } catch (e) {
+        if (errBox) errBox.innerText = 'Registration error: ' + (e?.message || e);
+      }
+    }
+    window.autoRegisterAndLogin = autoRegisterAndLogin;
+
     function skipOnboardingAsHost() {
       localStorage.removeItem('sovra_logged_out');
       const hostDid = '${masterKey.did}';
@@ -44194,6 +44298,7 @@ function renderHtml(
         isOnline: true,
         sessionToken: '${hostSessionToken}',
       };
+      window.myProfile = myProfile;
       try {
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
         if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
@@ -44208,6 +44313,11 @@ function renderHtml(
       if (typeof syncChatMessages === 'function') syncChatMessages();
       if (typeof renderChatContactsList === 'function') renderChatContactsList();
       showAuthenticatedAppView();
+      if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+        window.SovraAndroidOS.openApp('feed');
+      } else if (typeof switchTab === 'function') {
+        switchTab('feed');
+      }
       showAccountToast('💻 Connected as Local Node Operator (' + myProfile.handle + ')');
     }
 
@@ -86385,19 +86495,22 @@ function renderHtml(
       }
 
       function isUserAuthenticated() {
-        if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
-          return false;
-        }
         if (typeof localStorage !== 'undefined') {
           if (localStorage.getItem('sovra_logged_out') === 'true') return false;
           const token = localStorage.getItem('sovra_session_token');
           const profile = localStorage.getItem('sovra_user_profile');
-          if (token && profile) return true;
+          if (token && profile) {
+            try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+            return true;
+          }
         }
         var p = (typeof window !== 'undefined' && window.myProfile) || (typeof myProfile !== 'undefined' ? myProfile : null);
         if (p && !p.isGuest) {
           var t = p.sessionToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_session_token') : null);
-          if (t) return true;
+          if (t) {
+            try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+            return true;
+          }
         }
         return false;
       }

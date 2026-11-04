@@ -7045,14 +7045,15 @@ export class SovraDatabaseEngine {
         }
         sqDb.prepare(`
           INSERT OR REPLACE INTO offline_payment_vouchers (
-            voucher_id, sender_did, recipient_did, amount_sov, nonce, signature_hex, status, created_at, settled_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            voucher_id, sender_did, recipient_did, amount_sov, nonce, expires_at, signature, status, created_at, settled_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           voucher.voucherId,
           sender.did,
           finalCreatorDid,
           amount,
           voucher.rootHash || '0x' + nowTs.toString(16),
+          nowTs + 86400000,
           voucher.signatureHex || '0xsig',
           'SETTLED',
           nowTs,
