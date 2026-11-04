@@ -10694,24 +10694,8 @@ function renderHtml(
       to { opacity: 1; transform: scale(1); }
     }
     /* =========================================================================
-       PURE SMARTPHONE OS: TOTAL EXTERIOR SHELL PURGE & ENCAPSULATION
+       SOVRA RESPONSIVE ARCHITECTURE: FULL DESKTOP PRO RAIL + MOBILE COMPACT HUD
        ========================================================================= */
-    body.sovra-mode-home .app-top-header,
-    body.sovra-mode-app .app-top-header,
-    .app-top-header,
-    .app-left-rail,
-    .app-right-rail,
-    #appStageFooter,
-    #guestModeRibbon,
-    #mobileFloatingActionBtn,
-    .fb-contacts-card,
-    #insecureContextNotice,
-    #feed-view #sovraHeroAnchorCard,
-    #sovraFloatingGlassDock,
-    .sovra-floating-glass-dock {
-      display: none !important;
-    }
-
     body.sovra-mode-home .app-layout {
       display: none !important;
     }
@@ -10724,14 +10708,11 @@ function renderHtml(
     body.sovra-mode-home .sovra-native-app-bar {
       display: none !important;
     }
-    body.sovra-mode-home .sovra-page-dots-indicator {
-      bottom: 96px !important;
-    }
-    body.sovra-mode-home .android-home-hint {
-      margin-bottom: 24px !important;
-    }
 
     body.sovra-mode-app .sovra-home-screen-view {
+      display: none !important;
+    }
+    body.sovra-mode-app .sovra-android-nav-bar {
       display: none !important;
     }
     body.sovra-mode-app .sovra-modular-glass-dock,
@@ -10739,45 +10720,183 @@ function renderHtml(
     body.sovra-mode-app #sovraFloatingDockPill {
       display: none !important;
     }
-    body.sovra-mode-app .sovra-android-nav-bar {
-      display: none !important;
+
+    /* 🖥️ DESKTOP PRO LAYOUT (>= 861px): FULL TOP HEADER, LEFT/RIGHT RAILS & PROPORTIONED FEED */
+    @media (min-width: 861px) {
+      .app-top-header {
+        display: flex !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 1000 !important;
+        height: 56px !important;
+      }
+      .app-layout {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: center !important;
+        width: 100% !important;
+        min-height: calc(100vh - 56px) !important;
+        position: static !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .app-left-rail {
+        display: flex !important;
+        width: 260px !important;
+        min-width: 260px !important;
+        position: sticky !important;
+        top: 56px !important;
+        height: calc(100vh - 56px) !important;
+        overflow-y: auto !important;
+      }
+      .app-right-rail {
+        display: flex !important;
+        width: 280px !important;
+        min-width: 280px !important;
+        position: sticky !important;
+        top: 56px !important;
+        height: calc(100vh - 56px) !important;
+        overflow-y: auto !important;
+      }
+      .app-center-stage {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 !important;
+        max-width: 720px !important;
+        margin: 0 1rem !important;
+        padding: 1rem 0 !important;
+        overflow: visible !important;
+      }
+      .main-content {
+        width: 100% !important;
+        max-width: 720px !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+      }
+      .mobile-bottom-nav,
+      .sovra-native-app-bar {
+        display: none !important;
+      }
     }
-    body.sovra-mode-app .mobile-bottom-nav {
-      display: flex !important;
+
+    /* 📱 MOBILE COMPACT LAYOUT (<= 860px): TOP BAR + BOTTOM DOCK + 100% FEED */
+    @media (max-width: 860px) {
+      .app-top-header {
+        display: flex !important;
+        height: 52px !important;
+      }
+      .app-left-rail,
+      .app-right-rail {
+        display: none !important;
+      }
+      .app-layout {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        min-height: 100vh !important;
+        padding-bottom: 76px !important;
+      }
+      .app-center-stage {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0.5rem 0.75rem 2rem 0.75rem !important;
+      }
+      .main-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        padding: 0.25rem 0 3rem 0 !important;
+      }
+      .mobile-bottom-nav {
+        display: flex !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 9999 !important;
+      }
     }
-    body.sovra-mode-app .sovra-native-app-bar {
-      display: flex !important;
+
+    /* 🎨 HIGH-CONTRAST THEME INTEGRITY (ELIMINATE WHITE-ON-WHITE TEXT) */
+    body.theme-normal .yt-video-title {
+      color: #0f172a !important;
     }
-    body.sovra-mode-app .app-layout {
-      display: flex !important;
-      flex-direction: column !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      max-width: 100vw !important;
-      margin: 0 !important;
-      padding: 0 0 76px 0 !important;
-      overflow-y: auto !important;
-      box-sizing: border-box !important;
-      position: fixed !important;
-      inset: 0 !important;
+    body.theme-normal .yt-video-stats-text {
+      color: #475569 !important;
     }
-    body.sovra-mode-app .app-center-stage {
-      display: flex !important;
-      flex-direction: column !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      height: 100% !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      overflow-y: auto !important;
-      flex: 1 !important;
+    body.theme-normal .yt-action-pill-btn {
+      background: #f1f5f9 !important;
+      border: 1px solid #cbd5e1 !important;
+      color: #0f172a !important;
     }
-    body.sovra-mode-app .main-content {
-      width: 100% !important;
-      max-width: 900px !important;
-      margin: 0 auto !important;
-      padding: 0.75rem 1rem 3.5rem 1rem !important;
-      box-sizing: border-box !important;
+    body.theme-normal .yt-action-pill-btn span {
+      color: #0f172a !important;
+    }
+    body.theme-normal .yt-meta-card {
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+    }
+    body.theme-normal .yt-action-pill-group {
+      background: #f1f5f9 !important;
+      border: 1px solid #cbd5e1 !important;
+    }
+    body.theme-normal .yt-action-pill-btn svg {
+      color: #0f172a !important;
+      stroke: #0f172a !important;
+    }
+    body.theme-normal .yt-channel-row {
+      border-top: 1px solid #e2e8f0 !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+    }
+    body.theme-normal #ytChannelName {
+      color: #0f172a !important;
+    }
+    body.theme-normal .btn-subscribe {
+      background: #0f172a !important;
+      color: #ffffff !important;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25) !important;
+    }
+    body.theme-normal .btn-subscribe:hover {
+      background: #1e293b !important;
+    }
+    body.theme-black #ytChannelName {
+      color: #ffffff !important;
+    }
+    body.theme-black .btn-subscribe {
+      background: #ffffff !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .yt-action-pill-divider {
+      background: #cbd5e1 !important;
+    }
+    body.theme-normal #ytCidDisplay {
+      color: #2563eb !important;
+    }
+    body.theme-normal .composer-card {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #0f172a !important;
+    }
+    body.theme-normal .composer-textarea {
+      color: #0f172a !important;
+      background: #f8fafc !important;
+    }
+
+    body.theme-black .yt-video-title {
+      color: #f8fafc !important;
+    }
+    body.theme-black .yt-video-stats-text {
+      color: #94a3b8 !important;
+    }
+    body.theme-black .composer-card {
+      background: #111827 !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      color: #f8fafc !important;
     }
 
     /* 🚪 Sovereign Direct Header Logout Action Button */
@@ -18973,21 +19092,28 @@ function renderHtml(
                   ? 'linear-gradient(90deg, #854d0e, #ca8a04)'
                   : 'linear-gradient(90deg, #1e40af, #2563eb)'));
             banner.style.background = bgGrad;
+            if ((localStorage.getItem('sovra_alert_dismissed_' + alert.id) || sessionStorage.getItem('sovra_alert_dismissed_' + alert.id))) {
+              banner.style.display = 'none';
+              return;
+            }
             banner.style.display = 'block';
-            banner.innerHTML = '<div style="max-width: 1200px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #fff; font-family: -apple-system, sans-serif;">' +
+            banner.innerHTML = '<div style="max-width: 1200px; margin: 0 auto; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #fff; font-family: -apple-system, sans-serif;">' +
               '<div style="display: flex; align-items: center; gap: 10px; min-width: 0;">' +
                 '<span style="padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.3); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.5px;">' + (alert.level || 'INFO') + '</span>' +
-                '<strong style="font-size: 0.88rem; white-space: nowrap;">' + alert.title + ':</strong>' +
-                '<span style="font-size: 0.84rem; opacity: 0.95; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + alert.message + '</span>' +
+                '<strong style="font-size: 0.86rem; white-space: nowrap;">' + alert.title + ':</strong>' +
+                '<span style="font-size: 0.82rem; opacity: 0.95; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + alert.message + '</span>' +
               '</div>' +
-              '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">' +
+              '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">' +
                 (alert.actionUrl ? '<a href="' + alert.actionUrl + '" target="_blank" style="color: #fff; text-decoration: underline; font-size: 0.8rem; font-weight: 700;">' + (alert.actionLabel || 'Details &rarr;') + '</a>' : '') +
-                (!alert.isSticky ? '<button id="sovraAlertDismissBtn" style="background: none; border: none; color: #fff; font-size: 1.1rem; cursor: pointer; padding: 0 4px; opacity: 0.8;" title="Dismiss">&times;</button>' : '') +
+                '<button id="sovraAlertDismissBtn" style="background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 0.9rem; cursor: pointer; padding: 2px 8px; border-radius: 6px; font-weight: 700;" title="Dismiss">✕</button>' +
               '</div>' +
             '</div>';
             var dBtn = document.getElementById('sovraAlertDismissBtn');
             if (dBtn) {
-              dBtn.onclick = function() { banner.style.display = 'none'; };
+              dBtn.onclick = function() { 
+                banner.style.display = 'none'; 
+                try { sessionStorage.setItem('sovra_alert_dismissed_' + alert.id, 'true'); try { localStorage.setItem('sovra_alert_dismissed_' + alert.id, 'true'); } catch(_) {} } catch(_) {}
+              };
             }
           } else {
             banner.style.display = 'none';
@@ -19003,11 +19129,11 @@ function renderHtml(
     (function() {
       try {
         var s = localStorage.getItem('sovra_theme_mode');
-        var t = (s === 'normal') ? 'normal' : 'black';
+        var t = (s === 'normal') ? 'black' : 'black'; // Pure OLED Obsidian Dark Mode by default
         document.documentElement.setAttribute('data-theme', t);
         if (document.body) {
           document.body.classList.remove('theme-normal', 'theme-black', 'theme-cyber', 'theme-ios', 'theme-android', 'mode-advance');
-          document.body.classList.add('theme-' + t);
+          document.body.classList.add('theme-black');
         }
       } catch (_) {}
     })();
@@ -22976,8 +23102,9 @@ function renderHtml(
             <!-- Video Title & Tags -->
             <div>
               <div style="display: flex; gap: 0.4rem; margin-bottom: 0.35rem; flex-wrap: wrap;" id="ytVideoTags">
-                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); padding: 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 600;"><span>📡</span> OFFICIAL NETWORK TECHNICAL BROADCAST</span>
-                ${longFormVideosCatalog[0]!.tags.map(t => `<span style="color:#60a5fa; font-size:0.75rem; font-weight:600;">${t}</span>`).join(' ')}
+                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); padding: 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 700;"><span>⚡</span> 4K Ultra HD</span>
+                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); padding: 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 600;">#Technology</span>
+                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); padding: 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 600;">#Decentralized</span>
               </div>
               <div class="yt-video-title" id="ytVideoTitle">
                 ${longFormVideosCatalog[0]!.title}
@@ -22987,7 +23114,7 @@ function renderHtml(
             <!-- Stats & Video Actions Row (Horizontal Smooth-Scrolling Pill Bar) -->
             <div class="yt-actions-bar">
               <div class="yt-video-stats-text" id="ytVideoStats">
-                <b>284,512 views</b> &bull; Premiered 2 hours ago &bull; <code style="color: #818cf8;" id="ytCidDisplay" class="dev-cid-badge ipfs-cid-tag">CID: bafybeig...zdi</code>
+                <b>284,512 views</b> &bull; Premiered 2 hours ago &bull; <span style="color: #10b981; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span>✓</span> Verified Stream</span>
               </div>
 
               <div class="yt-actions-scroll">
@@ -23050,7 +23177,7 @@ function renderHtml(
                   ${longFormVideosCatalog[0]!.channelAvatar}
                 </div>
                 <div>
-                  <div style="font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.35rem;">
+                  <div style="font-weight: 700; color: var(--text-main, currentColor); display: flex; align-items: center; gap: 0.35rem;">
                     <span id="ytChannelName">${longFormVideosCatalog[0]!.channelName}</span>
                     <span style="color: #60a5fa; font-size: 0.85rem;" title="Verified Sovereign Identity">✓</span>
                   </div>
@@ -23063,11 +23190,11 @@ function renderHtml(
               <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <!-- BitSwap Seeder Health Capsule -->
                 <span id="ytSeederHealthCapsule" class="yt-seeder-health-capsule" style="display: inline-flex; align-items: center; gap: 5px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; padding: 4px 10px; font-size: 0.74rem; color: #34d399; font-weight: 700;">
-                  <span>🟢</span> <span id="ytSeederCountText">14 Local Seeders • 4K 60fps</span>
+                  <span>🟢</span> <span id="ytSeederCountText">⚡ 4K 60fps • High Bitrate Swarm</span>
                 </span>
                 <!-- Smart Telemetry Capsule -->
                 <span class="yt-telemetry-pill" style="display: inline-flex; align-items: center; gap: 5px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 20px; padding: 4px 10px; font-size: 0.74rem; color: #38bdf8; font-weight: 700;">
-                  <span>⚡</span> <span>Sub-300ms • 0% Loss</span>
+                  <span>⚡</span> <span>⚡ Ultra-Low Latency • Lossless</span>
                 </span>
 
                 <button class="btn-subscribe" id="btnSubscribe" onclick="toggleYtSubscribe()">Subscribe</button>
