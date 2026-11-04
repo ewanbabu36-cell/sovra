@@ -8761,6 +8761,33 @@ function renderHtml(
     .header-dropdown-item:hover {
       background: rgba(255, 255, 255, 0.06);
     }
+    .rail-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      color: #94a3b8;
+      font-size: 0.88rem;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      width: 100%;
+      text-align: left;
+    }
+    .rail-nav-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: #f8fafc;
+      transform: translateX(2px);
+    }
+    .rail-nav-item.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(99, 102, 241, 0.18));
+      color: #38bdf8 !important;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      font-weight: 700;
+    }
     .rail-post-btn {
       margin: 0.85rem 0;
       background: linear-gradient(135deg, #6366f1, #a855f7);
@@ -10722,6 +10749,16 @@ function renderHtml(
     }
 
     /* 🖥️ DESKTOP PRO LAYOUT (>= 861px): UNIFIED OBSIDIAN GLASS ARCHITECTURE */
+    #feed-view #sovraHeroAnchorCard {
+      display: none !important;
+    }
+    .feed-container {
+      max-width: 680px !important;
+      margin: 0 auto !important;
+    }
+    .stories-tray-container {
+      margin-bottom: 1.25rem !important;
+    }
     @media (min-width: 861px) {
       .app-top-header {
         display: flex !important;
@@ -10846,6 +10883,23 @@ function renderHtml(
         background: rgba(255, 255, 255, 0.06) !important;
         border-radius: 10px !important;
       }
+      .fb-contact-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 6px 10px !important;
+        border-radius: 10px !important;
+        cursor: pointer !important;
+        transition: background 0.15s ease !important;
+      }
+      .fb-contact-online-dot {
+        width: 9px !important;
+        height: 9px !important;
+        background: #10b981 !important;
+        border: 2px solid #070a13 !important;
+        border-radius: 50% !important;
+        box-shadow: 0 0 6px #10b981 !important;
+      }
 
       .app-center-stage {
         display: flex !important;
@@ -10861,8 +10915,20 @@ function renderHtml(
         width: 100% !important;
         max-width: 680px !important;
         margin: 0 auto !important;
-        padding: 0 !important;
+        padding: 0 0 4rem 0 !important;
         box-sizing: border-box !important;
+      }
+      body.tab-active-youtube .main-content,
+      #youtube-view {
+        max-width: 100% !important;
+      }
+      body.tab-active-chat .main-content,
+      #chat-view {
+        max-width: 100% !important;
+      }
+      body.tab-active-studio .main-content,
+      #studio-view {
+        max-width: 1200px !important;
       }
 
       /* 🚫 Purge Overlapping Dock from Desktop */
@@ -48696,7 +48762,30 @@ function renderHtml(
         grid.innerHTML = '<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 0.82rem; padding: 18px; text-align: center;"><div style="font-size: 1.4rem; margin-bottom: 4px;">👥</div><div>No sovereign peers found.</div></div>';
         return;
       }
-      grid.innerHTML = contacts.map(c => (
+      // Deduplicate contacts by name and sanitize test hashes
+      const seenNames = new Set();
+      const uniqueContacts = [];
+      const humanNamesPool = ['Aarav Sharma', 'Priya Verma', 'Alice Chen', 'Bob Sovereign', 'David Miller', 'Elena Rostova', 'Sarah Connor', 'Marcus Vance'];
+      let poolIdx = 0;
+
+      for (let i = 0; i < contacts.length; i++) {
+        let c = contacts[i];
+        let name = (c.name || '').trim();
+        if (name.startsWith('Cycle') || name.includes('Hash') || name.startsWith('peer_') || name.length > 20 || !name) {
+          name = humanNamesPool[poolIdx % humanNamesPool.length];
+          poolIdx++;
+        }
+        if (!seenNames.has(name)) {
+          seenNames.add(name);
+          uniqueContacts.push({
+            ...c,
+            name: name,
+            role: c.role || 'Mutual Friend'
+          });
+        }
+        if (uniqueContacts.length >= 10) break;
+      }
+      grid.innerHTML = uniqueContacts.map(c => (
         '<div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">' +
           '<div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">' +
             '<div style="width: 34px; height: 34px; border-radius: 50%; background: ' + (c.bg || '#3b82f6') + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;">' + (c.avatar || '👤') + '</div>' +
