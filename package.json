@@ -12,10 +12,11 @@
   "scripts": {
     "build": "pnpm -r run build",
     "build:client": "node --experimental-strip-types scripts/build-client-bundle.ts",
+    "test:prod-build": "node --check scripts/dev-server.ts && node --check scripts/database-engine.ts && node --experimental-strip-types scripts/build-client-bundle.ts",
     "dev": "node --experimental-strip-types scripts/dev-server.ts",
     "test": "vitest run",
     "test:fast": "vitest run --fileParallelism false tests/unit/client-script-integrity.test.ts tests/e2e/holographic-navigation.test.ts tests/e2e/pwa-manifest.test.ts tests/e2e/ftux-activation.test.ts tests/e2e/webrtc-stories-pwa.test.ts",
-    "validate:integrity": "vitest run --fileParallelism false tests/unit/client-script-integrity.test.ts tests/e2e/pwa-manifest.test.ts tests/e2e/ftux-activation.test.ts tests/e2e/webrtc-stories-pwa.test.ts",
+    "validate:integrity": "vitest run --fileParallelism false --teardownTimeout 15000 tests/unit/client-script-integrity.test.ts tests/e2e/pwa-manifest.test.ts tests/e2e/ftux-activation.test.ts tests/e2e/webrtc-stories-pwa.test.ts",
     "test:watch": "vitest",
     "test:architecture": "vitest run tests/security/dependency-boundaries.test.ts",
     "lint": "eslint .",

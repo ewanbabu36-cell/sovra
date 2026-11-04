@@ -189,6 +189,33 @@ export async function dispatchCallWebPush(recipientDid: string, callData: {
   return dispatched;
 }
 
+export async function dispatchTipWebPush(recipientDid: string, tipData: {
+  amountSov: number;
+  senderName: string;
+  txHash?: string;
+}): Promise<number> {
+  const tokens = getPushTokensForDid(recipientDid);
+  let dispatched = 0;
+  for (const token of tokens) {
+    if (token && token.startsWith('http')) {
+      try {
+        await sendWebPush(token, {
+          type: 'tip',
+          title: `💎 Received +${tipData.amountSov} SOV Micro-Tip!`,
+          body: `${tipData.senderName} sent you a 95% creator tip on Sovra P2P DAG`,
+          amountSov: tipData.amountSov,
+          senderName: tipData.senderName,
+          timestamp: Date.now(),
+        });
+        dispatched++;
+      } catch (err) {
+        console.warn('[WebPush] Error dispatching tip push:', err);
+      }
+    }
+  }
+  return dispatched;
+}
+
 export async function handlePushRoutes(ctx: PushRouteContext): Promise<boolean> {
   const { req, res, url, blindPushRelay, readBoundedBody } = ctx;
 
@@ -233,6 +260,37 @@ export async function handlePushRoutes(ctx: PushRouteContext): Promise<boolean> 
     } catch (err: any) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Push registration failed' }));
+    }
+    return true;
+  }
+
+  // WebPush Subscription Hook (1-Click PWA Registration)
+  if ((url.pathname === '/api/push/subscribe' || url.pathname === '/api/push/sub') && req.method === 'POST') {
+    try {
+      const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+      if (!bodyOk) return true;
+      const parsed = reqBody ? JSON.parse(reqBody) : {};
+      const deviceDid = parsed.did || parsed.deviceDid || 'did:sovra:anonymous';
+      const endpoint = parsed.endpoint || parsed.subscription?.endpoint || parsed.pushToken;
+      const blindChannelId = parsed.blindChannelId || crypto.createHash('sha256').update(String(deviceDid)).digest('hex');
+      const deviceId = parsed.deviceId || ('web-' + crypto.createHash('md5').update(String(endpoint || deviceDid)).digest('hex').slice(0, 12));
+
+      if (endpoint) {
+        blindPushRelay.registerDevice({
+          deviceId,
+          deviceDid,
+          platform: 'web',
+          pushToken: endpoint,
+          blindChannelId,
+          updatedAt: Date.now(),
+        });
+        recordPushSubscription(deviceDid, blindChannelId, endpoint);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, subscribed: true, did: deviceDid, totalDevices: blindPushRelay.getRegisteredDeviceCount() }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Push subscription failed' }));
     }
     return true;
   }

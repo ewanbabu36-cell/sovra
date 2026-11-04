@@ -1,0 +1,44 @@
+name: 🚀 Sovra Commercial Enterprise Release & CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  verify-and-release:
+    name: Full Enterprise Verification & Multi-Platform Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Verify Post-Quantum Crypto Primitives
+        run: npm test --prefix packages/crypto
+
+      - name: Client Script Syntax & Integrity Gate
+        run: npm run validate:integrity
+
+      - name: Run Global Commercial E2E Test Suite
+        run: npx vitest run tests/e2e/global-commercial-expansion.test.ts
+
+      - name: Verify Apple Universal Links & Asset Links
+        run: |
+          test -f public/.well-known/assetlinks.json || exit 1
+          test -f public/.well-known/apple-app-site-association || exit 1
+          test -f apps/ios/App/App/capacitor.config.json || exit 1
+          test -f apps/twa/twa-manifest.json || exit 1
+
+      - name: Build Docker Container Artifact
+        run: docker build -t sovra/network-node:latest .

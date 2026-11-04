@@ -86,3 +86,4 @@ chain/mytestnet/**/priv_validator_state.json
 chain/mytestnet/signer*
 *.sst
 test_tmp_*
+scratch/

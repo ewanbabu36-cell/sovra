@@ -1,0 +1,30 @@
+{
+  "appId": "app.sovra.network",
+  "appName": "Sovra",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://sovra.network",
+    "cleartext": false,
+    "allowNavigation": [
+      "sovra.network",
+      "*.sovra.network"
+    ]
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "scheme": "Sovra",
+    "backgroundColor": "#090d16",
+    "statusBarStyle": "dark",
+    "handleApplicationUrl": true
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#090d16"
+    }
+  }
+}

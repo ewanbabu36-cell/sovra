@@ -172,8 +172,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
   if ((url.pathname.startsWith('/api/reels/video/') || url.pathname.startsWith('/api/watch/video/') || url.pathname.startsWith('/api/video/stream/')) && req.method === 'GET') {
     const cid = path.basename(url.pathname);
     if (!cid || cid.includes('..') || cid.includes('/') || cid.includes('\\')) {
-      res.writeHead(400, { 'Content-Type': 'text/plain' });
-      res.end('Invalid CID');
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid CID', code: 'INVALID_CID', timestamp: Date.now() }));
       return true;
     }
 
@@ -205,8 +205,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
           }
         }
       } catch {}
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Video not found');
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'Video not found', code: 'VIDEO_NOT_FOUND', timestamp: Date.now() }));
       return true;
     }
 
@@ -725,8 +725,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       return true;
     }
 
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('HLS asset not found');
+    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'HLS asset not found', code: 'HLS_NOT_FOUND', timestamp: Date.now() }));
     return true;
   }
 
@@ -821,8 +821,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       return true;
     }
 
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Storyboard not found');
+    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'Storyboard not found', code: 'STORYBOARD_NOT_FOUND', timestamp: Date.now() }));
     return true;
   }
 

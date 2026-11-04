@@ -172,8 +172,8 @@ export async function handleDAppRoutes(
     const dappId = bundleMatch[1];
     const dapp = sovraDb.getMiniDAppById(dappId);
     if (!dapp) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Mini-DApp not found');
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'Mini-DApp not found', code: 'DAPP_NOT_FOUND', timestamp: Date.now() }));
       return true;
     }
 

@@ -1,0 +1,44 @@
+services:
+  sovra-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sovra-production-node
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+      - "3443:3443"
+      - "4001:4001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - SOVRA_HTTP_PORT=3001
+      - SOVRA_P2P_PORT=4001
+      - SOVRA_STORAGE_DIR=/app/.sovra-storage-prod
+      - SOVRA_CLUSTER_PEERS=
+    volumes:
+      - sovra_prod_data:/app/.sovra-storage-prod
+      - ./public:/app/public:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  sovra_prod_data:
+    driver: local
