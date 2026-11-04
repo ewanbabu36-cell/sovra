@@ -323,14 +323,17 @@ export class SovereignSelfHealingDaemon {
       this.cleanupUnixFsOrphans();
       this.enforceMediaCacheQuota();
     }, walInterval);
+    if (this.walTimer.unref) this.walTimer.unref();
 
     this.solvencyTimer = setInterval(() => {
       this.runContinuousSolvencyAudit();
     }, solvencyInterval);
+    if (this.solvencyTimer.unref) this.solvencyTimer.unref();
 
     this.peerDiagTimer = setInterval(() => {
       this.runPeerMeshDiagnostics();
     }, peerInterval);
+    if (this.peerDiagTimer.unref) this.peerDiagTimer.unref();
   }
 
   public stopDaemon(): void {

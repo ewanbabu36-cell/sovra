@@ -289,11 +289,12 @@ export class CometBftStreamHub {
     this.connect();
     if (!this.fallbackTimer) {
       this.fallbackTimer = setInterval(() => {
-        // Fallback heartbeat check in case WebSocket connection is interrupted
-        if (!this.ws || this.ws.readyState !== 1) {
+        // Fallback heartbeat check in case WebSocket connection is interrupted (only if clients are listening)
+        if (this.clients.size > 0 && (!this.ws || this.ws.readyState !== 1)) {
           this.checkAndBroadcast();
         }
-      }, 2500);
+      }, 5000);
+      if (this.fallbackTimer.unref) this.fallbackTimer.unref();
     }
   }
 
@@ -388,6 +389,7 @@ export class CometBftStreamHub {
   }
 
   private async checkAndBroadcast() {
+    if (this.clients.size === 0) return;
     try {
       const summary = await getExplorerSummaryData();
       if (summary && summary.height !== this.lastHeight) {

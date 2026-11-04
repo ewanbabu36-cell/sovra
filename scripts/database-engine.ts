@@ -3420,6 +3420,11 @@ export class SovraDatabaseEngine {
 
     if (purgedCount > 0) {
       this.save(true);
+      try {
+        if (this.sqliteEngine && typeof (this.sqliteEngine as any).checkpoint === 'function') {
+          (this.sqliteEngine as any).checkpoint();
+        }
+      } catch (_) {}
     }
     return { purgedCount };
   }
@@ -10842,16 +10847,6 @@ export class SovraDatabaseEngine {
         if (factor.pin) {
           const cleanPin = String(factor.pin).trim();
           passed = this.verifySecurityPin(cleanPin, user.securityPinHash);
-          // Auto-sync / migration: Allow common transitions (1234, 12345, 123456)
-          if (!passed) {
-            // Local Node Runner / Dev Mode Self-Healing:
-            // Allow common PINs or auto-sync PIN entered by developer on localhost
-            if (process.env.NODE_ENV !== 'production' || !process.env.NODE_ENV || cleanPin.length >= 4) {
-              passed = true;
-              user.securityPinHash = this.hashSecurityPin(cleanPin);
-              this.save();
-            }
-          }
         }
         if (!passed && factor.totpCode && user.totpSecret) {
           passed = this.verifyTotpCode(user.totpSecret, factor.totpCode);
