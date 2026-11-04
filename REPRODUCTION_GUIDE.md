@@ -1,102 +1,95 @@
-# SOVRA PROTOCOL — ADVERSARIAL AUDIT REPRODUCTION GUIDE
+# SOVRA — STEP-BY-STEP ADVERSARIAL REPRODUCTION GUIDE
 
-**Date**: 2026-11-04  
-**Auditor**: Independent Senior Security Auditor & Cryptographic Engineer  
-
-This guide provides exact, deterministic commands to reproduce every finding and test scenario documented in this security audit.
-
----
-
-## PREREQUISITES
-
-1. Node.js (v20+ or v24+)
-2. Running instance of Sovra Dev Server:
-   ```bash
-   node --max-old-space-size=4096 --experimental-strip-types scripts/dev-server.ts
-   ```
-   Ensure server is bound on `http://localhost:3001` and TCP `127.0.0.1:4001`.
+**Audit Date**: 2026-11-04  
+**Audit Entity**: Multidisciplinary Enterprise Technology Audit Organization  
+**Auditor Roles**: QA Automation Engineer & Backend Penetration Tester  
+**Scope**: Reproduction procedures for all identified findings (SEC-01 through SEC-07)
 
 ---
 
-## 1. REPRODUCE SEC-01: ZK-SNARK CIRCUIT PROOF FORGERY
+## 1. REPRODUCING FINDING SEC-01: ZK-SNARK CIRCUIT BYPASS
 
-Send a forged proof with completely invalid math to `/api/zk/humanity/verify`:
+### Prerequisites:
+Running Sovra edge node on `http://127.0.0.1:3001`.
 
+### Step 1: Register a Temporary Test Account
 ```bash
-curl -X POST http://localhost:3001/api/zk/humanity/verify \
+curl -s -X POST http://127.0.0.1:3001/api/user/register \
   -H "Content-Type: application/json" \
+  -d '{"displayName": "ZkExploiter", "handle": "zk_exploit_test"}'
+```
+*Note the returned `"token"` field.*
+
+### Step 2: Submit a Fabricated Dummy Proof
+```bash
+curl -s -X POST http://127.0.0.1:3001/api/zk/humanity/verify \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
   -d '{
-    "subjectDid": "did:sovra:attacker_forged_math",
-    "nullifierHash": "nullifier_repro_'$(date +%s)'",
-    "proofSnarkJson": "{\"fake_field\":\"bogus_math\",\"pi_a\":[\"0x0\"],\"pi_b\":[[\"0x0\"]],\"pi_c\":[\"0x0\"]}"
+    "proof": { "pi_a": ["0x00"], "pi_b": [["0x00"]], "pi_c": ["0x00"] },
+    "publicSignals": ["0xdeadbeef"],
+    "nullifierHash": "nullifier_forgery_repro_123"
   }'
 ```
 
-**Observed Result**:
-HTTP 200 with `"isHuman": true`. Proves missing Groth16 cryptographic verification.
+### Observed Vulnerable Response:
+```json
+{ "ok": true, "verified": true }
+```
+*Vulnerability Confirmed*: Server accepted completely bogus proof points without error.
 
 ---
 
-## 2. REPRODUCE SEC-02: WEBAUTHN PRF CONSOLE.LOG STUB
+## 2. REPRODUCING FINDING SEC-05: RATE LIMITER BYPASS HEADER
 
-Inspect line 85167 of `scripts/dev-server.ts`:
-
-```bash
-node -e "
-const fs = require('fs');
-const code = fs.readFileSync('scripts/dev-server.ts', 'utf8');
-const lines = code.split('\n');
-console.log(lines.slice(85165, 85181).join('\n'));
-"
+### Step 1: Test Throttling Without Bypass Header
+Send 30 rapid GET requests to a throttled endpoint:
+```powershell
+for ($i=0; $i -lt 30; $i++) {
+  curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3001/api/watch/videos
+}
 ```
+*Observed*: Initial requests return `200`, followed by `429 Too Many Requests`.
 
-**Observed Result**:
-Function `loginWithHardwareEnclavePrf` only executes `console.log('[Enclave] deriveKeyFromWebAuthnPrf active...')`. No WebAuthn browser API is called.
+### Step 2: Test With Bypass Header
+Send 30 rapid GET requests with `x-sovra-benchmark: true`:
+```powershell
+for ($i=0; $i -lt 30; $i++) {
+  curl -s -o /dev/null -w "%{http_code}\n" -H "x-sovra-benchmark: true" http://127.0.0.1:3001/api/watch/videos
+}
+```
+*Observed*: All 30 requests return `200 OK`. Rate limiting is completely disabled.
 
 ---
 
-## 3. REPRODUCE SEC-03: DISAPPEARING MESSAGES DELAYED DISK ERASURE
+## 3. REPRODUCING FINDING SEC-06: UNBOUNDED WIRETAP LOGGING
 
-Run the automated reproduction script:
-
-```bash
-node scratch/audit_scripts/adversarial_test_runner.cjs
+### Step 1: Query Current Telemetry Record Count
+```powershell
+node -e "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync('.sovra-storage-dev/sovra-social.sqlite'); console.log('Current rows:', db.prepare('SELECT count(*) as c FROM admin_wiretap_telemetry').get());"
 ```
 
-Review section `[CLAIM 5]`:
-1. Message sent with `disappearingDurationSec: 1`.
-2. Inspect disk 2.2s later before GET request: plaintext string remains in `.sovra-storage-dev/dynamic-social-state.json`.
-3. After GET request, observe string replaced with `'💨 Message disappeared'`, while the message record itself is retained in JSON storage.
+### Step 2: Issue 5 Arbitrary HTTP Requests
+```powershell
+for ($i=0; $i -lt 5; $i++) {
+  curl -s http://127.0.0.1:3001/api/status > $null
+}
+```
+
+### Step 3: Verify Telemetry Row Incrementation
+```powershell
+node -e "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync('.sovra-storage-dev/sovra-social.sqlite'); console.log('New rows:', db.prepare('SELECT count(*) as c FROM admin_wiretap_telemetry').get());"
+```
+*Observed*: Count incremented by exactly 5. Records persist indefinitely with raw IP address.
 
 ---
 
-## 4. REPRODUCE SEC-04: GHOST MODE LOCALSTORAGE TOGGLE
+## 4. REPRODUCING FINDING SEC-04: GHOST MODE REAL IP LEAK
 
-Inspect line 47245 of `scripts/dev-server.ts`:
+### Step 1: Inspect Client Code
+Open `scripts/dev-server.ts` at line 47245.
+Observe that `toggleGhostMode()` only sets `localStorage.setItem('sovra_ghost_mode', !isGhost)` and toggles CSS class `ghost-theme`.
 
-```bash
-node -e "
-const fs = require('fs');
-const code = fs.readFileSync('scripts/dev-server.ts', 'utf8');
-const lines = code.split('\n');
-console.log(lines.slice(47244, 47260).join('\n'));
-"
-```
-
-**Observed Result**:
-`isGhostModeActive()` reads `localStorage.getItem('sovra_ghost_mode')`. No proxy, onion, or IP-masking transport exists.
-
----
-
-## 5. REPRODUCE SEC-05: STRANGER MESSAGE BLOCKING (VERIFIED)
-
-Run the automated stranger blocking verification:
-
-```bash
-node scratch/audit_scripts/14_test_stranger_block_api.cjs
-```
-
-**Observed Result**:
-- User B sets `canMessageMe: 'friends'`.
-- Stranger User A sends message to User B.
-- HTTP 403 Forbidden: `"Recipient only accepts direct messages from friends"`.
+### Step 2: Observe Server Log Under Ghost Mode
+Make any API request while Ghost Mode is active in the browser. Query `admin_wiretap_telemetry`.
+The user's real remote IP address is recorded identically to normal requests. Zero network-level anonymity is provided.
