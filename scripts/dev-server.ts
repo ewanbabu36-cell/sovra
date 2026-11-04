@@ -19383,6 +19383,7 @@ function renderHtml(
           if (!banner) return;
           if (data && data.ok && Array.isArray(data.alerts) && data.alerts.length > 0) {
             var alert = data.alerts[0];
+            if (alert && ((alert.message && (alert.message.includes('Kademlia') || alert.message.includes('operational'))) || (alert.title && alert.title.includes('Decentralized P2P Mesh')))) { banner.style.display = 'none'; return; }
             var bgGrad = alert.level === 'EMERGENCY'
               ? 'linear-gradient(90deg, #991b1b, #dc2626)'
               : (alert.level === 'CRITICAL'
@@ -19706,8 +19707,8 @@ function renderHtml(
 
       <!-- 1. Universal Header Create Button & Popover Menu -->
       <div id="headerCreateWrap" class="header-create-wrap">
-        <button id="headerCreateBtn" type="button" class="header-action-icon-btn" onclick="toggleHeaderCreateMenu(event)" aria-label="Create new content" aria-expanded="false" title="Create New Content" style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.35); color: #818cf8; border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.15rem; cursor: pointer; transition: all 0.2s ease;">
-          <span>➕</span>
+        <button id="headerCreateBtn" type="button" class="header-action-icon-btn" onclick="toggleHeaderCreateMenu(event)" aria-label="Create new content" aria-expanded="false" title="Create New Content" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #f1f5f9; border-radius: 50%; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </button>
         <div id="headerCreateDropdown" class="header-create-dropdown" style="display: none;">
           <button type="button" class="header-create-item" data-action="create-post" onclick="triggerHeaderCreatePost(event)">
@@ -19764,8 +19765,8 @@ function renderHtml(
       <!-- 2. Encrypted Direct Chats (Facebook Standard Messenger) -->
       <div id="headerChatBtn" class="header-action-icon-btn" role="button" tabindex="0" onclick="handleHeaderChatClick(event)" onkeydown="if(event.key==='Enter'||event.key===' ')handleHeaderChatClick(event)" title="Messenger (Chats)" aria-label="Chats">
         <div class="header-icon-wrap">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-chat-icon" aria-hidden="true">
-            <path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.86 7.07-.15.93-.65 2.58-1.74 3.69-.19.19-.24.47-.13.71.11.24.35.4.61.4 2.87 0 5.09-1.29 6.08-1.99.43.08.87.12 1.32.12 5.52 0 10-4.03 10-9s-4.48-9-10-9z"/>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-chat-icon" aria-hidden="true">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
           </svg>
           <span id="headerChatBadge" class="header-action-badge" style="display: none;">0</span>
         </div>
@@ -19791,8 +19792,8 @@ function renderHtml(
       <!-- 3. Real-Time Notifications Bell (Facebook Standard: Free Floating Vector Bell & Edge-Anchored Badge) -->
       <div id="headerNotificationBell" class="header-action-icon-btn" role="button" tabindex="0" onclick="toggleNotificationCenter(this)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleNotificationCenter(this)" title="Notifications" aria-label="Notifications">
         <div class="header-icon-wrap">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="header-bell-icon" aria-hidden="true">
-            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-bell-icon" aria-hidden="true">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
           </svg>
           <span id="headerNotificationBadge" class="header-action-badge" style="display: none;">0</span>
         </div>
@@ -19837,9 +19838,9 @@ function renderHtml(
       </button>
 
       <!-- 4. User Profile Avatar with Integrated Presence Badge -->
-      <div id="currentUserPill" class="header-avatar-wrap is-online" role="button" tabindex="0" onclick="switchTab('me'); event.stopPropagation();" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" title="Open Your Profile (Click to View / Toggle Ghost Mode)" aria-label="Your Sovereign Profile">
-        <span id="currentUserAvatar" class="header-avatar-circle">👤</span>
-        <span id="headerLiveIndicator" class="header-live-indicator"><span class="avatar-presence-dot live-connected" id="liveDotPulse" title="Status: Online (Live Mesh)"></span></span>
+      <div id="currentUserPill" class="header-avatar-wrap is-online" role="button" tabindex="0" onclick="switchTab('me'); event.stopPropagation();" onkeydown="if(event.key==='Enter'||event.key===' ')switchTab('me')" title="Open Your Profile" aria-label="Your Sovereign Profile" style="width: 36px; height: 36px; border-radius: 50%; position: relative; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+        <span id="currentUserAvatar" class="header-avatar-circle" style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%); border: 1.5px solid rgba(255, 255, 255, 0.15); box-shadow: none; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; color: #fff;">S</span>
+        <span id="headerLiveIndicator" class="header-live-indicator" style="position: absolute; bottom: 0; right: 0; display: block; line-height: 0;"><span class="avatar-presence-dot live-connected" id="liveDotPulse" title="Status: Online (Live Mesh)" style="position: static; width: 10px; height: 10px; border-radius: 50%; background: #10b981; border: 2px solid #070a13; display: block; box-shadow: 0 0 6px #10b981;"></span></span>
       </div>
 
       <!-- 🚪 Dedicated Sovereign Direct Logout Action -->
@@ -19940,7 +19941,7 @@ function renderHtml(
   <div class="app-layout">
     <!-- Column 1: Left Navigation Rail (Desktop) -->
     <aside class="app-left-rail">
-      <div class="rail-brand" onclick="switchTab('feed'); event.stopPropagation();" style="cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 14px;" title="SOVRA Home (Return to Feed)">
+      <div class="rail-brand" onclick="switchTab('feed'); event.stopPropagation();" style="display: none !important;" title="SOVRA Home (Return to Feed)">
         <div class="sovra-brand-emblem-box" style="width: 36px; height: 36px;">
           <svg class="sovra-brand-emblem-svg" viewBox="0 0 512 512" width="28" height="28" aria-hidden="true">
             <rect width="512" height="512" rx="118" fill="#080e1e"/>
@@ -19993,27 +19994,23 @@ function renderHtml(
         <button class="rail-nav-item" id="tab-admin" data-action="switch-tab" data-tab="admin" onclick="switchTab('admin')" style="display: none;" title="Ops Console"></button>
       </nav>
 
-      <div class="rail-actions-group" style="display: flex; flex-direction: column; gap: 6px; margin: 0.65rem 0 0.85rem;">
-        <button class="rail-post-btn" data-action="create-post" onclick="triggerBottomCreateAction()" style="margin: 0; width: 100%;">
-          <span>✍️</span> <span>Create Post</span>
+      <div class="rail-actions-group" style="margin: 0.75rem 0 0.85rem;">
+        <button class="rail-post-btn" data-action="create-post" onclick="triggerBottomCreateAction()" style="margin: 0; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; border-radius: 12px; height: 42px; background: linear-gradient(135deg, #0284c7, #6366f1); border: none; color: #fff; font-size: 0.92rem; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35); cursor: pointer; transition: all 0.2s ease;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+          <span>New Post</span>
         </button>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-          <button type="button" class="rail-subaction-btn" onclick="switchTab('studio')" title="Upload Video" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.28); color: #38bdf8; border-radius: 10px; padding: 7px 4px; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.2s;">
-            <span>📹</span> <span>Upload</span>
-          </button>
-          <button type="button" class="rail-subaction-btn" onclick="startCallQuickAction()" title="Start Call" style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.28); color: #4ade80; border-radius: 10px; padding: 7px 4px; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.2s;">
-            <span>📞</span> <span>Call</span>
-          </button>
-        </div>
       </div>
 
-      <div class="rail-user-profile" data-action="switch-tab" data-tab="me" onclick="switchTab('me')">
-        <div id="railUserAvatar" style="width: 38px; height: 38px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; color: #fff; overflow: hidden; flex-shrink: 0;">S</div>
+      <div class="rail-user-profile" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer; transition: all 0.2s ease;">
+        <div id="railUserAvatar" style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; color: #fff; overflow: hidden; flex-shrink: 0;">S</div>
         <div style="flex: 1; min-width: 0;">
-          <div id="railUserName" style="font-weight: 700; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sovereign Node</div>
-          <div id="railUserHandle" style="font-size: 0.72rem; color: #38bdf8;">@you</div>
+          <div id="railUserName" style="font-weight: 700; font-size: 0.86rem; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sovereign Member</div>
+          <div id="railUserHandle" style="font-size: 0.74rem; color: #38bdf8; font-weight: 600;">@sovereign</div>
         </div>
-        <button type="button" class="rail-logout-quick-btn" id="railLogoutQuickBtn" onclick="openLogoutModal(); event.stopPropagation();" title="Log Out" aria-label="Log Out">
+        <button type="button" class="rail-logout-quick-btn" id="railLogoutQuickBtn" onclick="openLogoutModal(); event.stopPropagation();" title="Log Out" aria-label="Log Out" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 6px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
@@ -43838,8 +43835,8 @@ function renderHtml(
         }
         return;
       }
-      myProfile.name = myProfile.displayName || myProfile.name || 'Sovereign Node';
-      currentUserHandle = myProfile.handle || '@laptop_host';
+      myProfile.name = (myProfile.name && myProfile.name.startsWith('Host Node')) ? 'Sovereign Member' : (myProfile.displayName || myProfile.name || 'Sovereign Member');
+      currentUserHandle = (myProfile.handle === '@laptop_host' || !myProfile.handle) ? '@sovereign' : myProfile.handle;
 
       const avatarEl = document.getElementById('currentUserAvatar');
       if (avatarEl) {
@@ -48873,10 +48870,19 @@ function renderHtml(
         grid.innerHTML = '<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 0.82rem; padding: 18px; text-align: center;"><div style="font-size: 1.4rem; margin-bottom: 4px;">👥</div><div>No sovereign peers found.</div></div>';
         return;
       }
-      // Deduplicate contacts by name and sanitize test hashes
+      // Deduplicate contacts by name and sanitize test hashes with realistic avatars & status
       const seenNames = new Set();
       const uniqueContacts = [];
       const humanNamesPool = ['Aarav Sharma', 'Priya Verma', 'Alice Chen', 'Bob Sovereign', 'David Miller', 'Elena Rostova', 'Sarah Connor', 'Marcus Vance'];
+      const statusPool = ['Online', 'Active in Swarm', 'Available for Call', 'In Voice Room', 'Recently Active'];
+      const gradients = [
+        'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        'linear-gradient(135deg, #ec4899, #f43f5e)',
+        'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+        'linear-gradient(135deg, #10b981, #059669)',
+        'linear-gradient(135deg, #f59e0b, #d97706)',
+        'linear-gradient(135deg, #8b5cf6, #d946ef)'
+      ];
       let poolIdx = 0;
 
       for (let i = 0; i < contacts.length; i++) {
@@ -48888,26 +48894,35 @@ function renderHtml(
         }
         if (!seenNames.has(name)) {
           seenNames.add(name);
+          const initial = name.charAt(0).toUpperCase();
+          const colorIdx = Math.abs(name.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % gradients.length;
+          const status = statusPool[poolIdx % statusPool.length];
           uniqueContacts.push({
             ...c,
             name: name,
-            role: c.role || 'Mutual Friend'
+            avatar: initial,
+            bg: gradients[colorIdx],
+            role: status
           });
         }
         if (uniqueContacts.length >= 10) break;
       }
       grid.innerHTML = uniqueContacts.map(c => (
-        '<div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">' +
-          '<div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">' +
-            '<div style="width: 34px; height: 34px; border-radius: 50%; background: ' + (c.bg || '#3b82f6') + '; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;">' + (c.avatar || '👤') + '</div>' +
+        '<div style="background: rgba(30, 41, 59, 0.55); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease;">' +
+          '<div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">' +
+            '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + c.bg + '; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: 800; color: #fff; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">' + c.avatar + '</div>' +
             '<div style="overflow: hidden;">' +
-              '<div style="font-weight: 700; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + c.name + '</div>' +
-              '<div style="font-size: 0.7rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + c.role + '</div>' +
+              '<div style="font-weight: 700; font-size: 0.86rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + c.name + '</div>' +
+              '<div style="font-size: 0.72rem; color: #38bdf8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">' + c.role + '</div>' +
             '</div>' +
           '</div>' +
-          '<div style="display: flex; gap: 5px; flex-shrink: 0;">' +
-            '<button type="button" data-did="' + c.did + '" data-name="' + c.name + '" data-type="audio" onclick="startEncryptedCall(this.dataset.did, this.dataset.name, this.dataset.type)" title="Start Audio Call" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer;">📞</button>' +
-            '<button type="button" data-did="' + c.did + '" data-name="' + c.name + '" data-type="video" onclick="startEncryptedCall(this.dataset.did, this.dataset.name, this.dataset.type)" title="Start HD Video Call" style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.35); color: #818cf8; border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer;">📹</button>' +
+          '<div style="display: flex; gap: 6px; flex-shrink: 0;">' +
+            '<button type="button" data-did="' + c.did + '" data-name="' + c.name + '" data-type="audio" onclick="startEncryptedCall(this.dataset.did, this.dataset.name, this.dataset.type)" title="Start Audio Call" style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); color: #4ade80; border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease;">' +
+              '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
+            '</button>' +
+            '<button type="button" data-did="' + c.did + '" data-name="' + c.name + '" data-type="video" onclick="startEncryptedCall(this.dataset.did, this.dataset.name, this.dataset.type)" title="Start HD Video Call" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease;">' +
+              '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>' +
+            '</button>' +
           '</div>' +
         '</div>'
       )).join('');
