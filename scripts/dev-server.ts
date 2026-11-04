@@ -51,6 +51,7 @@ import {
   signEd25519,
   verifyEd25519,
   sha256,
+  deriveKeyFromWebAuthnPrf,
 } from '../packages/crypto/dist/index.js';
 import {
   SovraIdentityKey,
@@ -85201,6 +85202,11 @@ function renderHtml(
         if (credential) {
           const extResults = credential.getClientExtensionResults ? credential.getClientExtensionResults() : {};
           if (extResults.prf && extResults.prf.results && extResults.prf.results.first) {
+            const prfRaw = new Uint8Array(extResults.prf.results.first);
+            if (typeof window.deriveKeyFromWebAuthnPrf === 'function') {
+              const id = await window.deriveKeyFromWebAuthnPrf(prfRaw, salt);
+              window.__sovra_enclave_did = id.did;
+            }
             showAccountToast("✅ Hardware Enclave PRF seed successfully derived!");
           } else {
             showAccountToast("⚠️ Authenticated via Passkey (Note: PRF extension was omitted by your hardware vendor; using standard passkey session).");
@@ -85242,7 +85248,7 @@ function renderHtml(
         { id: 'key_vault', name: 'Enclave', icon: '🔐', category: 'utility', badge: '', action: () => { if (typeof openSovereignKeyVaultModal === 'function') openSovereignKeyVaultModal(); else if (typeof openSovereignMfaModal === 'function') openSovereignMfaModal(); }, desc: 'Sovereign Key Enclave & Passkeys' },
         { id: 'id_card', name: 'ID Card', icon: '🪪', category: 'social', badge: '', action: () => { if (typeof openSovereignIdCardModal === 'function') openSovereignIdCardModal(); else if (typeof openIdentitySwitcherSheet === 'function') openIdentitySwitcherSheet(); }, desc: 'Sovereign DID Credential Card' },
         { id: 'mesh_node', name: 'Mesh', icon: '🌐', category: 'utility', badge: 'mesh', action: () => { if (typeof toggleDepinHotspot === 'function') toggleDepinHotspot(); }, desc: 'DePIN Hotspot & libp2p Mesh' },
-        { id: 'ghost_mode', name: 'Ghost', icon: '👻', category: 'utility', badge: '', action: () => { if (typeof toggleGhostMode === 'function') toggleGhostMode(); else if (typeof showAccountToast === 'function') showAccountToast('Ghost Mode Toggled'); }, desc: 'Incognito Ephemeral Routing' },
+        { id: 'ghost_mode', name: 'Ghost', icon: '👻', category: 'utility', badge: '', action: () => { if (typeof toggleGhostMode === 'function') toggleGhostMode(); else if (typeof showAccountToast === 'function') showAccountToast('Ghost Mode Toggled'); }, desc: 'Appear Offline (Presence Stealth)' },
         { id: 'backup', name: 'Backup', icon: '🛡️', category: 'finance', badge: '', action: () => { if (typeof openSovereignBackupModal === 'function') openSovereignBackupModal(); }, desc: 'Encrypted Seed & Keys Backup' },
         { id: 'desktop_launcher', name: 'OS Mode', icon: '📱', category: 'utility', badge: '', action: () => { if (typeof localStorage !== 'undefined') localStorage.setItem('sovra_explicit_os_mode', 'home'); if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') window.SovraAndroidOS.goHome(); }, desc: 'Switch to Android OS Launcher View' },
         { id: 'settings', name: 'Settings', icon: '🛠️', category: 'utility', badge: '', action: () => switchTab('settings'), desc: 'Preferences, Themes & Privacy' }
@@ -89039,7 +89045,18 @@ async function startDevServer() {
       token = String(req.headers['x-sovra-session-token']).trim();
     } else if (req.headers.cookie) {
       const match = req.headers.cookie.match(/(?:^|;\s*)sovra_session_token=([^;]+)/);
-      if (match) token = decodeURIComponent(match[1]).trim();
+      if (match) {
+        token = decodeURIComponent(match[1]).trim();
+        // SEC-07: CSRF Protection for Cookie-Authenticated Mutating Requests
+        const method = (req.method || 'GET').toUpperCase();
+        if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+          const secFetchSite = req.headers['sec-fetch-site'];
+          const csrfHeader = req.headers['x-csrf-token'] || req.headers['x-sovra-csrf'] || req.headers['x-requested-with'];
+          if (secFetchSite === 'cross-site' || (!csrfHeader && req.headers.origin && req.headers.origin !== 'null' && !req.headers.origin.includes('localhost') && !req.headers.origin.includes('127.0.0.1'))) {
+            return null; // CSRF blocked!
+          }
+        }
+      }
     }
     if (!token && req.url) {
       try {
@@ -89403,7 +89420,8 @@ async function startDevServer() {
       const forwarded = req.headers['x-forwarded-for'];
       if (typeof forwarded === 'string' && forwarded.trim()) {
         const parts = forwarded.split(',').map(s => s.trim()).filter(Boolean);
-        for (const candidate of parts) {
+        for (let i = parts.length - 1; i >= 0; i--) {
+          const candidate = parts[i];
           if (net.isIP(candidate)) {
             clientIp = candidate;
             break;
@@ -94999,7 +95017,11 @@ async function startDevServer() {
         }
 
         const user = regResult.user;
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        const isSecureReg = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https');
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `sovra_session_token=${encodeURIComponent(user.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureReg ? '; Secure' : ''}`,
+        });
         res.end(JSON.stringify({
           ok: true,
           user: toPublicUserDTO(user),
@@ -95041,7 +95063,11 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: loginRes.error || 'Authentication failed' }));
           return;
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        const isSecureLogin = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https');
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `sovra_session_token=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
+        });
         res.end(JSON.stringify({
           ok: true,
           user: toPublicUserDTO(loginRes.user),
@@ -95347,10 +95373,18 @@ async function startDevServer() {
         } else if (parsed.sessionToken) {
           token = String(parsed.sessionToken).trim();
         }
+        if (!token && req.headers.cookie) {
+          const match = req.headers.cookie.match(/(?:^|;\s*)sovra_session_token=([^;]+)/);
+          if (match) token = decodeURIComponent(match[1]).trim();
+        }
         if (token) {
           sovraDb.logoutUser(token);
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        const isSecureLogout = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https');
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecureLogout ? '; Secure' : ''}`,
+        });
         res.end(JSON.stringify({ ok: true }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -100765,11 +100799,12 @@ async function startDevServer() {
   }
 
   // Disappearing messages active background purge daemon (SEC-03)
-setInterval(() => {
-  try {
-    sovraDb.purgeExpiredDisappearingMessages();
-  } catch (_) {}
-}, 15000);
+const disappearingPurgeInterval = setInterval(() => {
+    try {
+      sovraDb.purgeExpiredDisappearingMessages();
+    } catch (_) {}
+  }, 15000);
+  if (disappearingPurgeInterval.unref) disappearingPurgeInterval.unref();
 
 server.listen(HTTP_PORT, '0.0.0.0', () => {
     console.log('[2/2] HTTP Server Bound!');

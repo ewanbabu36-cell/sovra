@@ -241,9 +241,9 @@ export class SqliteSocialDatabaseEngine {
       PRAGMA foreign_keys = ON;
       PRAGMA busy_timeout = 10000;
       PRAGMA wal_autocheckpoint = 1000;
-      PRAGMA temp_store = MEMORY;
-      PRAGMA mmap_size = 268435456;
-      PRAGMA cache_size = -64000;
+      PRAGMA temp_store = FILE;
+      PRAGMA mmap_size = 67108864;
+      PRAGMA cache_size = -8000;
 
       -- 1. USERS
       CREATE TABLE IF NOT EXISTS users (
@@ -996,7 +996,7 @@ export class SqliteSocialDatabaseEngine {
           ['key_vault', 'Enclave', '🔐', 'utility', 'Sovereign Key Enclave & Passkeys', 1, 19],
           ['id_card', 'ID Card', '🪪', 'social', 'Sovereign DID Credential Card', 1, 20],
           ['mesh_node', 'Mesh', '🌐', 'utility', 'DePIN Hotspot & libp2p Mesh', 1, 21],
-          ['ghost_mode', 'Ghost', '👻', 'utility', 'Incognito Ephemeral Routing', 1, 22],
+          ['ghost_mode', 'Ghost', '👻', 'utility', 'Appear Offline (Presence Stealth)', 1, 22],
           ['backup', 'Backup', '🛡️', 'finance', 'Encrypted Seed & Keys Backup', 1, 23],
           ['desktop_launcher', 'OS Mode', '📱', 'utility', 'Switch to Android OS Launcher View', 1, 24],
           ['settings', 'Settings', '⚙️', 'utility', 'Preferences, Themes & Privacy', 1, 25]
@@ -2056,7 +2056,11 @@ export class SqliteSocialDatabaseEngine {
         WHERE disappearing_duration_sec > 0 
         AND (timestamp + (disappearing_duration_sec * 1000)) <= ?
       `).run(now);
-      return { deletedCount: Number(res.changes || 0) };
+      const deletedCount = Number(res.changes || 0);
+      if (deletedCount > 0) {
+        try { this.db.pragma('wal_checkpoint(TRUNCATE)'); } catch (_) {}
+      }
+      return { deletedCount };
     } catch (_) {
       return { deletedCount: 0 };
     }

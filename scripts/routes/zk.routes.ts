@@ -101,14 +101,44 @@ export async function handleZkRoutes(
         return true;
       }
 
-      // Public inputs alignment: [nullifier, externalNullifier / signalHash]
-      const publicSignals = Array.isArray(body.publicSignals)
-        ? body.publicSignals
-        : [nullifier, crypto.createHash('sha256').update(subjectDid).digest('hex').slice(0, 16)];
+      // Security SEC-01-B: Client-controlled verification key override defense
+      if ('vKey' in body) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Client-supplied verification keys are strictly forbidden. Sovereign canonical verification key is enforced.',
+        });
+        return true;
+      }
 
-      // Mathematical bilinear pairing check on BN254 elliptic curve
-      const vKey = (body.vKey && typeof body.vKey === "object") ? body.vKey : DEFAULT_SEMAPHORE_HUMANITY_VKEY;
-      const verificationResult = verifyGroth16Proof(proofObj, publicSignals, vKey);
+      // Pre-flight Nullifier Sybil Defense check
+      if (sovraDb.getZkAttestationByNullifier(nullifier)) {
+        sendJson(res, 409, {
+          ok: false,
+          error: 'Nullifier hash already used; duplicate proof-of-humanity attestation rejected',
+        });
+        return true;
+      }
+
+      // Public inputs alignment: Semaphore v3 expects 4 public signals:
+      // [merkleTreeRoot, nullifierHash, signalHash, externalNullifierHash]
+      if (!Array.isArray(body.publicSignals) || body.publicSignals.length !== 4) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Semaphore Groth16 proof requires exactly 4 public signals: [merkleTreeRoot, nullifierHash, signalHash, externalNullifierHash]',
+        });
+        return true;
+      }
+
+      if (body.publicSignals[1].toString() !== nullifier.toString()) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Nullifier parameter does not match publicSignals[1] nullifierHash in proof',
+        });
+        return true;
+      }
+
+      // Mathematical bilinear pairing check on BN254 elliptic curve using canonical sovereign vKey
+      const verificationResult = verifyGroth16Proof(proofObj, body.publicSignals, DEFAULT_SEMAPHORE_HUMANITY_VKEY);
 
       if (!verificationResult.valid) {
         sendJson(res, 400, {

@@ -55,8 +55,16 @@ export interface RestoreResult {
 
 function calculateFileSha256(filePath: string): string {
   const hash = crypto.createHash('sha256');
-  const buffer = fs.readFileSync(filePath);
-  hash.update(buffer);
+  const fd = fs.openSync(filePath, 'r');
+  const buf = Buffer.alloc(64 * 1024);
+  let bytesRead = 0;
+  try {
+    while ((bytesRead = fs.readSync(fd, buf, 0, buf.length, null)) > 0) {
+      hash.update(buf.subarray(0, bytesRead));
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
   return hash.digest('hex');
 }
 
