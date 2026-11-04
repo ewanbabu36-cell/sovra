@@ -10721,60 +10721,153 @@ function renderHtml(
       display: none !important;
     }
 
-    /* 🖥️ DESKTOP PRO LAYOUT (>= 861px): FULL TOP HEADER, LEFT/RIGHT RAILS & PROPORTIONED FEED */
+    /* 🖥️ DESKTOP PRO LAYOUT (>= 861px): UNIFIED OBSIDIAN GLASS ARCHITECTURE */
     @media (min-width: 861px) {
       .app-top-header {
         display: flex !important;
         position: sticky !important;
         top: 0 !important;
         z-index: 1000 !important;
-        height: 56px !important;
+        height: 58px !important;
+        background: rgba(11, 15, 25, 0.88) !important;
+        backdrop-filter: blur(24px) !important;
+        -webkit-backdrop-filter: blur(24px) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding: 0 1.5rem !important;
+        justify-content: space-between !important;
+        align-items: center !important;
       }
+
+      /* 🌟 Top Header Cleanse: Purge Icon Khichdi */
+      .header-menu-toggle-btn,
+      .header-desktop-nav,
+      #headerQuickActionSlots,
+      #headerWallpaperBtn,
+      #headerMobileSearchBtn,
+      #headerIdentitySwitcherPill,
+      #headerLogoutBtn,
+      #headerThemeToggleBtn,
+      .node-status-pill {
+        display: none !important;
+      }
+
+      .header-left-zone {
+        display: flex !important;
+        align-items: center !important;
+        gap: 16px !important;
+      }
+
+      .header-search-wrap {
+        display: flex !important;
+        flex: 1 !important;
+        max-width: 440px !important;
+        margin: 0 1.5rem !important;
+      }
+
+      .header-search-bar {
+        width: 100% !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 9999px !important;
+        padding: 7px 16px !important;
+        display: flex !important;
+        align-items: center !important;
+      }
+
+      .header-search-input {
+        color: #f8fafc !important;
+      }
+
+      .header-right-zone {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+      }
+
       .app-layout {
         display: flex !important;
         flex-direction: row !important;
         justify-content: center !important;
         width: 100% !important;
-        min-height: calc(100vh - 56px) !important;
+        min-height: calc(100vh - 58px) !important;
         position: static !important;
         overflow: visible !important;
         padding: 0 !important;
         margin: 0 !important;
+        background: #070a13 !important;
       }
+
       .app-left-rail {
         display: flex !important;
         width: 260px !important;
         min-width: 260px !important;
         position: sticky !important;
-        top: 56px !important;
-        height: calc(100vh - 56px) !important;
+        top: 58px !important;
+        height: calc(100vh - 58px) !important;
         overflow-y: auto !important;
+        background: rgba(11, 15, 25, 0.8) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding: 1.25rem 0.85rem !important;
       }
+
       .app-right-rail {
         display: flex !important;
-        width: 280px !important;
-        min-width: 280px !important;
+        width: 300px !important;
+        min-width: 300px !important;
         position: sticky !important;
-        top: 56px !important;
-        height: calc(100vh - 56px) !important;
+        top: 58px !important;
+        height: calc(100vh - 58px) !important;
         overflow-y: auto !important;
+        background: rgba(11, 15, 25, 0.8) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding: 1rem 0.85rem !important;
       }
+
+      .app-right-rail .card,
+      .fb-contacts-card,
+      .trending-card {
+        background: rgba(15, 23, 42, 0.75) !important;
+        backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 16px !important;
+        color: #f8fafc !important;
+      }
+
+      .fb-contact-name,
+      .fb-contacts-card span {
+        color: #f8fafc !important;
+      }
+
+      .fb-contact-row:hover {
+        background: rgba(255, 255, 255, 0.06) !important;
+        border-radius: 10px !important;
+      }
+
       .app-center-stage {
         display: flex !important;
         flex-direction: column !important;
         flex: 1 !important;
-        max-width: 720px !important;
-        margin: 0 1rem !important;
-        padding: 1rem 0 !important;
+        max-width: 680px !important;
+        margin: 0 1.25rem !important;
+        padding: 1.25rem 0 !important;
         overflow: visible !important;
       }
+
       .main-content {
         width: 100% !important;
-        max-width: 720px !important;
+        max-width: 680px !important;
         margin: 0 auto !important;
         padding: 0 !important;
         box-sizing: border-box !important;
       }
+
+      /* 🚫 Purge Overlapping Dock from Desktop */
+      .sovra-floating-glass-dock,
+      #sovraFloatingGlassDock,
       .mobile-bottom-nav,
       .sovra-native-app-bar {
         display: none !important;
@@ -10819,6 +10912,35 @@ function renderHtml(
         right: 0 !important;
         z-index: 9999 !important;
       }
+    }
+
+    /* 🎨 UNIFIED LUXURY OBSIDIAN GLASS ARCHITECTURE */
+    body,
+    body.theme-black,
+    body.theme-normal {
+      background-color: #070a13 !important;
+      color: #f8fafc !important;
+    }
+    body .app-layout {
+      background-color: #070a13 !important;
+    }
+    .feed-composer-card,
+    .composer-card,
+    .create-story-card,
+    .insta-post-card {
+      background: rgba(15, 23, 42, 0.75) !important;
+      backdrop-filter: blur(20px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      border-radius: 18px !important;
+      color: #f8fafc !important;
+    }
+    .composer-textarea {
+      background: rgba(0, 0, 0, 0.25) !important;
+      color: #f8fafc !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .composer-textarea::placeholder {
+      color: #94a3b8 !important;
     }
 
     /* 🎨 HIGH-CONTRAST THEME INTEGRITY (ELIMINATE WHITE-ON-WHITE TEXT) */
@@ -26718,10 +26840,10 @@ function renderHtml(
                 <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: #fff;">📞</div>
                 <div>
                   <div style="font-weight: 800; font-size: 1.05rem; color: #f8fafc;">Start Encrypted Call</div>
-                  <div style="font-size: 0.75rem; color: #94a3b8;">Direct WebRTC Noise_XX • Zero Middleman Telemetry</div>
+                  <div style="font-size: 0.75rem; color: #94a3b8;">HD Voice & Video • Private Peer-to-Peer</div>
                 </div>
               </div>
-              <span style="font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);">🔒 E2EE Active</span>
+              <span style="font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);">🔒 Private & Secure</span>
             </div>
 
             <!-- Contact Search Input -->
@@ -48041,8 +48163,8 @@ function renderHtml(
     var _currentMobileOsTheme = 'normal';
     var currentSovraTheme = (function() {
       try {
-        var saved = localStorage.getItem('sovra_theme_mode');
-        if (saved === 'black' || saved === 'normal') return saved;
+        localStorage.setItem('sovra_theme_mode', 'black');
+        return 'black';
       } catch (_) {}
       return 'black';
     })();
@@ -79529,7 +79651,14 @@ function renderHtml(
       }
 
       container.innerHTML = items.map(function(c) {
-        var cName = c.displayName || c.name || 'Friend';
+        var rawName = c.displayName || c.name || 'Friend';
+        var cName = rawName;
+        if (rawName.startsWith('peer_')) {
+          var hashId = rawName.replace('peer_', '').toUpperCase();
+          cName = 'Sovereign Peer (' + hashId.slice(0, 4) + ')';
+        } else if (rawName.startsWith('Cycle') || rawName.includes('Hash')) {
+          cName = 'Mesh Contributor';
+        }
         var cDid = c.did || c.userDid || '';
         var avatarHtml = c.avatarDataUrl
           ? '<img src="' + c.avatarDataUrl + '" class="fb-contact-avatar" />'
