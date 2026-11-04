@@ -80,7 +80,7 @@ export async function handleAdminFeatureRoute(ctx: AdminFeatureContext): Promise
         res.end(JSON.stringify({ ok: false, error: 'User account not found' }));
         return true;
       }
-      const currentBal = Number(user.balanceSov ?? 500);
+      const currentBal = Number(user.balanceSov ?? 0);
       const newBal = Math.max(0, currentBal + amount);
       user.balanceSov = newBal;
       user.updatedAt = Date.now();

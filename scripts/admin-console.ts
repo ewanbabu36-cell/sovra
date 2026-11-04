@@ -1059,7 +1059,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       <button class="admin-nav-item" onclick="switchAdminTab('swarm')">
         <span class="admin-nav-icon">🌐</span>
         <span>P2P Swarm & Mesh</span>
-        <span class="admin-nav-badge" id="sidebarPeerBadge">${connectedPeers.length || 1}</span>
+        <span class="admin-nav-badge" id="sidebarPeerBadge">${connectedPeers.length}</span>
       </button>
 
       <button class="admin-nav-item" onclick="switchAdminTab('storage')">
@@ -1162,7 +1162,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               <span>Connected Swarm Peers</span>
               <span style="color:#38bdf8;">Kademlia</span>
             </div>
-            <div class="ops-card-val">${connectedPeers.length || 1}</div>
+            <div class="ops-card-val">${connectedPeers.length}</div>
             <div class="ops-card-sub">Active ad-hoc connections &amp; multi-hop discovery</div>
           </div>
 
@@ -2383,12 +2383,14 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               <circle cx="350" cy="140" r="110" fill="none" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4,4" />
               <circle cx="350" cy="140" r="180" fill="none" stroke="rgba(255,255,255,0.02)" stroke-dasharray="6,6" />
 
-              <!-- Peer Orbit Connections -->
+              <!-- Peer Orbit Connections (Dynamically generated from connectedPeers) -->
               <g id="svgTopologyLinks">
-                <line x1="350" y1="140" x2="160" y2="70" stroke="rgba(56,189,248,0.35)" stroke-width="1.8" stroke-dasharray="4,4" />
-                <line x1="350" y1="140" x2="540" y2="70" stroke="rgba(168,85,247,0.35)" stroke-width="1.8" stroke-dasharray="4,4" />
-                <line x1="350" y1="140" x2="150" y2="210" stroke="rgba(16,185,129,0.35)" stroke-width="1.8" stroke-dasharray="4,4" />
-                <line x1="350" y1="140" x2="550" y2="210" stroke="rgba(245,158,11,0.35)" stroke-width="1.8" stroke-dasharray="4,4" />
+                ${connectedPeers.map((_, idx) => {
+                  const angle = (2 * Math.PI / Math.max(1, connectedPeers.length)) * idx;
+                  const x = Math.round(350 + 175 * Math.cos(angle));
+                  const y = Math.round(140 + 85 * Math.sin(angle));
+                  return `<line x1="350" y1="140" x2="${x}" y2="${y}" stroke="rgba(56,189,248,0.4)" stroke-width="1.8" stroke-dasharray="4,4" />`;
+                }).join('')}
               </g>
 
               <!-- Central Host Node -->
@@ -2398,41 +2400,25 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 <circle cx="0" cy="0" r="8" fill="#a5b4fc" />
                 <text x="0" y="-28" text-anchor="middle" font-size="11" font-weight="700" fill="#e0e7ff">did:sovra:host (Localhost)</text>
                 <text x="0" y="36" text-anchor="middle" font-size="9" font-family="var(--font-mono)" fill="#38bdf8">PORT :${tcpPort}</text>
+                ${connectedPeers.length === 0 ? `<text x="0" y="52" text-anchor="middle" font-size="9" fill="#94a3b8">Genesis Seed Node • Solitary Swarm (0 Peers)</text>` : ''}
               </g>
 
-              <!-- Connected Orbit Nodes -->
+              <!-- Connected Orbit Nodes (Dynamically projected from connectedPeers) -->
               <g id="svgTopologyNodes">
-                <!-- Peer 1: GossipSub Relay -->
-                <g transform="translate(160, 70)">
-                  <circle cx="0" cy="0" r="14" fill="#0c4a6e" stroke="#38bdf8" stroke-width="2" />
-                  <circle cx="0" cy="0" r="5" fill="#38bdf8" />
-                  <text x="0" y="-18" text-anchor="middle" font-size="10" font-weight="600" fill="#bae6fd">Peer Alpha (GossipSub)</text>
-                  <text x="0" y="24" text-anchor="middle" font-size="8" font-family="var(--font-mono)" fill="#94a3b8">1.4ms &bull; 5 topics</text>
-                </g>
-
-                <!-- Peer 2: BitSwap Seeder -->
-                <g transform="translate(540, 70)">
-                  <circle cx="0" cy="0" r="14" fill="#4c1d95" stroke="#a855f7" stroke-width="2" />
-                  <circle cx="0" cy="0" r="5" fill="#a855f7" />
-                  <text x="0" y="-18" text-anchor="middle" font-size="10" font-weight="600" fill="#e9d5ff">Peer Beta (BitSwap)</text>
-                  <text x="0" y="24" text-anchor="middle" font-size="8" font-family="var(--font-mono)" fill="#94a3b8">2.2ms &bull; 94.6% Hit</text>
-                </g>
-
-                <!-- Peer 3: Regional Mesh Node -->
-                <g transform="translate(150, 210)">
-                  <circle cx="0" cy="0" r="14" fill="#064e3b" stroke="#10b981" stroke-width="2" />
-                  <circle cx="0" cy="0" r="5" fill="#10b981" />
-                  <text x="0" y="-18" text-anchor="middle" font-size="10" font-weight="600" fill="#a7f3d0">Peer Gamma (Full Node)</text>
-                  <text x="0" y="24" text-anchor="middle" font-size="8" font-family="var(--font-mono)" fill="#94a3b8">1.8ms &bull; Sync 100%</text>
-                </g>
-
-                <!-- Peer 4: Edge Relay -->
-                <g transform="translate(550, 210)">
-                  <circle cx="0" cy="0" r="14" fill="#78350f" stroke="#f59e0b" stroke-width="2" />
-                  <circle cx="0" cy="0" r="5" fill="#f59e0b" />
-                  <text x="0" y="-18" text-anchor="middle" font-size="10" font-weight="600" fill="#fde68a">Peer Delta (IBC Relayer)</text>
-                  <text x="0" y="24" text-anchor="middle" font-size="8" font-family="var(--font-mono)" fill="#94a3b8">3.1ms &bull; ICS-20 Active</text>
-                </g>
+                ${connectedPeers.map((p, idx) => {
+                  const angle = (2 * Math.PI / Math.max(1, connectedPeers.length)) * idx;
+                  const x = Math.round(350 + 175 * Math.cos(angle));
+                  const y = Math.round(140 + 85 * Math.sin(angle));
+                  const label = String(p).slice(0, 12) + '...';
+                  return `
+                    <g transform="translate(${x}, ${y})">
+                      <circle cx="0" cy="0" r="14" fill="#0c4a6e" stroke="#38bdf8" stroke-width="2" />
+                      <circle cx="0" cy="0" r="5" fill="#38bdf8" />
+                      <text x="0" y="-18" text-anchor="middle" font-size="10" font-weight="600" fill="#bae6fd">${label}</text>
+                      <text x="0" y="24" text-anchor="middle" font-size="8" font-family="var(--font-mono)" fill="#94a3b8">P2P Mesh Peer</text>
+                    </g>
+                  `;
+                }).join('')}
               </g>
             </svg>
           </div>
@@ -2457,7 +2443,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           </div>
           <div class="ops-card">
             <div class="ops-card-label">P2P Swarm Meshing</div>
-            <div class="ops-card-val" id="metricPeerCount" style="color: #a855f7;">${connectedPeers.length || 1} Nodes</div>
+            <div class="ops-card-val" id="metricPeerCount" style="color: #a855f7;">${connectedPeers.length} Nodes</div>
             <div class="ops-card-sub">Kademlia alpha=3 active routing</div>
           </div>
         </div>
@@ -2580,7 +2566,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                           <td><code style="font-size:0.75rem; color:#94a3b8;" title="${c.ownerDid || 'System'}">${(c.ownerDid || 'did:sovra:system').slice(0, 18)}...</code></td>
                           <td>
                             ${
-                              c.ownerDid === 'did:sovra:system' || ['ch-alpha', 'ch-gaming', 'ch-news', 'ch-music'].includes(c.id)
+                              c.ownerDid === 'did:sovra:system' || c.id === 'chan_sovra_official' || c.handle === '@sovra'
                                 ? '<span style="font-size:0.72rem; color:#64748b;">Protected Seed</span>'
                                 : `<button class="btn-ops" style="padding:3px 8px; font-size:0.72rem; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;" onclick="deleteAdminChannel('${c.id}', '${c.name}')">Delete</button>`
                             }
@@ -2602,7 +2588,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                           <td><code style="font-size:0.75rem; color:#94a3b8;" title="${p.ownerDid || 'System'}">${(p.ownerDid || 'did:sovra:system').slice(0, 18)}...</code></td>
                           <td>
                             ${
-                              p.ownerDid === 'did:sovra:system' || ['pg-metropolis', 'pg-meshlabs', 'pg-bakery'].includes(p.id)
+                              p.ownerDid === 'did:sovra:system' || p.id === 'pg_sovra_official' || p.handle === '@sovra'
                                 ? '<span style="font-size:0.72rem; color:#64748b;">Protected Seed</span>'
                                 : `<button class="btn-ops" style="padding:3px 8px; font-size:0.72rem; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;" onclick="deleteAdminPage('${p.id}', '${p.name}')">Delete</button>`
                             }
@@ -3996,29 +3982,15 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       }
     }
 
-    // 💸 Live Revenue Test Simulator (Demonstrates real dynamic database updates)
-    async function triggerLiveTestTip() {
+    // 📜 Real Treasury & Tipping Ledger Sync
+    async function refreshTippingLedger() {
       const btn = document.getElementById('liveTipSimBtn');
-      if (btn) { btn.disabled = true; btn.innerText = '⏳ Processing Tip...'; }
+      if (btn) { btn.disabled = true; btn.innerText = '⏳ Syncing Ledger...'; }
       try {
-        const res = await fetch('/api/feed/tip', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            postId: 'post_live_test_' + Date.now(),
-            creatorDid: 'did:sovra:creator_genesis_1',
-            amountSov: 50,
-            message: 'Live Admin Console Verification Tip'
-          })
-        });
-        const data = await res.json();
-        if (btn) { btn.disabled = false; btn.innerText = '✅ +50 SOV Settled!'; }
-        alert('🎉 Live 50 SOV Tip Executed!\n\n95% (47.5 SOV) -> Creator\n5% (2.5 SOV) -> Network Treasury\n\nCheck the Treasury War Room to see the updated balance.');
-        setTimeout(() => { if (btn) btn.innerText = '📜 Inspect 95/5 Tip Ledger'; }, 3000);
-        if (typeof loadSolvencyReport === 'function') loadSolvencyReport();
+        if (typeof loadSolvencyReport === 'function') await loadSolvencyReport();
+        if (btn) { btn.disabled = false; btn.innerText = '📜 Inspect 95/5 Tip Ledger'; }
       } catch (e) {
         if (btn) { btn.disabled = false; btn.innerText = '📜 Inspect 95/5 Tip Ledger'; }
-        alert('Tip processed in local ledger.');
       }
     }
 
@@ -4690,7 +4662,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         }
         const peerEl = document.getElementById('metricPeerCount');
         if (peerEl && (data.connectedPeersCount !== undefined || data.systemTelemetry.p2pPeersCount !== undefined)) {
-          peerEl.innerText = (data.connectedPeersCount || data.systemTelemetry.p2pPeersCount || 1) + ' Nodes';
+          peerEl.innerText = (data.connectedPeersCount ?? data.systemTelemetry?.p2pPeersCount ?? 0) + ' Nodes';
         }
       }
 
