@@ -91,7 +91,7 @@ describe('Adversarial BOLA / IDOR & Authentication Defense Matrix', { timeout: 2
     const sess2Res = await fetch(`${BASE_URL}/api/user/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ handle: aliceHandle, device: 'Alice Secondary Laptop' }),
+      body: JSON.stringify({ handle: aliceHandle, device: 'Alice Secondary Laptop', pin: '123456' }),
     });
     expect(sess2Res.status).toBe(200);
 

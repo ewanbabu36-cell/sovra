@@ -10799,16 +10799,74 @@ export class SovraDatabaseEngine {
   }
 
   // ==========================================
-  // USER LOGIN & LOGOUT
+  // USER LOGIN & LOGOUT (REMEDIATED SEC-CRIT-01 & SEC-HIGH-01)
   // ==========================================
+
+  // --- BRUTE-FORCE PROTECTION LEDGERS ---
+  private failedPinAttempts = new Map<string, { attempts: number; firstAttemptAt: number; lastAttemptAt: number; lockedUntil?: number }>();
+  private failedPinAttemptsByIp = new Map<string, { attempts: number; firstAttemptAt: number; lastAttemptAt: number; lockedUntil?: number }>();
+
+  public getFailedPinAttempts(accountDid: string): { attempts: number; isLocked: boolean; lockedUntil?: number } {
+    const rec = this.failedPinAttempts.get(accountDid);
+    if (!rec) return { attempts: 0, isLocked: false };
+    const now = Date.now();
+    if (rec.lockedUntil && rec.lockedUntil > now) {
+      return { attempts: rec.attempts, isLocked: true, lockedUntil: rec.lockedUntil };
+    }
+    if (now - rec.lastAttemptAt > 15 * 60 * 1000) {
+      this.failedPinAttempts.delete(accountDid);
+      return { attempts: 0, isLocked: false };
+    }
+    return { attempts: rec.attempts, isLocked: false };
+  }
+
+  public recordFailedPinAttempt(accountDid: string, ipAddress?: string): { isLocked: boolean; attempts: number; lockedUntil?: number } {
+    const now = Date.now();
+    let rec = this.failedPinAttempts.get(accountDid);
+    if (!rec || (now - rec.lastAttemptAt > 15 * 60 * 1000)) {
+      rec = { attempts: 1, firstAttemptAt: now, lastAttemptAt: now };
+    } else {
+      rec.attempts += 1;
+      rec.lastAttemptAt = now;
+    }
+
+    if (rec.attempts >= 5) {
+      rec.lockedUntil = now + 15 * 60 * 1000; // 15-minute lockout
+    }
+    this.failedPinAttempts.set(accountDid, rec);
+
+    if (ipAddress) {
+      let ipRec = this.failedPinAttemptsByIp.get(ipAddress);
+      if (!ipRec || (now - ipRec.lastAttemptAt > 10 * 60 * 1000)) {
+        ipRec = { attempts: 1, firstAttemptAt: now, lastAttemptAt: now };
+      } else {
+        ipRec.attempts += 1;
+        ipRec.lastAttemptAt = now;
+      }
+      if (ipRec.attempts >= 20) {
+        ipRec.lockedUntil = now + 15 * 60 * 1000;
+      }
+      this.failedPinAttemptsByIp.set(ipAddress, ipRec);
+    }
+
+    return {
+      isLocked: Boolean(rec.lockedUntil && rec.lockedUntil > now),
+      attempts: rec.attempts,
+      lockedUntil: rec.lockedUntil,
+    };
+  }
+
+  public clearFailedPinAttempts(accountDid: string): void {
+    this.failedPinAttempts.delete(accountDid);
+  }
 
   public loginUser(
     identifier: string,
     deviceName?: string,
-    ipAddressOrFactor?: string | { pin?: string; totpCode?: string; isEnclaveBypass?: boolean },
+    ipAddressOrFactor?: string | { pin?: string; totpCode?: string; webauthnVerified?: boolean },
     userAgent?: string,
-    factorArg?: { pin?: string; totpCode?: string; isEnclaveBypass?: boolean }
-  ): { ok: boolean; user?: UserRecord; sessionToken?: string; error?: string } {
+    factorArg?: { pin?: string; totpCode?: string; webauthnVerified?: boolean }
+  ): { ok: boolean; user?: UserRecord; sessionToken?: string; error?: string; isLocked?: boolean; isThrottled?: boolean } {
     this.load();
     const clean = identifier.trim();
     const cleanHandle = clean.startsWith('@') ? clean : '@' + clean;
@@ -10833,15 +10891,38 @@ export class SovraDatabaseEngine {
         return { ok: false, error: 'Invalid Google Authenticator 6-digit code.' };
       }
     } else if (user.securityPinHash) {
-      if (!factor || (!factor.isEnclaveBypass && !factor.pin && !factor.totpCode)) {
-        if (process.env.NODE_ENV !== 'production' || process.env.VITEST) {
-          factor = { pin: '123456', isEnclaveBypass: true };
-        } else {
-          return { ok: false, error: 'Security PIN or authentication factor required.' };
+      // 1. IP-level throttling check
+      if (ipAddress) {
+        const ipRec = this.failedPinAttemptsByIp.get(ipAddress);
+        if (ipRec?.lockedUntil && ipRec.lockedUntil > Date.now()) {
+          const remainingSec = Math.ceil((ipRec.lockedUntil - Date.now()) / 1000);
+          return {
+            ok: false,
+            error: `Too many failed authentication attempts from this IP address. Please try again in ${remainingSec} seconds.`,
+            isThrottled: true,
+          };
         }
       }
-      if (factor.isEnclaveBypass) {
-        // Enclave resident passkey verified
+
+      // 2. Account-level Lockout Check
+      const accountStatus = this.getFailedPinAttempts(user.did);
+      if (accountStatus.isLocked && accountStatus.lockedUntil) {
+        const remainingMinutes = Math.ceil((accountStatus.lockedUntil - Date.now()) / 60000);
+        return {
+          ok: false,
+          error: `Account temporarily locked due to excessive failed PIN attempts. Please try again in ${remainingMinutes} minute(s) or recover your account using your 12-word recovery mnemonic.`,
+          isLocked: true,
+        };
+      }
+
+      // 3. Strict authentication factor requirement (no bypass, no dev fallback!)
+      if (!factor || (!factor.webauthnVerified && !factor.pin && !factor.totpCode)) {
+        return { ok: false, error: 'Security PIN or authentication factor required.' };
+      }
+
+      if (factor.webauthnVerified) {
+        // Authenticated via genuine server-verified WebAuthn assertion ceremony
+        this.clearFailedPinAttempts(user.did);
       } else {
         let passed = false;
         if (factor.pin) {
@@ -10852,8 +10933,23 @@ export class SovraDatabaseEngine {
           passed = this.verifyTotpCode(user.totpSecret, factor.totpCode);
         }
         if (!passed) {
-          return { ok: false, error: 'Incorrect Security PIN.' };
+          const failResult = this.recordFailedPinAttempt(user.did, ipAddress);
+          if (failResult.isLocked) {
+            return {
+              ok: false,
+              error: 'Account temporarily locked due to 5 consecutive failed PIN attempts. Please wait 15 minutes or recover with your 12-word seed phrase.',
+              isLocked: true,
+            };
+          }
+          const remaining = 5 - failResult.attempts;
+          return {
+            ok: false,
+            error: `Incorrect Security PIN. ${remaining} attempt(s) remaining before temporary account lockout.`,
+          };
         }
+
+        // On successful PIN match:
+        this.clearFailedPinAttempts(user.did);
       }
     } else if (!user.securityPinHash) {
       if (factor && factor.pin) {
@@ -11092,6 +11188,7 @@ export class SovraDatabaseEngine {
     }
     user.securityPinHash = this.hashSecurityPin(cleanNew);
     user.updatedAt = Date.now();
+    this.clearFailedPinAttempts(user.did);
     this.save();
     return { ok: true };
   }
@@ -11117,6 +11214,7 @@ export class SovraDatabaseEngine {
 
     user.securityPinHash = this.hashSecurityPin(cleanNew);
     user.updatedAt = Date.now();
+    this.clearFailedPinAttempts(user.did);
     this.save();
     return { ok: true };
   }
