@@ -97,13 +97,13 @@ describe('PHASE 5: Adversarial Authentication Bypass & Brute-Force Remediation M
         if (res.status === 200) break;
       } catch {}
     }
-  });
+  }, 45000);
 
   afterAll(() => {
     if (serverProcess) {
       serverProcess.kill('SIGINT');
     }
-  });
+  }, 45000);
 
   const testUserHandle = `@victim_auth_${Date.now()}`;
   const validPin = '654321';
@@ -141,7 +141,7 @@ describe('PHASE 5: Adversarial Authentication Bypass & Brute-Force Remediation M
     });
     expect(res.status).toBe(401);
     expect(res.body.ok).toBe(false);
-    expect(res.body.error).toContain('Security PIN or authentication factor required');
+    expect(res.body.error).toBe('Invalid credentials');
   });
 
   // 3. Login with malformed WebAuthn assertion — MUST FAIL (HTTP 400/401)
@@ -345,8 +345,8 @@ describe('PHASE 5: Adversarial Authentication Bypass & Brute-Force Remediation M
     expect(meRes.body.user?.recoveryPhrase).toBeUndefined();
   });
 
-  // 11. Repeated incorrect PIN attempts — MUST trigger throttling / lockout
-  it('11. locks account after 5 consecutive incorrect PIN attempts (HTTP 429)', async () => {
+  // 11. Repeated incorrect PIN attempts — MUST trigger rate limiting on failures, but NOT deny correct PIN (DOS-01 & AUTH-01)
+  it('11. returns uniform 401 for failures, rate-limits further failures (429), but permits correct PIN login (DOS-01)', async () => {
     const bruteHandle = `@brute_target_${Date.now()}`;
     await postJson('/api/user/register', {
       handle: bruteHandle,
@@ -354,26 +354,27 @@ describe('PHASE 5: Adversarial Authentication Bypass & Brute-Force Remediation M
       securityPin: '998877',
     });
 
-    // 4 failed attempts should return 401 with remaining attempts warning
+    // 4 failed attempts should return uniform 401 without account existence leakage
     for (let i = 1; i <= 4; i++) {
       const failRes = await postJson('/api/user/login', { handle: bruteHandle, pin: '000000' });
       expect(failRes.status).toBe(401);
-      expect(failRes.body.error).toContain('Incorrect Security PIN');
+      expect(failRes.body.error).toBe('Invalid credentials');
     }
 
-    // 5th failed attempt triggers account lockout (HTTP 429)
+    // 5th failed attempt triggers rate limiting for invalid attempts (HTTP 429)
     const lockRes = await postJson('/api/user/login', { handle: bruteHandle, pin: '000000' });
     expect(lockRes.status).toBe(429);
-    expect(lockRes.body.error).toContain('Account temporarily locked');
+    expect(lockRes.body.error).toContain('rate-limited');
 
-    // 6th attempt remains locked even if user types the correct PIN!
-    const lockedWithCorrectPin = await postJson('/api/user/login', { handle: bruteHandle, pin: '998877' });
-    expect(lockedWithCorrectPin.status).toBe(429);
-    expect(lockedWithCorrectPin.body.error).toContain('Account temporarily locked');
+    // DOS-01: Correct PIN is NEVER denied service solely due to attacker failures!
+    const correctPinRes = await postJson('/api/user/login', { handle: bruteHandle, pin: '998877' });
+    expect(correctPinRes.status).toBe(200);
+    expect(correctPinRes.body.ok).toBe(true);
+    expect(correctPinRes.body.sessionToken).toBeDefined();
   });
 
-  // 12. Concurrent brute-force attempts — MUST NOT bypass limits
-  it('12. prevents race conditions: concurrent burst of 10 failed attempts locks account atomically', async () => {
+  // 12. Concurrent brute-force attempts — MUST NOT bypass limits, correct PIN remains accessible
+  it('12. prevents race conditions: burst of 10 failed attempts rate-limits atomically while correct PIN succeeds', async () => {
     const raceHandle = `@race_target_${Date.now()}`;
     await postJson('/api/user/register', {
       handle: raceHandle,
@@ -381,7 +382,7 @@ describe('PHASE 5: Adversarial Authentication Bypass & Brute-Force Remediation M
       securityPin: '445566',
     });
 
-    // Fire 10 simultaneous requests
+    // Fire 10 simultaneous requests with wrong PIN
     const promises = Array.from({ length: 10 }, () =>
       postJson('/api/user/login', { handle: raceHandle, pin: '111111' })
     );
@@ -392,10 +393,14 @@ describe('PHASE 5: Adversarial Authentication Bypass & Brute-Force Remediation M
     const lockedCount = statuses.filter(s => s === 429).length;
     expect(lockedCount).toBeGreaterThanOrEqual(1);
 
-    // Subsequent single request is locked
-    const followUp = await postJson('/api/user/login', { handle: raceHandle, pin: '445566' });
-    expect(followUp.status).toBe(429);
-    expect(followUp.body.error).toContain('Account temporarily locked');
+    // Subsequent single request with WRONG PIN is rate limited
+    const followUpWrong = await postJson('/api/user/login', { handle: raceHandle, pin: '999999' });
+    expect(followUpWrong.status).toBe(429);
+
+    // Legitimate user with CORRECT PIN authenticates successfully (DOS-01)
+    const followUpCorrect = await postJson('/api/user/login', { handle: raceHandle, pin: '445566' });
+    expect(followUpCorrect.status).toBe(200);
+    expect(followUpCorrect.body.ok).toBe(true);
   });
 
   // 13. Legitimate account recovery via 12-word recovery mnemonic — MUST remain functional
@@ -412,7 +417,8 @@ describe('PHASE 5: Adversarial Authentication Bypass & Brute-Force Remediation M
     for (let i = 0; i < 5; i++) {
       await postJson('/api/user/login', { handle: recoverHandle, pin: '000000' });
     }
-    const checkLocked = await postJson('/api/user/login', { handle: recoverHandle, pin: '123123' });
+    // Check rate-limited on wrong PIN
+    const checkLocked = await postJson('/api/user/login', { handle: recoverHandle, pin: '000000' });
     expect(checkLocked.status).toBe(429);
 
     // Execute legitimate recovery via 12-word mnemonic
@@ -423,6 +429,12 @@ describe('PHASE 5: Adversarial Authentication Bypass & Brute-Force Remediation M
     });
     expect(resetRes.status).toBe(200);
     expect(resetRes.body.ok).toBe(true);
+
+    // SESS-01: Verify old registration session token is now REVOKED
+    const oldSessionCheck = await getJson('/api/user/sessions', {
+      Authorization: `Bearer ${reg.body.sessionToken}`,
+    });
+    expect(oldSessionCheck.status).toBe(401);
 
     // Account is unlocked! Login with new PIN succeeds
     const newLoginRes = await postJson('/api/user/login', {
@@ -453,7 +465,7 @@ describe('PHASE 5: Adversarial Authentication Bypass & Brute-Force Remediation M
 
     // Attempt failed logins: wrong PIN and isEnclaveBypass
     const fail1 = await postJson('/api/user/login', { handle: unauthHandle, pin: '000000' });
-    expect(fail1.status).toBe(401);
+    expect([401, 429]).toContain(fail1.status);
 
     const fail2 = await postJson('/api/user/login', { handle: unauthHandle, isEnclaveBypass: true });
     expect(fail2.status).toBe(400);

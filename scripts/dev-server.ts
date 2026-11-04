@@ -33043,43 +33043,33 @@ function renderHtml(
     var _knownHandleDids = ${safeJsonForScript(Object.fromEntries(sovraDb.getAllUsers().map(u => [u.handle.toLowerCase(), u.did])))};
     var _knownUserTokens = ${safeJsonForScript(Object.fromEntries(sovraDb.getAllUsers().filter(u => u.sessionToken).map(u => [u.did, u.sessionToken])))};
 
+    // SESS-02: Purge any legacy session tokens from localStorage
+    try {
+      localStorage.removeItem('sovra_session_token');
+      localStorage.removeItem('sovra_session_token_enc');
+      localStorage.removeItem('sovra_admin_token');
+    } catch(e) {}
+
     window.getEffectiveSessionToken = function() {
-      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
-      if (myDid && typeof _knownUserTokens !== 'undefined' && _knownUserTokens && _knownUserTokens[myDid]) {
-        var canonicalTok = _knownUserTokens[myDid];
-        if (canonicalTok) {
-          if (typeof myProfile !== 'undefined' && myProfile) myProfile.sessionToken = canonicalTok;
-          try { localStorage.setItem('sovra_session_token', canonicalTok); } catch(e) {}
-          return canonicalTok;
-        }
-      }
-      var token = (typeof myProfile !== 'undefined' && myProfile && myProfile.sessionToken) ? myProfile.sessionToken : '';
-      if (!token) {
-        var localToken = localStorage.getItem('sovra_session_token');
-        if (localToken && localToken !== 'undefined' && localToken !== 'null') {
-          token = localToken;
-        }
-      }
-      return token;
+      // Browser authentication is mediated securely via HttpOnly cookies
+      // No raw bearer tokens are returned or read from localStorage
+      return '';
     };
 
     window.isUserAuthenticated = function() {
       if (typeof localStorage !== 'undefined') {
         if (localStorage.getItem('sovra_logged_out') === 'true') return false;
-        var token = localStorage.getItem('sovra_session_token');
+        var authActive = localStorage.getItem('sovra_auth_active');
         var profile = localStorage.getItem('sovra_user_profile');
-        if (token && profile) {
+        if (authActive === 'true' || profile) {
           try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
           return true;
         }
       }
       var p = (typeof window !== 'undefined' && window.myProfile) || (typeof myProfile !== 'undefined' ? myProfile : null);
       if (p && !p.isGuest) {
-        var t = p.sessionToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_session_token') : null);
-        if (t) {
-          try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
-          return true;
-        }
+        try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+        return true;
       }
       return false;
     };
@@ -33134,7 +33124,7 @@ function renderHtml(
           }
           if (_knownUserTokens && myProfile.did && _knownUserTokens[myProfile.did]) {
             myProfile.sessionToken = _knownUserTokens[myProfile.did];
-            try { localStorage.setItem('sovra_session_token', myProfile.sessionToken); } catch(e) {}
+            try { localStorage.setItem('sovra_auth_active', 'true'); } catch(e) {}
           }
           try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
         }
@@ -33211,7 +33201,7 @@ function renderHtml(
         const refreshedToken = response.headers && (response.headers.get('x-sovra-refreshed-token') || response.headers.get('X-Sovra-Refreshed-Token'));
         if (refreshedToken) {
           try {
-            localStorage.setItem('sovra_session_token', refreshedToken);
+            localStorage.setItem('sovra_auth_active', 'true');
             if (typeof myProfile !== 'undefined' && myProfile) {
               myProfile.sessionToken = refreshedToken;
               localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
@@ -33225,7 +33215,7 @@ function renderHtml(
           const freshTok = (canonicalToken && canonicalToken !== currentToken) ? canonicalToken : '';
           if (freshTok) {
             try {
-              localStorage.setItem('sovra_session_token', freshTok);
+              localStorage.setItem('sovra_auth_active', 'true');
               if (typeof myProfile !== 'undefined' && myProfile) {
                 myProfile.sessionToken = freshTok;
                 localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
@@ -33571,13 +33561,13 @@ function renderHtml(
         try {
           const encResult = await encrypt(token);
           if (encResult) {
-            localStorage.setItem('sovra_session_token_enc', JSON.stringify(encResult));
-            localStorage.setItem('sovra_session_token', token);
+            localStorage.removeItem('sovra_session_token_enc');
+            localStorage.setItem('sovra_auth_active', 'true');
           } else {
-            localStorage.setItem('sovra_session_token', token);
+            localStorage.setItem('sovra_auth_active', 'true');
           }
         } catch (_) {
-          localStorage.setItem('sovra_session_token', token);
+          localStorage.setItem('sovra_auth_active', 'true');
         }
       }
 
@@ -42744,7 +42734,7 @@ function renderHtml(
       if (myProfile) {
         const activeSavedToken = localStorage.getItem('sovra_session_token');
         if ((!activeSavedToken || activeSavedToken === 'undefined' || activeSavedToken === 'null') && myProfile.sessionToken) {
-          try { localStorage.setItem('sovra_session_token', myProfile.sessionToken); } catch(e) {}
+          try { localStorage.setItem('sovra_auth_active', 'true'); } catch(e) {}
         }
       }
     } else {
@@ -43924,7 +43914,7 @@ function renderHtml(
         localStorage.removeItem('sovra_logged_out');
         localStorage.removeItem('sovra_is_guest');
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-        if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
+        if (data.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
 
         // 1. Immediately dismiss modal & display app UI (Zero latency)
         var womEl = document.getElementById('welcomeOnboardingModal');
@@ -44061,7 +44051,7 @@ function renderHtml(
         currentUserHandle = myProfile.handle;
         localStorage.removeItem('sovra_logged_out');
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-        if (verData.sessionToken) localStorage.setItem('sovra_session_token', verData.sessionToken);
+        if (verData.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
 
         registerPeerOnLan(myProfile);
 
@@ -44255,7 +44245,7 @@ function renderHtml(
           currentUserHandle = myProfile.handle;
           localStorage.removeItem('sovra_logged_out');
           localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-          if (regData.sessionToken) localStorage.setItem('sovra_session_token', regData.sessionToken);
+          if (regData.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
           var womEl = document.getElementById('welcomeOnboardingModal');
           if (womEl) {
             womEl.classList.add('modal-dismissed');
@@ -44297,7 +44287,7 @@ function renderHtml(
       window.myProfile = myProfile;
       try {
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-        if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
+        if (myProfile.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
       } catch(e) {}
       currentUserHandle = myProfile.handle;
       contactsData = [];
@@ -44465,7 +44455,7 @@ function renderHtml(
         currentUserHandle = myProfile.handle;
         try {
           localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-          if (myProfile.sessionToken) localStorage.setItem('sovra_session_token', myProfile.sessionToken);
+          if (myProfile.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
         } catch (e) {}
 
         registerPeerOnLan(myProfile);
@@ -45148,7 +45138,7 @@ function renderHtml(
       .then(function(data) {
         if (data && data.ok) {
           if (data.sessionToken) {
-            localStorage.setItem('sovra_session_token', data.sessionToken);
+            localStorage.setItem('sovra_auth_active', 'true');
             document.cookie = 'sovra_session_token=' + data.sessionToken + '; path=/; max-age=31536000';
           }
           if (data.user) {
@@ -45668,7 +45658,7 @@ function renderHtml(
         }
 
         if (data.sessionToken) {
-          localStorage.setItem('sovra_session_token', data.sessionToken);
+          localStorage.setItem('sovra_auth_active', 'true');
         }
         if (data.user) {
           localStorage.setItem('sovra_user_profile', JSON.stringify(data.user));
@@ -46397,7 +46387,7 @@ function renderHtml(
         localStorage.removeItem('sovra_logged_out');
         try {
           localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-          if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
+          if (data.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
         } catch (e) {}
 
         registerPeerOnLan(myProfile);
@@ -46448,7 +46438,7 @@ function renderHtml(
           if (data.ok && data.user) {
             localStorage.removeItem('sovra_logged_out');
             myProfile = data.user;
-            if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
+            if (data.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
             localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
           }
         }).catch(() => {});
@@ -53373,7 +53363,7 @@ function renderHtml(
         };
         try {
           localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-          localStorage.setItem('sovra_session_token', myProfile.sessionToken);
+          localStorage.setItem('sovra_auth_active', 'true');
         } catch(e) {}
       }
       const captionEl = document.getElementById('dynamicPostCaption');
@@ -84219,7 +84209,7 @@ function renderHtml(
 
       try {
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-        localStorage.setItem('sovra_session_token', myProfile.sessionToken);
+        localStorage.setItem('sovra_auth_active', 'true');
         localStorage.removeItem('sovra_is_guest');
         localStorage.setItem('sovra_has_followed', 'true');
         localStorage.setItem('sovra_auth_mode', 'registered');
@@ -89058,13 +89048,7 @@ async function startDevServer() {
         }
       }
     }
-    if (!token && req.url) {
-      try {
-        const u = new URL(req.url, 'http://localhost');
-        const qToken = u.searchParams.get('sessionToken') || u.searchParams.get('token');
-        if (qToken) token = qToken.trim();
-      } catch (e) {}
-    }
+    // PRIV-01 & SESS-02: Query-parameter authentication tokens are strictly prohibited (CWE-598)
     if (!token && _parsedBody && typeof _parsedBody === 'object') {
       if (_parsedBody.sessionToken) {
         token = String(_parsedBody.sessionToken).trim();
@@ -89623,8 +89607,11 @@ async function startDevServer() {
     // ==========================================
     if ((url.pathname === '/api/realtime/stream' || url.pathname === '/api/chat/events' || url.pathname === '/api/chat/stream') && req.method === 'GET') {
       const authHeader = req.headers.authorization;
-      const qToken = url.searchParams.get('token') || url.searchParams.get('sessionToken');
-      const token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.substring(7).trim() : (qToken ? qToken.trim() : '');
+      let token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.substring(7).trim() : '';
+      if (!token && req.headers.cookie) {
+        const match = req.headers.cookie.match(/(?:^|;\s*)sovra_session_token=([^;]+)/);
+        if (match) token = decodeURIComponent(match[1]).trim();
+      }
       if (!token) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Valid session token required for realtime stream' }));
@@ -95026,7 +95013,7 @@ async function startDevServer() {
           ok: true,
           user: toPublicUserDTO(user),
           sessionToken: user.sessionToken,
-          recoveryPhrase: user.recoveryPhrase,
+          recoveryPhrase: regResult.recoveryPhrase,
         }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -95063,14 +95050,20 @@ async function startDevServer() {
         } : undefined;
         const loginRes = sovraDb.loginUser(identifier, deviceName, clientIp, req.headers['user-agent'] as string, factor);
         if (!loginRes.ok || !loginRes.user) {
-          const status = (loginRes as any).isLocked || (loginRes as any).isThrottled ? 429 : (loginRes.error?.includes('not found') ? 404 : 401);
-          res.writeHead(status, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: loginRes.error || 'Authentication failed' }));
+          const status = (loginRes as any).isLocked || (loginRes as any).isThrottled ? 429 : 401;
+          res.writeHead(status, {
+            'Content-Type': 'application/json',
+            'Referrer-Policy': 'no-referrer',
+            'X-Content-Type-Options': 'nosniff',
+          });
+          res.end(JSON.stringify({ ok: false, error: loginRes.error || 'Invalid credentials' }));
           return;
         }
         const isSecureLogin = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https');
         res.writeHead(200, {
           'Content-Type': 'application/json',
+          'Referrer-Policy': 'strict-origin-when-cross-origin',
+          'X-Content-Type-Options': 'nosniff',
           'Set-Cookie': `sovra_session_token=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
         });
         res.end(JSON.stringify({
@@ -95351,12 +95344,22 @@ async function startDevServer() {
         }
         const recoverRes = sovraDb.resetSecurityPinWithRecoveryPhrase(identifier, recoveryPhrase, newPin);
         if (!recoverRes.ok) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: recoverRes.error || 'Failed to reset PIN with recovery phrase.' }));
+          res.writeHead(400, {
+            'Content-Type': 'application/json',
+            'Referrer-Policy': 'no-referrer',
+            'X-Content-Type-Options': 'nosniff',
+          });
+          res.end(JSON.stringify({ ok: false, error: recoverRes.error || 'Invalid recovery credentials.' }));
           return;
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, message: 'Security PIN reset successfully! You can now log in with your new PIN.' }));
+        const isSecure = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https');
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Referrer-Policy': 'no-referrer',
+          'X-Content-Type-Options': 'nosniff',
+          'Set-Cookie': `sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecure ? '; Secure' : ''}`,
+        });
+        res.end(JSON.stringify({ ok: true, message: 'Security PIN reset successfully! All active sessions have been revoked. Please log in with your new PIN.' }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
@@ -95833,19 +95836,15 @@ async function startDevServer() {
       const principal = resolvePrincipal(req);
       const did = url.searchParams.get('did') || '';
       const handle = url.searchParams.get('handle') || '';
-      const sessionTokenQuery = url.searchParams.get('sessionToken') || '';
       let user: any = null;
-      if (sessionTokenQuery) {
-        user = sovraDb.findUserBySessionToken(sessionTokenQuery);
-      }
-      if (!user && did) {
+      if (did) {
         user = sovraDb.findUserByDid(did);
-      } else if (!user && handle) {
+      } else if (handle) {
         user = sovraDb.findUserByHandle(handle);
-      } else if (!user && principal) {
+      } else if (principal) {
         user = sovraDb.findUserByDid(principal.did);
       }
-      if (!user && (did || handle || sessionTokenQuery)) {
+      if (!user && (did || handle)) {
         if (handle === '@laptop_host' || did === 'did:sovra:laptop_host') {
           user = sovraDb.getAllUsers().find(u => u.handle === '@laptop_host' || u.did === 'did:sovra:laptop_host') || null;
         }
@@ -95863,41 +95862,32 @@ async function startDevServer() {
             avatar: '💻',
             avatarBg: '#0284c7',
             role: 'creator',
-            sessionToken: sessionTokenQuery || ('stk_' + Date.now()),
+            sessionToken: 'stk_' + Date.now(),
           });
         }
       }
-      if (!user && !did && !handle && !sessionTokenQuery) {
+      if (!user && !did && !handle) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Unauthorized: No active session' }));
         return;
       }
-      const isSelf = !!(
-        (principal && user && (principal.did === user.did)) ||
-        (sessionTokenQuery && user && user.sessionToken === sessionTokenQuery)
-      );
+      const isSelf = !!(principal && user && (principal.did === user.did));
       const userDTO: any = toPublicUserDTO(user);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, user: userDTO }));
       return;
     }
 
+    // PRIV-01: Zero-knowledge recovery phrase policy - never exportable from server
     if (url.pathname === '/api/user/recovery-phrase' && req.method === 'GET') {
-      const principal = resolvePrincipal(req);
-      const sessionTokenQuery = url.searchParams.get('sessionToken') || '';
-      let user: any = null;
-      if (principal) {
-        user = sovraDb.findUserByDid(principal.did);
-      } else if (sessionTokenQuery) {
-        user = sovraDb.findUserBySessionToken(sessionTokenQuery);
-      }
-      if (!user) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: No active session' }));
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, recoveryPhrase: user.recoveryPhrase || '' }));
+      res.writeHead(403, {
+        'Content-Type': 'application/json',
+        'Referrer-Policy': 'no-referrer',
+      });
+      res.end(JSON.stringify({
+        ok: false,
+        error: 'Zero-Knowledge Security Policy: Master recovery phrases are never stored or exportable from the server. Use your offline backup recorded during registration.',
+      }));
       return;
     }
 
@@ -95952,12 +95942,15 @@ async function startDevServer() {
           sovraDb.upsertUser(user);
         }
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Referrer-Policy': 'no-referrer',
+          'X-Content-Type-Options': 'nosniff',
+        });
         res.end(JSON.stringify({
           ok: true,
           user: toPublicUserDTO(user),
           sessionToken: user.sessionToken,
-          recoveryPhrase: user.recoveryPhrase,
         }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });

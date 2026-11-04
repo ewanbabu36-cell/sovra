@@ -1230,7 +1230,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             <span class="ops-table-title">🔑 Cryptographic Node Identity &amp; Bindings</span>
             <button class="btn-ops btn-ops-user-app" onclick="inspectRawStatusJson()">View Raw Status JSON</button>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <tbody>
               <tr>
@@ -1275,7 +1275,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
       </section>
@@ -1297,7 +1297,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             <span class="ops-table-title">Active Mesh Peer Table</span>
             <span style="font-size: 0.78rem; color: #34d399; font-family: var(--font-mono);">Ad-Hoc TTL: 7 Hops Active</span>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -1327,7 +1327,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 </tr>
               `}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
       </section>
@@ -1369,7 +1369,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           <div class="ops-table-header">
             <span class="ops-table-title">Recent Merkle DAG CIDs</span>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -1397,7 +1397,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 </tr>
               `}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
       </section>
@@ -1441,7 +1441,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           <div class="ops-table-header">
             <span class="ops-table-title">Cryptographic Off-Chain Voucher Stream</span>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -1465,7 +1465,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 </tr>
               `).join('')}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
 
@@ -1506,7 +1506,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             <span class="ops-table-title">CosmWasm AMM Liquidity Pools Directory</span>
             <span style="font-size: 0.75rem; color: #94a3b8;">Instant 1-Click Liquidity Verification</span>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -1552,7 +1552,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 `;
               }).join('')}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
       </section>
@@ -1636,7 +1636,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             </div>
           </div>
 
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <!-- Floating Batch Toolbar -->
           <div id="adminUserBatchToolbar" style="display: none; align-items: center; justify-content: space-between; padding: 10px 16px; background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(16px); border: 1px solid #38bdf8; border-radius: 12px; margin-bottom: 0.75rem;">
             <span style="font-size: 0.82rem; font-weight: 700; color: #fff;"><span id="adminSelectedUsersCount">0</span> users selected</span>
@@ -1714,7 +1714,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 </tr>
               `).join('')}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
       </section>
@@ -1749,7 +1749,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             <span class="ops-table-title">📜 Immutable Activity Ledger</span>
             <span style="font-size: 0.75rem; color: #34d399; font-family: var(--font-mono);">● Real-Time Stream</span>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -1790,7 +1790,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 `;
               }).join('')}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
       </section>
@@ -1879,7 +1879,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             <span class="ops-table-title">Live Trust &amp; Safety Moderation Queue</span>
             <span style="font-size: 0.76rem; color: #94a3b8; font-family: var(--font-mono);">Real-Time P2P Flag Dispatcher</span>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -1980,7 +1980,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 `;
               }).join('')}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
 
@@ -1993,7 +1993,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             </div>
             <span class="ops-pill online"><span class="pulse-dot"></span> Quorum Engine Active</span>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -2045,7 +2045,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 `;
               }).join('')}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
 
@@ -2064,7 +2064,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               <button class="btn-ops btn-ops-user-app" onclick="refreshStrikeLedger()">🔄 Refresh</button>
             </div>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -2124,7 +2124,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 `;
               }).join('')}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
       </section>
@@ -2314,7 +2314,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             </div>
             <span class="ops-pill online"><span class="pulse-dot"></span> P2P Mesh Optimal</span>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -2350,7 +2350,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 `;
               }).join('')}
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
 
@@ -2533,7 +2533,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             <span class="ops-table-title">📡 Network Entities Directory</span>
             <span style="font-size:0.75rem; color:#94a3b8;">Centralized Admin Audit (Isolated from Consumer User Profiles)</span>
           </div>
-          <div class="ops-table-responsive">
+          <div class="ops-table-responsive">
             <table class="ops-table">
             <thead>
               <tr>
@@ -2598,7 +2598,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                     ].join('')
               }
             </tbody>
-          </table>
+          </table>
           </div>
         </div>
       </section>
@@ -3548,7 +3548,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       </div>
 
       <div style="max-height: 420px; overflow-y: auto;">
-        <div class="ops-table-responsive">
+        <div class="ops-table-responsive">
           <table class="ops-table">
           <thead>
             <tr>
@@ -3576,7 +3576,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               </tr>
             `).join('')}
           </tbody>
-        </table>
+        </table>
         </div>
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 8px;">
@@ -3864,7 +3864,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       <div class="ops-table-header">
         <span class="ops-table-title">Active Governance Quorum Proposals (Threshold: 2 Co-Signatures)</span>
       </div>
-      <div class="ops-table-responsive">
+      <div class="ops-table-responsive">
         <table class="ops-table">
         <thead>
           <tr>
@@ -3879,7 +3879,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <tbody id="governanceProposalsTableBody">
           <tr><td colspan="6" style="text-align: center; color: #64748b; padding: 1.5rem;">Loading governance proposals...</td></tr>
         </tbody>
-      </table>
+      </table>
       </div>
     </div>
 
@@ -4916,7 +4916,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       const modal = document.getElementById('adminStateDiffModal');
       if (modal) modal.style.display = 'none';
     };
-
+
     function showOpsToast(msg) {
       var toast = document.getElementById('opsToast');
       var toastMsg = document.getElementById('opsToastMsg');
@@ -6360,7 +6360,7 @@ export function renderAdminLoginHtml(): string {
         });
         const data = await res.json();
         if (data.ok && data.sessionToken) {
-          localStorage.setItem('sovra_admin_token', data.sessionToken);
+          try { localStorage.removeItem('sovra_admin_token'); } catch(e) {}
           document.cookie = 'sovra_session_token=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; Max-Age=604800';
           window.location.reload();
         } else {
