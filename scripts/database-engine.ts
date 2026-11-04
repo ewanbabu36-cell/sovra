@@ -143,7 +143,9 @@ export interface UserRecord {
   securityPinHash?: string; // SHA-256 hash of 6-digit PIN
   totpSecret?: string; // Base32 RFC 6238 TOTP Secret Key for Google Authenticator
   totpEnabled?: boolean; // Whether Google Authenticator 2FA is active
-  recoveryPhrase?: string; // 12-Word Sovereign Disaster Recovery Seed Phrase
+  recoveryPhrase?: string; // Legacy plaintext (deprecated; purged on load migration)
+  recoveryPhraseHash?: string; // Salted scrypt key-derivation verifier (PRIV-01)
+  recoveryPhraseSalt?: string; // Cryptographic 16-byte salt (hex)
   webauthnCredentials?: WebAuthnCredentialRecord[]; // Native Hardware Enclave / Biometric credentials
   closeFriendsDids?: string[]; // Instagram-grade Close Friends whitelist DIDs
   strikesCount?: number;
@@ -2651,16 +2653,23 @@ export class SovraDatabaseEngine {
       }
     }
 
-    // Ensure every user has a unique, cryptographically random BIP-39 recovery phrase
+    // PRIV-01: Auto-migrate legacy plaintext recovery phrases to salted scrypt key-derivation verifiers
     let usersNeedSave = false;
-    const seenRecoveryPhrases = new Set<string>();
     for (const u of this.db.users) {
-      const isDefaultStatic = (u.recoveryPhrase === 'sovereign galaxy velvet nexus matrix beacon titan solar quantum pulse harbor orbit');
-      if (!u.recoveryPhrase || isDefaultStatic || seenRecoveryPhrases.has(u.recoveryPhrase.toLowerCase())) {
-        u.recoveryPhrase = this.generateRecoveryPhrase();
+      if (u.recoveryPhrase) {
+        const { hash, salt } = this.hashRecoveryPhrase(u.recoveryPhrase);
+        u.recoveryPhraseHash = hash;
+        u.recoveryPhraseSalt = salt;
+        delete u.recoveryPhrase;
+        usersNeedSave = true;
+      } else if (!u.recoveryPhraseHash || !u.recoveryPhraseSalt) {
+        const generated = this.generateRecoveryPhrase();
+        const { hash, salt } = this.hashRecoveryPhrase(generated);
+        u.recoveryPhraseHash = hash;
+        u.recoveryPhraseSalt = salt;
+        delete u.recoveryPhrase;
         usersNeedSave = true;
       }
-      seenRecoveryPhrases.add(u.recoveryPhrase.toLowerCase());
     }
     if (usersNeedSave) {
       this.save();
@@ -2897,9 +2906,14 @@ export class SovraDatabaseEngine {
     const normInput = phrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
     if (!normInput) return undefined;
     return this.db.users.find(u => {
-      if (!u.recoveryPhrase) return false;
-      const normStored = u.recoveryPhrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
-      return normStored === normInput;
+      if (u.recoveryPhraseHash && u.recoveryPhraseSalt) {
+        return this.verifyRecoveryPhrase(normInput, u.recoveryPhraseHash, u.recoveryPhraseSalt);
+      }
+      if (u.recoveryPhrase) {
+        const normStored = u.recoveryPhrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+        return normStored === normInput;
+      }
+      return false;
     });
   }
 
@@ -2937,7 +2951,7 @@ export class SovraDatabaseEngine {
     balanceSov?: number;
     securityPin?: string;
     recoveryPhrase?: string;
-  }): { ok: true; user: UserRecord } | { ok: false; error: string; code: number } {
+  }): { ok: true; user: UserRecord; recoveryPhrase?: string } | { ok: false; error: string; code: number } {
     this.load();
     let cleanHandle = user.handle.trim();
     if (!cleanHandle.startsWith('@')) cleanHandle = '@' + cleanHandle;
@@ -2957,6 +2971,8 @@ export class SovraDatabaseEngine {
     const now = Date.now();
     const sessionToken = user.sessionToken || ('stk_' + crypto.randomBytes(24).toString('hex'));
     const chosenPin = (user.securityPin && user.securityPin.trim()) ? user.securityPin.trim() : '123456';
+    const rawRecoveryPhrase = user.recoveryPhrase || this.generateRecoveryPhrase();
+    const { hash: recHash, salt: recSalt } = this.hashRecoveryPhrase(rawRecoveryPhrase);
     const record: UserRecord = {
       did: user.did || ('did:sovra:user_' + crypto.randomBytes(8).toString('hex')),
       handle: cleanHandle,
@@ -2973,7 +2989,8 @@ export class SovraDatabaseEngine {
       securityPinHash: this.hashSecurityPin(chosenPin),
       totpSecret: this.generateTotpSecret(),
       totpEnabled: false,
-      recoveryPhrase: user.recoveryPhrase || this.generateRecoveryPhrase(),
+      recoveryPhraseHash: recHash,
+      recoveryPhraseSalt: recSalt,
       createdAt: now,
       updatedAt: now,
     };
@@ -3008,7 +3025,7 @@ export class SovraDatabaseEngine {
     try {
       this.sqliteEngine?.registerUser(record);
     } catch (_) {}
-    return { ok: true, user: record };
+    return { ok: true, user: record, recoveryPhrase: rawRecoveryPhrase };
   }
 
   public createUser(user: Partial<UserRecord> & { did: string; handle: string; displayName: string }): UserRecord {
@@ -3042,7 +3059,8 @@ export class SovraDatabaseEngine {
       securityPinHash: user.securityPinHash !== undefined ? user.securityPinHash : (existingIdx >= 0 ? this.db.users[existingIdx]!.securityPinHash : undefined),
       totpSecret: user.totpSecret !== undefined ? user.totpSecret : (existingIdx >= 0 ? this.db.users[existingIdx]!.totpSecret : undefined),
       totpEnabled: user.totpEnabled !== undefined ? user.totpEnabled : (existingIdx >= 0 ? Boolean(this.db.users[existingIdx]!.totpEnabled) : false),
-      recoveryPhrase: user.recoveryPhrase !== undefined ? user.recoveryPhrase : (existingIdx >= 0 ? this.db.users[existingIdx]!.recoveryPhrase : undefined),
+      recoveryPhraseHash: user.recoveryPhraseHash || (user.recoveryPhrase ? this.hashRecoveryPhrase(user.recoveryPhrase).hash : (existingIdx >= 0 ? this.db.users[existingIdx]!.recoveryPhraseHash : undefined)),
+      recoveryPhraseSalt: user.recoveryPhraseSalt || (user.recoveryPhrase ? this.hashRecoveryPhrase(user.recoveryPhrase).salt : (existingIdx >= 0 ? this.db.users[existingIdx]!.recoveryPhraseSalt : undefined)),
       webauthnCredentials: user.webauthnCredentials || (existingIdx >= 0 ? this.db.users[existingIdx]!.webauthnCredentials : undefined),
       role: user.role || (existingIdx >= 0 ? this.db.users[existingIdx]!.role : undefined),
       createdAt: existingIdx >= 0 ? this.db.users[existingIdx]!.createdAt : now,
@@ -10802,25 +10820,22 @@ export class SovraDatabaseEngine {
   // USER LOGIN & LOGOUT (REMEDIATED SEC-CRIT-01 & SEC-HIGH-01)
   // ==========================================
 
-  // --- BRUTE-FORCE PROTECTION LEDGERS ---
-  private failedPinAttempts = new Map<string, { attempts: number; firstAttemptAt: number; lastAttemptAt: number; lockedUntil?: number }>();
+  // --- BRUTE-FORCE PROTECTION & ANTI-DOS RISK LEDGERS ---
+  private failedPinAttempts = new Map<string, { attempts: number; firstAttemptAt: number; lastAttemptAt: number }>();
   private failedPinAttemptsByIp = new Map<string, { attempts: number; firstAttemptAt: number; lastAttemptAt: number; lockedUntil?: number }>();
 
-  public getFailedPinAttempts(accountDid: string): { attempts: number; isLocked: boolean; lockedUntil?: number } {
+  public getFailedPinAttempts(accountDid: string): { attempts: number; isElevatedRisk: boolean } {
     const rec = this.failedPinAttempts.get(accountDid);
-    if (!rec) return { attempts: 0, isLocked: false };
+    if (!rec) return { attempts: 0, isElevatedRisk: false };
     const now = Date.now();
-    if (rec.lockedUntil && rec.lockedUntil > now) {
-      return { attempts: rec.attempts, isLocked: true, lockedUntil: rec.lockedUntil };
-    }
     if (now - rec.lastAttemptAt > 15 * 60 * 1000) {
       this.failedPinAttempts.delete(accountDid);
-      return { attempts: 0, isLocked: false };
+      return { attempts: 0, isElevatedRisk: false };
     }
-    return { attempts: rec.attempts, isLocked: false };
+    return { attempts: rec.attempts, isElevatedRisk: rec.attempts >= 5 };
   }
 
-  public recordFailedPinAttempt(accountDid: string, ipAddress?: string): { isLocked: boolean; attempts: number; lockedUntil?: number } {
+  public recordFailedPinAttempt(accountDid: string, ipAddress?: string): { attempts: number; isIpLocked: boolean; ipLockedUntil?: number } {
     const now = Date.now();
     let rec = this.failedPinAttempts.get(accountDid);
     if (!rec || (now - rec.lastAttemptAt > 15 * 60 * 1000)) {
@@ -10829,11 +10844,10 @@ export class SovraDatabaseEngine {
       rec.attempts += 1;
       rec.lastAttemptAt = now;
     }
-
-    if (rec.attempts >= 5) {
-      rec.lockedUntil = now + 15 * 60 * 1000; // 15-minute lockout
-    }
     this.failedPinAttempts.set(accountDid, rec);
+
+    let isIpLocked = false;
+    let ipLockedUntil: number | undefined;
 
     if (ipAddress) {
       let ipRec = this.failedPinAttemptsByIp.get(ipAddress);
@@ -10843,17 +10857,15 @@ export class SovraDatabaseEngine {
         ipRec.attempts += 1;
         ipRec.lastAttemptAt = now;
       }
-      if (ipRec.attempts >= 20) {
+      if (ipRec.attempts >= 10) {
         ipRec.lockedUntil = now + 15 * 60 * 1000;
+        isIpLocked = true;
+        ipLockedUntil = ipRec.lockedUntil;
       }
       this.failedPinAttemptsByIp.set(ipAddress, ipRec);
     }
 
-    return {
-      isLocked: Boolean(rec.lockedUntil && rec.lockedUntil > now),
-      attempts: rec.attempts,
-      lockedUntil: rec.lockedUntil,
-    };
+    return { attempts: rec.attempts, isIpLocked, ipLockedUntil };
   }
 
   public clearFailedPinAttempts(accountDid: string): void {
@@ -10870,54 +10882,49 @@ export class SovraDatabaseEngine {
     this.load();
     const clean = identifier.trim();
     const cleanHandle = clean.startsWith('@') ? clean : '@' + clean;
+
+    let factor = (typeof ipAddressOrFactor === 'object' && ipAddressOrFactor !== null) ? ipAddressOrFactor : factorArg;
+    const ipAddress = typeof ipAddressOrFactor === 'string' ? ipAddressOrFactor : undefined;
+
+    // 2. Identity lookup
     const user = this.db.users.find(u =>
       u.did === clean ||
       u.handle.toLowerCase() === clean.toLowerCase() ||
       u.handle.toLowerCase() === cleanHandle.toLowerCase()
     );
+
+    // AUTH-01: Indistinguishable response and constant-time dummy verification on non-existent account
     if (!user) {
-      return { ok: false, error: 'User account not found' };
+      this.verifySecurityPin('000000', '$scrypt$ln=14,r=8,p=1$7465737473616c74$7465737468617368');
+      if (ipAddress) {
+        this.recordFailedPinAttempt('did:sovra:nonexistent', ipAddress);
+      }
+      return { ok: false, error: 'Invalid credentials' };
     }
 
-    let factor = (typeof ipAddressOrFactor === 'object' && ipAddressOrFactor !== null) ? ipAddressOrFactor : factorArg;
-    const ipAddress = typeof ipAddressOrFactor === 'string' ? ipAddressOrFactor : undefined;
-
-    // Verify 2FA / Security PIN factors
+    // 3. Credential Evaluation
     if (user.totpEnabled) {
       if (!factor || !factor.totpCode) {
-        return { ok: false, error: 'Google Authenticator 2FA code is required for this account.' };
+        return { ok: false, error: 'Invalid credentials' };
       }
       if (!user.totpSecret || !this.verifyTotpCode(user.totpSecret, factor.totpCode)) {
-        return { ok: false, error: 'Invalid Google Authenticator 6-digit code.' };
+        this.recordFailedPinAttempt(user.did, ipAddress);
+        return { ok: false, error: 'Invalid credentials' };
       }
     } else if (user.securityPinHash) {
-      // 1. IP-level throttling check
-      if (ipAddress) {
-        const ipRec = this.failedPinAttemptsByIp.get(ipAddress);
-        if (ipRec?.lockedUntil && ipRec.lockedUntil > Date.now()) {
-          const remainingSec = Math.ceil((ipRec.lockedUntil - Date.now()) / 1000);
-          return {
-            ok: false,
-            error: `Too many failed authentication attempts from this IP address. Please try again in ${remainingSec} seconds.`,
-            isThrottled: true,
-          };
-        }
-      }
-
-      // 2. Account-level Lockout Check
-      const accountStatus = this.getFailedPinAttempts(user.did);
-      if (accountStatus.isLocked && accountStatus.lockedUntil) {
-        const remainingMinutes = Math.ceil((accountStatus.lockedUntil - Date.now()) / 60000);
-        return {
-          ok: false,
-          error: `Account temporarily locked due to excessive failed PIN attempts. Please try again in ${remainingMinutes} minute(s) or recover your account using your 12-word recovery mnemonic.`,
-          isLocked: true,
-        };
-      }
-
-      // 3. Strict authentication factor requirement (no bypass, no dev fallback!)
+      // Strict factor requirement
       if (!factor || (!factor.webauthnVerified && !factor.pin && !factor.totpCode)) {
-        return { ok: false, error: 'Security PIN or authentication factor required.' };
+        if (ipAddress) {
+          const ipRec = this.failedPinAttemptsByIp.get(ipAddress);
+          if (ipRec?.lockedUntil && ipRec.lockedUntil > Date.now()) {
+            return {
+              ok: false,
+              error: 'Too many failed authentication attempts from this IP address. Please try again later.',
+              isThrottled: true,
+            };
+          }
+        }
+        return { ok: false, error: 'Invalid credentials' };
       }
 
       if (factor.webauthnVerified) {
@@ -10932,24 +10939,45 @@ export class SovraDatabaseEngine {
         if (!passed && factor.totpCode && user.totpSecret) {
           passed = this.verifyTotpCode(user.totpSecret, factor.totpCode);
         }
-        if (!passed) {
+
+        if (passed) {
+          // DOS-01: Correct PIN is ALWAYS accepted and resets account failure counter!
+          this.clearFailedPinAttempts(user.did);
+        } else {
+          // Check IP lock on failure
+          if (ipAddress) {
+            const ipRec = this.failedPinAttemptsByIp.get(ipAddress);
+            if (ipRec?.lockedUntil && ipRec.lockedUntil > Date.now()) {
+              const remainingSec = Math.ceil((ipRec.lockedUntil - Date.now()) / 1000);
+              return {
+                ok: false,
+                error: `Too many failed authentication attempts from this IP address. Please try again in ${remainingSec} seconds.`,
+                isThrottled: true,
+              };
+            }
+          }
+
+          // Failure handling:
           const failResult = this.recordFailedPinAttempt(user.did, ipAddress);
-          if (failResult.isLocked) {
+          if (failResult.isIpLocked) {
             return {
               ok: false,
-              error: 'Account temporarily locked due to 5 consecutive failed PIN attempts. Please wait 15 minutes or recover with your 12-word seed phrase.',
+              error: 'Too many failed authentication attempts from this IP address. Please try again in 15 minutes.',
+              isThrottled: true,
+            };
+          }
+          if (failResult.attempts >= 5) {
+            return {
+              ok: false,
+              error: 'Account authentication rate-limited due to multiple failed attempts. Please enter your correct PIN or recover using your 12-word recovery mnemonic.',
               isLocked: true,
             };
           }
-          const remaining = 5 - failResult.attempts;
           return {
             ok: false,
-            error: `Incorrect Security PIN. ${remaining} attempt(s) remaining before temporary account lockout.`,
+            error: 'Invalid credentials',
           };
         }
-
-        // On successful PIN match:
-        this.clearFailedPinAttempts(user.did);
       }
     } else if (!user.securityPinHash) {
       if (factor && factor.pin) {
@@ -10960,7 +10988,7 @@ export class SovraDatabaseEngine {
         }
       }
     } else if (!user.securityPinHash && !factor && process.env.NODE_ENV === 'production') {
-      return { ok: false, error: 'Authentication factor required.' };
+      return { ok: false, error: 'Invalid credentials' };
     }
 
     const token = 'stk_' + crypto.randomBytes(24).toString('hex');
@@ -11133,6 +11161,27 @@ export class SovraDatabaseEngine {
     return fallback.join(' ');
   }
 
+  public hashRecoveryPhrase(phrase: string, salt?: string): { hash: string; salt: string } {
+    const cleanSalt = salt || crypto.randomBytes(16).toString('hex');
+    const norm = phrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+    const hash = crypto.scryptSync(norm, cleanSalt, 32, { N: 16384, r: 8, p: 1 }).toString('hex');
+    return { hash, salt: cleanSalt };
+  }
+
+  public verifyRecoveryPhrase(inputPhrase: string, storedHash: string, salt: string): boolean {
+    if (!inputPhrase || !storedHash || !salt) return false;
+    try {
+      const norm = inputPhrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+      const derived = crypto.scryptSync(norm, salt, 32, { N: 16384, r: 8, p: 1 }).toString('hex');
+      const a = Buffer.from(derived, 'hex');
+      const b = Buffer.from(storedHash, 'hex');
+      if (a.length !== b.length) return false;
+      return crypto.timingSafeEqual(a, b);
+    } catch (_) {
+      return false;
+    }
+  }
+
   public enableUserTotp(identifier: string, totpCode: string): { ok: boolean; error?: string } {
     this.load();
     const clean = identifier.trim();
@@ -11198,13 +11247,23 @@ export class SovraDatabaseEngine {
     const clean = identifier.trim();
     const cleanHandle = clean.startsWith('@') ? clean : '@' + clean;
     const user = this.db.users.find(u => u.did === clean || u.handle.toLowerCase() === clean.toLowerCase() || u.handle.toLowerCase() === cleanHandle.toLowerCase());
-    if (!user) return { ok: false, error: 'User account not found' };
+    if (!user) {
+      // AUTH-01: Constant-time dummy hash on missing user
+      this.hashRecoveryPhrase('dummy fallback word seed for timing equalisation test pass phrase', '12345678901234567890123456789012');
+      return { ok: false, error: 'Invalid recovery credentials.' };
+    }
 
     const normInput = (recoveryPhrase || '').trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
-    const normStored = (user.recoveryPhrase || '').trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+    let matches = false;
+    if (user.recoveryPhraseHash && user.recoveryPhraseSalt) {
+      matches = this.verifyRecoveryPhrase(normInput, user.recoveryPhraseHash, user.recoveryPhraseSalt);
+    } else if (user.recoveryPhrase) {
+      const normStored = (user.recoveryPhrase || '').trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+      matches = Boolean(normStored && normInput === normStored);
+    }
 
-    if (!normStored || normInput !== normStored) {
-      return { ok: false, error: 'Invalid 12-word recovery phrase for this account.' };
+    if (!matches) {
+      return { ok: false, error: 'Invalid recovery credentials.' };
     }
 
     const cleanNew = String(newPin || '').trim();
@@ -11215,6 +11274,10 @@ export class SovraDatabaseEngine {
     user.securityPinHash = this.hashSecurityPin(cleanNew);
     user.updatedAt = Date.now();
     this.clearFailedPinAttempts(user.did);
+
+    // SESS-01: Revoke every active session across all devices
+    this.revokeAllUserSessions(user.did, 'Emergency recovery phrase PIN reset');
+
     this.save();
     return { ok: true };
   }
@@ -13190,6 +13253,53 @@ export class SovraDatabaseEngine {
     if (!Array.isArray(this.db.mutes)) return [];
     const now = Date.now();
     return this.db.mutes.filter(m => m.userDid === userDid && (!m.mutedUntil || m.mutedUntil > now));
+  }
+
+  public revokeAllUserSessions(userDid: string, reason?: string): number {
+    this.load();
+    if (!Array.isArray(this.db.user_sessions)) this.db.user_sessions = [];
+    if (!Array.isArray(this.db.revoked_tokens)) this.db.revoked_tokens = [];
+
+    let revokedCount = 0;
+    const now = Date.now();
+    for (const session of this.db.user_sessions) {
+      if (session.userDid === userDid && !session.isRevoked) {
+        session.isRevoked = true;
+        session.lastActiveAt = now;
+        revokedCount++;
+        if (!this.db.revoked_tokens.some(r => r.token === session.token)) {
+          this.db.revoked_tokens.push({
+            token: session.token,
+            revokedAt: now,
+            reason: reason || 'Revoke all user sessions',
+          });
+        }
+      }
+    }
+
+    const user = this.db.users.find(u => u.did === userDid);
+    if (user && user.sessionToken) {
+      if (!this.db.revoked_tokens.some(r => r.token === user.sessionToken)) {
+        this.db.revoked_tokens.push({
+          token: user.sessionToken,
+          revokedAt: now,
+          reason: reason || 'Revoke user primary sessionToken',
+        });
+      }
+      user.sessionToken = undefined;
+      user.updatedAt = now;
+    }
+
+    if (revokedCount > 0 || user) {
+      this.logAudit({
+        type: 'SESSION_REVOKED',
+        action: 'REVOKE_ALL_USER_SESSIONS',
+        actorDid: userDid,
+        details: `Revoked all active sessions (${revokedCount}) for user ${userDid}: ${reason || 'Session invalidation'}`,
+      });
+      this.save();
+    }
+    return revokedCount;
   }
 
   public revokeAllOtherSessions(userDid: string, currentToken?: string): number {

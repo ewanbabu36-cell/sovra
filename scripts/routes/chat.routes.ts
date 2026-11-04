@@ -1065,9 +1065,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     const hasAuthToken = Boolean(
       req.headers.authorization ||
       req.headers['x-sovra-session-token'] ||
-      (req.headers.cookie && req.headers.cookie.includes('sovra_session_token=')) ||
-      url.searchParams.get('sessionToken') ||
-      url.searchParams.get('token')
+      (req.headers.cookie && req.headers.cookie.includes('sovra_session_token='))
     );
     if (!hasAuthToken) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -1076,8 +1074,8 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     }
 
     let principal = resolvePrincipal(req);
-    if (!principal) {
-      const qToken = url.searchParams.get('token') || url.searchParams.get('sessionToken') || (req.headers['x-sovra-session-token'] as string);
+    if (!principal && req.headers['x-sovra-session-token']) {
+      const qToken = (req.headers['x-sovra-session-token'] as string).trim();
       if (qToken && (qToken.startsWith('stk_guest_') || qToken.startsWith('mesh_token_') || qToken.startsWith('stk_'))) {
         const u = sovraDb.findUserBySessionToken(qToken);
         if (u) {

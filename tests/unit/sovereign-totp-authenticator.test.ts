@@ -72,15 +72,17 @@ describe('Sovereign RFC 6238 TOTP Authenticator & Multi-Factor Security Suite', 
       securityPin: initialPin,
     });
     expect(regRes.ok).toBe(true);
+    expect(regRes.recoveryPhrase).toBeDefined();
     const user = sovraDb.findUserByDid(did);
     expect(user).toBeDefined();
     expect(user?.totpEnabled).toBe(false);
-    expect(user?.recoveryPhrase).toBeDefined();
+    expect(user?.recoveryPhraseHash).toBeDefined();
+    expect(user?.recoveryPhrase).toBeUndefined();
 
     // 2. Login requires correct PIN when factor is provided
     const wrongPinLogin = sovraDb.loginUser(handle, 'Desktop', { pin: '000000' });
     expect(wrongPinLogin.ok).toBe(false);
-    expect(wrongPinLogin.error).toContain('Incorrect Security PIN');
+    expect(wrongPinLogin.error).toBe('Invalid credentials');
 
     const correctPinLogin = sovraDb.loginUser(handle, 'Desktop', { pin: initialPin });
     expect(correctPinLogin.ok).toBe(true);
@@ -99,7 +101,7 @@ describe('Sovereign RFC 6238 TOTP Authenticator & Multi-Factor Security Suite', 
     // 4. Once 2FA is active, login requires rolling TOTP code
     const loginWithoutTotp = sovraDb.loginUser(handle, 'Desktop', { pin: initialPin });
     expect(loginWithoutTotp.ok).toBe(false);
-    expect(loginWithoutTotp.error).toContain('Google Authenticator 2FA code is required');
+    expect(loginWithoutTotp.error).toBe('Invalid credentials');
 
     const freshCode = sovraDb.computeTotpCode(userSecret);
     const loginWithTotp = sovraDb.loginUser(handle, 'Desktop', { pin: initialPin, totpCode: freshCode });

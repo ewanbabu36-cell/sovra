@@ -355,7 +355,8 @@ describe('SOVRA P0/P1 Adversarial Remediation & Verification Gate', { timeout: 2
 
       expect(foundA).toBeDefined();
       expect(foundA?.handle).toBe(alice.handle);
-      expect(foundA?.recoveryPhrase).toBeDefined();
+      expect(foundA?.recoveryPhraseHash).toBeDefined();
+      expect(foundA?.recoveryPhrase).toBeUndefined();
 
       expect(foundB).toBeDefined();
       expect(foundB?.handle).toBe(bob.handle);
