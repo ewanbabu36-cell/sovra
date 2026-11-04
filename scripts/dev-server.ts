@@ -353,90 +353,7 @@ interface CreatorProfile {
   highlights: { name: string; emoji: string }[];
 }
 
-const creatorProfiles: Record<string, CreatorProfile> = {
-  alice_creator: {
-    handle: 'alice_creator',
-    name: 'Alice ⚡ P2P Architect',
-    avatar: 'A',
-    avatarBg: '#6366f1',
-    verified: true,
-    postsCount: 48,
-    followersCount: '128.4K',
-    followingCount: 312,
-    bio: 'Decentralized P2P Architect • Zero middleman servers ⚡ • Building on Sovra protocol • Noise_XX / BitSwap enthusiast',
-    externalLink: 'https://sovra.network/alice',
-    highlights: [
-      { name: '⚡ Code', emoji: '💻' },
-      { name: '🌐 Nodes', emoji: '🖥️' },
-      { name: '✨ Setup', emoji: '⚙️' },
-      { name: '🚀 Swarms', emoji: '🛰️' },
-    ],
-    reels: [
-      { id: 'reel-1', views: '2.4M', title: 'Zero Central Servers', gradient: 'linear-gradient(135deg, #1e1b4b, #312e81)' },
-      { id: 'reel-4', views: '840K', title: 'Noise_XX Zero-RTT Handshake', gradient: 'linear-gradient(135deg, #431407, #7c2d12)' },
-      { id: 'reel-5', views: '1.9M', title: 'Sub-30ms BitSwap Swarming', gradient: 'linear-gradient(135deg, #172554, #1e40af)' },
-    ],
-  },
-  bob_live: {
-    handle: 'bob_live',
-    name: 'Bob | 5G Telecom',
-    avatar: 'B',
-    avatarBg: '#f59e0b',
-    verified: true,
-    postsCount: 36,
-    followersCount: '94.2K',
-    followingCount: 185,
-    bio: 'Cellular CGNAT hole puncher • UDP QUIC connection migration • Jio/Airtel 5G tester',
-    externalLink: 'https://sovra.network/bob',
-    highlights: [
-      { name: '🔥 5G Tests', emoji: '📡' },
-      { name: '🛡️ CGNAT', emoji: '🔒' },
-      { name: '⚡ QUIC', emoji: '⚡' },
-    ],
-    reels: [
-      { id: 'reel-2', views: '1.8M', title: 'ICE 4-tier Punching', gradient: 'linear-gradient(135deg, #3b0764, #1e1b4b)' },
-    ],
-  },
-  carol_sounds: {
-    handle: 'carol_sounds',
-    name: 'Carol 🎧 Sound Designer',
-    avatar: 'C',
-    avatarBg: '#ec4899',
-    verified: true,
-    postsCount: 62,
-    followersCount: '215K',
-    followingCount: 420,
-    bio: 'Grammy-nominated Sound Designer • Spatial multi-track master creator • Pure lossless P2P audio on Sovra DAG',
-    externalLink: 'https://sovra.network/carol',
-    highlights: [
-      { name: '🎧 Masters', emoji: '🎛️' },
-      { name: '🎹 Stems', emoji: '🎹' },
-      { name: '✨ Live', emoji: '🎙️' },
-    ],
-    reels: [
-      { id: 'reel-3', views: '3.9M', title: 'Spatial Audio Mixed Locally', gradient: 'linear-gradient(135deg, #064e3b, #0f172a)' },
-    ],
-  },
-  dave_edge: {
-    handle: 'dave_edge',
-    name: 'Dave | Edge Relay',
-    avatar: 'D',
-    avatarBg: '#3b82f6',
-    verified: true,
-    postsCount: 29,
-    followersCount: '48.9K',
-    followingCount: 92,
-    bio: 'Edge relay node operator (99.9% uptime) • Bandwidth vouchers & BitSwap seed caching on fast SSDs',
-    externalLink: 'https://sovra.network/dave',
-    highlights: [
-      { name: '🖥️ Relays', emoji: '⚡' },
-      { name: '📊 Metrics', emoji: '📈' },
-    ],
-    reels: [
-      { id: 'reel-5', views: '1.2M', title: 'BitSwap Swarm', gradient: 'linear-gradient(135deg, #172554, #1e1b4b)' },
-    ],
-  },
-};
+const creatorProfiles: Record<string, CreatorProfile> = {};
 
 interface MultiSegmentStory {
   creatorHandle: string;
@@ -466,35 +383,7 @@ interface ReelComment {
   likes: number;
 }
 
-const reelCommentsStore: ReelComment[] = [
-  {
-    id: 'rc-1',
-    reelId: 'reel-1',
-    authorHandle: 'dave_edge',
-    authorAvatar: 'D',
-    text: 'This 60fps snap scroll is buttery smooth! Zero lag on mobile. 🔥',
-    timeAgo: '2h',
-    likes: 42,
-  },
-  {
-    id: 'rc-2',
-    reelId: 'reel-1',
-    authorHandle: 'carol_sounds',
-    authorAvatar: 'C',
-    text: 'Love the audio sync! Spatial beat sounds pristine. 🎧',
-    timeAgo: '1h',
-    likes: 19,
-  },
-  {
-    id: 'rc-3',
-    reelId: 'reel-1',
-    authorHandle: 'bob_live',
-    authorAvatar: 'B',
-    text: 'Hole punching worked instantaneously on my carrier NAT. Verified! ⚡',
-    timeAgo: '35m',
-    likes: 8,
-  },
-];
+const reelCommentsStore: ReelComment[] = [];
 
 
 interface ContactRecord {
@@ -810,35 +699,25 @@ const longFormVideosCatalog: YoutubeVideoRecord[] = [
     shortHeader: 'Sovra 4K Architecture Deep Dive',
     summary: '• RFC 8216 HLS Master & Variant Playlist architecture breakdown\n• Speculative Segment 0 pre-warming for sub-300ms time-to-first-frame\n• 95/5 creator micropayment vouchers verified off-chain via Ed25519',
     category: 'Technology',
-    channelName: 'Sovra Protocol Lab',
+    channelName: 'SOVRA Protocol Lab',
     channelHandle: 'sovralab',
     channelAvatar: 'S',
-    channelAvatarBg: '#6366f1',
-    channelSubscribers: 142800,
-    channelSubscribersText: '142.8K subscribers',
-    isSubscribed: false,
-    views: 284512,
-    viewsText: '284K views',
-    likes: 18420,
-    dislikes: 12,
+    channelAvatarBg: '#0284c7',
+    channelSubscribers: 1,
+    channelSubscribersText: '1 subscriber',
+    isSubscribed: true,
+    views: 1,
+    viewsText: '1 view',
+    likes: 1,
+    dislikes: 0,
     cid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
     duration: '14:20',
     durationSeconds: 860,
-    publishedAt: 'Premiered 2 hours ago',
-    description: `In this deep architecture session, we break down Sovra's RFC 8216 HLS ABR pipeline, zero-server BitSwap swarming, and dynamic 95/5 creator micropayment vouchers verified off-chain with Ed25519 signatures.
-
-Timestamps & Chapters:
-00:00 - Introduction to Sovereign P2P Streaming
-02:15 - RFC 8216 Master & Variant Playlists
-05:40 - Speculative Segment 0 Pre-Warming
-09:12 - BitSwap Swarming over Cellular CGNAT
-12:30 - 95/5 Off-Chain Hardware Vouchers
-
-GitHub & Specs: https://github.com/sovra/protocol
-Decentralized CID: ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi`,
+    publishedAt: 'Official Launch Broadcast',
+    description: `Official introduction to Sovra's RFC 8216 HLS ABR pipeline, zero-server BitSwap swarming, and dynamic 95/5 creator micropayment vouchers verified off-chain with Ed25519 signatures.`,
     tags: ['#P2P', '#RFC8216', '#BitSwap', '#4KUHD', '#Sovra'],
-    ambientColor: 'rgba(99, 102, 241, 0.45)',
-    gradient: 'radial-gradient(circle at center, #1e1b4b 0%, #030712 100%)',
+    ambientColor: 'rgba(2, 132, 199, 0.45)',
+    gradient: 'radial-gradient(circle at center, #0f172a 0%, #020617 100%)',
     chapters: [
       { timeSeconds: 0, timecode: '00:00', title: 'Introduction to Sovereign P2P Streaming' },
       { timeSeconds: 135, timecode: '02:15', title: 'RFC 8216 Master & Variant Playlists' },
@@ -851,290 +730,12 @@ Decentralized CID: ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55
       { resolution: '1080p60', bitrate: '8 Mbps', framerate: '60fps', bandwidthBps: 8_000_000 },
       { resolution: '720p', bitrate: '4 Mbps', framerate: '30fps', bandwidthBps: 4_000_000 },
       { resolution: '480p', bitrate: '1.5 Mbps', framerate: '30fps', bandwidthBps: 1_500_000 },
-      { resolution: '360p', bitrate: '600 Kbps', framerate: '30fps', bandwidthBps: 600_000 },
     ],
-  },
-  {
-    id: 'yt-video-2',
-    title: 'Zero-Server Cellular CGNAT Traversal: ICE 4-Tier & Birthday Paradox Port Prediction',
-    channelName: 'Telecom Engineering Guild',
-    channelHandle: 'telecom_guild',
-    channelAvatar: 'T',
-    channelAvatarBg: '#10b981',
-    channelSubscribers: 98400,
-    channelSubscribersText: '98.4K subscribers',
-    isSubscribed: false,
-    views: 192430,
-    viewsText: '192K views',
-    likes: 12890,
-    dislikes: 8,
-    cid: 'bafybeicgnattraversal4tierportpredictionbirthdayparadox88',
-    duration: '18:45',
-    durationSeconds: 1125,
-    publishedAt: 'Yesterday',
-    description: `Why STUN alone fails on 35% of cellular carrier connections (Jio, Airtel, T-Mobile), and how Sovra's Birthday Paradox heuristic engine achieves 92% punch success without central TURN servers.
-
-Timestamps & Chapters:
-00:00 - Cellular NAT Reality & Port Mappings
-03:20 - Symmetric-to-Symmetric Hole Punch Gaps
-07:45 - Port Randomization & Birthday Paradox Math
-13:10 - Community Incentivized Relay Protocol
-16:50 - Live 5G Carrier Handover Benchmarks`,
-    tags: ['#Telecom', '#NATTraversal', '#STUN', '#5GQUIC', '#Networking'],
-    ambientColor: 'rgba(16, 185, 129, 0.45)',
-    gradient: 'radial-gradient(circle at center, #064e3b 0%, #022c22 100%)',
-    chapters: [
-      { timeSeconds: 0, timecode: '00:00', title: 'Cellular NAT Reality & Port Mappings' },
-      { timeSeconds: 200, timecode: '03:20', title: 'Symmetric-to-Symmetric Hole Punch Gaps' },
-      { timeSeconds: 465, timecode: '07:45', title: 'Port Randomization & Birthday Paradox Math' },
-      { timeSeconds: 790, timecode: '13:10', title: 'Community Incentivized Relay Protocol' },
-      { timeSeconds: 1010, timecode: '16:50', title: 'Live 5G Carrier Handover Benchmarks' },
-    ],
-    variants: [
-      { resolution: '1080p60', bitrate: '8 Mbps', framerate: '60fps', bandwidthBps: 8_000_000 },
-      { resolution: '720p', bitrate: '4 Mbps', framerate: '30fps', bandwidthBps: 4_000_000 },
-      { resolution: '480p', bitrate: '1.5 Mbps', framerate: '30fps', bandwidthBps: 1_500_000 },
-      { resolution: '360p', bitrate: '600 Kbps', framerate: '30fps', bandwidthBps: 600_000 },
-    ],
-  },
-  {
-    id: 'yt-video-3',
-    title: 'Double Ratchet E2EE Cryptography & Signal Protocol in Web & Mobile',
-    channelName: 'Alice Cryptography Lab',
-    channelHandle: 'alice_crypto',
-    channelAvatar: 'A',
-    channelAvatarBg: '#ec4899',
-    channelSubscribers: 215100,
-    channelSubscribersText: '215.1K subscribers',
-    isSubscribed: true,
-    views: 310890,
-    viewsText: '310K views',
-    likes: 24700,
-    dislikes: 15,
-    cid: 'bafybeidoubleratchetchacha20poly1305signalkdfkeys44',
-    duration: '22:10',
-    durationSeconds: 1330,
-    publishedAt: '3 days ago',
-    description: `Complete mathematical teardown of Signal-grade HKDF ratchet chains, Diffie-Hellman ephemeral steps, and ChaCha20-Poly1305 encryption on zero-server mesh topologies.
-
-Timestamps & Chapters:
-00:00 - Cryptographic Forward & Post-Compromise Secrecy
-04:10 - X3DH Pre-Key Bundles & Identity Keys
-09:30 - KDF Root & Chain Ratchets
-15:20 - RAM-Only Zero-Disk Ephemeral Buffers
-19:40 - Multi-Device Sync Without Private Key Leakage`,
-    tags: ['#Cryptography', '#DoubleRatchet', '#Signal', '#E2EE', '#Privacy'],
-    ambientColor: 'rgba(236, 72, 153, 0.45)',
-    gradient: 'radial-gradient(circle at center, #831843 0%, #4a044e 100%)',
-    chapters: [
-      { timeSeconds: 0, timecode: '00:00', title: 'Cryptographic Forward & Post-Compromise Secrecy' },
-      { timeSeconds: 250, timecode: '04:10', title: 'X3DH Pre-Key Bundles & Identity Keys' },
-      { timeSeconds: 570, timecode: '09:30', title: 'KDF Root & Chain Ratchets' },
-      { timeSeconds: 920, timecode: '15:20', title: 'RAM-Only Zero-Disk Ephemeral Buffers' },
-      { timeSeconds: 1180, timecode: '19:40', title: 'Multi-Device Sync Without Private Key Leakage' },
-    ],
-    variants: [
-      { resolution: '4K (2160p60)', bitrate: '25 Mbps', framerate: '60fps', bandwidthBps: 25_000_000 },
-      { resolution: '1080p60', bitrate: '8 Mbps', framerate: '60fps', bandwidthBps: 8_000_000 },
-      { resolution: '720p', bitrate: '4 Mbps', framerate: '30fps', bandwidthBps: 4_000_000 },
-      { resolution: '480p', bitrate: '1.5 Mbps', framerate: '30fps', bandwidthBps: 1_500_000 },
-    ],
-  },
-  {
-    id: 'yt-video-4',
-    title: 'Dynamic 95/5 Creator Split & Off-Chain Hardware Vouchers: The Death of the 45% Middleman Tax',
-    channelName: 'Creator Economics Studio',
-    channelHandle: 'creator_studio',
-    channelAvatar: 'C',
-    channelAvatarBg: '#f59e0b',
-    channelSubscribers: 76500,
-    channelSubscribersText: '76.5K subscribers',
-    isSubscribed: false,
-    views: 145200,
-    viewsText: '145K views',
-    likes: 11240,
-    dislikes: 6,
-    cid: 'bafybeicreatoreconomics95splitvouchersoffchainmerkle12',
-    duration: '12:05',
-    durationSeconds: 725,
-    publishedAt: '5 days ago',
-    description: `YouTube takes 45%, Twitch takes 50%. How Sovra uses off-chain state channel vouchers with Ed25519 signatures to deliver 95% straight to the creator and 5% to the bandwidth seeders.
-
-Timestamps & Chapters:
-00:00 - Big Tech 45% Middleman Tax Analysis
-02:40 - The Sovereign 95/5 Decentralized Model
-05:30 - Proof-of-Delivery Bandwidth Receipts
-08:45 - Instant Micro-Token Settlement
-10:50 - Live Channel Monetization Demonstration`,
-    tags: ['#CreatorEconomy', '#Monetization', '#MicroPayments', '#Decentralization'],
-    ambientColor: 'rgba(245, 158, 11, 0.45)',
-    gradient: 'radial-gradient(circle at center, #78350f 0%, #451a03 100%)',
-    chapters: [
-      { timeSeconds: 0, timecode: '00:00', title: 'Big Tech 45% Middleman Tax Analysis' },
-      { timeSeconds: 160, timecode: '02:40', title: 'The Sovereign 95/5 Decentralized Model' },
-      { timeSeconds: 330, timecode: '05:30', title: 'Proof-of-Delivery Bandwidth Receipts' },
-      { timeSeconds: 525, timecode: '08:45', title: 'Instant Micro-Token Settlement' },
-      { timeSeconds: 650, timecode: '10:50', title: 'Live Channel Monetization Demonstration' },
-    ],
-    variants: [
-      { resolution: '1080p60', bitrate: '8 Mbps', framerate: '60fps', bandwidthBps: 8_000_000 },
-      { resolution: '720p', bitrate: '4 Mbps', framerate: '30fps', bandwidthBps: 4_000_000 },
-      { resolution: '480p', bitrate: '1.5 Mbps', framerate: '30fps', bandwidthBps: 1_500_000 },
-      { resolution: '360p', bitrate: '600 Kbps', framerate: '30fps', bandwidthBps: 600_000 },
-    ],
-  },
+  }
 ];
-
 let currentYoutubeVideo: YoutubeVideoRecord = longFormVideosCatalog[0]!;
 
-const youtubeCommentsStore: Record<string, YoutubeCommentRecord[]> = {
-  'yt-video-1': [
-    {
-      id: 'yt-c1',
-      videoId: 'yt-video-1',
-      authorName: 'Sovra Protocol Lab',
-      authorAvatar: 'S',
-      authorHandle: 'sovralab',
-      text: '📌 Welcome everyone! RFC 8216 HLS Master Playlist & Variant specifications are live. Timestamps are linked in the description. What P2P benchmark should we stress-test next?',
-      timestamp: Date.now() - 7200000,
-      likes: 842,
-      isPinned: true,
-      isCreator: true,
-      creatorHeart: true,
-      replies: [
-        {
-          id: 'yt-r1-1',
-          commentId: 'yt-c1',
-          authorName: 'Alex Cryptographer',
-          authorAvatar: 'A',
-          authorHandle: 'alex_crypto',
-          text: 'Please test high-churn 5G cell tower handoffs with 50 concurrent seeders!',
-          timestamp: Date.now() - 6500000,
-          likes: 94,
-        },
-        {
-          id: 'yt-r1-2',
-          commentId: 'yt-c1',
-          authorName: 'DevP2P Builder',
-          authorAvatar: 'D',
-          authorHandle: 'devp2p',
-          text: 'Testing with 100K simulated peers on local DHT cluster right now. 0 packet drops!',
-          timestamp: Date.now() - 5200000,
-          likes: 62,
-        },
-      ],
-    },
-    {
-      id: 'yt-c2',
-      videoId: 'yt-video-1',
-      authorName: 'Sarah Monetization Expert',
-      authorAvatar: 'S',
-      authorHandle: 'sarah_creator',
-      text: 'The 95% creator split with 0% platform take is the holy grail. No more YouTube 45% middleman tax! Just sent a Super Thanks voucher.',
-      timestamp: Date.now() - 3600000,
-      likes: 342,
-      isSuperThanks: true,
-      superThanksAmount: '₹500',
-      creatorHeart: true,
-      replies: [
-        {
-          id: 'yt-r2-1',
-          commentId: 'yt-c2',
-          authorName: 'Sovra Protocol Lab',
-          authorAvatar: 'S',
-          authorHandle: 'sovralab',
-          text: 'Thank you Sarah! Your voucher was settled in 12ms over the local off-chain state channel. ❤️',
-          timestamp: Date.now() - 3400000,
-          likes: 128,
-          isCreator: true,
-        },
-      ],
-    },
-    {
-      id: 'yt-c3',
-      videoId: 'yt-video-1',
-      authorName: 'Marcus Edge Node',
-      authorAvatar: 'M',
-      authorHandle: 'marcus_edge',
-      text: 'Sub-300ms startup on cellular CGNAT via speculative segment 0 pre-warming is genius. Tested smoothly on my edge relay.',
-      timestamp: Date.now() - 1800000,
-      likes: 189,
-      replies: [],
-    },
-    {
-      id: 'yt-c4',
-      videoId: 'yt-video-1',
-      authorName: 'P2P Audio Engineer',
-      authorAvatar: 'P',
-      authorHandle: 'audio_p2p',
-      text: 'Spatial multi-track audio stems sync over BitSwap is butter smooth. Lossless FLAC stream decoded in 18ms!',
-      timestamp: Date.now() - 600000,
-      likes: 74,
-      replies: [],
-    },
-  ],
-  'yt-video-2': [
-    {
-      id: 'yt-c2-1',
-      videoId: 'yt-video-2',
-      authorName: 'Telecom Engineering Guild',
-      authorAvatar: 'T',
-      authorHandle: 'telecom_guild',
-      text: '📌 92% hole punching success benchmark data is published. Check chapter 07:45 for the birthday paradox probability formula derivation.',
-      timestamp: Date.now() - 86400000,
-      likes: 520,
-      isPinned: true,
-      isCreator: true,
-      creatorHeart: true,
-      replies: [],
-    },
-    {
-      id: 'yt-c2-2',
-      videoId: 'yt-video-2',
-      authorName: 'Jio 5G Researcher',
-      authorAvatar: 'J',
-      authorHandle: 'jio_research',
-      text: 'Verified on Jio 5G IPv6-only cellular network in Mumbai. Direct UDP QUIC hole punch established in 42ms!',
-      timestamp: Date.now() - 43200000,
-      likes: 215,
-      isSuperThanks: true,
-      superThanksAmount: '₹100',
-      replies: [],
-    },
-  ],
-  'yt-video-3': [
-    {
-      id: 'yt-c3-1',
-      videoId: 'yt-video-3',
-      authorName: 'Alice Cryptography Lab',
-      authorAvatar: 'A',
-      authorHandle: 'alice_crypto',
-      text: '📌 Double Ratchet mathematical test vectors available in packages/messaging. All 9 unit tests passed cleanly!',
-      timestamp: Date.now() - 172800000,
-      likes: 640,
-      isPinned: true,
-      isCreator: true,
-      creatorHeart: true,
-      replies: [],
-    },
-  ],
-  'yt-video-4': [
-    {
-      id: 'yt-c4-1',
-      videoId: 'yt-video-4',
-      authorName: 'Creator Economics Studio',
-      authorAvatar: 'C',
-      authorHandle: 'creator_studio',
-      text: '📌 Here is the math: If a creator earns $100K on YouTube, YouTube steals $45K. On Sovra, the creator keeps $95K, peer seeders earn $5K, platform takes $0.',
-      timestamp: Date.now() - 259200000,
-      likes: 890,
-      isPinned: true,
-      isCreator: true,
-      creatorHeart: true,
-      replies: [],
-    },
-  ],
-};
+const youtubeCommentsStore: Record<string, YoutubeCommentRecord[]> = {};
 
 interface TipVoucherRecord {
   voucherId: string;
@@ -1150,34 +751,7 @@ interface TipVoucherRecord {
   timestamp: number;
 }
 
-const tipVouchersStore: TipVoucherRecord[] = [
-  {
-    voucherId: 'vouch_genesis_01',
-    videoId: 'yt-video-1',
-    creatorDid: 'did:sovra:creator_studio_broadcast',
-    seederDid: 'did:sovra:edge_seeder_relay',
-    totalAmount: '500',
-    creatorAmount: '475',
-    seederAmount: '25',
-    platformAmount: '0',
-    senderName: 'Sarah Monetization Expert',
-    senderComment: 'Super Thanks for the 95/5 economic revolution!',
-    timestamp: Date.now() - 3600000,
-  },
-  {
-    voucherId: 'vouch_genesis_02',
-    videoId: 'yt-video-2',
-    creatorDid: 'did:sovra:telecom_guild',
-    seederDid: 'did:sovra:edge_seeder_relay',
-    totalAmount: '100',
-    creatorAmount: '95',
-    seederAmount: '5',
-    platformAmount: '0',
-    senderName: 'Jio 5G Researcher',
-    senderComment: 'Verified on Jio 5G IPv6 network!',
-    timestamp: Date.now() - 43200000,
-  },
-];
+const tipVouchersStore: TipVoucherRecord[] = [];
 
 
 let isCreatorModeActive = false;
@@ -23566,7 +23140,7 @@ function renderHtml(
             <div style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 0.75rem;">
               <div class="yt-comments-header">
                 <span style="font-weight: 700; color: #fff; font-size: 1.1rem;" id="ytCommentsCount">
-                  ${youtubeCommentsStore['yt-video-1']!.length} Comments
+                  ${(youtubeCommentsStore['yt-video-1'] || []).length} Comments
                 </span>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                   <span style="font-size: 0.8rem; color: var(--text-muted);">Sort by:</span>
