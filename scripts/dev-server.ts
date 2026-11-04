@@ -402,7 +402,7 @@ interface ContactRecord {
 const dynamicPeersStore: ContactRecord[] = [
   {
     did: 'did:sovra:laptop_host',
-    name: 'Host Node (Laptop)',
+    name: 'Host Node',
     avatar: '💻',
     avatarBg: '#6366f1',
     role: 'Root Mesh Relay & Seeder',
@@ -14718,10 +14718,13 @@ function renderHtml(
     .yt-video-title {
       font-size: 1.22rem;
       font-weight: 700;
-      color: #f8fafc;
+      color: var(--text, #0f172a) !important;
       line-height: 1.35;
       word-break: break-word;
       overflow-wrap: break-word;
+    }
+    .yt-video-stats-text {
+      color: var(--text-muted, #64748b) !important;
     }
     .yt-actions-bar {
       display: flex;
@@ -15355,19 +15358,31 @@ function renderHtml(
       }
     }
 
-    /* 2. Dock-Only Mode (Only bottom dock is visible, top tabs hidden even on desktop) */
-    body.nav-mode-dock .nav-tabs,
-    body.nav-mode-dock .header-desktop-nav,
-    body.nav-mode-dock .app-left-rail {
-      display: none !important;
+    /* 2. Dock-Only Mode: Strictly confined to mobile viewports (<=860px). Desktop ALWAYS preserves 3-column rail layout! */
+    @media (max-width: 860px) {
+      body.nav-mode-dock .nav-tabs,
+      body.nav-mode-dock .header-desktop-nav,
+      body.nav-mode-dock .app-left-rail {
+        display: none !important;
+      }
+      body.nav-mode-dock .mobile-bottom-nav {
+        display: flex !important;
+      }
+      body.nav-mode-dock .container,
+      body.nav-mode-dock .feed-container,
+      body.nav-mode-dock .friends-container {
+        margin-bottom: 5.5rem !important;
+      }
     }
-    body.nav-mode-dock .mobile-bottom-nav {
-      display: flex !important;
-    }
-    body.nav-mode-dock .container,
-    body.nav-mode-dock .feed-container,
-    body.nav-mode-dock .friends-container {
-      margin-bottom: 5.5rem !important;
+    @media (min-width: 861px) {
+      .mobile-bottom-nav,
+      #mobileFloatingActionBtn {
+        display: none !important;
+      }
+      .app-left-rail,
+      .app-right-rail {
+        display: flex !important;
+      }
     }
 
     /* 3. Top-Only Mode (Only top tabs visible, bottom dock hidden even on mobile) */
@@ -18957,7 +18972,7 @@ function renderHtml(
           if (!banner) return;
           if (data && data.ok && Array.isArray(data.alerts) && data.alerts.length > 0) {
             var alert = data.alerts[0];
-            if (alert && ((alert.message && (alert.message.includes('Kademlia') || alert.message.includes('operational'))) || (alert.title && alert.title.includes('Decentralized P2P Mesh')))) { banner.style.display = 'none'; return; }
+            if (alert && (alert.level === 'INFO' || (alert.message && (alert.message.includes('Kademlia') || alert.message.includes('operational') || alert.message.includes('libp2p') || alert.message.includes('Mesh'))) || (alert.title && alert.title.includes('Decentralized P2P Mesh')))) { banner.style.display = 'none'; return; }
             var bgGrad = alert.level === 'EMERGENCY'
               ? 'linear-gradient(90deg, #991b1b, #dc2626)'
               : (alert.level === 'CRITICAL'
@@ -22991,12 +23006,12 @@ function renderHtml(
                 <!-- Like / Dislike Joined Pill -->
                 <div class="yt-action-pill-group">
                   <button class="yt-action-pill-btn" id="ytLikeBtn" onclick="likeYtVideo()" aria-label="Like video">
-                    <span id="ytLikeThumb">👍</span>
-                    <span id="ytLikeCount">${longFormVideosCatalog[0]!.likes}</span>
+                    <span id="ytLikeThumb" style="display: inline-flex; align-items: center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg></span>
+                    <span id="ytLikeCount" style="font-weight: 700; margin-left: 4px;">${longFormVideosCatalog[0]!.likes}</span>
                   </button>
                   <div class="yt-action-pill-divider"></div>
                   <button class="yt-action-pill-btn" id="ytDislikeBtn" onclick="dislikeYtVideo()" aria-label="Dislike video">
-                    <span>👎</span>
+                    <span id="ytDislikeThumb" style="display: inline-flex; align-items: center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path></svg></span>
                   </button>
                 </div>
 
@@ -26699,26 +26714,9 @@ function renderHtml(
             <span>Recent Peers &amp; Quick Dial</span>
             <span style="font-size: 0.75rem; color: #94a3b8;">Direct WebRTC Mesh</span>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.6); padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="width: 32px; height: 32px; border-radius: 50%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 0.85rem;">A</div>
-                <div>
-                  <div style="font-size: 0.82rem; font-weight: 700; color: #fff;">Aarav Sharma</div>
-                  <div style="font-size: 0.68rem; color: #94a3b8;">Yesterday 18:42</div>
-                </div>
-              </div>
-              <button type="button" onclick="startCallQuickAction('Aarav Sharma')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-weight: 700;">Call</button>
-            </div>
-            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.6); padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="width: 32px; height: 32px; border-radius: 50%; background: #ec4899; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 0.85rem;">P</div>
-                <div>
-                  <div style="font-size: 0.82rem; font-weight: 700; color: #fff;">Priya Verma</div>
-                  <div style="font-size: 0.68rem; color: #94a3b8;">Oct 12, 14:10</div>
-                </div>
-              </div>
-              <button type="button" onclick="startCallQuickAction('Priya Verma')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-weight: 700;">Call</button>
+          <div id="recentCallsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
+            <div style="grid-column: 1 / -1; padding: 14px; text-align: center; color: #64748b; font-size: 0.8rem; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.08);">
+              No recent call history. Start a new peer-to-peer call above.
             </div>
           </div>
         </div>
@@ -44285,8 +44283,8 @@ function renderHtml(
       myProfile = {
         did: hostDid,
         handle: hostHandle,
-        displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
-        name: isMobileDevice ? 'Mobile Peer' : 'Host Node (Laptop)',
+        displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node',
+        name: isMobileDevice ? 'Mobile Peer' : 'Host Node',
         avatar: isMobileDevice ? '📱' : '💻',
         avatarBg: '#6366f1',
         bio: 'Sovereign P2P Node Operator',
@@ -48444,11 +48442,9 @@ function renderHtml(
         grid.innerHTML = '<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 0.82rem; padding: 18px; text-align: center;"><div style="font-size: 1.4rem; margin-bottom: 4px;">👥</div><div>No sovereign peers found.</div></div>';
         return;
       }
-      // Deduplicate contacts by name and sanitize test hashes with realistic avatars & status
-      const seenNames = new Set();
+      // Production Zero-Mock: Display real registered peers only; reject synthetic test artifacts
+      const seenDids = new Set();
       const uniqueContacts = [];
-      const humanNamesPool = ['Aarav Sharma', 'Priya Verma', 'Alice Chen', 'Bob Sovereign', 'David Miller', 'Elena Rostova', 'Sarah Connor', 'Marcus Vance'];
-      const statusPool = ['Online', 'Active in Swarm', 'Available for Call', 'In Voice Room', 'Recently Active'];
       const gradients = [
         'linear-gradient(135deg, #6366f1, #8b5cf6)',
         'linear-gradient(135deg, #ec4899, #f43f5e)',
@@ -48457,29 +48453,37 @@ function renderHtml(
         'linear-gradient(135deg, #f59e0b, #d97706)',
         'linear-gradient(135deg, #8b5cf6, #d946ef)'
       ];
-      let poolIdx = 0;
 
       for (let i = 0; i < contacts.length; i++) {
         let c = contacts[i];
-        let name = (c.name || '').trim();
-        if (name.startsWith('Cycle') || name.includes('Hash') || name.startsWith('peer_') || name.length > 20 || !name) {
-          name = humanNamesPool[poolIdx % humanNamesPool.length];
-          poolIdx++;
-        }
-        if (!seenNames.has(name)) {
-          seenNames.add(name);
+        if (!c || !c.did) continue;
+        let name = (c.displayName || c.name || '').trim();
+        if (!name || name.startsWith('Cycle') || name.includes('Hash') || name.startsWith('sec_') || name.includes('Attacker') || name.includes('bench_')) continue;
+        if (!seenDids.has(c.did)) {
+          seenDids.add(c.did);
           const initial = name.charAt(0).toUpperCase();
           const colorIdx = Math.abs(name.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % gradients.length;
-          const status = statusPool[poolIdx % statusPool.length];
           uniqueContacts.push({
             ...c,
             name: name,
-            avatar: initial,
-            bg: gradients[colorIdx],
-            role: status
+            avatar: c.avatar || initial,
+            bg: c.avatarBg || gradients[colorIdx],
+            role: c.role || 'Active Sovereign Peer'
           });
         }
         if (uniqueContacts.length >= 10) break;
+      }
+
+      if (uniqueContacts.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 0.88rem; padding: 28px 16px; text-align: center;"><div style="font-size: 1.8rem; margin-bottom: 6px;">📞</div><div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem; margin-bottom: 4px;">No Connected Peers Yet</div><div style="font-size: 0.78rem; color: #64748b; max-width: 300px; margin: 0 auto 14px;">Share your DID or invite friends over local Wi-Fi or Bluetooth mesh to start direct encrypted calls.</div><button type="button" id="copyMyCallDidBtn" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 999px; padding: 5px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">📋 Copy My DID</button></div>';
+        const copyBtn = document.getElementById('copyMyCallDidBtn');
+        if (copyBtn) {
+          copyBtn.onclick = function() {
+            navigator.clipboard.writeText(myProfile && myProfile.did ? myProfile.did : '');
+            if (typeof showAccountToast === 'function') showAccountToast('✓ Sovereign DID copied to clipboard', 'success');
+          };
+        }
+        return;
       }
       grid.innerHTML = uniqueContacts.map(c => (
         '<div style="background: rgba(30, 41, 59, 0.55); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease;">' +
@@ -49981,17 +49985,11 @@ function renderHtml(
 
       const items = [];
 
-      // 1. People / Contacts
-      const peersPool = (typeof contactsStore !== 'undefined' && Array.isArray(contactsStore) && contactsStore.length > 0)
-        ? contactsStore
-        : [
-            { id: 'rohit', name: 'Rohit Kumar', handle: '@rohit_live', did: 'did:sovra:rohit', role: 'Core Protocol Dev' },
-            { id: 'aarav', name: 'Aarav Sharma', handle: '@aarav', did: 'did:sovra:aarav', role: 'Distributed Systems Engineer' },
-            { id: 'elena', name: 'Elena Rostova', handle: '@elena_dev', did: 'did:sovra:elena', role: 'Cryptographic Security Lead' },
-            { id: 'maya', name: 'Maya Lin', handle: '@maya_creative', did: 'did:sovra:maya', role: 'Lead Visual Designer' }
-          ];
+      // 1. People / Contacts (Zero-Mock: Real registered contacts only)
+      const peersPool = (typeof contactsStore !== 'undefined' && Array.isArray(contactsStore)) ? contactsStore : [];
 
       peersPool.forEach(p => {
+        if (!p || !p.name) return;
         items.push({
           type: 'people',
           id: p.id || p.did || p.handle,
@@ -50002,15 +50000,8 @@ function renderHtml(
         });
       });
 
-      // 2. Videos Catalog
-      const videosPool = (typeof ytVideosCatalog !== 'undefined' && Array.isArray(ytVideosCatalog) && ytVideosCatalog.length > 0)
-        ? ytVideosCatalog
-        : [
-            { id: 'yt-1', title: 'Decentralized P2P Mesh Architecture (4K)', creator: 'SOVRA Core', views: '18.4K views', duration: '42:15' },
-            { id: 'yt-2', title: 'Cellular CGNAT Traversal Deep Dive', creator: 'Mesh Protocols', views: '9.2K views', duration: '28:40' },
-            { id: 'yt-3', title: 'WebGPU Shader Performance on Mobile', creator: 'GPU Devs', views: '14.1K views', duration: '19:12' },
-            { id: 'yt-4', title: 'Zero-Knowledge Proofs in Rust', creator: 'ZK Cryptography', views: '31.5K views', duration: '55:00' }
-          ];
+      // 2. Videos Catalog (Zero-Mock: Real catalog videos only)
+      const videosPool = (typeof ytVideosCatalog !== 'undefined' && Array.isArray(ytVideosCatalog)) ? ytVideosCatalog : [];
 
       videosPool.forEach((v, idx) => {
         items.push({
@@ -88557,7 +88548,7 @@ async function startDevServer() {
   sovraDb.upsertUser({
     did: masterKey.did,
     handle: '@laptop_host',
-    displayName: 'Host Node (Laptop)',
+    displayName: 'Host Node',
     avatar: '💻',
     avatarBg: '#6366f1',
     bio: 'Root Mesh Relay & Seeder',
