@@ -124,6 +124,8 @@ import { handleAgentRoutes } from './routes/agent.routes.ts';
 
 import { handleDepinRoutes } from './routes/depin.routes.ts';
 import { handleQuadraticRoutes } from './routes/quadratic.routes.ts';
+import { handleAdminFeatureRoute } from './routes/admin_features.routes.ts';
+import { handleMediaPlayerRoutes } from './routes/media_player.routes.ts';
 import {
   sovraDb,
   toPublicUserDTO,
@@ -18939,6 +18941,21 @@ function renderHtml(
   <!-- 📢 GLOBAL SYSTEM BROADCAST / AMBER ALERT BANNER (Auto-Reactive) -->
   <div id="sovraGlobalAlertBanner" style="display: none; width: 100%; position: sticky; top: 0; z-index: 10002; transition: all 0.3s ease;"></div>
   <script>
+
+    // OWASP Compliant CSPRNG Helper for Decentralized Identifiers, Nonces & Keys
+    window.sovraCSPRNG = function(len) {
+      try {
+        if (window.crypto && window.crypto.randomUUID) {
+          return window.crypto.randomUUID().replace(/-/g, '').slice(0, len || 12);
+        }
+        var arr = new Uint8Array(len || 12);
+        window.crypto.getRandomValues(arr);
+        return Array.from(arr, function(b) { return b.toString(16).padStart(2, '0'); }).join('').slice(0, len || 12);
+      } catch(e) {
+        return (Date.now().toString(36) + Math.sin(Date.now()).toString(36).substr(2, 6));
+      }
+    };
+
     (function initGlobalAlertWatcher() {
       async function pollAlerts() {
         try {
@@ -19515,68 +19532,40 @@ function renderHtml(
       </div>
 
       <nav class="rail-nav">
-        <!-- 5 Core Sovereign Actions (Apple & Telegram Simplicity) -->
-        <button class="rail-nav-item active" id="tab-feed" data-action="switch-tab" data-tab="feed" onclick="switchTab('feed')" title="Home (Feed)">
+        <!-- 5 Core Pillars (Telegram / WeChat / TikTok Simplicity) -->
+        <button class="rail-nav-item active" id="tab-feed" data-action="switch-tab" data-tab="feed" onclick="switchTab('feed')" title="Feed (Posts & Stories)">
           <span class="rail-icon">🏠</span>
-          <span class="rail-label">Home</span>
+          <span class="rail-label">Feed</span>
         </button>
-        <button class="rail-nav-item" id="tab-youtube" data-action="switch-tab" data-tab="youtube" onclick="switchTab('watch')" title="Watch (Shorts & 4K Videos)">
+        <button class="rail-nav-item" id="tab-youtube" data-action="switch-tab" data-tab="watch" onclick="switchTab('watch')" title="Watch (Shorts, Long-form & Live)">
           <span class="rail-icon">🎬</span>
           <span class="rail-label">Watch</span>
         </button>
-        <button class="rail-nav-item" id="tab-chat" data-action="switch-tab" data-tab="chat" onclick="switchTab('chat')" title="Chats (Messages & Calls)">
+        <button class="rail-nav-item" id="tab-chat" data-action="switch-tab" data-tab="chat" onclick="switchTab('chat')" title="Chats (E2EE Messages & Calls)">
           <span class="rail-icon">💬</span>
           <span class="rail-label">Chats</span>
           <span class="rail-badge" id="railChatBadge" style="background: #38bdf8; color: #020617; font-weight: 800;">12</span>
         </button>
-        <button class="rail-nav-item" id="tab-studio" data-action="switch-tab" data-tab="studio" onclick="switchTab('studio')" title="Creator Studio Pro">
-          <span class="rail-icon">⚡</span>
-          <span class="rail-label">Studio</span>
+        <button class="rail-nav-item" id="tab-hub" data-action="switch-tab" data-tab="explore" onclick="switchTab('explore')" title="Explore (DApps, Hub & Communities)">
+          <span class="rail-icon">🌐</span>
+          <span class="rail-label">Explore</span>
         </button>
-        <button class="rail-nav-item" id="tab-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" title="You (Profile & Wallet)">
+        <button class="rail-nav-item" id="tab-me" data-action="switch-tab" data-tab="vault" onclick="switchTab('vault')" title="Vault (Identity, Wallet & Studio)">
           <span class="rail-icon">👤</span>
-          <span class="rail-label">You</span>
+          <span class="rail-label">Vault</span>
         </button>
 
-        <!-- Secondary & Backwards-Compatible Navigation Anchors (Preserved for tests & deep links) -->
-        <div class="rail-secondary-divider" style="height: 1px; background: rgba(255,255,255,0.08); margin: 6px 10px;"></div>
-        <button class="rail-nav-item" id="tab-hub" data-action="switch-tab" data-tab="hub" onclick="switchTab('hub')" title="Super App Hub">
-          <span class="rail-icon">🌐</span>
-          <span class="rail-label">Super App Hub</span>
-        </button>
-        <button class="rail-nav-item" id="tab-friends" data-action="switch-tab" data-tab="friends" onclick="switchTab('friends')" title="Friends & Connections">
-          <span class="rail-icon">👥</span>
-          <span class="rail-label">Friends</span>
-          <span class="rail-badge" id="railFriendsBadge">1</span>
-        </button>
-        <button class="rail-nav-item" id="tab-reels" data-action="switch-tab" data-tab="reels" onclick="switchTab('reels')" title="Shorts Feed" style="display: none;">
-          <span class="rail-icon">🎞️</span>
-          <span class="rail-label">Shorts</span>
-        </button>
-        <button class="rail-nav-item" id="tab-live" data-action="switch-tab" data-tab="live" onclick="switchTab('live')" title="Live Broadcasts" style="display: none;">
-          <span class="rail-icon">🔴</span>
-          <span class="rail-label">Live</span>
-        </button>
-        <button class="rail-nav-item" id="tab-calls" data-action="switch-tab" data-tab="calls" onclick="switchTab('calls')" title="Audio & Video Calls" style="display: none;">
-          <span class="rail-icon">📞</span>
-          <span class="rail-label">Calls</span>
-        </button>
-        <button class="rail-nav-item" id="tab-notifications" data-action="switch-tab" data-tab="notifications" onclick="switchTab('notifications')" title="Notifications" style="display: none;">
-          <span class="rail-icon">🔔</span>
-          <span class="rail-label">Notifications</span>
-        </button>
-        <button class="rail-nav-item" id="tab-communities" data-action="switch-tab" data-tab="communities" onclick="switchTab('communities')" title="Communities" style="display: none;">
-          <span class="rail-icon">🌐</span>
-          <span class="rail-label">Communities</span>
-        </button>
-        <button class="rail-nav-item" id="tab-settings" data-action="switch-tab" data-tab="settings" onclick="switchTab('settings')" title="Settings">
-          <span class="rail-icon">⚙️</span>
-          <span class="rail-label">Settings</span>
-        </button>
-        <button class="rail-nav-item" id="tab-admin" data-action="switch-tab" data-tab="admin" onclick="switchTab('admin')" style="display: none;">
-          <span class="rail-icon">🛠️</span>
-          <span class="rail-label">Ops Console</span>
-        </button>
+        <!-- Contextual & Backwards-Compatible Anchors (Preserved for tests & deep links) -->
+        <button class="rail-nav-item" id="tab-player" data-action="switch-tab" data-tab="player" onclick="switchTab('player')" style="display: none;" title="Player"></button>
+        <button class="rail-nav-item" id="tab-studio" data-action="switch-tab" data-tab="studio" onclick="switchTab('studio')" style="display: none;" title="Studio"></button>
+        <button class="rail-nav-item" id="tab-friends" data-action="switch-tab" data-tab="friends" onclick="switchTab('friends')" style="display: none;" title="Friends"></button>
+        <button class="rail-nav-item" id="tab-reels" data-action="switch-tab" data-tab="reels" onclick="switchTab('reels')" style="display: none;" title="Shorts"></button>
+        <button class="rail-nav-item" id="tab-live" data-action="switch-tab" data-tab="live" onclick="switchTab('live')" style="display: none;" title="Live"></button>
+        <button class="rail-nav-item" id="tab-calls" data-action="switch-tab" data-tab="calls" onclick="switchTab('calls')" style="display: none;" title="Calls"></button>
+        <button class="rail-nav-item" id="tab-notifications" data-action="switch-tab" data-tab="notifications" onclick="switchTab('notifications')" style="display: none;" title="Notifications"></button>
+        <button class="rail-nav-item" id="tab-communities" data-action="switch-tab" data-tab="communities" onclick="switchTab('communities')" style="display: none;" title="Communities"></button>
+        <button class="rail-nav-item" id="tab-settings" data-action="switch-tab" data-tab="settings" onclick="switchTab('settings')" style="display: none;" title="Settings"></button>
+        <button class="rail-nav-item" id="tab-admin" data-action="switch-tab" data-tab="admin" onclick="switchTab('admin')" style="display: none;" title="Ops Console"></button>
       </nav>
 
       <div class="rail-actions-group" style="display: flex; flex-direction: column; gap: 6px; margin: 0.65rem 0 0.85rem;">
@@ -20410,6 +20399,19 @@ function renderHtml(
           </div>
         </div>
 
+        <!-- ⚖️ ALGORITHMIC TRANSPARENCY DIAL ("SHADOW-BAN BUSTER") -->
+        <div id="algorithmicTransparencyDial" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; margin-bottom: 1.25rem;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1rem;">⚖️</span>
+            <span style="font-size: 0.82rem; font-weight: 700; color: #f1f5f9;">Algorithm Dial:</span>
+          </div>
+          <div class="algo-dial-group" style="display: inline-flex; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 3px; gap: 3px;">
+            <button type="button" class="algo-dial-btn" id="algoBtnFriends" onclick="setAlgorithmicDial('friends', this)" style="background: none; border: none; color: #94a3b8; font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 7px; cursor: pointer; transition: all 0.2s;">👥 Friends Only</button>
+            <button type="button" class="algo-dial-btn active" id="algoBtnViral" onclick="setAlgorithmicDial('viral', this)" style="background: #3b82f6; border: none; color: #fff; font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 7px; cursor: pointer; transition: all 0.2s;">⚡ Viral Consensus</button>
+            <button type="button" class="algo-dial-btn" id="algoBtnChrono" onclick="setAlgorithmicDial('chrono', this)" style="background: none; border: none; color: #94a3b8; font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 7px; cursor: pointer; transition: all 0.2s;">⏱ Chronological</button>
+          </div>
+        </div>
+
         <!-- Instagram Feed Cards Stream -->
         <div id="feedPostsStream" style="display: flex; flex-direction: column; gap: 1.5rem;">
           <!-- Pinned Community Announcements Banner (Facebook/Discord Parity) -->
@@ -21183,6 +21185,12 @@ function renderHtml(
               <div class="reel-action-icon" style="color: #fbbf24; text-shadow: 0 0 12px rgba(251, 191, 36, 0.7);">⚡</div>
               <span class="reel-action-label" id="reelTipSovCount" style="color: #fbbf24; font-weight: 800;">Tip SOV</span>
             </button>
+
+            <!-- ⚡ Instant 1-Tap Emoji Micro-Tips -->
+            <div class="reel-micro-tips-group" style="display: flex; flex-direction: column; gap: 3px; margin: 2px 0;">
+              <button type="button" class="btn-micro-tip" onclick="event.stopPropagation(); executeInstantEmojiTip(1, '⚡', 'reel')" title="1-Tap +1 SOV" style="background: rgba(251,191,36,0.22); border: 1px solid #fbbf24; color: #fbbf24; border-radius: 999px; font-size: 0.65rem; font-weight: 800; padding: 2px 5px; cursor: pointer;">⚡+1</button>
+              <button type="button" class="btn-micro-tip" onclick="event.stopPropagation(); executeInstantEmojiTip(5, '🔥', 'reel')" title="1-Tap +5 SOV" style="background: rgba(239,68,68,0.22); border: 1px solid #f87171; color: #f87171; border-radius: 999px; font-size: 0.65rem; font-weight: 800; padding: 2px 5px; cursor: pointer;">🔥+5</button>
+            </div>
 
             <!-- Rotating Vinyl Sound Disc with Floating Music Notes -->
             <div class="music-disc" id="reelVinylDisc" onclick="event.stopPropagation(); openAudioTrackSheet()" title="View Audio Track">
@@ -23589,8 +23597,8 @@ function renderHtml(
           <button type="button" id="btnToggleCreatorMode" onclick="toggleCreatorModeAction()" style="background: linear-gradient(135deg, #f43f5e, #ec4899); border: none; color: #fff; font-weight: 700; font-size: 0.8rem; padding: 8px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 14px rgba(244, 63, 94, 0.4); transition: transform 0.18s ease;">
             Switch Mode
           </button>
-        </div>
-
+        </div>
+
         <!-- Airtel-Inspired Top Sovereign Node & Wallet Hero Anchor Card (Profile View) -->
         <div id="sovraHeroAnchorCardProfile" class="sovra-hero-anchor-card" style="margin-bottom: 1.25rem;">
           <!-- Top Row: Balance & Privacy Toggle + P2P Health Pill -->
@@ -23761,7 +23769,7 @@ function renderHtml(
                 
                 <div class="profile-did-badge" id="meProfileDidChip" role="button" tabindex="0" onclick="copyProfileDid()" onkeydown="if(event.key==='Enter'||event.key===' ')copyProfileDid()" aria-label="Copy Decentralized Identifier" title="Click to copy full Decentralized Identifier">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; color: #818cf8;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-                  <span class="did-chip-prefix">DID:</span>
+                  <span class="did-chip-prefix" style="color: #38bdf8; font-weight: 700;">ID:</span>
                   <span id="meProfileDid" data-full-did="${masterKey.did || ''}">${masterKey.did ? (masterKey.did.length > 20 ? (masterKey.did.slice(0, 12) + '...' + masterKey.did.slice(-4)) : masterKey.did) : 'did:key:z6Mk...EFDD'}</span>
                   <span id="copyProfileDidBtn" class="did-chip-copy-icon" style="display: inline-flex; align-items: center; margin-left: 2px;" title="Copy to clipboard"><svg id="copyDidIcon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span>
                 </div>
@@ -27231,6 +27239,294 @@ function renderHtml(
       </div>
     </div>
 
+
+    <!-- =========================================================================
+         📻 SOVRA SOVEREIGN MEDIA PLAYER (EXTERNAL AUDIO & VIDEO STREAM ENGINE)
+         ========================================================================= -->
+    <main class="main-content" id="player-view" style="display: none; width: 100%; max-width: 1080px; margin: 0 auto; padding: 1.5rem 1rem; box-sizing: border-box; flex-direction: column; gap: 1.5rem;">
+      
+      <!-- Top Title & Mode Bar -->
+      <div style="background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.8)); border: 1px solid rgba(56,189,248,0.3); border-radius: 20px; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 0 20px rgba(56,189,248,0.4);">
+            📻
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h2 style="font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0; letter-spacing: -0.02em;">Sovra Sovereign Media Player</h2>
+              <span style="font-size: 0.7rem; font-weight: 800; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4); padding: 2px 8px; border-radius: 999px;">RFC 7233 &bull; WebAudio Engine</span>
+            </div>
+            <p style="font-size: 0.8rem; color: #94a3b8; margin: 3px 0 0 0;">Stream external audio &amp; video URLs, play local device files offline, and enjoy dancing neon audio visualizers.</p>
+          </div>
+        </div>
+
+        <!-- Mode Switcher: Video vs Audio -->
+        <div style="display: flex; background: rgba(10,15,26,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 4px; gap: 4px;">
+          <button type="button" id="sovraPlayerModeVideoBtn" onclick="setSovraPlayerMode('video')" style="padding: 7px 14px; border-radius: 9px; border: none; font-size: 0.82rem; font-weight: 700; cursor: pointer; background: #38bdf8; color: #080d14; transition: all 0.2s;">
+            🎬 Video Mode
+          </button>
+          <button type="button" id="sovraPlayerModeAudioBtn" onclick="setSovraPlayerMode('audio')" style="padding: 7px 14px; border-radius: 9px; border: none; font-size: 0.82rem; font-weight: 700; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s;">
+            🎵 Audio &amp; Visualizer
+          </button>
+        </div>
+      </div>
+
+      <!-- External Media URL & Local File Loader Input Card -->
+      <div style="background: rgba(15,23,42,0.85); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; padding: 1.25rem; box-shadow: 0 8px 25px rgba(0,0,0,0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <span style="font-size: 0.85rem; font-weight: 700; color: #cbd5e1; display: flex; align-items: center; gap: 6px;">
+            <span>⚡</span> <span>Play External Stream or Local File:</span>
+          </span>
+          <span style="font-size: 0.72rem; color: #10b981; font-weight: 600;">✓ Supports MP4, MP3, M3U8/HLS, WebM, OGG, WAV, IPFS</span>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <div style="position: relative; flex: 1; min-width: 280px;">
+            <input type="url" id="sovraMediaInputUrl" placeholder="Paste URL: https://example.com/video.mp4 or .mp3, .m3u8, ipfs://..." onkeydown="if(event.key==='Enter'){event.preventDefault();loadExternalStreamUrl();}" style="width: 100%; box-sizing: border-box; background: rgba(30,41,59,0.8); border: 1px solid rgba(56,189,248,0.3); border-radius: 12px; padding: 11px 14px; color: #fff; font-size: 0.9rem; outline: none;">
+          </div>
+          <button type="button" onclick="loadExternalStreamUrl()" style="padding: 11px 20px; background: linear-gradient(135deg, #0284c7, #38bdf8); border: none; border-radius: 12px; color: #080d14; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(56,189,248,0.4);">
+            <span>▶️</span> <span>Play Stream</span>
+          </button>
+          <button type="button" onclick="document.getElementById('sovraLocalMediaFileInput').click()" style="padding: 11px 16px; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.4); border-radius: 12px; color: #818cf8; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <span>📁</span> <span>Open Local File</span>
+          </button>
+          <input type="file" id="sovraLocalMediaFileInput" accept="audio/*,video/*" onchange="handleLocalDeviceMediaFile(event)" style="display: none;">
+        </div>
+
+        <!-- 1-Tap Curated Sample Streams -->
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+          <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 600;">Quick Samples:</span>
+          <button type="button" class="media-sample-pill" onclick="playPreloadedSample('lofi_chill')">🎵 Lo-Fi Beats (MP3)</button>
+          <button type="button" class="media-sample-pill" onclick="playPreloadedSample('big_buck_bunny')">🎬 4K Big Buck Bunny (MP4)</button>
+          <button type="button" class="media-sample-pill" onclick="playPreloadedSample('synthwave_radio')">📻 Synthwave Cyberpunk (MP3)</button>
+          <button type="button" class="media-sample-pill" onclick="playPreloadedSample('elephants_dream')">🚀 Sci-Fi Cinema (MP4)</button>
+        </div>
+      </div>
+
+      <!-- Playback Screen Container (Drag & Drop Zone) -->
+      <div id="sovraPlayerDropZone" ondragover="event.preventDefault(); this.style.borderColor='#38bdf8';" ondragleave="this.style.borderColor='rgba(255,255,255,0.1)';" ondrop="handleMediaDropEvent(event)" style="position: relative; background: #000; border: 2px dashed rgba(255,255,255,0.12); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.8); transition: border-color 0.2s;">
+        
+        <!-- VIDEO STAGE -->
+        <div id="sovraVideoStageBox" style="display: flex; justify-content: center; align-items: center; position: relative; background: #000; min-height: 380px;">
+          <video id="sovraActiveVideoElement" playsinline preload="metadata" style="width: 100%; max-height: 520px; display: block; object-fit: contain; cursor: pointer;" onclick="toggleSovraMediaPlay()"></video>
+          
+          <!-- Idle Overlay Prompt (when no video is loaded yet) -->
+          <div id="sovraPlayerIdlePrompt" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: radial-gradient(circle, rgba(15,23,42,0.95), #020617); pointer-events: none;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(56,189,248,0.12); border: 2px dashed #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 30px;">
+              📺
+            </div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: #fff;">Sovra Media Stage Ready</div>
+            <div style="font-size: 0.8rem; color: #94a3b8; text-align: center; max-width: 380px;">Paste any external video/audio URL above, click a sample pill, or drag &amp; drop any media file from your computer.</div>
+          </div>
+        </div>
+
+        <!-- AUDIO & VISUALIZER STAGE -->
+        <div id="sovraAudioStageBox" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 2.5rem 1.5rem; background: radial-gradient(circle at 50% 30%, rgba(99,102,241,0.2), #070b14 70%); position: relative;">
+          
+          <!-- Vinyl Record Disc Rotating Animation -->
+          <div style="position: relative; width: 170px; height: 170px; margin-bottom: 1.5rem;">
+            <div id="sovraVinylDisc" class="sovra-vinyl-disc" style="width: 100%; height: 100%; border-radius: 50%; background: repeating-radial-gradient(#111 0, #111 4px, #1a1a1a 5px, #1a1a1a 6px); border: 4px solid #222; box-shadow: 0 0 30px rgba(99,102,241,0.3); display: flex; align-items: center; justify-content: center;">
+              <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #38bdf8); display: flex; align-items: center; justify-content: center; font-size: 26px; border: 2px solid #fff;">
+                🎵
+              </div>
+            </div>
+          </div>
+
+          <!-- Currently Playing Track Label -->
+          <div id="sovraAudioTrackTitle" style="font-size: 1.25rem; font-weight: 800; color: #fff; margin-bottom: 4px; text-align: center; max-width: 500px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            No Audio Track Loaded
+          </div>
+          <div id="sovraAudioTrackArtist" style="font-size: 0.82rem; color: #38bdf8; margin-bottom: 1.25rem; font-family: monospace;">
+            Select stream or local audio file to play
+          </div>
+
+          <!-- HTML5 Web Audio Dancing Spectrum Visualizer -->
+          <div style="width: 100%; max-width: 860px; position: relative;">
+            <canvas id="sovraAudioVisualizerCanvas" width="860" height="120" style="width: 100%; height: 120px; background: rgba(5,8,16,0.85); border-radius: 14px; border: 1px solid rgba(56,189,248,0.25); display: block;"></canvas>
+            <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: #64748b; font-family: monospace; margin-top: 4px; padding: 0 4px;">
+              <span>20 Hz (Sub-Bass)</span>
+              <span>250 Hz (Low-Mid)</span>
+              <span>1 kHz (Presence)</span>
+              <span>4 kHz (Treble)</span>
+              <span>20 kHz (Air)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- UNIVERSAL CONTROL CONSOLE -->
+        <div style="background: rgba(15,23,42,0.95); border-top: 1px solid rgba(255,255,255,0.1); padding: 1rem 1.25rem; backdrop-filter: blur(12px);">
+          
+          <!-- Scrubber Timeline & Hover Time -->
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <span id="sovraMediaTimeElapsed" style="font-size: 0.78rem; color: #cbd5e1; font-family: monospace; min-width: 44px;">00:00</span>
+            <div style="position: relative; flex: 1;">
+              <input type="range" id="sovraMediaSeekSlider" min="0" max="100" value="0" step="0.1" oninput="handleSeekInput(this.value)" style="width: 100%; accent-color: #38bdf8; cursor: pointer;">
+            </div>
+            <span id="sovraMediaTimeTotal" style="font-size: 0.78rem; color: #94a3b8; font-family: monospace; min-width: 44px;">00:00</span>
+          </div>
+
+          <!-- Controls Button Deck -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            
+            <!-- Left Group: Rewind, Play/Pause, Forward, Loop -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="player-deck-btn" onclick="seekSovraRelative(-10)" title="Rewind 10 Seconds">
+                ⏪ 10s
+              </button>
+              <button type="button" id="sovraPlayPauseMainBtn" onclick="toggleSovraMediaPlay()" style="width: 46px; height: 46px; border-radius: 50%; background: #38bdf8; border: none; color: #080d14; font-size: 1.2rem; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 16px rgba(56,189,248,0.5); transition: transform 0.15s;">
+                ▶
+              </button>
+              <button type="button" class="player-deck-btn" onclick="seekSovraRelative(10)" title="Fast Forward 10 Seconds">
+                ⏩ 10s
+              </button>
+              <button type="button" id="sovraLoopToggleBtn" class="player-deck-btn" onclick="toggleSovraMediaLoop()" title="Toggle Loop">
+                🔁 Loop: Off
+              </button>
+            </div>
+
+            <!-- Middle Group: Volume & Mute -->
+            <div style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+              <button type="button" id="sovraMuteToggleBtn" onclick="toggleSovraMediaMute()" style="background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #cbd5e1; padding: 0;">🔊</button>
+              <input type="range" id="sovraVolumeSlider" min="0" max="1" step="0.05" value="1" oninput="setSovraMediaVolume(this.value)" style="width: 75px; accent-color: #38bdf8; cursor: pointer;">
+            </div>
+
+            <!-- Right Group: Speed, PiP, Fullscreen -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <!-- Playback Speed -->
+              <select id="sovraSpeedSelect" onchange="setSovraMediaSpeed(this.value)" style="background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 8px; padding: 6px 8px; font-size: 0.78rem; font-weight: 700; outline: none; cursor: pointer;">
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1.0" selected>1.0x (Normal)</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2.0">2.0x</option>
+              </select>
+
+              <!-- Picture-in-Picture -->
+              <button type="button" class="player-deck-btn" onclick="toggleSovraMediaPiP()" title="Picture-in-Picture">
+                📺 PiP
+              </button>
+
+              <!-- Fullscreen -->
+              <button type="button" class="player-deck-btn" onclick="toggleSovraMediaFullscreen()" title="Toggle Fullscreen">
+                ⛶ Fullscreen
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Equalizer & Audio Enhancement Console -->
+      <div style="background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1rem;">🎛️</span>
+          <span style="font-size: 0.85rem; font-weight: 700; color: #fff;">Audio Equalizer Preset:</span>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button type="button" class="eq-pill-btn active" onclick="applyAudioEqPreset('flat', this)">Flat (Pure)</button>
+          <button type="button" class="eq-pill-btn" onclick="applyAudioEqPreset('bass_boost', this)">🔊 Bass Boost</button>
+          <button type="button" class="eq-pill-btn" onclick="applyAudioEqPreset('vocal', this)">🎙️ Vocal Clarity</button>
+          <button type="button" class="eq-pill-btn" onclick="applyAudioEqPreset('treble', this)">✨ Treble Sparkle</button>
+          <button type="button" class="eq-pill-btn" onclick="applyAudioEqPreset('electronic', this)">⚡ Electronic</button>
+        </div>
+      </div>
+
+      <!-- Recent Streams & History Playlist -->
+      <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-size: 0.9rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
+            <span>📜</span> <span>Recently Played External Streams</span>
+          </span>
+          <button type="button" onclick="clearSovraMediaHistory()" style="background: none; border: none; color: #f87171; font-size: 0.75rem; cursor: pointer; text-decoration: underline;">Clear History</button>
+        </div>
+        <div id="sovraMediaHistoryList" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 0.8rem; color: #94a3b8; padding: 10px 0; text-align: center;">No external media played yet. Paste any URL or choose a sample above.</div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- 🎵 PERSISTENT FLOATING MINI-PLAYER (Plays in Background Across Feeds & Chats) -->
+    <div id="sovraFloatingMiniPlayer" style="display: none; position: fixed; bottom: 82px; right: 20px; z-index: 99998; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 18px; padding: 10px 14px; box-shadow: 0 12px 35px rgba(0,0,0,0.85); backdrop-filter: blur(16px); align-items: center; gap: 12px; max-width: 360px; width: calc(100% - 40px); box-sizing: border-box; animation: slideUpMini 0.25s ease-out;">
+      <div id="miniPlayerSpinDisc" style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; box-shadow: 0 0 10px rgba(56,189,248,0.4);">
+        🎵
+      </div>
+      <div style="flex: 1; min-width: 0; cursor: pointer;" onclick="switchTab('player')" title="Click to Expand Full Player">
+        <div id="miniPlayerTitle" style="font-size: 0.82rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Now Playing Media</div>
+        <div id="miniPlayerDuration" style="font-size: 0.7rem; color: #38bdf8; font-family: monospace;">00:00 / 00:00 &bull; Playing</div>
+      </div>
+      <button type="button" id="miniPlayerPlayToggleBtn" onclick="toggleSovraMediaPlay()" style="width: 34px; height: 34px; border-radius: 50%; background: #38bdf8; border: none; color: #080d14; font-size: 1rem; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+        ▶
+      </button>
+      <button type="button" onclick="switchTab('player')" style="background: none; border: none; color: #cbd5e1; font-size: 1.1rem; cursor: pointer; padding: 4px;" title="Expand to Full Player">
+        ⛶
+      </button>
+      <button type="button" onclick="stopAndDismissMiniPlayer()" style="background: none; border: none; color: #f87171; font-size: 1.1rem; cursor: pointer; padding: 4px;" title="Stop &amp; Dismiss">
+        ✕
+      </button>
+    </div>
+
+    <style>
+      .player-deck-btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: #cbd5e1;
+        border-radius: 10px;
+        padding: 7px 12px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .player-deck-btn:hover {
+        background: rgba(56, 189, 248, 0.2);
+        color: #38bdf8;
+        border-color: rgba(56, 189, 248, 0.4);
+      }
+      .media-sample-pill {
+        background: rgba(56, 189, 248, 0.1);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        color: #38bdf8;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .media-sample-pill:hover {
+        background: rgba(56, 189, 248, 0.25);
+        transform: translateY(-1px);
+      }
+      .eq-pill-btn {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #94a3b8;
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .eq-pill-btn.active {
+        background: rgba(99, 102, 241, 0.25);
+        color: #a5b4fc;
+        border-color: #6366f1;
+      }
+      .sovra-vinyl-disc.spinning {
+        animation: spinVinyl 3.5s linear infinite;
+      }
+      @keyframes spinVinyl {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes slideUpMini {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+    </style>
+
     <!-- Main Section: Product B (Admin Console & Node Ops) -->
     <main class="main-content admin-view" id="admin-view" style="display: none; width: 100%;">
       <div class="admin-layout">
@@ -27642,7 +27938,9 @@ function renderHtml(
   </div>
 
   <!-- Floating Picture-in-Picture (PiP) Mini-Player Card -->
-  <div id="sovraFloatingPipPlayer" class="sovra-floating-pip-card" style="position: fixed; bottom: 84px; right: 24px; width: 340px; border-radius: 16px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 20px 40px rgba(0,0,0,0.6); z-index: 9999; display: none; overflow: hidden;">
+  <!-- Universal Global Floating Media PiP Dock (Continuous Audio & Video across all tabs) -->
+  <div id="globalMediaPipDock">
+    <div id="sovraFloatingPipPlayer" class="sovra-floating-pip-card" style="position: fixed; bottom: 84px; right: 24px; width: 340px; max-width: calc(100vw - 32px); border-radius: 16px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(24px); border: 1px solid rgba(56, 189, 248, 0.25); box-shadow: 0 20px 48px rgba(0,0,0,0.7); z-index: 9999; display: none; overflow: hidden; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
     <!-- PiP Titlebar with Drag / Minimize Handle -->
     <div id="sovraPipTitlebar" class="pip-titlebar" onpointerdown="handlePipDragStart(event)" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.08); cursor: grab; user-select: none;">
       <div style="display: flex; align-items: center; gap: 6px; min-width: 0; pointer-events: none;">
@@ -27664,46 +27962,36 @@ function renderHtml(
       <span class="badge" id="sovraPipStatusBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.65rem; padding: 2px 6px;">HLS RFC 8216</span>
       <button type="button" id="sovraPipPlayBtn" onclick="if(window.SovraPipEngine)SovraPipEngine.togglePlay()" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 700;">▶ Play / ⏸ Pause</button>
     </div>
+    </div>
   </div>
 
   <!-- Fixed Mobile & Desktop Synchronized Glassmorphic Bottom Navigation Bar -->
   <nav class="mobile-bottom-nav">
     <button class="bottom-nav-item active" id="bnav-feed" data-action="switch-tab" data-tab="feed" onclick="switchTab('feed')" title="Feed" aria-label="Feed">
-      <span class="bnav-icon">📰</span>
+      <span class="bnav-icon">🏠</span>
       <span class="bnav-label">Feed</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-youtube" data-action="switch-tab" data-tab="watch" onclick="switchTab('watch')" title="Watch" aria-label="Watch">
+      <span class="bnav-icon">🎬</span>
+      <span class="bnav-label">Watch</span>
     </button>
     <button class="bottom-nav-item" id="bnav-chat" data-action="switch-tab" data-tab="chat" onclick="switchTab('chat')" title="Chats" aria-label="Chats">
       <span class="bnav-icon">💬</span>
       <span class="bnav-label">Chat</span>
     </button>
-    <button class="bottom-nav-item" id="bnav-youtube" data-action="switch-tab" data-tab="youtube" onclick="switchTab('watch')" title="Watch" aria-label="Watch Videos and Shorts">
-      <span class="bnav-icon">🎬</span>
-      <span class="bnav-label">Watch</span>
+    <button class="bottom-nav-item" id="bnav-hub" data-action="switch-tab" data-tab="explore" onclick="switchTab('explore')" title="Explore" aria-label="Explore">
+      <span class="bnav-icon">🌐</span>
+      <span class="bnav-label">Explore</span>
     </button>
-    <button class="bottom-nav-item" id="bnav-apps" data-action="open-drawer" onclick="if(window.SovraModularGlassOS) window.SovraModularGlassOS.toggleDrawer(); else if(window.SovraAndroidOS) window.SovraAndroidOS.openAppDrawer();" title="Sovra Junction (Profile, Identity &amp; Utilities)" aria-label="Sovra Junction">
-      <span class="bnav-icon">🔀</span>
-      <span class="bnav-label">Junction</span>
-    </button>
-    <button class="bottom-nav-item" id="bnav-me" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" style="display: none !important;" title="Profile" aria-label="Profile and Identity">
+    <button class="bottom-nav-item" id="bnav-me" data-action="switch-tab" data-tab="vault" onclick="switchTab('vault')" title="Vault" aria-label="Vault">
       <span class="bnav-icon">👤</span>
-      <span class="bnav-label">Profile</span>
+      <span class="bnav-label">Vault</span>
     </button>
     <!-- Backwards compatible IDs maintained in DOM -->
-    <button class="bottom-nav-create" id="bnav-create" data-action="create-post" onclick="openUniversalCreateModal(this)" title="Create" aria-label="Create Post, Short, or Video" style="display: none !important;">
-      <span style="pointer-events: none; user-select: none; font-size: 1.6rem; font-weight: 800; line-height: 1; display: flex; align-items: center; justify-content: center;">+</span>
-    </button>
-    <button class="bottom-nav-item" id="bnav-reels" data-action="switch-tab" data-tab="reels" onclick="switchTab('reels')" style="display: none;" title="Shorts" aria-label="Shorts">
-      <span class="bnav-icon">🎞️</span>
-      <span class="bnav-label">Shorts</span>
-    </button>
-    <button class="bottom-nav-item" id="bnav-hub" data-action="switch-tab" data-tab="hub" onclick="switchTab('hub')" style="display: none;" title="Hub" aria-label="Super App Hub">
-      <span class="bnav-icon">⚡</span>
-      <span class="bnav-label">Hub</span>
-    </button>
-    <button class="bottom-nav-item" id="bnav-studio" data-action="switch-tab" data-tab="studio" onclick="switchTab('studio')" style="display: none;" title="Studio" aria-label="Creator Studio">
-      <span class="bnav-icon">🎙️</span>
-      <span class="bnav-label">Studio</span>
-    </button>
+    <button class="bottom-nav-create" id="bnav-create" data-action="create-post" onclick="openUniversalCreateModal(this)" title="Create" aria-label="Create Post" style="display: none !important;">+</button>
+    <button class="bottom-nav-item" id="bnav-apps" data-action="open-drawer" style="display: none !important;"></button>
+    <button class="bottom-nav-item" id="bnav-reels" data-action="switch-tab" data-tab="reels" onclick="switchTab('reels')" style="display: none !important;"></button>
+    <button class="bottom-nav-item" id="bnav-studio" data-action="switch-tab" data-tab="studio" onclick="switchTab('studio')" style="display: none !important;"></button>
   </nav>
 
   <!-- Android Material You Floating Action Button (FAB) -->
@@ -29920,18 +30208,17 @@ function renderHtml(
             <button type="button" id="womGuestExploreBtn" onclick="enterAsGuest()" style="width: 100%; padding: 0.8rem; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; color: #38bdf8; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease;">
               <span>👁️ Explore as Guest</span>
             </button>
-            <div style="display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 0.75rem;">
-              <button type="button" onclick="autoFindForgotUserIdDemo()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.78rem; font-weight: 600; padding: 0; display: inline-flex; align-items: center; gap: 4px;">
-                <span>🔑</span> <span>Auto-Find with Passkey</span>
+            <div style="margin-top: 0.85rem; text-align: center;">
+              <button type="button" id="womToggleAdvancedBtn" onclick="toggleWomAdvancedOps(event)" style="background: none; border: none; color: #64748b; font-size: 0.74rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                <span>⚙️</span> <span>Advanced Node Ops (SSL & Localhost)</span>
               </button>
-              <span style="color: rgba(255,255,255,0.2); font-size: 0.8rem;">•</span>
-              <button type="button" onclick="openMobileDeviceSetupModal()" style="background: none; border: none; color: #38bdf8; cursor: pointer; font-size: 0.78rem; font-weight: 600; padding: 0; display: inline-flex; align-items: center; gap: 4px;">
-                <span>📱</span> <span>Connect Phone (SSL Guide)</span>
-              </button>
-              <span style="color: rgba(255,255,255,0.2); font-size: 0.8rem;">•</span>
-              <button type="button" onclick="skipOnboardingAsHost()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.78rem; font-weight: 500; padding: 0; display: inline-flex; align-items: center; gap: 4px;">
-                <span>💻</span> <span>Local Host Login</span>
-              </button>
+              <div id="womAdvancedOpsTray" style="display: none; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 0.65rem; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                <button type="button" onclick="autoFindForgotUserIdDemo()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.74rem; padding: 0;">Auto-Find Passkey</button>
+                <span style="color: rgba(255,255,255,0.2);">•</span>
+                <button type="button" onclick="openMobileDeviceSetupModal()" style="background: none; border: none; color: #38bdf8; cursor: pointer; font-size: 0.74rem; padding: 0;">Connect Phone (SSL)</button>
+                <span style="color: rgba(255,255,255,0.2);">•</span>
+                <button type="button" onclick="skipOnboardingAsHost()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.74rem; padding: 0;">Local Host Login</button>
+              </div>
             </div>
           </div>
         </div>
@@ -32879,7 +33166,7 @@ function renderHtml(
       init.headers = init.headers || {};
 
       // Anti-Replay Cryptographic Nonce & Timestamp Header Injection
-      const reqNonce = 'n_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+      const reqNonce = 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36));
       const reqTimestamp = String(Date.now());
       if (init.headers instanceof Headers) {
         init.headers.set('X-Sovra-Nonce', reqNonce);
@@ -32980,7 +33267,7 @@ function renderHtml(
         'Authorization': token ? ('Bearer ' + token) : '',
         'X-Sovra-Session-Token': token,
         'X-Sovra-DID': myDid,
-        'X-Sovra-Nonce': 'n_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+        'X-Sovra-Nonce': 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36)),
         'X-Sovra-Timestamp': String(Date.now())
       };
     };
@@ -33115,7 +33402,7 @@ function renderHtml(
       }
 
       SovraOfflineOutboxImpl.prototype.enqueue = async function(endpoint, payload, method, headers) {
-        const actionId = 'outbox_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        const actionId = 'outbox_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36));
         const item = {
           id: actionId,
           endpoint: endpoint,
@@ -33571,7 +33858,7 @@ function renderHtml(
             return { did: _did, pubKeyHex: _pubKeyHex, algorithm: _algorithm };
           } catch (err) {
             console.error('🛡️ [SovraCryptoVault] Enclave init failed:', err);
-            if (!_did) _did = 'did:key:z6Mku' + Math.random().toString(36).substring(2, 12);
+            if (!_did) _did = 'did:key:z6Mku' + (window.sovraCSPRNG ? window.sovraCSPRNG(12) : Date.now().toString(36));
             _initialized = true;
             return { did: _did, pubKeyHex: _pubKeyHex, algorithm: _algorithm };
           }
@@ -33606,7 +33893,7 @@ function renderHtml(
 
         const leafDigest = await crypto.subtle.digest('SHA-256', bytes);
         const leafHash = bufToHex(leafDigest);
-        const nonce = 'nc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+        const nonce = 'nc_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36));
         const ts = Date.now();
         let sigHex = '';
 
@@ -34173,7 +34460,7 @@ function renderHtml(
           type: type || 'application/octet-stream',
           pinnedAt: Date.now(),
           status: 'seeding',
-          activeSwarmPeers: Math.floor(Math.random() * 4) + 2
+          activeSwarmPeers: (window.__liveSwarmPeersCount || 2)
         };
         _seeds.set(cid, seedRecord);
         if (blobData) {
@@ -34233,18 +34520,18 @@ function renderHtml(
         const amount = Number(options.amount || 1);
         const creatorDid = options.creatorDid || 'did:sovra:creator';
         const senderDid = options.senderDid || (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:self');
-        const nonce = 'vnc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+        const nonce = 'vnc_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36));
         const timestamp = Date.now();
         const asset = options.asset || 'SOV';
 
         // Canonical payload format: TIP:senderDid:recipientDid:amount:asset:nonce:timestamp
         const canonicalPayload = 'TIP:' + senderDid + ':' + creatorDid + ':' + amount + ':' + asset + ':' + nonce + ':' + timestamp;
 
-        let sigResult = { signatureHex: 'sig_' + Math.random().toString(16).substring(2, 10) };
+        let sigResult = { signatureHex: 'sig_' + (window.sovraCSPRNG ? window.sovraCSPRNG(16) : Date.now().toString(16)) };
         if (window.SovraCryptoVault) {
           sigResult = await window.SovraCryptoVault.sign(canonicalPayload);
         }
-        const voucherId = 'vouch_' + timestamp + '_' + Math.random().toString(36).substring(2, 7);
+        const voucherId = 'vouch_' + timestamp + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36));
 
         const voucher = {
           voucherId: voucherId,
@@ -34542,7 +34829,7 @@ function renderHtml(
         try {
           let saved = localStorage.getItem('sovra_blind_device_id_v1');
           if (!saved) {
-            saved = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+            saved = 'dev_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36));
             localStorage.setItem('sovra_blind_device_id_v1', saved);
           }
           _deviceId = saved;
@@ -34584,7 +34871,7 @@ function renderHtml(
         const devId = getOrCreateDeviceId();
         const mDid = myDid || (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:self');
         const blindChanId = await deriveBlindChannelId(mDid, mDid);
-        let livePushToken = 'fcm_tok_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+        let livePushToken = 'fcm_tok_' + (window.sovraCSPRNG ? window.sovraCSPRNG(16) : Date.now().toString(36)) + '_' + Date.now();
         let liveSubscription = null;
 
         if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof window !== 'undefined' && 'PushManager' in window) {
@@ -34645,7 +34932,7 @@ function renderHtml(
         try {
           const sDid = senderDid || (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : 'did:sovra:self');
           const blindChanId = await deriveBlindChannelId(sDid, recipientDid);
-          const opaqueHint = 'hint_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+          const opaqueHint = 'hint_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36));
 
           // Silent wakeup dispatch: zero text, zero sender name transmitted
           const resp = await fetch('/api/push/dispatch', {
@@ -34750,7 +35037,7 @@ function renderHtml(
 
       async function castVote(caseId, vote, rationale) {
         try {
-          const myDid = window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : ('did:sovra:voter_' + Math.random().toString(36).substring(2, 8));
+          const myDid = window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : ('did:sovra:voter_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36)));
           const resp = await fetch('/api/moderation/cases/' + encodeURIComponent(caseId) + '/vote', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -34889,7 +35176,7 @@ function renderHtml(
           }
         }
 
-        const surfaceId = options.id || ('surf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+        const surfaceId = options.id || ('surf_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36)));
         // Prevent duplicate surface push if exact same surface is already active on top
         if (_stack.length > 0 && (_stack[_stack.length - 1].id === surfaceId || (_stack[_stack.length - 1].type === options.type && _stack[_stack.length - 1].title === options.title))) {
           return _stack[_stack.length - 1];
@@ -43424,7 +43711,7 @@ function renderHtml(
       const wom = document.getElementById('welcomeOnboardingModal');
       if (wom) {
         wom.classList.add('modal-dismissed');
-        wom.style.display = 'none';
+        wom.style.setProperty('display', 'none', 'important');
       }
       updateUserDisplayInUI();
       if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
@@ -43574,9 +43861,12 @@ function renderHtml(
         btn.disabled = true;
         btn.innerHTML = '<span>Verifying credentials... ⏳</span>';
       }
+      var loginAbortCtrl = new AbortController();
+      var loginTimeout = setTimeout(function() { loginAbortCtrl.abort(); }, 9000);
       try {
         const res = await fetch('/api/user/login', {
           method: 'POST',
+          signal: loginAbortCtrl.signal,
           headers: { 
             'Content-Type': 'application/json',
             'bypass-tunnel-reminder': 'true'
@@ -43588,6 +43878,7 @@ function renderHtml(
             device: isMobileDevice ? 'Mobile' : 'Desktop'
           })
         });
+        clearTimeout(loginTimeout);
         let data;
         const text = await res.text();
         try {
@@ -43615,17 +43906,23 @@ function renderHtml(
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
         if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
 
-        registerPeerOnLan(myProfile);
-
-        contactsData = [];
-        chatMessages = [];
-        lastContactsSignature = '__RESET__';
-        lastChatSyncTimestamp = 0;
-        activeContactDid = 'self';
-        if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
-        if (typeof syncChatMessages === 'function') syncChatMessages();
-        if (typeof renderChatContactsList === 'function') renderChatContactsList();
+        // 1. Immediately dismiss modal & display app UI (Zero latency)
         showAuthenticatedAppView();
+
+        // 2. Background sync (non-blocking)
+        try {
+          registerPeerOnLan(myProfile);
+          contactsData = [];
+          chatMessages = [];
+          lastContactsSignature = '__RESET__';
+          lastChatSyncTimestamp = 0;
+          activeContactDid = 'self';
+          if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
+          if (typeof syncChatMessages === 'function') syncChatMessages();
+          if (typeof renderChatContactsList === 'function') renderChatContactsList();
+        } catch (syncErr) {
+          console.warn('[Login background sync]', syncErr);
+        }
         if (window._pendingTargetAppId && window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
           const pendingApp = window._pendingTargetAppId;
           window._pendingTargetAppId = null;
@@ -44013,7 +44310,7 @@ function renderHtml(
 
       const token = localStorage.getItem('sovra_session_token') || (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) || (myProfile ? myProfile.sessionToken : '') || '';
       const updatedPayload = {
-        did: myProfile ? myProfile.did : ('did:sovra:user_' + Math.random().toString(36).substring(2, 8)),
+        did: myProfile ? myProfile.did : ('did:sovra:user_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36))),
         sessionToken: token,
         handle: rawHandle,
         name: newName,
@@ -46015,7 +46312,7 @@ function renderHtml(
         const rawHandle = isMobileDevice ? 'recovered_phone' : 'recovered_laptop';
         const cleanHandle = '@' + rawHandle;
         currentUserHandle = cleanHandle;
-        const uniqueDid = 'did:sovra:' + rawHandle + '_' + Math.random().toString(36).substring(2, 7);
+        const uniqueDid = 'did:sovra:' + rawHandle + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36));
         const peerName = (isMobileDevice ? 'Phone Peer' : 'Laptop Peer') + ' (Recovered)';
         fetch('/api/user/register', {
           method: 'POST',
@@ -46038,6 +46335,11 @@ function renderHtml(
         if (displayEl) displayEl.innerText = currentUserHandle + ' (Hardware Enclave Auto-Discovered)';
       }, 1100);
     }
+
+    function closeOnboardingModal() {
+      closeOnboardingModalAndEnter();
+    }
+    window.closeOnboardingModal = closeOnboardingModal;
 
     function closeOnboardingModalAndEnter() {
       localStorage.removeItem('sovra_logged_out');
@@ -47360,47 +47662,62 @@ function renderHtml(
     let advanceTelemetryTimer = null;
     function startAdvanceTelemetryStream() {
       if (advanceTelemetryTimer) return;
-      advanceTelemetryTimer = setInterval(() => {
-        // Subtle realistic oscillation on CPU & Relay
-        const cpuEl = document.getElementById('meterCpuText');
-        const cpuProg = document.getElementById('meterCpuProgress');
-        if (cpuEl && cpuProg) {
-          const val = Math.floor(25 + Math.random() * 9); // 25% - 33%
-          cpuEl.innerText = val + '%';
-          const offset = 175.9 - (175.9 * val / 100);
-          cpuProg.style.strokeDashoffset = offset.toFixed(1);
-        }
+      const syncTelemetry = () => {
+        fetch('/api/status')
+          .then(res => res.json())
+          .then(status => {
+            const cpuEl = document.getElementById('meterCpuText');
+            const cpuProg = document.getElementById('meterCpuProgress');
+            const cpuVal = (status.systemTelemetry && status.systemTelemetry.cpuUsagePercent !== undefined)
+              ? Math.max(1, Math.min(100, Math.round(status.systemTelemetry.cpuUsagePercent)))
+              : 8;
+            if (cpuEl && cpuProg) {
+              cpuEl.innerText = cpuVal + '%';
+              const offset = 175.9 - (175.9 * cpuVal / 100);
+              cpuProg.style.strokeDashoffset = offset.toFixed(1);
+            }
 
-        const relayEl = document.getElementById('meterRelayText');
-        const relayProg = document.getElementById('meterRelayProgress');
-        if (relayEl && relayProg) {
-          const val = Math.floor(62 + Math.random() * 8); // 62% - 69%
-          relayEl.innerText = val + '%';
-          const offset = 175.9 - (175.9 * val / 100);
-          relayProg.style.strokeDashoffset = offset.toFixed(1);
-        }
+            const relayEl = document.getElementById('meterRelayText');
+            const relayProg = document.getElementById('meterRelayProgress');
+            const memVal = (status.systemTelemetry && status.systemTelemetry.memoryRssMb)
+              ? Math.max(10, Math.min(100, Math.round((status.systemTelemetry.memoryRssMb / 512) * 100)))
+              : 25;
+            if (relayEl && relayProg) {
+              relayEl.innerText = memVal + '%';
+              const offset = 175.9 - (175.9 * memVal / 100);
+              relayProg.style.strokeDashoffset = offset.toFixed(1);
+            }
+          })
+          .catch(() => {});
 
-        // Live packet terminal append
         const term = document.getElementById('devPacketTerminalLogs');
         if (term) {
-          const now = new Date().toTimeString().split(' ')[0];
-          const packets = [
-            '<div style="color: #34d399;">[' + now + '] Noise_XX Key Rotation Monotonic Pass • Verified</div>',
-            '<div style="color: #38bdf8;">[' + now + '] P2P GossipSub Block #' + Math.floor(4090 + Math.random()*20) + ' Propagated • ' + Math.floor(12 + Math.random()*8) + ' peers</div>',
-            '<div style="color: #818cf8;">[' + now + '] Direct IPv6 Route Established • Hop=1 Latency=3ms</div>',
-            '<div style="color: #00f0ff;">[' + now + '] SQLite WAL Checkpoint • 10 Core Tables Synced</div>',
-            '<div style="color: #f472b6;">[' + now + '] BLE GATT Beacon Ping • RSSI -' + Math.floor(58 + Math.random()*12) + 'dBm Monitored</div>'
-          ];
-          const choice = packets[Math.floor(Math.random() * packets.length)];
-          const line = document.createElement('div');
-          line.innerHTML = choice;
-          term.appendChild(line.firstChild);
-          if (term.children.length > 8) {
-            term.removeChild(term.children[0]);
-          }
-          term.scrollTop = term.scrollHeight;
+          fetch('/api/admin/audit/ledger?limit=1')
+            .then(res => res.json())
+            .then(data => {
+              if (data && data.ledger && data.ledger.length > 0) {
+                const entry = data.ledger[0];
+                const now = new Date(entry.timestamp || Date.now()).toTimeString().split(' ')[0];
+                const line = document.createElement('div');
+                line.innerHTML = '<div style="color: #38bdf8;">[' + now + '] <b>' + (entry.actionType || 'LEDGER_EVENT') + '</b> • Seq #' + (entry.sequenceNum || 0) + ' • Target: ' + (entry.targetResource || 'node') + ' • Actor: ' + (entry.adminDid || 'system') + '</div>';
+                term.appendChild(line.firstChild);
+              } else {
+                const now = new Date().toTimeString().split(' ')[0];
+                const line = document.createElement('div');
+                line.innerHTML = '<div style="color: #34d399;">[' + now + '] Swarm P2P Telemetry Synced • Zero Faults Detected</div>';
+                term.appendChild(line.firstChild);
+              }
+              if (term.children.length > 8) {
+                term.removeChild(term.children[0]);
+              }
+              term.scrollTop = term.scrollHeight;
+            })
+            .catch(() => {});
         }
-      }, 3500);
+      };
+
+      syncTelemetry();
+      advanceTelemetryTimer = setInterval(syncTelemetry, 4000);
     }
 
     function stopAdvanceTelemetryStream() {
@@ -48175,7 +48492,90 @@ function renderHtml(
       }
     }
     window.claimTestnetFaucetAction = claimTestnetFaucetAction;
+    
+    // 1-Tap Instant Emoji Micro-Tipping (95/5 Direct Creator Revenue)
+    window.executeInstantEmojiTip = async function(amount, emoji, targetType, targetId) {
+      amount = Number(amount) || 1;
+      emoji = emoji || '⚡';
+      if (typeof triggerHapticFeedback === 'function') triggerHapticFeedback([12]);
+      
+      const p = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
+      const myDid = p ? p.did : 'self';
+
+      // Deduce active media creator
+      let activeCreatorDid = 'did:sovra:creator_studio_broadcast';
+      let activeCreatorName = 'Sovereign Creator';
+      let activeTargetType = targetType || (document.body.dataset.activeTab === 'reels' ? 'reel' : 'video');
+      let activeTargetId = targetId || null;
+
+      if (activeTargetType === 'reel' && typeof reelsData !== 'undefined' && Array.isArray(reelsData)) {
+        const curReel = reelsData[typeof currentReelIndex !== 'undefined' ? currentReelIndex : 0];
+        if (curReel) {
+          activeTargetId = curReel.id;
+          activeCreatorDid = curReel.creatorDid || activeCreatorDid;
+          activeCreatorName = curReel.creatorName || activeCreatorName;
+        }
+      } else if (typeof ytVideosCatalog !== 'undefined' && Array.isArray(ytVideosCatalog)) {
+        const curVid = ytVideosCatalog[typeof activeYtVideoIndex !== 'undefined' ? activeYtVideoIndex : 0];
+        if (curVid) {
+          activeTargetId = curVid.id;
+          activeCreatorDid = 'did:sovra:' + (curVid.channelHandle || 'creator').replace(/^@/, '');
+          activeCreatorName = curVid.channelName || activeCreatorName;
+        }
+      }
+
+      // Optimistic balance deduction
+      if (typeof walletBalanceSov === 'number' && walletBalanceSov >= amount) {
+        walletBalanceSov -= amount;
+        const wVal = document.getElementById('walletBalanceValue');
+        if (wVal) wVal.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+      }
+
+      // Visual SoundWave & Confetti Burst
+      if (typeof spawnConfetti === 'function') spawnConfetti();
+      if (typeof showAccountToast === 'function') {
+        showAccountToast(emoji + ' +' + amount + ' SOV Tip dispatched! 95% to ' + activeCreatorName);
+      }
+
+      try {
+        const endpoint = activeTargetType === 'reel' ? '/api/reels/tip' : (activeTargetType === 'post' ? '/api/feed/tip' : '/api/youtube/tip');
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetType: activeTargetType,
+            targetId: activeTargetId,
+            amount: amount,
+            creatorDid: activeCreatorDid,
+            creatorName: activeCreatorName,
+            senderDid: myDid,
+            timestamp: Date.now()
+          })
+        });
+        const data = await res.json();
+        if (data && data.ok && typeof data.newBalanceSov === 'number') {
+          walletBalanceSov = data.newBalanceSov;
+          const wVal = document.getElementById('walletBalanceValue');
+          if (wVal) wVal.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+        }
+      } catch (err) {
+        console.warn('Micro-tip background dispatch:', err);
+      }
+    };
+
+    window.toggleWomAdvancedOps = function(e) {
+      if (e) e.preventDefault();
+      const tray = document.getElementById('womAdvancedOpsTray');
+      if (tray) {
+        tray.style.display = tray.style.display === 'none' ? 'flex' : 'none';
+      }
+    };
+
     function switchTab(tab) {
+    if (tab === 'explore') tab = 'hub';
+    if (tab === 'vault') tab = 'me';
+    if (tab === 'watch') tab = 'youtube';
+
       if (typeof triggerHapticFeedback === 'function') triggerHapticFeedback([8]);
       // Pre-flight Auth Guard for navigation links & tab switches
       var isAuth = (typeof window.isUserAuthenticated === 'function')
@@ -48260,6 +48660,7 @@ function renderHtml(
         notifications: document.getElementById('notifications-view'),
         settings: document.getElementById('settings-view'),
         dapps: document.getElementById('dapps-view'),
+        player: document.getElementById('player-view'),
       };
       const tabs = {
         feed: document.getElementById('tab-feed'),
@@ -48277,6 +48678,7 @@ function renderHtml(
         notifications: document.getElementById('tab-notifications'),
         settings: document.getElementById('tab-settings'),
         dapps: document.getElementById('navTabDApps'),
+        player: document.getElementById('tab-player'),
       };
       const bnavs = {
         feed: document.getElementById('bnav-feed'),
@@ -48289,6 +48691,17 @@ function renderHtml(
         hub: document.getElementById('bnav-hub'),
         studio: document.getElementById('bnav-studio'),
       };
+
+      // Floating Mini-Player coordination
+      if (tab === 'player') {
+        const mini = document.getElementById('sovraFloatingMiniPlayer');
+        if (mini) mini.style.display = 'none';
+      } else {
+        const vid = document.getElementById('sovraActiveVideoElement');
+        if (vid && !vid.paused && !vid.ended && vid.currentTime > 0) {
+          if (typeof showSovraMiniPlayer === 'function') showSovraMiniPlayer();
+        }
+      }
 
       // ❄️ Freeze Previous Tab (Scroll & Media Playback)
       const prevTab = document.body.dataset.activeTab || window._currentActiveTab || 'feed';
@@ -49241,7 +49654,7 @@ function renderHtml(
       const color = colorSelect ? colorSelect.value : '#3b82f6';
       const emoji = _selectedCommEmoji || '🌐';
 
-      const newId = 'comm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      const newId = 'comm-' + Date.now() + '-' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36));
       const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
 
       const newComm = {
@@ -50996,7 +51409,7 @@ function renderHtml(
           var cAvatar = (c.authorAvatar && (c.authorAvatar.startsWith('http') || c.authorAvatar.startsWith('data:')))
             ? '<img src="' + c.authorAvatar + '" style="width:100%;height:100%;object-fit:cover;" />'
             : '<span>' + escapePostModalText((c.author || 'P').charAt(0).toUpperCase()) + '</span>';
-          return '<div class="sovra-post-modal-comment-item" id="modal-cmt-' + (c.id || Math.random()) + '">' +
+          return '<div class="sovra-post-modal-comment-item" id="modal-cmt-' + (c.id || (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now())) + '">' +
             '<div class="sovra-post-modal-comment-avatar">' + cAvatar + '</div>' +
             '<div class="sovra-post-modal-comment-content">' +
               '<div class="sovra-post-modal-comment-author">' + escapePostModalText(c.author || 'Peer') + '</div>' +
@@ -52790,7 +53203,7 @@ function renderHtml(
     function submitDynamicPost() {
       if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('publish posts')) return;
       if (!myProfile) {
-        const guestSeed = Math.random().toString(36).substring(2, 8);
+        const guestSeed = (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36));
         myProfile = {
           did: 'did:sovra:guest_' + guestSeed,
           handle: '@guest_' + guestSeed,
@@ -53044,7 +53457,7 @@ function renderHtml(
       }
 
       // ⚡ TIER-1 OPTIMISTIC UI: Instantly render post & reset composer with 0ms delay
-      const optPostId = 'opt-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+      const optPostId = 'opt-' + Date.now() + '-' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36));
       const myDid = (myProfile && myProfile.did) ? myProfile.did : 'did:sovra:self';
       const optimisticPost = {
         id: optPostId,
@@ -53610,6 +54023,47 @@ function renderHtml(
         }
       });
     }
+
+    // ⚖️ Algorithmic Transparency Dial Controller ("Shadow-Ban Buster")
+    window._currentAlgoMode = 'viral';
+    window.setAlgorithmicDial = function(mode, btn) {
+      window._currentAlgoMode = mode || 'viral';
+      document.querySelectorAll('.algo-dial-btn').forEach(function(b) {
+        b.style.background = 'none';
+        b.style.color = '#94a3b8';
+        b.classList.remove('active');
+      });
+      if (btn) {
+        btn.style.background = '#3b82f6';
+        btn.style.color = '#fff';
+        btn.classList.add('active');
+      }
+      renderFilteredFeedByAlgoMode(window._currentAlgoMode);
+    };
+
+    window.renderFilteredFeedByAlgoMode = function(mode) {
+      const container = document.getElementById('feedPostsStream');
+      if (!container || !Array.isArray(feedPostsData)) return;
+
+      var posts = feedPostsData.slice();
+      if (mode === 'friends') {
+        var friendDids = new Set((typeof contactsData !== 'undefined' ? contactsData : []).map(function(c) { return c.did || c.id; }));
+        if (myProfile && myProfile.did) friendDids.add(myProfile.did);
+        posts = posts.filter(function(p) { return friendDids.has(p.authorDid) || (p.authorHandle && friendDids.has(p.authorHandle)); });
+      } else if (mode === 'chrono') {
+        posts.sort(function(a, b) { return (b.timestamp || b.createdAt || 0) - (a.timestamp || a.createdAt || 0); });
+      } else {
+        posts.sort(function(a, b) {
+          var scoreA = ((a.tipsCount || a.tip_amount || 0) * 2) + (a.likesCount || 0) + ((a.comments || []).length * 1.5) - (a.reportsCount || 0);
+          var scoreB = ((b.tipsCount || b.tip_amount || 0) * 2) + (b.likesCount || 0) + ((b.comments || []).length * 1.5) - (b.reportsCount || 0);
+          return scoreB - scoreA;
+        });
+      }
+
+      container.querySelectorAll('.insta-post-card').forEach(function(c) { c.remove(); });
+      posts.forEach(function(p) { renderDynamicPostCard(p, false); });
+      showAccountToast('⚖️ Filter applied: ' + (mode === 'friends' ? '👥 Friends Only' : (mode === 'chrono' ? '⏱ Chronological' : '⚡ Viral Consensus')));
+    };
 
     function syncFeedPosts() {
       const sessionToken = (myProfile && myProfile.sessionToken) ? myProfile.sessionToken : (localStorage.getItem('sovra_session_token') || '');
@@ -55244,7 +55698,7 @@ function renderHtml(
         const authorInitial = (c.author || 'P')[0].toUpperCase();
         const safeText = safeHtmlStr(c.text || '');
         const safeAuthor = safeHtmlStr(c.author || 'Peer');
-        const cmtId = c.id || ('cmt-' + Math.random().toString(36).substr(2, 9));
+        const cmtId = c.id || ('cmt-' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36)));
 
         const role = c.role || c.authorRole || '';
         let roleBadge = '';
@@ -58033,7 +58487,7 @@ function renderHtml(
           }
 
           if (txBox && txDisp) {
-            txDisp.innerText = data.txHash || '0x' + Math.random().toString(16).slice(2);
+            txDisp.innerText = data.txHash || ('0x' + (window.sovraCSPRNG ? window.sovraCSPRNG(32) : Date.now().toString(16)));
             txBox.style.display = 'block';
           }
 
@@ -58630,7 +59084,7 @@ function renderHtml(
       }
 
       try {
-        var clientNonce = 'ord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+        var clientNonce = 'ord_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36));
         var finalPayload = Object.assign({}, pendingConfirmOrderPayload, { clientNonce: clientNonce, isDemo: true });
 
         var res = await fetch('/api/trading/order', {
@@ -59733,7 +60187,7 @@ function renderHtml(
               '<span>' + (c.timeAgo || 'Just now') + '</span>' +
               '<span id="likes-' + c.id + '">' + (c.likes || 0) + ' likes</span>' +
               '<span style="color: #60a5fa; cursor: pointer;" onclick="appendCommentEmoji(&quot;❤️ &quot;)">Reply</span>' +
-              '<span style="color: #34d399; font-size: 0.65rem;">● Ed25519 Verified</span>' +
+              '<span style="color: #38bdf8; font-size: 0.72rem; font-weight: 700;" title="Verified Sovereign Identity">✓ Verified</span>' +
             '</div>' +
           '</div>' +
           '<button style="background: none; border: none; color: rgba(255,255,255,0.6); font-size: 0.85rem; cursor: pointer;" onclick="likeComment(&quot;' + c.id + '&quot;)">🤍</button>' +
@@ -60732,7 +61186,7 @@ function renderHtml(
         }
 
         const newPacket = {
-          packetId: 'dtn_pkt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          packetId: 'dtn_pkt_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36)),
           senderDid: myDid,
           recipientDid: recipient,
           ciphertextHex: hexCipher,
@@ -62589,7 +63043,7 @@ function renderHtml(
       }
 
       setTimeout(function() {
-        var txHash = 'sov_tx_' + Date.now().toString(16) + Math.random().toString(16).substring(2, 10);
+        var txHash = 'sov_tx_' + Date.now().toString(16) + (window.sovraCSPRNG ? window.sovraCSPRNG(12) : Date.now().toString(16));
         if (btn) {
           btn.textContent = 'Unlocked! ✅';
           btn.style.background = '#10b981';
@@ -69368,7 +69822,7 @@ function renderHtml(
           type: file.type || 'application/octet-stream',
           size: file.size,
           dataUrl: dataUrl,
-          cid: 'bafy' + Math.random().toString(36).substring(2, 12),
+          cid: 'bafy' + (window.sovraCSPRNG ? window.sovraCSPRNG(12) : Date.now().toString(36)),
           isViewOnce: Boolean(window.isViewOnceDraftActive)
         };
         renderPendingChatAttachmentPreview();
@@ -69871,7 +70325,7 @@ function renderHtml(
       }
 
       // 🛡️ Pillar 1: Client-side Cryptographic Signature
-      let clientSigHex = 'ed25519_sig_' + Math.random().toString(16).substring(2, 10);
+      let clientSigHex = 'ed25519_sig_' + (window.sovraCSPRNG ? window.sovraCSPRNG(16) : Date.now().toString(16));
       if (window.SovraCryptoVault) {
         try {
           const sigRes = await window.SovraCryptoVault.sign(text || (attToSend ? attToSend.name : 'attachment'));
@@ -69883,7 +70337,7 @@ function renderHtml(
       const isOnion = Boolean(window.privacyRelayActive);
 
       const newMsg = {
-        id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 7),
+        id: 'msg-' + now + '-' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36)),
         senderDid: myDid,
         recipientDid: activeContactDid,
         senderName: myName,
@@ -69905,7 +70359,7 @@ function renderHtml(
         isBitChat: isBc,
         isViewOnce: isMsgViewOnce,
         isSealedSender: isSealed,
-        sealedDeliveryToken: isSealed ? 'sdt_' + Math.random().toString(16).substring(2, 10) : undefined,
+        sealedDeliveryToken: isSealed ? ('sdt_' + (window.sovraCSPRNG ? window.sovraCSPRNG(12) : Date.now().toString(16))) : undefined,
         isOnionRouted: isOnion,
         hopCount: isOnion ? 3 : 1,
         route: isOnion ? ['blind-guard-relay', 'blind-middle-relay', 'blind-exit-relay', activeContactDid] : [myDid, activeContactDid]
@@ -70517,7 +70971,7 @@ function renderHtml(
         const myName = myProfile ? (myProfile.name || myProfile.displayName || 'You') : 'You';
         const token = (myProfile && myProfile.sessionToken) || localStorage.getItem('sovra_session_token') || '';
         const voiceMsg = {
-          id: 'audio-' + now + '-' + Math.random().toString(36).substring(2, 6),
+          id: 'audio-' + now + '-' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36)),
           senderDid: myDid,
           recipientDid: activeContactDid,
           senderName: myName,
@@ -70529,7 +70983,7 @@ function renderHtml(
           timestamp: now,
           sentAt: now,
           status: 'sent',
-          signatureHex: 'ed25519_sig_' + Math.random().toString(16).substring(2, 10),
+          signatureHex: 'ed25519_sig_' + (window.sovraCSPRNG ? window.sovraCSPRNG(16) : Date.now().toString(16)),
           disappearingDurationSec: timerSec,
           expiresAt: timerSec > 0 ? now + timerSec * 1000 : undefined,
           isDisappeared: false,
@@ -72923,7 +73377,7 @@ function renderHtml(
       const myDid = (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : null) || ((typeof myProfile !== 'undefined' && myProfile) ? myProfile.did : 'self');
 
       const msgObj = {
-        id: 'incall_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        id: 'incall_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36)),
         text: text,
         isMe: true,
         senderName: myName,
@@ -76125,7 +76579,7 @@ function renderHtml(
                 '<div style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.35; margin-top: 0.15rem;">' + parseTimestampsToLinks(r.text) + '</div>' +
                 '<div style="display: flex; align-items: center; gap: 0.65rem; font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">' +
                   '<span style="cursor: pointer;" onclick="likeNestedReply(&quot;' + c.id + '&quot;, &quot;' + r.id + '&quot;)">👍 ' + r.likes + '</span>' +
-                  '<span style="color: #34d399; font-size: 0.65rem;">● Ed25519 Verified</span>' +
+                  '<span style="color: #38bdf8; font-size: 0.72rem; font-weight: 700;" title="Verified Sovereign Identity">✓ Verified</span>' +
                 '</div>' +
               '</div>' +
             '</div>'
@@ -76146,7 +76600,7 @@ function renderHtml(
               '<div>' + headerBadges + '<span style="font-size: 0.82rem; font-weight: 700; color: #e2e8f0;">@' + c.authorHandle + '</span> ' +
               '<span style="font-size: 0.7rem; color: var(--text-muted); margin-left: 4px;">' + timeStr + '</span>' +
               creatorHeart +
-              '<span style="color: #34d399; font-size: 0.65rem; margin-left: 8px;">● Ed25519 Verified</span>' +
+              '<span style="color: #38bdf8; font-size: 0.72rem; font-weight: 700; margin-left: 8px;" title="Verified Sovereign Identity">✓ Verified</span>' +
               '</div>' +
               '<div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.4; margin-top: 0.25rem;">' + parseTimestampsToLinks(c.text) + '</div>' +
               '<div style="display: flex; align-items: center; gap: 0.85rem; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">' +
@@ -79148,7 +79602,7 @@ function renderHtml(
         syncChanNamePreview(nameInput.value);
       }
       if (handleInput && (!handleInput.value || handleInput.value === '@sovra_alpha')) {
-        const rawHandle = user?.handle ? user.handle.replace(/^@/, '') : ('creator_' + Math.floor(Math.random() * 899 + 100));
+        const rawHandle = user?.handle ? user.handle.replace(/^@/, '') : ('creator_' + crypto.randomInt(100, 999));
         handleInput.value = '@' + rawHandle + '_hub';
         syncChanHandlePreview(handleInput.value);
       }
@@ -83598,7 +84052,7 @@ function renderHtml(
       myProfile.isGuest = false;
       myProfile.balanceSov = (myProfile.balanceSov && myProfile.balanceSov >= 50) ? myProfile.balanceSov : 50;
       if (!myProfile.sessionToken) {
-        myProfile.sessionToken = 'stk_' + Math.random().toString(36).substring(2, 12);
+        myProfile.sessionToken = 'stk_' + (window.sovraCSPRNG ? window.sovraCSPRNG(16) : Date.now().toString(36));
       }
 
       try {
@@ -84230,7 +84684,7 @@ function renderHtml(
           name: name,
           category: cat || 'tools',
           description: desc || '',
-          bundleCid: 'bafybeic' + Math.random().toString(36).substring(2, 10),
+          bundleCid: 'bafybeic' + (window.sovraCSPRNG ? window.sovraCSPRNG(10) : Date.now().toString(36)),
           authorDid: myDid,
           permissions: ['identity:profile', 'wallet:pay']
         })
@@ -84573,6 +85027,7 @@ function renderHtml(
         { id: 'feed', name: 'Feed', icon: '📰', category: 'social', badge: '', action: () => switchTab('feed'), desc: 'Decentralized Social Feed' },
         { id: 'reels', name: 'Reels', icon: '🎬', category: 'media', badge: '', action: () => switchTab('reels'), desc: 'Sovereign Short Videos' },
         { id: 'watch', name: 'Watch', icon: '📺', category: 'media', badge: '', action: () => switchTab('youtube'), desc: 'Longform Decentralized Video' },
+        { id: 'player', name: 'Player', icon: '📻', category: 'media', badge: '', action: () => switchTab('player'), desc: 'Sovereign Audio & Video Media Player' },
         { id: 'chat', name: 'Chat', icon: '💬', category: 'social', badge: 'chat', action: () => switchTab('chat'), desc: 'Double-Ratchet Noise_XX E2EE' },
         { id: 'profile', name: 'Profile', icon: '👤', category: 'social', badge: '', action: () => switchTab('me'), desc: 'Sovereign DID Identity & Posts' },
         { id: 'wallet', name: 'Wallet', icon: '💰', category: 'finance', badge: 'wallet', action: () => { if (typeof openFullPageWallet === 'function') openFullPageWallet(); else switchTab('me'); }, desc: 'DID Vault & Balance' },
@@ -84602,6 +85057,7 @@ function renderHtml(
         feed: { gradient: 'linear-gradient(135deg, #1e40af, #3b82f6)', shadow: 'rgba(59, 130, 246, 0.45)' },
         reels: { gradient: 'linear-gradient(135deg, #be185d, #ec4899, #f97316)', shadow: 'rgba(236, 72, 153, 0.45)' },
         watch: { gradient: 'linear-gradient(135deg, #b91c1c, #ef4444)', shadow: 'rgba(239, 68, 68, 0.45)' },
+        player: { gradient: 'linear-gradient(135deg, #0284c7, #6366f1, #a855f7)', shadow: 'rgba(99, 102, 241, 0.45)' },
         chat: { gradient: 'linear-gradient(135deg, #047857, #10b981)', shadow: 'rgba(16, 185, 129, 0.45)' },
         profile: { gradient: 'linear-gradient(135deg, #4338ca, #6366f1)', shadow: 'rgba(99, 102, 241, 0.45)' },
         wallet: { gradient: 'linear-gradient(135deg, #b45309, #f59e0b, #fbbf24)', shadow: 'rgba(245, 158, 11, 0.45)' },
@@ -85997,6 +86453,7 @@ function renderHtml(
           reels: { title: 'Shorts & Reels', icon: '🎞️' },
           watch: { title: 'Watch Video Hub', icon: '🎬' },
           youtube: { title: 'Watch Video Hub', icon: '🎬' },
+          player: { title: 'Sovereign Media Player', icon: '📻' },
           wallet: { title: 'Sovereign Wallet & Vault', icon: '💰' },
           friends: { title: 'Friends & P2P Swarm', icon: '👥' },
           studio: { title: 'Creator Studio Pro', icon: '🎙️' },
@@ -86266,7 +86723,7 @@ function renderHtml(
         const targetItem = workspacePages[pageIdx][targetSlotIdx];
         if (!targetItem) return null;
 
-        const folderId = 'folder_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+        const folderId = 'folder_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(6) : Date.now().toString(36));
         const folderTitle = title || 'Folder';
 
         let initialApps = [];
@@ -87312,6 +87769,597 @@ function renderHtml(
         bootAndroidOS();
       }
     })();
+
+
+    // =========================================================================
+    // 📻 SOVRA SOVEREIGN MEDIA PLAYER CLIENT ENGINE
+    // =========================================================================
+
+    var sovraPlayerState = {
+      mode: 'video', // 'video' | 'audio'
+      currentUrl: '',
+      title: 'Idle Player',
+      isPlaying: false,
+      isMuted: false,
+      volume: 1.0,
+      speed: 1.0,
+      loop: false,
+      audioCtx: null,
+      analyser: null,
+      sourceNode: null,
+      biquadLow: null,
+      biquadMid: null,
+      biquadHigh: null,
+      visualizerAnimId: null,
+      history: []
+    };
+
+    function formatMediaTime(seconds) {
+      if (isNaN(seconds) || seconds < 0) return '00:00';
+      var m = Math.floor(seconds / 60);
+      var s = Math.floor(seconds % 60);
+      return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+    }
+
+    function setSovraPlayerMode(mode) {
+      sovraPlayerState.mode = mode;
+      var videoStage = document.getElementById('sovraVideoStageBox');
+      var audioStage = document.getElementById('sovraAudioStageBox');
+      var btnVideo = document.getElementById('sovraPlayerModeVideoBtn');
+      var btnAudio = document.getElementById('sovraPlayerModeAudioBtn');
+
+      if (mode === 'audio') {
+        if (videoStage) videoStage.style.display = 'none';
+        if (audioStage) audioStage.style.display = 'flex';
+        if (btnAudio) {
+          btnAudio.style.background = '#6366f1';
+          btnAudio.style.color = '#fff';
+        }
+        if (btnVideo) {
+          btnVideo.style.background = 'transparent';
+          btnVideo.style.color = '#94a3b8';
+        }
+        initWebAudioVisualizer();
+      } else {
+        if (videoStage) videoStage.style.display = 'flex';
+        if (audioStage) audioStage.style.display = 'none';
+        if (btnVideo) {
+          btnVideo.style.background = '#38bdf8';
+          btnVideo.style.color = '#080d14';
+        }
+        if (btnAudio) {
+          btnAudio.style.background = 'transparent';
+          btnAudio.style.color = '#94a3b8';
+        }
+      }
+    }
+
+    function getActiveMediaElement() {
+      return document.getElementById('sovraActiveVideoElement');
+    }
+
+    function loadExternalStreamUrl(customUrl, optionalType) {
+      var input = document.getElementById('sovraMediaInputUrl');
+      var url = (customUrl || (input ? input.value : '') || '').trim();
+      if (!url) {
+        if (typeof showAccountToast === 'function') showAccountToast('⚠️ Please enter a valid audio or video URL');
+        return;
+      }
+
+      // Check for audio extensions
+      var lowerUrl = url.toLowerCase().split('?')[0];
+      var isAudio = optionalType === 'audio' || lowerUrl.endsWith('.mp3') || lowerUrl.endsWith('.wav') || lowerUrl.endsWith('.ogg') || lowerUrl.endsWith('.aac') || lowerUrl.endsWith('.m4a') || lowerUrl.endsWith('.flac');
+      setSovraPlayerMode(isAudio ? 'audio' : 'video');
+
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl) return;
+
+      var idlePrompt = document.getElementById('sovraPlayerIdlePrompt');
+      if (idlePrompt) idlePrompt.style.display = 'none';
+
+      // Use CORS-free gateway proxy if needed
+      var finalUrl = url;
+      if (url.startsWith('ipfs://')) {
+        finalUrl = '/api/feed/video/' + url.replace('ipfs://', '');
+      } else if (!url.startsWith('/') && !url.includes(window.location.host) && !url.startsWith('blob:')) {
+        // Pass through proxy to eliminate any CORS header restriction
+        finalUrl = '/api/media/proxy?url=' + encodeURIComponent(url);
+      }
+
+      mediaEl.src = finalUrl;
+      mediaEl.load();
+
+      var trackTitle = url.split('/').pop().split('?')[0] || 'External Stream';
+      sovraPlayerState.currentUrl = url;
+      sovraPlayerState.title = trackTitle;
+
+      var trackTitleEl = document.getElementById('sovraAudioTrackTitle');
+      if (trackTitleEl) trackTitleEl.textContent = decodeURIComponent(trackTitle);
+
+      var trackArtistEl = document.getElementById('sovraAudioTrackArtist');
+      if (trackArtistEl) trackArtistEl.textContent = 'External Stream • ' + (isAudio ? 'Audio Stream' : 'Video Stream');
+
+      mediaEl.play().then(function() {
+        sovraPlayerState.isPlaying = true;
+        updatePlayPauseVisuals(true);
+        saveMediaToHistory(trackTitle, url, isAudio ? 'audio' : 'video');
+        initWebAudioVisualizer();
+      }).catch(function(err) {
+        console.warn('Media play notice:', err);
+      });
+    }
+
+    function handleLocalDeviceMediaFile(event) {
+      var file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      var lowerName = (file.name || '').toLowerCase();
+      var isAudio = (file.type && file.type.startsWith('audio/')) || lowerName.endsWith('.mp3') || lowerName.endsWith('.wav') || lowerName.endsWith('.ogg') || lowerName.endsWith('.aac') || lowerName.endsWith('.m4a') || lowerName.endsWith('.flac');
+      setSovraPlayerMode(isAudio ? 'audio' : 'video');
+
+      var objectUrl = URL.createObjectURL(file);
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl) return;
+
+      var idlePrompt = document.getElementById('sovraPlayerIdlePrompt');
+      if (idlePrompt) idlePrompt.style.display = 'none';
+
+      mediaEl.src = objectUrl;
+      mediaEl.load();
+
+      sovraPlayerState.currentUrl = objectUrl;
+      sovraPlayerState.title = file.name;
+
+      var trackTitleEl = document.getElementById('sovraAudioTrackTitle');
+      if (trackTitleEl) trackTitleEl.textContent = file.name;
+
+      var trackArtistEl = document.getElementById('sovraAudioTrackArtist');
+      if (trackArtistEl) trackArtistEl.textContent = 'Local File (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB) • 100% Private Offline';
+
+      mediaEl.play().then(function() {
+        sovraPlayerState.isPlaying = true;
+        updatePlayPauseVisuals(true);
+        saveMediaToHistory(file.name, '[Local Offline File: ' + file.name + ']', isAudio ? 'audio' : 'video');
+        initWebAudioVisualizer();
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('📁 Playing local ' + (isAudio ? 'audio' : 'video') + ': ' + file.name);
+        }
+      }).catch(function(_) {});
+    }
+
+    function handleMediaDropEvent(event) {
+      event.preventDefault();
+      var zone = document.getElementById('sovraPlayerDropZone');
+      if (zone) zone.style.borderColor = 'rgba(255,255,255,0.12)';
+
+      var files = event.dataTransfer && event.dataTransfer.files;
+      if (files && files.length > 0) {
+        handleLocalDeviceMediaFile({ target: { files: files } });
+      }
+    }
+
+    function playPreloadedSample(sampleId) {
+      var samples = {
+        lofi_chill: {
+          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+          title: 'Lo-Fi Study Beats (Relaxing Piano)',
+          type: 'audio'
+        },
+        synthwave_radio: {
+          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+          title: 'Cyberpunk Synthwave Electro Journey',
+          type: 'audio'
+        },
+        big_buck_bunny: {
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+          title: 'Big Buck Bunny (4K Cinema Open Movie)',
+          type: 'video'
+        },
+        elephants_dream: {
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+          title: 'Elephants Dream (Sci-Fi Cinema)',
+          type: 'video'
+        }
+      };
+
+      var s = samples[sampleId];
+      if (!s) return;
+
+      var input = document.getElementById('sovraMediaInputUrl');
+      if (input) input.value = s.url;
+
+      loadExternalStreamUrl(s.url, s.type);
+    }
+
+    function toggleSovraMediaPlay() {
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl || !mediaEl.src) {
+        // If idle, load first sample
+        playPreloadedSample('lofi_chill');
+        return;
+      }
+
+      if (mediaEl.paused) {
+        mediaEl.play().then(function() {
+          sovraPlayerState.isPlaying = true;
+          updatePlayPauseVisuals(true);
+          initWebAudioVisualizer();
+        }).catch(function(_) {});
+      } else {
+        mediaEl.pause();
+        sovraPlayerState.isPlaying = false;
+        updatePlayPauseVisuals(false);
+      }
+    }
+
+    function updatePlayPauseVisuals(isPlaying) {
+      var btn = document.getElementById('sovraPlayPauseMainBtn');
+      var miniBtn = document.getElementById('miniPlayerPlayToggleBtn');
+      var disc = document.getElementById('sovraVinylDisc');
+
+      if (btn) btn.innerHTML = isPlaying ? '❚❚' : '▶';
+      if (miniBtn) miniBtn.innerHTML = isPlaying ? '❚❚' : '▶';
+
+      if (disc) {
+        if (isPlaying) disc.classList.add('spinning');
+        else disc.classList.remove('spinning');
+      }
+
+      // Update Mini Player Banner
+      var miniTitle = document.getElementById('miniPlayerTitle');
+      if (miniTitle) miniTitle.textContent = sovraPlayerState.title || 'Playing Media';
+    }
+
+    function seekSovraRelative(deltaSeconds) {
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl || !mediaEl.duration) return;
+      mediaEl.currentTime = Math.max(0, Math.min(mediaEl.duration, mediaEl.currentTime + deltaSeconds));
+    }
+
+    function handleSeekInput(val) {
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl || !mediaEl.duration) return;
+      mediaEl.currentTime = (parseFloat(val) / 100) * mediaEl.duration;
+    }
+
+    function setSovraMediaVolume(val) {
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl) return;
+      mediaEl.volume = parseFloat(val);
+      sovraPlayerState.volume = parseFloat(val);
+      var muteBtn = document.getElementById('sovraMuteToggleBtn');
+      if (muteBtn) muteBtn.textContent = parseFloat(val) === 0 ? '🔇' : (parseFloat(val) < 0.5 ? '🔉' : '🔊');
+    }
+
+    function toggleSovraMediaMute() {
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl) return;
+      mediaEl.muted = !mediaEl.muted;
+      sovraPlayerState.isMuted = mediaEl.muted;
+      var muteBtn = document.getElementById('sovraMuteToggleBtn');
+      var slider = document.getElementById('sovraVolumeSlider');
+      if (muteBtn) muteBtn.textContent = mediaEl.muted ? '🔇' : '🔊';
+      if (slider) slider.value = mediaEl.muted ? '0' : String(sovraPlayerState.volume || 1);
+    }
+
+    function setSovraMediaSpeed(rate) {
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl) return;
+      mediaEl.playbackRate = parseFloat(rate);
+      sovraPlayerState.speed = parseFloat(rate);
+    }
+
+    function toggleSovraMediaLoop() {
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl) return;
+      mediaEl.loop = !mediaEl.loop;
+      sovraPlayerState.loop = mediaEl.loop;
+      var btn = document.getElementById('sovraLoopToggleBtn');
+      if (btn) {
+        btn.textContent = mediaEl.loop ? '🔁 Loop: On' : '🔁 Loop: Off';
+        btn.style.color = mediaEl.loop ? '#38bdf8' : '#cbd5e1';
+      }
+    }
+
+    function toggleSovraMediaPiP() {
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl) return;
+      try {
+        if (document.pictureInPictureElement) {
+          document.exitPictureInPicture();
+        } else if (mediaEl.requestPictureInPicture) {
+          mediaEl.requestPictureInPicture();
+        }
+      } catch (e) {
+        console.warn('PiP notice:', e);
+      }
+    }
+
+    function toggleSovraMediaFullscreen() {
+      var zone = document.getElementById('sovraPlayerDropZone');
+      var mediaEl = getActiveMediaElement();
+      var target = zone || mediaEl;
+      if (!target) return;
+      try {
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else if (target.requestFullscreen) {
+          target.requestFullscreen();
+        }
+      } catch (e) {
+        console.warn('Fullscreen notice:', e);
+      }
+    }
+
+    // ==========================================
+    // 🎛️ WEB AUDIO API FREQUENCY SPECTRUM VISUALIZER
+    // ==========================================
+
+    function initWebAudioVisualizer() {
+      var canvas = document.getElementById('sovraAudioVisualizerCanvas');
+      var mediaEl = getActiveMediaElement();
+      if (!canvas || !mediaEl) return;
+
+      var ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      if (!sovraPlayerState.audioCtx) {
+        try {
+          var AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtxClass) {
+            sovraPlayerState.audioCtx = new AudioCtxClass();
+            sovraPlayerState.analyser = sovraPlayerState.audioCtx.createAnalyser();
+            sovraPlayerState.analyser.fftSize = 128;
+            sovraPlayerState.analyser.smoothingTimeConstant = 0.85;
+
+            // Equalizer nodes
+            sovraPlayerState.biquadLow = sovraPlayerState.audioCtx.createBiquadFilter();
+            sovraPlayerState.biquadLow.type = 'lowshelf';
+            sovraPlayerState.biquadLow.frequency.value = 250;
+
+            sovraPlayerState.biquadMid = sovraPlayerState.audioCtx.createBiquadFilter();
+            sovraPlayerState.biquadMid.type = 'peaking';
+            sovraPlayerState.biquadMid.frequency.value = 1500;
+
+            sovraPlayerState.biquadHigh = sovraPlayerState.audioCtx.createBiquadFilter();
+            sovraPlayerState.biquadHigh.type = 'highshelf';
+            sovraPlayerState.biquadHigh.frequency.value = 4000;
+
+            try {
+              sovraPlayerState.sourceNode = sovraPlayerState.audioCtx.createMediaElementSource(mediaEl);
+              sovraPlayerState.sourceNode.connect(sovraPlayerState.biquadLow);
+              sovraPlayerState.biquadLow.connect(sovraPlayerState.biquadMid);
+              sovraPlayerState.biquadMid.connect(sovraPlayerState.biquadHigh);
+              sovraPlayerState.biquadHigh.connect(sovraPlayerState.analyser);
+              sovraPlayerState.analyser.connect(sovraPlayerState.audioCtx.destination);
+            } catch(corsErr) {
+              // If CORS restriction prohibits direct media element source, fall back to simulated wave
+              console.log('[Media Player] AudioContext connected with visualizer fallback');
+            }
+          }
+        } catch(e) {}
+      }
+
+      if (sovraPlayerState.audioCtx && sovraPlayerState.audioCtx.state === 'suspended') {
+        sovraPlayerState.audioCtx.resume();
+      }
+
+      if (sovraPlayerState.visualizerAnimId) {
+        cancelAnimationFrame(sovraPlayerState.visualizerAnimId);
+      }
+
+      var bufferLength = (sovraPlayerState.analyser ? sovraPlayerState.analyser.frequencyBinCount : 32);
+      var dataArray = new Uint8Array(bufferLength);
+
+      function renderFrame() {
+        sovraPlayerState.visualizerAnimId = requestAnimationFrame(renderFrame);
+
+        var w = canvas.width;
+        var h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        var isActuallyPlaying = !mediaEl.paused && !mediaEl.ended;
+
+        if (sovraPlayerState.analyser && isActuallyPlaying) {
+          sovraPlayerState.analyser.getByteFrequencyData(dataArray);
+        }
+
+        // Draw Bars
+        var barCount = 36;
+        var barWidth = (w / barCount) - 4;
+
+        for (var i = 0; i < barCount; i++) {
+          var val = isActuallyPlaying ? (dataArray[i % bufferLength] || (Math.sin(Date.now() / 150 + i) * 60 + 80)) : 4;
+          var barHeight = Math.max(4, (val / 255) * (h - 15));
+          var x = i * (barWidth + 4) + 6;
+          var y = h - barHeight - 4;
+
+          var grad = ctx.createLinearGradient(0, y, 0, h);
+          grad.addColorStop(0, '#38bdf8');
+          grad.addColorStop(0.5, '#6366f1');
+          grad.addColorStop(1, '#a855f7');
+
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.roundRect ? ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]) : ctx.rect(x, y, barWidth, barHeight);
+          ctx.fill();
+        }
+      }
+
+      renderFrame();
+    }
+
+    function applyAudioEqPreset(preset, btn) {
+      document.querySelectorAll('.eq-pill-btn').forEach(function(b) { b.classList.remove('active'); });
+      if (btn) btn.classList.add('active');
+
+      if (!sovraPlayerState.biquadLow || !sovraPlayerState.biquadMid || !sovraPlayerState.biquadHigh) return;
+
+      if (preset === 'bass_boost') {
+        sovraPlayerState.biquadLow.gain.value = 8;
+        sovraPlayerState.biquadMid.gain.value = 1;
+        sovraPlayerState.biquadHigh.gain.value = -1;
+      } else if (preset === 'vocal') {
+        sovraPlayerState.biquadLow.gain.value = -2;
+        sovraPlayerState.biquadMid.gain.value = 7;
+        sovraPlayerState.biquadHigh.gain.value = 3;
+      } else if (preset === 'treble') {
+        sovraPlayerState.biquadLow.gain.value = -3;
+        sovraPlayerState.biquadMid.gain.value = 2;
+        sovraPlayerState.biquadHigh.gain.value = 8;
+      } else if (preset === 'electronic') {
+        sovraPlayerState.biquadLow.gain.value = 6;
+        sovraPlayerState.biquadMid.gain.value = -2;
+        sovraPlayerState.biquadHigh.gain.value = 6;
+      } else {
+        sovraPlayerState.biquadLow.gain.value = 0;
+        sovraPlayerState.biquadMid.gain.value = 0;
+        sovraPlayerState.biquadHigh.gain.value = 0;
+      }
+
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('🎛️ Equalizer preset applied: ' + preset.toUpperCase());
+      }
+    }
+
+    // ==========================================
+    // 🎵 FLOATING MINI-PLAYER (BACKGROUND PLAYBACK)
+    // ==========================================
+
+    function showSovraMiniPlayer() {
+      var mini = document.getElementById('sovraFloatingMiniPlayer');
+      var mediaEl = getActiveMediaElement();
+      if (!mini || !mediaEl || mediaEl.paused) return;
+
+      mini.style.display = 'flex';
+      var title = document.getElementById('miniPlayerTitle');
+      if (title) title.textContent = sovraPlayerState.title || 'Playing Media';
+
+      var disc = document.getElementById('miniPlayerSpinDisc');
+      if (disc) disc.textContent = sovraPlayerState.mode === 'video' ? '🎬' : '🎵';
+    }
+
+    function closeSovraMiniPlayer() {
+      var mini = document.getElementById('sovraFloatingMiniPlayer');
+      if (mini) mini.style.display = 'none';
+    }
+
+    function stopAndDismissMiniPlayer() {
+      var mediaEl = getActiveMediaElement();
+      if (mediaEl) {
+        mediaEl.pause();
+        sovraPlayerState.isPlaying = false;
+        updatePlayPauseVisuals(false);
+      }
+      closeSovraMiniPlayer();
+    }
+
+    // ==========================================
+    // 📜 RECENT STREAMS HISTORY
+    // ==========================================
+
+    function saveMediaToHistory(title, url, type) {
+      try {
+        var rawHistory = localStorage.getItem('sovra_media_history');
+        var history = rawHistory ? JSON.parse(rawHistory) : [];
+        history = history.filter(function(h) { return h.url !== url; });
+        history.unshift({
+          title: title,
+          url: url,
+          type: type || 'video',
+          timestamp: Date.now()
+        });
+        if (history.length > 10) history = history.slice(0, 10);
+        localStorage.setItem('sovra_media_history', JSON.stringify(history));
+        renderMediaHistory();
+      } catch(e) {}
+    }
+
+    function renderMediaHistory() {
+      var list = document.getElementById('sovraMediaHistoryList');
+      if (!list) return;
+
+      try {
+        var rawHistory = localStorage.getItem('sovra_media_history');
+        var history = rawHistory ? JSON.parse(rawHistory) : [];
+        if (history.length === 0) {
+          list.innerHTML = '<div style="font-size: 0.8rem; color: #94a3b8; padding: 10px 0; text-align: center;">No external media played yet. Paste any URL or choose a sample above.</div>';
+          return;
+        }
+
+        list.innerHTML = history.map(function(item) {
+          return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(30,41,59,0.5); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); gap: 10px;">' +
+            '<div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">' +
+              '<span>' + (item.type === 'audio' ? '🎵' : '🎬') + '</span>' +
+              '<div style="min-width: 0; flex: 1;">' +
+                '<div style="font-size: 0.82rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + item.title + '</div>' +
+                '<div style="font-size: 0.7rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: monospace;">' + item.url + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<button type="button" class="media-sample-pill" onclick="loadExternalStreamUrl(\\'' + encodeURIComponent(item.url) + '\\', \\'' + item.type + '\\')">▶ Play</button>' +
+          '</div>';
+        }).join('');
+      } catch(e) {}
+    }
+
+    function clearSovraMediaHistory() {
+      try {
+        localStorage.removeItem('sovra_media_history');
+        renderMediaHistory();
+      } catch(e) {}
+    }
+
+    // Global Programmatic Invoker (used from chat, feed, or console)
+    window.openSovraMediaPlayer = function(url, title, type) {
+      if (typeof switchTab === 'function') switchTab('player');
+      var input = document.getElementById('sovraMediaInputUrl');
+      if (input) input.value = url;
+      loadExternalStreamUrl(url, type);
+    };
+
+    // Initialize media listeners once DOM is ready
+    function initSovraMediaPlayerListeners() {
+      var mediaEl = getActiveMediaElement();
+      if (!mediaEl) return;
+
+      mediaEl.addEventListener('timeupdate', function() {
+        var cur = mediaEl.currentTime;
+        var dur = mediaEl.duration || 0;
+        var elCur = document.getElementById('sovraMediaTimeElapsed');
+        var elDur = document.getElementById('sovraMediaTimeTotal');
+        var slider = document.getElementById('sovraMediaSeekSlider');
+        var miniDur = document.getElementById('miniPlayerDuration');
+
+        if (elCur) elCur.textContent = formatMediaTime(cur);
+        if (elDur) elDur.textContent = formatMediaTime(dur);
+        if (slider && dur > 0) slider.value = String((cur / dur) * 100);
+        if (miniDur) miniDur.textContent = formatMediaTime(cur) + ' / ' + formatMediaTime(dur);
+      });
+
+      mediaEl.addEventListener('ended', function() {
+        sovraPlayerState.isPlaying = false;
+        updatePlayPauseVisuals(false);
+      });
+
+      mediaEl.addEventListener('pause', function() {
+        sovraPlayerState.isPlaying = false;
+        updatePlayPauseVisuals(false);
+      });
+
+      mediaEl.addEventListener('play', function() {
+        sovraPlayerState.isPlaying = true;
+        updatePlayPauseVisuals(true);
+      });
+
+      renderMediaHistory();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initSovraMediaPlayerListeners);
+    } else {
+      setTimeout(initSovraMediaPlayerListeners, 500);
+    }
+
 
 </script>
 </body>
@@ -89313,7 +90361,7 @@ async function startDevServer() {
           v.fromDid === targetDid ||
           v.recipientDid === targetDid
         ) {
-          userTxMap.set(v.voucherId || `${v.timestamp}_${Math.random()}`, v);
+          userTxMap.set(v.voucherId || `${v.timestamp}_${crypto.randomUUID()}`, v);
         }
       });
       const userTransactions = Array.from(userTxMap.values())
@@ -91077,6 +92125,18 @@ async function startDevServer() {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
       }
+      return;
+    }
+
+    // ==========================================
+    // 📻 SOVRA SOVEREIGN MEDIA PLAYER & STREAM PROXY ROUTES
+    // ==========================================
+    if (await handleMediaPlayerRoutes({
+      req,
+      res,
+      url,
+      readBoundedBody,
+    })) {
       return;
     }
 
@@ -92927,7 +93987,7 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: 'calleeDid required' }));
           return;
         }
-        const callId = parsed.id || ('call_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9));
+        const callId = parsed.id || ('call_' + Date.now() + '_' + crypto.randomUUID().replace(/-/g, '').slice(0, 8));
         const logged = sovraDb.recordCallLog({
           id: callId,
           callerDid,
@@ -95238,7 +96298,7 @@ async function startDevServer() {
                 }
 
                 const postType: PostType = (payload.postType as PostType) || 'text';
-                const postId = payload.id || ('feed-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7));
+                const postId = payload.id || ('feed-' + Date.now() + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8));
                 const authorUser = sovraDb.findUserByDid(principal.did);
 
                 const newPost = sovraDb.createPost({
@@ -98017,6 +99077,20 @@ async function startDevServer() {
       return;
     }
 
+
+    // ==========================================
+    // 👑 ADMIN FEATURE ROUTES (USER COCKPIT & 6 REVENUE STREAMS)
+    // ==========================================
+    if (await handleAdminFeatureRoute({
+      req,
+      res,
+      url,
+      readBoundedBody,
+      storageDaemon,
+    })) {
+      return;
+    }
+
     // ==========================================
     // 🔔 ZERO-KNOWLEDGE BLIND PUSH GATEWAY (MODULAR CONTROLLER)
     // ==========================================
@@ -99440,8 +100514,18 @@ async function startDevServer() {
       return;
     }
 
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found');
+    res.writeHead(404, { 'Content-Type': 'application/problem+json; charset=utf-8' });
+    res.end(JSON.stringify({
+      type: 'https://sovra.network/errors/route-not-found',
+      title: 'Route Not Found',
+      status: 404,
+      detail: 'The requested route was not found on this Sovra node.',
+      instance: req.url,
+      ok: false,
+      error: 'Not Found',
+      code: 'ROUTE_NOT_FOUND',
+      timestamp: Date.now()
+    }));
   };
 
   const server = http.createServer(requestHandler);

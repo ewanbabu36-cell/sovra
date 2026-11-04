@@ -1,0 +1,45 @@
+{
+  "packageId": "app.sovra.network",
+  "host": "sovra.network",
+  "name": "Sovra — Sovereign Social Network",
+  "launcherName": "Sovra",
+  "themeColor": "#090d16",
+  "navigationColor": "#090d16",
+  "backgroundColor": "#090d16",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://sovra.network/icon-512.png",
+  "maskableIconUrl": "https://sovra.network/icon-maskable.png",
+  "splashColor": "#090d16",
+  "shortcuts": [
+    {
+      "name": "Home Feed",
+      "short_name": "Feed",
+      "url": "/#feed"
+    },
+    {
+      "name": "Reels & Watch",
+      "short_name": "Watch",
+      "url": "/#watch"
+    },
+    {
+      "name": "P2P Encrypted Chats",
+      "short_name": "Chats",
+      "url": "/#chats"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://sovra.network/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "playBilling": {
+      "enabled": false
+    },
+    "locationDelegation": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  }
+}

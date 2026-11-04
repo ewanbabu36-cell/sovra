@@ -5,3 +5,5 @@ export * from './primitives.js';
 export * from './pow.js';
 export * from './steganography.js';
 export * from './prf.js';
+export * from './pqc.js';
+export * from './mpc.js';

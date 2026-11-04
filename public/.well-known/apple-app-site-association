@@ -1,0 +1,39 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID1234.app.sovra.network",
+        "paths": [
+          "/spaces/*",
+          "/profile/*",
+          "/channel/*",
+          "/chat/*",
+          "/watch/*",
+          "/post/*",
+          "/join/*",
+          "/feed/*",
+          "/p/*",
+          "/u/*",
+          "/call/*"
+        ]
+      },
+      {
+        "appID": "TEAMID.network.sovra.mobile",
+        "paths": [
+          "/feed/*",
+          "/p/*",
+          "/u/*",
+          "/call/*",
+          "/chat/*"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "TEAMID1234.app.sovra.network",
+      "TEAMID.network.sovra.mobile"
+    ]
+  }
+}
