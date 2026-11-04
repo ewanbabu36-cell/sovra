@@ -10940,43 +10940,154 @@ function renderHtml(
       }
     }
 
-    /* 📱 MOBILE COMPACT LAYOUT (<= 860px): TOP BAR + BOTTOM DOCK + 100% FEED */
+    /* =========================================================================
+       🔥 ZERO-CLUTTER UNIVERSAL PURGE: SINGLE SOURCE OF TRUTH (DESKTOP & MOBILE)
+       ========================================================================= */
+    .sovra-native-app-bar,
+    #sovraNativeAppBar,
+    .header-menu-toggle-btn,
+    .header-desktop-nav,
+    #headerQuickActionSlots,
+    #headerWallpaperBtn,
+    #headerIdentitySwitcherPill,
+    #headerLogoutBtn,
+    #headerThemeToggleBtn,
+    .node-status-pill,
+    .sovra-floating-glass-dock,
+    #sovraFloatingGlassDock,
+    #feed-view #sovraHeroAnchorCard {
+      display: none !important;
+    }
+
+    /* 📱 MOBILE COMPACT HEADER (<= 860px): CLEAN BRAND + 3 ICONS ONLY */
     @media (max-width: 860px) {
       .app-top-header {
         display: flex !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 1000 !important;
         height: 52px !important;
+        background: rgba(11, 15, 25, 0.94) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding: 0 12px !important;
+        justify-content: space-between !important;
+        align-items: center !important;
       }
-      .app-left-rail,
-      .app-right-rail {
+      .header-left-zone {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+      }
+      .header-search-wrap {
         display: none !important;
       }
-      .app-layout {
+      .header-right-zone {
         display: flex !important;
-        flex-direction: column !important;
-        width: 100% !important;
-        min-height: 100vh !important;
-        padding-bottom: 76px !important;
+        align-items: center !important;
+        gap: 8px !important;
       }
-      .app-center-stage {
-        display: flex !important;
-        flex-direction: column !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        padding: 0.5rem 0.75rem 2rem 0.75rem !important;
+      #headerCreateBtn {
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 0.95rem !important;
       }
-      .main-content {
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 auto !important;
-        padding: 0.25rem 0 3rem 0 !important;
+      #headerChatBtn,
+      #headerNotificationBell {
+        width: 34px !important;
+        height: 34px !important;
       }
+      #currentUserPill {
+        width: 34px !important;
+        height: 34px !important;
+      }
+
+      /* 📱 100% PERFECT CENTERED MOBILE BOTTOM DOCK (ZERO CUTOFF / ZERO SHIFT) */
       .mobile-bottom-nav {
         display: flex !important;
         position: fixed !important;
         bottom: 0 !important;
         left: 0 !important;
         right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 58px !important;
+        transform: none !important;
+        margin: 0 !important;
+        padding: 0 4px !important;
+        border-radius: 0 !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        background: rgba(11, 15, 25, 0.96) !important;
+        backdrop-filter: blur(24px) !important;
+        -webkit-backdrop-filter: blur(24px) !important;
+        justify-content: space-around !important;
+        align-items: center !important;
         z-index: 9999 !important;
+        box-sizing: border-box !important;
+      }
+      .bottom-nav-item {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        padding: 6px 0 !important;
+        background: transparent !important;
+        border: none !important;
+        color: #94a3b8 !important;
+      }
+      .bottom-nav-item.active {
+        color: #38bdf8 !important;
+      }
+      .bottom-nav-item .bnav-icon {
+        font-size: 1.2rem !important;
+      }
+      .bottom-nav-item .bnav-label {
+        font-size: 0.65rem !important;
+        font-weight: 700 !important;
+      }
+
+      .app-layout {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        min-height: 100vh !important;
+        padding-bottom: 64px !important;
+      }
+      .app-center-stage {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0.5rem 0.75rem 4rem 0.75rem !important;
+        margin: 0 !important;
+      }
+      .main-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        padding: 0 0 4rem 0 !important;
+      }
+
+      /* Horizon Filter Bar for Mobile */
+      .algo-horizon-bar {
+        display: flex !important;
+        gap: 8px !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        padding: 6px 2px 10px 2px !important;
+      }
+      .algo-horizon-bar::-webkit-scrollbar {
+        display: none !important;
+      }
+      .algo-pill {
+        flex-shrink: 0 !important;
       }
     }
 
