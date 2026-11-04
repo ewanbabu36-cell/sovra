@@ -95050,15 +95050,20 @@ async function startDevServer() {
           identifier = '@' + identifier;
         }
         const deviceName = String(parsed.device || parsed.deviceName || (req.headers['user-agent']?.includes('Mobile') ? 'Mobile Node' : 'Web Session'));
-        const hasFactorInput = parsed.pin !== undefined || parsed.securityPin !== undefined || parsed.totpCode !== undefined || parsed.code !== undefined || parsed.enclaveBypass !== undefined || parsed.isEnclaveBypass !== undefined;
+        // SEC-CRIT-01: Prohibit client-supplied enclave bypass flags
+        if (parsed.isEnclaveBypass !== undefined || parsed.enclaveBypass !== undefined) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Direct enclave bypass flags are strictly prohibited. Authenticate via WebAuthn ceremony.' }));
+          return;
+        }
+        const hasFactorInput = parsed.pin !== undefined || parsed.securityPin !== undefined || parsed.totpCode !== undefined || parsed.code !== undefined;
         const factor = hasFactorInput ? {
           pin: parsed.pin ? String(parsed.pin).trim() : (parsed.securityPin ? String(parsed.securityPin).trim() : undefined),
           totpCode: parsed.totpCode ? String(parsed.totpCode).trim() : (parsed.code ? String(parsed.code).trim() : undefined),
-          isEnclaveBypass: Boolean(parsed.enclaveBypass || parsed.isEnclaveBypass),
         } : undefined;
         const loginRes = sovraDb.loginUser(identifier, deviceName, clientIp, req.headers['user-agent'] as string, factor);
         if (!loginRes.ok || !loginRes.user) {
-          const status = loginRes.error?.includes('not found') ? 404 : 401;
+          const status = (loginRes as any).isLocked || (loginRes as any).isThrottled ? 429 : (loginRes.error?.includes('not found') ? 404 : 401);
           res.writeHead(status, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: loginRes.error || 'Authentication failed' }));
           return;
@@ -95072,7 +95077,7 @@ async function startDevServer() {
           ok: true,
           user: toPublicUserDTO(loginRes.user),
           sessionToken: loginRes.sessionToken,
-          recoveryPhrase: loginRes.user.recoveryPhrase,
+          // SEC-PHASE-3: Never expose recoveryPhrase during ordinary user login
         }));
       } catch (err: any) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -95185,7 +95190,7 @@ async function startDevServer() {
         }
 
         const deviceName = String(parsed.device || (req.headers['user-agent']?.includes('Mobile') ? 'Mobile Biometric' : 'Desktop Biometric'));
-        const loginRes = sovraDb.loginUser(user.handle, deviceName, clientIp, req.headers['user-agent'] as string, { isEnclaveBypass: true });
+        const loginRes = sovraDb.loginUser(user.handle, deviceName, clientIp, req.headers['user-agent'] as string, { webauthnVerified: true });
         if (!loginRes.ok || !loginRes.user) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: loginRes.error || 'Session creation failed' }));
@@ -95872,9 +95877,6 @@ async function startDevServer() {
         (sessionTokenQuery && user && user.sessionToken === sessionTokenQuery)
       );
       const userDTO: any = toPublicUserDTO(user);
-      if (isSelf && user?.recoveryPhrase) {
-        userDTO.recoveryPhrase = user.recoveryPhrase;
-      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, user: userDTO }));
       return;
