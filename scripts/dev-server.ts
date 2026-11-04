@@ -33068,25 +33068,18 @@ function renderHtml(
       if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
         return false;
       }
-      if (typeof window !== 'undefined' && window.myProfile) {
-        if (window.myProfile.isGuest || !window.myProfile.sessionToken) return false;
-        return true;
-      }
       if (typeof localStorage !== 'undefined') {
         if (localStorage.getItem('sovra_logged_out') === 'true') return false;
-        if (localStorage.getItem('sovra_is_guest') === 'true') return false;
         var token = localStorage.getItem('sovra_session_token');
         var profile = localStorage.getItem('sovra_user_profile');
-        if (!token || !profile) {
-          if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
-            return false;
-          }
-          if (typeof window !== 'undefined' && window.location && window.location.href) {
-            return false;
-          }
-        }
+        if (token && profile) return true;
       }
-      return true;
+      var p = (typeof window !== 'undefined' && window.myProfile) || (typeof myProfile !== 'undefined' ? myProfile : null);
+      if (p && !p.isGuest) {
+        var t = p.sessionToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_session_token') : null);
+        if (t) return true;
+      }
+      return false;
     };
 
     window.registerPeerOnLan = function(customProfile) {
@@ -43702,34 +43695,40 @@ function renderHtml(
     }
     window.showAuthLandingModal = showAuthLandingModal;
 
+    var _inShowAuthAppView = false;
     function showAuthenticatedAppView() {
-      try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
-      const appLayout = document.querySelector('.app-layout');
-      if (appLayout) appLayout.classList.remove('app-hidden');
-      const bottomNav = document.querySelector('.mobile-bottom-nav');
-      if (bottomNav) bottomNav.classList.remove('app-hidden');
-      const wom = document.getElementById('welcomeOnboardingModal');
-      if (wom) {
-        wom.classList.add('modal-dismissed');
-        wom.style.setProperty('display', 'none', 'important');
+      if (_inShowAuthAppView) return;
+      _inShowAuthAppView = true;
+      try {
+        try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+        try { localStorage.removeItem('sovra_logged_out'); } catch(e) {}
+        const appLayout = document.querySelector('.app-layout');
+        if (appLayout) appLayout.classList.remove('app-hidden');
+        const bottomNav = document.querySelector('.mobile-bottom-nav');
+        if (bottomNav) bottomNav.classList.remove('app-hidden');
+        const wom = document.getElementById('welcomeOnboardingModal');
+        if (wom) {
+          wom.classList.add('modal-dismissed');
+          wom.style.setProperty('display', 'none', 'important');
+        }
+        updateUserDisplayInUI();
+        try { if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts(); } catch(e) {}
+        try { if (typeof syncChatMessages === 'function') syncChatMessages(); } catch(e) {}
+        try { if (typeof fetchNotifications === 'function') fetchNotifications(); } catch(e) {}
+        try { if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships(); } catch(e) {}
+        const isGuest = localStorage.getItem('sovra_is_guest') === 'true' || (myProfile && myProfile.isGuest);
+        const ribbon = document.getElementById('guestModeRibbon');
+        if (ribbon) ribbon.style.display = isGuest ? 'flex' : 'none';
+        if (typeof updateOnboardingChecklistUI === 'function') updateOnboardingChecklistUI();
+        document.body.classList.remove('sovra-mode-home');
+        document.body.classList.add('sovra-mode-app');
+        if (typeof switchTab === 'function') {
+          switchTab('feed');
+        }
+        if (typeof updateCreatorProfileUI === 'function') updateCreatorProfileUI();
+      } finally {
+        _inShowAuthAppView = false;
       }
-      updateUserDisplayInUI();
-      if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
-      if (typeof syncChatMessages === 'function') syncChatMessages();
-      if (typeof fetchNotifications === 'function') fetchNotifications();
-      if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
-      const isGuest = localStorage.getItem('sovra_is_guest') === 'true' || (myProfile && myProfile.isGuest);
-      const ribbon = document.getElementById('guestModeRibbon');
-      if (ribbon) ribbon.style.display = isGuest ? 'flex' : 'none';
-      if (typeof updateOnboardingChecklistUI === 'function') updateOnboardingChecklistUI();
-      document.body.classList.remove('sovra-mode-home');
-      document.body.classList.add('sovra-mode-app');
-      if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
-        window.SovraAndroidOS.openApp('feed');
-      } else if (typeof switchTab === 'function') {
-        switchTab('feed');
-      }
-      if (typeof updateCreatorProfileUI === 'function') updateCreatorProfileUI();
     }
         function showCreatorUpgradeModal() {
       let modal = document.getElementById('sovraCreatorUpgradeModal');
@@ -43900,13 +43899,24 @@ function renderHtml(
 
         if (errBox) errBox.style.display = 'none';
         myProfile = data.user;
+        if (data.sessionToken) {
+          myProfile.sessionToken = data.sessionToken;
+        }
+        window.myProfile = myProfile;
         currentUserHandle = myProfile.handle;
 
+        try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
         localStorage.removeItem('sovra_logged_out');
+        localStorage.removeItem('sovra_is_guest');
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
         if (data.sessionToken) localStorage.setItem('sovra_session_token', data.sessionToken);
 
         // 1. Immediately dismiss modal & display app UI (Zero latency)
+        var womEl = document.getElementById('welcomeOnboardingModal');
+        if (womEl) {
+          womEl.classList.add('modal-dismissed');
+          womEl.style.setProperty('display', 'none', 'important');
+        }
         showAuthenticatedAppView();
 
         // 2. Background sync (non-blocking)
@@ -44161,6 +44171,11 @@ function renderHtml(
         alert('Network failure: ' + (err.message || err));
       }
     }
+
+    function enterAsGuest() {
+      skipOnboardingAsHost();
+    }
+    window.enterAsGuest = enterAsGuest;
 
     function skipOnboardingAsHost() {
       localStorage.removeItem('sovra_logged_out');
@@ -86373,25 +86388,18 @@ function renderHtml(
         if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
           return false;
         }
-        if (typeof window !== 'undefined' && window.myProfile) {
-          if (window.myProfile.isGuest || !window.myProfile.sessionToken) return false;
-          return true;
-        }
         if (typeof localStorage !== 'undefined') {
           if (localStorage.getItem('sovra_logged_out') === 'true') return false;
-          if (localStorage.getItem('sovra_is_guest') === 'true') return false;
           const token = localStorage.getItem('sovra_session_token');
           const profile = localStorage.getItem('sovra_user_profile');
-          if (!token || !profile) {
-            if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('sovra-unauthenticated')) {
-              return false;
-            }
-            if (typeof window !== 'undefined' && window.location && window.location.href) {
-              return false;
-            }
-          }
+          if (token && profile) return true;
         }
-        return true;
+        var p = (typeof window !== 'undefined' && window.myProfile) || (typeof myProfile !== 'undefined' ? myProfile : null);
+        if (p && !p.isGuest) {
+          var t = p.sessionToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_session_token') : null);
+          if (t) return true;
+        }
+        return false;
       }
       window.isUserAuthenticated = isUserAuthenticated;
 
@@ -86442,8 +86450,8 @@ function renderHtml(
         }
 
         // Ensure private app view is hydrated with user's profile and displayed
-        if (typeof showAuthenticatedAppView === 'function') {
-          showAuthenticatedAppView();
+        if (typeof updateUserDisplayInUI === 'function') {
+          updateUserDisplayInUI();
         }
 
         // Update native top app bar title and icon
