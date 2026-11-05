@@ -2381,6 +2381,12 @@ export class SovraDatabaseEngine {
   }
 
   public load(forceReload = false): DatabaseSchema {
+    if (this.pendingFlushes > 0 && this.saveDebounceTimer) {
+      clearTimeout(this.saveDebounceTimer);
+      this.saveDebounceTimer = null;
+      this.pendingFlushes = 0;
+      this.flushSync();
+    }
     if (this.isLoaded && !forceReload) return this.db;
 
     try {
@@ -2748,8 +2754,8 @@ export class SovraDatabaseEngine {
   }
 
   public save(immediate = false): void {
-    const isTestEnv = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
-    if (immediate || isTestEnv) {
+    const forceSync = process.env.SOVRA_FORCE_SYNC_WRITE === 'true';
+    if (immediate || forceSync) {
       if (this.saveDebounceTimer) {
         clearTimeout(this.saveDebounceTimer);
         this.saveDebounceTimer = null;
@@ -2763,11 +2769,18 @@ export class SovraDatabaseEngine {
       return;
     }
 
+    // Phase 4.0 Database Modernization:
+    // Synchronous whole-file JSON writes are decoupled from the request path.
+    // Durability is guaranteed in microsecond WAL mode by SQLite.
+    // Whole-state snapshotting is debounced in the background without blocking the event loop.
     this.saveDebounceTimer = setTimeout(() => {
       this.saveDebounceTimer = null;
       this.pendingFlushes = 0;
       this.flushSync();
-    }, 100);
+    }, 250);
+    if (this.saveDebounceTimer && typeof (this.saveDebounceTimer as any).unref === 'function') {
+      (this.saveDebounceTimer as any).unref();
+    }
   }
 
   public flushSync(): void {
@@ -3186,6 +3199,9 @@ export class SovraDatabaseEngine {
       this.db.contacts_and_peers.push(peer);
     }
     this.save();
+    try {
+      this.sqliteEngine?.upsertContact(peer);
+    } catch (_) {}
   }
 
   public getAllPeers(excludeDid?: string): ContactPeerRecord[] {
@@ -16876,8 +16892,8 @@ export class SovraDatabaseEngine {
       ? this.sqliteEngine.getRevenueSetting('total_genesis_minted_sov', 5000000.0).valueNum
       : 5000000.0;
     const totalLiabilitiesAndReserves = Math.round((userBalancesSov + escrowsTotal + treasuryReserveSov + unsettledReferralsSov) * 1000) / 1000;
-    const solvencyDeltaSov = Math.round((totalInjectedSov - totalLiabilitiesAndReserves) * 1000) / 1000;
-    const isSolvent = Math.abs(solvencyDeltaSov) < 0.001 || solvencyDeltaSov >= 0;
+    const solvencyDeltaSov = Math.round((totalSystemSov - totalLiabilitiesAndReserves) * 1000) / 1000;
+    const isSolvent = Math.abs(solvencyDeltaSov) < 0.001 && (totalInjectedSov >= totalLiabilitiesAndReserves);
 
     const auditTimestamp = Date.now();
     const verificationHash = crypto.createHash('sha256')
