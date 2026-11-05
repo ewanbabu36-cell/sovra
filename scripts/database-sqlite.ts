@@ -5193,11 +5193,32 @@ export class SqliteSocialDatabaseEngine {
 
       const countRow = this.prepareCached('SELECT COUNT(*) as c FROM durable_pin_throttles').get() as any;
       if (countRow && Number(countRow.c) > 50000) {
+        // P0 SECURITY REMEDIATION (Phase 3.6): Never evict active lockouts (locked_until > now). Only prune unlocked/expired records.
         this.prepareCached(`
-          DELETE FROM durable_pin_throttles WHERE target_key IN (
-            SELECT target_key FROM durable_pin_throttles ORDER BY last_attempt_at ASC LIMIT 5000
-          )
-        `).run();
+          DELETE FROM durable_pin_throttles 
+          WHERE (locked_until IS NULL OR locked_until <= ?)
+            AND target_key IN (
+              SELECT target_key FROM durable_pin_throttles 
+              WHERE (locked_until IS NULL OR locked_until <= ?)
+              ORDER BY last_attempt_at ASC 
+              LIMIT 5000
+            )
+        `).run(now, now);
+      }
+
+      const ipCountRow = this.prepareCached('SELECT COUNT(*) as c FROM durable_ip_throttles').get() as any;
+      if (ipCountRow && Number(ipCountRow.c) > 50000) {
+        // P0 SECURITY REMEDIATION (Phase 3.6): Never evict active IP lockouts (locked_until > now).
+        this.prepareCached(`
+          DELETE FROM durable_ip_throttles 
+          WHERE (locked_until IS NULL OR locked_until <= ?)
+            AND ip_address IN (
+              SELECT ip_address FROM durable_ip_throttles 
+              WHERE (locked_until IS NULL OR locked_until <= ?)
+              ORDER BY last_attempt_at ASC 
+              LIMIT 5000
+            )
+        `).run(now, now);
       }
     } catch (_) {}
   }

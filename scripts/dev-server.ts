@@ -89356,7 +89356,60 @@ async function startDevServer() {
 
   function injectCspNonce(html: string, nonce: string): string {
     if (!nonce) return html;
-    return html.replace(/<script\b(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+
+    const delegatorScript = `<script nonce="${nonce}">
+(function() {
+  if (window.__sovraCspDelegator) return;
+  window.__sovraCspDelegator = true;
+  var EVTS = [
+    'click', 'change', 'input', 'keydown', 'keyup', 'submit',
+    'mouseover', 'mouseout', 'pointerdown', 'pointerup', 'dblclick',
+    'contextmenu', 'touchstart', 'touchend', 'focus', 'blur'
+  ];
+  EVTS.forEach(function(evt) {
+    document.addEventListener(evt, function(e) {
+      var t = e.target;
+      while (t && t !== document && t.nodeType === 1) {
+        var attr = 'data-sovra-on' + evt;
+        if (t.hasAttribute && t.hasAttribute(attr)) {
+          var code = t.getAttribute(attr);
+          if (code) {
+            try {
+              var fn = new Function('event', code);
+              fn.call(t, e);
+            } catch (err) {
+              console.error('[SovraCSP] Action error for ' + attr + ':', err);
+            }
+          }
+          break;
+        }
+        t = t.parentElement;
+      }
+    }, true);
+  });
+})();
+</script>`;
+
+    // Transform all inline on* handlers on HTML elements to data-sovra-on*
+    let transformed = html.replace(/(<[a-zA-Z0-9\-]+)([^>]*?)>/g, (fullMatch, tagPrefix, attrs) => {
+      const lower = tagPrefix.toLowerCase();
+      if (lower === '<script' || lower === '<style') return fullMatch;
+      const transformedAttrs = attrs.replace(/\s+on([a-zA-Z]+)\s*=\s*(["'])([\s\S]*?)\2/g, (attrMatch, evt, quote, val) => {
+        return ` data-sovra-on${evt.toLowerCase()}=${quote}${val}${quote}`;
+      });
+      return `${tagPrefix}${transformedAttrs}>`;
+    });
+
+    // Inject nonce into all script tags
+    transformed = transformed.replace(/<script\b(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+
+    // Prepend delegator script in head or body
+    if (transformed.includes('<head>')) {
+      return transformed.replace('<head>', `<head>\n  ${delegatorScript}`);
+    } else if (transformed.includes('<body>')) {
+      return transformed.replace('<body>', `<body>\n  ${delegatorScript}`);
+    }
+    return delegatorScript + transformed;
   }
 
   let _cachedHtmlResponse: {
