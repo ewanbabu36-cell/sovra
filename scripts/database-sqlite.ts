@@ -964,6 +964,26 @@ export class SqliteSocialDatabaseEngine {
       );
       CREATE INDEX IF NOT EXISTS idx_platform_features_cat ON platform_features(category);
       CREATE INDEX IF NOT EXISTS idx_platform_features_order ON platform_features(display_order);
+
+      -- 49. DURABLE PIN BRUTE-FORCE THROTTLES (P0 PERSISTENT PROTECTION)
+      CREATE TABLE IF NOT EXISTS durable_pin_throttles (
+        target_key TEXT PRIMARY KEY,
+        attempts INTEGER NOT NULL,
+        first_attempt_at INTEGER NOT NULL,
+        last_attempt_at INTEGER NOT NULL,
+        locked_until INTEGER DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_durable_pin_throttles_last ON durable_pin_throttles(last_attempt_at);
+
+      -- 50. DURABLE IP AUTHENTICATION THROTTLES (P0 PERSISTENT PROTECTION)
+      CREATE TABLE IF NOT EXISTS durable_ip_throttles (
+        ip_address TEXT PRIMARY KEY,
+        attempts INTEGER NOT NULL,
+        first_attempt_at INTEGER NOT NULL,
+        last_attempt_at INTEGER NOT NULL,
+        locked_until INTEGER DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_durable_ip_throttles_last ON durable_ip_throttles(last_attempt_at);
     `);
 
     // Ensure mini_dapps status column and seed default platform features
@@ -4961,6 +4981,225 @@ export class SqliteSocialDatabaseEngine {
     } catch (_) {
       return null;
     }
+  }
+
+  // ==========================================
+  // DURABLE PIN BRUTE-FORCE THROTTLING (P0 REMEDIATION)
+  // Shared, atomic, persistent state across workers/restarts
+  // ==========================================
+
+  public getPinThrottle(targetKey: string): { attempts: number; isElevatedRisk: boolean; lockedUntil?: number } {
+    try {
+      const now = Date.now();
+      const row = this.prepareCached(
+        'SELECT attempts, first_attempt_at, last_attempt_at, locked_until FROM durable_pin_throttles WHERE target_key = ?'
+      ).get(targetKey) as any;
+
+      if (!row) return { attempts: 0, isElevatedRisk: false };
+
+      // Expire window after 15 minutes
+      if (now - Number(row.last_attempt_at) > 15 * 60 * 1000) {
+        this.clearPinThrottle(targetKey);
+        return { attempts: 0, isElevatedRisk: false };
+      }
+
+      return {
+        attempts: Number(row.attempts),
+        isElevatedRisk: Number(row.attempts) >= 5,
+        lockedUntil: Number(row.locked_until) || undefined,
+      };
+    } catch (err) {
+      console.error('[CRITICAL_SECURITY] Durable throttle getPinThrottle failure:', err);
+      return { attempts: 0, isElevatedRisk: false };
+    }
+  }
+
+  public recordPinThrottle(
+    targetKey: string,
+    ipAddress?: string,
+    maxAttempts = 5,
+    lockDurationMs = 15 * 60 * 1000
+  ): { attempts: number; isIpLocked: boolean; ipLockedUntil?: number } {
+    const now = Date.now();
+    try {
+      this.db.exec('BEGIN IMMEDIATE');
+
+      let currentAttempts = 1;
+      let firstAttemptAt = now;
+      let lockedUntil = 0;
+
+      const existing = this.prepareCached(
+        'SELECT attempts, first_attempt_at, last_attempt_at, locked_until FROM durable_pin_throttles WHERE target_key = ?'
+      ).get(targetKey) as any;
+
+      if (existing && (now - Number(existing.last_attempt_at) <= 15 * 60 * 1000)) {
+        currentAttempts = Number(existing.attempts) + 1;
+        firstAttemptAt = Number(existing.first_attempt_at);
+        if (currentAttempts >= maxAttempts) {
+          lockedUntil = now + lockDurationMs;
+        } else {
+          lockedUntil = Number(existing.locked_until) || 0;
+        }
+      }
+
+      this.prepareCached(`
+        INSERT INTO durable_pin_throttles (target_key, attempts, first_attempt_at, last_attempt_at, locked_until)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(target_key) DO UPDATE SET
+          attempts = excluded.attempts,
+          last_attempt_at = excluded.last_attempt_at,
+          locked_until = excluded.locked_until
+      `).run(targetKey, currentAttempts, firstAttemptAt, now, lockedUntil);
+
+      let isIpLocked = false;
+      let ipLockedUntil: number | undefined;
+
+      if (ipAddress) {
+        let ipAttempts = 1;
+        let ipFirstAttemptAt = now;
+        let ipLockedUntilVal = 0;
+
+        const existingIp = this.prepareCached(
+          'SELECT attempts, first_attempt_at, last_attempt_at, locked_until FROM durable_ip_throttles WHERE ip_address = ?'
+        ).get(ipAddress) as any;
+
+        if (existingIp && (now - Number(existingIp.last_attempt_at) <= 10 * 60 * 1000)) {
+          ipAttempts = Number(existingIp.attempts) + 1;
+          ipFirstAttemptAt = Number(existingIp.first_attempt_at);
+          if (ipAttempts >= 10) {
+            ipLockedUntilVal = now + 15 * 60 * 1000;
+          } else {
+            ipLockedUntilVal = Number(existingIp.locked_until) || 0;
+          }
+        }
+
+        if (ipAttempts >= 10) {
+          isIpLocked = true;
+          ipLockedUntil = now + 15 * 60 * 1000;
+          ipLockedUntilVal = ipLockedUntil;
+        }
+
+        this.prepareCached(`
+          INSERT INTO durable_ip_throttles (ip_address, attempts, first_attempt_at, last_attempt_at, locked_until)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(ip_address) DO UPDATE SET
+            attempts = excluded.attempts,
+            last_attempt_at = excluded.last_attempt_at,
+            locked_until = excluded.locked_until
+        `).run(ipAddress, ipAttempts, ipFirstAttemptAt, now, ipLockedUntilVal);
+      }
+
+      // Storage bounding & opportunistic pruning to prevent unbounded growth attacks
+      if (Math.random() < 0.05) {
+        this.pruneExpiredThrottlesInternal(now);
+      }
+
+      this.db.exec('COMMIT');
+      return { attempts: currentAttempts, isIpLocked, ipLockedUntil };
+    } catch (err) {
+      try { this.db.exec('ROLLBACK'); } catch (_) {}
+      console.error('[CRITICAL_SECURITY] Durable throttle recordPinThrottle failure:', err);
+      throw err;
+    }
+  }
+
+  public getIpThrottle(ipAddress: string): { attempts: number; isLocked: boolean; lockedUntil?: number } {
+    try {
+      const now = Date.now();
+      const row = this.prepareCached(
+        'SELECT attempts, first_attempt_at, last_attempt_at, locked_until FROM durable_ip_throttles WHERE ip_address = ?'
+      ).get(ipAddress) as any;
+
+      if (!row) return { attempts: 0, isLocked: false };
+
+      if (now - Number(row.last_attempt_at) > 10 * 60 * 1000 && (!row.locked_until || Number(row.locked_until) <= now)) {
+        this.clearIpThrottle(ipAddress);
+        return { attempts: 0, isLocked: false };
+      }
+
+      const lockedUntil = Number(row.locked_until) || 0;
+      return {
+        attempts: Number(row.attempts),
+        isLocked: lockedUntil > now,
+        lockedUntil: lockedUntil > 0 ? lockedUntil : undefined,
+      };
+    } catch (err) {
+      console.error('[CRITICAL_SECURITY] Durable throttle getIpThrottle failure:', err);
+      return { attempts: 0, isLocked: false };
+    }
+  }
+
+  public clearPinThrottle(targetKey: string): void {
+    try {
+      this.prepareCached('DELETE FROM durable_pin_throttles WHERE target_key = ?').run(targetKey);
+    } catch (err) {
+      console.error('[CRITICAL_SECURITY] Durable throttle clearPinThrottle failure:', err);
+    }
+  }
+
+  public clearIpThrottle(ipAddress: string): void {
+    try {
+      this.prepareCached('DELETE FROM durable_ip_throttles WHERE ip_address = ?').run(ipAddress);
+    } catch (err) {
+      console.error('[CRITICAL_SECURITY] Durable throttle clearIpThrottle failure:', err);
+    }
+  }
+
+  public copyPinThrottle(sourceKey: string, targetKey: string): boolean {
+    try {
+      const now = Date.now();
+      const source = this.prepareCached(
+        'SELECT attempts, first_attempt_at, last_attempt_at, locked_until FROM durable_pin_throttles WHERE target_key = ?'
+      ).get(sourceKey) as any;
+
+      if (!source || (now - Number(source.last_attempt_at) > 15 * 60 * 1000)) {
+        return false;
+      }
+
+      this.prepareCached(`
+        INSERT INTO durable_pin_throttles (target_key, attempts, first_attempt_at, last_attempt_at, locked_until)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(target_key) DO UPDATE SET
+          attempts = excluded.attempts,
+          first_attempt_at = excluded.first_attempt_at,
+          last_attempt_at = excluded.last_attempt_at,
+          locked_until = excluded.locked_until
+      `).run(targetKey, source.attempts, source.first_attempt_at, source.last_attempt_at, source.locked_until);
+
+      return true;
+    } catch (err) {
+      console.error('[CRITICAL_SECURITY] Durable throttle copyPinThrottle failure:', err);
+      return false;
+    }
+  }
+
+  public pruneExpiredThrottles(ttlMs = 15 * 60 * 1000): { prunedPin: number; prunedIp: number } {
+    const cutoff = Date.now() - ttlMs;
+    try {
+      const resPin = this.prepareCached('DELETE FROM durable_pin_throttles WHERE last_attempt_at < ? AND (locked_until IS NULL OR locked_until <= ?)').run(cutoff, Date.now());
+      const resIp = this.prepareCached('DELETE FROM durable_ip_throttles WHERE last_attempt_at < ? AND (locked_until IS NULL OR locked_until <= ?)').run(cutoff, Date.now());
+      return { prunedPin: resPin.changes, prunedIp: resIp.changes };
+    } catch (err) {
+      console.error('[CRITICAL_SECURITY] Durable throttle prune failure:', err);
+      return { prunedPin: 0, prunedIp: 0 };
+    }
+  }
+
+  private pruneExpiredThrottlesInternal(now: number): void {
+    try {
+      const cutoff = now - 15 * 60 * 1000;
+      this.prepareCached('DELETE FROM durable_pin_throttles WHERE last_attempt_at < ? AND (locked_until IS NULL OR locked_until <= ?)').run(cutoff, now);
+      this.prepareCached('DELETE FROM durable_ip_throttles WHERE last_attempt_at < ? AND (locked_until IS NULL OR locked_until <= ?)').run(cutoff, now);
+
+      const countRow = this.prepareCached('SELECT COUNT(*) as c FROM durable_pin_throttles').get() as any;
+      if (countRow && Number(countRow.c) > 50000) {
+        this.prepareCached(`
+          DELETE FROM durable_pin_throttles WHERE target_key IN (
+            SELECT target_key FROM durable_pin_throttles ORDER BY last_attempt_at ASC LIMIT 5000
+          )
+        `).run();
+      }
+    } catch (_) {}
   }
 
   public close(): void {

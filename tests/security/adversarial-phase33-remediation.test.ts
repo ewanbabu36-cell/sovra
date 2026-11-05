@@ -320,7 +320,8 @@ describe('SOVRA Phase 3.3 — Security Defect Remediation & Adversarial Verifica
       const initialKey = sovraDb.getTargetThrottleKey('@alice_rotation');
       expect(initialKey).toMatch(/^target_th_[0-9a-f]{32}$/);
 
-      // Record a failed attempt under initial key
+      // Clean persistent state and record a failed attempt under initial key
+      sovraDb.clearFailedPinAttempts(initialKey);
       sovraDb.recordFailedPinAttempt(initialKey);
       const attemptState = sovraDb.getFailedPinAttempts(initialKey);
       expect(attemptState.attempts).toBe(1);
@@ -365,15 +366,16 @@ describe('SOVRA Phase 3.3 — Security Defect Remediation & Adversarial Verifica
       expect(csp).toContain("frame-ancestors 'self'");
     });
 
-    it('verifies production policy structure supports cryptographic nonces and script-src-attr', () => {
+    it('verifies strict production CSP eliminates unsafe-inline, unsafe-eval, and script-src-attr', () => {
       // In production mode, dev-server generates:
-      // script-src 'self' 'nonce-${cspNonce}' 'unsafe-inline' blob:; script-src-attr 'unsafe-inline';
+      // script-src 'self' 'nonce-${cspNonce}' blob:;
       const sampleNonce = crypto.randomBytes(16).toString('base64');
-      const prodScriptPolicy = `script-src 'self' 'nonce-${sampleNonce}' 'unsafe-inline' blob:; script-src-attr 'unsafe-inline';`;
+      const prodScriptPolicy = `script-src 'self' 'nonce-${sampleNonce}' blob:;`;
 
       expect(prodScriptPolicy).not.toContain('unsafe-eval');
+      expect(prodScriptPolicy).not.toContain("'unsafe-inline'");
+      expect(prodScriptPolicy).not.toContain("script-src-attr 'unsafe-inline'");
       expect(prodScriptPolicy).toContain(`'nonce-${sampleNonce}'`);
-      expect(prodScriptPolicy).toContain("script-src-attr 'unsafe-inline'");
     });
   });
 });

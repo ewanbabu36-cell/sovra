@@ -10833,11 +10833,22 @@ export class SovraDatabaseEngine {
   // USER LOGIN & LOGOUT (REMEDIATED SEC-CRIT-01 & SEC-HIGH-01)
   // ==========================================
 
-  // --- BRUTE-FORCE PROTECTION & ANTI-DOS RISK LEDGERS ---
+  // --- BRUTE-FORCE PROTECTION & ANTI-DOS RISK LEDGERS (DURABLE & IN-MEMORY) ---
   private failedPinAttempts = new Map<string, { attempts: number; firstAttemptAt: number; lastAttemptAt: number }>();
   private failedPinAttemptsByIp = new Map<string, { attempts: number; firstAttemptAt: number; lastAttemptAt: number; lockedUntil?: number }>();
 
   public getFailedPinAttempts(accountDid: string): { attempts: number; isElevatedRisk: boolean } {
+    if (this.sqliteEngine) {
+      try {
+        const sqliteRes = this.sqliteEngine.getPinThrottle(accountDid);
+        if (sqliteRes.attempts === 0) {
+          this.failedPinAttempts.delete(accountDid);
+        }
+        return { attempts: sqliteRes.attempts, isElevatedRisk: sqliteRes.isElevatedRisk };
+      } catch (err) {
+        console.warn('[SovraDB] SQLite getPinThrottle fallback to memory:', err);
+      }
+    }
     const rec = this.failedPinAttempts.get(accountDid);
     if (!rec) return { attempts: 0, isElevatedRisk: false };
     const now = Date.now();
@@ -10848,19 +10859,49 @@ export class SovraDatabaseEngine {
     return { attempts: rec.attempts, isElevatedRisk: rec.attempts >= 5 };
   }
 
+  public getIpThrottle(ipAddress: string): { attempts: number; isLocked: boolean; ipLockedUntil?: number } {
+    if (this.sqliteEngine) {
+      try {
+        const res = this.sqliteEngine.getIpThrottle(ipAddress);
+        if (res.isLocked) {
+          return { attempts: res.attempts, isLocked: true, ipLockedUntil: res.lockedUntil };
+        }
+      } catch (err) {
+        console.warn('[SovraDB] SQLite getIpThrottle fallback to memory:', err);
+      }
+    }
+    const ipRec = this.failedPinAttemptsByIp.get(ipAddress);
+    if (ipRec?.lockedUntil && ipRec.lockedUntil > Date.now()) {
+      return { attempts: ipRec.attempts, isLocked: true, ipLockedUntil: ipRec.lockedUntil };
+    }
+    return { attempts: ipRec?.attempts || 0, isLocked: false };
+  }
+
   public recordFailedPinAttempt(accountDid: string, ipAddress?: string): { attempts: number; isIpLocked: boolean; ipLockedUntil?: number } {
+    let attempts = 1;
+    let isIpLocked = false;
+    let ipLockedUntil: number | undefined;
+
+    if (this.sqliteEngine) {
+      try {
+        const durableResult = this.sqliteEngine.recordPinThrottle(accountDid, ipAddress);
+        attempts = durableResult.attempts;
+        isIpLocked = durableResult.isIpLocked;
+        ipLockedUntil = durableResult.ipLockedUntil;
+      } catch (err) {
+        console.error('[CRITICAL_SECURITY] Durable throttle write failure, engaging fail-closed fallback:', err);
+      }
+    }
+
     const now = Date.now();
     let rec = this.failedPinAttempts.get(accountDid);
     if (!rec || (now - rec.lastAttemptAt > 15 * 60 * 1000)) {
-      rec = { attempts: 1, firstAttemptAt: now, lastAttemptAt: now };
+      rec = { attempts: Math.max(1, attempts), firstAttemptAt: now, lastAttemptAt: now };
     } else {
-      rec.attempts += 1;
+      rec.attempts = Math.max(rec.attempts + 1, attempts);
       rec.lastAttemptAt = now;
     }
     this.failedPinAttempts.set(accountDid, rec);
-
-    let isIpLocked = false;
-    let ipLockedUntil: number | undefined;
 
     if (ipAddress) {
       let ipRec = this.failedPinAttemptsByIp.get(ipAddress);
@@ -10870,8 +10911,8 @@ export class SovraDatabaseEngine {
         ipRec.attempts += 1;
         ipRec.lastAttemptAt = now;
       }
-      if (ipRec.attempts >= 10) {
-        ipRec.lockedUntil = now + 15 * 60 * 1000;
+      if (ipRec.attempts >= 10 || isIpLocked) {
+        ipRec.lockedUntil = ipLockedUntil || (now + 15 * 60 * 1000);
         isIpLocked = true;
         ipLockedUntil = ipRec.lockedUntil;
       }
@@ -10882,6 +10923,13 @@ export class SovraDatabaseEngine {
   }
 
   public clearFailedPinAttempts(accountDid: string): void {
+    if (this.sqliteEngine) {
+      try {
+        this.sqliteEngine.clearPinThrottle(accountDid);
+      } catch (err) {
+        console.warn('[SovraDB] SQLite clearPinThrottle fallback to memory:', err);
+      }
+    }
     this.failedPinAttempts.delete(accountDid);
   }
 
@@ -10893,7 +10941,7 @@ export class SovraDatabaseEngine {
    * Validates the cryptographic strength of a throttle secret.
    * Enforces minimum 32 characters (256-bit entropy) and rejects known insecure values.
    */
-  public static validateThrottleSecret(secret?: string): { valid: boolean; error?: string } {
+  public static validateThrottleSecret(secret?: string, isProdOverride?: boolean): { valid: boolean; error?: string } {
     if (!secret || typeof secret !== 'string') {
       return { valid: false, error: 'SOVRA_THROTTLE_SECRET is missing. A cryptographically random secret of at least 32 characters is required.' };
     }
@@ -10929,6 +10977,18 @@ export class SovraDatabaseEngine {
     }
     if (entropy < 2.5) {
       return { valid: false, error: 'SOVRA_THROTTLE_SECRET exhibits insufficient Shannon entropy (< 2.5 bits/symbol).' };
+    }
+
+    const isProduction = typeof isProdOverride === 'boolean' ? isProdOverride : (process.env.NODE_ENV === 'production');
+    if (isProduction) {
+      const isHex64 = /^[0-9a-fA-F]{64}$/.test(trimmed);
+      const isBase64_44 = /^[A-Za-z0-9+/=]{44}$/.test(trimmed) || /^[A-Za-z0-9+/]{43}=?$/.test(trimmed);
+      if (!isHex64 && !isBase64_44) {
+        return {
+          valid: false,
+          error: 'In production mode (NODE_ENV=production), SOVRA_THROTTLE_SECRET must be at least 32 raw bytes (256 bits) from a CSPRNG, formatted as a 64-character hexadecimal or 44-character Base64 string.'
+        };
+      }
     }
 
     return { valid: true };
@@ -11034,13 +11094,19 @@ export class SovraDatabaseEngine {
     const targetThrottleKey = this.getTargetThrottleKey(identifier);
 
     // AUTH-01 Rotation Defense: Inherit active failure state from rotated secret if primary key has no active state
-    const primaryRec = this.failedPinAttempts.get(targetThrottleKey);
-    if (!primaryRec || (Date.now() - primaryRec.lastAttemptAt > 15 * 60 * 1000)) {
+    const primaryState = this.getFailedPinAttempts(targetThrottleKey);
+    if (primaryState.attempts === 0) {
       for (const rotSecret of this.rotatedThrottleSecrets) {
         const rotKey = this.getTargetThrottleKey(identifier, rotSecret);
-        const rotRec = this.failedPinAttempts.get(rotKey);
-        if (rotRec && (Date.now() - rotRec.lastAttemptAt <= 15 * 60 * 1000)) {
-          this.failedPinAttempts.set(targetThrottleKey, { ...rotRec });
+        const rotState = this.getFailedPinAttempts(rotKey);
+        if (rotState.attempts > 0) {
+          if (this.sqliteEngine) {
+            this.sqliteEngine.copyPinThrottle(rotKey, targetThrottleKey);
+          }
+          const rotMem = this.failedPinAttempts.get(rotKey);
+          if (rotMem) {
+            this.failedPinAttempts.set(targetThrottleKey, { ...rotMem });
+          }
           break;
         }
       }
@@ -11060,9 +11126,9 @@ export class SovraDatabaseEngine {
     if (!user) {
       this.verifySecurityPin('000000', '$scrypt$ln=14,r=8,p=1$7465737473616c74$7465737468617368');
       if (ipAddress) {
-        const ipRec = this.failedPinAttemptsByIp.get(ipAddress);
-        if (ipRec?.lockedUntil && ipRec.lockedUntil > Date.now()) {
-          const remainingSec = Math.ceil((ipRec.lockedUntil - Date.now()) / 1000);
+        const ipCheck = this.getIpThrottle(ipAddress);
+        if (ipCheck.isLocked && ipCheck.ipLockedUntil) {
+          const remainingSec = Math.max(1, Math.ceil((ipCheck.ipLockedUntil - Date.now()) / 1000));
           return {
             ok: false,
             error: `Too many failed authentication attempts from this IP address. Please try again in ${remainingSec} seconds.`,
@@ -11153,9 +11219,9 @@ export class SovraDatabaseEngine {
         } else {
           // Check IP lock on failure
           if (ipAddress) {
-            const ipRec = this.failedPinAttemptsByIp.get(ipAddress);
-            if (ipRec?.lockedUntil && ipRec.lockedUntil > Date.now()) {
-              const remainingSec = Math.ceil((ipRec.lockedUntil - Date.now()) / 1000);
+            const ipCheck = this.getIpThrottle(ipAddress);
+            if (ipCheck.isLocked && ipCheck.ipLockedUntil) {
+              const remainingSec = Math.max(1, Math.ceil((ipCheck.ipLockedUntil - Date.now()) / 1000));
               return {
                 ok: false,
                 error: `Too many failed authentication attempts from this IP address. Please try again in ${remainingSec} seconds.`,

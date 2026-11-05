@@ -89318,6 +89318,42 @@ async function startDevServer() {
     }
   };
 
+  const cspReportRateLimits = new Map<string, { count: number; resetAt: number }>();
+  function isCspReportRateLimited(ip: string): boolean {
+    const now = Date.now();
+    let rec = cspReportRateLimits.get(ip);
+    if (!rec || rec.resetAt <= now) {
+      cspReportRateLimits.set(ip, { count: 1, resetAt: now + 60000 });
+      return false;
+    }
+    rec.count++;
+    return rec.count > 100;
+  }
+
+  function getClientIp(req: http.IncomingMessage): string {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (typeof forwarded === 'string') {
+      return forwarded.split(',')[0]!.trim();
+    }
+    return req.socket.remoteAddress || '127.0.0.1';
+  }
+
+  function sanitizeCspUri(uri?: string): string {
+    if (!uri || typeof uri !== 'string') return '';
+    return uri.replace(/[?#].*$/, '').slice(0, 250);
+  }
+
+  function logRedactedCspReport(reportData: any, clientIp: string): void {
+    try {
+      const report = reportData['csp-report'] || (Array.isArray(reportData) ? reportData[0]?.body : reportData);
+      if (!report) return;
+      const violatedDirective = String(report['violated-directive'] || report.violatedDirective || 'unknown').slice(0, 100);
+      const blockedUri = sanitizeCspUri(report['blocked-uri'] || report.blockedURL);
+      const documentUri = sanitizeCspUri(report['document-uri'] || report.documentURL);
+      console.warn(`[CSP_TELEMETRY] Violation detected: directive=${violatedDirective}, blocked=${blockedUri}, doc=${documentUri}, ip=${clientIp}`);
+    } catch (_) {}
+  }
+
   function injectCspNonce(html: string, nonce: string): string {
     if (!nonce) return html;
     return html.replace(/<script\b(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
@@ -89501,18 +89537,43 @@ async function startDevServer() {
     const cspNonce = crypto.randomBytes(16).toString('base64');
     (res as any).cspNonce = cspNonce;
     const scriptPolicy = isProduction
-      ? `script-src 'self' 'nonce-${cspNonce}' 'unsafe-inline' blob:; script-src-attr 'unsafe-inline';`
+      ? `script-src 'self' 'nonce-${cspNonce}' blob:;`
       : "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;";
 
     res.setHeader(
       'Content-Security-Policy',
-      `default-src 'self' data: blob:; ${scriptPolicy} style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; connect-src 'self' ws: wss: https: http: stun: turn: turns:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self';`
+      `default-src 'self' data: blob:; ${scriptPolicy} style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; connect-src 'self' ws: wss: https: http: stun: turn: turns:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; report-uri /api/security/csp-report; report-to default;`
     );
+    res.setHeader('Reporting-Endpoints', 'default="/api/security/csp-report"');
     if (req.headers['x-forwarded-proto'] === 'https' || isEncrypted) {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     }
 
     if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    // ==========================================
+    // 🛡️ STRICT CSP VIOLATION TELEMETRY (TASK 2)
+    // Safe, rate-limited, query/token-scrubbed reporting
+    // ==========================================
+    if (url.pathname === '/api/security/csp-report' && (req.method === 'POST' || req.method === 'PUT')) {
+      const clientIp = getClientIp(req);
+      if (isCspReportRateLimited(clientIp)) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+        res.end(JSON.stringify({ ok: false, error: 'Too many reports' }));
+        return;
+      }
+
+      const { body, ok } = await readBoundedBody(req, res, 65536);
+      if (ok && body) {
+        try {
+          const parsed = JSON.parse(body);
+          logRedactedCspReport(parsed, clientIp);
+        } catch (_) {}
+      }
       res.writeHead(204);
       res.end();
       return;
@@ -100759,7 +100820,8 @@ async function startDevServer() {
           'Content-Encoding': 'gzip',
           'Content-Length': String((responseBody as Buffer).length),
           'ETag': _cachedHtmlResponse.etag,
-          'Cache-Control': 'public, max-age=0, must-revalidate',
+          'Cache-Control': isProduction ? 'no-store, no-cache, must-revalidate, private' : 'public, max-age=0, must-revalidate',
+          'Pragma': isProduction ? 'no-cache' : 'public',
         });
         res.end(responseBody);
       } else {
@@ -100767,7 +100829,8 @@ async function startDevServer() {
           'Content-Type': 'text/html; charset=utf-8',
           'Content-Length': String(Buffer.byteLength(responseBody as string, 'utf8')),
           'ETag': _cachedHtmlResponse.etag,
-          'Cache-Control': 'public, max-age=0, must-revalidate',
+          'Cache-Control': isProduction ? 'no-store, no-cache, must-revalidate, private' : 'public, max-age=0, must-revalidate',
+          'Pragma': isProduction ? 'no-cache' : 'public',
         });
         res.end(responseBody);
       }

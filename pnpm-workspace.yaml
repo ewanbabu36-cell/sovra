@@ -6,3 +6,8 @@ packages:
 
 allowBuilds:
   esbuild: true
+
+overrides:
+  tinypool: '>=2.1.2'
+  vite: '>=7.3.7'
+  minimatch: '>=11.0.1'
