@@ -3041,6 +3041,18 @@ export class SovraDatabaseEngine {
     const existingIdx = this.db.users.findIndex(u => u.did === user.did);
     const now = Date.now();
 
+    // SEC-NEW-01 Fix: Calculate recovery hash and salt exactly once to prevent desynchronization
+    let computedRecHash = user.recoveryPhraseHash;
+    let computedRecSalt = user.recoveryPhraseSalt;
+    if ((!computedRecHash || !computedRecSalt) && user.recoveryPhrase) {
+      const derived = this.hashRecoveryPhrase(user.recoveryPhrase);
+      computedRecHash = derived.hash;
+      computedRecSalt = derived.salt;
+    } else if (!computedRecHash && existingIdx >= 0) {
+      computedRecHash = this.db.users[existingIdx]!.recoveryPhraseHash;
+      computedRecSalt = this.db.users[existingIdx]!.recoveryPhraseSalt;
+    }
+
     const record: UserRecord = {
       did: user.did || ('did:sovra:user_' + crypto.randomBytes(8).toString('hex')),
       handle: cleanHandle,
@@ -3060,8 +3072,8 @@ export class SovraDatabaseEngine {
       securityPinHash: user.securityPinHash !== undefined ? user.securityPinHash : (existingIdx >= 0 ? this.db.users[existingIdx]!.securityPinHash : undefined),
       totpSecret: user.totpSecret !== undefined ? user.totpSecret : (existingIdx >= 0 ? this.db.users[existingIdx]!.totpSecret : undefined),
       totpEnabled: user.totpEnabled !== undefined ? user.totpEnabled : (existingIdx >= 0 ? Boolean(this.db.users[existingIdx]!.totpEnabled) : false),
-      recoveryPhraseHash: user.recoveryPhraseHash || (user.recoveryPhrase ? this.hashRecoveryPhrase(user.recoveryPhrase).hash : (existingIdx >= 0 ? this.db.users[existingIdx]!.recoveryPhraseHash : undefined)),
-      recoveryPhraseSalt: user.recoveryPhraseSalt || (user.recoveryPhrase ? this.hashRecoveryPhrase(user.recoveryPhrase).salt : (existingIdx >= 0 ? this.db.users[existingIdx]!.recoveryPhraseSalt : undefined)),
+      recoveryPhraseHash: computedRecHash,
+      recoveryPhraseSalt: computedRecSalt,
       webauthnCredentials: user.webauthnCredentials || (existingIdx >= 0 ? this.db.users[existingIdx]!.webauthnCredentials : undefined),
       role: user.role || (existingIdx >= 0 ? this.db.users[existingIdx]!.role : undefined),
       createdAt: existingIdx >= 0 ? this.db.users[existingIdx]!.createdAt : now,
@@ -10900,6 +10912,25 @@ export class SovraDatabaseEngine {
     if (insecureList.has(trimmed.toLowerCase())) {
       return { valid: false, error: 'Insecure or trivial SOVRA_THROTTLE_SECRET is strictly forbidden.' };
     }
+
+    // Entropy check: reject low-entropy secrets (repeated characters or minimal symbol set)
+    const charCounts: Record<string, number> = {};
+    for (const ch of trimmed) {
+      charCounts[ch] = (charCounts[ch] || 0) + 1;
+    }
+    const uniqueChars = Object.keys(charCounts).length;
+    if (uniqueChars < 8) {
+      return { valid: false, error: 'SOVRA_THROTTLE_SECRET exhibits insufficient character diversity (< 8 unique characters).' };
+    }
+    let entropy = 0;
+    for (const count of Object.values(charCounts)) {
+      const p = count / trimmed.length;
+      entropy -= p * Math.log2(p);
+    }
+    if (entropy < 2.5) {
+      return { valid: false, error: 'SOVRA_THROTTLE_SECRET exhibits insufficient Shannon entropy (< 2.5 bits/symbol).' };
+    }
+
     return { valid: true };
   }
 

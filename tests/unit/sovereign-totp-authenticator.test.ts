@@ -1,7 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { sovraDb } from '../../scripts/database-engine.js';
 
 describe('Sovereign RFC 6238 TOTP Authenticator & Multi-Factor Security Suite', () => {
+  beforeAll(() => {
+    if (!process.env.SOVRA_THROTTLE_SECRET || process.env.SOVRA_THROTTLE_SECRET.length < 32) {
+      process.env.SOVRA_THROTTLE_SECRET = 'unit-test-sovra-throttle-secret-key-32chars-entropy!';
+    }
+    sovraDb.loadThrottleSecrets();
+  });
   it('generates cryptographic Base32 secrets and calculates valid 6-digit RFC 6238 TOTP codes', () => {
     const secret = sovraDb.generateTotpSecret(20);
     expect(secret).toBeDefined();
