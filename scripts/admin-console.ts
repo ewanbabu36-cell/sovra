@@ -3967,7 +3967,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         sec.style.setProperty('display', 'none', 'important');
       });
 
-      const targetBtn = Array.from(document.querySelectorAll('.admin-nav-item')).find(b => b.getAttribute('onclick')?.includes(tabId));
+      const targetBtn = Array.from(document.querySelectorAll('.admin-nav-item')).find(b => (b.getAttribute('data-sovra-onclick') || b.getAttribute('onclick'))?.includes(tabId));
       if (targetBtn) targetBtn.classList.add('active');
 
       const targetSection = document.getElementById('view-' + tabId);
@@ -4095,7 +4095,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         alert('No users available to export.');
         return;
       }
-      let csv = 'Handle,Name,DID,Role,Device,Balance_SOV\r\n';
+      let csv = 'Handle,Name,DID,Role,Device,Balance_SOV\\r\\n';
       rows.forEach(r => {
         const handle = r.getAttribute('data-handle') || '';
         const name = (r.getAttribute('data-name') || '').replace(/,/g, ' ');
@@ -4104,7 +4104,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         const cols = r.querySelectorAll('td');
         const device = cols[2]?.innerText?.trim() || '';
         const bal = cols[3]?.innerText?.replace('SOV', '')?.trim() || '500';
-        csv += '"' + handle + '","' + name + '","' + did + '","' + role + '","' + device + '",' + bal + '\r\n';
+        csv += '"' + handle + '","' + name + '","' + did + '","' + role + '","' + device + '",' + bal + '\\r\\n';
       });
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -4114,7 +4114,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     }
 
     async function promptChangeUserRole(did, currentRole) {
-      const newRole = prompt('Enter new role for user (' + did.slice(0, 20) + '...):\n\nOptions: USER, CREATOR, ADMIN, OPERATOR', currentRole || 'USER');
+      const newRole = prompt('Enter new role for user (' + did.slice(0, 20) + '...):\\n\\nOptions: USER, CREATOR, ADMIN, OPERATOR', currentRole || 'USER');
       if (!newRole || newRole.trim().toUpperCase() === currentRole) return;
       try {
         const res = await fetch('/api/admin/user/update-role', {
@@ -4138,7 +4138,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     }
 
     async function promptAdjustUserBalance(did, handle) {
-      const amountStr = prompt('Adjust SOV balance for ' + handle + ':\n\nEnter positive amount to credit (+), or negative amount to debit (-):\nExample: 100 or -50');
+      const amountStr = prompt('Adjust SOV balance for ' + handle + ':\\n\\nEnter positive amount to credit (+), or negative amount to debit (-):\\nExample: 100 or -50');
       if (!amountStr) return;
       const amount = parseFloat(amountStr);
       if (isNaN(amount) || amount === 0) {
@@ -4364,7 +4364,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       }
 
       list.innerHTML = filtered.map(function(it, idx) {
-        return '<div class="palette-item ' + (idx === 0 ? 'selected' : '') + '" onclick="executePaletteItem(\'' + it.id + '\')">' +
+        return '<div class="palette-item ' + (idx === 0 ? 'selected' : '') + '" data-sovra-onclick="executePaletteItem(&quot;' + it.id + '&quot;)">' +
           '<div class="palette-item-icon">' + it.icon + '</div>' +
           '<div style="flex: 1;">' +
             '<div style="font-weight: 700; font-size: 0.88rem;">' + it.title + '</div>' +
@@ -4422,7 +4422,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     }
 
     // Append periodic events to simulate live network traffic
-    setInterval(() => {
+    setInterval(async () => {
       if (!isTelemetryStreaming) return;
       const body = document.getElementById('telemetryTerminalBody');
       if (!body) return;
@@ -4953,7 +4953,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     }
 
     async function executeModerationAction(reportId, action, targetType, targetId, notes) {
-      if (!confirm('Enforce 1-Click Action: ' + action.toUpperCase() + ' on ' + targetType + ' ' + targetId + '?\n\nThis will immediately take effect and broadcast live to all peer feeds via SSE.')) {
+      if (!confirm('Enforce 1-Click Action: ' + action.toUpperCase() + ' on ' + targetType + ' ' + targetId + '?\\n\\nThis will immediately take effect and broadcast live to all peer feeds via SSE.')) {
         return;
       }
 
@@ -5084,11 +5084,11 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                     '<td><div><span class="code-pill" style="color:#94a3b8;" title="' + r.reporterDid + '">' + (r.reporterDid || 'did:sovra:anon').slice(0, 14) + '...</span></div></td>' +
                     '<td id="mod-status-' + r.id + '">' + statusBadge + '</td>' +
                     '<td style="text-align: right;"><div style="display:inline-flex; gap:4px; justify-content:flex-end; flex-wrap:wrap;">' +
-                      '<button class="btn-ops btn-action-dismiss" title="Dismiss Flag & Retain Visible" onclick="executeModerationAction(\'' + r.id + '\', \'Dismiss\', \'' + r.targetType + '\', \'' + r.targetId + '\')">✅ Dismiss</button>' +
-                      '<button class="btn-ops btn-action-blur" title="Blur Content with Warning Banner" onclick="executeModerationAction(\'' + r.id + '\', \'Blur\', \'' + r.targetType + '\', \'' + r.targetId + '\')">⚠️ Blur</button>' +
-                      '<button class="btn-ops btn-action-tombstone" title="Tombstone Content with Violation Notice" onclick="executeModerationAction(\'' + r.id + '\', \'Tombstone\', \'' + r.targetType + '\', \'' + r.targetId + '\')">🪦 Tombstone</button>' +
-                      '<button class="btn-ops btn-action-remove" title="Remove Post from Mesh Feeds" onclick="executeModerationAction(\'' + r.id + '\', \'Remove\', \'' + r.targetType + '\', \'' + r.targetId + '\')">🗑️ Remove</button>' +
-                      '<button class="btn-ops btn-action-suspend" title="Suspend Bad Actor" onclick="executeModerationAction(\'' + r.id + '\', \'Suspend\', \'' + r.targetType + '\', \'' + r.targetId + '\')">🚫 Suspend</button>' +
+                      '<button class="btn-ops btn-action-dismiss" title="Dismiss Flag & Retain Visible" data-sovra-onclick="executeModerationAction(&quot;' + r.id + '&quot;, &quot;Dismiss&quot;, &quot;' + r.targetType + '&quot;, &quot;' + r.targetId + '&quot;)">✅ Dismiss</button>' +
+                      '<button class="btn-ops btn-action-blur" title="Blur Content with Warning Banner" data-sovra-onclick="executeModerationAction(&quot;' + r.id + '&quot;, &quot;Blur&quot;, &quot;' + r.targetType + '&quot;, &quot;' + r.targetId + '&quot;)">⚠️ Blur</button>' +
+                      '<button class="btn-ops btn-action-tombstone" title="Tombstone Content with Violation Notice" data-sovra-onclick="executeModerationAction(&quot;' + r.id + '&quot;, &quot;Tombstone&quot;, &quot;' + r.targetType + '&quot;, &quot;' + r.targetId + '&quot;)">🪦 Tombstone</button>' +
+                      '<button class="btn-ops btn-action-remove" title="Remove Post from Mesh Feeds" data-sovra-onclick="executeModerationAction(&quot;' + r.id + '&quot;, &quot;Remove&quot;, &quot;' + r.targetType + '&quot;, &quot;' + r.targetId + '&quot;)">🗑️ Remove</button>' +
+                      '<button class="btn-ops btn-action-suspend" title="Suspend Bad Actor" data-sovra-onclick="executeModerationAction(&quot;' + r.id + '&quot;, &quot;Suspend&quot;, &quot;' + r.targetType + '&quot;, &quot;' + r.targetId + '&quot;)">🚫 Suspend</button>' +
                     '</div></td>' +
                   '</tr>';
                 }).join('');
@@ -5177,7 +5177,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                   '<td><span style="font-size:0.75rem; color:#cbd5e1;">' + (s.deviceName || s.ip || '127.0.0.1 (Localhost)') + '</span></td>' +
                   '<td><span style="font-size:0.75rem; color:#94a3b8;">' + new Date(s.lastActiveAt || s.createdAt || Date.now()).toLocaleTimeString() + '</span></td>' +
                   '<td style="text-align: right;">' +
-                    '<button class="btn-ops" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171;" onclick="terminateSessionAdmin(\'' + (s.token || s.id) + '\')">Revoke Session</button>' +
+                    '<button class="btn-ops" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171;" data-sovra-onclick="terminateSessionAdmin(&quot;' + (s.token || s.id) + '&quot;)">Revoke Session</button>' +
                   '</td>' +
                 '</tr>';
               }).join('');
@@ -5194,7 +5194,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     }
 
     async function terminateSessionAdmin(sessionId) {
-      if (!confirm('Are you sure you want to revoke session ' + sessionId + '?\nThe client will be disconnected immediately.')) return;
+      if (!confirm('Are you sure you want to revoke session ' + sessionId + '?\\n\\nThe client will be disconnected immediately.')) return;
       try {
         var token = window.__SOVRA_ADMIN_TOKEN__ || localStorage.getItem('sovra_admin_token') || sessionStorage.getItem('sovra_admin_token') || '';
         var headers = { 'Content-Type': 'application/json' };
@@ -5334,7 +5334,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                   '<td style="font-size:0.75rem; color:#94a3b8;">' + expiresStr + '</td>' +
                   '<td style="text-align: right;">' +
                     (s.status === 'ACTIVE'
-                      ? '<button class="btn-ops" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); color: #34d399;" onclick="pardonStrikeAdmin(\'' + s.id + '\')">🕊️ Pardon</button>'
+                      ? '<button class="btn-ops" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); color: #34d399;" data-sovra-onclick="pardonStrikeAdmin(&quot;' + s.id + '&quot;)">🕊️ Pardon</button>'
                       : '<span style="font-size:0.72rem; color:#64748b;">Closed</span>') +
                   '</td>' +
                 '</tr>';
@@ -5498,9 +5498,9 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data && data.ok) {
-            var msg = 'Sybil Loop Audit Complete:\n' +
-              '• Circular Cycles Detected: ' + (data.cyclesDetected || 0) + '\n' +
-              '• Suspicious Puppet Clusters: ' + ((data.sybilClusters && data.sybilClusters.length) || 0) + '\n' +
+            var msg = 'Sybil Loop Audit Complete:\\n' +
+              '• Circular Cycles Detected: ' + (data.cyclesDetected || 0) + '\\n' +
+              '• Suspicious Puppet Clusters: ' + ((data.sybilClusters && data.sybilClusters.length) || 0) + '\\n' +
               '• Auto-Frozen DIDs: ' + ((data.frozenDids && data.frozenDids.length) || 0);
             alert(msg);
           } else {
@@ -5778,7 +5778,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               '<td><span style="font-weight:700; color:' + (signCount >= 2 ? '#10b981' : '#f59e0b') + ';">' + signCount + '/2 Signatures</span></td>' +
               '<td><span class="ops-pill ' + (isExecuted ? 'online' : 'crypto') + '">' + prop.status + '</span></td>' +
               '<td style="text-align: right;">' +
-                (!isExecuted ? '<button class="btn-ops" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(168,85,247,0.2); border-color: rgba(168,85,247,0.4); color: #c084fc;" onclick="coSignGovernanceProposal(\'' + prop.id + '\')">Co-Sign</button>' : '<span style="color:#10b981; font-size:0.72rem;">✓ Executed</span>') +
+                (!isExecuted ? '<button class="btn-ops" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(168,85,247,0.2); border-color: rgba(168,85,247,0.4); color: #c084fc;" data-sovra-onclick="coSignGovernanceProposal(&quot;' + prop.id + '&quot;)">Co-Sign</button>' : '<span style="color:#10b981; font-size:0.72rem;">✓ Executed</span>') +
               '</td>' +
             '</tr>';
           }).join('');
@@ -5807,7 +5807,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     }
 
     function toggleAdminCircuitBreaker() {
-      var sure = confirm('EMERGENCY CIRCUIT BREAKER:\nAre you sure you want to toggle the Sovereign Protocol Circuit Breaker? This will halt high-velocity financial operations.');
+      var sure = confirm('EMERGENCY CIRCUIT BREAKER:\\nAre you sure you want to toggle the Sovereign Protocol Circuit Breaker? This will halt high-velocity financial operations.');
       if (!sure) return;
       fetch('/api/admin/circuit-breaker/toggle', {
         method: 'POST',
