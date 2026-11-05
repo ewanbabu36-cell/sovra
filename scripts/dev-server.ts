@@ -89390,17 +89390,32 @@ async function startDevServer() {
 })();
 </script>`;
 
+    // Protect script and style blocks from attribute replacement
+    const placeholders: string[] = [];
+    let maskedHtml = html.replace(/(<(script|style)\b[^>]*>)([\s\S]*?)(<\/\2>)/gi, (match, openTag, tagName, body, closeTag) => {
+      let modifiedOpenTag = openTag;
+      if (tagName.toLowerCase() === 'script' && !/\bnonce=/i.test(openTag)) {
+        modifiedOpenTag = openTag.replace(/<script\b/i, `<script nonce="${nonce}"`);
+      }
+      const token = `__SOVRA_CSP_PLACEHOLDER_${placeholders.length}__`;
+      placeholders.push(`${modifiedOpenTag}${body}${closeTag}`);
+      return token;
+    });
+
     // Transform all inline on* handlers on HTML elements to data-sovra-on*
-    let transformed = html.replace(/(<[a-zA-Z0-9\-]+)([^>]*?)>/g, (fullMatch, tagPrefix, attrs) => {
-      const lower = tagPrefix.toLowerCase();
-      if (lower === '<script' || lower === '<style') return fullMatch;
+    maskedHtml = maskedHtml.replace(/(<[a-zA-Z0-9\-]+)([^>]*?)>/g, (fullMatch, tagPrefix, attrs) => {
       const transformedAttrs = attrs.replace(/\s+on([a-zA-Z]+)\s*=\s*(["'])([\s\S]*?)\2/g, (attrMatch, evt, quote, val) => {
         return ` data-sovra-on${evt.toLowerCase()}=${quote}${val}${quote}`;
       });
       return `${tagPrefix}${transformedAttrs}>`;
     });
 
-    // Inject nonce into all script tags
+    // Restore protected script and style blocks
+    let transformed = maskedHtml.replace(/__SOVRA_CSP_PLACEHOLDER_(\d+)__/g, (_, idx) => {
+      return placeholders[Number(idx)];
+    });
+
+    // Inject nonce into any remaining script tags without nonce
     transformed = transformed.replace(/<script\b(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
 
     // Prepend delegator script in head or body
@@ -100129,51 +100144,50 @@ async function startDevServer() {
         'Expires': '0',
       });
 
-      res.end(
-        renderAdminHtml({
-          peerId: binding.peerId,
-          did: masterKey.did,
-          devicePublicKeyHex: binding.devicePublicKeyHex,
-          tcpPort,
-          uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
-          totalBlocks: storageDaemon.getStats().totalBlocks,
-          pinnedCount: storageDaemon.getStats().pinnedCount,
-          postsCount: sovraDb.getState().posts.length,
-          connectedPeers: node.getConnectedPeers(),
-          vouchers: sovraDb.getState().tip_vouchers || [],
-          registeredUsersCount: allUsers.length,
-          registeredUsers: allUsers as any,
-          chatThreadsCount: threadsCount,
-          chatMessagesVolume: allMsgs.length,
-          diskStorageBytes: diskBytes,
-          diskStorageMb: String(diskMb),
-          auditLogs: sovraDb.getAuditLogs(50),
-          channels: sovraDb.getAllChannels(),
-          pages: sovraDb.getAllPages(),
-          juryCases: sovraDb.getJuryCases(),
-          reports: sovraDb.getReports(),
-          ammPools: sovraDb.getAmmPools(),
-          cw20Tokens: sovraDb.getCw20Tokens(),
-          strikes: sovraDb.getStrikeLedger(),
-          activeSessions: sovraDb.getActiveSessions(),
-          systemTelemetry: getRealSystemTelemetry(node.getConnectedPeers().length),
-          solvencyReport: sovraDb.getTreasurySolvencyReport(),
-          proposals: sovereignAdminSecurity.getProposals(),
-          circuitBreaker: sovereignAdminSecurity.getCircuitBreaker(),
-          algoDials: sovraDb.getSqliteEngine()?.getAlgoDials() || [],
-          shadowbans: sovraDb.getSqliteEngine()?.getShadowbans() || [],
-          featureFlags: sovraDb.getSqliteEngine()?.getFeatureFlags() || [],
-          broadcastAlerts: sovraDb.getSqliteEngine()?.getBroadcastAlerts() || [],
-          legalHolds: sovraDb.getSqliteEngine()?.getLegalHolds() || [],
-          revenueTakeRate: sovraDb.getSqliteEngine()?.getPlatformTakeRate() ?? 5.0,
-          disintermediationEvents: sovraDb.getSqliteEngine()?.getDisintermediationEvents(50) || [],
-          washTradingCycles: sovraDb.getSqliteEngine()?.detectWashTradingCycles(72) || [],
-          killSwitches: sovraDb.getSqliteEngine()?.getKillSwitches() || [],
-          honeypotIntrusions: sovraDb.getSqliteEngine()?.getHoneypotIntrusions(50) || [],
-          panopticonSessions: sovraDb.getSqliteEngine()?.getPanopticonSessions(100) || [],
-          sentinelStatus: sovraDb.getSqliteEngine()?.runSentinelHealthAudit(),
-        }),
-      );
+      const adminHtml = renderAdminHtml({
+        peerId: binding.peerId,
+        did: masterKey.did,
+        devicePublicKeyHex: binding.devicePublicKeyHex,
+        tcpPort,
+        uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
+        totalBlocks: storageDaemon.getStats().totalBlocks,
+        pinnedCount: storageDaemon.getStats().pinnedCount,
+        postsCount: sovraDb.getState().posts.length,
+        connectedPeers: node.getConnectedPeers(),
+        vouchers: sovraDb.getState().tip_vouchers || [],
+        registeredUsersCount: allUsers.length,
+        registeredUsers: allUsers as any,
+        chatThreadsCount: threadsCount,
+        chatMessagesVolume: allMsgs.length,
+        diskStorageBytes: diskBytes,
+        diskStorageMb: String(diskMb),
+        auditLogs: sovraDb.getAuditLogs(50),
+        channels: sovraDb.getAllChannels(),
+        pages: sovraDb.getAllPages(),
+        juryCases: sovraDb.getJuryCases(),
+        reports: sovraDb.getReports(),
+        ammPools: sovraDb.getAmmPools(),
+        cw20Tokens: sovraDb.getCw20Tokens(),
+        strikes: sovraDb.getStrikeLedger(),
+        activeSessions: sovraDb.getActiveSessions(),
+        systemTelemetry: getRealSystemTelemetry(node.getConnectedPeers().length),
+        solvencyReport: sovraDb.getTreasurySolvencyReport(),
+        proposals: sovereignAdminSecurity.getProposals(),
+        circuitBreaker: sovereignAdminSecurity.getCircuitBreaker(),
+        algoDials: sovraDb.getSqliteEngine()?.getAlgoDials() || [],
+        shadowbans: sovraDb.getSqliteEngine()?.getShadowbans() || [],
+        featureFlags: sovraDb.getSqliteEngine()?.getFeatureFlags() || [],
+        broadcastAlerts: sovraDb.getSqliteEngine()?.getBroadcastAlerts() || [],
+        legalHolds: sovraDb.getSqliteEngine()?.getLegalHolds() || [],
+        revenueTakeRate: sovraDb.getSqliteEngine()?.getPlatformTakeRate() ?? 5.0,
+        disintermediationEvents: sovraDb.getSqliteEngine()?.getDisintermediationEvents(50) || [],
+        washTradingCycles: sovraDb.getSqliteEngine()?.detectWashTradingCycles(72) || [],
+        killSwitches: sovraDb.getSqliteEngine()?.getKillSwitches() || [],
+        honeypotIntrusions: sovraDb.getSqliteEngine()?.getHoneypotIntrusions(50) || [],
+        panopticonSessions: sovraDb.getSqliteEngine()?.getPanopticonSessions(100) || [],
+        sentinelStatus: sovraDb.getSqliteEngine()?.runSentinelHealthAudit(),
+      });
+      res.end(injectCspNonce(adminHtml, (res as any).cspNonce));
       return;
     }
 
