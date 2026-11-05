@@ -983,6 +983,146 @@ export class SqliteSocialDatabaseEngine {
         last_attempt_at INTEGER NOT NULL,
         locked_until INTEGER DEFAULT 0
       );
+
+      -- 52. CONTACTS & PEERS
+      CREATE TABLE IF NOT EXISTS contacts (
+        did TEXT PRIMARY KEY,
+        handle TEXT,
+        name TEXT NOT NULL,
+        avatar TEXT NOT NULL DEFAULT '💻',
+        avatar_bg TEXT NOT NULL DEFAULT '#6366f1',
+        role TEXT NOT NULL DEFAULT 'Desktop Peer',
+        device TEXT NOT NULL DEFAULT 'Desktop',
+        is_online INTEGER NOT NULL DEFAULT 0,
+        last_seen TEXT NOT NULL DEFAULT 'Offline',
+        last_seen_timestamp INTEGER NOT NULL,
+        disappearing_duration_sec INTEGER NOT NULL DEFAULT 0,
+        safety_numbers TEXT,
+        is_verified INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_contacts_handle ON contacts(handle);
+      CREATE INDEX IF NOT EXISTS idx_contacts_online ON contacts(is_online);
+
+      -- 53. PAGES
+      CREATE TABLE IF NOT EXISTS pages (
+        id TEXT PRIMARY KEY,
+        handle TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'general',
+        bio TEXT NOT NULL DEFAULT '',
+        count INTEGER NOT NULL DEFAULT 0,
+        cta TEXT,
+        cta_type TEXT,
+        avatar TEXT NOT NULL DEFAULT '🏢',
+        bg TEXT NOT NULL DEFAULT '#4f46e5',
+        is_following INTEGER NOT NULL DEFAULT 0,
+        owner_did TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_pages_handle ON pages(handle);
+      CREATE INDEX IF NOT EXISTS idx_pages_owner ON pages(owner_did);
+
+      -- 54. LIVE SESSIONS
+      CREATE TABLE IF NOT EXISTS live_sessions (
+        id TEXT PRIMARY KEY,
+        creator_did TEXT NOT NULL,
+        creator_handle TEXT,
+        creator_name TEXT,
+        creator_avatar TEXT,
+        title TEXT NOT NULL,
+        description TEXT,
+        stream_url TEXT,
+        playback_url TEXT,
+        thumbnail_url TEXT,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        scheduled_start_time INTEGER,
+        viewer_count INTEGER NOT NULL DEFAULT 0,
+        peak_viewers INTEGER NOT NULL DEFAULT 0,
+        viewers_json TEXT NOT NULL DEFAULT '[]',
+        likes_count INTEGER NOT NULL DEFAULT 0,
+        tip_total_sov REAL NOT NULL DEFAULT 0.0,
+        tips_json TEXT NOT NULL DEFAULT '[]',
+        signals_json TEXT NOT NULL DEFAULT '[]',
+        category TEXT NOT NULL DEFAULT 'tech',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        actual_start_time INTEGER,
+        ended_at INTEGER,
+        archive_video_id TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_live_sessions_creator ON live_sessions(creator_did);
+      CREATE INDEX IF NOT EXISTS idx_live_sessions_status ON live_sessions(status);
+
+      -- 55. LIVE CHAT MESSAGES
+      CREATE TABLE IF NOT EXISTS live_chat_messages (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        sender_did TEXT NOT NULL,
+        sender_handle TEXT,
+        sender_name TEXT NOT NULL,
+        sender_avatar TEXT NOT NULL DEFAULT '⚡',
+        text TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        is_moderator INTEGER NOT NULL DEFAULT 0,
+        is_tip INTEGER NOT NULL DEFAULT 0,
+        tip_amount REAL NOT NULL DEFAULT 0.0
+      );
+      CREATE INDEX IF NOT EXISTS idx_live_chat_session ON live_chat_messages(session_id);
+      CREATE INDEX IF NOT EXISTS idx_live_chat_timestamp ON live_chat_messages(timestamp);
+
+      -- 56. STRIKES
+      CREATE TABLE IF NOT EXISTS strikes (
+        id TEXT PRIMARY KEY,
+        user_did TEXT NOT NULL,
+        strike_level INTEGER NOT NULL DEFAULT 1,
+        reason TEXT NOT NULL,
+        evidence_report_id TEXT,
+        enforced_by_did TEXT,
+        signature_hex TEXT,
+        issued_at INTEGER NOT NULL,
+        expires_at INTEGER,
+        status TEXT NOT NULL DEFAULT 'ACTIVE'
+      );
+      CREATE INDEX IF NOT EXISTS idx_strikes_user ON strikes(user_did);
+      CREATE INDEX IF NOT EXISTS idx_strikes_status ON strikes(status);
+
+      -- 57. BRIDGE TRANSFERS
+      CREATE TABLE IF NOT EXISTS bridge_transfers (
+        id TEXT PRIMARY KEY,
+        tx_hash TEXT UNIQUE NOT NULL,
+        sender_address TEXT,
+        sender_did TEXT NOT NULL,
+        target_chain TEXT NOT NULL,
+        target_address TEXT NOT NULL,
+        amount TEXT NOT NULL,
+        source_asset TEXT NOT NULL DEFAULT 'SOV',
+        destination_asset TEXT NOT NULL DEFAULT 'OSMO',
+        stages_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        relayer_fee TEXT,
+        created_at INTEGER NOT NULL,
+        settled_at INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_bridge_tx_hash ON bridge_transfers(tx_hash);
+      CREATE INDEX IF NOT EXISTS idx_bridge_sender ON bridge_transfers(sender_did);
+
+      -- 58. ORGANIZATIONS
+      CREATE TABLE IF NOT EXISTS organizations (
+        id TEXT PRIMARY KEY,
+        handle TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        bio TEXT,
+        avatar TEXT NOT NULL DEFAULT '🏢',
+        bg TEXT NOT NULL DEFAULT '#3b82f6',
+        verified_tier TEXT NOT NULL DEFAULT 'standard',
+        owner_did TEXT NOT NULL,
+        members_json TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_orgs_handle ON organizations(handle);
+      CREATE INDEX IF NOT EXISTS idx_orgs_owner ON organizations(owner_did);
       CREATE INDEX IF NOT EXISTS idx_durable_ip_throttles_last ON durable_ip_throttles(last_attempt_at);
     `);
 
@@ -1279,7 +1419,8 @@ export class SqliteSocialDatabaseEngine {
         }
       }
 
-      this.db.exec('COMMIT;');
+
+this.db.exec('COMMIT;');
       return true;
     } catch (err) {
       this.db.exec('ROLLBACK;');
@@ -1757,6 +1898,141 @@ export class SqliteSocialDatabaseEngine {
         );
       }
 
+      
+      // 24. CONTACTS & PEERS
+      if (Array.isArray(state.contacts_and_peers)) {
+        const stmt = this.db.prepare(`
+          INSERT OR REPLACE INTO contacts (
+            did, handle, name, avatar, avatar_bg, role, device, is_online,
+            last_seen, last_seen_timestamp, disappearing_duration_sec,
+            safety_numbers, is_verified, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const p of state.contacts_and_peers) {
+          const now = Date.now();
+          stmt.run(
+            p.did, p.handle || null, p.name || 'Peer', p.avatar || '💻',
+            p.avatarBg || '#6366f1', p.role || 'Desktop Peer', p.device || 'Desktop',
+            p.isOnline ? 1 : 0, p.lastSeen || 'Offline', p.lastSeenTimestamp || now,
+            p.disappearingDurationSec || 0, p.safetyNumbers || null,
+            p.isVerified ? 1 : 0, p.createdAt || now, p.updatedAt || now
+          );
+        }
+      }
+
+      // 25. PAGES
+      if (Array.isArray(state.pages)) {
+        const stmt = this.db.prepare(`
+          INSERT OR REPLACE INTO pages (
+            id, handle, name, category, bio, count, cta, cta_type,
+            avatar, bg, is_following, owner_did, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const pg of state.pages) {
+          stmt.run(
+            pg.id, pg.handle, pg.name, pg.category || 'general', pg.bio || '',
+            pg.count || 0, pg.cta || null, pg.ctaType || null,
+            pg.avatar || '🏢', pg.bg || '#4f46e5', pg.isFollowing ? 1 : 0,
+            pg.ownerDid || 'did:sovra:system', pg.createdAt || Date.now()
+          );
+        }
+      }
+
+      // 26. LIVE SESSIONS
+      if (Array.isArray(state.live_sessions)) {
+        const stmt = this.db.prepare(`
+          INSERT OR REPLACE INTO live_sessions (
+            id, creator_did, creator_handle, creator_name, creator_avatar,
+            title, description, stream_url, playback_url, thumbnail_url,
+            status, scheduled_start_time, viewer_count, peak_viewers,
+            viewers_json, likes_count, tip_total_sov, tips_json, signals_json,
+            category, created_at, updated_at, actual_start_time, ended_at, archive_video_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const ls of state.live_sessions) {
+          stmt.run(
+            ls.id, ls.creatorDid, ls.creatorHandle || null, ls.creatorName || null, ls.creatorAvatar || null,
+            ls.title, ls.description || null, ls.streamUrl || null, ls.playbackUrl || null, ls.thumbnailUrl || null,
+            ls.status || 'ACTIVE', ls.scheduledStartTime || null, ls.viewerCount || 0, ls.peakViewers || 0,
+            ls.viewers ? JSON.stringify(ls.viewers) : '[]', ls.likesCount || 0, ls.tipTotalSov || 0.0,
+            ls.tips ? JSON.stringify(ls.tips) : '[]', ls.signals ? JSON.stringify(ls.signals) : '[]',
+            ls.category || 'tech', ls.createdAt || Date.now(), ls.updatedAt || Date.now(),
+            ls.actualStartTime || null, ls.endedAt || null, ls.archiveVideoId || null
+          );
+        }
+      }
+
+      // 27. LIVE CHAT MESSAGES
+      if (Array.isArray(state.live_chat_messages)) {
+        const stmt = this.db.prepare(`
+          INSERT OR REPLACE INTO live_chat_messages (
+            id, session_id, sender_did, sender_handle, sender_name, sender_avatar,
+            text, timestamp, is_moderator, is_tip, tip_amount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const msg of state.live_chat_messages) {
+          stmt.run(
+            msg.id, msg.sessionId, msg.senderDid, msg.senderHandle || null,
+            msg.senderName || 'Peer', msg.senderAvatar || '⚡', msg.text,
+            msg.timestamp || Date.now(), msg.isModerator ? 1 : 0, msg.isTip ? 1 : 0,
+            msg.tipAmount || 0.0
+          );
+        }
+      }
+
+      // 28. STRIKES
+      if (Array.isArray(state.strikes)) {
+        const stmt = this.db.prepare(`
+          INSERT OR REPLACE INTO strikes (
+            id, user_did, strike_level, reason, evidence_report_id,
+            enforced_by_did, signature_hex, issued_at, expires_at, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const s of state.strikes) {
+          stmt.run(
+            s.id, s.userDid, s.strikeLevel || 1, s.reason, s.evidenceReportId || null,
+            s.enforcedByDid || null, s.signatureHex || null, s.issuedAt || Date.now(),
+            s.expiresAt || null, s.status || 'ACTIVE'
+          );
+        }
+      }
+
+      // 29. BRIDGE TRANSFERS
+      if (Array.isArray(state.bridge_transfers)) {
+        const stmt = this.db.prepare(`
+          INSERT OR REPLACE INTO bridge_transfers (
+            id, tx_hash, sender_address, sender_did, target_chain, target_address,
+            amount, source_asset, destination_asset, stages_json, status, relayer_fee,
+            created_at, settled_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const b of state.bridge_transfers) {
+          stmt.run(
+            b.id, b.txHash, b.senderAddress || null, b.senderDid, b.targetChain, b.targetAddress,
+            String(b.amount || '0'), b.sourceAsset || 'SOV', b.destinationAsset || 'OSMO',
+            b.stages ? JSON.stringify(b.stages) : '[]', b.status || 'PENDING',
+            b.relayerFee || null, b.createdAt || Date.now(), b.settledAt || null
+          );
+        }
+      }
+
+      // 30. ORGANIZATIONS
+      if (Array.isArray(state.organizations)) {
+        const stmt = this.db.prepare(`
+          INSERT OR REPLACE INTO organizations (
+            id, handle, name, bio, avatar, bg, verified_tier, owner_did,
+            members_json, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const org of state.organizations) {
+          stmt.run(
+            org.id, org.handle, org.name, org.bio || null, org.avatar || '🏢',
+            org.bg || '#3b82f6', org.verifiedTier || 'standard', org.ownerDid,
+            org.members ? JSON.stringify(org.members) : '[]', org.createdAt || Date.now()
+          );
+        }
+      }
+
       this.db.exec('COMMIT;');
       return true;
     } catch (err) {
@@ -2098,6 +2374,84 @@ export class SqliteSocialDatabaseEngine {
     } catch (err: any) {
       return { ok: false, error: err?.message || 'Failed to delete message' };
     }
+  }
+
+
+  public upsertContact(p: any): void {
+    try {
+      const now = Date.now();
+      const stmt = this.prepareCached(`
+        INSERT OR REPLACE INTO contacts (
+          did, handle, name, avatar, avatar_bg, role, device, is_online,
+          last_seen, last_seen_timestamp, disappearing_duration_sec,
+          safety_numbers, is_verified, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        p.did, p.handle || null, p.name || 'Peer', p.avatar || '💻',
+        p.avatarBg || '#6366f1', p.role || 'Desktop Peer', p.device || 'Desktop',
+        p.isOnline ? 1 : 0, p.lastSeen || 'Offline', p.lastSeenTimestamp || now,
+        p.disappearingDurationSec || 0, p.safetyNumbers || null,
+        p.isVerified ? 1 : 0, p.createdAt || now, p.updatedAt || now
+      );
+    } catch (_) {}
+  }
+
+  public upsertPage(pg: any): void {
+    try {
+      const stmt = this.prepareCached(`
+        INSERT OR REPLACE INTO pages (
+          id, handle, name, category, bio, count, cta, cta_type,
+          avatar, bg, is_following, owner_did, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        pg.id, pg.handle, pg.name, pg.category || 'general', pg.bio || '',
+        pg.count || 0, pg.cta || null, pg.ctaType || null,
+        pg.avatar || '🏢', pg.bg || '#4f46e5', pg.isFollowing ? 1 : 0,
+        pg.ownerDid || 'did:sovra:system', pg.createdAt || Date.now()
+      );
+    } catch (_) {}
+  }
+
+  public upsertLiveSession(ls: any): void {
+    try {
+      const stmt = this.prepareCached(`
+        INSERT OR REPLACE INTO live_sessions (
+          id, creator_did, creator_handle, creator_name, creator_avatar,
+          title, description, stream_url, playback_url, thumbnail_url,
+          status, scheduled_start_time, viewer_count, peak_viewers,
+          viewers_json, likes_count, tip_total_sov, tips_json, signals_json,
+          category, created_at, updated_at, actual_start_time, ended_at, archive_video_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        ls.id, ls.creatorDid, ls.creatorHandle || null, ls.creatorName || null, ls.creatorAvatar || null,
+        ls.title, ls.description || null, ls.streamUrl || null, ls.playbackUrl || null, ls.thumbnailUrl || null,
+        ls.status || 'ACTIVE', ls.scheduledStartTime || null, ls.viewerCount || 0, ls.peakViewers || 0,
+        ls.viewers ? JSON.stringify(ls.viewers) : '[]', ls.likesCount || 0, ls.tipTotalSov || 0.0,
+        ls.tips ? JSON.stringify(ls.tips) : '[]', ls.signals ? JSON.stringify(ls.signals) : '[]',
+        ls.category || 'tech', ls.createdAt || Date.now(), ls.updatedAt || Date.now(),
+        ls.actualStartTime || null, ls.endedAt || null, ls.archiveVideoId || null
+      );
+    } catch (_) {}
+  }
+
+  public appendLiveChatMessage(msg: any): void {
+    try {
+      const stmt = this.prepareCached(`
+        INSERT OR REPLACE INTO live_chat_messages (
+          id, session_id, sender_did, sender_handle, sender_name, sender_avatar,
+          text, timestamp, is_moderator, is_tip, tip_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        msg.id, msg.sessionId, msg.senderDid, msg.senderHandle || null,
+        msg.senderName || 'Peer', msg.senderAvatar || '⚡', msg.text,
+        msg.timestamp || Date.now(), msg.isModerator ? 1 : 0, msg.isTip ? 1 : 0,
+        msg.tipAmount || 0.0
+      );
+    } catch (_) {}
   }
 
   public deleteUserAccount(userDid: string): { ok: boolean; error?: string } {
