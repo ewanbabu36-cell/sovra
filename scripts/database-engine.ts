@@ -10873,10 +10873,121 @@ export class SovraDatabaseEngine {
     this.failedPinAttempts.delete(accountDid);
   }
 
-  public getTargetThrottleKey(identifier: string): string {
+  // --- AUTH-01 HMAC THROTTLE KEY ENGINE & SECRET ROTATION ---
+  private throttleSecret?: string;
+  private rotatedThrottleSecrets: string[] = [];
+
+  /**
+   * Validates the cryptographic strength of a throttle secret.
+   * Enforces minimum 32 characters (256-bit entropy) and rejects known insecure values.
+   */
+  public static validateThrottleSecret(secret?: string): { valid: boolean; error?: string } {
+    if (!secret || typeof secret !== 'string') {
+      return { valid: false, error: 'SOVRA_THROTTLE_SECRET is missing. A cryptographically random secret of at least 32 characters is required.' };
+    }
+    const trimmed = secret.trim();
+    if (trimmed.length < 32) {
+      return { valid: false, error: `SOVRA_THROTTLE_SECRET must be at least 32 characters (currently ${trimmed.length}).` };
+    }
+    const insecureList = new Set([
+      'legacy_public_constant_salt:',
+      'change_me',
+      'password',
+      'secret',
+      'admin',
+      '12345678901234567890123456789012',
+    ]);
+    if (insecureList.has(trimmed.toLowerCase())) {
+      return { valid: false, error: 'Insecure or trivial SOVRA_THROTTLE_SECRET is strictly forbidden.' };
+    }
+    return { valid: true };
+  }
+
+  public loadThrottleSecrets(explicitSecret?: string): void {
+    const raw = explicitSecret || process.env.SOVRA_THROTTLE_SECRET;
+    const rotationRaw = process.env.SOVRA_THROTTLE_SECRET_ROTATION;
+
+    const secrets: string[] = [];
+    if (raw) {
+      for (const s of raw.split(',')) {
+        const trimmed = s.trim();
+        if (trimmed) secrets.push(trimmed);
+      }
+    }
+    if (rotationRaw) {
+      for (const s of rotationRaw.split(',')) {
+        const trimmed = s.trim();
+        if (trimmed && !secrets.includes(trimmed)) secrets.push(trimmed);
+      }
+    }
+
+    if (secrets.length > 0) {
+      const primary = secrets[0]!;
+      const validation = SovraDatabaseEngine.validateThrottleSecret(primary);
+      if (!validation.valid) {
+        throw new Error(`[CRITICAL_AUTH_CONFIG] ${validation.error}`);
+      }
+      this.throttleSecret = primary;
+      this.rotatedThrottleSecrets = secrets.slice(1).filter(s => {
+        return SovraDatabaseEngine.validateThrottleSecret(s).valid;
+      });
+    } else {
+      this.throttleSecret = undefined;
+      this.rotatedThrottleSecrets = [];
+    }
+  }
+
+  public getPrimaryThrottleSecret(): string {
+    if (!this.throttleSecret) {
+      this.loadThrottleSecrets();
+    }
+    if (!this.throttleSecret) {
+      throw new Error('[CRITICAL_AUTH_CONFIG] SOVRA_THROTTLE_SECRET is missing or insecure. A cryptographically random secret of at least 32 characters is required. Refusing to fall back to a public constant.');
+    }
+    return this.throttleSecret;
+  }
+
+  public getRotatedThrottleSecrets(): string[] {
+    return [...this.rotatedThrottleSecrets];
+  }
+
+  public rotateThrottleSecret(newSecret: string): void {
+    const validation = SovraDatabaseEngine.validateThrottleSecret(newSecret);
+    if (!validation.valid) {
+      throw new Error(`[ROTATION_FAILED] ${validation.error}`);
+    }
+    const currentPrimary = this.throttleSecret;
+    if (currentPrimary && currentPrimary !== newSecret.trim() && !this.rotatedThrottleSecrets.includes(currentPrimary)) {
+      this.rotatedThrottleSecrets.unshift(currentPrimary);
+      if (this.rotatedThrottleSecrets.length > 5) {
+        this.rotatedThrottleSecrets.pop();
+      }
+    }
+    this.throttleSecret = newSecret.trim();
+    process.env.SOVRA_THROTTLE_SECRET = this.throttleSecret;
+  }
+
+  public normalizeHandleForThrottling(identifier: string): string {
     const clean = (identifier || '').trim().toLowerCase();
-    const handle = clean.startsWith('@') ? clean : (clean.startsWith('did:') ? clean : '@' + clean);
-    return 'target_th_' + crypto.createHash('sha256').update('sovra_target_throttle_salt_v3:' + handle).digest('hex').slice(0, 32);
+    return clean.startsWith('@') ? clean : (clean.startsWith('did:') ? clean : '@' + clean);
+  }
+
+  public getTargetThrottleKey(identifier: string, secretOverride?: string): string {
+    const secret = secretOverride || this.getPrimaryThrottleSecret();
+    const handle = this.normalizeHandleForThrottling(identifier);
+    return 'target_th_' + crypto.createHmac('sha256', secret).update('sovra_target_throttle_v1:' + handle).digest('hex').slice(0, 32);
+  }
+
+  public getAllTargetThrottleKeys(identifier: string): string[] {
+    const primary = this.getTargetThrottleKey(identifier);
+    const keys = [primary];
+    for (const rotSecret of this.rotatedThrottleSecrets) {
+      const rotKey = this.getTargetThrottleKey(identifier, rotSecret);
+      if (!keys.includes(rotKey)) {
+        keys.push(rotKey);
+      }
+    }
+    return keys;
   }
 
   public loginUser(
@@ -10890,6 +11001,19 @@ export class SovraDatabaseEngine {
     const clean = identifier.trim();
     const cleanHandle = clean.startsWith('@') ? clean : '@' + clean;
     const targetThrottleKey = this.getTargetThrottleKey(identifier);
+
+    // AUTH-01 Rotation Defense: Inherit active failure state from rotated secret if primary key has no active state
+    const primaryRec = this.failedPinAttempts.get(targetThrottleKey);
+    if (!primaryRec || (Date.now() - primaryRec.lastAttemptAt > 15 * 60 * 1000)) {
+      for (const rotSecret of this.rotatedThrottleSecrets) {
+        const rotKey = this.getTargetThrottleKey(identifier, rotSecret);
+        const rotRec = this.failedPinAttempts.get(rotKey);
+        if (rotRec && (Date.now() - rotRec.lastAttemptAt <= 15 * 60 * 1000)) {
+          this.failedPinAttempts.set(targetThrottleKey, { ...rotRec });
+          break;
+        }
+      }
+    }
 
     let factor = (typeof ipAddressOrFactor === 'object' && ipAddressOrFactor !== null) ? ipAddressOrFactor : factorArg;
     const ipAddress = typeof ipAddressOrFactor === 'string' ? ipAddressOrFactor : undefined;
@@ -10961,7 +11085,7 @@ export class SovraDatabaseEngine {
       }
       // Successful TOTP
       this.clearFailedPinAttempts(user.did);
-      this.clearFailedPinAttempts(targetThrottleKey);
+      for (const k of this.getAllTargetThrottleKeys(identifier)) this.clearFailedPinAttempts(k);
     } else if (user.securityPinHash) {
       // Strict factor requirement
       if (!factor || (!factor.webauthnVerified && !factor.pin && !factor.totpCode)) {
@@ -10980,7 +11104,7 @@ export class SovraDatabaseEngine {
       if (factor.webauthnVerified) {
         // Authenticated via genuine server-verified WebAuthn assertion ceremony
         this.clearFailedPinAttempts(user.did);
-        this.clearFailedPinAttempts(targetThrottleKey);
+        for (const k of this.getAllTargetThrottleKeys(identifier)) this.clearFailedPinAttempts(k);
       } else {
         let passed = false;
         if (factor.pin) {
@@ -10994,7 +11118,7 @@ export class SovraDatabaseEngine {
         if (passed) {
           // DOS-01: Correct PIN is ALWAYS accepted and resets account failure counter & target throttle!
           this.clearFailedPinAttempts(user.did);
-          this.clearFailedPinAttempts(targetThrottleKey);
+          for (const k of this.getAllTargetThrottleKeys(identifier)) this.clearFailedPinAttempts(k);
         } else {
           // Check IP lock on failure
           if (ipAddress) {
@@ -11288,7 +11412,7 @@ export class SovraDatabaseEngine {
     user.securityPinHash = this.hashSecurityPin(cleanNew);
     user.updatedAt = Date.now();
     this.clearFailedPinAttempts(user.did);
-    this.clearFailedPinAttempts(this.getTargetThrottleKey(identifier));
+    for (const k of this.getAllTargetThrottleKeys(identifier)) this.clearFailedPinAttempts(k);
 
     // Auto-migrate legacy plaintext recovery phrase if encountered
     if (user.recoveryPhrase) {

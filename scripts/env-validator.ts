@@ -70,6 +70,28 @@ export function validateEnvironment(): EnvValidationResult {
     }
   }
 
+  // 1b. SOVRA_THROTTLE_SECRET VALIDATION (AUTH-01 Genuine HMAC)
+  const throttleSecret = process.env.SOVRA_THROTTLE_SECRET;
+  if (isProduction) {
+    if (!throttleSecret) {
+      errors.push('CRITICAL: SOVRA_THROTTLE_SECRET environment variable is required in production.');
+    } else {
+      const primarySecret = throttleSecret.split(',')[0]!.trim();
+      if (primarySecret.length < 32) {
+        errors.push(`CRITICAL: SOVRA_THROTTLE_SECRET must be at least 32 characters in production (currently ${primarySecret.length}).`);
+      }
+      if (INSECURE_DEFAULT_SECRETS.has(primarySecret.toLowerCase())) {
+        errors.push('CRITICAL: Default or demo SOVRA_THROTTLE_SECRET is strictly forbidden in production.');
+      }
+    }
+  } else {
+    if (!throttleSecret) {
+      warnings.push('SOVRA_THROTTLE_SECRET is not set; ensure a cryptographically secure random key of >= 32 characters is configured.');
+    } else if (throttleSecret.split(',')[0]!.trim().length < 32) {
+      warnings.push('SOVRA_THROTTLE_SECRET is shorter than recommended 32 characters.');
+    }
+  }
+
   // 2. WEBRTC / TURN VALIDATION
   const turnServers = process.env.SOVRA_TURN_SERVERS || process.env.WEBRTC_TURN_SERVERS;
   const turnSecret = process.env.SOVRA_TURN_SECRET || process.env.WEBRTC_TURN_SECRET;
@@ -142,11 +164,12 @@ export function scrubSecrets(input: string): string {
   // Mask private keys
   scrubbed = scrubbed.replace(/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[^-]+-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g, '[REDACTED_PRIVATE_KEY]');
 
-  // Mask passwords / PINs in JSON
-  scrubbed = scrubbed.replace(/"(?:password|pin|securityPin|totpSecret|adminSecret|secret)":\s*"[^"]+"/gi, match => {
+  // Mask passwords / PINs / throttle secrets in JSON or key-values
+  scrubbed = scrubbed.replace(/"(?:password|pin|securityPin|totpSecret|adminSecret|throttleSecret|SOVRA_THROTTLE_SECRET|secret)":\s*"[^"]+"/gi, match => {
     const key = match.split(':')[0];
     return `${key}: "[REDACTED]"`;
   });
+  scrubbed = scrubbed.replace(/SOVRA_THROTTLE_SECRET=[^\s]+/gi, 'SOVRA_THROTTLE_SECRET=[REDACTED]');
 
   return scrubbed;
 }
