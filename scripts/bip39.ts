@@ -1,6 +1,6 @@
 /**
  * @file scripts/bip39.ts
- * Standard RFC BIP-39 Cryptographic Mnemonic & Checksum Engine for Sovra Backend.
+ * Standard BIP-39 (Bitcoin Improvement Proposal 39) Cryptographic Mnemonic & Checksum Engine for Sovra Backend.
  */
 
 import crypto from 'node:crypto';
@@ -47,11 +47,10 @@ export function validateBip39RecoveryPhrase(phrase: string): boolean {
   if (!phrase || typeof phrase !== 'string') return false;
 
   const words = phrase.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length !== 12 && words.length !== 24) return false;
+  if (![12, 15, 18, 21, 24].includes(words.length)) return false;
 
-  const totalBits = words.length * 11;
-  const csBits = words.length === 12 ? 4 : 8;
-  const entBits = totalBits - csBits;
+  const csBits = words.length / 3;
+  const entBits = words.length * 11 - csBits;
 
   let binStr = '';
   for (const w of words) {

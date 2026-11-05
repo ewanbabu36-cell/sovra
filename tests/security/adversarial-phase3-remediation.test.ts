@@ -84,10 +84,12 @@ describe('PHASE 3: Final Security Hardening & Zero-Trust Adversarial Suite (AUTH
   }
 
   beforeAll(async () => {
+    process.env.SOVRA_THROTTLE_SECRET = 'test-throttle-secret-key-32-chars-long-entropy-ok!';
     const env: Record<string, string | undefined> = {
       ...process.env,
       PORT: String(testPort),
       SOVRA_DISABLE_HTTPS: 'true',
+      SOVRA_THROTTLE_SECRET: 'test-throttle-secret-key-32-chars-long-entropy-ok!',
     };
     delete env.VITEST;
 
@@ -219,6 +221,142 @@ describe('PHASE 3: Final Security Hardening & Zero-Trust Adversarial Suite (AUTH
 
       expect(lastStatus).toBe(429);
       expect(lastError).toContain('Too many failed authentication attempts from this IP address');
+    });
+
+    it('3a. handles burst of concurrent failed requests and atomically reaches 429 rate-limit threshold', async () => {
+      const concurrentTarget = `@burst_target_${Date.now()}`;
+      // Send 10 concurrent failed requests from 10 distinct IPs
+      const promises = Array.from({ length: 10 }, (_, i) => {
+        return postJson('/api/user/login', {
+          handle: concurrentTarget,
+          pin: '000000',
+        }, { 'x-forwarded-for': `192.168.99.${i + 1}` });
+      });
+
+      const results = await Promise.all(promises);
+      const statuses = results.map(r => r.status);
+      const errors = results.map(r => r.body.error);
+
+      // Confirm all returned either 401 or 429
+      for (const st of statuses) {
+        expect([401, 429]).toContain(st);
+      }
+      // At least 5 requests must be rate-limited (429)
+      const throttledCount = statuses.filter(s => s === 429).length;
+      expect(throttledCount).toBeGreaterThanOrEqual(5);
+
+      // Subsequent request is definitely throttled (429)
+      const followUp = await postJson('/api/user/login', {
+        handle: concurrentTarget,
+        pin: '000000',
+      }, { 'x-forwarded-for': '192.168.99.200' });
+      expect(followUp.status).toBe(429);
+      expect(followUp.body.error).toContain('Account authentication rate-limited');
+    });
+
+    it('3b. verifies genuine HMAC-SHA256 derivation and secret dependency', () => {
+      const db = new SovraDatabaseEngine();
+      const secretA = 'secret-a-cryptographically-random-key-32chars!';
+      const secretB = 'secret-b-cryptographically-random-key-32chars!';
+
+      const keyA1 = db.getTargetThrottleKey('@alice', secretA);
+      const keyA2 = db.getTargetThrottleKey('alice', secretA);
+      const keyA3 = db.getTargetThrottleKey('  @Alice  ', secretA);
+      const keyB = db.getTargetThrottleKey('@alice', secretB);
+
+      // 1. Consistency across casing, whitespace, and leading @
+      expect(keyA1).toBe(keyA2);
+      expect(keyA1).toBe(keyA3);
+
+      // 2. Secret dependency: different secrets MUST yield completely different HMAC throttle keys
+      expect(keyA1).not.toBe(keyB);
+
+      // 3. Mathematical HMAC-SHA256 equivalence check
+      const manualHmac = 'target_th_' + crypto.createHmac('sha256', secretA).update('sovra_target_throttle_v1:@alice').digest('hex').slice(0, 32);
+      expect(keyA1).toBe(manualHmac);
+    });
+
+    it('3c. validates throttle secret strength and strictly rejects missing/insecure secrets (no silent fallback)', () => {
+      const db = new SovraDatabaseEngine();
+
+      // 1. Missing secret
+      expect(SovraDatabaseEngine.validateThrottleSecret(undefined).valid).toBe(false);
+      expect(SovraDatabaseEngine.validateThrottleSecret('').valid).toBe(false);
+
+      // 2. Too short (<32 chars)
+      expect(SovraDatabaseEngine.validateThrottleSecret('short_secret_under_32').valid).toBe(false);
+
+      // 3. Insecure default constants
+      expect(SovraDatabaseEngine.validateThrottleSecret('sovra_target_throttle_salt_v3:').valid).toBe(false);
+      expect(SovraDatabaseEngine.validateThrottleSecret('password').valid).toBe(false);
+      expect(SovraDatabaseEngine.validateThrottleSecret('12345678901234567890123456789012').valid).toBe(false);
+
+      // 4. Valid secret
+      expect(SovraDatabaseEngine.validateThrottleSecret('a_valid_cryptographic_secret_with_32_characters!').valid).toBe(true);
+
+      // 5. Engine refusal to fall back to a public constant
+      const unconfiguredDb = new SovraDatabaseEngine();
+      delete process.env.SOVRA_THROTTLE_SECRET;
+      delete process.env.SOVRA_THROTTLE_SECRET_ROTATION;
+      unconfiguredDb.loadThrottleSecrets();
+      expect(() => unconfiguredDb.getTargetThrottleKey('@target')).toThrow(/Refusing to fall back to a public constant/);
+
+      // Restore secret for remaining tests
+      process.env.SOVRA_THROTTLE_SECRET = 'test-throttle-secret-key-32-chars-long-entropy-ok!';
+    });
+
+    it('3d. verifies safe secret rotation: persists active throttle state and clears both keys on success', () => {
+      const db = new SovraDatabaseEngine();
+      const secretV1 = 'throttle-secret-version-1-initial-32-chars-ok!';
+      const secretV2 = 'throttle-secret-version-2-rotated-32-chars-ok!';
+
+      db.loadThrottleSecrets(secretV1);
+      const targetUser = `@rot_target_${Date.now()}`;
+
+      // Simulate 4 failed attempts under Secret V1
+      const keyV1 = db.getTargetThrottleKey(targetUser);
+      for (let i = 0; i < 4; i++) {
+        db.recordFailedPinAttempt(keyV1);
+      }
+      expect(db.getFailedPinAttempts(keyV1).attempts).toBe(4);
+
+      // Rotate to Secret V2
+      db.rotateThrottleSecret(secretV2);
+      expect(db.getPrimaryThrottleSecret()).toBe(secretV2);
+      expect(db.getRotatedThrottleSecrets()).toContain(secretV1);
+
+      const keyV2 = db.getTargetThrottleKey(targetUser);
+      expect(keyV2).not.toBe(keyV1);
+
+      // Register test account with hashed PIN
+      const user = db.createUser({
+        did: `did:sovra:user_rot_${Date.now()}`,
+        handle: targetUser,
+        displayName: 'Rotation Target',
+        securityPinHash: db.hashSecurityPin('888888'),
+      });
+
+      // 5th attempt under rotated secret V2 should inherit V1 failures and trigger throttle (429)
+      const fifthAttempt = db.loginUser(targetUser, 'Mobile Node', '192.168.1.50', 'TestAgent', { pin: '000000' });
+      expect(fifthAttempt.ok).toBe(false);
+      expect(fifthAttempt.isLocked).toBe(true); // Throttled! Attacker cannot bypass by secret rotation
+
+      // Legitimate user enters correct PIN: must authenticate and clear BOTH V1 and V2 throttle keys
+      const legitimateLogin = db.loginUser(targetUser, 'Mobile Node', '192.168.1.99', 'TestAgent', { pin: '888888' });
+      expect(legitimateLogin.ok).toBe(true);
+
+      // Verify both V1 and V2 throttle records are cleared
+      expect(db.getFailedPinAttempts(keyV1).attempts).toBe(0);
+      expect(db.getFailedPinAttempts(keyV2).attempts).toBe(0);
+    });
+
+    it('3e. confirms zero public SHA256-based throttle identifiers remain in source files', () => {
+      const dbEngineContent = fs.readFileSync(path.resolve(__dirname, '../../scripts/database-engine.ts'), 'utf8');
+
+      // Check that the legacy public salt is completely eliminated
+      expect(dbEngineContent).not.toContain('sovra_target_throttle_salt_v3');
+      expect(dbEngineContent).not.toContain('sovra_target_throttle_salt');
+      expect(dbEngineContent).toContain("crypto.createHmac('sha256'");
     });
   });
 

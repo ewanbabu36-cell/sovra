@@ -88582,6 +88582,24 @@ async function startDevServer() {
   const HTTPS_PORT = parseInt(process.env.HTTPS_PORT ?? '3443', 10);
   const startTime = Date.now();
 
+  // SEC-AUTH-01: Validate and enforce genuine SOVRA_THROTTLE_SECRET strength at startup
+  const envValidation = validateEnvironment();
+  if (!envValidation.valid && process.env.NODE_ENV === 'production') {
+    console.error('FATAL: Environment validation failed in production:');
+    envValidation.errors.forEach(e => console.error(`  - ${e}`));
+    process.exit(1);
+  }
+  if (!process.env.SOVRA_THROTTLE_SECRET || process.env.SOVRA_THROTTLE_SECRET.trim().length < 32) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('FATAL: SOVRA_THROTTLE_SECRET must be configured with >= 32 characters in production.');
+      process.exit(1);
+    } else if (!process.env.VITEST) {
+      console.warn('[SECURITY WARNING] SOVRA_THROTTLE_SECRET not set; generating ephemeral 256-bit random key for dev session.');
+      process.env.SOVRA_THROTTLE_SECRET = crypto.randomBytes(32).toString('hex');
+    }
+  }
+  sovraDb.loadThrottleSecrets();
+
   const replayStore = new DurableReplayStore({
     filePath: path.join(STORAGE_DIR, 'replay-protection.json'),
   });

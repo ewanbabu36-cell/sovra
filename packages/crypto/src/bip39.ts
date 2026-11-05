@@ -1,9 +1,9 @@
 /**
  * @file packages/crypto/src/bip39.ts
- * Official RFC BIP-39 Standard Mnemonic Implementation.
+ * Official BIP-39 (Bitcoin Improvement Proposal 39) Standard Mnemonic Implementation.
  * 
  * Provides:
- * 1. 128-bit (12 words) and 256-bit (24 words) mnemonic generation from cryptographic entropy.
+ * 1. 128-bit to 256-bit (12, 15, 18, 21, 24 words) mnemonic generation from cryptographic entropy.
  * 2. Strict SHA-256 checksum calculation and verification.
  * 3. Validation against the canonical 2048-word English dictionary.
  * 4. Conversion between entropy bytes and mnemonic phrases.
@@ -20,10 +20,10 @@ for (let i = 0; i < BIP39_ENGLISH_WORDLIST.length; i++) {
 }
 
 /**
- * Generates a fresh, cryptographically secure 12-word (128-bit) or 24-word (256-bit) BIP-39 mnemonic.
+ * Generates a fresh, cryptographically secure BIP-39 mnemonic (12, 15, 18, 21, or 24 words).
  */
-export function generateBip39Mnemonic(wordCount: 12 | 24 = 12): string {
-  const entropyBytes = wordCount === 24 ? 32 : 16;
+export function generateBip39Mnemonic(wordCount: 12 | 15 | 18 | 21 | 24 = 12): string {
+  const entropyBytes = (wordCount * 11 - (wordCount / 3)) / 8;
   const entropy = secureRandomBytes(entropyBytes);
   return entropyToBip39Mnemonic(entropy);
 }
@@ -33,11 +33,11 @@ export function generateBip39Mnemonic(wordCount: 12 | 24 = 12): string {
  */
 export function entropyToBip39Mnemonic(entropy: Uint8Array): string {
   const entBits = entropy.length * 8;
-  if (entBits !== 128 && entBits !== 256) {
-    throw new CryptoError(`Entropy bits must be 128 or 256, got: ${entBits}`);
+  if (![128, 160, 192, 224, 256].includes(entBits)) {
+    throw new CryptoError(`Entropy bits must be 128, 160, 192, 224, or 256, got: ${entBits}`);
   }
 
-  const csBits = entBits / 32; // 4 bits for 128-bit, 8 bits for 256-bit
+  const csBits = entBits / 32; // 4 to 8 bits
   const hash = sha256(entropy);
 
   // Convert entropy to binary bit string
@@ -68,11 +68,10 @@ export function validateBip39Mnemonic(mnemonic: string): boolean {
   if (!mnemonic || typeof mnemonic !== 'string') return false;
 
   const words = mnemonic.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length !== 12 && words.length !== 24) return false;
+  if (![12, 15, 18, 21, 24].includes(words.length)) return false;
 
-  const totalBits = words.length * 11;
-  const csBits = words.length === 12 ? 4 : 8;
-  const entBits = totalBits - csBits;
+  const csBits = words.length / 3;
+  const entBits = words.length * 11 - csBits;
 
   let binStr = '';
   for (const w of words) {
@@ -107,9 +106,8 @@ export function bip39MnemonicToEntropy(mnemonic: string): Uint8Array {
   }
 
   const words = mnemonic.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const totalBits = words.length * 11;
-  const csBits = words.length === 12 ? 4 : 8;
-  const entBits = totalBits - csBits;
+  const csBits = words.length / 3;
+  const entBits = words.length * 11 - csBits;
 
   let binStr = '';
   for (const w of words) {
