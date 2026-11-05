@@ -89318,6 +89318,11 @@ async function startDevServer() {
     }
   };
 
+  function injectCspNonce(html: string, nonce: string): string {
+    if (!nonce) return html;
+    return html.replace(/<script\b(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+  }
+
   let _cachedHtmlResponse: {
     htmlStr: string;
     gzipBuf: Buffer;
@@ -89492,9 +89497,16 @@ async function startDevServer() {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     res.setHeader('X-XSS-Protection', '1; mode=block');
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cspNonce = crypto.randomBytes(16).toString('base64');
+    (res as any).cspNonce = cspNonce;
+    const scriptPolicy = isProduction
+      ? `script-src 'self' 'nonce-${cspNonce}' 'unsafe-inline' blob:; script-src-attr 'unsafe-inline';`
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;";
+
     res.setHeader(
       'Content-Security-Policy',
-      "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; connect-src 'self' ws: wss: https: http: stun: turn: turns:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
+      `default-src 'self' data: blob:; ${scriptPolicy} style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; connect-src 'self' ws: wss: https: http: stun: turn: turns:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self';`
     );
     if (req.headers['x-forwarded-proto'] === 'https' || isEncrypted) {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
@@ -99973,7 +99985,7 @@ async function startDevServer() {
         'Pragma': 'no-cache',
         'Expires': '0',
       });
-      res.end(renderExplorerHtml());
+      res.end(injectCspNonce(renderExplorerHtml(), (res as any).cspNonce));
       return;
     }
 
@@ -99987,7 +99999,7 @@ async function startDevServer() {
           'Pragma': 'no-cache',
           'Expires': '0',
         });
-        res.end(renderAdminLoginHtml());
+        res.end(injectCspNonce(renderAdminLoginHtml(), (res as any).cspNonce));
         return;
       }
 
@@ -100725,23 +100737,39 @@ async function startDevServer() {
       }
 
       const acceptEncoding = String(req.headers['accept-encoding'] || '');
-      if (acceptEncoding.includes('gzip')) {
+      const wantsGzip = acceptEncoding.includes('gzip');
+      const isProduction = process.env.NODE_ENV === 'production';
+      const cspNonce = (res as any).cspNonce;
+
+      let responseBody: Buffer | string;
+      if (isProduction && cspNonce) {
+        const nonceHtml = injectCspNonce(_cachedHtmlResponse.htmlStr, cspNonce);
+        if (wantsGzip) {
+          responseBody = zlib.gzipSync(Buffer.from(nonceHtml, 'utf8'));
+        } else {
+          responseBody = nonceHtml;
+        }
+      } else {
+        responseBody = wantsGzip ? _cachedHtmlResponse.gzipBuf : _cachedHtmlResponse.htmlStr;
+      }
+
+      if (wantsGzip) {
         res.writeHead(200, {
           'Content-Type': 'text/html; charset=utf-8',
           'Content-Encoding': 'gzip',
-          'Content-Length': String(_cachedHtmlResponse.gzipBuf.length),
+          'Content-Length': String((responseBody as Buffer).length),
           'ETag': _cachedHtmlResponse.etag,
           'Cache-Control': 'public, max-age=0, must-revalidate',
         });
-        res.end(_cachedHtmlResponse.gzipBuf);
+        res.end(responseBody);
       } else {
         res.writeHead(200, {
           'Content-Type': 'text/html; charset=utf-8',
-          'Content-Length': String(Buffer.byteLength(_cachedHtmlResponse.htmlStr, 'utf8')),
+          'Content-Length': String(Buffer.byteLength(responseBody as string, 'utf8')),
           'ETag': _cachedHtmlResponse.etag,
           'Cache-Control': 'public, max-age=0, must-revalidate',
         });
-        res.end(_cachedHtmlResponse.htmlStr);
+        res.end(responseBody);
       }
       return;
     }
