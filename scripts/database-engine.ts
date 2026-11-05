@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { SqliteSocialDatabaseEngine } from './database-sqlite.ts';
+import { generateBip39RecoveryPhrase, validateBip39RecoveryPhrase, BIP39_ENGLISH_WORDLIST } from './bip39.ts';
 
 // ==========================================
 // 1. DATA MODELS & SCHEMAS
@@ -10872,6 +10873,12 @@ export class SovraDatabaseEngine {
     this.failedPinAttempts.delete(accountDid);
   }
 
+  public getTargetThrottleKey(identifier: string): string {
+    const clean = (identifier || '').trim().toLowerCase();
+    const handle = clean.startsWith('@') ? clean : (clean.startsWith('did:') ? clean : '@' + clean);
+    return 'target_th_' + crypto.createHash('sha256').update('sovra_target_throttle_salt_v3:' + handle).digest('hex').slice(0, 32);
+  }
+
   public loginUser(
     identifier: string,
     deviceName?: string,
@@ -10882,6 +10889,7 @@ export class SovraDatabaseEngine {
     this.load();
     const clean = identifier.trim();
     const cleanHandle = clean.startsWith('@') ? clean : '@' + clean;
+    const targetThrottleKey = this.getTargetThrottleKey(identifier);
 
     let factor = (typeof ipAddressOrFactor === 'object' && ipAddressOrFactor !== null) ? ipAddressOrFactor : factorArg;
     const ipAddress = typeof ipAddressOrFactor === 'string' ? ipAddressOrFactor : undefined;
@@ -10893,11 +10901,34 @@ export class SovraDatabaseEngine {
       u.handle.toLowerCase() === cleanHandle.toLowerCase()
     );
 
-    // AUTH-01: Indistinguishable response and constant-time dummy verification on non-existent account
+    // AUTH-01: Indistinguishable response, uniform 401/429 curve, and constant-time dummy verification on non-existent account
     if (!user) {
       this.verifySecurityPin('000000', '$scrypt$ln=14,r=8,p=1$7465737473616c74$7465737468617368');
       if (ipAddress) {
-        this.recordFailedPinAttempt('did:sovra:nonexistent', ipAddress);
+        const ipRec = this.failedPinAttemptsByIp.get(ipAddress);
+        if (ipRec?.lockedUntil && ipRec.lockedUntil > Date.now()) {
+          const remainingSec = Math.ceil((ipRec.lockedUntil - Date.now()) / 1000);
+          return {
+            ok: false,
+            error: `Too many failed authentication attempts from this IP address. Please try again in ${remainingSec} seconds.`,
+            isThrottled: true,
+          };
+        }
+      }
+      const failResult = this.recordFailedPinAttempt(targetThrottleKey, ipAddress);
+      if (failResult.isIpLocked) {
+        return {
+          ok: false,
+          error: 'Too many failed authentication attempts from this IP address. Please try again in 15 minutes.',
+          isThrottled: true,
+        };
+      }
+      if (failResult.attempts >= 5) {
+        return {
+          ok: false,
+          error: 'Account authentication rate-limited due to multiple failed attempts. Please enter your correct PIN or recover using your 12-word recovery mnemonic.',
+          isLocked: true,
+        };
       }
       return { ok: false, error: 'Invalid credentials' };
     }
@@ -10905,24 +10936,43 @@ export class SovraDatabaseEngine {
     // 3. Credential Evaluation
     if (user.totpEnabled) {
       if (!factor || !factor.totpCode) {
+        this.recordFailedPinAttempt(user.did);
+        const failResult = this.recordFailedPinAttempt(targetThrottleKey, ipAddress);
+        if (failResult.attempts >= 5) {
+          return {
+            ok: false,
+            error: 'Account authentication rate-limited due to multiple failed attempts. Please enter your correct PIN or recover using your 12-word recovery mnemonic.',
+            isLocked: true,
+          };
+        }
         return { ok: false, error: 'Invalid credentials' };
       }
       if (!user.totpSecret || !this.verifyTotpCode(user.totpSecret, factor.totpCode)) {
-        this.recordFailedPinAttempt(user.did, ipAddress);
+        this.recordFailedPinAttempt(user.did);
+        const failResult = this.recordFailedPinAttempt(targetThrottleKey, ipAddress);
+        if (failResult.attempts >= 5) {
+          return {
+            ok: false,
+            error: 'Account authentication rate-limited due to multiple failed attempts. Please enter your correct PIN or recover using your 12-word recovery mnemonic.',
+            isLocked: true,
+          };
+        }
         return { ok: false, error: 'Invalid credentials' };
       }
+      // Successful TOTP
+      this.clearFailedPinAttempts(user.did);
+      this.clearFailedPinAttempts(targetThrottleKey);
     } else if (user.securityPinHash) {
       // Strict factor requirement
       if (!factor || (!factor.webauthnVerified && !factor.pin && !factor.totpCode)) {
-        if (ipAddress) {
-          const ipRec = this.failedPinAttemptsByIp.get(ipAddress);
-          if (ipRec?.lockedUntil && ipRec.lockedUntil > Date.now()) {
-            return {
-              ok: false,
-              error: 'Too many failed authentication attempts from this IP address. Please try again later.',
-              isThrottled: true,
-            };
-          }
+        this.recordFailedPinAttempt(user.did);
+        const failResult = this.recordFailedPinAttempt(targetThrottleKey, ipAddress);
+        if (failResult.attempts >= 5) {
+          return {
+            ok: false,
+            error: 'Account authentication rate-limited due to multiple failed attempts. Please enter your correct PIN or recover using your 12-word recovery mnemonic.',
+            isLocked: true,
+          };
         }
         return { ok: false, error: 'Invalid credentials' };
       }
@@ -10930,6 +10980,7 @@ export class SovraDatabaseEngine {
       if (factor.webauthnVerified) {
         // Authenticated via genuine server-verified WebAuthn assertion ceremony
         this.clearFailedPinAttempts(user.did);
+        this.clearFailedPinAttempts(targetThrottleKey);
       } else {
         let passed = false;
         if (factor.pin) {
@@ -10941,8 +10992,9 @@ export class SovraDatabaseEngine {
         }
 
         if (passed) {
-          // DOS-01: Correct PIN is ALWAYS accepted and resets account failure counter!
+          // DOS-01: Correct PIN is ALWAYS accepted and resets account failure counter & target throttle!
           this.clearFailedPinAttempts(user.did);
+          this.clearFailedPinAttempts(targetThrottleKey);
         } else {
           // Check IP lock on failure
           if (ipAddress) {
@@ -10958,7 +11010,8 @@ export class SovraDatabaseEngine {
           }
 
           // Failure handling:
-          const failResult = this.recordFailedPinAttempt(user.did, ipAddress);
+          this.recordFailedPinAttempt(user.did);
+          const failResult = this.recordFailedPinAttempt(targetThrottleKey, ipAddress);
           if (failResult.isIpLocked) {
             return {
               ok: false,
@@ -11100,67 +11153,28 @@ export class SovraDatabaseEngine {
     return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
   }
 
-  public static readonly BIP39_WORDLIST: string[] = [
-    'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse',
-    'access', 'accident', 'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire', 'across', 'act',
-    'action', 'actor', 'actress', 'actual', 'adapt', 'add', 'addict', 'address', 'adjust', 'admit',
-    'adult', 'advance', 'advice', 'aerobic', 'affair', 'afford', 'afraid', 'again', 'age', 'agent',
-    'agree', 'ahead', 'aim', 'air', 'airport', 'aisle', 'alarm', 'album', 'alcohol', 'alert',
-    'alien', 'all', 'alley', 'allow', 'almost', 'alone', 'alpha', 'already', 'also', 'alter',
-    'always', 'amateur', 'amazing', 'among', 'amount', 'amused', 'analyst', 'anchor', 'ancient', 'anger',
-    'angle', 'angry', 'animal', 'ankle', 'announce', 'annual', 'another', 'answer', 'antenna', 'antique',
-    'anxiety', 'any', 'apart', 'apology', 'appear', 'apple', 'approve', 'april', 'arch', 'arctic',
-    'area', 'arena', 'argue', 'arm', 'armed', 'armor', 'army', 'around', 'arrange', 'arrest',
-    'arrive', 'arrow', 'art', 'artefact', 'artist', 'artwork', 'ask', 'aspect', 'assault', 'asset',
-    'assist', 'assume', 'asthma', 'athlete', 'atom', 'attack', 'attend', 'attitude', 'attract', 'auction',
-    'audit', 'august', 'aunt', 'author', 'auto', 'autumn', 'average', 'avocado', 'avoid', 'awake',
-    'aware', 'away', 'awesome', 'awful', 'awkward', 'axis', 'baby', 'bachelor', 'bacon', 'badge',
-    'bag', 'balance', 'balcony', 'ball', 'bamboo', 'banana', 'banner', 'bar', 'barely', 'bargain',
-    'barrel', 'base', 'basic', 'basket', 'battle', 'beach', 'beacon', 'bean', 'beauty', 'because',
-    'become', 'beef', 'before', 'begin', 'behave', 'behind', 'believe', 'below', 'belt', 'bench',
-    'benefit', 'best', 'betray', 'better', 'between', 'beyond', 'bicycle', 'bid', 'bike', 'bind',
-    'biology', 'bird', 'birth', 'bitter', 'black', 'blade', 'blame', 'blanket', 'blast', 'bleak',
-    'bless', 'blind', 'blood', 'blossom', 'blouse', 'blue', 'blur', 'blush', 'board', 'boat',
-    'body', 'boil', 'bomb', 'bone', 'bonus', 'book', 'boost', 'border', 'boring', 'borrow',
-    'boss', 'bottom', 'bounce', 'box', 'boy', 'bracket', 'brain', 'brand', 'brass', 'brave',
-    'bread', 'breeze', 'brick', 'bridge', 'brief', 'bright', 'bring', 'brisk', 'broccoli', 'broken',
-    'bronze', 'broom', 'brother', 'brown', 'brush', 'bubble', 'buddy', 'budget', 'buffalo', 'build',
-    'bulb', 'bulk', 'bullet', 'bundle', 'bunker', 'burden', 'burger', 'burst', 'bus', 'business',
-    'busy', 'butter', 'buyer', 'buzz', 'matrix', 'nexus', 'pulse', 'orbit', 'enclave', 'cipher'
-  ];
+  public static readonly BIP39_WORDLIST: readonly string[] = BIP39_ENGLISH_WORDLIST;
 
+  /**
+   * Generates a standard RFC BIP-39 12-word recovery mnemonic with 128 bits of CSPRNG entropy
+   * and 4-bit SHA-256 checksum.
+   */
   public generateRecoveryPhrase(): string {
-    const wordPool = SovraDatabaseEngine.BIP39_WORDLIST;
-    const existing = new Set<string>();
-    if (Array.isArray(this.db?.users)) {
-      for (const u of this.db.users) {
-        if (u.recoveryPhrase) existing.add(u.recoveryPhrase.toLowerCase().trim());
-      }
-    }
-
-    for (let attempts = 0; attempts < 100; attempts++) {
-      const picked: string[] = [];
-      const usedIndices = new Set<number>();
-      while (picked.length < 12) {
-        const idx = crypto.randomInt(0, wordPool.length);
-        if (!usedIndices.has(idx)) {
-          usedIndices.add(idx);
-          picked.push(wordPool[idx]);
-        }
-      }
-      const candidate = picked.join(' ');
-      if (!existing.has(candidate.toLowerCase())) {
-        return candidate;
-      }
-    }
-
-    const fallback: string[] = [];
-    for (let i = 0; i < 12; i++) {
-      fallback.push(wordPool[crypto.randomInt(0, wordPool.length)]);
-    }
-    return fallback.join(' ');
+    return generateBip39RecoveryPhrase();
   }
 
+  /**
+   * Validates a 12-word or 24-word BIP-39 recovery mnemonic using official 2048-word dictionary and SHA-256 checksum.
+   */
+  public validateRecoveryPhrase(phrase: string): boolean {
+    return validateBip39RecoveryPhrase(phrase);
+  }
+
+  /**
+   * Salted Scrypt KDF Passphrase Verifier.
+   * Parameters: N=16384, r=8, p=1, keyLength=32 bytes, salt=16 random bytes.
+   * Requires 16MB RAM per derivation, ensuring robust resistance to offline GPU/ASIC brute-force attacks.
+   */
   public hashRecoveryPhrase(phrase: string, salt?: string): { hash: string; salt: string } {
     const cleanSalt = salt || crypto.randomBytes(16).toString('hex');
     const norm = phrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
@@ -11274,6 +11288,15 @@ export class SovraDatabaseEngine {
     user.securityPinHash = this.hashSecurityPin(cleanNew);
     user.updatedAt = Date.now();
     this.clearFailedPinAttempts(user.did);
+    this.clearFailedPinAttempts(this.getTargetThrottleKey(identifier));
+
+    // Auto-migrate legacy plaintext recovery phrase if encountered
+    if (user.recoveryPhrase) {
+      const { hash, salt } = this.hashRecoveryPhrase(user.recoveryPhrase);
+      user.recoveryPhraseHash = hash;
+      user.recoveryPhraseSalt = salt;
+      delete user.recoveryPhrase;
+    }
 
     // SESS-01: Revoke every active session across all devices
     this.revokeAllUserSessions(user.did, 'Emergency recovery phrase PIN reset');

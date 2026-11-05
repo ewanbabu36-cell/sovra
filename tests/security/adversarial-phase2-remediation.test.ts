@@ -395,7 +395,7 @@ describe('PHASE 2: Critical Adversarial Security Remediation Matrix (DOS-01, AUT
       });
       expect(exportRes.status).toBe(403);
       expect(exportRes.body.ok).toBe(false);
-      expect(exportRes.body.error).toContain('Zero-Knowledge Security Policy');
+      expect(exportRes.body.error).toMatch(/(?:Zero-Knowledge|Passphrase) Security Policy/);
       expect(exportRes.body.recoveryPhrase).toBeUndefined();
     });
 

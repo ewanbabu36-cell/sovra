@@ -44536,9 +44536,10 @@ function renderHtml(
       }
 
       if (sessionToken) {
-        const _meDidParam = (myProfile && myProfile.did) ? ('&did=' + encodeURIComponent(myProfile.did)) : '';
-        const _meHandleParam = (myProfile && myProfile.handle) ? ('&handle=' + encodeURIComponent(myProfile.handle)) : '';
-        fetch('/api/user/me?sessionToken=' + encodeURIComponent(sessionToken) + _meDidParam + _meHandleParam, {
+        const _meDidParam = (myProfile && myProfile.did) ? ('?did=' + encodeURIComponent(myProfile.did)) : '';
+        const _meHandleParam = (myProfile && myProfile.handle) ? ((_meDidParam ? '&' : '?') + 'handle=' + encodeURIComponent(myProfile.handle)) : '';
+        fetch('/api/user/me' + _meDidParam + _meHandleParam, {
+          credentials: 'same-origin',
           headers: { 'Authorization': 'Bearer ' + sessionToken }
         })
           .then(r => r.json())
@@ -44941,11 +44942,11 @@ function renderHtml(
       }
 
       // Fetch uniquely generated seed phrase from backend for this authenticated account
-      var token = (myProfile && myProfile.sessionToken) || localStorage.getItem('sovra_session_token') || '';
-      var url = '/api/user/recovery-phrase' + (token ? ('?sessionToken=' + encodeURIComponent(token)) : '');
+      var token = (myProfile && myProfile.sessionToken) || '';
+      var url = '/api/user/recovery-phrase';
       var headers = token ? { 'Authorization': 'Bearer ' + token } : {};
 
-      fetch(url, { headers: headers })
+      fetch(url, { credentials: 'same-origin', headers: headers })
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data && data.ok && data.recoveryPhrase) {
@@ -45027,10 +45028,10 @@ function renderHtml(
       if (myProfile && myProfile.recoveryPhrase && myProfile.recoveryPhrase.trim()) {
         renderWords(myProfile.recoveryPhrase);
       } else {
-        var token = (typeof getEffectiveSessionToken === 'function') ? getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
-        var url = '/api/user/recovery-phrase' + (token ? ('?sessionToken=' + encodeURIComponent(token)) : '');
+        var token = (typeof getEffectiveSessionToken === 'function') ? getEffectiveSessionToken() : ((myProfile && myProfile.sessionToken) || '');
+        var url = '/api/user/recovery-phrase';
         var headers = token ? { 'Authorization': 'Bearer ' + token } : {};
-        fetch(url, { headers: headers })
+        fetch(url, { credentials: 'same-origin', headers: headers })
           .then(function(r) { return r.json(); })
           .then(function(data) {
             if (data && data.ok && data.recoveryPhrase) {
@@ -47395,7 +47396,7 @@ function renderHtml(
         if (_realtimeEventSource) {
           _realtimeEventSource.close();
         }
-        _realtimeEventSource = new EventSource('/api/realtime/stream?token=' + encodeURIComponent(token));
+        _realtimeEventSource = new EventSource('/api/realtime/stream');
         updateLiveStatus('connecting');
 
         _realtimeEventSource.onopen = function() {
@@ -69639,12 +69640,6 @@ function renderHtml(
 
     function getAuthenticatedAttachmentUrl(att, forceDownload) {
       if (!att) return '';
-      const token = (typeof window.getEffectiveSessionToken === 'function')
-        ? window.getEffectiveSessionToken()
-        : ((typeof myProfile !== 'undefined' && myProfile && myProfile.sessionToken)
-            ? myProfile.sessionToken
-            : (localStorage.getItem('sovra_session_token') || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : '')));
-
       let baseUrl = att.url || (att.cid ? '/api/chat/attachment/' + encodeURIComponent(att.cid) : '');
       if (!baseUrl && att.dataUrl) {
         const b = dataUrlToBlob(att.dataUrl);
@@ -69654,9 +69649,6 @@ function renderHtml(
 
       try {
         const parsed = new URL(baseUrl, window.location.origin);
-        if (token && !parsed.searchParams.get('token')) {
-          parsed.searchParams.set('token', token);
-        }
         if (att.name && !parsed.searchParams.get('name')) {
           parsed.searchParams.set('name', att.name);
         }
@@ -69666,7 +69658,6 @@ function renderHtml(
         return parsed.pathname + parsed.search;
       } catch (_) {
         const params = [];
-        if (token && !baseUrl.includes('token=')) params.push('token=' + encodeURIComponent(token));
         if (att.name && !baseUrl.includes('name=')) params.push('name=' + encodeURIComponent(att.name));
         if (forceDownload && !baseUrl.includes('download=1')) params.push('download=1');
 
@@ -72026,16 +72017,16 @@ function renderHtml(
 
     function callFetch(endpoint, options) {
       options = options || {};
-      const token = (typeof myProfile !== 'undefined' && myProfile && myProfile.sessionToken)
-        ? myProfile.sessionToken
-        : (localStorage.getItem('sovra_session_token') || (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : ''));
+      const token = (typeof window.getEffectiveSessionToken === 'function')
+        ? window.getEffectiveSessionToken()
+        : ((typeof myProfile !== 'undefined' && myProfile && myProfile.sessionToken)
+            ? myProfile.sessionToken
+            : (window.SOVRA_HOST_SESSION ? window.SOVRA_HOST_SESSION.token : ''));
 
       let url = endpoint;
-      if (token && !url.includes('sessionToken=')) {
-        url += (url.includes('?') ? '&' : '?') + 'sessionToken=' + encodeURIComponent(token);
-      }
 
       const auth = (typeof window.getAuthHeaders === 'function') ? window.getAuthHeaders() : {};
+      options.credentials = 'same-origin';
       options.headers = Object.assign({}, auth, options.headers || {});
       if (token) {
         options.headers['Authorization'] = 'Bearer ' + token;
@@ -77657,9 +77648,9 @@ function renderHtml(
     function syncFriendsRelationships(callback) {
       if (document.hidden) return;
       const myDid = myProfile ? myProfile.did : '${masterKey.did}';
-      const token = localStorage.getItem('sovra_session_token') || (myProfile ? myProfile.sessionToken : '') || '';
       const authHeaders = (typeof getAuthHeaders === 'function') ? getAuthHeaders() : { 'Content-Type': 'application/json' };
-      fetch('/api/friends/list?userDid=' + encodeURIComponent(myDid) + (token ? '&sessionToken=' + encodeURIComponent(token) : ''), {
+      fetch('/api/friends/list?userDid=' + encodeURIComponent(myDid), {
+        credentials: 'same-origin',
         headers: authHeaders
       })
         .then(function(r) { return r.json(); })
@@ -95878,7 +95869,7 @@ async function startDevServer() {
       return;
     }
 
-    // PRIV-01: Zero-knowledge recovery phrase policy - never exportable from server
+    // PRIV-01: Salted Passphrase Verifier policy - recovery phrase is never stored or exportable from server
     if (url.pathname === '/api/user/recovery-phrase' && req.method === 'GET') {
       res.writeHead(403, {
         'Content-Type': 'application/json',
@@ -95886,7 +95877,7 @@ async function startDevServer() {
       });
       res.end(JSON.stringify({
         ok: false,
-        error: 'Zero-Knowledge Security Policy: Master recovery phrases are never stored or exportable from the server. Use your offline backup recorded during registration.',
+        error: 'Passphrase Security Policy: Master recovery phrases are never stored or exportable from the server. Use your offline backup recorded during registration.',
       }));
       return;
     }
@@ -95925,6 +95916,7 @@ async function startDevServer() {
           const derivedDid = 'did:sovra:seed_' + seedHash.slice(0, 16);
           const derivedHandle = '@citizen_' + seedHash.slice(0, 8);
           const newToken = 'stk_' + crypto.randomBytes(24).toString('hex');
+          const { hash: recHash, salt: recSalt } = sovraDb.hashRecoveryPhrase(words.join(' ').toLowerCase());
 
           user = sovraDb.upsertUser({
             did: derivedDid,
@@ -95933,7 +95925,8 @@ async function startDevServer() {
             avatar: '🚀',
             avatarBg: '#6366f1',
             sessionToken: newToken,
-            recoveryPhrase: words.join(' ').toLowerCase(),
+            recoveryPhraseHash: recHash,
+            recoveryPhraseSalt: recSalt,
             balanceSov: 500.0,
           });
         } else if (!user.sessionToken) {
