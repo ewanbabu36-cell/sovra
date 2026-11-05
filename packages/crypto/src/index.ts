@@ -8,3 +8,5 @@ export * from './prf.js';
 export * from './pqc.js';
 export * from './mpc.js';
 export * from './zk.js';
+export * from './bip39.js';
+export * from './bip39-wordlist.js';

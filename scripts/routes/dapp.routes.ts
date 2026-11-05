@@ -156,7 +156,7 @@ export async function handleDAppRoutes(
           permissions: dapp.permissions,
           bundleCid: dapp.bundleCid,
         },
-        sandboxUrl: `/api/dapps/${dapp.id}/bundle?token=${token}`,
+        sandboxUrl: `/api/dapps/${dapp.id}/bundle`,
         expiresAt,
       });
       return true;
