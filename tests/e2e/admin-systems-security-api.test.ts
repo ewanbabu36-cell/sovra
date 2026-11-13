@@ -1,13 +1,77 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 
 describe('Sovra Super-Console Systems & Security Apex REST API Invariants', () => {
   const baseUrl = 'http://localhost:3001';
+  const adminSecret = 'sovra-test-admin-secret-key-32-chars-ok!';
+
+  let rootToken = '';
+  let commanderToken = '';
+  let moderatorToken = '';
+
+  beforeAll(async () => {
+    // 1. Establish Root Admin Session (SUPER_ADMIN)
+    const rootLogin = await fetch(`${baseUrl}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        did: 'did:sov:admin_root',
+        role: 'SUPER_ADMIN',
+        adminKey: adminSecret,
+      }),
+    });
+    const rootData = await rootLogin.json();
+    expect(rootData.ok).toBe(true);
+    rootToken = rootData.sessionToken;
+    expect(rootToken).toBeDefined();
+
+    // 2. Establish Incident Commander Session (INCIDENT_COMMANDER)
+    const cmdLogin = await fetch(`${baseUrl}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        did: 'did:sov:admin_commander',
+        role: 'INCIDENT_COMMANDER',
+        adminKey: adminSecret,
+      }),
+    });
+    const cmdData = await cmdLogin.json();
+    expect(cmdData.ok).toBe(true);
+    commanderToken = cmdData.sessionToken;
+    expect(commanderToken).toBeDefined();
+
+    // 3. Establish Content Moderator Session (CONTENT_MODERATOR)
+    const modLogin = await fetch(`${baseUrl}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        did: 'did:sov:admin_moderator',
+        role: 'CONTENT_MODERATOR',
+        adminKey: adminSecret,
+      }),
+    });
+    const modData = await modLogin.json();
+    expect(modData.ok).toBe(true);
+    moderatorToken = modData.sessionToken;
+    expect(moderatorToken).toBeDefined();
+  });
 
   // =========================================================================
   // CONSTRAINT 4: RBAC Roles Management & Role Isolation
   // =========================================================================
-  it('should list pre-seeded RBAC roles and permissions via GET /api/admin/rbac/roles', async () => {
+  it('should reject unauthenticated request to /api/admin/rbac/roles with 401 Unauthorized', async () => {
     const res = await fetch(`${baseUrl}/api/admin/rbac/roles`);
+    expect(res.status).toBe(401);
+    const data = await res.json();
+    expect(data.ok).toBe(false);
+    expect(data.error).toMatch(/UNAUTHORIZED/i);
+  });
+
+  it('should list pre-seeded RBAC roles and permissions via GET /api/admin/rbac/roles for authorized admin', async () => {
+    const res = await fetch(`${baseUrl}/api/admin/rbac/roles`, {
+      headers: {
+        Authorization: `Bearer ${rootToken}`,
+      },
+    });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.ok).toBe(true);
@@ -23,13 +87,28 @@ describe('Sovra Super-Console Systems & Security Apex REST API Invariants', () =
     expect(commanderRole.permissions).toContain('kill_switches:write');
   });
 
-  it('should assign a new RBAC role via POST /api/admin/rbac/assign', async () => {
+  it('should reject unauthenticated role assignment attempt with 401 Unauthorized', async () => {
+    const assignRes = await fetch(`${baseUrl}/api/admin/rbac/assign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        adminDid: 'did:sov:unauth_test',
+        role: 'NETWORK_OPERATOR',
+        permissions: ['telemetry:read'],
+      }),
+    });
+    expect(assignRes.status).toBe(401);
+  });
+
+  it('should assign a new RBAC role via POST /api/admin/rbac/assign for Super Admin', async () => {
     const customAdminDid = 'did:sov:test_ops_' + Date.now();
     const assignRes = await fetch(`${baseUrl}/api/admin/rbac/assign`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-did': 'did:sov:admin_root', // Super Admin
+        Authorization: `Bearer ${rootToken}`,
       },
       body: JSON.stringify({
         adminDid: customAdminDid,
@@ -43,7 +122,11 @@ describe('Sovra Super-Console Systems & Security Apex REST API Invariants', () =
     expect(assignData.ok).toBe(true);
 
     // Verify it appears in roles list
-    const rolesRes = await fetch(`${baseUrl}/api/admin/rbac/roles`);
+    const rolesRes = await fetch(`${baseUrl}/api/admin/rbac/roles`, {
+      headers: {
+        Authorization: `Bearer ${rootToken}`,
+      },
+    });
     const rolesData = await rolesRes.json();
     const assigned = rolesData.roles.find((r: any) => r.adminDid === customAdminDid);
     expect(assigned).toBeDefined();
@@ -55,12 +138,12 @@ describe('Sovra Super-Console Systems & Security Apex REST API Invariants', () =
   // CONSTRAINT 4: Strict RBAC Permission Enforcement on Destructive Actions
   // =========================================================================
   it('should reject unauthorized role with 403 Forbidden on nuclear kill-switch trigger', async () => {
-    // Content Moderator attempting to trigger nuclear kill switch
+    // Content Moderator attempting to trigger nuclear kill switch (lacks kill_switches:write)
     const res = await fetch(`${baseUrl}/api/admin/nuclear/switch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-did': 'did:sov:admin_moderator', // Lacks kill_switches:write
+        Authorization: `Bearer ${moderatorToken}`,
       },
       body: JSON.stringify({
         switchId: 'MEDIA_UPLOADS_FROZEN',
@@ -76,12 +159,12 @@ describe('Sovra Super-Console Systems & Security Apex REST API Invariants', () =
   });
 
   it('should authorize Incident Commander on nuclear kill-switch and log tamper-evident audit record', async () => {
-    // Incident Commander toggles switch
+    // Incident Commander toggles switch (possesses kill_switches:write)
     const res = await fetch(`${baseUrl}/api/admin/nuclear/switch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-did': 'did:sov:admin_commander', // Has kill_switches:write
+        Authorization: `Bearer ${commanderToken}`,
       },
       body: JSON.stringify({
         switchId: 'WEBRTC_CALLING_FROZEN',
@@ -95,7 +178,11 @@ describe('Sovra Super-Console Systems & Security Apex REST API Invariants', () =
     expect(data.ok).toBe(true);
 
     // Verify cryptographic audit log contains this mutation
-    const auditRes = await fetch(`${baseUrl}/api/admin/audit/ledger?limit=10`);
+    const auditRes = await fetch(`${baseUrl}/api/admin/audit/ledger?limit=10`, {
+      headers: {
+        Authorization: `Bearer ${rootToken}`,
+      },
+    });
     const auditData = await auditRes.json();
     expect(auditData.ok).toBe(true);
 
@@ -110,7 +197,11 @@ describe('Sovra Super-Console Systems & Security Apex REST API Invariants', () =
   // CONSTRAINT 4: Cryptographic Merkle Chain Integrity Verification
   // =========================================================================
   it('should verify cryptographic SHA-256 Merkle chain integrity via /api/admin/audit/verify-chain', async () => {
-    const res = await fetch(`${baseUrl}/api/admin/audit/verify-chain`);
+    const res = await fetch(`${baseUrl}/api/admin/audit/verify-chain`, {
+      headers: {
+        Authorization: `Bearer ${rootToken}`,
+      },
+    });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.ok).toBe(true);
@@ -127,7 +218,7 @@ describe('Sovra Super-Console Systems & Security Apex REST API Invariants', () =
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-did': 'did:sov:admin_moderator', // Lacks ledger:transfer
+        Authorization: `Bearer ${moderatorToken}`, // Lacks ledger:transfer
       },
       body: JSON.stringify({
         fromDid: 'did:sov:sender_unauth',
@@ -147,7 +238,11 @@ describe('Sovra Super-Console Systems & Security Apex REST API Invariants', () =
   // CONSTRAINT 2: Zero Thread Blocking Async Wash-Trading Scan API
   // =========================================================================
   it('should execute non-blocking time-budgeted async wash-trading cycle scan', async () => {
-    const res = await fetch(`${baseUrl}/api/admin/revenue/wash-trading-async`);
+    const res = await fetch(`${baseUrl}/api/admin/revenue/wash-trading-async`, {
+      headers: {
+        Authorization: `Bearer ${rootToken}`,
+      },
+    });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.ok).toBe(true);

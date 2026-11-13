@@ -14,4 +14,5 @@ export * from './guardian-liveness.js';
 export * from './onboarding.js';
 export * from './principal.js';
 export * from './admin.js';
+export * from './governance/index.js';
 

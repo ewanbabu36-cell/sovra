@@ -101,29 +101,11 @@ export class SovereignAdminSecurityEngine {
   };
 
   constructor() {
-    this.seedDefaultProposal();
+    // Zero-trust initialization: proposals must be created explicitly by authenticated principals
   }
 
   private seedDefaultProposal() {
-    const id = 'prop_seed_' + Date.now();
-    this.proposals.set(id, {
-      id,
-      action: 'TREASURY_WITHDRAWAL',
-      payload: { amountSov: 50, recipientDid: 'did:sovra:charity_dao', description: 'Quarterly Mesh Seed Reserve Allocation' },
-      proposerDid: 'did:sovra:admin_alpha',
-      proposerRole: 'TREASURY_OFFICER',
-      requiredSignatures: 2,
-      signatures: [
-        {
-          signerDid: 'did:sovra:admin_alpha',
-          role: 'TREASURY_OFFICER',
-          passkeySignature: 'sig_ed25519_pk_' + crypto.randomBytes(16).toString('hex'),
-          timestamp: Date.now() - 3600000,
-        },
-      ],
-      status: 'PENDING',
-      createdAt: Date.now() - 3600000,
-    });
+    // Deprecated mock proposal - removed in accordance with zero-trust governance remediation
   }
 
   public authorize(principal: AdminPrincipal | null, requiredPermission: string): { authorized: boolean; error?: string; statusCode: number } {

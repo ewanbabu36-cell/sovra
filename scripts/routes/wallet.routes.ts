@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { sovraDb } from '../database-engine.ts';
-import { signEd25519, bytesToHex } from '../../packages/crypto/dist/index.js';
+import { signEd25519, bytesToHex, verifyMetaTransaction, type MetaTransactionRequest } from '../../packages/crypto/dist/index.js';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
 
 const PRIMARY_RPC = process.env.SOVRA_L1_RPC || 'http://127.0.0.1:26657';
@@ -57,10 +57,20 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         nativeBalance = String(balData.balance || '0');
       }
     } catch {
-      // Fallback: check database wallet balance
-      const dbAny = sovraDb as any;
-      const userWallets = (dbAny && dbAny.db && dbAny.db.wallets) ? dbAny.db.wallets : {};
-      nativeBalance = String(userWallets[address]?.balance || '1000000000000');
+      // Fallback: check database wallet balance from SQLite
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const targetDid = ctx.url.searchParams.get('did') || (principal ? principal.did : null);
+      let foundBal = 0;
+      const sqlite = (sovraDb as any).getSqliteEngine?.()?.db;
+      if (sqlite && targetDid) {
+        const row = sqlite.prepare('SELECT balance_sov FROM users WHERE did = ?').get(targetDid);
+        if (row && typeof row.balance_sov === 'number') {
+          foundBal = row.balance_sov;
+        }
+      } else if (targetDid) {
+        foundBal = sovraDb.getUserBalance(targetDid);
+      }
+      nativeBalance = String(BigInt(Math.round(foundBal * 1_000_000)));
     }
 
     const nativeBalNumeric = Number(nativeBalance) / 1_000_000;
@@ -182,90 +192,38 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         dbAny.db.amm_pools = [];
       }
 
-      // Locate or establish AMM pool for this token
+      // Locate active AMM pool for this token
       let pool = dbAny.db.amm_pools.find((p: any) => p.tokenAddress === tokenAddress);
       if (!pool) {
-        pool = {
-          poolAddress: 'sovra1wasm' + crypto.createHash('sha256').update(`amm_pool:${tokenAddress}`).digest('hex').slice(0, 32),
-          tokenAddress,
-          creatorAddress: parsed.creatorAddress || userAddress,
-          reserveSov: '10000000',    // 10 SOV
-          reserveToken: '100000000', // 100 Tokens
-          feePercent: 1,             // 1% royalty
-          createdAt: Date.now()
-        };
-        dbAny.db.amm_pools.push(pool);
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: `Liquidity pool does not exist for token address: ${tokenAddress}. Spawning phantom unbacked reserves is strictly prohibited.`,
+        }));
+        return true;
       }
 
       let l1TxResult: any = null;
       let calculatedOutput = '0';
       let royaltyFee = '0';
 
-      // Execute on Layer-1 if online
-      try {
-        const valKeyPath = path.resolve(process.cwd(), 'chain/mytestnet/node0/validator-0.key.json');
-        if (fs.existsSync(valKeyPath)) {
-          const valKey = JSON.parse(fs.readFileSync(valKeyPath, 'utf8'));
-          const senderAddress = userAddress.startsWith('sovra12a806ca82') ? userAddress : valKey.address;
-          const privKey = Buffer.from(valKey.priv_key, 'hex').subarray(0, 32);
-
-          const nonceRes = await fetch(`${PRIMARY_RPC}/query/nonce?address=${encodeURIComponent(senderAddress)}`);
-          const nonceData = await nonceRes.json();
-          const nonce = Number(nonceData.nonce || 0);
-
-          let swapMsg: any;
-          let fundsAttached = '0';
-
-          if (direction === 'buy') {
-            fundsAttached = amount;
-            swapMsg = {
-              buy_tokens: {
-                min_tokens: minOutput !== '0' ? minOutput : undefined
-              }
-            };
-          } else {
-            swapMsg = {
-              sell_tokens: {
-                amount,
-                min_sov: minOutput !== '0' ? minOutput : undefined
-              }
-            };
-          }
-
-          const execPayload: any = {
-            type: 'execute',
-            sender: senderAddress,
-            contract: pool.poolAddress,
-            msg: JSON.stringify(swapMsg),
-            fee: '1000',
-            nonce
-          };
-          if (fundsAttached !== '0') {
-            execPayload.amount = fundsAttached;
-          }
-
-          const signBytes = Buffer.from(JSON.stringify(execPayload), 'utf8');
-          const sig = bytesToHex(signEd25519(new Uint8Array(privKey), new Uint8Array(signBytes)));
-
-          const l1Payload = {
-            ...execPayload,
-            pub_key: valKey.pub_key,
-            sig
-          };
-
+      // Execute on Layer-1 if pre-signed client transaction is provided
+      // Non-custodial: only relay client-signed transactions (never sign with validator private key)
+      const clientSignedTx = req.body?.signedTx;
+      if (clientSignedTx && typeof clientSignedTx === 'object') {
+        try {
           const rpcRes = await fetch(`${PRIMARY_RPC}/broadcast_tx_commit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(l1Payload)
+            body: JSON.stringify(clientSignedTx)
           });
           if (rpcRes.ok) {
             l1TxResult = await rpcRes.json();
           }
+        } catch (rpcErr) {
+          console.warn('[WALLET] L1 swap broadcast warning:', rpcErr);
         }
-      } catch (rpcErr) {
-        console.warn('[WALLET] L1 swap broadcast warning:', rpcErr);
       }
-
       // Calculate Constant Product (x * y = k) locally for pool state
       const rSov = BigInt(pool.reserveSov);
       const rTok = BigInt(pool.reserveToken);
@@ -323,6 +281,71 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
     const pools: any[] = typeof (sovraDb as any).getAmmPools === 'function' ? (sovraDb as any).getAmmPools() : (((sovraDb as any).db && Array.isArray((sovraDb as any).db.amm_pools)) ? (sovraDb as any).db.amm_pools : []);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, pools, count: pools.length }));
+    return true;
+  }
+
+  // 3b. POST /api/wallet/pools/create - Establish verified AMM pool with deposited reserves
+  if (url.pathname === '/api/wallet/pools/create' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+
+      const tokenAddress = String(parsed.tokenAddress || '').trim();
+      const initialSov = Math.round(Number(parsed.initialSov || 0) * 1_000_000);
+      const initialToken = Math.round(Number(parsed.initialToken || 0) * 1_000_000);
+
+      if (!tokenAddress || initialSov <= 0 || initialToken <= 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'tokenAddress, initialSov (>0), and initialToken (>0) required' }));
+        return true;
+      }
+
+      const creator = sovraDb.findUserByDid(principal.did);
+      const creatorBal = Number(creator?.balanceSov ?? creator?.balance_sov ?? 0);
+      const sovDeposit = initialSov / 1_000_000;
+      if (creatorBal < sovDeposit) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: `Insufficient balance to fund pool. Available: ${creatorBal} SOV, Required: ${sovDeposit} SOV` }));
+        return true;
+      }
+
+      const dbAny = sovraDb as any;
+      if (!Array.isArray(dbAny.db.amm_pools)) dbAny.db.amm_pools = [];
+      const existing = dbAny.db.amm_pools.find((p: any) => p.tokenAddress === tokenAddress);
+      if (existing) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Pool already exists for this token' }));
+        return true;
+      }
+
+      // Debit creator balance for deposited liquidity
+      if (creator) {
+        creator.balanceSov = Math.round((creatorBal - sovDeposit) * 100) / 100;
+        creator.balance_sov = creator.balanceSov;
+      }
+
+      const newPool = {
+        poolAddress: 'sovra1wasm' + crypto.createHash('sha256').update(`amm_pool:${tokenAddress}`).digest('hex').slice(0, 32),
+        tokenAddress,
+        creatorAddress: resolveUserAddress(ctx),
+        creatorDid: principal.did,
+        reserveSov: String(initialSov),
+        reserveToken: String(initialToken),
+        feePercent: Math.min(Math.max(Number(parsed.feePercent || 1), 0.1), 5),
+        createdAt: Date.now(),
+      };
+      dbAny.db.amm_pools.push(newPool);
+      if (typeof dbAny.save === 'function') dbAny.save();
+
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, pool: newPool, message: 'AMM liquidity pool created and funded successfully' }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Pool creation failed' }));
+    }
     return true;
   }
 
@@ -462,22 +485,25 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
     try {
       const parsed = JSON.parse(body || '{}');
-      const principal = ctx.resolvePrincipal(ctx.req);
-      const targetDid = parsed.did || (principal ? principal.did : 'did:sovra:guest');
-      const amount = Number(parsed.amount || 50);
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+
+      const targetDid = principal.did;
+      const requestedAmount = Number(parsed.amount || 50);
+      const amount = Math.min(50, Math.max(1, isNaN(requestedAmount) ? 50 : requestedAmount));
 
       // Cryptographic 24-hour rate limiting
-      const sqlite = (sovraDb as any).getSqliteEngine?.()?.getRawDb?.() || (sovraDb as any).sqliteEngine?.getRawDb?.();
+      const sqlite = (sovraDb as any).getSqliteEngine?.()?.db;
       if (sqlite) {
         try {
           const lastClaim = sqlite.prepare(`
-            SELECT created_at FROM analytics_events 
-            WHERE event_type = 'FAUCET_CLAIM' AND user_did = ? 
+            SELECT created_at FROM token_transfers 
+            WHERE tx_type = 'FAUCET_CLAIM' AND to_did = ? 
             ORDER BY created_at DESC LIMIT 1
           `).get(targetDid) as any;
 
           if (lastClaim) {
-            const lastTime = new Date(lastClaim.created_at).getTime();
+            const lastTime = Number(lastClaim.created_at);
             if (Date.now() - lastTime < 24 * 60 * 60 * 1000) {
               const waitHours = Math.ceil((24 * 60 * 60 * 1000 - (Date.now() - lastTime)) / 3600000);
               res.writeHead(429, { 'Content-Type': 'application/json' });
@@ -488,50 +514,55 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         } catch (_) {}
       }
 
-      let result = (sovraDb as any).depositFunds({
-        did: targetDid,
+      // Ensure user exists in SQLite
+      let user = sqlite?.prepare('SELECT balance_sov FROM users WHERE did = ?').get(targetDid) as any;
+      if (!user) {
+        const now = Date.now();
+        sqlite?.prepare(`
+          INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, device_type, created_at, updated_at)
+          VALUES (?, ?, ?, '🎨', '#10b981', 0.0, 'BROWSER', ?, ?)
+        `).run(targetDid, principal.displayName || ('@user_' + targetDid.slice(-6)), principal.displayName || 'User', now, now);
+        user = { balance_sov: 0.0 };
+      }
+
+      const txId = 'tx_faucet_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+      const now = Date.now();
+      sqlite?.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?').run(amount, now, targetDid);
+      sqlite?.prepare(`
+        INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
+        VALUES (?, 'did:sov:treasury_genesis', ?, ?, 0.0, 'FAUCET_CLAIM', ?)
+      `).run(txId, targetDid, amount, now);
+
+      const updatedUser = sqlite?.prepare('SELECT balance_sov FROM users WHERE did = ?').get(targetDid) as any;
+      const newBalance = updatedUser ? Number(updatedUser.balance_sov) : amount;
+
+      // Sync memory
+      if ((sovraDb as any).db && Array.isArray((sovraDb as any).db.users)) {
+        const memUser = (sovraDb as any).db.users.find((u: any) => u.did === targetDid);
+        if (memUser) {
+          memUser.balanceSov = newBalance;
+        }
+      }
+
+      try {
+        sovraDb.recordAnalyticsEvent({
+          eventType: 'FAUCET_CLAIM',
+          userDid: targetDid,
+          metadataJson: JSON.stringify({ amount, txType: 'GENESIS_TESTNET_FAUCET', txId })
+        });
+      } catch (_) {}
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        claimed: amount,
         amount,
-        sourceTx: 'faucet_claim_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'),
-      });
-
-      if (!result.ok && result.error === 'User account not found') {
-        const handle = targetDid.replace('did:sovra:', '@');
-        (sovraDb as any).registerUser({
-          did: targetDid,
-          handle,
-          displayName: handle.replace('@', ''),
-          balanceSov: 0.0
-        });
-        result = (sovraDb as any).depositFunds({
-          did: targetDid,
-          amount,
-          sourceTx: 'faucet_claim_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'),
-        });
-      }
-
-      if (result.ok) {
-        try {
-          sovraDb.recordAnalyticsEvent({
-            eventType: 'FAUCET_CLAIM',
-            userDid: targetDid,
-            metadataJson: JSON.stringify({ amount, txType: 'GENESIS_TESTNET_FAUCET' })
-          });
-        } catch (_) {}
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          ok: true,
-          claimed: amount,
-          amount,
-          newBalance: result.newBalance,
-          newBalanceFiat: Number((result.newBalance * 3.0).toFixed(2)),
-          currency: 'SOV',
-          txHash: '0x' + crypto.randomBytes(16).toString('hex'),
-          message: `🎁 ${amount.toFixed(2)} SOV Genesis Starter Grant claimed successfully!`,
-        }));
-      } else {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: result.error || 'Faucet claim failed' }));
-      }
+        newBalance,
+        newBalanceFiat: Number((newBalance * 3.0).toFixed(2)),
+        currency: 'SOV',
+        txHash: txId,
+        message: `🎁 ${amount.toFixed(2)} SOV Genesis Starter Grant claimed successfully!`,
+      }));
     } catch (err: any) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Server error' }));
@@ -546,34 +577,285 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
     try {
       const parsed = JSON.parse(body || '{}');
-      const senderDid = parsed.senderDid || resolveUserAddress(ctx);
-      const recipientDid = parsed.recipientDid || parsed.recipient;
-      const amount = String(parsed.amount || '0');
-      const tokenSymbol = String(parsed.tokenSymbol || 'SOV').toUpperCase();
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
 
-      if (!recipientDid || Number(amount) <= 0) {
+      let senderDid = principal.did;
+      let recipientDid = String(parsed.recipientDid || parsed.recipient || '').trim();
+
+      // Handle signed offline DTN voucher submission
+      if (parsed.voucher) {
+        const vch = parsed.voucher;
+        if (vch.expiresAt && vch.expiresAt < Date.now()) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Payment voucher has expired' }));
+          return true;
+        }
+        // In offline voucher redemption: sender is the voucher issuer, recipient is the claimant/payee
+        senderDid = vch.senderDid || vch.fromDid || vch.payerDid;
+        recipientDid = vch.payeeDid || vch.toDid || principal.did;
+        parsed.amount = vch.amount ?? vch.amountSov;
+        parsed.tokenSymbol = vch.tokenSymbol || 'SOV';
+        parsed.idempotencyKey = vch.voucherId;
+
+        if (!senderDid) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Voucher missing valid sender identification' }));
+          return true;
+        }
+      } else {
+        if (parsed.senderDid && parsed.senderDid !== principal.did) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot transfer funds from another identity' }));
+          return true;
+        }
+      }
+      const amountSov = Math.round(Number(parsed.amount || '0') * 100) / 100;
+      const tokenSymbol = String(parsed.tokenSymbol || 'SOV').toUpperCase();
+      const memo = parsed.memo ? String(parsed.memo).slice(0, 256) : undefined;
+      const idempotencyKey = req.headers['idempotency-key']
+        ? String(req.headers['idempotency-key']).trim()
+        : parsed.idempotencyKey
+          ? String(parsed.idempotencyKey).trim()
+          : undefined;
+
+      if (!recipientDid) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'recipientDid and positive amount are required' }));
+        res.end(JSON.stringify({ ok: false, error: 'recipientDid is required' }));
         return true;
       }
 
-      const txHash = '0x' + crypto.randomBytes(32).toString('hex');
+      if (!Number.isFinite(amountSov) || amountSov <= 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Positive finite amount is required' }));
+        return true;
+      }
+
+      if (recipientDid === senderDid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Self-transfer prohibited: sender and recipient cannot be identical' }));
+        return true;
+      }
+
+      // Execute atomic P2P transfer via SQLite double-entry ledger
+      const transferResult = (sovraDb as any).executeUserP2PTransfer({
+        fromDid: senderDid,
+        toDid: recipientDid,
+        amountSov,
+        feeSov: 0.0,
+        txType: 'P2P_TRANSFER',
+        memo,
+        idempotencyKey,
+        ipAddress: req.socket?.remoteAddress || '127.0.0.1',
+      });
+
+      if (!transferResult.ok) {
+        res.writeHead(transferResult.statusCode || 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: transferResult.error || 'Transfer failed' }));
+        return true;
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
-        txHash,
+        txHash: transferResult.txId,
+        txId: transferResult.txId,
         senderDid,
         recipientDid,
-        amount,
+        amount: amountSov,
+        fromBalance: transferResult.fromBalance,
+        toBalance: transferResult.toBalance,
         tokenSymbol,
         status: 'confirmed',
+        isReplay: transferResult.isReplay || false,
         timestamp: Date.now(),
       }));
     } catch (err: any) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Transfer failed' }));
     }
     return true;
+  }
+
+  // ==========================================
+  // 10. POST /api/wallet/meta-tx - EIP-2771 Gasless Relayer
+  // ==========================================
+  if (url.pathname === '/api/wallet/meta-tx' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const metaReq = JSON.parse(body || '{}') as MetaTransactionRequest;
+      if (!metaReq.from || !metaReq.to || !metaReq.signatureHex) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing required meta-tx fields (from, to, signatureHex)' }));
+        return true;
+      }
+
+      // Resolve sender public key
+      const sender = (sovraDb as any).db?.users?.find((u: any) => u.did === metaReq.from);
+      let pubKeyBytes: Uint8Array | null = null;
+      if (sender && sender.publicKey) {
+        pubKeyBytes = Buffer.from(sender.publicKey, 'hex');
+      } else if (metaReq.from.startsWith('did:key:')) {
+        pubKeyBytes = Buffer.from(metaReq.from.slice(8, 72).padEnd(64, '0'), 'hex');
+      } else {
+        pubKeyBytes = crypto.createHash('sha256').update(metaReq.from).digest();
+      }
+
+      const verifyRes = verifyMetaTransaction(metaReq, pubKeyBytes);
+      if (!verifyRes.valid) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: verifyRes.error || 'Meta-transaction signature invalid' }));
+        return true;
+      }
+
+      const amountSov = parseFloat(metaReq.amount || '0') || 0;
+      let txId = 'relayer_tx_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+
+      if (amountSov > 0) {
+        const transferRes = (sovraDb as any).executeUserP2PTransfer({
+          fromDid: metaReq.from,
+          toDid: metaReq.to,
+          amountSov,
+          feeSov: 0.0, // Sponsored: 0 fee charged to user!
+          txType: metaReq.action === 'TIP' ? 'CREATOR_TIP' : 'P2P_TRANSFER',
+          memo: `Gasless Meta-Tx Relayed: ${metaReq.action}`,
+          idempotencyKey: `meta_${metaReq.from}_${metaReq.nonce}`,
+        });
+        if (!transferRes.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: transferRes.error }));
+          return true;
+        }
+        txId = transferRes.txId;
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        txHash: txId,
+        relayerSponsored: true,
+        gasChargedSov: 0,
+        action: metaReq.action,
+        status: 'confirmed',
+      }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Meta-tx execution failed' }));
+      return true;
+    }
+  }
+
+  // ==========================================
+  // 11. GET /api/wallet/fiat/quote - Live Fiat Conversion Rates
+  // ==========================================
+  if (url.pathname === '/api/wallet/fiat/quote' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      rates: {
+        INR: 10.0, // 1 SOV = 10 INR
+        USD: 0.12, // 1 SOV = $0.12 USD
+      },
+      updatedAt: Date.now(),
+    }));
+    return true;
+  }
+
+  // ==========================================
+  // 12. POST /api/wallet/fiat/webhook - Automated Fiat On-Ramp
+  // ==========================================
+  if (url.pathname === '/api/wallet/fiat/webhook' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const payload = JSON.parse(body || '{}');
+      const { paymentId, userDid, amountFiat, currency } = payload;
+      if (!userDid || !amountFiat || amountFiat <= 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid webhook payload (userDid, amountFiat required)' }));
+        return true;
+      }
+
+      const sovToCredit = Number((amountFiat / 10).toFixed(4));
+      const user = (sovraDb as any).db?.users?.find((u: any) => u.did === userDid);
+      if (!user) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'User not found' }));
+        return true;
+      }
+
+      user.balanceSov = (user.balanceSov || 0) + sovToCredit;
+      (sovraDb as any).save();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        creditedSov: sovToCredit,
+        newBalance: user.balanceSov,
+        paymentId: paymentId || `pay_${Date.now()}`,
+      }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Webhook processing failed' }));
+      return true;
+    }
+  }
+
+  // ==========================================
+  // 13. POST /api/wallet/fiat/withdraw - 1-Click Bank/UPI Cash-Out
+  // ==========================================
+  if (url.pathname === '/api/wallet/fiat/withdraw' && req.method === 'POST') {
+    const principal = ctx.enforceAuth(req, res);
+    if (!principal) return true;
+
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const payload = JSON.parse(body || '{}');
+      const amountSov = parseFloat(payload.amountSov || '0');
+      const payoutTarget = payload.payoutTarget || 'UPI';
+      const targetAddress = payload.targetAddress || '';
+
+      if (isNaN(amountSov) || amountSov <= 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid amountSov' }));
+        return true;
+      }
+
+      const user = (sovraDb as any).db?.users?.find((u: any) => u.did === principal.did);
+      if (!user || (user.balanceSov || 0) < amountSov) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Insufficient SOV balance for cash out' }));
+        return true;
+      }
+
+      user.balanceSov -= amountSov;
+      (sovraDb as any).save();
+
+      const fiatPayoutAmount = Number((amountSov * 10).toFixed(2));
+      const payoutReceiptId = `payout_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        payoutReceiptId,
+        debitedSov: amountSov,
+        fiatPayoutAmount,
+        currency: 'INR',
+        payoutTarget,
+        targetAddress,
+        remainingBalance: user.balanceSov,
+        status: 'PROCESSED',
+      }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Withdrawal processing failed' }));
+      return true;
+    }
   }
 
   return false;

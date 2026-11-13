@@ -64,7 +64,9 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
 
     try {
       const parsed = JSON.parse(body);
-      const creatorDid = resolveUserDid(ctx, parsed);
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+      const creatorDid = principal.did;
       const user = sovraDb.findUserByDid(creatorDid);
       const rawTitle = parsed.title !== undefined ? String(parsed.title).trim() : 'Sovereign Swarm Live Broadcast';
       if (!rawTitle) {
@@ -180,7 +182,9 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
         return true;
       }
 
-      const senderDid = resolveUserDid(ctx, parsed);
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+      const senderDid = principal.did;
       const user = sovraDb.findUserByDid(senderDid);
       const senderName = parsed.senderName || user?.displayName || 'Supporter';
 
@@ -322,47 +326,22 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
 
       let txHash = '0x' + crypto.randomBytes(32).toString('hex');
       if (tokenAddress) {
-        try {
-          const valKeyPath = path.resolve(process.cwd(), 'chain/mytestnet/node0/validator-0.key.json');
-          if (fs.existsSync(valKeyPath)) {
-            const valKey = JSON.parse(fs.readFileSync(valKeyPath, 'utf8'));
-            const senderKeyAddr = senderAddress.startsWith('sovra12a806ca82') ? senderAddress : valKey.address;
-            const privKey = Buffer.from(valKey.priv_key, 'hex').subarray(0, 32);
-
-            const nonceRes = await fetch(`${PRIMARY_RPC}/query/nonce?address=${encodeURIComponent(senderKeyAddr)}`);
-            const nonceData = await nonceRes.json();
-            const nonce = Number(nonceData.nonce || 0);
-
-            const transferMsg = {
-              transfer: {
-                recipient: creatorAddress,
-                amount
-              }
-            };
-
-            const txPayload = {
-              type: 'execute',
-              sender: senderKeyAddr,
-              contract: tokenAddress,
-              nonce,
-              fee: '1000',
-              msg: JSON.stringify(transferMsg)
-            };
-
-            const signBytes = Buffer.from(JSON.stringify(txPayload), 'utf8');
-            const sig = bytesToHex(signEd25519(new Uint8Array(privKey), new Uint8Array(signBytes)));
+        // Non-custodial: relay client-signed transaction if provided
+        const clientSignedTx = (req as any).body?.signedTx;
+        if (clientSignedTx && typeof clientSignedTx === 'object') {
+          try {
             const rpcRes = await fetch(`${PRIMARY_RPC}/broadcast_tx_commit`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...txPayload, pub_key: valKey.pub_key, sig })
+              body: JSON.stringify(clientSignedTx)
             });
             if (rpcRes.ok) {
               const rData = await rpcRes.json();
               if (rData && rData.hash) txHash = rData.hash;
             }
+          } catch (l1Err) {
+            console.warn('[SUPERCHAT] L1 CW20 transfer broadcast warning:', l1Err);
           }
-        } catch (l1Err) {
-          console.warn('[SUPERCHAT] L1 CW20 transfer broadcast warning:', l1Err);
         }
       }
 
@@ -639,7 +618,9 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
         return true;
       }
 
-      const requesterDid = resolveUserDid(ctx, parsed);
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+      const requesterDid = principal.did;
       const endRes = sovraDb.endLiveBroadcast(sessionId, requesterDid);
       if (!endRes.ok) {
         const errLower = (endRes.error || '').toLowerCase();
@@ -793,10 +774,36 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body);
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+
       const sessionId = parsed.sessionId;
-      const bidderDid = parsed.bidderDid || 'did:sovra:bidder';
-      const bidderName = parsed.bidderName || 'Sovereign Collector';
+      const bidderDid = principal.did;
+      const bidder = sovraDb.findUserByDid(bidderDid);
+      if (!bidder) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Bidder account not found' }));
+        return true;
+      }
+
+      const bidderName = bidder.displayName || bidder.handle || 'Sovereign Collector';
       const amount = Number(parsed.amountSov);
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Positive numerical bid amount required' }));
+        return true;
+      }
+
+      const availableBalance = Number(bidder.balanceSov ?? bidder.balance_sov ?? 0);
+      if (availableBalance < amount) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: `Insufficient SOV balance to place bid. Available: ${availableBalance} SOV, Required: ${amount} SOV`,
+        }));
+        return true;
+      }
 
       const auction = liveAuctions.get(sessionId);
       if (!auction || auction.status !== 'ACTIVE') {

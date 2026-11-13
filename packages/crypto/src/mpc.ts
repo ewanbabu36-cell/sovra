@@ -26,13 +26,17 @@ export function gfAdd(a: number, b: number): number {
 
 export function gfMul(a: number, b: number): number {
   if (a === 0 || b === 0) return 0;
-  return EXP[LOG[a] + LOG[b]];
+  const logA = LOG[a] ?? 0;
+  const logB = LOG[b] ?? 0;
+  return EXP[logA + logB] ?? 0;
 }
 
 export function gfDiv(a: number, b: number): number {
   if (b === 0) throw new Error('Division by zero in GF(2^8)');
   if (a === 0) return 0;
-  return EXP[(LOG[a] - LOG[b] + 255) % 255];
+  const logA = LOG[a] ?? 0;
+  const logB = LOG[b] ?? 0;
+  return EXP[(logA - logB + 255) % 255] ?? 0;
 }
 
 export interface MpcShare {
@@ -79,8 +83,8 @@ export function splitSecretMpc(secret: string | Buffer, threshold = 2, totalShar
   for (let x = 1; x <= totalShares; x++) {
     const shareBuf = Buffer.alloc(len);
     for (let i = 0; i < len; i++) {
-      const s = secretBuf[i];
-      const slope = a1[i];
+      const s = secretBuf[i] ?? 0;
+      const slope = a1[i] ?? 0;
       // f(x) = s ^ (slope * x) in GF(2^8)
       shareBuf[i] = gfAdd(s, gfMul(slope, x));
     }
@@ -88,12 +92,17 @@ export function splitSecretMpc(secret: string | Buffer, threshold = 2, totalShar
     const shareHex = shareBuf.toString('hex');
     const commitment = crypto.createHash('sha256').update(shareHex).digest('hex');
 
-    shares.push({
+    const share: MpcShare = {
       id: x,
       shareHex,
       commitment,
-      holderType: holderTypes[x - 1],
-    });
+    };
+    const ht = holderTypes[x - 1];
+    if (ht !== undefined) {
+      share.holderType = ht;
+    }
+
+    shares.push(share);
   }
 
   const secretHash = crypto.createHash('sha256').update(secretBuf).digest('hex');
@@ -129,6 +138,10 @@ export function reconstructSecretMpc(shares: MpcShare[]): string {
   const s0 = selected[0];
   const s1 = selected[1];
 
+  if (!s0 || !s1) {
+    throw new Error('Distinct share IDs are required for MPC polynomial reconstruction');
+  }
+
   const b0 = Buffer.from(s0.shareHex, 'hex');
   const b1 = Buffer.from(s1.shareHex, 'hex');
 
@@ -150,8 +163,8 @@ export function reconstructSecretMpc(shares: MpcShare[]): string {
   const l1 = gfDiv(x0, denom);
 
   for (let i = 0; i < len; i++) {
-    const y0 = b0[i];
-    const y1 = b1[i];
+    const y0 = b0[i] ?? 0;
+    const y1 = b1[i] ?? 0;
     const term0 = gfMul(y0, l0);
     const term1 = gfMul(y1, l1);
     secretBuf[i] = gfAdd(term0, term1);

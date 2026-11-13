@@ -1098,6 +1098,40 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <span class="admin-nav-badge" id="sidebarModerationBadge" style="background:#f43f5e; color:#fff;">${reports ? reports.filter(r => r.status === 'SUBMITTED' || r.status === 'UNDER_REVIEW' || r.status === 'TRIAGED').length : 0} Pending</span>
       </button>
 
+      <div style="margin: 14px 16px 4px 16px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; border-top: 1px solid rgba(148,163,184,0.15); padding-top: 10px;">
+        Authoritative Moderation
+      </div>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('user-management')">
+        <span class="admin-nav-icon">👤</span>
+        <span>User Management</span>
+        <span class="admin-nav-badge" style="background:#3b82f6; color:#fff;">Users</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('creator-management')">
+        <span class="admin-nav-icon">🎬</span>
+        <span>Creator Management</span>
+        <span class="admin-nav-badge" style="background:#8b5cf6; color:#fff;">Creators</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('content-moderation')">
+        <span class="admin-nav-icon">📑</span>
+        <span>Content Moderation</span>
+        <span class="admin-nav-badge" style="background:#ec4899; color:#fff;">Posts</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('moderation-appeals')">
+        <span class="admin-nav-icon">⚖️</span>
+        <span>Appeals &amp; Review</span>
+        <span class="admin-nav-badge" style="background:#eab308; color:#000;">Queue</span>
+      </button>
+
+      <button class="admin-nav-item" onclick="switchAdminTab('moderation-audit')">
+        <span class="admin-nav-icon">📜</span>
+        <span>Moderation Ledger</span>
+        <span class="admin-nav-badge" style="background:#14b8a6; color:#000;">Merkle</span>
+      </button>
+
       <button class="admin-nav-item" onclick="switchAdminTab('telemetry')">
         <span class="admin-nav-icon">⚡</span>
         <span>System Health &amp; Mesh</span>
@@ -2128,6 +2162,314 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           </div>
         </div>
       </section>
+
+
+      <!-- ==============================================
+           SECTION: USER MANAGEMENT & MODERATION COCKPIT
+           ============================================== -->
+      <section class="ops-section" id="view-user-management">
+        <div class="ops-header-card">
+          <div>
+            <div class="ops-header-title">👤 User Management &amp; Moderation Cockpit</div>
+            <div class="ops-header-desc">Search, inspect, and execute authoritative moderation actions (temporary blocks, permanent suspensions, scoped shadowbans, restorations) with mandatory confirmation and tamper-evident audit logging.</div>
+          </div>
+          <div style="display: flex; gap: 0.65rem; align-items: center;">
+            <button class="btn-ops primary" onclick="loadAdminUsers()">🔄 Refresh Users</button>
+          </div>
+        </div>
+
+        <div class="ops-card" style="margin-bottom: 16px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+            <input type="text" id="userMgmtSearchInput" placeholder="Search by DID, handle, or name..." style="flex: 1; min-width: 260px; padding: 8px 14px; background: rgba(15,23,42,0.6); border: 1px solid rgba(148,163,184,0.3); border-radius: 8px; color: #fff; font-size: 0.85rem;" onkeydown="if(event.key==='Enter') loadAdminUsers()">
+            <select id="userMgmtStatusFilter" style="padding: 8px 12px; background: rgba(15,23,42,0.6); border: 1px solid rgba(148,163,184,0.3); border-radius: 8px; color: #cbd5e1; font-size: 0.85rem;" onchange="loadAdminUsers()">
+              <option value="ALL">All Account Statuses</option>
+              <option value="ACTIVE">Active Accounts</option>
+              <option value="BLOCKED">Temporarily Blocked</option>
+              <option value="SUSPENDED">Permanently Suspended</option>
+            </select>
+            <button class="btn-ops primary" onclick="loadAdminUsers()">Search</button>
+          </div>
+        </div>
+
+        <div class="ops-card">
+          <div style="overflow-x: auto;">
+            <table class="ops-table">
+              <thead>
+                <tr>
+                  <th>Identity / Handle</th>
+                  <th>DID (SOVRA ID)</th>
+                  <th>Status</th>
+                  <th>Restrictions / Shadowban</th>
+                  <th>Balance (SOV)</th>
+                  <th>Registered</th>
+                  <th style="text-align: right;">Moderation Actions</th>
+                </tr>
+              </thead>
+              <tbody id="userMgmtTableBody">
+                <tr><td colspan="7" style="text-align:center; padding: 24px; color: #64748b;">Loading user accounts...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="userMgmtPagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 0.8rem; color: #94a3b8;"></div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           SECTION: CREATOR MANAGEMENT & CHANNEL MODERATION
+           ============================================== -->
+      <section class="ops-section" id="view-creator-management">
+        <div class="ops-header-card">
+          <div>
+            <div class="ops-header-title">🎬 Creator Management &amp; Channel Moderation</div>
+            <div class="ops-header-desc">Manage verified content creators, broadcast channels, monetization entitlements, and content distribution restrictions. Invariant: creator wallet balances and earned payouts are strictly protected from confiscation.</div>
+          </div>
+          <div style="display: flex; gap: 0.65rem; align-items: center;">
+            <button class="btn-ops primary" onclick="loadAdminCreators()">🔄 Refresh Creators</button>
+          </div>
+        </div>
+
+        <div class="ops-card" style="margin-bottom: 16px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+            <input type="text" id="creatorMgmtSearchInput" placeholder="Search creators by DID, handle, or channel..." style="flex: 1; min-width: 260px; padding: 8px 14px; background: rgba(15,23,42,0.6); border: 1px solid rgba(148,163,184,0.3); border-radius: 8px; color: #fff; font-size: 0.85rem;" onkeydown="if(event.key==='Enter') loadAdminCreators()">
+            <button class="btn-ops primary" onclick="loadAdminCreators()">Search</button>
+          </div>
+        </div>
+
+        <div class="ops-card">
+          <div style="overflow-x: auto;">
+            <table class="ops-table">
+              <thead>
+                <tr>
+                  <th>Creator Profile</th>
+                  <th>Channel &amp; Videos</th>
+                  <th>Account Status</th>
+                  <th>Monetization Status</th>
+                  <th>Wallet Balance</th>
+                  <th>Restrictions</th>
+                  <th style="text-align: right;">Creator Actions</th>
+                </tr>
+              </thead>
+              <tbody id="creatorMgmtTableBody">
+                <tr><td colspan="7" style="text-align:center; padding: 24px; color: #64748b;">Loading creator directory...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="creatorMgmtPagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 0.8rem; color: #94a3b8;"></div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           SECTION: CONTENT & POST MODERATION REGISTRY
+           ============================================== -->
+      <section class="ops-section" id="view-content-moderation">
+        <div class="ops-header-card">
+          <div>
+            <div class="ops-header-title">📑 Content &amp; Post-Level Moderation Registry</div>
+            <div class="ops-header-desc">Inspect published posts, reels, and video media across peer feeds. Execute content removals, sensitivity blurring, and distribution restrictions. Constitutional protection: lawful political criticism and satire are preserved.</div>
+          </div>
+          <div style="display: flex; gap: 0.65rem; align-items: center;">
+            <button class="btn-ops primary" onclick="loadAdminContent()">🔄 Refresh Content</button>
+          </div>
+        </div>
+
+        <div class="ops-card" style="margin-bottom: 16px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+            <input type="text" id="contentModAuthorInput" placeholder="Filter by Author DID..." style="flex: 1; min-width: 220px; padding: 8px 14px; background: rgba(15,23,42,0.6); border: 1px solid rgba(148,163,184,0.3); border-radius: 8px; color: #fff; font-size: 0.85rem;" onkeydown="if(event.key==='Enter') loadAdminContent()">
+            <select id="contentModStateFilter" style="padding: 8px 12px; background: rgba(15,23,42,0.6); border: 1px solid rgba(148,163,184,0.3); border-radius: 8px; color: #cbd5e1; font-size: 0.85rem;" onchange="loadAdminContent()">
+              <option value="ALL">All Moderation States</option>
+              <option value="ACTIVE">Active (Public)</option>
+              <option value="RESTRICTED">Restricted / Blurred</option>
+              <option value="REMOVED">Removed Content</option>
+            </select>
+            <button class="btn-ops primary" onclick="loadAdminContent()">Filter</button>
+          </div>
+        </div>
+
+        <div class="ops-card">
+          <div style="overflow-x: auto;">
+            <table class="ops-table">
+              <thead>
+                <tr>
+                  <th>Post ID</th>
+                  <th>Author DID</th>
+                  <th>Type</th>
+                  <th>Caption Preview</th>
+                  <th>Moderation State</th>
+                  <th>Engagement</th>
+                  <th>Created</th>
+                  <th style="text-align: right;">Content Actions</th>
+                </tr>
+              </thead>
+              <tbody id="contentModTableBody">
+                <tr><td colspan="8" style="text-align:center; padding: 24px; color: #64748b;">Loading published posts...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="contentModPagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 0.8rem; color: #94a3b8;"></div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           SECTION: DUE PROCESS & MODERATION APPEALS
+           ============================================== -->
+      <section class="ops-section" id="view-moderation-appeals">
+        <div class="ops-header-card">
+          <div>
+            <div class="ops-header-title">⚖️ Due Process &amp; Community Appeals Queue</div>
+            <div class="ops-header-desc">Review submitted appeals from restricted users, creators, and content authors. Sovereign due process allows restrictions to be upheld, reversed, or reduced with transparent review notes.</div>
+          </div>
+          <div style="display: flex; gap: 0.65rem; align-items: center;">
+            <button class="btn-ops primary" onclick="loadAdminAppeals()">🔄 Refresh Appeals</button>
+          </div>
+        </div>
+
+        <div class="ops-card" style="margin-bottom: 16px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+            <select id="appealsStatusFilter" style="padding: 8px 12px; background: rgba(15,23,42,0.6); border: 1px solid rgba(148,163,184,0.3); border-radius: 8px; color: #cbd5e1; font-size: 0.85rem;" onchange="loadAdminAppeals()">
+              <option value="ALL">All Appeal States</option>
+              <option value="PENDING" selected>Pending Review</option>
+              <option value="UPHELD">Upheld (Denied)</option>
+              <option value="REVERSED">Reversed (Restored)</option>
+              <option value="REDUCED">Reduced (Shortened)</option>
+            </select>
+            <button class="btn-ops primary" onclick="loadAdminAppeals()">Filter</button>
+          </div>
+        </div>
+
+        <div class="ops-card">
+          <div style="overflow-x: auto;">
+            <table class="ops-table">
+              <thead>
+                <tr>
+                  <th>Appeal ID</th>
+                  <th>Target Identity / ID</th>
+                  <th>Type</th>
+                  <th>Applicant DID</th>
+                  <th>Appeal Reason &amp; Statement</th>
+                  <th>Status</th>
+                  <th>Submitted</th>
+                  <th style="text-align: right;">Review Actions</th>
+                </tr>
+              </thead>
+              <tbody id="appealsTableBody">
+                <tr><td colspan="8" style="text-align:center; padding: 24px; color: #64748b;">Loading appeals queue...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           SECTION: TAMPER-EVIDENT MERKLE MODERATION AUDIT LEDGER
+           ============================================== -->
+      <section class="ops-section" id="view-moderation-audit">
+        <div class="ops-header-card">
+          <div>
+            <div class="ops-header-title">📜 Tamper-Evident Merkle Moderation Audit Ledger</div>
+            <div class="ops-header-desc">Immutable, cryptographically chained record of all administrative moderation actions. Every action links to previous block hashes via SHA-256 Merkle chain. Sensitive child safety evidence is automatically redacted.</div>
+          </div>
+          <div style="display: flex; gap: 0.65rem; align-items: center;">
+            <button class="btn-ops primary" onclick="loadAdminModAudit()">🔄 Refresh Ledger</button>
+          </div>
+        </div>
+
+        <div class="ops-card">
+          <div style="overflow-x: auto;">
+            <table class="ops-table">
+              <thead>
+                <tr>
+                  <th>Action ID</th>
+                  <th>Target ID</th>
+                  <th>Type</th>
+                  <th>Action</th>
+                  <th>Admin DID</th>
+                  <th>Reason Code</th>
+                  <th>Duration</th>
+                  <th>Status Transition</th>
+                  <th>Timestamp</th>
+                  <th>Merkle Hash</th>
+                </tr>
+              </thead>
+              <tbody id="modAuditTableBody">
+                <tr><td colspan="10" style="text-align:center; padding: 24px; color: #64748b;">Loading audit ledger...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           UNIVERSAL MODERATION ACTION CONFIRMATION MODAL
+           ============================================== -->
+      <div id="modActionModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px); z-index:99999; align-items:center; justify-content:center; padding:16px;">
+        <div style="background:#0f172a; border:1px solid #334155; border-radius:14px; max-width:540px; width:100%; padding:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.7); color:#f8fafc;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid #1e293b; padding-bottom:12px;">
+            <div style="font-size:1.1rem; font-weight:800; display:flex; align-items:center; gap:8px;">
+              <span id="modModalIcon">⚠️</span> <span id="modModalTitle">Confirm Moderation Action</span>
+            </div>
+            <button type="button" onclick="closeModActionModal()" style="background:none; border:none; color:#94a3b8; font-size:1.3rem; cursor:pointer;">&times;</button>
+          </div>
+
+          <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); border-radius:8px; padding:12px; margin-bottom:16px; font-size:0.82rem; color:#fca5a5; line-height:1.4;">
+            <strong>Mandatory Confirmation:</strong> This action will be cryptographically signed by your admin DID, recorded in the tamper-evident Merkle hash chain, and will immediately affect protocol routing.
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:4px;">Target Entity</label>
+            <div id="modModalTargetDisplay" style="font-family:monospace; background:rgba(15,23,42,0.8); border:1px solid #1e293b; border-radius:6px; padding:8px 12px; font-size:0.85rem; color:#38bdf8; word-break:break-all;"></div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+            <div>
+              <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:4px;">Reason Code</label>
+              <select id="modModalReasonCode" style="width:100%; padding:8px 10px; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#fff; font-size:0.82rem;">
+                <option value="TERMS_VIOLATION">Terms Violation</option>
+                <option value="SPAM_OR_ABUSE">Spam or Abuse</option>
+                <option value="HARASSMENT">Harassment & Bullying</option>
+                <option value="HATE_SPEECH">Hate Speech</option>
+                <option value="CHILD_SAFETY">Child Safety Escalation (CSAM)</option>
+                <option value="ILLEGAL_CONTENT">Illegal Content</option>
+                <option value="PROHIBITED_NUDITY">Prohibited Nudity</option>
+                <option value="CONSTITUTIONAL_REVIEW">Community Standard Review</option>
+              </select>
+            </div>
+            <div id="modModalDurationGroup">
+              <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:4px;">Duration (Expiry Mandatory)</label>
+              <select id="modModalDuration" style="width:100%; padding:8px 10px; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#fff; font-size:0.82rem;">
+                <option value="3600000">1 Hour</option>
+                <option value="86400000" selected>24 Hours (1 Day)</option>
+                <option value="604800000">7 Days (1 Week)</option>
+                <option value="2592000000">30 Days (1 Month)</option>
+                <option value="7776000000">90 Days (3 Months)</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="modModalScopeGroup" style="display:none; margin-bottom:12px;">
+            <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:4px;">Shadowban Enforcement Scope</label>
+            <select id="modModalScope" style="width:100%; padding:8px 10px; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#fff; font-size:0.82rem;">
+              <option value="all">All Enforcements (Feed, Search, Discovery, Recommendations)</option>
+              <option value="feed">Feed Stream Only</option>
+              <option value="search">Search & Autocomplete Only</option>
+              <option value="discovery">Trending & Explore Grid Only</option>
+              <option value="recommendation">Recommendations Only</option>
+              <option value="comments">Comments Stream Only</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:4px;">Authoritative Reason / Evidence Notes *</label>
+            <textarea id="modModalReason" placeholder="State the specific policy violation and evidence basis..." style="width:100%; min-height:75px; padding:8px 12px; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#fff; font-size:0.85rem; box-sizing:border-box;"></textarea>
+          </div>
+
+          <div id="modModalError" style="display:none; color:#f87171; background:rgba(239,68,68,0.15); border:1px solid #ef4444; border-radius:6px; padding:8px 12px; font-size:0.82rem; margin-bottom:14px;"></div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn-ops" onclick="closeModActionModal()" style="padding:8px 16px; background:#334155; color:#cbd5e1; border:none; border-radius:8px; cursor:pointer;">Cancel</button>
+            <button type="button" id="modModalConfirmBtn" class="btn-ops primary" onclick="submitModAction()" style="padding:8px 20px; font-weight:700; border-radius:8px; cursor:pointer;">Execute Action</button>
+          </div>
+        </div>
+      </div>
 
       <!-- ==============================================
            MODULE 6: META-GRADE SYSTEM HEALTH & MESH TELEMETRY
@@ -3979,6 +4321,16 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
 
       if (tabId === 'treasury-war-room' || tabId === 'revenue-leakage-radar') {
         if (typeof loadSolvencyReport === 'function') loadSolvencyReport();
+      } else if (tabId === 'user-management') {
+        if (typeof loadAdminUsers === 'function') loadAdminUsers();
+      } else if (tabId === 'creator-management') {
+        if (typeof loadAdminCreators === 'function') loadAdminCreators();
+      } else if (tabId === 'content-moderation') {
+        if (typeof loadAdminContent === 'function') loadAdminContent();
+      } else if (tabId === 'moderation-appeals') {
+        if (typeof loadAdminAppeals === 'function') loadAdminAppeals();
+      } else if (tabId === 'moderation-audit') {
+        if (typeof loadAdminModAudit === 'function') loadAdminModAudit();
       }
     }
 
@@ -6376,6 +6728,458 @@ export function renderAdminLoginHtml(): string {
         submitBtn.innerText = 'Authenticate Session';
       }
     }
+
+    // =========================================================================
+    // 🛡️ AUTHORITATIVE MODERATION CONTROLLERS & UNIVERSAL ACTION MODAL
+    // =========================================================================
+
+    var currentModModalState = {
+      actionType: '',
+      targetId: '',
+      targetType: 'USER',
+      currentStatus: ''
+    };
+
+    function openModActionModal(actionType, targetId, targetType, currentStatus) {
+      currentModModalState = { actionType: actionType, targetId: targetId, targetType: targetType || 'USER', currentStatus: currentStatus || '' };
+      var modal = document.getElementById('modActionModal');
+      var title = document.getElementById('modModalTitle');
+      var icon = document.getElementById('modModalIcon');
+      var targetDisplay = document.getElementById('modModalTargetDisplay');
+      var durationGroup = document.getElementById('modModalDurationGroup');
+      var scopeGroup = document.getElementById('modModalScopeGroup');
+      var confirmBtn = document.getElementById('modModalConfirmBtn');
+      var errBox = document.getElementById('modModalError');
+      var reasonInput = document.getElementById('modModalReason');
+
+      if (errBox) errBox.style.display = 'none';
+      if (reasonInput) reasonInput.value = '';
+
+      if (targetDisplay) targetDisplay.textContent = targetType + ': ' + targetId;
+
+      if (actionType === 'BLOCK') {
+        if (icon) icon.textContent = '⛔';
+        if (title) title.textContent = 'Temporarily Block User Account';
+        if (durationGroup) durationGroup.style.display = 'block';
+        if (scopeGroup) scopeGroup.style.display = 'none';
+        if (confirmBtn) { confirmBtn.textContent = 'Apply Block'; confirmBtn.style.background = '#f59e0b'; }
+      } else if (actionType === 'SUSPEND' || actionType === 'CREATOR_SUSPEND') {
+        if (icon) icon.textContent = '🚫';
+        if (title) title.textContent = actionType === 'CREATOR_SUSPEND' ? 'Permanently Suspend Creator' : 'Permanently Suspend User';
+        if (durationGroup) durationGroup.style.display = 'none';
+        if (scopeGroup) scopeGroup.style.display = 'none';
+        if (confirmBtn) { confirmBtn.textContent = 'Execute Suspension'; confirmBtn.style.background = '#ef4444'; }
+      } else if (actionType === 'RESTORE' || actionType === 'CREATOR_RESTORE') {
+        if (icon) icon.textContent = '🕊️';
+        if (title) title.textContent = 'Restore & Unblock Account';
+        if (durationGroup) durationGroup.style.display = 'none';
+        if (scopeGroup) scopeGroup.style.display = 'none';
+        if (confirmBtn) { confirmBtn.textContent = 'Restore Account'; confirmBtn.style.background = '#10b981'; }
+      } else if (actionType === 'SHADOWBAN') {
+        if (icon) icon.textContent = '👻';
+        if (title) title.textContent = 'Apply Scoped Shadowban';
+        if (durationGroup) durationGroup.style.display = 'block';
+        if (scopeGroup) scopeGroup.style.display = 'block';
+        if (confirmBtn) { confirmBtn.textContent = 'Apply Shadowban'; confirmBtn.style.background = '#8b5cf6'; }
+      } else if (actionType === 'SHADOWBAN_REMOVE') {
+        if (icon) icon.textContent = '🕊️';
+        if (title) title.textContent = 'Lift Shadowban';
+        if (durationGroup) durationGroup.style.display = 'none';
+        if (scopeGroup) scopeGroup.style.display = 'none';
+        if (confirmBtn) { confirmBtn.textContent = 'Lift Shadowban'; confirmBtn.style.background = '#10b981'; }
+      } else if (actionType === 'MONETIZATION') {
+        if (icon) icon.textContent = '💳';
+        var isRestricted = currentStatus === 'RESTRICTED';
+        if (title) title.textContent = isRestricted ? 'Restore Creator Monetization' : 'Restrict Creator Monetization';
+        if (durationGroup) durationGroup.style.display = 'none';
+        if (scopeGroup) scopeGroup.style.display = 'none';
+        if (confirmBtn) {
+          confirmBtn.textContent = isRestricted ? 'Restore Monetization' : 'Restrict Monetization';
+          confirmBtn.style.background = isRestricted ? '#10b981' : '#f59e0b';
+        }
+      } else if (actionType === 'CONTENT_REMOVE') {
+        if (icon) icon.textContent = '🗑️';
+        if (title) title.textContent = 'Remove Content / Post';
+        if (durationGroup) durationGroup.style.display = 'none';
+        if (scopeGroup) scopeGroup.style.display = 'none';
+        if (confirmBtn) { confirmBtn.textContent = 'Remove Content'; confirmBtn.style.background = '#ef4444'; }
+      } else if (actionType === 'CONTENT_RESTRICT') {
+        if (icon) icon.textContent = '⚠️';
+        if (title) title.textContent = 'Restrict Content Distribution';
+        if (durationGroup) durationGroup.style.display = 'none';
+        if (scopeGroup) scopeGroup.style.display = 'none';
+        if (confirmBtn) { confirmBtn.textContent = 'Restrict Distribution'; confirmBtn.style.background = '#f59e0b'; }
+      } else if (actionType === 'CONTENT_RESTORE') {
+        if (icon) icon.textContent = '🕊️';
+        if (title) title.textContent = 'Restore Content / Post';
+        if (durationGroup) durationGroup.style.display = 'none';
+        if (scopeGroup) scopeGroup.style.display = 'none';
+        if (confirmBtn) { confirmBtn.textContent = 'Restore Content'; confirmBtn.style.background = '#10b981'; }
+      }
+
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeModActionModal() {
+      var modal = document.getElementById('modActionModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    async function submitModAction() {
+      var errBox = document.getElementById('modModalError');
+      var reasonInput = document.getElementById('modModalReason');
+      var reasonCodeSelect = document.getElementById('modModalReasonCode');
+      var durationSelect = document.getElementById('modModalDuration');
+      var scopeSelect = document.getElementById('modModalScope');
+      var confirmBtn = document.getElementById('modModalConfirmBtn');
+
+      var reason = (reasonInput.value || '').trim();
+      var reasonCode = reasonCodeSelect.value;
+      var durationMs = Number(durationSelect.value || 86400000);
+      var scope = scopeSelect ? scopeSelect.value : 'all';
+
+      if (!reason || reason.length < 5) {
+        if (errBox) {
+          errBox.textContent = 'Mandatory field: Please provide a clear reason (min 5 characters) for the moderation audit record.';
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+
+      confirmBtn.disabled = true;
+      confirmBtn.innerText = 'Executing...';
+
+      var actionType = currentModModalState.actionType;
+      var targetId = currentModModalState.targetId;
+      var targetType = currentModModalState.targetType;
+      var currentStatus = currentModModalState.currentStatus;
+
+      var endpoint = '';
+      var payload = {};
+
+      if (actionType === 'BLOCK') {
+        endpoint = '/api/admin/users/block';
+        payload = { targetDid: targetId, durationMs: durationMs, reason: reason, reasonCode: reasonCode };
+      } else if (actionType === 'SUSPEND') {
+        endpoint = '/api/admin/users/suspend';
+        payload = { targetDid: targetId, reason: reason, reasonCode: reasonCode };
+      } else if (actionType === 'RESTORE') {
+        endpoint = '/api/admin/users/restore';
+        payload = { targetDid: targetId, reason: reason, reasonCode: reasonCode };
+      } else if (actionType === 'SHADOWBAN') {
+        endpoint = '/api/admin/users/shadowban';
+        payload = { targetId: targetId, targetType: targetType, durationMs: durationMs, scope: scope, reason: reason, reasonCode: reasonCode };
+      } else if (actionType === 'SHADOWBAN_REMOVE') {
+        endpoint = '/api/admin/users/shadowban/remove';
+        payload = { targetId: targetId, scope: 'all', reason: reason };
+      } else if (actionType === 'CREATOR_SUSPEND') {
+        endpoint = '/api/admin/creators/suspend';
+        payload = { creatorDid: targetId, reason: reason, reasonCode: reasonCode };
+      } else if (actionType === 'CREATOR_RESTORE') {
+        endpoint = '/api/admin/creators/restore';
+        payload = { creatorDid: targetId, reason: reason, reasonCode: reasonCode };
+      } else if (actionType === 'MONETIZATION') {
+        endpoint = '/api/admin/creators/monetization';
+        payload = { creatorDid: targetId, active: currentStatus === 'RESTRICTED', reason: reason };
+      } else if (actionType === 'CONTENT_REMOVE') {
+        endpoint = '/api/admin/content/remove';
+        payload = { postId: targetId, reason: reason, reasonCode: reasonCode };
+      } else if (actionType === 'CONTENT_RESTRICT') {
+        endpoint = '/api/admin/content/restrict';
+        payload = { postId: targetId, scope: 'discovery', reason: reason, reasonCode: reasonCode };
+      } else if (actionType === 'CONTENT_RESTORE') {
+        endpoint = '/api/admin/content/restore';
+        payload = { postId: targetId, reason: reason, reasonCode: reasonCode };
+      }
+
+      try {
+        var res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        var data = await res.json();
+        if (data.ok) {
+          closeModActionModal();
+          if (targetType === 'USER') loadAdminUsers();
+          else if (targetType === 'CREATOR') loadAdminCreators();
+          else if (targetType === 'CONTENT') loadAdminContent();
+        } else {
+          errBox.textContent = data.error || 'Failed to execute moderation action.';
+          errBox.style.display = 'block';
+        }
+      } catch (err) {
+        errBox.textContent = 'Network error: ' + err.message;
+        errBox.style.display = 'block';
+      } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerText = 'Execute Action';
+      }
+    }
+
+    async function loadAdminUsers() {
+      var tbody = document.getElementById('userMgmtTableBody');
+      var searchInput = document.getElementById('userMgmtSearchInput');
+      var search = searchInput ? searchInput.value.trim() : '';
+      var statusSelect = document.getElementById('userMgmtStatusFilter');
+      var status = statusSelect ? statusSelect.value : 'ALL';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 24px; color: #64748b;">Loading user accounts...</td></tr>';
+
+      try {
+        var res = await fetch('/api/admin/users/list?search=' + encodeURIComponent(search) + '&status=' + encodeURIComponent(status));
+        var data = await res.json();
+        if (!data.ok || !data.users || data.users.length === 0) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 24px; color: #64748b;">No matching users found.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.users.map(function(u) {
+          var statusBadge = '<span class="ops-pill online">ACTIVE</span>';
+          if (u.status === 'SUSPENDED') statusBadge = '<span class="ops-pill" style="color:#ef4444; border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.1);">SUSPENDED</span>';
+          else if (u.status === 'BLOCKED') statusBadge = '<span class="ops-pill" style="color:#f59e0b; border-color:rgba(245,158,11,0.3); background:rgba(245,158,11,0.1);">BLOCKED</span>';
+
+          var sbBadge = u.isShadowBanned ? '<span class="ops-pill" style="color:#8b5cf6; border-color:rgba(139,92,246,0.3); background:rgba(139,92,246,0.1);">👻 SHADOWBAN (' + (u.shadowBanScope || 'all') + ')</span>' : '<span style="color:#64748b; font-size:0.75rem;">None</span>';
+          var regDate = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Genesis';
+
+          var actions = '';
+          if (u.status !== 'BLOCKED') {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);" onclick="openModActionModal(\'BLOCK\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">⛔ Block</button> ';
+          }
+          if (u.status !== 'SUSPENDED') {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="openModActionModal(\'SUSPEND\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">🚫 Suspend</button> ';
+          }
+          if (u.status === 'BLOCKED' || u.status === 'SUSPENDED') {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'RESTORE\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">🕊️ Restore</button> ';
+          }
+          if (!u.isShadowBanned) {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#8b5cf6; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.3);" onclick="openModActionModal(\'SHADOWBAN\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">👻 Shadowban</button> ';
+          } else {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'SHADOWBAN_REMOVE\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">🕊️ Unban</button> ';
+          }
+
+          return '<tr>' +
+            '<td><div style="font-weight:700; color:#fff;">' + (u.displayName || u.name || 'Anonymous') + '</div>' +
+            '<div style="font-size:0.78rem; color:#94a3b8;">' + (u.handle ? '@' + u.handle : '') + (u.isVerified ? ' ✅' : '') + '</div></td>' +
+            '<td><span class="code-pill">' + u.did.slice(0, 16) + '...</span></td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' + sbBadge + '</td>' +
+            '<td style="font-weight:700; color:#38bdf8;">' + Number(u.balance || 0).toLocaleString() + ' SOV</td>' +
+            '<td style="font-size:0.75rem; color:#94a3b8;">' + regDate + '</td>' +
+            '<td style="text-align:right; white-space:nowrap;">' + actions + '</td>' +
+            '</tr>';
+        }).join('');
+
+        var pag = document.getElementById('userMgmtPagination');
+        if (pag) pag.innerHTML = 'Showing ' + data.users.length + ' of ' + data.total + ' registered users';
+      } catch (e) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 24px; color: #ef4444;">Error loading users: ' + e.message + '</td></tr>';
+      }
+    }
+
+    async function loadAdminCreators() {
+      var tbody = document.getElementById('creatorMgmtTableBody');
+      var searchInput = document.getElementById('creatorMgmtSearchInput');
+      var search = searchInput ? searchInput.value.trim() : '';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 24px; color: #64748b;">Loading creator directory...</td></tr>';
+
+      try {
+        var res = await fetch('/api/admin/creators/list?search=' + encodeURIComponent(search));
+        var data = await res.json();
+        if (!data.ok || !data.creators || data.creators.length === 0) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 24px; color: #64748b;">No creators registered.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.creators.map(function(c) {
+          var statusBadge = '<span class="ops-pill online">ACTIVE</span>';
+          if (c.status === 'SUSPENDED') statusBadge = '<span class="ops-pill" style="color:#ef4444; border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.1);">SUSPENDED</span>';
+
+          var monBadge = c.monetizationStatus === 'RESTRICTED' ?
+            '<span class="ops-pill" style="color:#f59e0b; border-color:rgba(245,158,11,0.3); background:rgba(245,158,11,0.1);">⚠️ RESTRICTED</span>' :
+            '<span class="ops-pill online">✅ MONETIZED</span>';
+
+          var actions = '';
+          if (c.status !== 'SUSPENDED') {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="openModActionModal(\'CREATOR_SUSPEND\', \'' + c.did + '\', \'CREATOR\', \'' + c.status + '\')">🚫 Suspend</button> ';
+          } else {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'CREATOR_RESTORE\', \'' + c.did + '\', \'CREATOR\', \'' + c.status + '\')">🕊️ Restore</button> ';
+          }
+          actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);" onclick="openModActionModal(\'MONETIZATION\', \'' + c.did + '\', \'CREATOR\', \'' + c.monetizationStatus + '\')">' + (c.monetizationStatus === 'RESTRICTED' ? '💳 Enable Monetization' : '⚠️ Restrict Monetization') + '</button> ';
+          if (!c.isShadowBanned) {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#8b5cf6; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.3);" onclick="openModActionModal(\'SHADOWBAN\', \'' + c.did + '\', \'CREATOR\', \'' + c.status + '\')">👻 Shadowban</button>';
+          } else {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'SHADOWBAN_REMOVE\', \'' + c.did + '\', \'CREATOR\', \'' + c.status + '\')">🕊️ Unban</button>';
+          }
+
+          return '<tr>' +
+            '<td><div style="font-weight:700; color:#fff;">' + (c.displayName || c.name || 'Creator') + '</div>' +
+            '<div style="font-size:0.78rem; color:#94a3b8;">@' + (c.handle || '') + (c.isVerified ? ' ✅' : '') + '</div>' +
+            '<div style="font-size:0.7rem; color:#64748b; font-family:monospace;">' + c.did.slice(0, 16) + '...</div></td>' +
+            '<td><div style="font-weight:600; color:#cbd5e1;">' + (c.channelName || 'Default Channel') + '</div>' +
+            '<div style="font-size:0.75rem; color:#94a3b8;">🎬 ' + (c.videoCount || 0) + ' Published Videos</div></td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' + monBadge + '</td>' +
+            '<td><div style="font-weight:700; color:#38bdf8;">' + Number(c.balance || 0).toLocaleString() + ' SOV</div>' +
+            '<div style="font-size:0.68rem; color:#10b981;">🛡️ Wallet Invariant Active</div></td>' +
+            '<td>' + (c.isShadowBanned ? '<span class="ops-pill" style="color:#8b5cf6;">👻 SHADOWBAN</span>' : '<span style="color:#64748b; font-size:0.75rem;">Clean</span>') + '</td>' +
+            '<td style="text-align:right; white-space:nowrap;">' + actions + '</td>' +
+            '</tr>';
+        }).join('');
+      } catch (e) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 24px; color: #ef4444;">Error loading creators: ' + e.message + '</td></tr>';
+      }
+    }
+
+    async function loadAdminContent() {
+      var tbody = document.getElementById('contentModTableBody');
+      var authorInput = document.getElementById('contentModAuthorInput');
+      var authorDid = authorInput ? authorInput.value.trim() : '';
+      var modSelect = document.getElementById('contentModStateFilter');
+      var modState = modSelect ? modSelect.value : 'ALL';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: #64748b;">Loading published posts...</td></tr>';
+
+      try {
+        var res = await fetch('/api/admin/content/list?authorDid=' + encodeURIComponent(authorDid) + '&moderationState=' + encodeURIComponent(modState));
+        var data = await res.json();
+        if (!data.ok || !data.posts || data.posts.length === 0) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: #64748b;">No matching content records found.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.posts.map(function(p) {
+          var modBadge = '<span class="ops-pill online">ACTIVE</span>';
+          if (p.is_removed || p.moderation_state === 'REMOVED') modBadge = '<span class="ops-pill" style="color:#ef4444; border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.1);">REMOVED</span>';
+          else if (p.moderation_state === 'RESTRICTED') modBadge = '<span class="ops-pill" style="color:#f59e0b; border-color:rgba(245,158,11,0.3); background:rgba(245,158,11,0.1);">RESTRICTED</span>';
+
+          var preview = p.caption ? (p.caption.slice(0, 70) + (p.caption.length > 70 ? '...' : '')) : '(No caption)';
+          var postDate = p.created_at ? new Date(Number(p.created_at)).toLocaleDateString() : '';
+
+          var actions = '';
+          if (!p.is_removed && p.moderation_state !== 'REMOVED') {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="openModActionModal(\'CONTENT_REMOVE\', \'' + p.id + '\', \'CONTENT\', \'' + p.moderation_state + '\')">🗑️ Remove</button> ';
+          } else {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'CONTENT_RESTORE\', \'' + p.id + '\', \'CONTENT\', \'' + p.moderation_state + '\')">🕊️ Restore</button> ';
+          }
+          if (p.moderation_state !== 'RESTRICTED' && !p.is_removed) {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);" onclick="openModActionModal(\'CONTENT_RESTRICT\', \'' + p.id + '\', \'CONTENT\', \'' + p.moderation_state + '\')">⚠️ Restrict</button>';
+          }
+
+          return '<tr>' +
+            '<td><span class="code-pill">' + p.id.slice(0, 12) + '...</span></td>' +
+            '<td><span style="font-family:monospace; font-size:0.75rem; color:#94a3b8;">' + (p.author_did || '').slice(0, 16) + '...</span></td>' +
+            '<td><span class="code-pill" style="color:#38bdf8;">' + (p.post_type || 'post').toUpperCase() + '</span></td>' +
+            '<td style="font-size:0.8rem; color:#cbd5e1; max-width:260px;">' + preview + '</td>' +
+            '<td>' + modBadge + '</td>' +
+            '<td style="font-size:0.75rem; color:#94a3b8;">❤️ ' + (p.likes_count || 0) + ' &bull; 💬 ' + (p.comments_count || 0) + '</td>' +
+            '<td style="font-size:0.75rem; color:#64748b;">' + postDate + '</td>' +
+            '<td style="text-align:right; white-space:nowrap;">' + actions + '</td>' +
+            '</tr>';
+        }).join('');
+      } catch (e) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: #ef4444;">Error loading content: ' + e.message + '</td></tr>';
+      }
+    }
+
+    async function loadAdminAppeals() {
+      var tbody = document.getElementById('appealsTableBody');
+      var statusSelect = document.getElementById('appealsStatusFilter');
+      var status = statusSelect ? statusSelect.value : 'ALL';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: #64748b;">Loading appeals queue...</td></tr>';
+
+      try {
+        var res = await fetch('/api/admin/moderation/appeals?status=' + encodeURIComponent(status));
+        var data = await res.json();
+        if (!data.ok || !data.appeals || data.appeals.length === 0) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: #64748b;">No appeals in this view.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.appeals.map(function(a) {
+          var stBadge = '<span class="ops-pill" style="color:#eab308; border-color:rgba(234,179,8,0.3); background:rgba(234,179,8,0.1);">PENDING</span>';
+          if (a.status === 'UPHELD') stBadge = '<span class="ops-pill" style="color:#ef4444; border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.1);">UPHELD</span>';
+          else if (a.status === 'REVERSED') stBadge = '<span class="ops-pill online">REVERSED</span>';
+          else if (a.status === 'REDUCED') stBadge = '<span class="ops-pill" style="color:#38bdf8; border-color:rgba(56,189,248,0.3); background:rgba(56,189,248,0.1);">REDUCED</span>';
+
+          var dateStr = a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '';
+          var actions = '';
+          if (a.status === 'PENDING') {
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="reviewAppealDirect(\'' + a.id + '\', \'UPHELD\')">Uphold</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="reviewAppealDirect(\'' + a.id + '\', \'REVERSED\')">Reverse</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#38bdf8; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3);" onclick="reviewAppealDirect(\'' + a.id + '\', \'REDUCED\')">Reduce</button>';
+          } else {
+            actions = '<span style="font-size:0.72rem; color:#64748b;">Resolved</span>';
+          }
+
+          return '<tr>' +
+            '<td><span class="code-pill">' + a.id + '</span></td>' +
+            '<td><span style="font-family:monospace; font-size:0.75rem; color:#38bdf8;">' + a.targetId.slice(0, 16) + '...</span></td>' +
+            '<td><span class="code-pill">' + a.targetType + '</span></td>' +
+            '<td><span style="font-family:monospace; font-size:0.75rem; color:#94a3b8;">' + (a.applicantDid || '').slice(0, 16) + '...</span></td>' +
+            '<td><div style="font-weight:700; color:#fff; font-size:0.8rem;">' + a.reason + '</div>' +
+            '<div style="font-size:0.75rem; color:#94a3b8;">' + (a.explanation || '') + '</div></td>' +
+            '<td>' + stBadge + '</td>' +
+            '<td style="font-size:0.75rem; color:#64748b;">' + dateStr + '</td>' +
+            '<td style="text-align:right; white-space:nowrap;">' + actions + '</td>' +
+            '</tr>';
+        }).join('');
+      } catch (e) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: #ef4444;">Error loading appeals: ' + e.message + '</td></tr>';
+      }
+    }
+
+    async function reviewAppealDirect(appealId, decision) {
+      var reviewNotes = prompt('Enter review statement / rationale for decision (' + decision + '):');
+      if (!reviewNotes) return;
+      try {
+        var res = await fetch('/api/admin/moderation/appeals/review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appealId: appealId, decision: decision, reviewNotes: reviewNotes })
+        });
+        var data = await res.json();
+        if (data.ok) {
+          loadAdminAppeals();
+        } else {
+          alert('Error: ' + (data.error || 'Failed to review appeal'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function loadAdminModAudit() {
+      var tbody = document.getElementById('modAuditTableBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 24px; color: #64748b;">Loading Merkle audit ledger...</td></tr>';
+
+      try {
+        var res = await fetch('/api/admin/moderation/audit-logs?limit=50');
+        var data = await res.json();
+        if (!data.ok || !data.logs || data.logs.length === 0) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 24px; color: #64748b;">No audit ledger entries yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.logs.map(function(l) {
+          var dt = l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : '';
+          var hashShort = (l.hash || '').slice(0, 14) + '...';
+          return '<tr>' +
+            '<td><span class="code-pill">' + l.actionId + '</span></td>' +
+            '<td><span style="font-family:monospace; font-size:0.75rem; color:#38bdf8;">' + (l.targetId || '').slice(0, 16) + '...</span></td>' +
+            '<td><span class="code-pill">' + l.targetType + '</span></td>' +
+            '<td style="font-weight:700; color:#fff;">' + l.actionType + '</td>' +
+            '<td><span style="font-family:monospace; font-size:0.75rem; color:#94a3b8;">' + (l.adminDid || '').slice(0, 16) + '...</span></td>' +
+            '<td><span style="font-size:0.75rem; color:#fca5a5;">' + l.reasonCode + '</span></td>' +
+            '<td><span style="font-size:0.75rem; color:#94a3b8;">' + (l.durationMs > 0 ? (l.durationMs / 3600000).toFixed(1) + ' hrs' : 'Permanent / N/A') + '</span></td>' +
+            '<td><span style="font-size:0.72rem; color:#cbd5e1;">' + (l.previousStatus || 'N/A') + ' &rarr; ' + (l.newStatus || 'N/A') + '</span></td>' +
+            '<td><span style="font-size:0.75rem; color:#64748b;">' + dt + '</span></td>' +
+            '<td><span class="code-pill" style="color:#10b981; font-family:monospace;" title="' + l.hash + '">' + hashShort + '</span></td>' +
+            '</tr>';
+        }).join('');
+      } catch (e) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 24px; color: #ef4444;">Error loading audit ledger: ' + e.message + '</td></tr>';
+      }
+    }
+
   </script>
 </body>
 </html>`;

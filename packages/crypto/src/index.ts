@@ -10,3 +10,5 @@ export * from './mpc.js';
 export * from './zk.js';
 export * from './bip39.js';
 export * from './bip39-wordlist.js';
+export * from './wallet.js';
+export * from './meta-tx.js';

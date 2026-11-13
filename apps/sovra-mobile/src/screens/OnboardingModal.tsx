@@ -486,8 +486,8 @@ export function OnboardingModal({
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span>Identity:</span>
-                <span style={{ color: '#f8fafc', fontFamily: 'monospace' }}>
-                  {createdProfile.did.slice(0, 16)}...
+                <span style={{ color: '#38bdf8', fontWeight: 700 }}>
+                  {createdProfile.handle} ✓
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>

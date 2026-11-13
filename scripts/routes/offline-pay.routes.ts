@@ -60,10 +60,15 @@ export async function handleOfflinePayRoutes(
       const senderDid = body.senderDid;
       const recipientDid = body.recipientDid || '*';
       const amountSov = Number(body.amountSov);
-      const signature = body.signature || `sig_mock_${crypto.randomBytes(16).toString('hex')}`;
+      const signature = body.signature;
 
       if (!senderDid || isNaN(amountSov) || amountSov <= 0) {
         sendJson(res, 400, { ok: false, error: 'senderDid and valid amountSov are required' });
+        return true;
+      }
+
+      if (!signature) {
+        sendJson(res, 400, { ok: false, error: 'Cryptographic Ed25519 signature is strictly required to generate an offline voucher' });
         return true;
       }
 
@@ -105,6 +110,23 @@ export async function handleOfflinePayRoutes(
         return true;
       }
 
+      // Authorization & Front-Running Defense:
+      const authHeader = req.headers.authorization;
+      const xDid = (req.headers['x-sovra-did'] || req.headers['did']) as string;
+      let callerDid: string | null = null;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7).trim();
+        const user = sovraDb.findUserBySessionToken(token);
+        if (user) callerDid = user.did;
+      } else if (xDid) {
+        callerDid = xDid.trim();
+      }
+
+      if (callerDid && callerDid !== claimantDid) {
+        sendJson(res, 403, { ok: false, error: 'Forbidden: Cannot claim voucher on behalf of another sovereign DID' });
+        return true;
+      }
+
       const result = sovraDb.claimOfflinePaymentVoucher(voucherId, claimantDid);
       if (!result.ok) {
         sendJson(res, 400, result);
@@ -124,11 +146,29 @@ export async function handleOfflinePayRoutes(
     }
   }
 
-  // 3. GET /api/wallet/offline/vouchers - List offline vouchers
+  // 3. GET /api/wallet/offline/vouchers - List offline vouchers (Privacy & Anti-Frontrunning Gated)
   if (method === 'GET' && (url === '/api/wallet/offline/vouchers' || url.startsWith('/api/wallet/offline/vouchers?'))) {
     const parsedUrl = new URL(url, 'http://localhost');
     const did = parsedUrl.searchParams.get('did') || undefined;
-    const vouchers = sovraDb.getOfflinePaymentVouchers(did);
+
+    const authHeader = req.headers.authorization;
+    const xDid = (req.headers['x-sovra-did'] || req.headers['did']) as string;
+    let callerDid: string | null = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7).trim();
+      const user = sovraDb.findUserBySessionToken(token);
+      if (user) callerDid = user.did;
+    } else if (xDid) {
+      callerDid = xDid.trim();
+    }
+
+    if (callerDid && did && callerDid !== did && callerDid !== 'did:sovra:admin') {
+      sendJson(res, 403, { ok: false, error: 'Forbidden: Cannot view offline vouchers for another identity' });
+      return true;
+    }
+
+    const effectiveDid = did || callerDid;
+    const vouchers = sovraDb.getOfflinePaymentVouchers(effectiveDid);
     sendJson(res, 200, {
       ok: true,
       count: vouchers.length,

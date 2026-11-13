@@ -9,12 +9,14 @@
  * 4. Real Post Creation modal with duplicate-submission protection.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { MobileStoryItem } from '../types.js';
 import {
   fetchFeedPosts,
   likeFeedPost,
   createFeedPost,
+  voteFeedPoll,
+  reportFeedPost,
   fetchStories,
   fetchStoriesSwarm,
   publishStory,
@@ -75,6 +77,20 @@ export const INITIAL_STORIES: MobileStoryItem[] = [
   },
 ];
 
+export interface FeedPollOption {
+  text: string;
+  votes: number;
+}
+
+export interface FeedPoll {
+  id: string;
+  question: string;
+  options: FeedPollOption[];
+  totalVotes: number;
+  userVotedIndex?: number | undefined;
+  expiresAt: number;
+}
+
 export interface FeedPost {
   id: string;
   creatorHandle: string;
@@ -84,10 +100,13 @@ export interface FeedPost {
   caption: string;
   likes: number;
   timeAgo: string;
-  isLiked?: boolean;
-  mediaImage?: string;
-  mediaGradient?: string;
-  commentsCount?: number;
+  isLiked?: boolean | undefined;
+  mediaImage?: string | undefined;
+  carouselImages?: string[] | undefined;
+  mediaVideo?: string | undefined;
+  mediaGradient?: string | undefined;
+  commentsCount?: number | undefined;
+  poll?: FeedPoll | undefined;
 }
 
 export const INITIAL_POSTS: FeedPost[] = [
@@ -746,6 +765,30 @@ export function FeedScreen(): React.JSX.Element {
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set());
   const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
 
+  // Phase 1.1: Virtualized Feed & Infinite Scroll Windowing
+  const [visibleCount, setVisibleCount] = useState<number>(8);
+  const feedScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Phase 1.2: Multi-Image Carousel & Video Composer State
+  const [postCarouselImages, setPostCarouselImages] = useState<string[]>([]);
+  const [postMediaVideo, setPostMediaVideo] = useState<string | null>(null);
+  const [activeCarouselIndices, setActiveCarouselIndices] = useState<Record<string, number>>({});
+
+  // Phase 1.3: Interactive Community Polls State
+  const [isPollEnabled, setIsPollEnabled] = useState<boolean>(false);
+  const [pollQuestion, setPollQuestion] = useState<string>('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [userPollVotes, setUserPollVotes] = useState<Record<string, number>>({});
+
+  // Phase 1.4: Client-Side Post Trust & Safety Menu
+  const [activePostMenuId, setActivePostMenuId] = useState<string | null>(null);
+  const [mutedAuthors, setMutedAuthors] = useState<Set<string>>(new Set());
+  const [blockedPeers, setBlockedPeers] = useState<Set<string>>(new Set());
+  const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+
+  // Phase 1.5: Real-Time "New Posts ↑" Floating Pill
+  const [newIncomingPostsCount, setNewIncomingPostsCount] = useState<number>(0);
+
   // Airtel UX & Horizon Switcher States
   const [activePersona, setActivePersona] = useState<SovereignPersona>(DEFAULT_PERSONAS[0]!);
   const [isIdentitySwitcherOpen, setIsIdentitySwitcherOpen] = useState<boolean>(false);
@@ -889,13 +932,111 @@ export function FeedScreen(): React.JSX.Element {
   };
 
   const handlePostImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (files.length === 1) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const res = reader.result as string;
+        setPostMediaImage(res);
+        setPostCarouselImages([res]);
+      };
+      reader.readAsDataURL(files[0]!);
+    } else {
+      const fileList = Array.from(files).slice(0, 5);
+      const promises = fileList.map(f => new Promise<string>((resolve) => {
+        const r = new FileReader();
+        r.onloadend = () => resolve(r.result as string);
+        r.readAsDataURL(f);
+      }));
+      Promise.all(promises).then(images => {
+        setPostCarouselImages(images);
+        setPostMediaImage(images[0] || null);
+      });
+    }
+  };
+
+  const handlePostVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
-      setPostMediaImage(reader.result as string);
+      setPostMediaVideo(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleVotePoll = async (postId: string, optionIndex: number) => {
+    if (userPollVotes[postId] !== undefined) return;
+    setUserPollVotes(prev => ({ ...prev, [postId]: optionIndex }));
+    setPosts(prev => prev.map(p => {
+      if (p.id !== postId || !p.poll) return p;
+      const updatedOpts = p.poll.options.map((opt, idx) => ({
+        ...opt,
+        votes: idx === optionIndex ? opt.votes + 1 : opt.votes,
+      }));
+      return {
+        ...p,
+        poll: {
+          ...p.poll,
+          options: updatedOpts,
+          totalVotes: p.poll.totalVotes + 1,
+          userVotedIndex: optionIndex,
+        },
+      };
+    }));
+    try {
+      await voteFeedPoll(postId, optionIndex);
+      showToast('✓ Consensus vote registered on P2P mesh');
+    } catch (_) {}
+  };
+
+  const handleReportPost = async (postId: string) => {
+    const reason = window.prompt('Report Post (Spam, Harassment, Misinformation, Scam):', 'Spam');
+    if (!reason) return;
+    setActivePostMenuId(null);
+    setHiddenPostIds(prev => new Set([...prev, postId]));
+    showToast('✓ Post reported to community moderation and hidden');
+    try {
+      await reportFeedPost(postId, reason);
+    } catch (_) {}
+  };
+
+  const handleMuteAuthor = (authorHandle: string) => {
+    setActivePostMenuId(null);
+    setMutedAuthors(prev => new Set([...prev, authorHandle]));
+    showToast(`🔇 Muted @${authorHandle}. Content hidden from feed.`);
+  };
+
+  const handleBlockPeer = (authorHandle: string) => {
+    setActivePostMenuId(null);
+    setBlockedPeers(prev => new Set([...prev, authorHandle]));
+    showToast(`🚫 Blocked peer @${authorHandle}`);
+  };
+
+  const handleHidePost = (postId: string) => {
+    setActivePostMenuId(null);
+    setHiddenPostIds(prev => new Set([...prev, postId]));
+    showToast('Post hidden from your feed');
+  };
+
+  const handleNextCarousel = (postId: string, max: number) => {
+    setActiveCarouselIndices(prev => ({
+      ...prev,
+      [postId]: ((prev[postId] || 0) + 1) % max,
+    }));
+  };
+
+  const handlePrevCarousel = (postId: string, max: number) => {
+    setActiveCarouselIndices(prev => ({
+      ...prev,
+      [postId]: ((prev[postId] || 0) - 1 + max) % max,
+    }));
+  };
+
+  const handleScrollToTopAndLoadNew = () => {
+    feedScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    setNewIncomingPostsCount(0);
   };
 
   const toggleStorySeen = async (id: string) => {
@@ -952,16 +1093,40 @@ export function FeedScreen(): React.JSX.Element {
 
   const handleCreatePost = async () => {
     const caption = newCaption.trim();
-    if (!caption) {
-      setCreateError('Please enter a caption for your post');
+    if (!caption && !postMediaImage && postCarouselImages.length === 0 && !postMediaVideo && !isPollEnabled) {
+      setCreateError('Please enter a caption, attach media, or add a poll');
       return;
+    }
+
+    let pollPayload: FeedPoll | undefined = undefined;
+    if (isPollEnabled) {
+      const validOptions = pollOptions.map(o => o.trim()).filter(Boolean);
+      if (!pollQuestion.trim()) {
+        setCreateError('Please enter a question for your poll');
+        return;
+      }
+      if (validOptions.length < 2) {
+        setCreateError('Poll requires at least 2 options');
+        return;
+      }
+      pollPayload = {
+        id: `poll_${Date.now()}`,
+        question: pollQuestion.trim(),
+        options: validOptions.map(opt => ({ text: opt, votes: 0 })),
+        totalVotes: 0,
+        expiresAt: Date.now() + 86400000 * 3,
+      };
     }
 
     setIsSubmitting(true);
     setCreateError(null);
 
     try {
-      const res = await createFeedPost(caption, postMediaImage || undefined);
+      const res = await createFeedPost(caption, postMediaImage || undefined, {
+        carouselImages: postCarouselImages.length > 0 ? postCarouselImages : undefined,
+        mediaVideo: postMediaVideo || undefined,
+        pollData: pollPayload,
+      });
       if (res.ok && res.post) {
         const newPost: FeedPost = {
           id: res.post.id,
@@ -972,6 +1137,9 @@ export function FeedScreen(): React.JSX.Element {
           avatarEmoji: res.post.authorAvatar || '⚡',
           imageEmoji: res.post.mediaEmoji || '🌌',
           mediaImage: res.post.mediaImage || postMediaImage || undefined,
+          carouselImages: postCarouselImages.length > 0 ? postCarouselImages : undefined,
+          mediaVideo: postMediaVideo || undefined,
+          poll: pollPayload,
           caption: res.post.caption,
           likes: 0,
           timeAgo: 'Just now',
@@ -980,6 +1148,11 @@ export function FeedScreen(): React.JSX.Element {
         setPosts(prev => [newPost, ...prev]);
         setNewCaption('');
         setPostMediaImage(null);
+        setPostCarouselImages([]);
+        setPostMediaVideo(null);
+        setIsPollEnabled(false);
+        setPollQuestion('');
+        setPollOptions(['', '']);
         setIsCreateOpen(false);
         showToast('✓ Post published to sovereign peer swarm!');
       } else {
@@ -1015,9 +1188,18 @@ export function FeedScreen(): React.JSX.Element {
         likes: 0,
         timeAgo: 'Just now',
         isLiked: false,
+        carouselImages: postCarouselImages.length > 0 ? postCarouselImages : undefined,
+        mediaVideo: postMediaVideo || undefined,
+        poll: pollPayload,
       };
       setPosts(prev => [newPost, ...prev]);
       setNewCaption('');
+      setPostMediaImage(null);
+      setPostCarouselImages([]);
+      setPostMediaVideo(null);
+      setIsPollEnabled(false);
+      setPollQuestion('');
+      setPollOptions(['', '']);
       setIsCreateOpen(false);
       showToast('✓ Post saved offline. Queued for auto-sync!');
     } finally {
@@ -1159,6 +1341,7 @@ export function FeedScreen(): React.JSX.Element {
 
   return (
     <div
+      ref={feedScrollRef}
       style={{
         flex: 1,
         backgroundColor: '#090d16',
@@ -1166,8 +1349,37 @@ export function FeedScreen(): React.JSX.Element {
         overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
+        position: 'relative',
       }}
     >
+      {/* Real-Time "New Posts ↑" Floating Pill (Phase 1.5) */}
+      {newIncomingPostsCount > 0 && (
+        <button
+          onClick={handleScrollToTopAndLoadNew}
+          style={{
+            position: 'fixed',
+            top: 64,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99,
+            backgroundColor: '#00a884',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 24,
+            padding: '8px 18px',
+            fontSize: 12,
+            fontWeight: 700,
+            boxShadow: '0 4px 16px rgba(0, 168, 132, 0.5)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span>⬆️</span>
+          <span>{newIncomingPostsCount} New {newIncomingPostsCount === 1 ? 'Post' : 'Posts'}</span>
+        </button>
+      )}
       {/* Top Header */}
       <header
         style={{
@@ -1677,28 +1889,100 @@ export function FeedScreen(): React.JSX.Element {
             </div>
           )}
 
-          {/* Media Attachment Preview */}
-          {postMediaImage && (
-            <div style={{ position: 'relative', marginBottom: 12, borderRadius: 8, overflow: 'hidden', maxHeight: 140 }}>
-              <img src={postMediaImage} alt="Post attachment preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {/* Media Attachment Previews */}
+          {postCarouselImages.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 }}>
+                {postCarouselImages.map((img, idx) => (
+                  <div key={idx} style={{ position: 'relative', width: 80, height: 80, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.15)' }}>
+                    <img src={img} alt={`Thumb ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button
+                      onClick={() => {
+                        const updated = postCarouselImages.filter((_, i) => i !== idx);
+                        setPostCarouselImages(updated);
+                        setPostMediaImage(updated[0] || null);
+                      }}
+                      style={{ position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      ✕
+                    </button>
+                    <span style={{ position: 'absolute', bottom: 2, left: 2, backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, padding: '1px 4px', borderRadius: 4 }}>
+                      #{idx + 1}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <span style={{ fontSize: 10, color: '#38bdf8' }}>📷 {postCarouselImages.length} {postCarouselImages.length === 1 ? 'photo' : 'photos in carousel'} attached</span>
+            </div>
+          )}
+
+          {postMediaVideo && (
+            <div style={{ position: 'relative', marginBottom: 12, borderRadius: 8, overflow: 'hidden', maxHeight: 160, backgroundColor: '#000' }}>
+              <video src={postMediaVideo} controls loop muted playsInline style={{ width: '100%', maxHeight: 160, objectFit: 'contain' }} />
               <button
-                onClick={() => setPostMediaImage(null)}
-                style={{
-                  position: 'absolute',
-                  top: 6,
-                  right: 6,
-                  backgroundColor: 'rgba(0,0,0,0.6)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: 24,
-                  height: 24,
-                  cursor: 'pointer',
-                  fontSize: 12,
-                }}
+                onClick={() => setPostMediaVideo(null)}
+                style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12 }}
               >
                 ✕
               </button>
+              <span style={{ position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.7)', color: '#38bdf8', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>
+                🎬 Short MP4 Video
+              </span>
+            </div>
+          )}
+
+          {/* Interactive Community Poll Composer */}
+          {isPollEnabled && (
+            <div style={{ marginBottom: 12, padding: 12, backgroundColor: 'rgba(56, 189, 248, 0.06)', borderRadius: 10, border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#38bdf8' }}>📊 Community Consensus Poll</span>
+                <button
+                  onClick={() => setIsPollEnabled(false)}
+                  style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 12, cursor: 'pointer' }}
+                >
+                  Remove Poll
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="Ask a community question..."
+                value={pollQuestion}
+                onChange={e => setPollQuestion(e.target.value)}
+                style={{ width: '100%', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#fff', padding: '8px 10px', fontSize: 12, marginBottom: 8, outline: 'none' }}
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {pollOptions.map((opt, oIdx) => (
+                  <div key={oIdx} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder={`Option ${oIdx + 1}`}
+                      value={opt}
+                      onChange={e => {
+                        const next = [...pollOptions];
+                        next[oIdx] = e.target.value;
+                        setPollOptions(next);
+                      }}
+                      style={{ flex: 1, backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 6, color: '#fff', padding: '6px 8px', fontSize: 12, outline: 'none' }}
+                    />
+                    {pollOptions.length > 2 && (
+                      <button
+                        onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== oIdx))}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 14, cursor: 'pointer' }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {pollOptions.length < 4 && (
+                <button
+                  onClick={() => setPollOptions([...pollOptions, ''])}
+                  style={{ marginTop: 8, background: 'none', border: 'none', color: '#38bdf8', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  + Add Option (Max 4)
+                </button>
+              )}
             </div>
           )}
 
@@ -1723,40 +2007,88 @@ export function FeedScreen(): React.JSX.Element {
             }}
           />
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center' }}>
-            <label
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                backgroundColor: postMediaImage ? '#0369a1' : 'rgba(255,255,255,0.08)',
-                color: '#fff',
-                padding: '6px 12px',
-                borderRadius: 8,
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              <span>📷</span>
-              <span>{postMediaImage ? 'Photo Added' : 'Add Photo'}</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handlePostImageChange}
-                style={{ display: 'none' }}
-              />
-            </label>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  backgroundColor: postCarouselImages.length > 0 ? '#0369a1' : 'rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                }}
+              >
+                <span>📷</span>
+                <span>{postCarouselImages.length > 0 ? `Photos (${postCarouselImages.length})` : 'Add Photos'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handlePostImageChange}
+                  style={{ display: 'none' }}
+                />
+              </label>
 
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  backgroundColor: postMediaVideo ? '#0284c7' : 'rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                }}
+              >
+                <span>🎬</span>
+                <span>{postMediaVideo ? 'Video Added' : 'Add Video'}</span>
+                <input
+                  type="file"
+                  accept="video/mp4,video/*"
+                  onChange={handlePostVideoChange}
+                  style={{ display: 'none' }}
+                />
+              </label>
+
+              <button
+                onClick={() => setIsPollEnabled(!isPollEnabled)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  backgroundColor: isPollEnabled ? '#0284c7' : 'rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  fontSize: 11,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <span>📊</span>
+                <span>{isPollEnabled ? 'Poll Active' : 'Add Poll'}</span>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button
                 onClick={() => {
                   setIsCreateOpen(false);
                   setPostMediaImage(null);
+                  setPostCarouselImages([]);
+                  setPostMediaVideo(null);
+                  setIsPollEnabled(false);
                   setCreateError(null);
                 }}
                 disabled={isSubmitting}
                 style={{
-                  padding: '8px 14px',
+                  padding: '8px 12px',
                   backgroundColor: '#374151',
                   color: '#cbd5e1',
                   border: 'none',
@@ -1770,22 +2102,22 @@ export function FeedScreen(): React.JSX.Element {
               </button>
               <button
                 onClick={handleCreatePost}
-                disabled={isSubmitting || (!newCaption.trim() && !postMediaImage)}
+                disabled={isSubmitting || (!newCaption.trim() && postCarouselImages.length === 0 && !postMediaVideo && !isPollEnabled)}
                 style={{
-                  padding: '8px 18px',
-                  backgroundColor: isSubmitting || (!newCaption.trim() && !postMediaImage) ? '#475569' : '#00a884',
+                  padding: '8px 16px',
+                  backgroundColor: isSubmitting || (!newCaption.trim() && postCarouselImages.length === 0 && !postMediaVideo && !isPollEnabled) ? '#475569' : '#00a884',
                   color: '#fff',
                   border: 'none',
                   borderRadius: 8,
                   fontSize: 12,
                   fontWeight: 700,
-                  cursor: isSubmitting || (!newCaption.trim() && !postMediaImage) ? 'not-allowed' : 'pointer',
+                  cursor: isSubmitting || (!newCaption.trim() && postCarouselImages.length === 0 && !postMediaVideo && !isPollEnabled) ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
                 }}
               >
-                {isSubmitting ? 'Relaying...' : '🚀 Broadcast Post'}
+                {isSubmitting ? 'Relaying...' : '🚀 Broadcast'}
               </button>
             </div>
           </div>
@@ -1826,7 +2158,7 @@ export function FeedScreen(): React.JSX.Element {
         </div>
       )}
 
-      {/* Feed Posts */}
+      {/* Feed Posts — Virtualized Windowed Renderer (Phase 1.1) */}
       <section aria-label="Feed Stream" style={{ flex: 1, paddingBottom: 64 }}>
         {/* Loading Skeleton */}
         {isLoading && (
@@ -1895,169 +2227,460 @@ export function FeedScreen(): React.JSX.Element {
           </div>
         )}
 
-        {/* Populated Posts */}
+        {/* Populated Windowed Posts */}
         {!isLoading &&
-          posts.map(post => (
-            <article
-              key={post.id}
-              style={{
-                marginBottom: 16,
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                paddingBottom: 12,
-              }}
-            >
-              {/* Post Author */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '10px 16px',
-                }}
-              >
-                <div
+          posts
+            .filter(
+              p =>
+                !hiddenPostIds.has(p.id) &&
+                !mutedAuthors.has(p.creatorHandle) &&
+                !blockedPeers.has(p.creatorHandle)
+            )
+            .slice(0, visibleCount)
+            .map(post => {
+              const carouselIndex = activeCarouselIndices[post.id] || 0;
+              const hasMultiCarousel = Array.isArray(post.carouselImages) && post.carouselImages.length > 1;
+
+              return (
+                <article
+                  key={post.id}
                   style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: '50%',
-                    backgroundColor: '#312e81',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    marginBottom: 16,
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    paddingBottom: 12,
                   }}
                 >
-                  {post.avatarEmoji}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {post.creatorName}
-                  </div>
-                  <div style={{ fontSize: 10, color: '#94a3b8' }}>@{post.creatorHandle}</div>
-                </div>
-                <span style={{ color: '#64748b' }}>•••</span>
-              </div>
+                  {/* Post Author & Trust Menu Header */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 16px',
+                      position: 'relative',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: '50%',
+                        backgroundColor: '#312e81',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {post.avatarEmoji}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {post.creatorName}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#94a3b8' }}>@{post.creatorHandle}</div>
+                    </div>
 
-              {/* Media Canvas */}
-              <div
-                onDoubleClick={() => toggleLike(post.id)}
+                    {/* Phase 1.4: Client-Side Trust & Safety 3-Dot Dropdown */}
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setActivePostMenuId(activePostMenuId === post.id ? null : post.id)}
+                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 6, fontSize: 14 }}
+                        aria-label="Post actions"
+                      >
+                        •••
+                      </button>
+                      {activePostMenuId === post.id && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: 26,
+                            backgroundColor: '#1e293b',
+                            borderRadius: 10,
+                            border: '1px solid rgba(255,255,255,0.14)',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+                            zIndex: 50,
+                            width: 175,
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column',
+                          }}
+                        >
+                          <button
+                            onClick={() => handleHidePost(post.id)}
+                            style={{ padding: '9px 12px', background: 'none', border: 'none', color: '#cbd5e1', textAlign: 'left', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                          >
+                            <span>👁️</span> Hide Post
+                          </button>
+                          <button
+                            onClick={() => handleMuteAuthor(post.creatorHandle)}
+                            style={{ padding: '9px 12px', background: 'none', border: 'none', color: '#cbd5e1', textAlign: 'left', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                          >
+                            <span>🔇</span> Mute @{post.creatorHandle}
+                          </button>
+                          <button
+                            onClick={() => handleBlockPeer(post.creatorHandle)}
+                            style={{ padding: '9px 12px', background: 'none', border: 'none', color: '#f87171', textAlign: 'left', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                          >
+                            <span>🚫</span> Block Peer
+                          </button>
+                          <div style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+                          <button
+                            onClick={() => handleReportPost(post.id)}
+                            style={{ padding: '9px 12px', background: 'none', border: 'none', color: '#ef4444', textAlign: 'left', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}
+                          >
+                            <span>🚩</span> Report Post
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Media Canvas: Multi-Image Carousel (Phase 1.2) or Short Video or Single Photo */}
+                  {hasMultiCarousel ? (
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: 320,
+                        backgroundColor: '#000',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <img
+                        src={post.carouselImages![carouselIndex]}
+                        alt={`Slide ${carouselIndex + 1}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onDoubleClick={() => toggleLike(post.id)}
+                      />
+                      {/* Counter Badge */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 10,
+                          right: 10,
+                          backgroundColor: 'rgba(0,0,0,0.7)',
+                          color: '#fff',
+                          padding: '3px 8px',
+                          borderRadius: 12,
+                          fontSize: 10,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {carouselIndex + 1} / {post.carouselImages!.length}
+                      </div>
+                      {/* Prev Button */}
+                      {carouselIndex > 0 && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            handlePrevCarousel(post.id, post.carouselImages!.length);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            left: 8,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            backgroundColor: 'rgba(0,0,0,0.6)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: 28,
+                            height: 28,
+                            cursor: 'pointer',
+                            fontSize: 14,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          ‹
+                        </button>
+                      )}
+                      {/* Next Button */}
+                      {carouselIndex < post.carouselImages!.length - 1 && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleNextCarousel(post.id, post.carouselImages!.length);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: 8,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            backgroundColor: 'rgba(0,0,0,0.6)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: 28,
+                            height: 28,
+                            cursor: 'pointer',
+                            fontSize: 14,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          ›
+                        </button>
+                      )}
+                      {/* Dots Bar */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: 10,
+                          left: 0,
+                          right: 0,
+                          display: 'flex',
+                          justifyContent: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        {post.carouselImages!.map((_, dotIdx) => (
+                          <div
+                            key={dotIdx}
+                            style={{
+                              width: carouselIndex === dotIdx ? 8 : 5,
+                              height: 5,
+                              borderRadius: 3,
+                              backgroundColor: carouselIndex === dotIdx ? '#38bdf8' : 'rgba(255,255,255,0.4)',
+                              transition: 'all 0.2s ease',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : post.mediaVideo ? (
+                    <div style={{ width: '100%', height: 320, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <video
+                        src={post.mediaVideo}
+                        controls
+                        loop
+                        muted
+                        playsInline
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      onDoubleClick={() => toggleLike(post.id)}
+                      style={{
+                        width: '100%',
+                        height: 320,
+                        backgroundColor: '#111827',
+                        background: post.mediaGradient || '#111827',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '4.5rem',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {post.mediaImage ? (
+                        <img
+                          src={post.mediaImage}
+                          alt={post.caption || 'Feed post image'}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      ) : (
+                        post.imageEmoji || '🌌'
+                      )}
+                    </div>
+                  )}
+
+                  {/* Actions Bar */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      padding: '10px 16px',
+                      fontSize: '1.2rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                      <button
+                        onClick={() => toggleLike(post.id)}
+                        aria-label={post.isLiked ? 'Unlike' : 'Like'}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '1.2rem',
+                          padding: 0,
+                          color: post.isLiked ? '#ef4444' : '#fff',
+                          transition: 'transform 0.15s ease',
+                        }}
+                      >
+                        {post.isLiked ? '❤️' : '🤍'}
+                      </button>
+                      <button
+                        onClick={() => openComments(post.id)}
+                        aria-label="Comments"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '1.2rem',
+                          padding: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          color: '#fff',
+                        }}
+                      >
+                        <span>💬</span>
+                        {typeof post.commentsCount === 'number' && post.commentsCount > 0 && (
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>{post.commentsCount}</span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleRepost(post.id)}
+                        aria-label="Repost"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '1.2rem',
+                          padding: 0,
+                          color: repostedPosts.has(post.id) ? '#10b981' : '#fff',
+                        }}
+                      >
+                        🚀
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => handleSavePost(post.id)}
+                      aria-label="Bookmark"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '1.2rem',
+                        padding: 0,
+                        color: bookmarkedPosts.has(post.id) ? '#f59e0b' : '#fff',
+                      }}
+                    >
+                      {bookmarkedPosts.has(post.id) ? '🔖' : '🏷️'}
+                    </button>
+                  </div>
+
+                  {/* Interactive Community Polls (Phase 1.3) */}
+                  {post.poll && (
+                    <div style={{ margin: '4px 16px 10px', padding: 12, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#f8fafc', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>📊</span>
+                        <span>{post.poll.question}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {post.poll.options.map((opt, optIdx) => {
+                          const hasVoted = post.poll!.userVotedIndex !== undefined || userPollVotes[post.id] !== undefined;
+                          const userSelected = post.poll!.userVotedIndex === optIdx || userPollVotes[post.id] === optIdx;
+                          const totalVotes = Math.max(1, post.poll!.totalVotes);
+                          const pct = hasVoted ? Math.round((opt.votes / totalVotes) * 100) : 0;
+
+                          return (
+                            <button
+                              key={optIdx}
+                              onClick={() => handleVotePoll(post.id, optIdx)}
+                              disabled={hasVoted}
+                              style={{
+                                position: 'relative',
+                                overflow: 'hidden',
+                                padding: '8px 12px',
+                                borderRadius: 8,
+                                border: userSelected ? '1px solid #00a884' : '1px solid rgba(255,255,255,0.1)',
+                                backgroundColor: hasVoted ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255,255,255,0.05)',
+                                color: '#fff',
+                                textAlign: 'left',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: hasVoted ? 'default' : 'pointer',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                              }}
+                            >
+                              {hasVoted && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    bottom: 0,
+                                    left: 0,
+                                    width: `${pct}%`,
+                                    backgroundColor: userSelected ? 'rgba(0, 168, 132, 0.3)' : 'rgba(56, 189, 248, 0.15)',
+                                    transition: 'width 0.4s ease',
+                                    zIndex: 0,
+                                  }}
+                                />
+                              )}
+                              <span style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {opt.text} {userSelected && <span style={{ color: '#00a884' }}>✓</span>}
+                              </span>
+                              {hasVoted && (
+                                <span style={{ position: 'relative', zIndex: 1, fontWeight: 700, fontSize: 11, color: userSelected ? '#00a884' : '#94a3b8' }}>
+                                  {pct}%
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10, color: '#64748b' }}>
+                        <span>{post.poll.totalVotes} {post.poll.totalVotes === 1 ? 'vote' : 'votes'}</span>
+                        <span>Consensus poll • P2P verified</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Post Likes & Caption */}
+                  <div style={{ padding: '0 16px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                      {post.likes} {post.likes === 1 ? 'like' : 'likes'}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                      <span style={{ fontWeight: 700, marginRight: 6 }}>{post.creatorHandle}</span>
+                      {post.caption}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{post.timeAgo}</div>
+                  </div>
+                </article>
+              );
+            })}
+
+        {/* Phase 1.1: Virtualized Infinite Scroll Load Trigger */}
+        {!isLoading &&
+          posts.filter(
+            p =>
+              !hiddenPostIds.has(p.id) &&
+              !mutedAuthors.has(p.creatorHandle) &&
+              !blockedPeers.has(p.creatorHandle)
+          ).length > visibleCount && (
+            <div style={{ textAlign: 'center', padding: '16px 0 24px' }}>
+              <button
+                onClick={() => setVisibleCount(prev => prev + 6)}
                 style={{
-                  width: '100%',
-                  height: 320,
-                  backgroundColor: '#111827',
-                  background: post.mediaGradient || '#111827',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '4.5rem',
-                  position: 'relative',
-                  overflow: 'hidden',
+                  padding: '9px 20px',
+                  backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  borderRadius: 20,
+                  color: '#38bdf8',
+                  fontSize: 12,
+                  fontWeight: 700,
                   cursor: 'pointer',
                 }}
               >
-                {post.mediaImage ? (
-                  <img
-                    src={post.mediaImage}
-                    alt={post.caption || 'Feed post image'}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                  />
-                ) : (
-                  post.imageEmoji || '🌌'
-                )}
-              </div>
-
-              {/* Actions */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: '10px 16px',
-                  fontSize: '1.2rem',
-                }}
-              >
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                  <button
-                    onClick={() => toggleLike(post.id)}
-                    aria-label={post.isLiked ? 'Unlike' : 'Like'}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      padding: 0,
-                      color: post.isLiked ? '#ef4444' : '#fff',
-                      transition: 'transform 0.15s ease',
-                    }}
-                  >
-                    {post.isLiked ? '❤️' : '🤍'}
-                  </button>
-                  <button
-                    onClick={() => openComments(post.id)}
-                    aria-label="Comments"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      color: '#fff',
-                    }}
-                  >
-                    <span>💬</span>
-                    {typeof post.commentsCount === 'number' && post.commentsCount > 0 && (
-                      <span style={{ fontSize: 11, color: '#94a3b8' }}>{post.commentsCount}</span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleRepost(post.id)}
-                    aria-label="Repost"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      padding: 0,
-                      color: repostedPosts.has(post.id) ? '#10b981' : '#fff',
-                    }}
-                  >
-                    🚀
-                  </button>
-                </div>
-                <button
-                  onClick={() => handleSavePost(post.id)}
-                  aria-label="Bookmark"
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '1.2rem',
-                    padding: 0,
-                    color: bookmarkedPosts.has(post.id) ? '#f59e0b' : '#fff',
-                  }}
-                >
-                  {bookmarkedPosts.has(post.id) ? '🔖' : '🏷️'}
-                </button>
-              </div>
-
-              {/* Post Likes & Caption */}
-              <div style={{ padding: '0 16px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                  {post.likes} {post.likes === 1 ? 'like' : 'likes'}
-                </div>
-                <div style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.4, wordBreak: 'break-word' }}>
-                  <span style={{ fontWeight: 700, marginRight: 6 }}>{post.creatorHandle}</span>
-                  {post.caption}
-                </div>
-                <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{post.timeAgo}</div>
-              </div>
-            </article>
-          ))}
+                Load More Sovereign Posts ⚡
+              </button>
+            </div>
+          )}
       </section>
 
       {/* Feed Comments Bottom-Sheet Modal */}

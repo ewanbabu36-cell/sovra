@@ -417,6 +417,24 @@ class SovraBleJsBridge(
     fun requiresLocationServices(): Boolean = bleModule.requiresLocationServices()
 
     @JavascriptInterface
+    fun isIgnoringBatteryOptimizations(): Boolean = bleModule.isIgnoringBatteryOptimizations()
+
+    @JavascriptInterface
+    fun requestIgnoreBatteryOptimizations() {
+        activity.runOnUiThread {
+            bleModule.requestIgnoreBatteryOptimizations()
+        }
+    }
+
+    @JavascriptInterface
+    fun registerPeerIdentity(did: String, address: String) {
+        bleModule.registerPeerIdentity(did, address)
+    }
+
+    @JavascriptInterface
+    fun resolveAddressForDid(did: String): String = bleModule.resolveAddressForDid(did)
+
+    @JavascriptInterface
     fun requestPermissions() {
         activity.runOnUiThread {
             activity.requestBlePermissions()

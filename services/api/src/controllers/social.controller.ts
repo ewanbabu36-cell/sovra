@@ -86,6 +86,10 @@ export class SocialController {
   }
 
   private async parseJsonBody<T = any>(req: IncomingMessage): Promise<T> {
+    if ((req as any).rawBody !== undefined) {
+      const data = (req as any).rawBody;
+      return data ? JSON.parse(data) : ({} as T);
+    }
     return new Promise((resolve, reject) => {
       let data = '';
       req.on('data', chunk => {
@@ -95,6 +99,7 @@ export class SocialController {
         }
       });
       req.on('end', () => {
+        (req as any).rawBody = data;
         try {
           resolve(data ? JSON.parse(data) : ({} as T));
         } catch (e) {
@@ -124,7 +129,7 @@ export class SocialController {
     }
 
     const page = active.slice(0, limit);
-    const nextCursor = page.length === limit ? page[page.length - 1].id : null;
+    const nextCursor = page.length === limit ? (page[page.length - 1]?.id ?? null) : null;
 
     this.sendJson(res, 200, {
       ok: true,
@@ -139,6 +144,11 @@ export class SocialController {
    */
   public async handleCreatePost(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
+      const principal = (req as any).principal;
+      if (!principal?.did) {
+        return this.sendJson(res, 401, { ok: false, error: 'Unauthorized: Authentication required' });
+      }
+
       const body = await this.parseJsonBody(req);
       const { content, mediaCid, mediaType, mediaUrl, authorDid, authorHandle, authorName, authorAvatar } = body;
 
@@ -156,7 +166,11 @@ export class SocialController {
         });
       }
 
-      const did = authorDid || (req.headers['x-sovra-did'] as string) || 'did:sovra:anonymous';
+      if (authorDid && authorDid !== principal.did) {
+        return this.sendJson(res, 403, { ok: false, error: 'Forbidden: Author DID mismatch' });
+      }
+
+      const did = principal.did;
       const handle = authorHandle || 'sovereign_citizen';
       const name = authorName || 'Sovereign Citizen';
       const avatar = authorAvatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${did}`;
@@ -196,13 +210,18 @@ export class SocialController {
    * DELETE /api/posts/:id: Soft-delete a post.
    */
   public handleDeletePost(req: IncomingMessage, res: ServerResponse, postId: string): void {
+    const principal = (req as any).principal;
+    if (!principal?.did) {
+      return this.sendJson(res, 401, { ok: false, error: 'Unauthorized: Authentication required' });
+    }
+
     const post = this.posts.find(p => p.id === postId);
     if (!post || post.isDeleted) {
       return this.sendJson(res, 404, { ok: false, error: 'Post not found.' });
     }
 
-    const requesterDid = (req.headers['x-sovra-did'] as string) || '';
-    if (requesterDid && post.authorDid !== requesterDid && requesterDid !== 'did:sovra:admin') {
+    const requesterDid = principal.did;
+    if (requesterDid && post.authorDid !== requesterDid && requesterDid !== 'did:sovra:admin' && principal.role !== 'admin' && (principal.role as any) !== 'SUPER_ADMIN') {
       return this.sendJson(res, 403, { ok: false, error: 'Unauthorized to delete this post.' });
     }
 
@@ -221,9 +240,18 @@ export class SocialController {
    */
   public async handleReaction(req: IncomingMessage, res: ServerResponse, postId: string): Promise<void> {
     try {
+      const principal = (req as any).principal;
+      if (!principal?.did) {
+        return this.sendJson(res, 401, { ok: false, error: 'Unauthorized: Authentication required' });
+      }
+
       const body = await this.parseJsonBody(req);
       const reactionType = (body.reaction || 'like').toLowerCase();
-      const userDid = (req.headers['x-sovra-did'] as string) || body.userDid || 'anonymous';
+      const userDid = principal.did;
+
+      if (body.userDid && body.userDid !== userDid) {
+        return this.sendJson(res, 403, { ok: false, error: 'Forbidden: User DID mismatch' });
+      }
 
       const post = this.posts.find(p => p.id === postId && !p.isDeleted);
       if (!post) {
@@ -286,6 +314,11 @@ export class SocialController {
    */
   public async handleAddComment(req: IncomingMessage, res: ServerResponse, postId: string): Promise<void> {
     try {
+      const principal = (req as any).principal;
+      if (!principal?.did) {
+        return this.sendJson(res, 401, { ok: false, error: 'Unauthorized: Authentication required' });
+      }
+
       const post = this.posts.find(p => p.id === postId && !p.isDeleted);
       if (!post) {
         return this.sendJson(res, 404, { ok: false, error: 'Post not found.' });
@@ -301,10 +334,15 @@ export class SocialController {
         });
       }
 
+      const userDid = principal.did;
+      if (authorDid && authorDid !== userDid) {
+        return this.sendJson(res, 403, { ok: false, error: 'Forbidden: Author DID mismatch' });
+      }
+
       const comment: CommentRecord = {
         id: `comment_${crypto.randomBytes(8).toString('hex')}`,
         postId,
-        authorDid: authorDid || 'did:sovra:anonymous',
+        authorDid: userDid,
         authorHandle: authorHandle || 'citizen',
         authorName: authorName || 'Citizen',
         authorAvatar: authorAvatar || 'https://api.dicebear.com/7.x/identicon/svg?seed=comment',

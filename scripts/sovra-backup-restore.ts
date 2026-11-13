@@ -419,4 +419,44 @@ export class SovraBackupManager {
       return [];
     }
   }
+
+  /**
+   * Automatically prunes and rotates old backups to prevent disk exhaustion.
+   * Keeps at most `maxSnapshots` recent backups, and removes backups older than `maxAgeDays`.
+   */
+  public rotateBackups(options?: { maxSnapshots?: number; maxAgeDays?: number; destRoot?: string }): {
+    prunedCount: number;
+    retainedCount: number;
+    prunedBackupIds: string[];
+  } {
+    const maxSnapshots = options?.maxSnapshots ?? 7;
+    const maxAgeDays = options?.maxAgeDays ?? 14;
+    const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const backups = this.listBackups(options?.destRoot);
+    const prunedBackupIds: string[] = [];
+    let retainedCount = 0;
+
+    for (let i = 0; i < backups.length; i++) {
+      const b = backups[i]!;
+      const isBeyondRetentionCount = i >= maxSnapshots;
+      const isBeyondMaxAge = b.manifest ? (now - b.manifest.timestamp) > maxAgeMs : false;
+
+      if (isBeyondRetentionCount || isBeyondMaxAge) {
+        try {
+          fs.rmSync(b.backupDir, { recursive: true, force: true });
+          prunedBackupIds.push(b.backupId);
+        } catch (_) {}
+      } else {
+        retainedCount++;
+      }
+    }
+
+    return {
+      prunedCount: prunedBackupIds.length,
+      retainedCount,
+      prunedBackupIds,
+    };
+  }
 }

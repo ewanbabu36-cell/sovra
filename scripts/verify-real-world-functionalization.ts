@@ -155,7 +155,7 @@ async function runRealWorldVerification() {
     const aliceUnauthMe = await request('GET', '/api/user/me', undefined, aliceToken);
     assert(aliceUnauthMe.status === 401, 'Logged out token rejected on /api/user/me with 401 Unauthorized');
 
-    const aliceLogin = await request('POST', '/api/user/login', { identifier: aliceHandle });
+    const aliceLogin = await request('POST', '/api/user/login', { identifier: aliceHandle, pin: '123456' });
     assert(aliceLogin.status === 200 && aliceLogin.data.ok === true, 'Alice re-login succeeded with handle');
     const aliceNewToken = aliceLogin.data.sessionToken;
 
@@ -283,18 +283,18 @@ async function runRealWorldVerification() {
 
     // Bob messages query
     const bobMsgs = await request('GET', '/api/chat/messages', undefined, bobToken);
-    assert(bobMsgs.data.messages.some((m: any) => m.text.includes('Hey Bob')), 'Bob can read Alice message');
+    assert(bobMsgs.data.messages.some((m: any) => m.senderDid === aliceDid && (m.text?.includes('Hey Bob') || m.isE2EE || m.ciphertextHex)), 'Bob can read Alice message');
 
     // Charlie messages query: Charlie MUST NOT see Alice & Bob messages
     const charlieMsgs = await request('GET', '/api/chat/messages', undefined, charlieToken);
-    const leaked = charlieMsgs.data.messages.some((m: any) => m.text.includes('Hey Bob') || m.text.includes('pinned'));
+    const leaked = charlieMsgs.data.messages.some((m: any) => (m.senderDid === aliceDid || m.senderDid === bobDid) && m.recipientDid !== charlieDid && !m.recipientDid.startsWith('channel:'));
     assert(!leaked, 'Charlie CANNOT read private messages between Alice & Bob (Privacy isolation enforced)');
 
     // 7. Channels & Subscriptions
     console.log('\n[7/12] Testing Channels, Creation & Subscriptions...');
     const chanRes = await request('POST', '/api/social/channels', {
-      name: 'Decentralized Web Creators',
-      handle: 'web_creators',
+      name: `Decentralized Web Creators ${runId}`,
+      handle: `creators_${runId}`,
       description: 'Discussions on sovereign web stacks',
     }, bobToken);
     assert(chanRes.status === 200 && chanRes.data.ok === true, 'Bob created a channel');
@@ -316,8 +316,10 @@ async function runRealWorldVerification() {
     }, aliceNewToken);
     assert(tipRes.status === 200 && tipRes.data.ok === true, 'Alice tipped Bob 20 SOV', tipRes);
     assert(tipRes.data?.newBalance === 480, 'Alice balance correctly decremented: 500 - 20 = 480 SOV', tipRes.data);
-    assert(tipRes.data?.split?.creatorAmount === 19, 'Bob received 95% creator split: 19 SOV', tipRes.data);
-    assert(tipRes.data?.split?.seederAmount === 1, 'Seeder received 5% seeder split: 1 SOV', tipRes.data);
+    const creatorGot = tipRes.data?.split?.creator ?? tipRes.data?.split?.creatorAmount;
+    const seederGot = tipRes.data?.split?.seeder ?? tipRes.data?.split?.seederAmount;
+    assert(creatorGot === 19, 'Bob received 95% creator split: 19 SOV', tipRes.data);
+    assert(seederGot === 1, 'Seeder received 5% seeder split: 1 SOV', tipRes.data);
 
     // Attempt tipping with amount > balance
     const overdrawTip = await request('POST', '/api/youtube/tip', {
@@ -367,7 +369,7 @@ async function runRealWorldVerification() {
       callType: 'audio',
     }, aliceNewToken);
     assert(callOfferRes.status === 200 && callOfferRes.data.ok === true, 'Alice created WebRTC call offer for Bob');
-    const callId = callOfferRes.data.session.callId;
+    const callId = callOfferRes.data?.session?.callId || callOfferRes.data?.sessionId;
 
     // Bob polls call
     const bobPollRes = await request('GET', `/api/call/poll?callId=${callId}`, undefined, bobToken);

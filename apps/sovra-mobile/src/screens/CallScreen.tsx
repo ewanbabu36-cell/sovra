@@ -311,8 +311,8 @@ export function CallScreen({
           <span>End-to-End Encrypted (Noise_XX / DTLS-SRTP)</span>
         </div>
         <div style={{ fontSize: 22, fontWeight: 700 }}>{peerName}</div>
-        <div style={{ fontSize: 13, color: '#94a3b8', fontFamily: 'monospace' }}>
-          {formatTimer(duration)} &bull; Tier 1 (IPv6 Direct) &bull; {peerDid.slice(0, 16)}...
+        <div style={{ fontSize: 13, color: '#38bdf8', fontWeight: 600 }}>
+          {formatTimer(duration)} &bull; Direct Sovereign Stream &bull; Secure Encrypted
         </div>
       </div>
 

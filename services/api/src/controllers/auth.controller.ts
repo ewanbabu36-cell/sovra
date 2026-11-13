@@ -27,10 +27,19 @@ export class AuthController {
 
   constructor() {}
 
+  public getSession(token: string): UserSession | undefined {
+    const cleanToken = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
+    return this.activeSessions.get(cleanToken);
+  }
+
   /**
    * Parses JSON body from incoming HTTP request safely.
    */
   public async parseJsonBody<T = any>(req: IncomingMessage): Promise<T> {
+    if ((req as any).rawBody !== undefined) {
+      const data = (req as any).rawBody;
+      return data ? JSON.parse(data) : ({} as T);
+    }
     return new Promise((resolve, reject) => {
       let data = '';
       req.on('data', chunk => {
@@ -66,7 +75,7 @@ export class AuthController {
   public async handleRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
       const body = await this.parseJsonBody(req);
-      const { handle, displayName, password } = body;
+      const { handle, displayName } = body;
 
       if (!handle || !displayName) {
         return this.sendJson(res, 400, {

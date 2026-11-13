@@ -25,7 +25,7 @@ export interface StudioRouteContext {
   url: URL;
   readBoundedBody: (req: http.IncomingMessage, res: http.ServerResponse, maxBytes: number) => Promise<{ body: string; ok: boolean }>;
   resolvePrincipal: (req: http.IncomingMessage) => AuthenticatedPrincipal | null;
-  enforceAuth: (req: http.IncomingMessage, res: http.ServerResponse) => AuthenticatedPrincipal | null;
+  enforceAuth: (req: http.IncomingMessage, res: http.ServerResponse, parsedBody?: Record<string, any>) => AuthenticatedPrincipal | null;
 }
 
 function resolveCreatorDid(ctx: StudioRouteContext): string {
@@ -38,6 +38,32 @@ function resolveCreatorDid(ctx: StudioRouteContext): string {
     return qDid.trim();
   }
   return 'did:sovra:creator_primary';
+}
+
+// Perceptual Hash Copyright & Piracy Registry
+export interface CopyrightFingerprint {
+  pHash: string;
+  creatorDid: string;
+  sourceCid: string;
+  title: string;
+  registeredAt: number;
+}
+export const copyrightFingerprintRegistry = new Map<string, CopyrightFingerprint>();
+
+export function computePerceptualHash(input: string): string {
+  return crypto.createHash('sha256').update(input).digest('hex').substring(0, 16);
+}
+
+export function findCopyrightMatch(pHash: string): CopyrightFingerprint | null {
+  for (const [existingHash, record] of copyrightFingerprintRegistry.entries()) {
+    if (existingHash === pHash) return record;
+    let diff = 0;
+    for (let i = 0; i < 16; i++) {
+      if (existingHash[i] !== pHash[i]) diff++;
+    }
+    if (diff <= 1) return record;
+  }
+  return null;
 }
 
 export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Promise<boolean> {
@@ -194,44 +220,16 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
       const instanceSeq = (dbAny.db.wasm_contracts.length || 0) + 1;
       const contractAddress = 'sovra1wasm' + crypto.createHash('sha256').update(`sovra_wasm_contract:${codeId}:${instanceSeq}`).digest('hex').slice(0, 32);
 
-      // Attempt broadcast to L1 node if online
+      // Non-custodial: relay client-signed transaction if provided
       let l1TxResult: any = null;
       let finalContractAddress = contractAddress;
-      try {
-        const valKeyPath = path.resolve(process.cwd(), 'chain/mytestnet/node0/validator-0.key.json');
-        if (fs.existsSync(valKeyPath)) {
-          const valKey = JSON.parse(fs.readFileSync(valKeyPath, 'utf8'));
-          const senderAddress = creatorAddress.startsWith('sovra12a806ca82') ? creatorAddress : valKey.address;
-          const privKey = Buffer.from(valKey.priv_key, 'hex').subarray(0, 32);
-
-          // Get current nonce
-          const nonceRes = await fetch(`${PRIMARY_RPC}/query/nonce?address=${encodeURIComponent(senderAddress)}`);
-          const nonceData = await nonceRes.json();
-          const nonce = Number(nonceData.nonce || 0);
-
-          const instantiatePayload = {
-            type: 'instantiate',
-            sender: senderAddress,
-            nonce,
-            fee: '1000',
-            code_id: codeId,
-            label: `${name} (${symbol})`,
-            msg: JSON.stringify(instantiateMsg),
-          };
-
-          const signBytes = Buffer.from(JSON.stringify(instantiatePayload), 'utf8');
-          const sig = bytesToHex(signEd25519(new Uint8Array(privKey), new Uint8Array(signBytes)));
-
-          const l1Payload = {
-            ...instantiatePayload,
-            pub_key: valKey.pub_key,
-            sig,
-          };
-
+      const clientSignedTx = parsed.signedTx || parsed.clientSignedTx;
+      if (clientSignedTx && typeof clientSignedTx === 'object') {
+        try {
           const rpcRes = await fetch(`${PRIMARY_RPC}/broadcast_tx_commit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(l1Payload),
+            body: JSON.stringify(clientSignedTx),
           });
           if (rpcRes.ok) {
             l1TxResult = await rpcRes.json();
@@ -239,9 +237,9 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
               finalContractAddress = l1TxResult.contract_address;
             }
           }
+        } catch (rpcErr) {
+          console.warn('[STUDIO] L1 instantiate broadcast error:', rpcErr);
         }
-      } catch (rpcErr) {
-        console.warn('[STUDIO] L1 instantiate broadcast error:', rpcErr);
       }
 
       const txHash = l1TxResult?.hash || ('0x' + crypto.createHash('sha256').update(`${finalContractAddress}:${Date.now()}`).digest('hex'));
@@ -416,35 +414,13 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
       };
 
       let finalContractAddress = contractAddress;
-      try {
-        const valKeyPath = path.resolve(process.cwd(), 'chain/mytestnet/node0/validator-0.key.json');
-        if (fs.existsSync(valKeyPath)) {
-          const valKey = JSON.parse(fs.readFileSync(valKeyPath, 'utf8'));
-          const senderAddress = creatorAddress.startsWith('sovra12a806ca82') ? creatorAddress : valKey.address;
-          const privKey = Buffer.from(valKey.priv_key, 'hex').subarray(0, 32);
-
-          const nonceRes = await fetch(`${PRIMARY_RPC}/query/nonce?address=${encodeURIComponent(senderAddress)}`);
-          const nonceData = await nonceRes.json();
-          const nonce = Number(nonceData.nonce || 0);
-
-          const instantiatePayload = {
-            type: 'instantiate',
-            sender: senderAddress,
-            nonce,
-            fee: '1000',
-            code_id: codeId,
-            label: `${name} (${symbol}) NFT Pass`,
-            msg: JSON.stringify(instantiateMsg),
-          };
-
-          const signBytes = Buffer.from(JSON.stringify(instantiatePayload), 'utf8');
-          const sig = bytesToHex(signEd25519(new Uint8Array(privKey), new Uint8Array(signBytes)));
-          const l1Payload = { ...instantiatePayload, pub_key: valKey.pub_key, sig };
-
+      const clientSignedTx = parsed.signedTx || parsed.clientSignedTx;
+      if (clientSignedTx && typeof clientSignedTx === 'object') {
+        try {
           const rpcRes = await fetch(`${PRIMARY_RPC}/broadcast_tx_commit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(l1Payload),
+            body: JSON.stringify(clientSignedTx),
           });
           if (rpcRes.ok) {
             const l1TxResult = await rpcRes.json();
@@ -452,9 +428,9 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
               finalContractAddress = l1TxResult.contract_address;
             }
           }
+        } catch (err) {
+          console.warn('[STUDIO] L1 CW721 instantiate broadcast:', err);
         }
-      } catch (err) {
-        console.warn('[STUDIO] L1 CW721 instantiate broadcast:', err);
       }
 
       const dropRecord = {
@@ -559,36 +535,17 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
         }
       };
 
-      try {
-        const valKeyPath = path.resolve(process.cwd(), 'chain/mytestnet/node0/validator-0.key.json');
-        if (fs.existsSync(valKeyPath)) {
-          const valKey = JSON.parse(fs.readFileSync(valKeyPath, 'utf8'));
-          const senderAddress = valKey.address;
-          const privKey = Buffer.from(valKey.priv_key, 'hex').subarray(0, 32);
-
-          const nonceRes = await fetch(`${PRIMARY_RPC}/query/nonce?address=${encodeURIComponent(senderAddress)}`);
-          const nonceData = await nonceRes.json();
-          const nonce = Number(nonceData.nonce || 0);
-
-          const mintPayload = {
-            type: 'execute',
-            sender: senderAddress,
-            contract: drop.contractAddress,
-            nonce,
-            fee: '1000',
-            msg: JSON.stringify(mintMsg)
-          };
-
-          const signBytes = Buffer.from(JSON.stringify(mintPayload), 'utf8');
-          const sig = bytesToHex(signEd25519(new Uint8Array(privKey), new Uint8Array(signBytes)));
+      const clientSignedTx = parsed.signedTx || parsed.clientSignedTx;
+      if (clientSignedTx && typeof clientSignedTx === 'object') {
+        try {
           await fetch(`${PRIMARY_RPC}/broadcast_tx_commit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...mintPayload, pub_key: valKey.pub_key, sig })
+            body: JSON.stringify(clientSignedTx),
           });
+        } catch (l1Err) {
+          console.warn('[NFT] L1 mint execute warning:', l1Err);
         }
-      } catch (l1Err) {
-        console.warn('[NFT] L1 mint execute warning:', l1Err);
       }
 
       drop.mintedCount = nextTokenNum;
@@ -662,9 +619,18 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     const { body, ok } = await readBoundedBody(req, res, 10 * 1024 * 1024);
     if (!ok) return true;
 
+    let parsed: any = {};
     try {
-      const parsed = JSON.parse(body);
-      const creatorDid = parsed.creatorDid || resolveCreatorDid(ctx);
+      parsed = JSON.parse(body);
+    } catch (_) {
+      parsed = {};
+    }
+
+    const principal = ctx.enforceAuth(req, res, parsed);
+    if (!principal) return true;
+
+    try {
+      const creatorDid = principal.did || parsed.creatorDid || resolveCreatorDid(ctx);
       const title = parsed.title || 'Creator Studio Upload';
       const description = parsed.description || '';
       const tags = parsed.tags || '#creator #sovra';
@@ -674,6 +640,29 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
         : ['1080p', '720p', '480p', '360p'];
 
       const scheduledPublishAt = typeof parsed.scheduledPublishAt === 'number' ? parsed.scheduledPublishAt : undefined;
+
+      // Automated Content Perceptual Hash (pHash) Fingerprinting
+      const mediaPayload = parsed.mediaVideo || parsed.sourceCid || (title + description);
+      const pHash = parsed.pHash || computePerceptualHash(mediaPayload);
+      const copyrightMatch = findCopyrightMatch(pHash);
+      if (copyrightMatch && copyrightMatch.creatorDid !== creatorDid) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: 'Content copyright strike: Media perceptual fingerprint matches registered work',
+          pHash,
+          matchedCid: copyrightMatch.sourceCid,
+          originalCreatorDid: copyrightMatch.creatorDid,
+        }));
+        return true;
+      }
+      copyrightFingerprintRegistry.set(pHash, {
+        pHash,
+        creatorDid,
+        sourceCid,
+        title,
+        registeredAt: Date.now(),
+      });
 
       // Create tracking job in database
       const job = sovraDb.createStudioJob({
@@ -732,6 +721,7 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
         res.end(JSON.stringify({
           ok: true,
           job: updated,
+          pHash,
           masterManifestCid: transcodeRes.value.masterManifestCid,
           masterPlaylistUrl,
           resolutionVariants: Object.keys(transcodeRes.value.resolutionCids),
@@ -745,6 +735,23 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Invalid studio upload payload: ' + (err?.message || err) }));
     }
+    return true;
+  }
+
+  // 2b. GET /api/studio/copyright/lookup - Query media perceptual hash copyright status
+  if (url.pathname === '/api/studio/copyright/lookup' && req.method === 'GET') {
+    const hash = url.searchParams.get('pHash') || url.searchParams.get('hash') || '';
+    const cid = url.searchParams.get('cid') || '';
+    const queryHash = hash || (cid ? computePerceptualHash(cid) : '');
+    const match = queryHash ? findCopyrightMatch(queryHash) : null;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      matched: !!match,
+      pHash: queryHash,
+      fingerprint: match,
+      totalFingerprints: copyrightFingerprintRegistry.size,
+    }));
     return true;
   }
 
@@ -925,9 +932,18 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
 
+    let parsed: any = {};
     try {
-      const parsed = JSON.parse(body);
-      const creatorDid = resolveCreatorDid(ctx);
+      parsed = JSON.parse(body);
+    } catch (_) {
+      parsed = {};
+    }
+
+    const principal = ctx.enforceAuth(req, res, parsed);
+    if (!principal) return true;
+
+    try {
+      const creatorDid = principal.did || resolveCreatorDid(ctx);
       const contentId = parsed.contentId || parsed.id;
       if (!contentId) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -956,9 +972,18 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
     if (!ok) return true;
 
+    let parsed: any = {};
     try {
-      const parsed = JSON.parse(body);
-      const creatorDid = resolveCreatorDid(ctx);
+      parsed = JSON.parse(body);
+    } catch (_) {
+      parsed = {};
+    }
+
+    const principal = ctx.enforceAuth(req, res, parsed);
+    if (!principal) return true;
+
+    try {
+      const creatorDid = principal.did || resolveCreatorDid(ctx);
       const contentId = parsed.contentId || parsed.id;
       if (!contentId) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1043,9 +1068,17 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
   if (url.pathname === '/api/studio/playlists/create' && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
+    let parsed: any = {};
     try {
-      const parsed = JSON.parse(body);
-      const creatorDid = resolveCreatorDid(ctx);
+      parsed = JSON.parse(body);
+    } catch (_) {
+      parsed = {};
+    }
+    const principal = ctx.enforceAuth(req, res, parsed);
+    if (!principal) return true;
+
+    try {
+      const creatorDid = principal.did || resolveCreatorDid(ctx);
       if (!parsed.title || !parsed.title.trim()) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Playlist title is required' }));
@@ -1707,9 +1740,17 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
   if ((url.pathname === '/api/studio/payout' || url.pathname === '/api/studio/monetization/claim-payout') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
+    let parsed: any = {};
     try {
-      const parsed = (ok && body) ? JSON.parse(body) : {};
-      const creatorDid = parsed.creatorDid || resolveCreatorDid(ctx);
+      parsed = (ok && body) ? JSON.parse(body) : {};
+    } catch (_) {
+      parsed = {};
+    }
+    const principal = ctx.enforceAuth(req, res, parsed);
+    if (!principal) return true;
+
+    try {
+      const creatorDid = principal.did || parsed.creatorDid || resolveCreatorDid(ctx);
       const requestedAmount = typeof parsed.amount === 'number' ? parsed.amount : undefined;
       const result = sovraDb.claimCreatorPayout(creatorDid, requestedAmount);
       if (!result.ok) {

@@ -3,10 +3,11 @@
  * Sovra Modular API Gateway Service
  */
 
-export { dispatchApiRequest } from './routes/index.ts';
-export { authController } from './controllers/auth.controller.ts';
-export { chatController } from './controllers/chat.controller.ts';
-export { socialController } from './controllers/social.controller.ts';
-export { telemetryController } from './controllers/telemetry.controller.ts';
-export { walletController } from './controllers/wallet.controller.ts';
-export { securityMiddleware } from './middleware/security.middleware.ts';
+export { dispatchApiRequest } from './routes/index.js';
+export { authController } from './controllers/auth.controller.js';
+export { chatController } from './controllers/chat.controller.js';
+export { socialController } from './controllers/social.controller.js';
+export { telemetryController } from './controllers/telemetry.controller.js';
+export { walletController } from './controllers/wallet.controller.js';
+export { securityMiddleware } from './middleware/security.middleware.js';
+export { authMiddleware } from './middleware/auth.middleware.js';

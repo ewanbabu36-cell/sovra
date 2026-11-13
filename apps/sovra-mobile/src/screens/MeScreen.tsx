@@ -41,6 +41,14 @@ import {
   DEFAULT_PERSONAS,
   type SovereignPersona,
 } from '../components/IdentitySwitcherModal.js';
+import { QrCodeRenderer, formatSovraUri } from '../components/QrCodeRenderer.js';
+import { BackupSeedModal } from '../components/BackupSeedModal.js';
+import { ImportSeedModal } from '../components/ImportSeedModal.js';
+import { DepositModal } from '../components/DepositModal.js';
+import { TransactionReceiptModal } from '../components/TransactionReceiptModal.js';
+import { AddressBookModal } from '../components/AddressBookModal.js';
+import { QrScannerModal } from '../components/QrScannerModal.js';
+import { CreatorStudioDrawer } from '../components/CreatorStudioDrawer.js';
 
 
 function getDynamicDeviceId(): string {
@@ -82,6 +90,8 @@ export function SendTokenModal({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txReceipt, setTxReceipt] = useState<string | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isAddressBookOpen, setIsAddressBookOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -101,6 +111,26 @@ export function SendTokenModal({
       return;
     }
 
+    // Biometric confirmation guard before funds move
+    if (typeof window !== 'undefined' && (window as any).PublicKeyCredential && typeof navigator.credentials?.get === 'function') {
+      try {
+        await navigator.credentials.get({
+          publicKey: {
+            challenge: crypto.getRandomValues(new Uint8Array(32)),
+            timeout: 60000,
+            userVerification: 'preferred',
+            rpId: window.location.hostname || 'localhost',
+          },
+        });
+      } catch {
+        const confirmed = window.confirm(`Confirm transfer of ${numAmount} ${tokenSymbol} to ${cleanRecipient.slice(0, 16)}...?`);
+        if (!confirmed) {
+          setIsSending(false);
+          return;
+        }
+      }
+    }
+
     setIsSending(true);
     setError(null);
     try {
@@ -110,7 +140,7 @@ export function SendTokenModal({
         tokenSymbol,
       });
       if (res.ok) {
-        setTxReceipt(res.txHash || '0x' + Math.random().toString(16).substring(2));
+        setTxReceipt(res.txHash || 'tx_' + Date.now());
         if (onTransferComplete) onTransferComplete();
       } else {
         throw new Error(res.error || 'Transfer failed');
@@ -171,6 +201,19 @@ export function SendTokenModal({
           </button>
         </div>
 
+        <QrScannerModal
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScanSuccess={parsed => {
+            setRecipientDid(parsed.address);
+            if (parsed.amount) setAmount(parsed.amount);
+          }}
+        />
+        <AddressBookModal
+          isOpen={isAddressBookOpen}
+          onClose={() => setIsAddressBookOpen(false)}
+          onSelectContact={c => setRecipientDid(c.address)}
+        />
         {txReceipt ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '16px 0' }}>
             <div
@@ -246,9 +289,53 @@ export function SendTokenModal({
             )}
 
             <div>
-              <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>
-                Recipient DID or Sovereign Address
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                  Recipient DID or Sovereign Address
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    style={{
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      color: '#38bdf8',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <span>📷</span>
+                    <span>Scan QR</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddressBookOpen(true)}
+                    style={{
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      color: '#34d399',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <span>📒</span>
+                    <span>Contacts</span>
+                  </button>
+                </div>
+              </div>
               <input
                 type="text"
                 placeholder="did:key:z6Mks... or sovra1..."
@@ -264,12 +351,14 @@ export function SendTokenModal({
                   fontSize: 12,
                   outline: 'none',
                   boxSizing: 'border-box',
+                  fontFamily: 'monospace',
                 }}
               />
               <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                {['did:key:z6MksAliceP2P', 'did:key:z6MksBobMesh'].map(contact => (
+                {['did:key:z6MksAliceP2PGenesis', 'did:key:z6MksBobMeshNode'].map(contact => (
                   <button
                     key={contact}
+                    type="button"
                     onClick={() => setRecipientDid(contact)}
                     style={{
                       background: 'rgba(255,255,255,0.06)',
@@ -443,44 +532,13 @@ export function ReceiveTokenModal({
           </button>
         </div>
 
-        {/* Styled Visual QR Code Representation */}
-        <div
-          style={{
-            width: 180,
-            height: 180,
-            backgroundColor: '#fff',
-            borderRadius: 16,
-            padding: 12,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-          }}
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 28px)', gap: 4 }}>
-            {Array.from({ length: 25 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  width: 28,
-                  height: 28,
-                  backgroundColor:
-                    i % 2 === 0 || i === 0 || i === 4 || i === 20 || i === 24
-                      ? '#0f172a'
-                      : i % 3 === 0
-                      ? '#3b82f6'
-                      : '#cbd5e1',
-                  borderRadius: 4,
-                }}
-              />
-            ))}
-          </div>
-          <div style={{ fontSize: 9, color: '#0f172a', fontWeight: 800, marginTop: 4 }}>
-            SOVRA MESH DID QR
-          </div>
-        </div>
+        {/* High-Contrast Pure Vector ISO/IEC 18004 QR Code */}
+        <QrCodeRenderer
+          value={formatSovraUri(activeAddress)}
+          size={180}
+          title="Receive Assets QR"
+          showActions={true}
+        />
 
         <div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Your Sovereign Address / DID:</div>
@@ -799,10 +857,20 @@ export function WalletDrawerModal({
   const [isSwapping, setIsSwapping] = useState(false);
   const [swapResult, setSwapResult] = useState<string | null>(null);
 
-  // Send & Receive Modals state
+  // Send & Receive & Deposit & Security Modals state
   const [isSendOpen, setIsSendOpen] = useState(false);
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isStakingOpen, setIsStakingOpen] = useState(false);
+  const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [isBackupOpen, setIsBackupOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isAddressBookDrawerOpen, setIsAddressBookDrawerOpen] = useState(false);
+  const [activeAccountIndex, setActiveAccountIndex] = useState(0);
+  const [selectedReceiptTx, setSelectedReceiptTx] = useState<any | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+
+  const defaultMnemonic = 'legal winner thank year wave sausage worth useful legal winner thank yellow';
+  const activeMnemonic = (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_active_mnemonic') : null) || defaultMnemonic;
 
   const loadAssets = useCallback(async () => {
     setIsLoading(true);
@@ -829,6 +897,10 @@ export function WalletDrawerModal({
   useEffect(() => {
     if (isOpen) {
       loadAssets();
+      try {
+        const txs = localDb.getWalletTransactions();
+        setRecentTransactions(txs || []);
+      } catch {}
     }
   }, [isOpen, loadAssets]);
 
@@ -904,17 +976,74 @@ export function WalletDrawerModal({
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#f8fafc' }}>
-              Multi-Asset Portfolio
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#f8fafc' }}>
+                Multi-Asset Portfolio
+              </h3>
+              <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, backgroundColor: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontWeight: 800 }}>
+                BIP-39
+              </span>
+            </div>
             <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
               Layer-1 Sovereign Native Assets &amp; Creator CW20 Tokens
             </div>
           </div>
-          <button
-            onClick={onClose}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setIsBackupOpen(true)}
+              title="Backup 12-Word Recovery Phrase"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8,
+                padding: '4px 8px',
+                color: '#38bdf8',
+                fontSize: 10,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              🔑 Backup
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsImportOpen(true)}
+              title="Import Wallet from Seed Phrase"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8,
+                padding: '4px 8px',
+                color: '#94a3b8',
+                fontSize: 10,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              📥 Import
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAddressBookDrawerOpen(true)}
+              title="Address Book"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8,
+                padding: '4px 8px',
+                color: '#34d399',
+                fontSize: 10,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              📒
+            </button>
+            <button
+              onClick={onClose}
             style={{
               backgroundColor: 'rgba(255,255,255,0.08)',
               border: 'none',
@@ -928,6 +1057,42 @@ export function WalletDrawerModal({
           >
             ✕
           </button>
+        </div>
+        </div>
+
+        {/* Multi-Account Derivation Selector */}
+        <div style={{ display: 'flex', gap: 6, backgroundColor: '#1e293b', padding: 4, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+          {[
+            { idx: 0, label: 'Personal (0)' },
+            { idx: 1, label: 'Creator (1)' },
+            { idx: 2, label: 'Vault (2)' },
+          ].map(acc => (
+            <button
+              key={acc.idx}
+              type="button"
+              onClick={() => {
+                setActiveAccountIndex(acc.idx);
+                if (typeof localStorage !== 'undefined') {
+                  localStorage.setItem('sovra_active_account_index', String(acc.idx));
+                }
+                loadAssets();
+              }}
+              style={{
+                flex: 1,
+                padding: '6px 0',
+                borderRadius: 8,
+                border: 'none',
+                backgroundColor: activeAccountIndex === acc.idx ? '#3b82f6' : 'transparent',
+                color: activeAccountIndex === acc.idx ? '#fff' : '#94a3b8',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+              }}
+            >
+              {acc.label}
+            </button>
+          ))}
         </div>
 
         {/* Valuation Card */}
@@ -989,24 +1154,73 @@ export function WalletDrawerModal({
           onDelegationSuccess={() => loadAssets()}
         />
 
-        {/* Quick Action Buttons: Send, Receive, Stake */}
-        <div style={{ display: 'flex', gap: 10 }}>
+        {/* Modals: Deposit, Backup, Import, Contacts, Receipt */}
+        <DepositModal
+          isOpen={isDepositOpen}
+          onClose={() => setIsDepositOpen(false)}
+          userAddress={userDid || 'sovra1alice_genesis_node_primary'}
+          onDepositSuccess={() => loadAssets()}
+        />
+        <BackupSeedModal
+          isOpen={isBackupOpen}
+          onClose={() => setIsBackupOpen(false)}
+          mnemonic={activeMnemonic}
+        />
+        <ImportSeedModal
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          onImportSuccess={w => {
+            setActiveAccountIndex(w.accountIndex || 0);
+            loadAssets();
+          }}
+        />
+        <AddressBookModal
+          isOpen={isAddressBookDrawerOpen}
+          onClose={() => setIsAddressBookDrawerOpen(false)}
+        />
+        <TransactionReceiptModal
+          isOpen={Boolean(selectedReceiptTx)}
+          onClose={() => setSelectedReceiptTx(null)}
+          tx={selectedReceiptTx}
+        />
+
+        {/* Quick Action Buttons: Deposit (+Add Money), Send, Receive, Stake */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+          <button
+            onClick={() => setIsDepositOpen(true)}
+            style={{
+              padding: '12px 0',
+              backgroundColor: '#10b981',
+              color: '#080d14',
+              border: 'none',
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+            }}
+          >
+            <span>➕</span>
+            <span>Add</span>
+          </button>
           <button
             onClick={() => setIsSendOpen(true)}
             style={{
-              flex: 1,
               padding: '12px 0',
               backgroundColor: '#00a884',
               color: '#fff',
               border: 'none',
               borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 700,
+              fontSize: 12,
+              fontWeight: 800,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 6,
+              gap: 4,
             }}
           >
             <span>💸</span>
@@ -1015,19 +1229,18 @@ export function WalletDrawerModal({
           <button
             onClick={() => setIsReceiveOpen(true)}
             style={{
-              flex: 1,
               padding: '12px 0',
               backgroundColor: '#3b82f6',
               color: '#fff',
               border: 'none',
               borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 700,
+              fontSize: 12,
+              fontWeight: 800,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 6,
+              gap: 4,
             }}
           >
             <span>📥</span>
@@ -1036,19 +1249,18 @@ export function WalletDrawerModal({
           <button
             onClick={() => setIsStakingOpen(true)}
             style={{
-              flex: 1,
               padding: '12px 0',
               backgroundColor: '#0284c7',
               color: '#fff',
               border: 'none',
               borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 700,
+              fontSize: 12,
+              fontWeight: 800,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 6,
+              gap: 4,
             }}
           >
             <span>⚡</span>
@@ -1123,6 +1335,57 @@ export function WalletDrawerModal({
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>{asset.displayBalance}</div>
                     <div style={{ fontSize: 11, color: '#94a3b8' }}>{asset.type}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Recent Activity & Interactive Receipts */}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase' }}>
+            Recent Activity ({recentTransactions.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {recentTransactions.length === 0 ? (
+              <div style={{ padding: '12px 14px', backgroundColor: '#1e293b', borderRadius: 12, textAlign: 'center', color: '#64748b', fontSize: 11 }}>
+                No transactions yet. Claim Faucet or execute P2P transfer!
+              </div>
+            ) : (
+              recentTransactions.slice(0, 5).map(tx => (
+                <div
+                  key={tx.txHash}
+                  onClick={() => setSelectedReceiptTx(tx)}
+                  style={{
+                    backgroundColor: '#1e293b',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>{tx.type === 'transfer' ? '💸' : '⚡'}</span>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#f8fafc' }}>
+                        {tx.type === 'transfer' ? 'P2P Transfer' : 'Swap / Activity'}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace' }}>
+                        {tx.txHash.slice(0, 8)}...
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#38bdf8' }}>
+                      {tx.amount} {tx.tokenSymbol || 'SOV'}
+                    </div>
+                    <div style={{ fontSize: 9, color: tx.status === 'confirmed' ? '#34d399' : '#fbbf24' }}>
+                      {tx.status}
+                    </div>
                   </div>
                 </div>
               ))
@@ -1508,6 +1771,7 @@ export function MeScreen(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false);
   const [activePersona, setActivePersona] = useState<SovereignPersona>(DEFAULT_PERSONAS[0]!);
   const [isIdentitySwitcherOpen, setIsIdentitySwitcherOpen] = useState(false);
+  const [isStudioOpen, setIsStudioOpen] = useState(false);
 
   const loadUserData = useCallback(async () => {
     setIsLoading(true);
@@ -1832,8 +2096,8 @@ export function MeScreen(): React.JSX.Element {
               border: '1px solid rgba(56, 189, 248, 0.2)',
             }}
           >
-            <span style={{ fontSize: 10, color: '#38bdf8', fontFamily: 'monospace' }}>
-              {profile.did.slice(0, 16)}...Verified
+            <span style={{ fontSize: 10, color: '#38bdf8', fontWeight: 700 }}>
+              🛡️ {profile.handle || '@sovereign'} &bull; Verified Peer
             </span>
           </div>
         </div>
@@ -1916,6 +2180,48 @@ export function MeScreen(): React.JSX.Element {
             }}
           >
             Invite ➔
+          </div>
+        </div>
+
+        {/* Creator Studio Pro Banner */}
+        <div
+          onClick={() => setIsStudioOpen(true)}
+          style={{
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(168, 85, 247, 0.25) 100%)',
+            border: '1px solid rgba(168, 85, 247, 0.45)',
+            borderRadius: 14,
+            padding: '12px 14px',
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            boxShadow: '0 4px 18px rgba(99, 102, 241, 0.15)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 24 }}>🎬</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#e0e7ff' }}>Creator Studio Pro</div>
+              <div style={{ fontSize: 11, color: '#c7d2fe', marginTop: 1 }}>
+                Real-time 48h analytics, pHash shield &amp; Merkle claims
+              </div>
+            </div>
+          </div>
+          <div
+            style={{
+              backgroundColor: '#6366f1',
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 800,
+              padding: '6px 12px',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            Studio ↗
           </div>
         </div>
       </div>
@@ -2121,6 +2427,13 @@ export function MeScreen(): React.JSX.Element {
           setActivePersona(p);
         }}
         onAddPersona={() => setIsOnboardingOpen(true)}
+      />
+
+      {/* Sovereign Creator Studio Drawer */}
+      <CreatorStudioDrawer
+        isOpen={isStudioOpen}
+        onClose={() => setIsStudioOpen(false)}
+        userDid={profile?.did}
       />
     </div>
   );

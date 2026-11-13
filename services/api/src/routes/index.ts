@@ -6,12 +6,13 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { authController } from '../controllers/auth.controller.ts';
-import { walletController } from '../controllers/wallet.controller.ts';
-import { telemetryController } from '../controllers/telemetry.controller.ts';
-import { socialController } from '../controllers/social.controller.ts';
-import { chatController } from '../controllers/chat.controller.ts';
-import { securityMiddleware } from '../middleware/security.middleware.ts';
+import { authController } from '../controllers/auth.controller.js';
+import { walletController } from '../controllers/wallet.controller.js';
+import { telemetryController } from '../controllers/telemetry.controller.js';
+import { socialController } from '../controllers/social.controller.js';
+import { chatController } from '../controllers/chat.controller.js';
+import { securityMiddleware } from '../middleware/security.middleware.js';
+import { authMiddleware } from '../middleware/auth.middleware.js';
 
 export async function dispatchApiRequest(
   req: IncomingMessage,
@@ -49,20 +50,27 @@ export async function dispatchApiRequest(
     return true;
   }
   if (pathname === '/api/user/me' && req.method === 'GET') {
+    await authMiddleware.authenticate(req);
     authController.handleGetMe(req, res);
     return true;
   }
 
-  // 2. Wallet & Sovereign Vault Routes
+  // 2. Wallet & Sovereign Vault Routes (Strict Authentication Required)
   if (pathname === '/api/wallet/balance' && req.method === 'GET') {
+    const auth = await authMiddleware.requireAuth(req, res);
+    if (!auth) return true;
     walletController.handleGetBalance(req, res);
     return true;
   }
   if (pathname === '/api/wallet/transfer' && req.method === 'POST') {
+    const auth = await authMiddleware.requireAuth(req, res);
+    if (!auth) return true;
     await walletController.handleTransfer(req, res);
     return true;
   }
   if (pathname === '/api/wallet/transactions' && req.method === 'GET') {
+    const auth = await authMiddleware.requireAuth(req, res);
+    if (!auth) return true;
     walletController.handleGetTransactions(req, res);
     return true;
   }
@@ -73,52 +81,83 @@ export async function dispatchApiRequest(
     return true;
   }
   if (pathname === '/api/posts' && req.method === 'POST') {
+    const auth = await authMiddleware.requireAuth(req, res);
+    if (!auth) return true;
     await socialController.handleCreatePost(req, res);
     return true;
   }
   const deletePostMatch = pathname.match(/^\/api\/posts\/([^/]+)$/);
   if (deletePostMatch && req.method === 'DELETE') {
-    socialController.handleDeletePost(req, res, deletePostMatch[1]);
-    return true;
+    const postId = deletePostMatch[1];
+    if (postId) {
+      const auth = await authMiddleware.requireAuth(req, res);
+      if (!auth) return true;
+      socialController.handleDeletePost(req, res, postId);
+      return true;
+    }
   }
   const reactionMatch = pathname.match(/^\/api\/posts\/([^/]+)\/reactions$/);
   if (reactionMatch && req.method === 'POST') {
-    await socialController.handleReaction(req, res, reactionMatch[1]);
-    return true;
+    const postId = reactionMatch[1];
+    if (postId) {
+      const auth = await authMiddleware.requireAuth(req, res);
+      if (!auth) return true;
+      await socialController.handleReaction(req, res, postId);
+      return true;
+    }
   }
   const commentsMatch = pathname.match(/^\/api\/posts\/([^/]+)\/comments$/);
   if (commentsMatch) {
-    if (req.method === 'GET') {
-      socialController.handleGetComments(res, commentsMatch[1]);
-      return true;
-    }
-    if (req.method === 'POST') {
-      await socialController.handleAddComment(req, res, commentsMatch[1]);
-      return true;
+    const postId = commentsMatch[1];
+    if (postId) {
+      if (req.method === 'GET') {
+        socialController.handleGetComments(res, postId);
+        return true;
+      }
+      if (req.method === 'POST') {
+        const auth = await authMiddleware.requireAuth(req, res);
+        if (!auth) return true;
+        await socialController.handleAddComment(req, res, postId);
+        return true;
+      }
     }
   }
 
-  // 4. Chat & E2EE Messaging Routes
+  // 4. Chat & E2EE Messaging Routes (Strict Authentication Required)
   if (pathname === '/api/chat/threads' && req.method === 'GET') {
+    const auth = await authMiddleware.requireAuth(req, res);
+    if (!auth) return true;
     chatController.handleGetThreads(req, res);
     return true;
   }
   if (pathname === '/api/chat/messages' && req.method === 'POST') {
+    const auth = await authMiddleware.requireAuth(req, res);
+    if (!auth) return true;
     await chatController.handleSendMessage(req, res);
     return true;
   }
   const chatMessagesMatch = pathname.match(/^\/api\/chat\/messages\/([^/]+)$/);
   if (chatMessagesMatch && req.method === 'GET') {
-    chatController.handleGetMessages(res, chatMessagesMatch[1]);
-    return true;
+    const threadId = chatMessagesMatch[1];
+    if (threadId) {
+      const auth = await authMiddleware.requireAuth(req, res);
+      if (!auth) return true;
+      chatController.handleGetMessages(res, threadId);
+      return true;
+    }
   }
   const chatReadMatch = pathname.match(/^\/api\/chat\/messages\/([^/]+)\/read$/);
   if (chatReadMatch && req.method === 'POST') {
-    chatController.handleMarkRead(res, chatReadMatch[1]);
-    return true;
+    const messageId = chatReadMatch[1];
+    if (messageId) {
+      const auth = await authMiddleware.requireAuth(req, res);
+      if (!auth) return true;
+      chatController.handleMarkRead(res, messageId);
+      return true;
+    }
   }
 
-  // 5. System Telemetry & Status Routes
+  // 5. System Telemetry & Status Routes (Public Node Status)
   if (pathname === '/api/status' && req.method === 'GET') {
     telemetryController.handleGetStatus(req, res);
     return true;

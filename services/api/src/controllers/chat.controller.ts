@@ -18,12 +18,12 @@ export interface ChatMessage {
   senderDid: string;
   recipientDid: string;
   content: string;
-  attachmentCid?: string;
-  attachmentType?: string;
+  attachmentCid?: string | undefined;
+  attachmentType?: string | undefined;
   isDelivered: boolean;
   isRead: boolean;
-  disappearingSeconds?: number;
-  expiresAt?: number;
+  disappearingSeconds?: number | undefined;
+  expiresAt?: number | undefined;
   timestamp: number;
 }
 
@@ -65,12 +65,17 @@ export class ChatController {
   }
 
   private async parseJsonBody<T = any>(req: IncomingMessage): Promise<T> {
+    if ((req as any).rawBody !== undefined) {
+      const data = (req as any).rawBody;
+      return data ? JSON.parse(data) : ({} as T);
+    }
     return new Promise((resolve, reject) => {
       let data = '';
       req.on('data', chunk => {
         data += chunk;
       });
       req.on('end', () => {
+        (req as any).rawBody = data;
         try {
           resolve(data ? JSON.parse(data) : ({} as T));
         } catch (e) {
@@ -85,7 +90,11 @@ export class ChatController {
    * GET /api/chat/threads: Returns all active threads for user.
    */
   public handleGetThreads(req: IncomingMessage, res: ServerResponse): void {
-    const userDid = (req.headers['x-sovra-did'] as string) || 'default_user';
+    const principal = (req as any).principal;
+    if (!principal?.did) {
+      return this.sendJson(res, 401, { ok: false, error: 'Unauthorized: Authentication required' });
+    }
+    const userDid = principal.did;
 
     const threadMap = new Map<string, ChatThread>();
     for (const msg of this.messages) {
@@ -129,6 +138,11 @@ export class ChatController {
    */
   public async handleSendMessage(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
+      const principal = (req as any).principal;
+      if (!principal?.did) {
+        return this.sendJson(res, 401, { ok: false, error: 'Unauthorized: Authentication required' });
+      }
+
       const body = await this.parseJsonBody(req);
       const { recipientDid, content, attachmentCid, attachmentType, disappearingSeconds } = body;
 
@@ -139,7 +153,11 @@ export class ChatController {
         });
       }
 
-      const senderDid = (req.headers['x-sovra-did'] as string) || 'default_user';
+      const senderDid = principal.did;
+      if (body.senderDid && body.senderDid !== senderDid) {
+        return this.sendJson(res, 403, { ok: false, error: 'Forbidden: Sender DID mismatch' });
+      }
+
       // Deterministic pairwise thread ID
       const threadId = [senderDid, recipientDid].sort().join('_');
 
