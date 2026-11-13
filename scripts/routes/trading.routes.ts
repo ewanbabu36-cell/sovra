@@ -192,12 +192,19 @@ export async function handleTradingRoutes(ctx: TradingRouteContext): Promise<boo
     try {
       const parsed = JSON.parse(body || '{}');
       const principal = resolvePrincipal(req);
-      const userDid = parsed.did || principal?.did;
-      if (!userDid) {
+      if (!principal?.did) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Authentication required to place trading orders' }));
         return true;
       }
+
+      if (parsed.did && parsed.did !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'BOLA Violation: Cannot place orders on behalf of another sovereign DID' }));
+        return true;
+      }
+
+      const userDid = principal.did;
 
       const rawSide = String(parsed.side || 'buy').toLowerCase();
       const side = rawSide === 'sell' ? 'sell' : 'buy';
@@ -273,12 +280,24 @@ export async function handleTradingRoutes(ctx: TradingRouteContext): Promise<boo
     try {
       const parsed = JSON.parse(body || '{}');
       const principal = resolvePrincipal(req);
-      const userDid = parsed.did || principal?.did;
+      if (!principal?.did) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Authentication required to cancel trading orders' }));
+        return true;
+      }
+
+      if (parsed.did && parsed.did !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'BOLA Violation: Cannot cancel orders on behalf of another sovereign DID' }));
+        return true;
+      }
+
+      const userDid = principal.did;
       const orderId = parsed.orderId ? String(parsed.orderId).trim() : '';
 
-      if (!userDid || !orderId) {
+      if (!orderId) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'orderId and valid user identification required' }));
+        res.end(JSON.stringify({ ok: false, error: 'orderId is required' }));
         return true;
       }
 

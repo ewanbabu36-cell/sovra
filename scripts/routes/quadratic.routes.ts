@@ -104,6 +104,23 @@ export async function handleQuadraticRoutes(
         return true;
       }
 
+      // Authorization / BOLA Defense
+      const authHeader = req.headers.authorization;
+      const xDid = (req.headers['x-sovra-did'] || req.headers['did']) as string;
+      let callerDid: string | null = null;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7).trim();
+        const user = sovraDb.findUserBySessionToken(token);
+        if (user) callerDid = user.did;
+      } else if (xDid) {
+        callerDid = xDid.trim();
+      }
+
+      if (callerDid && callerDid !== backerDid) {
+        sendJson(res, 403, { ok: false, error: 'Forbidden: Cannot pledge funds on behalf of another sovereign DID' });
+        return true;
+      }
+
       const result = sovraDb.pledgeQuadraticEscrow(campaignId, backerDid, Number(amountSov));
       if (!result.ok) {
         sendJson(res, 400, result);
@@ -132,6 +149,24 @@ export async function handleQuadraticRoutes(
 
       if (!campaignId || milestoneIndex === undefined) {
         sendJson(res, 400, { ok: false, error: 'campaignId and milestoneIndex are required' });
+        return true;
+      }
+
+      // Authorization: Only campaign creator or admin can release milestone funds
+      const authHeader = req.headers.authorization;
+      const xDid = (req.headers['x-sovra-did'] || req.headers['did']) as string;
+      let callerDid: string | null = null;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7).trim();
+        const user = sovraDb.findUserBySessionToken(token);
+        if (user) callerDid = user.did;
+      } else if (xDid) {
+        callerDid = xDid.trim();
+      }
+
+      const campaign = (sovraDb.getQuadraticEscrows() || []).find((c: any) => c.campaignId === campaignId || c.id === campaignId);
+      if (campaign && callerDid && callerDid !== campaign.creatorDid && callerDid !== 'did:sovra:admin') {
+        sendJson(res, 403, { ok: false, error: 'Forbidden: Only the campaign creator can release milestones' });
         return true;
       }
 

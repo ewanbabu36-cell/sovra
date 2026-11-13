@@ -73,7 +73,7 @@ export class DurableOutboxStore {
 
   constructor(config: DurableMeshStoreConfig = {}) {
     this.storageDir = config.storageDir;
-    this.maxRelayQueueSize = config.maxRelayQueueSize ?? 1000;
+    this.maxRelayQueueSize = config.maxRelayQueueSize ?? 500;
     this.maxInboxSize = config.maxInboxSize ?? 2000;
     this.maxSeenCacheSize = config.maxSeenCacheSize ?? 10000;
   }
@@ -289,6 +289,40 @@ export class DurableOutboxStore {
   // 2. RELAY QUEUE (Store-and-Forward Transit)
   // ==========================================
 
+  /**
+   * Identifies Priority 1 Financial Vouchers & Offline Payments:
+   * Non-evictable DTN items that survive cache saturation over ephemeral chat/pings.
+   */
+  public isFinancialVoucher(envelope: MeshEnvelope): boolean {
+    if (envelope.priority >= 2) return true;
+    if ((envelope as any).isFinancialVoucher || (envelope as any).txType === 'TIP' || (envelope as any).txType === 'VOUCHER') {
+      return true;
+    }
+    const envType = String(envelope.envelopeType || '').toUpperCase();
+    if (
+      envType.includes('VOUCHER') ||
+      envType.includes('PAYMENT') ||
+      envType.includes('TIP') ||
+      envType.includes('FINANCIAL')
+    ) {
+      return true;
+    }
+    try {
+      if (envelope.payloadBytes && envelope.payloadBytes.length > 0 && envelope.payloadBytes.length < 2048) {
+        const text = new TextDecoder().decode(envelope.payloadBytes);
+        if (
+          text.includes('"type":"VOUCHER"') ||
+          text.includes('"type":"TIP"') ||
+          text.includes('"tx_type":"TIP"') ||
+          text.includes('"amount"') && text.includes('"recipient"')
+        ) {
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  }
+
   public enqueueRelay(envelope: MeshEnvelope): boolean {
     const now = Date.now();
 
@@ -307,14 +341,22 @@ export class DurableOutboxStore {
       return false;
     }
 
-    // 4. Capacity bounds & LRU eviction if full
+    // 4. Dual-Tier Priority DTN Capacity bounds & Eviction
+    // Tier 1: Financial Vouchers / Offline SOV Payments (strictly non-evictable)
+    // Tier 2: Ephemeral Chat / Status Pings (evicted via LRU when capacity reached)
     if (this.relayQueue.size >= this.maxRelayQueueSize) {
-      // Evict lowest priority / earliest expiring item
+      const incomingIsFinancial = this.isFinancialVoucher(envelope);
+
+      // Search for lowest priority non-financial (Tier 2) item to evict
       let evictId: string | null = null;
       let lowestPriority = Infinity;
       let earliestExpiry = Infinity;
 
       for (const [id, env] of this.relayQueue.entries()) {
+        // Non-evictable check: NEVER evict financial vouchers for incoming chat
+        if (this.isFinancialVoucher(env)) {
+          continue;
+        }
         if (env.priority < lowestPriority || (env.priority === lowestPriority && env.expiresAt < earliestExpiry)) {
           lowestPriority = env.priority;
           earliestExpiry = env.expiresAt;
@@ -322,10 +364,11 @@ export class DurableOutboxStore {
         }
       }
 
-      if (evictId && lowestPriority <= envelope.priority) {
+      if (evictId) {
+        // Evict ephemeral candidate
         this.relayQueue.delete(evictId);
-      } else if (evictId && lowestPriority > envelope.priority) {
-        // New envelope has lower priority than anything in queue, reject
+      } else if (!incomingIsFinancial) {
+        // Queue is full of non-evictable financial vouchers; drop incoming ephemeral packet
         return false;
       }
     }
@@ -349,6 +392,9 @@ export class DurableOutboxStore {
     }
 
     return valid.sort((a, b) => {
+      const aFinancial = this.isFinancialVoucher(a) ? 1 : 0;
+      const bFinancial = this.isFinancialVoucher(b) ? 1 : 0;
+      if (bFinancial !== aFinancial) return bFinancial - aFinancial;
       if (b.priority !== a.priority) return b.priority - a.priority;
       return a.timestamp - b.timestamp;
     });

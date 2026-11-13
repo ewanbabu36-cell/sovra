@@ -39,6 +39,24 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
   private incomingConnectionHandlers: Array<(channel: BleConnectionChannel) => void> = [];
   private isScanning = false;
   private isAdvertising = false;
+  private didToMacMap = new Map<string, string>();
+  private macToDidMap = new Map<string, string>();
+  private batteryLevel = 1.0;
+  private isBatteryThrottled = false;
+
+  public setBatteryLevel(level: number): { isThrottled: boolean; dutyCycle: { scanMs: number; idleMs: number } } {
+    this.batteryLevel = Math.max(0, Math.min(1, level));
+    this.isBatteryThrottled = this.batteryLevel < 0.20; // Auto-throttle under 20% battery
+    if (this.isBatteryThrottled) {
+      this.setScanDutyCycle('BACKGROUND_LOW_POWER');
+      return { isThrottled: true, dutyCycle: { scanMs: 1000, idleMs: 9000 } };
+    }
+    return { isThrottled: false, dutyCycle: { scanMs: 3000, idleMs: 3000 } };
+  }
+
+  public getBatteryThrottleStatus(): { batteryLevel: number; isThrottled: boolean } {
+    return { batteryLevel: this.batteryLevel, isThrottled: this.isBatteryThrottled };
+  }
 
   constructor() {
     this.nativeModule = getNativeBleModule();
@@ -92,6 +110,47 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
       return await this.nativeModule.isBluetoothEnabled();
     } catch {
       return false;
+    }
+  }
+
+  public registerPeerIdentity(did: string, address: string): void {
+    if (did && address) {
+      this.didToMacMap.set(did, address);
+      this.macToDidMap.set(address, did);
+      if (this.nativeModule && typeof this.nativeModule.registerPeerIdentity === 'function') {
+        try {
+          this.nativeModule.registerPeerIdentity(did, address);
+        } catch {}
+      }
+    }
+  }
+
+  public resolveAddressForDid(peerDidOrAddress: string): string {
+    return this.didToMacMap.get(peerDidOrAddress) || peerDidOrAddress;
+  }
+
+  public resolveDidForAddress(address: string): string | undefined {
+    return this.macToDidMap.get(address);
+  }
+
+  public async isIgnoringBatteryOptimizations(): Promise<boolean> {
+    if (!this.nativeModule || typeof this.nativeModule.isIgnoringBatteryOptimizations !== 'function') {
+      return true; // Non-Android or older runtime
+    }
+    try {
+      return Boolean(await this.nativeModule.isIgnoringBatteryOptimizations());
+    } catch {
+      return true;
+    }
+  }
+
+  public async requestIgnoreBatteryOptimizations(): Promise<void> {
+    if (this.nativeModule && typeof this.nativeModule.requestIgnoreBatteryOptimizations === 'function') {
+      try {
+        await this.nativeModule.requestIgnoreBatteryOptimizations();
+      } catch (e) {
+        console.warn('[NativeBleBridge] requestIgnoreBatteryOptimizations failed:', e);
+      }
     }
   }
 
@@ -181,7 +240,8 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
       );
     }
 
-    const connRes = await this.nativeModule.connectGatt(targetAddress);
+    const resolvedAddress = this.resolveAddressForDid(targetAddress);
+    const connRes = await this.nativeModule.connectGatt(resolvedAddress);
     const gattId = connRes.gattId;
     const mtu = connRes.mtu || 23;
 

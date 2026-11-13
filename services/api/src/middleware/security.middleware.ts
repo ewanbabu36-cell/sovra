@@ -72,7 +72,7 @@ export class SecurityMiddleware {
   }
 
   public checkRateLimit(req: IncomingMessage): boolean {
-    const ip = req.socket.remoteAddress || '127.0.0.1';
+    const ip = req.socket?.remoteAddress || '127.0.0.1';
     const now = Date.now();
     const bucket = ipRequestBuckets.get(ip);
 

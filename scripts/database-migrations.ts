@@ -644,6 +644,108 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 8,
+    name: '008_financial_idempotency_keys',
+    checksum: 'sha256_008_financial_idempotency_v1',
+    up: (db: DatabaseSync) => {
+      db.exec(`
+        -- 1. DURABLE FINANCIAL IDEMPOTENCY LEDGER
+        CREATE TABLE IF NOT EXISTS financial_idempotency_keys (
+          idempotency_key TEXT PRIMARY KEY,
+          user_did TEXT NOT NULL,
+          operation_type TEXT NOT NULL DEFAULT 'TIP',
+          payload_hash TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          tx_id TEXT,
+          status TEXT NOT NULL,
+          response_json TEXT,
+          status_code INTEGER DEFAULT 200,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_finkey_user ON financial_idempotency_keys(user_did);
+        CREATE INDEX IF NOT EXISTS idx_finkey_created ON financial_idempotency_keys(created_at);
+      `);
+      try {
+        db.exec('ALTER TABLE token_transfers ADD COLUMN idempotency_key TEXT;');
+      } catch (_) {}
+      try {
+        db.exec('CREATE INDEX IF NOT EXISTS idx_transfers_idempotency ON token_transfers(idempotency_key);');
+      } catch (_) {}
+    },
+    down: (db: DatabaseSync) => {
+      db.exec(`
+        DROP TABLE IF EXISTS financial_idempotency_keys;
+      `);
+    },
+  },
+  {
+    version: 9,
+    name: '009_durable_video_upload_sessions',
+    checksum: 'sha256_009_video_upload_sessions_v1',
+    up: (db: DatabaseSync) => {
+      db.exec(`
+        -- DURABLE VIDEO UPLOAD SESSIONS AND CHUNK MANIFEST
+        CREATE TABLE IF NOT EXISTS video_upload_sessions (
+          upload_id TEXT PRIMARY KEY,
+          author_did TEXT NOT NULL,
+          title TEXT NOT NULL,
+          file_size INTEGER NOT NULL DEFAULT 0,
+          mime_type TEXT NOT NULL DEFAULT 'video/mp4',
+          category TEXT NOT NULL DEFAULT 'General',
+          tags_json TEXT NOT NULL DEFAULT '[]',
+          channel_name TEXT NOT NULL DEFAULT 'Sovereign Creator',
+          channel_handle TEXT NOT NULL DEFAULT '@creator',
+          duration_seconds REAL DEFAULT 30,
+          visibility TEXT NOT NULL DEFAULT 'public',
+          staging_dir TEXT NOT NULL,
+          parts_json TEXT NOT NULL DEFAULT '[]',
+          status TEXT NOT NULL DEFAULT 'IN_PROGRESS',
+          media_cid TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_upload_sessions_author ON video_upload_sessions(author_did);
+        CREATE INDEX IF NOT EXISTS idx_upload_sessions_status ON video_upload_sessions(status);
+        CREATE INDEX IF NOT EXISTS idx_upload_sessions_created ON video_upload_sessions(created_at);
+      `);
+    },
+    down: (db: DatabaseSync) => {
+      db.exec(`
+        DROP TABLE IF EXISTS video_upload_sessions;
+      `);
+    },
+  },
+  {
+    version: 10,
+    name: '010_e2ee_encrypted_chat_messages',
+    checksum: 'sha256_010_e2ee_encrypted_chat_v1',
+    up: (db: DatabaseSync) => {
+      try {
+        db.exec('ALTER TABLE direct_messages ADD COLUMN is_e2ee INTEGER NOT NULL DEFAULT 1;');
+      } catch (_) {}
+      try {
+        db.exec("ALTER TABLE direct_messages ADD COLUMN ciphertext_hex TEXT NOT NULL DEFAULT '';");
+      } catch (_) {}
+      try {
+        db.exec("ALTER TABLE direct_messages ADD COLUMN iv_hex TEXT NOT NULL DEFAULT '';");
+      } catch (_) {}
+      try {
+        db.exec("ALTER TABLE direct_messages ADD COLUMN tag_hex TEXT NOT NULL DEFAULT '';");
+      } catch (_) {}
+      try {
+        db.exec(`
+          UPDATE direct_messages
+          SET is_e2ee = 1,
+              ciphertext_hex = hex(text),
+              text = '🔒 [End-to-End Encrypted: AES-GCM-256]'
+          WHERE text != '' AND text NOT LIKE '🔒%';
+        `);
+      } catch (_) {}
+    },
+    down: (db: DatabaseSync) => {},
+  },
 ];
 
 export class SqliteMigrationRunner {

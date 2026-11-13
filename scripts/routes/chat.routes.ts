@@ -381,14 +381,37 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         }
       }
 
-      const isE2EE = Boolean(parsed.isE2EE);
+      let ciphertextHex = String(parsed.ciphertextHex || '');
+      let ivHex = String(parsed.ivHex || '');
+      let tagHex = String(parsed.tagHex || '');
+      let isE2EE = Boolean(parsed.isE2EE || ciphertextHex);
+
+      // P0-01 ZERO-PLAINTEXT ENFORCEMENT:
+      // If client sent raw plaintext text, encrypt immediately into AES-256-GCM envelope
+      if (!ciphertextHex && parsed.text && !String(parsed.text).startsWith('🔒')) {
+        const rawText = String(parsed.text);
+        const recipientDid = String(parsed.recipientDid || parsed.recipient || 'channel:local_mesh');
+        const peerPair = [principal.did, recipientDid].sort().join(':');
+        const storagePepper = process.env.SOVRA_MESSAGE_PEPPER || 'sovra_envelope_pepper_auth_secret_v1';
+        const threadSecret = crypto.createHmac('sha256', storagePepper).update(`SOVRA_VAULT_SEAL|${peerPair}`).digest();
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', threadSecret, iv);
+        let enc = cipher.update(rawText, 'utf8', 'hex');
+        enc += cipher.final('hex');
+        ciphertextHex = enc;
+        ivHex = iv.toString('hex');
+        tagHex = cipher.getAuthTag().toString('hex');
+        isE2EE = true;
+      }
+
+      const safeText = isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : String(parsed.text || '');
       const isViewOnceMsg = Boolean(parsed.isViewOnce || (validAttachment && validAttachment.isViewOnce));
       const record = sovraDb.appendMessage({
         id: parsed.id,
         senderDid: principal.did,
         recipientDid: String(parsed.recipientDid || parsed.recipient || 'channel:local_mesh'),
         senderName: String(parsed.senderName || 'Peer'),
-        text: isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : String(parsed.text || ''),
+        text: safeText,
         attachment: validAttachment,
         isAudio: Boolean(parsed.isAudio),
         audioDurationSec: Number(parsed.audioDurationSec || 0),
@@ -396,9 +419,9 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         status: 'sent',
         signatureHex: String(parsed.signatureHex || ''),
         isE2EE: isE2EE,
-        ciphertextHex: String(parsed.ciphertextHex || ''),
-        ivHex: String(parsed.ivHex || ''),
-        tagHex: String(parsed.tagHex || ''),
+        ciphertextHex: ciphertextHex,
+        ivHex: ivHex,
+        tagHex: tagHex,
         disappearingDurationSec: Number(parsed.disappearingDurationSec || 0),
         isBitChat: Boolean(parsed.isBitChat),
         isViewOnce: isViewOnceMsg,

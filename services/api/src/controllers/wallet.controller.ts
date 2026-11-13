@@ -40,12 +40,17 @@ export class WalletController {
   }
 
   private async parseJsonBody<T = any>(req: IncomingMessage): Promise<T> {
+    if ((req as any).rawBody !== undefined) {
+      const data = (req as any).rawBody;
+      return data ? JSON.parse(data) : ({} as T);
+    }
     return new Promise((resolve, reject) => {
       let data = '';
       req.on('data', chunk => {
         data += chunk;
       });
       req.on('end', () => {
+        (req as any).rawBody = data;
         try {
           resolve(data ? JSON.parse(data) : ({} as T));
         } catch (e) {
@@ -60,7 +65,11 @@ export class WalletController {
    * Retrieves active wallet balance.
    */
   public handleGetBalance(req: IncomingMessage, res: ServerResponse): void {
-    const userDid = (req.headers['x-sovra-did'] as string) || 'default_user';
+    const principal = (req as any).principal;
+    if (!principal?.did) {
+      return this.sendJson(res, 401, { ok: false, error: 'Unauthorized: Authentication required' });
+    }
+    const userDid = principal.did;
     const balance = this.balances.has(userDid) ? this.balances.get(userDid)! : 500.0;
     this.sendJson(res, 200, {
       ok: true,
@@ -77,8 +86,13 @@ export class WalletController {
    */
   public async handleTransfer(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
+      const principal = (req as any).principal;
+      if (!principal?.did) {
+        return this.sendJson(res, 401, { ok: false, error: 'Unauthorized: Authentication required' });
+      }
+
       const body = await this.parseJsonBody(req);
-      const { recipientDid, amount, memo } = body;
+      const { recipientDid, amount } = body;
 
       const numAmount = Number(amount);
       if (!recipientDid || isNaN(numAmount) || numAmount <= 0) {
@@ -88,7 +102,14 @@ export class WalletController {
         });
       }
 
-      const senderDid = (req.headers['x-sovra-did'] as string) || 'default_user';
+      const senderDid = principal.did;
+      if (body.senderDid && body.senderDid !== senderDid) {
+        return this.sendJson(res, 403, {
+          ok: false,
+          error: 'Forbidden: Cannot transfer funds on behalf of another DID',
+        });
+      }
+
       const senderBalance = this.balances.has(senderDid) ? this.balances.get(senderDid)! : 500.0;
 
       if (senderBalance < numAmount) {
@@ -129,7 +150,11 @@ export class WalletController {
    * Retrieves transaction history.
    */
   public handleGetTransactions(req: IncomingMessage, res: ServerResponse): void {
-    const userDid = (req.headers['x-sovra-did'] as string) || 'default_user';
+    const principal = (req as any).principal;
+    if (!principal?.did) {
+      return this.sendJson(res, 401, { ok: false, error: 'Unauthorized: Authentication required' });
+    }
+    const userDid = principal.did;
     const userTxs = this.transactions.filter(
       tx => tx.senderDid === userDid || tx.recipientDid === userDid
     );

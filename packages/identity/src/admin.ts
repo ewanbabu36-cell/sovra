@@ -161,6 +161,26 @@ export class AdminSecurityEngine {
     });
   }
 
+  /**
+   * Revokes an individual administrative session by its token.
+   */
+  public revokeAdminSession(token: string, reason?: string): boolean {
+    if (!token) return false;
+    const cleanToken = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
+    const principal = this.adminSessions.get(cleanToken);
+    const deleted = this.adminSessions.delete(cleanToken);
+    if (deleted && principal) {
+      this.logAudit({
+        actorDid: principal.did,
+        role: principal.role,
+        action: 'ADMIN_SESSION_REVOKED',
+        details: reason || 'Administrative session revoked',
+        success: true,
+      });
+    }
+    return deleted;
+  }
+
   public getActiveSessionCount(): number {
     return this.adminSessions.size;
   }

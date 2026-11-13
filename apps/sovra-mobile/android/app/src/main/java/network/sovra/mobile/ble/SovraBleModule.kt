@@ -11,6 +11,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import android.os.ParcelUuid
 import android.util.Base64
 import android.util.Log
@@ -158,6 +161,125 @@ class SovraBleModule(private val context: Context) {
 
     // Track devices connected to our GATT Server
     private val serverConnectedDevices = ConcurrentHashMap<String, BluetoothDevice>()
+
+    // Cryptographic DID <-> Hardware MAC Address Session Decoupling
+    private val didToMacMap = ConcurrentHashMap<String, String>()
+    private val macToDidMap = ConcurrentHashMap<String, String>()
+
+    fun registerPeerIdentity(did: String, address: String) {
+        if (did.isNotBlank() && address.isNotBlank()) {
+            didToMacMap[did] = address
+            macToDidMap[address] = did
+            Log.i(TAG, "Decoupled MAC mapping registered: $did -> $address")
+        }
+    }
+
+    fun resolveAddressForDid(peerDidOrAddress: String): String {
+        return didToMacMap[peerDidOrAddress] ?: peerDidOrAddress
+    }
+
+    fun resolveDidForAddress(address: String): String? {
+        return macToDidMap[address]
+    }
+
+    // OEM Battery Optimization Whitelist methods
+    fun isIgnoringBatteryOptimizations(): Boolean {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            pm.isIgnoringBatteryOptimizations(context.packageName)
+        } else true
+    }
+
+    fun requestIgnoreBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            if (pm?.isIgnoringBatteryOptimizations(context.packageName) == false) {
+                try {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                    Log.i(TAG, "Launched ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS intent")
+                } catch (e: Exception) {
+                    try {
+                        val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(fallbackIntent)
+                    } catch (e2: Exception) {
+                        Log.w(TAG, "Unable to open battery optimization settings: ${e2.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Apple Background Overflow Service Data Parser:
+     * When iOS devices enter the background or lock their screens, CoreBluetooth stops advertising
+     * the local name and compresses 128-bit service UUIDs into Apple Manufacturer Data (0x004C, type 0x01)
+     * or raw service solicitation bytes (AD Type 0x14, 0x15, 0x1F).
+     * This parser decodes raw scan record bytes to detect sleeping/locked iPhones running Sovra.
+     */
+    fun isAppleOverflowServicePresent(scanRecordBytes: ByteArray?, targetServiceUuid: UUID): Boolean {
+        if (scanRecordBytes == null || scanRecordBytes.isEmpty()) return false
+        var offset = 0
+        val length = scanRecordBytes.size
+
+        while (offset < length - 1) {
+            val fieldLength = scanRecordBytes[offset].toInt() and 0xFF
+            if (fieldLength == 0) break
+            if (offset + 1 + fieldLength > length) break
+
+            val fieldType = scanRecordBytes[offset + 1].toInt() and 0xFF
+            val dataStart = offset + 2
+            val dataLen = fieldLength - 1
+
+            // Type 0xFF: Manufacturer Specific Data
+            if (fieldType == 0xFF && dataLen >= 2) {
+                val companyId = (scanRecordBytes[dataStart].toInt() and 0xFF) or
+                        ((scanRecordBytes[dataStart + 1].toInt() and 0xFF) shl 8)
+
+                // Apple Inc Company ID = 0x004C
+                if (companyId == 0x004C && dataLen >= 3) {
+                    val appleType = scanRecordBytes[dataStart + 2].toInt() and 0xFF
+                    // Apple Type 0x01: Overflow Service UUID hash area
+                    if (appleType == 0x01) {
+                        return true
+                    }
+                }
+                // Sovra Custom Beacon Company ID = 0x5356 ('SV')
+                if (companyId == 0x5356) {
+                    return true
+                }
+            }
+
+            // Type 0x14, 0x15, 0x1F: Service Solicitation 16-bit / 128-bit
+            if (fieldType == 0x14 || fieldType == 0x15 || fieldType == 0x1F) {
+                for (k in dataStart until (dataStart + dataLen - 1)) {
+                    val b1 = scanRecordBytes[k].toInt() and 0xFF
+                    val b2 = scanRecordBytes[k + 1].toInt() and 0xFF
+                    if ((b1 == 0x56 && b2 == 0x53) || (b1 == 0x53 && b2 == 0x56)) {
+                        return true
+                    }
+                }
+            }
+
+            offset += 1 + fieldLength
+        }
+
+        // Direct byte inspection fallback for raw RF transmissions containing Sovra magic 0x5356
+        for (i in 0 until length - 1) {
+            if ((scanRecordBytes[i] == 0x56.toByte() && scanRecordBytes[i + 1] == 0x53.toByte()) ||
+                (scanRecordBytes[i] == 0x53.toByte() && scanRecordBytes[i + 1] == 0x56.toByte())) {
+                return true
+            }
+        }
+
+        return false
+    }
+
 
     // ==========================================
     // 2. BLE ADVERTISING (PERIPHERAL ROLE)
@@ -460,7 +582,10 @@ class SovraBleModule(private val context: Context) {
                 val hasSovraName = rawName.contains("Sovra", ignoreCase = true) ||
                                    rawName.contains("Peer", ignoreCase = true)
 
-                if (!hasSovraUuid && !hasSovraMfg && !hasSovraName) {
+                val rawBytes = scanRecord.bytes
+                val hasAppleOverflow = isAppleOverflowServicePresent(rawBytes, serviceUuid)
+
+                if (!hasSovraUuid && !hasSovraMfg && !hasSovraName && !hasAppleOverflow) {
                     return
                 }
 
@@ -478,6 +603,8 @@ class SovraBleModule(private val context: Context) {
                     customName
                 } else if (rawName.isNotBlank()) {
                     rawName
+                } else if (hasAppleOverflow) {
+                    "iPhone " + address.take(6)
                 } else {
                     "Peer " + address.take(8)
                 }
@@ -888,7 +1015,8 @@ class SovraBleModule(private val context: Context) {
         }
     }
 
-    fun sendDataToAddress(address: String, data: ByteArray, callback: ((Boolean, String?) -> Unit)? = null) {
+    fun sendDataToAddress(targetDidOrAddress: String, data: ByteArray, callback: ((Boolean, String?) -> Unit)? = null) {
+        val address = resolveAddressForDid(targetDidOrAddress)
         // 1. If we already have an active client connection to this address, write directly
         val existingClient = activeConnections.values.find {
             it.address.equals(address, ignoreCase = true) && it.isConnected && it.writeCharacteristic != null

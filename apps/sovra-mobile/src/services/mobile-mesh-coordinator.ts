@@ -22,7 +22,7 @@ import {
   type DeliveryReceipt,
 } from '@sovra/p2p';
 import { BitChatMeshRouter } from '@sovra/messaging';
-import { bytesToHex } from '@sovra/crypto';
+import { bytesToHex, signEd25519, secureRandomBytes } from '@sovra/crypto';
 import { NativeMobileBleAdapter } from './native-ble-bridge.js';
 import { localDb, type CachedMessage, type CachedPost } from './local-database.js';
 import { secureKeyStore } from './secure-keystore.js';
@@ -31,6 +31,41 @@ export interface MobileMeshRuntimeState {
   status: MeshNetworkStatus;
   diagnostics: MeshDiagnostics;
   controls: MeshUserControls;
+}
+
+export type TrafficTier = 'TIER_1_BLE_DTN' | 'TIER_2_EDGE_CDN';
+
+export interface TrafficClassification {
+  tier: TrafficTier;
+  maxPayloadBytes: number;
+  channel: 'BLE_MESH' | 'EDGE_CDN';
+  isPermittedOnBle: boolean;
+  reason: string;
+}
+
+export function classifyTrafficPayload(payloadType: string, byteSize: number): TrafficClassification {
+  const isTier1 = (
+    ['ENCRYPTED_MESSAGE', 'FINANCIAL_VOUCHER', 'PRESENCE_BEACON', 'SOS_ALERT', 'ROUTING_HEARTBEAT'].includes(payloadType) &&
+    byteSize <= 2048
+  );
+
+  if (isTier1) {
+    return {
+      tier: 'TIER_1_BLE_DTN',
+      maxPayloadBytes: 2048,
+      channel: 'BLE_MESH',
+      isPermittedOnBle: true,
+      reason: 'Ultra-lightweight text, emergency or voucher payload <= 2KB',
+    };
+  }
+
+  return {
+    tier: 'TIER_2_EDGE_CDN',
+    maxPayloadBytes: 100 * 1024 * 1024,
+    channel: 'EDGE_CDN',
+    isPermittedOnBle: false,
+    reason: 'High-bandwidth media (Video/Reels/4K) routed via Edge Gateways/CDN to protect device battery',
+  };
 }
 
 export class MobileMeshCoordinator {
@@ -311,6 +346,72 @@ export class MobileMeshCoordinator {
   // ==========================================
   // SEND SOCIAL OPERATIONS OVER MESH
   // ==========================================
+
+  /**
+   * Enqueues a non-evictable Priority 1 Financial Voucher / Offline Payment envelope
+   * into the durable DTN relay queue.
+   */
+  public enqueueFinancialVoucher(voucherEnvelope: any): boolean {
+    const envelope = {
+      ...voucherEnvelope,
+      priority: Math.max(2, voucherEnvelope.priority ?? 2),
+      isFinancialVoucher: true,
+    };
+    return this.outboxStore.enqueueRelay(envelope);
+  }
+
+  public isFinancialVoucher(envelope: any): boolean {
+    return Boolean(envelope?.isFinancialVoucher || (envelope as any)?.priority === 2);
+  }
+
+  /**
+   * Creates, signs, and enqueues a genuine SignedPaymentVoucher into the Durable DTN Outbox.
+   * Non-evictable Tier 1 offline payment voucher broadcasted over BLE mesh.
+   */
+  public async createAndQueuePaymentVoucher(params: {
+    payeeDid: string;
+    amount: string | number;
+    tokenSymbol?: string;
+  }): Promise<{ voucher: any; queued: boolean }> {
+    const nonce = '0x' + bytesToHex(secureRandomBytes(16));
+    const voucherId = 'vch_' + Date.now() + '_' + nonce.slice(2, 10);
+    const expiresAt = Date.now() + 7 * 86400000;
+    const tokenSymbol = params.tokenSymbol || 'SOV';
+
+    const voucherPayload = {
+      voucherId,
+      payerDid: this.localDid,
+      payeeDid: params.payeeDid,
+      amount: String(params.amount),
+      tokenSymbol,
+      nonce,
+      expiresAt,
+    };
+
+    const canonicalBytes = new TextEncoder().encode(JSON.stringify(voucherPayload));
+    const sigBytes = signEd25519(this.localPrivateKey, canonicalBytes);
+    const signatureHex = bytesToHex(sigBytes);
+
+    const voucher = {
+      ...voucherPayload,
+      signatureHex,
+    };
+
+    const envelope = {
+      envelopeId: voucherId,
+      envelopeType: 'FINANCIAL_VOUCHER',
+      senderDid: this.localDid,
+      recipientDid: params.payeeDid,
+      payloadBytes: canonicalBytes,
+      signatureBytes: sigBytes,
+      priority: 2,
+      isFinancialVoucher: true,
+      voucher,
+    };
+
+    const queued = this.enqueueFinancialVoucher(envelope);
+    return { voucher, queued };
+  }
 
   public async sendChatMessage(
     targetDid: string,

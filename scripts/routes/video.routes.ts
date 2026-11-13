@@ -1018,6 +1018,7 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
           voucher: tipResult.voucher,
           newBalance: tipResult.senderBalance,
           recipientBalance: tipResult.recipientBalance,
+          split: tipResult.split,
           settlement: {
             total: tipResult.split.total,
             creator: tipResult.split.creator,
@@ -1177,8 +1178,9 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body);
-      const principal = resolvePrincipal(req, parsed);
-      const userDid = parsed.userDid || principal?.did || 'did:sovra:user_rahul_sharma_core';
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return true;
+      const userDid = principal.did;
       const videoId = String(parsed.videoId || '');
       const durationWatchedSec = Number(parsed.durationWatchedSec || parsed.currentTimeSec || 0);
       const currentTimeSec = Number(parsed.currentTimeSec || durationWatchedSec);
@@ -1211,8 +1213,15 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
 
   // Subscriptions Feed API (Video Routes Fallthrough)
   if ((url.pathname === '/api/subscriptions/feed' || url.pathname === '/api/subscriptions') && req.method === 'GET') {
-    const principal = resolvePrincipal(req);
-    const userDid = url.searchParams.get('userDid') || principal?.did || 'did:sovra:user_rahul_sharma_core';
+    const principal = enforceAuth(req, res);
+    if (!principal) return true;
+    const requestedDid = url.searchParams.get('userDid');
+    const userDid = requestedDid || principal.did;
+    if (userDid !== principal.did && principal.role !== 'SUPER_ADMIN' && principal.role !== 'ADMIN') {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access another user\'s subscription feed' }));
+      return true;
+    }
     const videos = sovraDb.getSubscriptionsFeed(userDid);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, videos, count: videos.length }));
@@ -1221,8 +1230,15 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
 
   // Subscriptions Channels Shelf API (Video Routes Fallthrough)
   if (url.pathname === '/api/subscriptions/channels' && req.method === 'GET') {
-    const principal = resolvePrincipal(req);
-    const userDid = url.searchParams.get('userDid') || principal?.did || 'did:sovra:user_rahul_sharma_core';
+    const principal = enforceAuth(req, res);
+    if (!principal) return true;
+    const requestedDid = url.searchParams.get('userDid');
+    const userDid = requestedDid || principal.did;
+    if (userDid !== principal.did && principal.role !== 'SUPER_ADMIN' && principal.role !== 'ADMIN') {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access another user\'s subscribed channels' }));
+      return true;
+    }
     const channels = sovraDb.getSubscribedChannels(userDid);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, channels, count: channels.length }));

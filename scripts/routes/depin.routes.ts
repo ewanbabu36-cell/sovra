@@ -89,8 +89,8 @@ export async function handleDepinRoutes(
       const sessionId = body.sessionId;
       const bytesRelayed = Number(body.bytesRelayed || 0);
 
-      if (!sessionId || bytesRelayed <= 0) {
-        sendJson(res, 400, { ok: false, error: 'sessionId and valid positive bytesRelayed are required' });
+      if (!sessionId || bytesRelayed <= 0 || bytesRelayed > 500 * 1024 * 1024) {
+        sendJson(res, 400, { ok: false, error: 'sessionId and valid positive bytesRelayed (max 500 MB) are required' });
         return true;
       }
 

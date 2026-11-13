@@ -8,7 +8,6 @@
  * 3. Reactive Solvency & Amber Alert Status
  */
 
-import os from 'node:os';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 export interface SystemTelemetry {
@@ -38,7 +37,7 @@ export class TelemetryController {
   /**
    * Node health and P2P mesh status endpoint.
    */
-  public handleGetStatus(req: IncomingMessage, res: ServerResponse): void {
+  public handleGetStatus(_req: IncomingMessage, res: ServerResponse): void {
     const memory = process.memoryUsage();
     const telemetry: SystemTelemetry = {
       version: '1.0.0-ENTERPRISE',
@@ -63,7 +62,7 @@ export class TelemetryController {
   /**
    * Active alerts and amber warnings endpoint.
    */
-  public handleGetAlerts(req: IncomingMessage, res: ServerResponse): void {
+  public handleGetAlerts(_req: IncomingMessage, res: ServerResponse): void {
     this.sendJson(res, 200, {
       ok: true,
       alerts: [],

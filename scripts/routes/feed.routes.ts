@@ -19,11 +19,16 @@ export interface FeedRouteContext {
 
 export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
   const { req, res, url, resolvePrincipal } = ctx;
-
+  const sqlite = sovraDb.getSqliteEngine();
+  
   // 1. Trending topics
   if (url.pathname === '/api/feed/trending' && req.method === 'GET') {
-    const posts = sovraDb.getFeedPosts();
-    const reels = sovraDb.getAllReels();
+        const isDiscoveryBanned = (authorDid?: string) => {
+      if (!sqlite?.moderation || !authorDid) return false;
+      return sqlite.moderation.checkShadowBanEnforcement(authorDid, 'discovery').isShadowBanned;
+    };
+    const posts = sovraDb.getFeedPosts().filter(p => !p.isRemoved && p.moderationState !== 'REMOVED' && !isDiscoveryBanned(p.authorDid));
+    const reels = sovraDb.getAllReels().filter(r => !isDiscoveryBanned(r.authorDid));
     const tagCounts = new Map<string, number>();
 
     const extractTags = (text?: any) => {
@@ -87,6 +92,15 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
     const principal = resolvePrincipal(req);
     const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 25;
     let posts = sovraDb.getFeedPosts(principal?.did);
+        if (sqlite?.moderation) {
+      posts = posts.filter(p => {
+        if (p.isRemoved || p.moderationState === 'REMOVED') return false;
+        if (principal?.did && p.authorDid === principal.did) return true;
+        const feedBan = sqlite.moderation.checkShadowBanEnforcement(p.authorDid, 'feed').isShadowBanned;
+        const recBan = sqlite.moderation.checkShadowBanEnforcement(p.authorDid, 'recommendation').isShadowBanned;
+        return !feedBan && !recBan;
+      });
+    }
 
     const now = Date.now();
     const scoredPosts = posts.map(p => {
@@ -194,7 +208,15 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
   if (url.pathname === '/api/feed/hashtag' && req.method === 'GET') {
     const rawTag = url.searchParams.get('tag') || '';
     const cleanTag = rawTag.startsWith('#') ? rawTag.toLowerCase() : ('#' + rawTag).toLowerCase();
-    const allPosts = sovraDb.getFeedPosts();
+    const principal = resolvePrincipal(req);
+    let allPosts = sovraDb.getFeedPosts(principal?.did);
+        if (sqlite?.moderation) {
+      allPosts = allPosts.filter(p => {
+        if (p.isRemoved || p.moderationState === 'REMOVED') return false;
+        if (principal?.did && p.authorDid === principal.did) return true;
+        return !sqlite.moderation.checkShadowBanEnforcement(p.authorDid, 'discovery').isShadowBanned;
+      });
+    }
     const matching = allPosts.filter(p => {
       const text = ((p.tags || '') + ' ' + (p.caption || '')).toLowerCase();
       return text.includes(cleanTag);
@@ -212,9 +234,13 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
     const category = (url.searchParams.get('category') || 'all').toLowerCase();
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 40)));
     const principal = resolvePrincipal(req);
-
-    const posts = sovraDb.getFeedPosts(principal?.did);
-    const reels = sovraDb.getAllReels();
+        const isDiscoveryBanned = (authorDid?: string) => {
+      if (!sqlite?.moderation || !authorDid) return false;
+      if (principal?.did && authorDid === principal.did) return false;
+      return sqlite.moderation.checkShadowBanEnforcement(authorDid, 'discovery').isShadowBanned;
+    };
+    const posts = sovraDb.getFeedPosts(principal?.did).filter(p => !p.isRemoved && p.moderationState !== 'REMOVED' && !isDiscoveryBanned(p.authorDid));
+    const reels = sovraDb.getAllReels().filter(r => !isDiscoveryBanned(r.authorDid));
 
     interface ExploreItem {
       id: string;
@@ -330,8 +356,7 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
     });
 
     // 🎛️ Algorithmic Dynamic Ranking: The God Dial & Shadowban Engine
-    const sqlite = sovraDb.getSqliteEngine();
-    const dials = sqlite ? sqlite.getAlgoDials() : [];
+        const dials = sqlite ? sqlite.getAlgoDials() : [];
     const dialMap = new Map<string, number>();
     dials.forEach(d => {
       if (d.category) dialMap.set(d.category.toLowerCase(), d.multiplier);
@@ -424,7 +449,18 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
   // 12. Subscriptions Feed API (YouTube Parity)
   if ((url.pathname === '/api/subscriptions/feed' || url.pathname === '/api/subscriptions') && req.method === 'GET') {
     const principal = resolvePrincipal(req);
-    const userDid = url.searchParams.get('userDid') || principal?.did || 'did:sovra:user_rahul_sharma_core';
+    if (!principal) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+      return true;
+    }
+    const requestedDid = url.searchParams.get('userDid');
+    const userDid = requestedDid || principal.did;
+    if (userDid !== principal.did && principal.role !== 'SUPER_ADMIN' && principal.role !== 'ADMIN') {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access another user\'s subscription feed' }));
+      return true;
+    }
     const videos = sovraDb.getSubscriptionsFeed(userDid);
     res.writeHead(200, {
       'Content-Type': 'application/json',
@@ -437,7 +473,18 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
   // 13. Subscribed Channels Shelf API (YouTube Parity)
   if (url.pathname === '/api/subscriptions/channels' && req.method === 'GET') {
     const principal = resolvePrincipal(req);
-    const userDid = url.searchParams.get('userDid') || principal?.did || 'did:sovra:user_rahul_sharma_core';
+    if (!principal) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+      return true;
+    }
+    const requestedDid = url.searchParams.get('userDid');
+    const userDid = requestedDid || principal.did;
+    if (userDid !== principal.did && principal.role !== 'SUPER_ADMIN' && principal.role !== 'ADMIN') {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access another user\'s subscribed channels' }));
+      return true;
+    }
     const channels = sovraDb.getSubscribedChannels(userDid);
     res.writeHead(200, {
       'Content-Type': 'application/json',
