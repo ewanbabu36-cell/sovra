@@ -19,6 +19,8 @@ export interface ProfileScreenProps {
   readonly onOpenSettings: () => void;
   readonly onOpenStudio?: () => void;
   readonly onOpenWallet?: () => void;
+  readonly balanceSov?: string;
+  readonly onShareProfile?: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -29,6 +31,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onOpenSettings,
   onOpenStudio,
   onOpenWallet,
+  balanceSov,
+  onShareProfile,
 }) => {
   const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts');
 
@@ -135,23 +139,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
       </div>
 
-      {/* 2-Column Action Pill Buttons */}
+      {/* 3-Pill Action Row (Instagram & Telegram Wallet Standard) */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <button
           onClick={onOpenWallet}
           style={{
-            flex: 1,
-            backgroundColor: '#1e293b',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: '#f8fafc',
+            flex: 1.2,
+            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            color: '#34d399',
             borderRadius: 10,
-            padding: '10px 0',
+            padding: '10px 8px',
             fontSize: 12,
             fontWeight: 700,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
           }}
         >
-          🪙 Wallet Hub
+          <span>💳</span> <span>{balanceSov ? `${balanceSov} SOV` : 'Wallet'}</span>
         </button>
         <button
           onClick={onOpenSettings}
@@ -161,7 +169,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             border: '1px solid rgba(255,255,255,0.08)',
             color: '#f8fafc',
             borderRadius: 10,
-            padding: '10px 0',
+            padding: '10px 8px',
             fontSize: 12,
             fontWeight: 700,
             cursor: 'pointer',
@@ -169,6 +177,106 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         >
           Edit Profile
         </button>
+        <button
+          onClick={() => {
+            if (onShareProfile) {
+              onShareProfile();
+            } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+              navigator.clipboard.writeText(`https://sovra.network/?peer=${profile.did}`);
+              alert('Profile link copied to clipboard!');
+            }
+          }}
+          style={{
+            backgroundColor: '#1e293b',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: '#cbd5e1',
+            borderRadius: 10,
+            padding: '10px 14px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+          title="Share Profile"
+        >
+          🔗 Share
+        </button>
+      </div>
+
+      {/* Story Highlights Shelf (Instagram Parity) */}
+      <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 10, marginBottom: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0, cursor: 'pointer' }}>
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              border: '2px dashed rgba(56, 189, 248, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 20,
+              color: '#38bdf8',
+              backgroundColor: 'rgba(56, 189, 248, 0.08)',
+            }}
+          >
+            +
+          </div>
+          <span style={{ fontSize: 10, color: '#94a3b8' }}>New</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0, cursor: 'pointer' }}>
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              border: '2px solid #818cf8',
+              padding: 2,
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(99, 102, 241, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+              }}
+            >
+              ⚡
+            </div>
+          </div>
+          <span style={{ fontSize: 10, color: '#e2e8f0', fontWeight: 600 }}>Mesh P2P</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0, cursor: 'pointer' }}>
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              border: '2px solid #34d399',
+              padding: 2,
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(16, 185, 129, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+              }}
+            >
+              🎨
+            </div>
+          </div>
+          <span style={{ fontSize: 10, color: '#e2e8f0', fontWeight: 600 }}>Art / NFT</span>
+        </div>
       </div>
 
       {/* Content Tabs: Grid & Saved */}
@@ -211,8 +319,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
         {activeTab === 'posts' ? (
           posts.length === 0 ? (
-            <div style={{ gridColumn: 'span 3', textAlign: 'center', padding: '40px 0', color: '#64748b', fontSize: 13 }}>
-              No sovereign posts published yet. Tap [+] to share your first story!
+            <div
+              style={{
+                gridColumn: 'span 3',
+                textAlign: 'center',
+                padding: '48px 16px',
+                backgroundColor: 'rgba(255,255,255,0.02)',
+                borderRadius: 16,
+                border: '1px dashed rgba(255,255,255,0.1)',
+                margin: '12px 0',
+              }}
+            >
+              <div style={{ fontSize: 36, marginBottom: 8 }}>📸</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+                No Sovereign Posts Yet
+              </div>
+              <div style={{ fontSize: 12, color: '#94a3b8', maxWidth: 260, margin: '0 auto', lineHeight: 1.4 }}>
+                Publish dispatches or share photos to the decentralized mesh.
+              </div>
             </div>
           ) : (
             posts.map((p, idx) => (
@@ -221,7 +345,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 style={{
                   aspectRatio: '1',
                   backgroundColor: '#1e293b',
-                  borderRadius: 4,
+                  borderRadius: 6,
                   overflow: 'hidden',
                   display: 'flex',
                   alignItems: 'center',
@@ -229,6 +353,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   fontSize: 12,
                   color: '#94a3b8',
                   position: 'relative',
+                  transition: 'transform 0.16s ease',
+                  cursor: 'pointer',
                 }}
               >
                 {p.mediaUrl ? (
@@ -240,24 +366,47 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             ))
           )
         ) : (
-          bookmarkedPosts.map((p, idx) => (
+          bookmarkedPosts.length === 0 ? (
             <div
-              key={p.id || idx}
               style={{
-                aspectRatio: '1',
-                backgroundColor: '#1e293b',
-                borderRadius: 4,
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                gridColumn: 'span 3',
+                textAlign: 'center',
+                padding: '48px 16px',
+                backgroundColor: 'rgba(255,255,255,0.02)',
+                borderRadius: 16,
+                border: '1px dashed rgba(255,255,255,0.1)',
+                margin: '12px 0',
               }}
             >
-              <div style={{ padding: 6, textAlign: 'center', fontSize: 10, color: '#94a3b8' }}>
-                {p.content?.slice(0, 30) || 'Bookmark'}
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🔖</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+                No Saved Dispatches
+              </div>
+              <div style={{ fontSize: 12, color: '#94a3b8', maxWidth: 260, margin: '0 auto', lineHeight: 1.4 }}>
+                Tap the bookmark icon on any feed post to save it for private offline viewing.
               </div>
             </div>
-          ))
+          ) : (
+            bookmarkedPosts.map((p, idx) => (
+              <div
+                key={p.id || idx}
+                style={{
+                  aspectRatio: '1',
+                  backgroundColor: '#1e293b',
+                  borderRadius: 6,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ padding: 6, textAlign: 'center', fontSize: 10, color: '#94a3b8' }}>
+                  {p.content?.slice(0, 30) || 'Bookmark'}
+                </div>
+              </div>
+            ))
+          )
         )}
       </div>
     </div>

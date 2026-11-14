@@ -1,0 +1,98 @@
+{
+  "chain_id": "sovra-mainnet-1",
+  "genesis_time": 1794641117,
+  "consensus_params": {
+    "block": {
+      "max_bytes": "22020096",
+      "max_gas": "-1",
+      "time_iota_ms": "1000"
+    },
+    "evidence": {
+      "max_age_num_blocks": "100000",
+      "max_age_duration": "172800000000000"
+    },
+    "validator": {
+      "pub_key_types": [
+        "ed25519"
+      ]
+    }
+  },
+  "governance_params": {
+    "constitutional_cap_sov": 100000000,
+    "constitutional_cap_usov": "100000000000000",
+    "sip_001_whale_influence_cap": {
+      "enabled": true,
+      "max_single_voter_share": 0.05,
+      "policy_id": "SIP-001",
+      "description": "Anti-Plutocracy Quadratic Whale Influence Cap: No single voter may command more than 5% effective weight on any ballot."
+    },
+    "sip_002_anti_sybil_maturity_gate": {
+      "enabled": true,
+      "min_account_age_days": 30,
+      "policy_id": "SIP-002",
+      "description": "Anti-Sybil Maturity Gate: Identities must have a minimum ledger maturity of 30 days to participate in governance."
+    },
+    "security_council": {
+      "threshold": "3-of-5",
+      "required_approvals": 3,
+      "total_council_seats": 5,
+      "timelock_delay_seconds": 172800,
+      "members": [
+        {
+          "seat": 1,
+          "did": "did:sovra:council-1",
+          "pub_key": "50dec499bc1281f64488a3ca9500c9c1a4eea67f5147af0450ee0deebf8601be",
+          "role": "SECURITY_COUNCIL",
+          "label": "Seat 1: Core Protocol"
+        },
+        {
+          "seat": 2,
+          "did": "did:sovra:council-2",
+          "pub_key": "a81cd7b53eb1edcfc9abce54679faf08ccaa002bd5898b63431f29cc964e67e3",
+          "role": "SECURITY_COUNCIL",
+          "label": "Seat 2: Cryptography & Zero-Knowledge"
+        },
+        {
+          "seat": 3,
+          "did": "did:sovra:council-3",
+          "pub_key": "d6cbcf5c5acf4688995801c2993a53f4c5ff164bd897362909fb2f1a5ede7724",
+          "role": "SECURITY_COUNCIL",
+          "label": "Seat 3: Network Topology & P2P Mesh"
+        },
+        {
+          "seat": 4,
+          "did": "did:sovra:council-4",
+          "pub_key": "b5fc366f668f7d6dfc43a9b2942895ccb9e4eea5d7b1ca46f1e8c710347977ec",
+          "role": "SECURITY_COUNCIL",
+          "label": "Seat 4: Community & Treasury Custody"
+        },
+        {
+          "seat": 5,
+          "did": "did:sovra:council-5",
+          "pub_key": "7f9c2d4509da86668f6c4b74fdda6c96438ec6d8d72cadd95491b25f2b2216fd",
+          "role": "SECURITY_COUNCIL",
+          "label": "Seat 5: Emergency Response & Hardware Enclave"
+        }
+      ]
+    }
+  },
+  "accounts": {
+    "sovra188bf7314475bba74c0740246e3f23dce62c5086d": "30000000000000",
+    "sovra1community000000000000000000000000000000": "40000000000000",
+    "sovra1validatorpool00000000000000000000000000": "20000000000000",
+    "sovra1seederescrow000000000000000000000000000": "10000000000000"
+  },
+  "validators": [
+    {
+      "name": "sovra-mainnet-seed",
+      "address": "sovra188bf7314475bba74c0740246e3f23dce62c5086d",
+      "pub_key": "8236781f27b1ad67e951f8a33cc0d1a5f6cfdbff6563c5c123cb2caed6df7d42",
+      "voting_power": 100,
+      "node_id": "88bf7314475bba74c0740246e3f23dce62c5086d",
+      "p2p_addr": "88bf7314475bba74c0740246e3f23dce62c5086d@seed1.sovra.network:26656"
+    }
+  ],
+  "seed_nodes": [
+    "88bf7314475bba74c0740246e3f23dce62c5086d@seed1.sovra.network:26656"
+  ]
+}

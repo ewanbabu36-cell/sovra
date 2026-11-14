@@ -65,7 +65,8 @@ export async function hashContactIdentifier(raw: string): Promise<string> {
     // Micro pure-js fallback for deterministic tests if crypto unavailable
     let hash = 0x811c9dc5;
     for (let i = 0; i < data.length; i++) {
-      hash ^= data[i];
+      const b = data[i] ?? 0;
+      hash ^= b;
       hash = (hash * 0x01000193) >>> 0;
     }
     return hash.toString(16).padStart(64, '0');

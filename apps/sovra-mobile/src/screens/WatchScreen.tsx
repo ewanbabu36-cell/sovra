@@ -2206,8 +2206,12 @@ export function WatchScreen(): React.JSX.Element {
               fontSize: 12,
               border: 'none',
               cursor: 'pointer',
-              transition: 'background 0.2s',
+              transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
+            onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
           >
             {isSubscribed ? 'Subscribed' : 'Subscribe'}
           </button>
@@ -2231,7 +2235,12 @@ export function WatchScreen(): React.JSX.Element {
               gap: 4,
               cursor: isTipping ? 'wait' : 'pointer',
               whiteSpace: 'nowrap',
+              transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
+            onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
           >
             ⚡ Super Thanks ({tipsSent > 0 ? `+₹${tipsSent}` : '₹10'})
           </button>
@@ -2249,7 +2258,12 @@ export function WatchScreen(): React.JSX.Element {
               gap: 4,
               whiteSpace: 'nowrap',
               cursor: 'pointer',
+              transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
+            onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
           >
             👍 {video?.likes || 842}
           </button>
@@ -2264,7 +2278,12 @@ export function WatchScreen(): React.JSX.Element {
               fontSize: 11,
               whiteSpace: 'nowrap',
               cursor: 'pointer',
+              transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
+            onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
           >
             ↗️ Share
           </button>

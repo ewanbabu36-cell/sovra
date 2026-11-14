@@ -754,6 +754,9 @@ export function FeedScreen(): React.JSX.Element {
   // Toast notification for errors / feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Micro-Interaction: Instagram-Grade Double-Tap Floating Heart Burst
+  const [postHeartAnim, setPostHeartAnim] = useState<{ postId: string; x: number; y: number; id: number } | null>(null);
+
   // Feed Comments Modal State
   const [activePostCommentsId, setActivePostCommentsId] = useState<string | null>(null);
   const [commentsList, setCommentsList] = useState<any[]>([]);
@@ -1048,6 +1051,21 @@ export function FeedScreen(): React.JSX.Element {
     } catch {
       // Non-critical background failure
     }
+  };
+
+  const handlePostDoubleTap = (e: React.MouseEvent, postId: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setPostHeartAnim({ postId, x, y, id: Date.now() });
+    setTimeout(() => setPostHeartAnim(null), 750);
+    const post = posts.find(p => p.id === postId);
+    if (post && !post.isLiked) {
+      toggleLike(postId);
+    }
+    try {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([35, 25, 35]);
+    } catch {}
   };
 
   const toggleLike = async (id: string) => {
@@ -2351,8 +2369,25 @@ export function FeedScreen(): React.JSX.Element {
                         src={post.carouselImages![carouselIndex]}
                         alt={`Slide ${carouselIndex + 1}`}
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onDoubleClick={() => toggleLike(post.id)}
+                        onDoubleClick={e => handlePostDoubleTap(e, post.id)}
                       />
+                      {/* Floating Double-Tap Heart Burst */}
+                      {postHeartAnim && postHeartAnim.postId === post.id && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: postHeartAnim.x - 35,
+                            top: postHeartAnim.y - 35,
+                            fontSize: 70,
+                            pointerEvents: 'none',
+                            animation: 'heartBurst 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                            zIndex: 40,
+                            filter: 'drop-shadow(0 4px 16px rgba(239, 68, 68, 0.8))',
+                          }}
+                        >
+                          ❤️
+                        </div>
+                      )}
                       {/* Counter Badge */}
                       <div
                         style={{
@@ -2464,7 +2499,7 @@ export function FeedScreen(): React.JSX.Element {
                     </div>
                   ) : (
                     <div
-                      onDoubleClick={() => toggleLike(post.id)}
+                      onDoubleClick={e => handlePostDoubleTap(e, post.id)}
                       style={{
                         width: '100%',
                         height: 320,
@@ -2492,6 +2527,24 @@ export function FeedScreen(): React.JSX.Element {
                       ) : (
                         post.imageEmoji || '🌌'
                       )}
+
+                      {/* Floating Double-Tap Heart Burst */}
+                      {postHeartAnim && postHeartAnim.postId === post.id && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: postHeartAnim.x - 35,
+                            top: postHeartAnim.y - 35,
+                            fontSize: 70,
+                            pointerEvents: 'none',
+                            animation: 'heartBurst 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                            zIndex: 40,
+                            filter: 'drop-shadow(0 4px 16px rgba(239, 68, 68, 0.8))',
+                          }}
+                        >
+                          ❤️
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2506,17 +2559,27 @@ export function FeedScreen(): React.JSX.Element {
                   >
                     <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                       <button
-                        onClick={() => toggleLike(post.id)}
+                        onClick={() => {
+                          try {
+                            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([20]);
+                          } catch {}
+                          toggleLike(post.id);
+                        }}
                         aria-label={post.isLiked ? 'Unlike' : 'Like'}
                         style={{
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
-                          fontSize: '1.2rem',
+                          fontSize: '1.25rem',
                           padding: 0,
                           color: post.isLiked ? '#ef4444' : '#fff',
-                          transition: 'transform 0.15s ease',
+                          transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                          transform: post.isLiked ? 'scale(1.15)' : 'scale(1)',
                         }}
+                        onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.85)')}
+                        onMouseUp={e => (e.currentTarget.style.transform = post.isLiked ? 'scale(1.15)' : 'scale(1)')}
+                        onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.85)')}
+                        onTouchEnd={e => (e.currentTarget.style.transform = post.isLiked ? 'scale(1.15)' : 'scale(1)')}
                       >
                         {post.isLiked ? '❤️' : '🤍'}
                       </button>

@@ -612,4 +612,43 @@ describe('SOVRA Foundational Governance & Founder Identity Subsystem', () => {
       expect(report.governanceMetrics.totalRegisteredVoters).toBe(1500);
     });
   });
+
+  // =========================================================================
+  // 10. GENESIS SECURITY COUNCIL 3-OF-5 THRESHOLD & KEY BINDING VERIFICATION
+  // =========================================================================
+  describe('Genesis Security Council (Track D)', () => {
+    it('binds all 5 genesis security council keys with 3-of-5 threshold enforcement', () => {
+      const mpaEngine = new MultiPartyApprovalEngine();
+      expect(MultiPartyApprovalEngine.REQUIRED_COUNCIL_APPROVALS).toBe(3);
+      expect(MultiPartyApprovalEngine.TOTAL_COUNCIL_SEATS).toBe(5);
+
+      // Verify each of the 5 council keys resolves accurately
+      const councilDids = [
+        'did:sovra:council-1',
+        'did:sovra:council-2',
+        'did:sovra:council-3',
+        'did:sovra:council-4',
+        'did:sovra:council-5',
+      ];
+
+      for (const did of councilDids) {
+        const pubKey = mpaEngine.resolveAuthorizedPublicKey(did, 'EMERGENCY_SECURITY_PAUSE');
+        expect(pubKey).toBeDefined();
+        expect(pubKey.length).toBe(32);
+      }
+
+      // Propose an action requiring Security Council approval
+      const proposal = mpaEngine.proposeAction({
+        actionType: 'EMERGENCY_SECURITY_PAUSE',
+        proposerDid: councilDids[0],
+        payload: { reason: 'Scheduled security audit review', code: 'SEC-MAINNET-01' },
+        eligibleSigners: councilDids,
+        requiredApprovals: 3,
+      });
+
+      expect(proposal.requiredApprovals).toBe(3);
+      expect(proposal.eligibleSigners.size).toBe(5);
+      expect(proposal.status).toBe('PENDING');
+    });
+  });
 });

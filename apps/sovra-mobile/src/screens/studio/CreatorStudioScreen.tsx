@@ -6,14 +6,18 @@
 import React, { useState } from 'react';
 
 export interface CreatorStudioScreenProps {
-  readonly balanceSov: string;
+  readonly balanceSov?: string;
+  readonly handle?: string;
   readonly onOpenWithdraw?: () => void;
+  readonly onOpenWallet?: () => void;
   readonly onBack?: () => void;
 }
 
 export const CreatorStudioScreen: React.FC<CreatorStudioScreenProps> = ({
-  balanceSov,
+  balanceSov = '150.00',
+  handle = '@alice',
   onOpenWithdraw,
+  onOpenWallet,
   onBack,
 }) => {
   const [tokenGatedEnabled, setTokenGatedEnabled] = useState(true);
@@ -38,7 +42,10 @@ export const CreatorStudioScreen: React.FC<CreatorStudioScreenProps> = ({
               ←
             </button>
           )}
-          <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>🎨 Creator Studio</h2>
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>🎨 Creator Studio</h2>
+            <div style={{ fontSize: 11, color: '#94a3b8' }}>{handle}</div>
+          </div>
         </div>
         <span
           style={{
@@ -90,6 +97,25 @@ export const CreatorStudioScreen: React.FC<CreatorStudioScreenProps> = ({
         >
           ⚡ Cash Out to Bank / UPI (Zero Fee)
         </button>
+        {onOpenWallet && (
+          <button
+            onClick={onOpenWallet}
+            style={{
+              width: '100%',
+              marginTop: 8,
+              padding: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              color: '#f8fafc',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            💳 View Sovereign Treasury Wallet
+          </button>
+        )}
       </div>
 
       {/* Analytics Grid */}

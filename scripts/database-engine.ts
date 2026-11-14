@@ -7487,7 +7487,7 @@ export class SovraDatabaseEngine {
     const allTips = (this.db.tip_vouchers || []).filter(v => (!v.type || v.type === 'tip') && (!creatorDid || v.creatorDid === creatorDid || v.toDid === creatorDid));
 
     const claimedSov = Math.round(allPayouts.reduce((acc, p) => acc + Number(p.totalAmount || p.creatorAmount || 0), 0) * 100) / 100;
-    const baseTipPool = allTips.length > 0 ? allTips.reduce((acc, t) => acc + Number(t.creatorAmount || 0), 0) : 324.50;
+    const baseTipPool = allTips.length > 0 ? allTips.reduce((acc, t) => acc + Number(t.creatorAmount || 0), 0) : 0.0;
     const unclaimedSov = Math.max(0, Math.round((baseTipPool - claimedSov) * 100) / 100);
 
     const receipts = allPayouts.map(p => ({
@@ -7500,31 +7500,6 @@ export class SovraDatabaseEngine {
       txHash: p.signature || ('0x' + crypto.createHash('sha256').update(p.id).digest('hex')),
       timestamp: p.timestamp || Date.now(),
     }));
-
-    if (receipts.length === 0) {
-      receipts.push(
-        {
-          id: 'payout-seed-1',
-          date: 'Today, 11:20 AM',
-          type: 'Super Chat Video Tip',
-          supporterDid: 'did:sovra:alice_01',
-          netRevenue: '+25.00 SOV',
-          status: 'Merkle Settled',
-          txHash: '0x8f2a1490b83c41ef7631980a34b21901c876e5d429a1b0c9f8e7d6c5b4a3210f',
-          timestamp: Date.now() - 3600000,
-        },
-        {
-          id: 'payout-seed-2',
-          date: 'Yesterday, 04:15 PM',
-          type: 'Supporter Monthly Tier',
-          supporterDid: 'did:sovra:bob_mesh',
-          netRevenue: '+50.00 SOV',
-          status: 'Merkle Settled',
-          txHash: '0x3c91a0f8b72e41dc65980a12e34091fc876e5d429a1b0c9f8e7d6c5b4a3210e',
-          timestamp: Date.now() - 86400000,
-        }
-      );
-    }
 
     return {
       unclaimedSov,
