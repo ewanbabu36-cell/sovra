@@ -128,6 +128,7 @@ import { handleDepinRoutes } from './routes/depin.routes.ts';
 import { handleQuadraticRoutes } from './routes/quadratic.routes.ts';
 import { handleAdminFeatureRoute } from './routes/admin_features.routes.ts';
 import { handleMediaPlayerRoutes } from './routes/media_player.routes.ts';
+import { SOVRA_RTC_CONFIGURATION, getWebRtcConfiguration } from './webrtc-config.ts';
 import {
   sovraDb,
   toPublicUserDTO,
@@ -19337,6 +19338,7 @@ function renderHtml(
       } catch(e) {}
     })();
     window.SOVRA_ICE_SERVERS = ${JSON.stringify(getIceServers())};
+    window.SOVRA_RTC_CONFIGURATION = ${JSON.stringify(SOVRA_RTC_CONFIGURATION)};
   </script>
   <!-- Top Notice Banner for Insecure LAN Contexts (WebRTC Camera/Mic) -->
   <div id="insecureContextNotice" style="display: none; background: linear-gradient(90deg, #1e1b4b, #312e81); color: #e0e7ff; padding: 10px 16px; font-size: 0.8rem; border-bottom: 1px solid #4f46e5; align-items: center; justify-content: space-between; z-index: 999999; position: sticky; top: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
@@ -26439,7 +26441,7 @@ function renderHtml(
                     <h2 style="font-size: 1.4rem; font-weight: 900; color: #fff; margin: 0;">Content Detection &amp; Provenance</h2>
                     <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">Cryptographic IPFS multihash verification and decentralized community copyright protection</div>
                   </div>
-                  <button type="button" class="btn btn-secondary" onclick="showAccountToast('🛡️ Scanning local mesh swarm for perceptual content hashes...')" style="padding: 7px 16px; font-size: 0.8rem; border-radius: 20px;">
+                  <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.scanProvenanceMatches()" style="padding: 7px 16px; font-size: 0.8rem; border-radius: 20px;">
                     Scan Mesh Matches
                   </button>
                 </div>
@@ -26457,13 +26459,9 @@ function renderHtml(
                         <th style="text-align: right;">ACTION</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="studioProvenanceTableBody">
                       <tr>
-                        <td>Decentralized P2P Mesh Architecture (4K HLS)</td>
-                        <td><code style="color: #38bdf8; font-size: 0.72rem;">bafybeic3q5o6w</code></td>
-                        <td>2026-10-14 02:40 UTC</td>
-                        <td><span class="badge" style="background: rgba(16,185,129,0.2); color: #34d399;">100% Original (No Matches)</span></td>
-                        <td style="text-align: right;"><button type="button" class="btn btn-secondary" onclick="showAccountToast('✓ Merkle receipt verified')" style="font-size: 0.72rem; padding: 4px 8px;">Verify</button></td>
+                        <td colspan="5" style="text-align: center; padding: 25px; color: #64748b;">Loading Merkle provenance registry...</td>
                       </tr>
                     </tbody>
                   </table>
@@ -64848,18 +64846,52 @@ window.SovraCreatorStudioEngine = {
       },
 
       exportChannelDidKey: function() {
-        const link = window.location.origin + '/@you';
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(link).then(function() {
-            if (typeof showAccountToast === 'function') showAccountToast('📋 Channel public link copied to clipboard.');
+        var activeDid = (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did) || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || (window.SovraCreatorStudioEngine && window.SovraCreatorStudioEngine.activeChannelId ? ('did:sovra:channel:' + window.SovraCreatorStudioEngine.activeChannelId) : 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(activeDid).then(function() {
+            if (typeof showAccountToast === 'function') showAccountToast('🔑 Channel DID Root Key exported & copied to clipboard: ' + activeDid.slice(0, 20) + '...');
           });
         }
       },
 
       submitStudioFeedback: function() {
-        const input = document.getElementById('studioFeedbackInput');
-        if (input) input.value = '';
-        if (typeof showAccountToast === 'function') showAccountToast('🙏 Thank you for your feedback! Creator tools are constantly improving.');
+        var topicEl = document.getElementById('studioFeedbackTopic');
+        var textEl = document.getElementById('studioFeedbackText');
+        var topic = topicEl ? topicEl.value : 'general';
+        var text = textEl ? textEl.value.trim() : '';
+        if (!text) {
+          if (typeof showToast === 'function') showToast('Please enter your feedback text.', 'warning');
+          else alert('Please enter your feedback text.');
+          return;
+        }
+
+        var activeDid = (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did) || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || '';
+        fetch('/api/feedback/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: topic,
+            feedback: text,
+            channelId: window.SovraCreatorStudioEngine && window.SovraCreatorStudioEngine.activeChannelId,
+            userDid: activeDid
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res && res.ok) {
+            if (textEl) textEl.value = '';
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('📨 Feedback submitted encrypted over mesh gossip. Receipt: ' + (res.feedbackId || 'OK'));
+            } else if (typeof showToast === 'function') {
+              showToast('Feedback submitted successfully!', 'success');
+            }
+          } else {
+            if (typeof showToast === 'function') showToast('Feedback failed: ' + (res.error || 'Unknown error'), 'error');
+          }
+        })
+        .catch(function(err) {
+          if (typeof showToast === 'function') showToast('Network error submitting feedback: ' + err.message, 'error');
+        });
       },
 
       closeVideoDetailsModal: function() {
@@ -67361,14 +67393,14 @@ window.SovraCreatorStudioEngine = {
 
       exportChannelDidKey: function() {
         var doExport = function() {
-          var didKey = 'did:key:z6MkhaXgBZDvotDkL5257faiz48Z8x28ins55CXkBDA84Z';
+          var activeDid = (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did) || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || (window.SovraCreatorStudioEngine && window.SovraCreatorStudioEngine.activeChannelId ? ('did:sovra:channel:' + window.SovraCreatorStudioEngine.activeChannelId) : 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD');
           if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(didKey);
+            navigator.clipboard.writeText(activeDid);
           }
           if (typeof showAccountToast === 'function') {
-            showAccountToast('🔑 Biometric Verified: Channel DID Root Key exported & copied to clipboard!');
+            showAccountToast('🔑 Biometric Verified: Channel DID Root Key (' + activeDid.slice(0, 16) + '...) exported & copied to clipboard!');
           } else if (typeof showToast === 'function') {
-            showToast('Channel DID key exported!', 'success');
+            showToast('Channel DID key exported: ' + activeDid, 'success');
           }
         };
 
@@ -67385,13 +67417,34 @@ window.SovraCreatorStudioEngine = {
 
       bulkUnpublishVideos: function(videoIds) {
         var self = this;
+        var idsToUnpublish = Array.isArray(videoIds) && videoIds.length > 0 ? videoIds : (self.selectedContentIds || []);
+        if (idsToUnpublish.length === 0) {
+          if (typeof showToast === 'function') showToast('No videos selected to unpublish.', 'warning');
+          return;
+        }
         var doBulkUnpublish = function() {
-          if (typeof showAccountToast === 'function') {
-            showAccountToast('🛡️ Biometric Verified: Batch unpublishing videos from mesh swarm.');
-          } else if (typeof showToast === 'function') {
-            showToast('Batch videos unpublished successfully.', 'success');
-          }
-          self.loadContentLibrary();
+          fetch('/api/video/bulk-unpublish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoIds: idsToUnpublish })
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(res) {
+            if (res && res.ok) {
+              if (typeof showAccountToast === 'function') {
+                showAccountToast('🛡️ Biometric Verified: Batch unpublished ' + (res.unpublishedCount || idsToUnpublish.length) + ' videos from mesh swarm.');
+              } else if (typeof showToast === 'function') {
+                showToast('Batch videos unpublished successfully.', 'success');
+              }
+              self.selectedContentIds = [];
+              self.loadContentLibrary();
+            } else {
+              if (typeof showToast === 'function') showToast('Unpublish failed: ' + (res.error || 'Server error'), 'error');
+            }
+          })
+          .catch(function(err) {
+            if (typeof showToast === 'function') showToast('Network error during unpublish: ' + err.message, 'error');
+          });
         };
 
         if (typeof triggerBiometricShield === 'function') {
@@ -67416,12 +67469,33 @@ window.SovraCreatorStudioEngine = {
           return;
         }
 
-        if (textEl) textEl.value = '';
-        if (typeof showAccountToast === 'function') {
-          showAccountToast('📨 Feedback submitted encrypted over mesh gossip. Thank you!');
-        } else if (typeof showToast === 'function') {
-          showToast('Feedback submitted successfully!', 'success');
-        }
+        var activeDid = (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did) || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || '';
+        fetch('/api/feedback/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: topic,
+            feedback: text,
+            channelId: window.SovraCreatorStudioEngine && window.SovraCreatorStudioEngine.activeChannelId,
+            userDid: activeDid
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res && res.ok) {
+            if (textEl) textEl.value = '';
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('📨 Feedback submitted encrypted over mesh gossip. Receipt: ' + (res.feedbackId || 'OK'));
+            } else if (typeof showToast === 'function') {
+              showToast('Feedback submitted successfully!', 'success');
+            }
+          } else {
+            if (typeof showToast === 'function') showToast('Feedback failed: ' + (res.error || 'Unknown error'), 'error');
+          }
+        })
+        .catch(function(err) {
+          if (typeof showToast === 'function') showToast('Network error submitting feedback: ' + err.message, 'error');
+        });
       },
 
       loadEarnMonetization: function() {
@@ -67461,27 +67535,51 @@ window.SovraCreatorStudioEngine = {
       },
 
       loadCopyrightProvenance: function() {
-        var tbody = document.querySelector('#studioSectionCopyright table tbody');
+        var tbody = document.getElementById('studioProvenanceTableBody') || document.querySelector('#studioSectionCopyright table tbody');
         if (!tbody) return;
-        var chanQuery = this.activeChannelId ? ('?channelId=' + encodeURIComponent(this.activeChannelId)) : '';
-        fetch('/api/studio/content' + chanQuery)
+        var myDid = (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did) || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || '';
+        fetch('/api/video/provenance' + (myDid ? ('?creatorDid=' + encodeURIComponent(myDid)) : ''))
           .then(function(r) { return r.json(); })
           .then(function(data) {
-            if (data && data.ok && Array.isArray(data.items) && data.items.length > 0) {
-              tbody.innerHTML = data.items.map(function(v, idx) {
-                var cid = (v.id && v.id.startsWith('bafy')) ? v.id : ('bafybeic' + (v.id ? v.id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8) : 'seed') + (idx + 1) + 'w');
+            if (data && data.ok && Array.isArray(data.videos) && data.videos.length > 0) {
+              tbody.innerHTML = data.videos.map(function(v) {
+                var cid = v.cid || ('bafybeic' + (v.id ? v.id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10) : 'seed'));
+                var rootHash = v.rootHash || ('0x' + cid.slice(-16));
                 var dStr = new Date(v.createdAt || Date.now()).toISOString().replace('T', ' ').substring(0, 16) + ' UTC';
+                var safeTitle = String(v.title || 'Sovereign Dispatch').replace(/[<>&"']/g, '');
+                var safeCid = String(cid).replace(/[<>&"']/g, '');
+                var safeRoot = String(rootHash).replace(/[<>&"']/g, '');
                 return '<tr>' +
-                  '<td style="font-weight: 700; color: #fff;">' + (v.title || 'Sovereign Dispatch') + '</td>' +
-                  '<td><code style="color: #38bdf8; font-size: 0.72rem;">' + cid + '</code></td>' +
+                  '<td style="font-weight: 700; color: #fff;">' + safeTitle + '</td>' +
+                  '<td><code style="color: #38bdf8; font-size: 0.72rem;">' + safeCid + '</code></td>' +
                   '<td>' + dStr + '</td>' +
-                  '<td><span class="badge" style="background: rgba(16,185,129,0.2); color: #34d399;">100% Original (No Matches)</span></td>' +
-                  '<td style="text-align: right;"><button type="button" class="btn btn-secondary" onclick="showAccountToast(&quot;✓ Cryptographic Merkle receipt for CID ' + cid + ' verified on Ed25519 node cluster&quot;)" style="font-size: 0.72rem; padding: 4px 8px;">Verify</button></td>' +
+                  '<td><span class="badge" style="background: rgba(16,185,129,0.2); color: #34d399;">' + (v.matchStatus || '100% Original (No Matches)') + '</span></td>' +
+                  '<td style="text-align: right;"><button type="button" class="btn btn-secondary" onclick="window.verifyMerkleReceipt(&quot;' + safeCid + '&quot;, &quot;' + safeRoot + '&quot;)" style="font-size: 0.72rem; padding: 4px 8px;">Verify</button></td>' +
                 '</tr>';
               }).join('');
+            } else if (tbody) {
+              tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 25px; color: #64748b;">No Merkle authorship records found. Upload a video to register immutable IPFS multihash.</td></tr>';
             }
           })
           .catch(function() {});
+      },
+
+      scanProvenanceMatches: function() {
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('🛡️ Scanning local mesh swarm for perceptual content hashes...');
+        }
+        fetch('/api/video/provenance/scan', { method: 'POST' })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data && data.ok) {
+              var msg = '✓ Scanned ' + data.scannedSwarmVideos + ' swarm videos. ' + data.provenanceStatus;
+              if (typeof showAccountToast === 'function') showAccountToast(msg);
+              else if (typeof showToast === 'function') showToast(msg, 'success');
+            }
+          })
+          .catch(function(err) {
+            if (typeof showToast === 'function') showToast('Scan error: ' + err.message, 'error');
+          });
       },
 
       loadStudioSettings: function() {
@@ -102744,11 +102842,15 @@ async function startDevServer() {
     // ==========================================
     // 🌐 WEBRTC DYNAMIC ICE SERVERS & TURN RELAYS
     // ==========================================
-    if (url.pathname === '/api/webrtc/ice-servers' && req.method === 'GET') {
+    if ((url.pathname === '/api/webrtc/config' || url.pathname === '/api/webrtc/ice-servers') && req.method === 'GET') {
       const principal = resolvePrincipal(req);
       const iceServers = getIceServers(principal?.did);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, iceServers }));
+      res.end(JSON.stringify({
+        ok: true,
+        iceServers,
+        configuration: SOVRA_RTC_CONFIGURATION,
+      }));
       return;
     }
 
