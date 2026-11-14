@@ -1978,6 +1978,74 @@ export function ChatsScreen(): React.JSX.Element {
             </div>
           )}
 
+          {!isLoading && messages.length === 0 && (
+            <div
+              style={{
+                margin: 'auto',
+                maxWidth: 320,
+                textAlign: 'center',
+                padding: '24px 18px',
+                backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 18,
+                backdropFilter: 'blur(12px)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.2))',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 22,
+                }}
+              >
+                🔒
+              </div>
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+                End-to-End Encrypted
+              </h4>
+              <p style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                Messages and audio notes are secured with Double Ratchet &amp; ChaCha20-Poly1305. Only you and {activeRecipient.name} hold the private keys.
+              </p>
+              <button
+                onClick={() => {
+                  setInputText('👋 Hello!');
+                  setTimeout(() => handleSendMessage(), 50);
+                }}
+                style={{
+                  marginTop: 6,
+                  padding: '8px 16px',
+                  backgroundColor: '#00a884',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 20,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'transform 0.15s ease',
+                }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.95)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+              >
+                <span>👋</span>
+                <span>Say Hello</span>
+              </button>
+            </div>
+          )}
+
           {messages
             .filter(m => !chatSearchQuery.trim() || m.text.toLowerCase().includes(chatSearchQuery.toLowerCase()))
             .map(msg => (
@@ -1987,10 +2055,18 @@ export function ChatsScreen(): React.JSX.Element {
               style={{
                 alignSelf: msg.isOutgoing ? 'flex-end' : 'flex-start',
                 backgroundColor: msg.isOutgoing ? '#005c4b' : '#202c33',
-                padding: '8px 12px',
-                borderRadius: 10,
+                backgroundImage: msg.isOutgoing
+                  ? 'linear-gradient(135deg, #005c4b 0%, #026b57 100%)'
+                  : 'linear-gradient(135deg, #202c33 0%, #26343d 100%)',
+                padding: '9px 13px',
+                borderRadius: msg.isOutgoing ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
                 maxWidth: '82%',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                boxShadow: msg.isOutgoing
+                  ? '0 1px 3px rgba(0, 0, 0, 0.25), 0 0 1px rgba(0, 168, 132, 0.2)'
+                  : '0 1px 3px rgba(0, 0, 0, 0.25)',
+                border: msg.isOutgoing
+                  ? '1px solid rgba(0, 168, 132, 0.25)'
+                  : '1px solid rgba(255, 255, 255, 0.06)',
                 position: 'relative',
                 cursor: 'pointer',
               }}
@@ -2256,8 +2332,9 @@ export function ChatsScreen(): React.JSX.Element {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            padding: '8px 12px 14px 12px',
+            padding: '8px 12px calc(12px + env(safe-area-inset-bottom, 0px)) 12px',
             backgroundColor: '#202c33',
+            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
           }}
         >
           <div
@@ -2268,7 +2345,9 @@ export function ChatsScreen(): React.JSX.Element {
               gap: 8,
               backgroundColor: '#2a3942',
               borderRadius: 22,
-              padding: '6px 12px',
+              padding: '7px 12px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.25)',
             }}
           >
             <span>😊</span>
@@ -2323,18 +2402,25 @@ export function ChatsScreen(): React.JSX.Element {
             disabled={isSending}
             aria-label={inputText.trim() ? 'Send Message' : 'Record Voice Note'}
             style={{
-              width: 40,
-              height: 40,
+              width: 42,
+              height: 42,
               borderRadius: '50%',
               backgroundColor: '#00a884',
+              backgroundImage: 'linear-gradient(135deg, #00a884 0%, #059669 100%)',
               border: 'none',
               color: '#fff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              fontSize: 15,
+              fontSize: 16,
+              boxShadow: '0 2px 8px rgba(0, 168, 132, 0.35)',
+              transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease',
             }}
+            onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
           >
             {inputText.trim() ? '➤' : isRecordingVoice ? '⏹' : '🎤'}
           </button>

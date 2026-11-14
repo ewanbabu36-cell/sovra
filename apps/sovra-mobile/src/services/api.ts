@@ -751,14 +751,13 @@ export async function fetchMeshStatus(): Promise<MobileMeshStatus> {
       controls: data.controls,
     };
   } catch {
-    // Resilient offline mesh fallback when central HTTP server is unreachable.
-    // Local Bluetooth Low Energy GATT and Store-and-Forward DTN remain fully active.
+    // Truthful offline mesh status when central/local node daemon is unreachable.
     return {
-      status: 'BLUETOOTH_MESH',
+      status: 'OFFLINE',
       diagnostics: {
-        nearbyPeersCount: 1,
-        authenticatedPeersCount: 1,
-        activeTransports: ['BLUETOOTH', 'STORE_AND_FORWARD_DTN'],
+        nearbyPeersCount: 0,
+        authenticatedPeersCount: 0,
+        activeTransports: [],
         outboxPendingCount: 0,
         relayQueueCount: 0,
         totalBytesSent: 0,
@@ -766,14 +765,14 @@ export async function fetchMeshStatus(): Promise<MobileMeshStatus> {
         packetsRouted: 0,
         duplicatePacketsDropped: 0,
         lastSyncTimestamp: Date.now(),
-        currentNetworkStatus: 'BLUETOOTH_MESH_ACTIVE',
+        currentNetworkStatus: 'OFFLINE_STANDALONE',
       },
       controls: {
         bluetoothMeshEnabled: true,
-        discoverabilityEnabled: true,
-        relayParticipationEnabled: true,
+        discoverabilityEnabled: false,
+        relayParticipationEnabled: false,
         batteryProfile: 'BALANCED',
-        privateRoutingOnly: false,
+        privateRoutingOnly: true,
       },
     };
   }
@@ -875,69 +874,23 @@ export async function fetchMeshTelemetry(): Promise<MobileMeshTelemetry> {
     if (!res.ok) throw new Error(`Telemetry failed: HTTP ${res.status}`);
     return await res.json();
   } catch {
-    // Offline simulated telemetry fallback
+    // Truthful offline telemetry state: local node is standalone with zero connected peers
     return {
-      ok: true,
-      localPeerId: '12D3KooWLocalMeshPeer',
+      ok: false,
+      localPeerId: '12D3KooWOfflineNode',
       localDid: activeUserDid,
-      localNoiseXxKey: '0x8f2a1c4b7e9d0a3f5c2b1e4d6a8f0c3b',
+      localNoiseXxKey: '0x0000000000000000000000000000000000000000000000000000000000000000',
       interfaces: {
-        ble5: { active: true, mtu: 512, phy: '2M_LE_CODED', txPowerDbm: -59 },
-        wifiDirectNan: { active: true, band: '5GHz', clusterRole: 'ANCHOR_MASTER' },
+        ble5: { active: false, mtu: 512, phy: '2M_LE_CODED', txPowerDbm: -59 },
+        wifiDirectNan: { active: false, band: '5GHz', clusterRole: 'STANDALONE' },
       },
       rfConfig: {
         attenuationDb: 0,
         packetLossPct: 0,
         rangeDecayMeters: 50,
-        multiHopFallbackEnabled: true,
+        multiHopFallbackEnabled: false,
       },
-      peers: [
-        {
-          peerDid: 'did:sovra:alice_architect',
-          handle: '@alice_creator',
-          displayName: 'Alice (P2P Architect)',
-          transport: 'BLE_GATT_5.3',
-          rssiDbm: -51,
-          effectiveRssiDbm: -51,
-          distanceMeters: 1.8,
-          effectiveDistanceMeters: 1.8,
-          hopCount: 1,
-          bytesRelayed: 420,
-          noiseXxKey: '0x3f5c2b1e4d6a8f0c3b8f2a1c4b7e9d0a',
-          signalBars: 5,
-          status: 'CONNECTED',
-        },
-        {
-          peerDid: 'did:sovra:bob_validator',
-          handle: '@bob_node',
-          displayName: 'Bob (Mesh Validator)',
-          transport: 'BLE_MESH_RELAY',
-          rssiDbm: -64,
-          effectiveRssiDbm: -64,
-          distanceMeters: 4.2,
-          effectiveDistanceMeters: 4.2,
-          hopCount: 1,
-          bytesRelayed: 1240,
-          noiseXxKey: '0x7e9d0a3f5c2b1e4d6a8f0c3b8f2a1c4b',
-          signalBars: 4,
-          status: 'CONNECTED',
-        },
-        {
-          peerDid: 'did:sovra:carol_relay',
-          handle: '@carol_crypt',
-          displayName: 'Carol (Zero-Knowledge Seeder)',
-          transport: 'WIFI_DIRECT_NAN',
-          rssiDbm: -73,
-          effectiveRssiDbm: -73,
-          distanceMeters: 8.6,
-          effectiveDistanceMeters: 8.6,
-          hopCount: 2,
-          bytesRelayed: 2890,
-          noiseXxKey: '0x1e4d6a8f0c3b8f2a1c4b7e9d0a3f5c2b',
-          signalBars: 3,
-          status: 'CONNECTED',
-        },
-      ],
+      peers: [],
     };
   }
 }
@@ -957,16 +910,15 @@ export async function updateRfSimulation(config: {
     if (!res.ok) throw new Error(`RF update failed: HTTP ${res.status}`);
     return await res.json();
   } catch {
-    const defaultTelemetry = await fetchMeshTelemetry();
     return {
-      ok: true,
+      ok: false,
       rfConfig: {
-        attenuationDb: config.attenuationDb ?? defaultTelemetry.rfConfig.attenuationDb,
-        packetLossPct: config.packetLossPct ?? defaultTelemetry.rfConfig.packetLossPct,
-        rangeDecayMeters: config.rangeDecayMeters ?? defaultTelemetry.rfConfig.rangeDecayMeters,
-        multiHopFallbackEnabled: config.multiHopFallbackEnabled ?? defaultTelemetry.rfConfig.multiHopFallbackEnabled,
+        attenuationDb: config.attenuationDb ?? 0,
+        packetLossPct: config.packetLossPct ?? 0,
+        rangeDecayMeters: config.rangeDecayMeters ?? 50,
+        multiHopFallbackEnabled: config.multiHopFallbackEnabled ?? false,
       },
-      peers: defaultTelemetry.peers,
+      peers: [],
     };
   }
 }
@@ -982,39 +934,18 @@ export async function sendMeshPing(senderDid?: string): Promise<MobileMeshPingRe
     return await res.json();
   } catch {
     return {
-      ok: true,
+      ok: false,
       pingResult: {
-        pingId: 'ping_mock_' + Math.floor(Math.random() * 100000),
+        pingId: 'ping_failed_' + Date.now(),
         senderDid: senderDid || activeUserDid,
-        ephemeralNoiseKey: '0x9d0a3f5c2b1e4d6a',
+        ephemeralNoiseKey: '0x0',
         cipherSuite: 'Noise_XX_25519_ChaChaPoly',
         timestamp: Date.now(),
-        responses: [
-          {
-            responderDid: 'did:sovra:alice_architect',
-            responderHandle: '@alice_creator',
-            rttMs: 16,
-            hopCount: 1,
-            rssiDbm: -51,
-            routedViaMultiHop: false,
-            relayedBytes: 548,
-            signatureHex: 'mock_sig_alice',
-          },
-          {
-            responderDid: 'did:sovra:bob_validator',
-            responderHandle: '@bob_node',
-            rttMs: 24,
-            hopCount: 1,
-            rssiDbm: -64,
-            routedViaMultiHop: false,
-            relayedBytes: 1368,
-            signatureHex: 'mock_sig_bob',
-          },
-        ],
-        totalRoundTripMs: 24,
-        lossRatePct: 0,
-        successfulPongs: 2,
-        totalPings: 2,
+        responses: [],
+        totalRoundTripMs: 0,
+        lossRatePct: 100,
+        successfulPongs: 0,
+        totalPings: 1,
       },
     };
   }
@@ -1327,6 +1258,7 @@ export async function depositSandboxFiat(amountInr: number | string): Promise<an
 // ==========================================
 
 export interface WalletAssetItem {
+  id?: string;
   type: string;
   name: string;
   symbol: string;
@@ -2556,16 +2488,8 @@ export async function subscribeChannelTier(channelId: string, tierLevel: number)
     }
     return data;
   } catch (err: any) {
-    console.warn('[API] subscribeChannelTier offline fallback:', err);
-    const mockSub = {
-      id: 'csub_mock_' + Date.now(),
-      channelId,
-      tierLevel,
-      status: 'ACTIVE',
-      periodEnd: Date.now() + 30 * 24 * 60 * 60 * 1000,
-    };
-    await localDb.saveChannelMembership(mockSub);
-    return { ok: true, subscription: mockSub };
+    console.warn('[API] subscribeChannelTier error:', err);
+    return { ok: false, error: err?.message || 'Subscription failed. Server unreachable.' };
   }
 }
 
@@ -2593,8 +2517,8 @@ export async function sendLiveSuperChat(params: {
     }
     return data;
   } catch (err: any) {
-    console.warn('[API] sendLiveSuperChat offline fallback:', err);
-    return { ok: true };
+    console.warn('[API] sendLiveSuperChat error:', err);
+    return { ok: false, error: err?.message || 'SuperChat delivery failed. Server unreachable.' };
   }
 }
 

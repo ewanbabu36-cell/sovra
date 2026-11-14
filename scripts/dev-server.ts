@@ -9597,8 +9597,97 @@ function renderHtml(
     .post-card {
       background-color: var(--surface);
       border: 1px solid var(--surface-border);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 1.25rem;
+      transition: box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.24s ease;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    }
+    body.theme-normal .post-card:hover {
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+      border-color: #cbd5e1;
+    }
+    body.theme-black .post-card:hover {
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+
+    /* Tactile Press Micro-Interactions (Apple & Linear Standard) */
+    button, .btn, .profile-btn, .header-nav-btn, .tab-btn, .profile-stat-box, .overflow-menu-item {
+      transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.16s ease, background 0.16s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button:active, .btn:active, .profile-btn:active, .header-nav-btn:active, .tab-btn:active, .profile-stat-box:active {
+      transform: scale(0.965);
+    }
+
+    /* Instagram-Style Like Heart Pop Animation */
+    @keyframes heartBurst {
+      0% { transform: scale(1); }
+      35% { transform: scale(1.38); }
+      65% { transform: scale(0.92); }
+      100% { transform: scale(1); }
+    }
+    .heart-animating {
+      animation: heartBurst 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    /* Shimmer Skeleton Loaders (Instagram & YouTube Standard) */
+    @keyframes shimmerSkeleton {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .skeleton-box {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.04) 63%);
+      background-size: 400% 100%;
+      animation: shimmerSkeleton 1.4s ease infinite;
+      border-radius: 8px;
+    }
+    body.theme-normal .skeleton-box {
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+      background-size: 400% 100%;
+    }
+
+    /* Modal / Drawer Slide-Up Animation */
+    @keyframes slideUpModal {
+      from { transform: translateY(18px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .animated-slide-up {
+      animation: slideUpModal 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Empty States Styling (Zero Data Polish) */
+    .empty-state-card {
+      text-align: center;
+      padding: 3rem 1.5rem;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      margin: 1.5rem 0;
+    }
+    body.theme-normal .empty-state-card {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+    .empty-state-icon {
+      font-size: 2.75rem;
+      margin-bottom: 0.75rem;
+      display: inline-block;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+    }
+    .empty-state-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+    .empty-state-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      max-width: 320px;
+      margin: 0 auto 1.25rem auto;
+      line-height: 1.45;
     }
     .post-header {
       display: flex;
@@ -23737,6 +23826,10 @@ function renderHtml(
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                 <span>Wallet</span>
               </button>
+              <button class="profile-btn profile-btn-secondary" id="profileShareBtn" onclick="openShareProfileModal(event)" aria-label="Share Profile" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;" title="Share Profile">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                <span>Share</span>
+              </button>
               <button class="profile-btn profile-btn-secondary" id="btnBackupSovereignIdentity" onclick="openSovereignBackupModal()" aria-label="Backup Sovereign Identity" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.35); color: #a5b4fc; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" title="Backup 12-Word Sovereign Mnemonic Seed Phrase">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
                 <span>Backup</span>
@@ -23900,7 +23993,7 @@ function renderHtml(
             </div>
 
             <!-- Authoritative Professional Dashboard Banner (Instagram & YouTube Parity - Single Source of Truth) -->
-            <div class="creator-hub-trigger-banner" id="creatorHubTriggerBanner" onclick="openSpatialChannelsPagesSurface(this)" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openSpatialChannelsPagesSurface(this)" style="cursor: pointer; margin-top: 1rem; background: linear-gradient(135deg, rgba(99, 102, 241, 0.16) 0%, rgba(56, 189, 248, 0.10) 100%); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);" title="Open Channels &amp; Public Pages Hub">
+            <div class="creator-hub-trigger-banner" id="creatorHubTriggerBanner" onclick="openSpatialChannelsPagesSurface(this)" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openSpatialChannelsPagesSurface(this)" style="cursor: pointer; margin-top: 1rem; background: linear-gradient(135deg, rgba(99, 102, 241, 0.16) 0%, rgba(56, 189, 248, 0.10) 100%); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 14px; padding: 12px 16px; display: ${isCreatorModeActive ? 'flex' : 'none'}; align-items: center; justify-content: space-between; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);" title="Open Channels &amp; Public Pages Hub">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 40px; height: 40px; border-radius: 12px; background: rgba(99, 102, 241, 0.22); border: 1px solid rgba(99, 102, 241, 0.45); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: #a5b4fc; flex-shrink: 0; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);">✨</div>
                 <div>
@@ -24142,6 +24235,58 @@ function renderHtml(
                   <div class="storage-meter-segment" style="width: 20%; background: #a855f7;"></div>
                 </div>
               </div>
+
+              <!-- P2P BitSwap Seeder Node Mining HUD Tile (Relocated to Developer / Node Diagnostics) -->
+              <div id="walletSeederMiningTile" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; margin-top: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span style="font-weight: 700; color: #38bdf8; font-size: 0.82rem; display: flex; align-items: center; gap: 6px;">
+                    <span>⚡</span> <span>P2P Seeder Node Mining</span>
+                  </span>
+                  <span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.65rem; font-weight: 700;">🟢 RELAY MINING ACTIVE</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; font-size: 0.75rem;">
+                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
+                    <div style="color: #94a3b8; font-size: 0.65rem;">Blocks Relayed</div>
+                    <div id="seederBlocksRelayedCount" style="font-weight: 800; color: #fff; font-size: 0.95rem; margin-top: 2px;">1,428</div>
+                  </div>
+                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
+                    <div style="color: #94a3b8; font-size: 0.65rem;">Bandwidth Shared</div>
+                    <div id="seederBandwidthSharedText" style="font-weight: 800; color: #38bdf8; font-size: 0.95rem; margin-top: 2px;">14.2 GB</div>
+                  </div>
+                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
+                    <div style="color: #94a3b8; font-size: 0.65rem;">Unclaimed Yield</div>
+                    <div id="seederUnclaimedYieldText" style="font-weight: 800; color: #10b981; font-size: 0.95rem; margin-top: 2px;">5.25 SOV</div>
+                  </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                  <span style="font-size: 0.72rem; color: #94a3b8;">Est. daily yield: <b>~2.40 SOV / day</b></span>
+                  <button type="button" id="btnClaimSeederRewards" onclick="claimBitSwapSeederRewards()" style="background: linear-gradient(135deg, #059669, #10b981); color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-size: 0.75rem; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4); display: flex; align-items: center; gap: 5px;">
+                    <span>⚡ Claim 5.25 SOV</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Merkle DAG Ingestion & Storage Quotas (Node Operator Diagnostics) -->
+              <div style="margin-top: 0.85rem; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">
+                <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 6px;">
+                  <span>📦</span> <span>Merkle DAG Ingestion &amp; Quotas</span>
+                </div>
+                <div style="display: flex; gap: 0.75rem; margin-bottom: 0.65rem; background: rgba(0,0,0,0.3); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.75rem; flex-wrap: wrap;">
+                  <div>Capacity: <b id="quotaCapacity">50 GB</b></div>
+                  <div>Used: <b id="quotaUsed" style="color: #60a5fa;">0 B</b></div>
+                  <div>Pinned: <b id="quotaPinned" style="color: #34d399;">0 B</b></div>
+                  <div>Active Pins: <b id="activePinsCount" style="color: #a78bfa;">0</b></div>
+                </div>
+                <textarea id="mediaPayload" style="width: 100%; min-height: 44px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; padding: 0.5rem; font-size: 0.8rem;" placeholder="Paste media payload to chunk, pin into Merkle DAG, and announce to DHT..."></textarea>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem; flex-wrap: wrap; gap: 6px;">
+                  <div id="mediaPublishResult" style="font-size: 0.74rem; font-family: monospace; color: #a5b4fc;"></div>
+                  <div style="display: flex; gap: 0.4rem;">
+                    <button type="button" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.35rem 0.55rem;" onclick="triggerVerifyReplicas()">Verify Replicas</button>
+                    <button type="button" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.35rem 0.55rem;" onclick="triggerGC()">Run GC</button>
+                    <button type="button" class="btn btn-primary" style="background: #4f46e5; font-size: 0.72rem; padding: 0.35rem 0.65rem;" onclick="publishMediaAsset()">Publish &amp; Pin DAG</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="card-footer-actions">
               <button type="button" class="btn-card-action" onclick="runNodeGarbageCollection()" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #fca5a5;">
@@ -24310,36 +24455,6 @@ function renderHtml(
               <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.4;">
                 Self-custodial sovereign wallet with zero platform cuts, instant P2P voucher settlements, and Merkle-verified payment receipts.
               </div>
-
-              <!-- P2P BitSwap Seeder Node Mining HUD Tile (Gap 4) -->
-              <div id="walletSeederMiningTile" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; margin-bottom: 0.85rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                  <span style="font-weight: 700; color: #38bdf8; font-size: 0.82rem; display: flex; align-items: center; gap: 6px;">
-                    <span>⚡</span> <span>P2P Seeder Node Mining</span>
-                  </span>
-                  <span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.65rem; font-weight: 700;">🟢 RELAY MINING ACTIVE</span>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; font-size: 0.75rem;">
-                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
-                    <div style="color: #94a3b8; font-size: 0.65rem;">Blocks Relayed</div>
-                    <div id="seederBlocksRelayedCount" style="font-weight: 800; color: #fff; font-size: 0.95rem; margin-top: 2px;">1,428</div>
-                  </div>
-                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
-                    <div style="color: #94a3b8; font-size: 0.65rem;">Bandwidth Shared</div>
-                    <div id="seederBandwidthSharedText" style="font-weight: 800; color: #38bdf8; font-size: 0.95rem; margin-top: 2px;">14.2 GB</div>
-                  </div>
-                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
-                    <div style="color: #94a3b8; font-size: 0.65rem;">Unclaimed Yield</div>
-                    <div id="seederUnclaimedYieldText" style="font-weight: 800; color: #10b981; font-size: 0.95rem; margin-top: 2px;">5.25 SOV</div>
-                  </div>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
-                  <span style="font-size: 0.72rem; color: #94a3b8;">Est. daily yield: <b>~2.40 SOV / day</b></span>
-                  <button type="button" id="btnClaimSeederRewards" onclick="claimBitSwapSeederRewards()" style="background: linear-gradient(135deg, #059669, #10b981); color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-size: 0.75rem; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4); display: flex; align-items: center; gap: 5px;">
-                    <span>⚡ Claim 5.25 SOV</span>
-                  </button>
-                </div>
-              </div>
             </div>
             <div class="card-footer-actions" style="display: flex; flex-direction: column; gap: 8px;">
               <button type="button" class="btn-card-action" onclick="openFullPageWallet()" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.35) 100%); border-color: rgba(16, 185, 129, 0.5); color: #34d399; font-weight: 700; padding: 10px 14px; font-size: 0.88rem; width: 100%; justify-content: center; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
@@ -24463,43 +24578,8 @@ function renderHtml(
           </div>
         </div>
 
-        <!-- Creator Studio & Merkle DAG Ingestion Section -->
-        <div class="card" id="creatorStudioSection" style="padding: 1.25rem; border-radius: 16px; border-color: rgba(99, 102, 241, 0.35); display: ${isCreatorModeActive ? 'block' : 'none'};">
-          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-            <span style="display: flex; align-items: center; gap: 0.5rem;">✨ <span>Creator Studio &amp; Storage Daemon</span></span>
-            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">BitSwap + Merkle DAG Active</span>
-          </div>
-
-          <!-- Post Composer -->
-          <div style="margin-bottom: 1.25rem;">
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.4rem;">Publish Signed Message to GossipSub:</div>
-            <textarea id="postContent" style="width: 100%; min-height: 60px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; padding: 0.6rem; font-size: 0.85rem;" placeholder="Publish a signed post to the decentralized Sovra mesh (Noise_XX / GossipSub)..."></textarea>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem;">
-              <span style="font-size: 0.75rem; color: var(--text-muted);">Topic: <code style="color: #a5b4fc;">sovra/feed/main</code></span>
-              <button class="btn btn-primary" onclick="publishPost()">Sign &amp; Publish Post</button>
-            </div>
-          </div>
-
-          <!-- Storage Daemon Pinning -->
-          <div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Merkle DAG Chunking &amp; Storage Quotas:</div>
-            <div style="display: flex; gap: 1rem; margin-bottom: 0.75rem; background: rgba(0,0,0,0.25); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.78rem;">
-              <div>Capacity: <b id="quotaCapacity">50 GB</b></div>
-              <div>Used: <b id="quotaUsed" style="color: #60a5fa;">0 B</b></div>
-              <div>Pinned: <b id="quotaPinned" style="color: #34d399;">0 B</b></div>
-              <div>Active Pins: <b id="activePinsCount" style="color: #a78bfa;">0</b></div>
-            </div>
-            <textarea id="mediaPayload" style="width: 100%; min-height: 50px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; padding: 0.6rem; font-size: 0.85rem;" placeholder="Type or paste media payload / video transcripts to chunk, pin into Merkle DAG, and announce to DHT..."></textarea>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
-              <div id="mediaPublishResult" style="font-size: 0.78rem; font-family: monospace; color: #a5b4fc;"></div>
-              <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.4rem 0.6rem;" onclick="triggerVerifyReplicas()">Verify Replicas</button>
-                <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.4rem 0.6rem;" onclick="triggerGC()">Run GC</button>
-                <button class="btn btn-primary" style="background: #4f46e5; font-size: 0.75rem; padding: 0.4rem 0.75rem;" onclick="publishMediaAsset()">Publish &amp; Pin DAG</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Creator Studio Section (Preserved for DOM Compatibility, Managed via Dedicated Studio & Diagnostics) -->
+        <div id="creatorStudioSection" style="display: none;" aria-hidden="true"></div>
 
       </div>
       </div>
@@ -50692,6 +50772,25 @@ function renderHtml(
         dd.style.display = 'none';
       }
     });
+
+    function openShareProfileModal(e) {
+      if (e) e.stopPropagation();
+      const handle = (myProfile && myProfile.handle) ? myProfile.handle.replace('@', '') : 'user';
+      const url = window.location.origin + '/@' + handle;
+      const title = (myProfile && myProfile.name ? myProfile.name : 'Sovereign Peer') + ' on SOVRA';
+      const text = 'Connect with ' + ((myProfile && myProfile.handle) || '@sovereign') + ' on SOVRA P2P Mesh Network';
+      if (navigator.share && typeof navigator.share === 'function') {
+        navigator.share({ title: title, text: text, url: url }).catch(function() {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function() {
+          if (typeof showAccountToast === 'function') showAccountToast('🔗 Profile link copied to clipboard!');
+          else alert('Link copied: ' + url);
+        }).catch(function() {
+          if (typeof showAccountToast === 'function') showAccountToast('🔗 Profile link: ' + url);
+        });
+      }
+    }
+    window.openShareProfileModal = openShareProfileModal;
 
     function copyPeerProfileLink(e) {
       if (e) e.stopPropagation();
@@ -77461,6 +77560,8 @@ window.SovraCreatorStudioEngine = {
         const isAct = !!data.isCreatorModeActive;
         const studioSec = document.getElementById('creatorStudioSection');
         if (studioSec) studioSec.style.display = isAct ? 'block' : 'none';
+        const hubBanner = document.getElementById('creatorHubTriggerBanner');
+        if (hubBanner) hubBanner.style.display = isAct ? 'flex' : 'none';
 
         const statusText = document.getElementById('creatorStatusText');
         if (statusText) statusText.innerText = isAct ? 'Studio Active' : 'Standard Account';
@@ -77500,14 +77601,17 @@ window.SovraCreatorStudioEngine = {
       if (toggle && !toggle.checked) {
         toggle.checked = true;
         toggleCreatorMode(true);
+      }
+      if (typeof switchTab === 'function') {
+        switchTab('studio');
       } else {
         const studioSec = document.getElementById('creatorStudioSection');
         if (studioSec) {
           studioSec.style.display = 'block';
           studioSec.scrollIntoView({ behavior: 'smooth' });
         }
-        showAccountToast('🚀 Creator Studio is active');
       }
+      showAccountToast('🚀 Opening Creator Studio Command Center');
     }
 
     async function runNodeGarbageCollection() {
@@ -89562,14 +89666,11 @@ async function startDevServer() {
     req: http.IncomingMessage,
     _parsedBody?: Record<string, any>,
   ): AuthenticatedPrincipal | null {
-    const authHeader = req.headers.authorization;
     let token = '';
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7).trim();
-    } else if (req.headers['x-sovra-session-token']) {
-      token = String(req.headers['x-sovra-session-token']).trim();
-    } else if (req.headers.cookie) {
-      const match = req.headers.cookie.match(/(?:^|;\s*)sovra_session_token=([^;]+)/);
+
+    // Step 1: Cookie-first extraction for web security (HttpOnly, SameSite=Strict, Secure)
+    if (req.headers.cookie) {
+      const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
       if (match) {
         token = decodeURIComponent(match[1]).trim();
         // SEC-07: CSRF Protection for Cookie-Authenticated Mutating Requests
@@ -89583,6 +89684,17 @@ async function startDevServer() {
         }
       }
     }
+
+    // Step 2: Graceful fallback to Authorization: Bearer <token> or header for mobile API clients
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7).trim();
+      } else if (req.headers['x-sovra-session-token']) {
+        token = String(req.headers['x-sovra-session-token']).trim();
+      }
+    }
+
     // PRIV-01 & SESS-02: Query-parameter authentication tokens are strictly prohibited (CWE-598)
     if (!token && _parsedBody && typeof _parsedBody === 'object') {
       if (_parsedBody.sessionToken) {
@@ -95643,7 +95755,7 @@ async function startDevServer() {
     // ==========================================
     // 👤 CORE USER & IDENTITY DATABASE ENDPOINTS
     // ==========================================
-    if (url.pathname === '/api/user/register' && req.method === 'POST') {
+    if ((url.pathname === '/api/user/register' || url.pathname === '/api/auth/register') && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
       try {
@@ -95752,10 +95864,13 @@ async function startDevServer() {
         }
 
         const user = regResult.user;
-        const isSecureReg = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https');
+        const isSecureReg = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
         res.writeHead(200, {
           'Content-Type': 'application/json',
-          'Set-Cookie': `sovra_session_token=${encodeURIComponent(user.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureReg ? '; Secure' : ''}`,
+          'Set-Cookie': [
+            `sovra_session=${encodeURIComponent(user.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureReg ? '; Secure' : ''}`,
+            `sovra_session_token=${encodeURIComponent(user.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureReg ? '; Secure' : ''}`,
+          ],
         });
         res.end(JSON.stringify({
           ok: true,
@@ -95770,7 +95885,7 @@ async function startDevServer() {
       return;
     }
 
-    if (url.pathname === '/api/user/login' && req.method === 'POST') {
+    if ((url.pathname === '/api/user/login' || url.pathname === '/api/auth/login') && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
       try {
@@ -95807,12 +95922,15 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: loginRes.error || 'Invalid credentials' }));
           return;
         }
-        const isSecureLogin = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https');
+        const isSecureLogin = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'Referrer-Policy': 'strict-origin-when-cross-origin',
           'X-Content-Type-Options': 'nosniff',
-          'Set-Cookie': `sovra_session_token=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
+          'Set-Cookie': [
+            `sovra_session=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
+            `sovra_session_token=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
+          ],
         });
         res.end(JSON.stringify({
           ok: true,
@@ -95938,7 +96056,14 @@ async function startDevServer() {
           return;
         }
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        const isSecureWebAuthn = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Set-Cookie': [
+            `sovra_session=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureWebAuthn ? '; Secure' : ''}`,
+            `sovra_session_token=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureWebAuthn ? '; Secure' : ''}`,
+          ],
+        });
         res.end(JSON.stringify({
           ok: true,
           user: toPublicUserDTO(loginRes.user),
@@ -96100,12 +96225,15 @@ async function startDevServer() {
           res.end(JSON.stringify({ ok: false, error: recoverRes.error || 'Invalid recovery credentials.' }));
           return;
         }
-        const isSecure = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https');
+        const isSecure = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'Referrer-Policy': 'no-referrer',
           'X-Content-Type-Options': 'nosniff',
-          'Set-Cookie': `sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecure ? '; Secure' : ''}`,
+          'Set-Cookie': [
+            `sovra_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecure ? '; Secure' : ''}`,
+            `sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecure ? '; Secure' : ''}`,
+          ],
         });
         res.end(JSON.stringify({ ok: true, message: 'Security PIN reset successfully! All active sessions have been revoked. Please log in with your new PIN.' }));
       } catch (err: any) {
@@ -96115,7 +96243,7 @@ async function startDevServer() {
       return;
     }
 
-    if (url.pathname === '/api/user/logout' && req.method === 'POST') {
+    if ((url.pathname === '/api/user/logout' || url.pathname === '/api/auth/logout') && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
       try {
@@ -96130,16 +96258,19 @@ async function startDevServer() {
           token = String(parsed.sessionToken).trim();
         }
         if (!token && req.headers.cookie) {
-          const match = req.headers.cookie.match(/(?:^|;\s*)sovra_session_token=([^;]+)/);
+          const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
           if (match) token = decodeURIComponent(match[1]).trim();
         }
         if (token) {
           sovraDb.logoutUser(token);
         }
-        const isSecureLogout = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https');
+        const isSecureLogout = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
         res.writeHead(200, {
           'Content-Type': 'application/json',
-          'Set-Cookie': `sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecureLogout ? '; Secure' : ''}`,
+          'Set-Cookie': [
+            `sovra_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecureLogout ? '; Secure' : ''}`,
+            `sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecureLogout ? '; Secure' : ''}`,
+          ],
         });
         res.end(JSON.stringify({ ok: true }));
       } catch (err: any) {
@@ -96170,7 +96301,10 @@ async function startDevServer() {
         dynamicSocialStore.channels = sovraDb.getAllChannels();
         dynamicSocialStore.pages = sovraDb.getAllPages();
 
-        res.setHeader('Set-Cookie', 'sovra_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax');
+        res.setHeader('Set-Cookie', [
+          'sovra_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict',
+          'sovra_session_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict'
+        ]);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, deletedDid: principal.did, message: 'Account and associated data deleted permanently' }));
       } catch (err: any) {
@@ -101657,6 +101791,41 @@ server.listen(HTTP_PORT, '0.0.0.0', () => {
     } catch (daemonErr) {
       console.warn('[SELF-HEALING] Failed to initialize daemon:', daemonErr);
     }
+
+    // Periodic L1 Blockchain Settlement Mule (Every 45 seconds)
+    // Synchronizes offline SQLite payment vouchers to CometBFT L1 Consensus when sovrad.exe is active
+    const l1SettlementMuleInterval = setInterval(async () => {
+      try {
+        const state = sovraDb.getState();
+        const vouchers = state.tip_vouchers || [];
+        const pending = vouchers.filter((v: any) => v && v.status === 'pending_l1_settlement');
+        if (pending.length === 0) return;
+
+        // Check if L1 CometBFT node is reachable
+        const statusRes = await fetch(`${L1_RPC_URL}/status`, { signal: AbortSignal.timeout(2000) }).catch(() => null);
+        if (!statusRes || !statusRes.ok) {
+          // L1 node offline - vouchers remain safely queued in SQLite WAL state channel
+          return;
+        }
+
+        for (const voucher of pending) {
+          const res = await broadcastL1Tx({
+            type: 'send',
+            recipient: voucher.recipientAddress || voucher.toDid,
+            amountUsov: String(BigInt(Math.floor(Number(voucher.totalAmount || '1') * 1_000_000))),
+            feeUsov: '100',
+          });
+          if (res.ok) {
+            voucher.status = 'settled_on_chain';
+            voucher.txHash = res.txHash;
+            voucher.blockHeight = res.height;
+            console.log(`[L1-MULE] Successfully settled voucher ${voucher.voucherId} on CometBFT block #${res.height}`);
+          }
+        }
+        sovraDb.save();
+      } catch (_) {}
+    }, 45 * 1000);
+    l1SettlementMuleInterval.unref();
   });
 }
 

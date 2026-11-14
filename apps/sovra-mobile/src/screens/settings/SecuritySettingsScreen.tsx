@@ -4,23 +4,32 @@
  */
 
 import React, { useState } from 'react';
-import { discoverContacts, linkUserContactHashes, type ContactMatch } from '../../services/contact-discovery';
+import { discoverContacts, type ContactMatch } from '../../services/contact-discovery';
 
 export interface SecuritySettingsScreenProps {
-  readonly handle: string;
-  readonly onOpenBackupSeed: () => void;
-  readonly onOpenImportSeed: () => void;
-  readonly onLogout: () => void;
+  readonly handle?: string;
+  readonly profile?: any;
+  readonly onOpenBackupSeed?: () => void;
+  readonly onOpenBackup?: () => void;
+  readonly onOpenImportSeed?: () => void;
+  readonly onOpenImport?: () => void;
+  readonly onLogout?: () => void;
   readonly onBack?: () => void;
 }
 
 export const SecuritySettingsScreen: React.FC<SecuritySettingsScreenProps> = ({
   handle,
+  profile,
   onOpenBackupSeed,
+  onOpenBackup,
   onOpenImportSeed,
-  onLogout,
+  onOpenImport,
+  onLogout = () => {},
   onBack,
 }) => {
+  const activeHandle = handle || profile?.handle || '@sovereign';
+  const handleBackup = onOpenBackupSeed || onOpenBackup || (() => {});
+  const handleImport = onOpenImportSeed || onOpenImport || (() => {});
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [discoveredContacts, setDiscoveredContacts] = useState<ContactMatch[]>([]);
@@ -80,7 +89,7 @@ export const SecuritySettingsScreen: React.FC<SecuritySettingsScreenProps> = ({
           <div>
             <div style={{ fontSize: 14, fontWeight: 700 }}>Hardware Passkey</div>
             <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-              TouchID / FaceID Biometric Enclave
+              TouchID / FaceID Biometric Enclave &bull; {activeHandle}
             </div>
           </div>
           <span style={{ color: '#10b981', fontSize: 12, fontWeight: 800 }}>ACTIVE ✓</span>
@@ -179,7 +188,7 @@ export const SecuritySettingsScreen: React.FC<SecuritySettingsScreenProps> = ({
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={onOpenBackupSeed}
+            onClick={handleBackup}
             style={{
               flex: 1,
               padding: '10px 0',
@@ -195,7 +204,7 @@ export const SecuritySettingsScreen: React.FC<SecuritySettingsScreenProps> = ({
             🔑 Export Seed Phrase
           </button>
           <button
-            onClick={onOpenImportSeed}
+            onClick={handleImport}
             style={{
               flex: 1,
               padding: '10px 0',

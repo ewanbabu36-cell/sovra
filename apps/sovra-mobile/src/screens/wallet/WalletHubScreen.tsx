@@ -13,30 +13,44 @@ import React from 'react';
 import type { WalletAssetItem } from '../../services/api';
 
 export interface WalletHubScreenProps {
-  readonly balance: string;
-  readonly fiatValuation: string;
-  readonly assets: WalletAssetItem[];
-  readonly onOpenSend: () => void;
-  readonly onOpenReceive: () => void;
-  readonly onOpenDeposit: () => void;
-  readonly onOpenStaking: () => void;
-  readonly onOpenBackupSeed: () => void;
+  readonly balance?: string;
+  readonly balanceSov?: string;
+  readonly fiatValuation?: string;
+  readonly assets?: WalletAssetItem[];
+  readonly onOpenSend?: () => void;
+  readonly onSend?: () => void;
+  readonly onOpenReceive?: () => void;
+  readonly onReceive?: () => void;
+  readonly onOpenDeposit?: () => void;
+  readonly onDeposit?: () => void;
+  readonly onOpenStaking?: () => void;
+  readonly onOpenBackupSeed?: () => void;
   readonly onBack?: () => void;
 }
 
 export const WalletHubScreen: React.FC<WalletHubScreenProps> = ({
   balance,
+  balanceSov,
   fiatValuation,
-  assets,
+  assets = [],
   onOpenSend,
+  onSend,
   onOpenReceive,
+  onReceive,
   onOpenDeposit,
+  onDeposit,
   onOpenStaking,
   onOpenBackupSeed,
   onBack,
 }) => {
-  const numBalance = parseFloat(balance) || 0;
+  const activeBalance = balance ?? balanceSov ?? '0.00';
+  const numBalance = parseFloat(activeBalance) || 0;
   const isHighBalance = numBalance > 100;
+  const handleSend = onOpenSend || onSend || (() => {});
+  const handleReceive = onOpenReceive || onReceive || (() => {});
+  const handleDeposit = onOpenDeposit || onDeposit || (() => {});
+  const handleStaking = onOpenStaking || (() => {});
+  const handleBackupSeed = onOpenBackupSeed || (() => {});
 
   return (
     <div style={{ padding: '16px 16px 80px 16px', color: '#f8fafc', maxWidth: 480, margin: '0 auto' }}>
@@ -88,7 +102,7 @@ export const WalletHubScreen: React.FC<WalletHubScreenProps> = ({
           Total Sovereign Valuation
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '8px 0 4px 0' }}>
-          <span style={{ fontSize: 32, fontWeight: 900, color: '#f8fafc' }}>{balance}</span>
+          <span style={{ fontSize: 32, fontWeight: 900, color: '#f8fafc' }}>{activeBalance}</span>
           <span style={{ fontSize: 16, fontWeight: 800, color: '#818cf8' }}>SOV</span>
         </div>
         <div style={{ fontSize: 13, color: '#34d399', fontWeight: 600 }}>
@@ -99,7 +113,7 @@ export const WalletHubScreen: React.FC<WalletHubScreenProps> = ({
       {/* Progressive Security Shield Banner */}
       {isHighBalance ? (
         <div
-          onClick={onOpenBackupSeed}
+          onClick={handleBackupSeed}
           style={{
             backgroundColor: 'rgba(234, 179, 8, 0.12)',
             border: '1px solid rgba(234, 179, 8, 0.35)',
@@ -148,7 +162,7 @@ export const WalletHubScreen: React.FC<WalletHubScreenProps> = ({
       {/* 4-Action Quick Buttons Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 }}>
         <button
-          onClick={onOpenDeposit}
+          onClick={handleDeposit}
           style={{
             padding: '12px 0',
             backgroundColor: '#10b981',
@@ -169,7 +183,7 @@ export const WalletHubScreen: React.FC<WalletHubScreenProps> = ({
         </button>
 
         <button
-          onClick={onOpenSend}
+          onClick={handleSend}
           style={{
             padding: '12px 0',
             backgroundColor: '#1e293b',
@@ -190,7 +204,7 @@ export const WalletHubScreen: React.FC<WalletHubScreenProps> = ({
         </button>
 
         <button
-          onClick={onOpenReceive}
+          onClick={handleReceive}
           style={{
             padding: '12px 0',
             backgroundColor: '#1e293b',
@@ -211,7 +225,7 @@ export const WalletHubScreen: React.FC<WalletHubScreenProps> = ({
         </button>
 
         <button
-          onClick={onOpenStaking}
+          onClick={handleStaking}
           style={{
             padding: '12px 0',
             backgroundColor: '#1e293b',

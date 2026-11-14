@@ -407,9 +407,13 @@ export function ReelsScreen(): React.JSX.Element {
       setHeartAnim({ x, y, id: animId });
       setTimeout(() => setHeartAnim(null), 800);
 
+      try {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([35, 25, 35]);
+      } catch {}
+
       // Optimistic like increment
       setReels(prev =>
-        prev.map(r => (r.id === reelId ? { ...r, likesCount: r.likesCount + 1 } : r)),
+        prev.map(r => (r.id === reelId ? { ...r, likesCount: r.isLiked ? r.likesCount : r.likesCount + 1, isLiked: true } : r)),
       );
 
       try {
@@ -749,13 +753,13 @@ export function ReelsScreen(): React.JSX.Element {
               <div
                 style={{
                   position: 'absolute',
-                  left: heartAnim.x - 30,
-                  top: heartAnim.y - 30,
-                  fontSize: 60,
+                  left: heartAnim.x - 35,
+                  top: heartAnim.y - 35,
+                  fontSize: 70,
                   pointerEvents: 'none',
-                  transform: 'scale(1.2)',
-                  transition: 'all 0.4s ease-out',
-                  zIndex: 20,
+                  animation: 'heartBurst 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                  filter: 'drop-shadow(0 4px 16px rgba(239, 68, 68, 0.85))',
+                  zIndex: 25,
                 }}
               >
                 ❤️
@@ -787,24 +791,31 @@ export function ReelsScreen(): React.JSX.Element {
                   alignItems: 'center',
                   gap: 2,
                   cursor: 'pointer',
+                  transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                 }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.85)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+                onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.85)')}
+                onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
               >
                 <div
                   style={{
                     width: 44,
                     height: 44,
                     borderRadius: '50%',
-                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    backgroundColor: reel.isLiked ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.15)',
+                    border: reel.isLiked ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(255,255,255,0.12)',
                     backdropFilter: 'blur(8px)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: 20,
+                    transition: 'all 0.2s ease',
                   }}
                 >
-                  🤍
+                  {reel.isLiked ? '❤️' : '🤍'}
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{reel.likesCount}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: reel.isLiked ? '#ef4444' : '#fff' }}>{reel.likesCount}</span>
               </div>
 
               {/* Comments Button */}
@@ -819,7 +830,12 @@ export function ReelsScreen(): React.JSX.Element {
                   alignItems: 'center',
                   gap: 2,
                   cursor: 'pointer',
+                  transition: 'transform 0.15s ease',
                 }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.85)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+                onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.85)')}
+                onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
               >
                 <div
                   style={{
@@ -828,6 +844,7 @@ export function ReelsScreen(): React.JSX.Element {
                     borderRadius: '50%',
                     backgroundColor: 'rgba(255,255,255,0.15)',
                     backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255,255,255,0.12)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -853,7 +870,12 @@ export function ReelsScreen(): React.JSX.Element {
                   alignItems: 'center',
                   gap: 2,
                   cursor: 'pointer',
+                  transition: 'transform 0.15s ease',
                 }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.85)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+                onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.85)')}
+                onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
               >
                 <div
                   style={{
@@ -862,6 +884,7 @@ export function ReelsScreen(): React.JSX.Element {
                     borderRadius: '50%',
                     backgroundColor: 'rgba(255,255,255,0.15)',
                     backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255,255,255,0.12)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -873,18 +896,21 @@ export function ReelsScreen(): React.JSX.Element {
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Share</span>
               </div>
 
-              {/* Music Vinyl */}
+              {/* Spinning Music Vinyl (TikTok / Reels Standard) */}
               <div
                 style={{
-                  width: 40,
-                  height: 40,
+                  width: 42,
+                  height: 42,
                   borderRadius: '50%',
                   backgroundColor: '#0f172a',
-                  border: '2px solid rgba(255,255,255,0.2)',
+                  background: 'radial-gradient(circle, #334155 25%, #0f172a 75%)',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 0 12px rgba(0,0,0,0.6)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 14,
+                  animation: 'spinVinyl 3.5s linear infinite',
                 }}
               >
                 🎵

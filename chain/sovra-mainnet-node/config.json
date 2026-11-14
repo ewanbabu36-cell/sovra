@@ -1,0 +1,18 @@
+{
+  "moniker": "sovra-mainnet-seed",
+  "chain_id": "sovra-mainnet-1",
+  "rpc_port": 26657,
+  "rpc_laddr": "tcp://0.0.0.0:26657",
+  "p2p_port": 26656,
+  "key_name": "validator",
+  "node_address": "sovra188bf7314475bba74c0740246e3f23dce62c5086d",
+  "node_id": "88bf7314475bba74c0740246e3f23dce62c5086d",
+  "p2p": {
+    "laddr": "tcp://0.0.0.0:26656",
+    "external_address": "127.0.0.1:26656",
+    "pex": true,
+    "seeds": [],
+    "persistent_peers": [],
+    "max_peers": 50
+  }
+}

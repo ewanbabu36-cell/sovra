@@ -42,6 +42,50 @@ export interface TrustedSignerRecord {
   readonly expiresAt?: number | undefined;
 }
 
+export interface GenesisCouncilMember {
+  readonly did: string;
+  readonly publicKeyHex: string;
+  readonly role: string;
+  readonly label: string;
+}
+
+/**
+ * Authoritative 3-of-5 Genesis Security Council.
+ * Bound to CometBFT consensus parameters and cryptographic multisig approval.
+ */
+export const GENESIS_SECURITY_COUNCIL: readonly GenesisCouncilMember[] = Object.freeze([
+  {
+    did: 'did:sovra:council-1',
+    publicKeyHex: '50dec499bc1281f64488a3ca9500c9c1a4eea67f5147af0450ee0deebf8601be',
+    role: 'SECURITY_COUNCIL',
+    label: 'Genesis Security Council Seat 1 (Core Protocol)',
+  },
+  {
+    did: 'did:sovra:council-2',
+    publicKeyHex: 'a81cd7b53eb1edcfc9abce54679faf08ccaa002bd5898b63431f29cc964e67e3',
+    role: 'SECURITY_COUNCIL',
+    label: 'Genesis Security Council Seat 2 (Cryptography & Zero-Knowledge)',
+  },
+  {
+    did: 'did:sovra:council-3',
+    publicKeyHex: 'd6cbcf5c5acf4688995801c2993a53f4c5ff164bd897362909fb2f1a5ede7724',
+    role: 'SECURITY_COUNCIL',
+    label: 'Genesis Security Council Seat 3 (Network Topology & P2P Mesh)',
+  },
+  {
+    did: 'did:sovra:council-4',
+    publicKeyHex: 'b5fc366f668f7d6dfc43a9b2942895ccb9e4eea5d7b1ca46f1e8c710347977ec',
+    role: 'SECURITY_COUNCIL',
+    label: 'Genesis Security Council Seat 4 (Community & Treasury Custody)',
+  },
+  {
+    did: 'did:sovra:council-5',
+    publicKeyHex: '7f9c2d4509da86668f6c4b74fdda6c96438ec6d8d72cadd95491b25f2b2216fd',
+    role: 'SECURITY_COUNCIL',
+    label: 'Genesis Security Council Seat 5 (Emergency Response & Hardware Enclave)',
+  },
+]);
+
 export interface MultiPartyActionProposal {
   readonly id: string;
   readonly chainId: string;
@@ -62,6 +106,9 @@ export interface MultiPartyActionProposal {
 }
 
 export class MultiPartyApprovalEngine {
+  public static readonly REQUIRED_COUNCIL_APPROVALS = 3;
+  public static readonly TOTAL_COUNCIL_SEATS = 5;
+
   private readonly actions = new Map<string, MultiPartyActionProposal>();
   private readonly consumedNonces = new Set<string>();
   private readonly trustedSignerRegistry = new Map<string, TrustedSignerRecord>();
@@ -75,11 +122,23 @@ export class MultiPartyApprovalEngine {
     revocationEngine?: KeyRotationRevocationEngine;
     chainId?: string;
     strictRegistry?: boolean;
+    bindGenesisCouncil?: boolean;
   }) {
     this.signerRegistry = options?.signerRegistry;
     this.revocationEngine = options?.revocationEngine;
     this.defaultChainId = options?.chainId ?? 'sovra-testnet';
     this.strictRegistry = options?.strictRegistry ?? false;
+
+    // Bind 5 Genesis Security Council members (3-of-5 threshold) unless explicitly disabled
+    if (options?.bindGenesisCouncil !== false) {
+      for (const member of GENESIS_SECURITY_COUNCIL) {
+        this.registerSigner({
+          did: member.did,
+          publicKeyBytes: hexToBytes(member.publicKeyHex),
+          role: member.role,
+        });
+      }
+    }
   }
 
   private static isRoleAuthorizedForAction(role: string, actionType: MultiPartyActionType): boolean {

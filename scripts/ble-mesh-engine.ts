@@ -262,7 +262,13 @@ export class OfflineBleMeshEngine {
   };
 
   constructor() {
-    this.seedDefaultNearbyBeacons();
+    if (this.isSimulationEnabled()) {
+      this.seedDefaultNearbyBeacons();
+    }
+  }
+
+  public isSimulationEnabled(): boolean {
+    return process.env.SOVRA_ENABLE_BLE_RADAR_SIMULATION === 'true';
   }
 
   public seedDefaultNearbyBeacons(): void {
@@ -318,7 +324,7 @@ export class OfflineBleMeshEngine {
   }
 
   public scanNearbyPeers(options?: { maxDistanceMeters?: number }): BleRadarBeaconFrame[] {
-    if (this.beacons.size === 0) {
+    if (this.beacons.size === 0 && this.isSimulationEnabled()) {
       this.seedDefaultNearbyBeacons();
     }
     const now = Date.now();

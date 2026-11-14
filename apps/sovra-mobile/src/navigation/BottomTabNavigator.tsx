@@ -8,7 +8,15 @@ import { FeedScreen } from '../screens/FeedScreen.js';
 import { ReelsScreen } from '../screens/ReelsScreen.js';
 import { WatchScreen } from '../screens/WatchScreen.js';
 import { ChatsScreen } from '../screens/ChatsScreen.js';
-import { MeScreen } from '../screens/MeScreen.js';
+import { ProfileScreen } from '../screens/profile/ProfileScreen.js';
+import { CreatorStudioScreen } from '../screens/studio/CreatorStudioScreen.js';
+import { WalletHubScreen } from '../screens/wallet/WalletHubScreen.js';
+import { SecuritySettingsScreen } from '../screens/settings/SecuritySettingsScreen.js';
+import { SendTokenModal, ReceiveTokenModal } from '../screens/MeScreen.js';
+import { BackupSeedModal } from '../components/BackupSeedModal.js';
+import { ImportSeedModal } from '../components/ImportSeedModal.js';
+import { DepositModal } from '../components/DepositModal.js';
+import type { UserAccountProfile } from '@sovra/identity';
 import { CallScreen } from '../screens/CallScreen.js';
 import { MeshDiagnosticsScreen } from '../screens/MeshDiagnosticsScreen.js';
 import {
@@ -19,6 +27,12 @@ import {
   declineCall,
   endCall,
   type MobileIncomingCall,
+  fetchUserProfile,
+  fetchFeedPosts,
+  fetchBookmarkedPosts,
+  fetchFollowStats,
+  fetchWalletAssets,
+  type WalletAssetItem,
 } from '../services/api.js';
 
 export type TabKey = 'feed' | 'reels' | 'watch' | 'chats' | 'me';
@@ -61,6 +75,114 @@ export function BottomTabNavigator(): React.JSX.Element {
   // PWA Install prompt state
   const [installPromptEvent, setInstallPromptEvent] = useState<any | null>(null);
   const [isInstallDismissed, setIsInstallDismissed] = useState(false);
+
+  // Decoupled 4-Tier Surface Navigation State
+  const [activeSubModal, setActiveSubModal] = useState<'none' | 'wallet' | 'studio' | 'settings'>('none');
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  // Authoritative Shared User & Profile State
+  const [profile, setProfile] = useState<UserAccountProfile>({
+    did: 'did:key:z6MksAliceP2PGenesisAddress',
+    handle: '@alice',
+    displayName: 'Alice Sovereign',
+    deviceId: 'dev_mobile_01',
+    devicePublicKeyHex: '',
+    credentialId: 'cred_titan_bio_01',
+    createdAt: Math.floor(Date.now() / 1000),
+    isLocked: false,
+  });
+  const [followStats, setFollowStats] = useState({
+    followersCount: 142,
+    followingCount: 38,
+    friendsCount: 24,
+    postsCount: 0,
+  });
+  const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [savedPosts, setSavedPosts] = useState<any[]>([]);
+  const [walletBalance, setWalletBalance] = useState('150.00');
+  const [walletAssets, setWalletAssets] = useState<WalletAssetItem[]>([
+    {
+      id: 'sov-native',
+      type: 'NATIVE',
+      name: 'Sovereign Token',
+      symbol: 'SOV',
+      decimals: 6,
+      balance: '150.00',
+      displayBalance: '150.00 SOV',
+      sovValue: '150.00',
+      icon: '⚡',
+    },
+    {
+      id: 'cw20-alice',
+      type: 'CW20',
+      name: 'Alice Creator Token',
+      symbol: 'ALICE',
+      decimals: 6,
+      balance: '2500.00',
+      displayBalance: '2,500 ALICE',
+      sovValue: '25.00',
+      icon: '🎨',
+    },
+  ]);
+
+  // Load Authoritative Profile, Posts & Wallet Data from SQLite / Node Engine
+  useEffect(() => {
+    let mounted = true;
+    async function loadData() {
+      try {
+        const [profRes, feedRes, bookmarkedRes, statsRes, assetsRes] = await Promise.allSettled([
+          fetchUserProfile(),
+          fetchFeedPosts(),
+          fetchBookmarkedPosts(),
+          fetchFollowStats(),
+          fetchWalletAssets(),
+        ]);
+        if (!mounted) return;
+        if (profRes.status === 'fulfilled' && profRes.value) {
+          const sp = profRes.value;
+          setProfile(prev => ({
+            ...prev,
+            did: sp.did || prev.did,
+            handle: sp.handle || prev.handle,
+            displayName: sp.displayName || sp.name || prev.displayName,
+          }));
+          if (sp.balanceSov !== undefined) {
+            setWalletBalance(Number(sp.balanceSov).toFixed(2));
+          }
+        }
+        if (feedRes.status === 'fulfilled' && Array.isArray(feedRes.value)) {
+          setUserPosts(feedRes.value);
+          setFollowStats(prev => ({ ...prev, postsCount: feedRes.value.length }));
+        }
+        if (bookmarkedRes.status === 'fulfilled' && Array.isArray(bookmarkedRes.value)) {
+          setSavedPosts(bookmarkedRes.value);
+        }
+        if (statsRes.status === 'fulfilled' && statsRes.value) {
+          setFollowStats(prev => ({
+            ...prev,
+            followersCount: statsRes.value.followersCount ?? prev.followersCount,
+            followingCount: statsRes.value.followingCount ?? prev.followingCount,
+          }));
+        }
+        if (assetsRes.status === 'fulfilled' && assetsRes.value?.assets) {
+          setWalletAssets(assetsRes.value.assets);
+          if (assetsRes.value.totalValuationSov) {
+            setWalletBalance(Number(assetsRes.value.totalValuationSov).toFixed(2));
+          }
+        }
+      } catch (err) {
+        console.warn('[BottomTabNavigator] Load profile data warning:', err);
+      }
+    }
+    loadData();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const handleBeforeInstall = (e: Event) => {
@@ -323,8 +445,108 @@ export function BottomTabNavigator(): React.JSX.Element {
         return <WatchScreen />;
       case 'chats':
         return <ChatsScreen />;
-      case 'me':
-        return <MeScreen />;
+      case 'me': {
+        if (activeSubModal !== 'none') {
+          return (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                animation: 'slideUpModal 0.26s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            >
+              {/* iOS Sheet Drag Handle Indicator */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  paddingTop: 8,
+                  paddingBottom: 4,
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  triggerHapticFeedback([10]);
+                  setActiveSubModal('none');
+                }}
+                title="Dismiss"
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                  }}
+                />
+              </div>
+
+              {activeSubModal === 'wallet' && (
+                <WalletHubScreen
+                  balance={walletBalance}
+                  fiatValuation={(Number(walletBalance) * 3).toFixed(2)}
+                  assets={walletAssets}
+                  onOpenSend={() => setShowSendModal(true)}
+                  onOpenReceive={() => setShowReceiveModal(true)}
+                  onOpenDeposit={() => setShowDepositModal(true)}
+                  onOpenStaking={() => triggerHapticFeedback([40, 20])}
+                  onOpenBackupSeed={() => setShowBackupModal(true)}
+                  onBack={() => setActiveSubModal('none')}
+                />
+              )}
+              {activeSubModal === 'studio' && (
+                <CreatorStudioScreen
+                  balanceSov={walletBalance}
+                  handle={profile.handle || '@sovereign'}
+                  onOpenWithdraw={() => triggerHapticFeedback([40, 20])}
+                  onOpenWallet={() => setActiveSubModal('wallet')}
+                  onBack={() => setActiveSubModal('none')}
+                />
+              )}
+              {activeSubModal === 'settings' && (
+                <SecuritySettingsScreen
+                  handle={profile.handle || '@sovereign'}
+                  profile={profile}
+                  onOpenBackupSeed={() => setShowBackupModal(true)}
+                  onOpenImportSeed={() => setShowImportModal(true)}
+                  onLogout={() => {
+                    triggerHapticFeedback([50, 50]);
+                    setActiveSubModal('none');
+                  }}
+                  onBack={() => setActiveSubModal('none')}
+                />
+              )}
+            </div>
+          );
+        }
+        return (
+          <ProfileScreen
+            profile={profile}
+            stats={followStats}
+            posts={userPosts}
+            bookmarkedPosts={savedPosts}
+            balanceSov={walletBalance}
+            onOpenSettings={() => setActiveSubModal('settings')}
+            onOpenStudio={() => setActiveSubModal('studio')}
+            onOpenWallet={() => setActiveSubModal('wallet')}
+            onShareProfile={() => {
+              triggerHapticFeedback([20]);
+              if (typeof navigator !== 'undefined' && (navigator as any).share) {
+                (navigator as any).share({
+                  title: `${profile.displayName || 'Sovereign Peer'} on SOVRA`,
+                  text: `Connect with ${profile.handle || '@sovereign'} on the SOVRA P2P Mesh Network`,
+                  url: `https://sovra.network/?peer=${profile.did}`,
+                }).catch(() => {});
+              } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                navigator.clipboard.writeText(`https://sovra.network/?peer=${profile.did}`);
+                alert('Profile link copied to clipboard!');
+              }
+            }}
+          />
+        );
+      }
     }
   };
 
@@ -375,16 +597,41 @@ export function BottomTabNavigator(): React.JSX.Element {
         overflow: 'hidden',
       }}
     >
+      <style>{`
+        @keyframes slideUpModal {
+          from { transform: translateY(24px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes radarPulse {
+          0% { transform: scale(0.92); opacity: 0.8; }
+          50% { transform: scale(1.08); opacity: 1; }
+          100% { transform: scale(0.92); opacity: 0.8; }
+        }
+        @keyframes heartBurst {
+          0% { transform: scale(1); }
+          35% { transform: scale(1.35); }
+          65% { transform: scale(0.95); }
+          100% { transform: scale(1); }
+        }
+        @keyframes spinVinyl {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+
       {/* Offline Mesh Top Status HUD Pill */}
       <div
         style={{
-          height: 32,
-          backgroundColor: '#030712',
+          height: 'calc(34px + env(safe-area-inset-top, 0px))',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          backgroundColor: 'rgba(3, 7, 18, 0.95)',
+          backdropFilter: 'blur(12px)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 12px',
+          paddingLeft: 12,
+          paddingRight: 12,
           zIndex: 40,
         }}
       >
@@ -618,51 +865,87 @@ export function BottomTabNavigator(): React.JSX.Element {
         </div>
       )}
 
-      {/* Bottom 5-Tab Bar */}
+      {/* Bottom 5-Tab Bar (iOS Safe Area & Glowing Active Indicator) */}
       <div
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          height: 60,
-          backgroundColor: '#030712',
+          height: 'calc(62px + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          backgroundColor: 'rgba(3, 7, 18, 0.92)',
           borderTop: '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
           justifyContent: 'space-around',
           alignItems: 'center',
           zIndex: 50,
-          backdropFilter: 'blur(12px)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.4)',
         }}
       >
-        {TABS.map(tab => (
-          <div
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              cursor: 'pointer',
-              opacity: activeTab === tab.key ? 1 : 0.45,
-              transition: 'all 0.2s ease',
-              padding: '6px 12px',
-            }}
-          >
-            <span style={{ fontSize: 20 }}>{tab.icon}</span>
-            <span
+        {TABS.map(tab => {
+          const isActive = activeTab === tab.key;
+          return (
+            <div
+              key={tab.key}
+              onClick={() => {
+                triggerHapticFeedback([12]);
+                setActiveTab(tab.key);
+                if (tab.key === 'me' && activeSubModal !== 'none') {
+                  setActiveSubModal('none');
+                }
+              }}
               style={{
-                fontSize: 10,
-                fontWeight: activeTab === tab.key ? 700 : 500,
-                color: activeTab === tab.key ? '#38bdf8' : '#94a3b8',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                cursor: 'pointer',
+                padding: '6px 14px',
+                position: 'relative',
+                transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease',
+                transform: isActive ? 'scale(1.06)' : 'scale(1)',
+                opacity: isActive ? 1 : 0.45,
+                userSelect: 'none',
               }}
             >
-              {tab.label}
-            </span>
-          </div>
-        ))}
+              {isActive && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    width: 22,
+                    height: 3,
+                    borderRadius: 2,
+                    background: 'linear-gradient(90deg, #38bdf8, #818cf8)',
+                    boxShadow: '0 0 10px rgba(56, 189, 248, 0.8)',
+                  }}
+                />
+              )}
+              <span
+                style={{
+                  fontSize: 20,
+                  filter: isActive ? 'drop-shadow(0 2px 6px rgba(56, 189, 248, 0.45))' : 'none',
+                }}
+              >
+                {tab.icon}
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? '#38bdf8' : '#94a3b8',
+                  letterSpacing: '0.2px',
+                }}
+              >
+                {tab.label}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {/* WhatsApp-Style High-Priority Incoming Call Heads-Up Overlay */}
@@ -780,6 +1063,43 @@ export function BottomTabNavigator(): React.JSX.Element {
         <div style={{ position: 'absolute', inset: 0, zIndex: 90 }}>
           <MeshDiagnosticsScreen onClose={() => setShowDiagnosticsModal(false)} />
         </div>
+      )}
+
+      {/* Sub-Modal Dialogs for Wallet & Security Operations */}
+      {showSendModal && (
+        <SendTokenModal
+          isOpen={showSendModal}
+          onClose={() => setShowSendModal(false)}
+          balance={walletBalance}
+          onTransferComplete={() => setShowSendModal(false)}
+        />
+      )}
+      {showReceiveModal && (
+        <ReceiveTokenModal
+          isOpen={showReceiveModal}
+          onClose={() => setShowReceiveModal(false)}
+          userDid={profile.did}
+        />
+      )}
+      {showDepositModal && (
+        <DepositModal
+          isOpen={showDepositModal}
+          onClose={() => setShowDepositModal(false)}
+          userAddress={profile.did}
+        />
+      )}
+      {showBackupModal && (
+        <BackupSeedModal
+          isOpen={showBackupModal}
+          onClose={() => setShowBackupModal(false)}
+          mnemonic={(typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_active_mnemonic') : null) || 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'}
+        />
+      )}
+      {showImportModal && (
+        <ImportSeedModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+        />
       )}
 {/* Active Call Fullscreen View (Available anywhere across all tabs) */}
       {activeCallSession && (
