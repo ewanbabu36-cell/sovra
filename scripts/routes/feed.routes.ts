@@ -124,7 +124,7 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
   }
 
   // 3. Feed List
-  if ((url.pathname === '/api/feed/list' || url.pathname === '/api/feed/posts') && req.method === 'GET') {
+  if ((url.pathname === '/api/feed' || url.pathname === '/api/feed/list' || url.pathname === '/api/feed/posts') && req.method === 'GET') {
     const principal = resolvePrincipal(req);
     const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 15;
     const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : undefined;
