@@ -817,10 +817,79 @@ export function FeedScreen(): React.JSX.Element {
   const [newIncomingPostsCount, setNewIncomingPostsCount] = useState<number>(0);
 
   // Airtel UX & Horizon Switcher States
-  const [activePersona, setActivePersona] = useState<SovereignPersona>(DEFAULT_PERSONAS[0]!);
+  const [personas, setPersonas] = useState<SovereignPersona[]>(() => {
+    const saved = localDb.getPersonas();
+    return (Array.isArray(saved) && saved.length > 0) ? (saved as SovereignPersona[]) : DEFAULT_PERSONAS;
+  });
+  const [activePersona, setActivePersona] = useState<SovereignPersona>(() => {
+    const act = localDb.getActivePersona();
+    return (act && act.id) ? act : DEFAULT_PERSONAS[0]!;
+  });
   const [isIdentitySwitcherOpen, setIsIdentitySwitcherOpen] = useState<boolean>(false);
+  const [isIdentityCreatorOpen, setIsIdentityCreatorOpen] = useState<boolean>(false);
+  const [newPersonaType, setNewPersonaType] = useState<'channel' | 'dao' | 'store' | 'alias'>('channel');
+  const [newPersonaHandle, setNewPersonaHandle] = useState<string>('');
+  const [newPersonaName, setNewPersonaName] = useState<string>('');
+  const [newPersonaBio, setNewPersonaBio] = useState<string>('');
   const [checkoutItem, setCheckoutItem] = useState<CheckoutItemPayload | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
+
+  const handleCreatePersona = () => {
+    const rawHandle = newPersonaHandle.trim().replace(/^@/, '');
+    const handleClean = '@' + (rawHandle || 'sovereign_alias');
+    const nameClean = newPersonaName.trim() || 'Sovereign Persona';
+    const subDid = 'did:key:z6Mk' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+
+    let avatar = '🎬';
+    let role = 'Creator Channel';
+    let pType: 'citizen' | 'channel' | 'org' = 'channel';
+    let badgeText = 'Creator Channel';
+    let badgeColor = '#f43f5e';
+
+    if (newPersonaType === 'dao') {
+      avatar = '🏛️';
+      role = 'Community DAO';
+      pType = 'org';
+      badgeText = 'DAO Space';
+      badgeColor = '#38bdf8';
+    } else if (newPersonaType === 'store') {
+      avatar = '🛍️';
+      role = 'Merchant Store';
+      pType = 'channel';
+      badgeText = 'Merchant';
+      badgeColor = '#10b981';
+    } else if (newPersonaType === 'alias') {
+      avatar = '🎭';
+      role = 'P2P Alias';
+      pType = 'citizen';
+      badgeText = 'Anonymous';
+      badgeColor = '#8b5cf6';
+    }
+
+    const createdPersona: SovereignPersona = {
+      id: 'persona_' + Date.now(),
+      handle: handleClean,
+      name: nameClean,
+      role: role,
+      type: pType,
+      avatar: avatar,
+      badgeText: badgeText,
+      badgeColor: badgeColor,
+      subscribersCount: 1,
+    };
+
+    const updatedPersonas = [...personas, createdPersona];
+    setPersonas(updatedPersonas);
+    localDb.savePersonas(updatedPersonas);
+    setActivePersona(createdPersona);
+    localDb.setActivePersona(createdPersona);
+
+    setIsIdentityCreatorOpen(false);
+    setNewPersonaHandle('');
+    setNewPersonaName('');
+    setNewPersonaBio('');
+    showToast(`✓ Created persona ${createdPersona.name} (${subDid.slice(0, 16)}…)`);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -3154,13 +3223,204 @@ export function FeedScreen(): React.JSX.Element {
       <IdentitySwitcherModal
         isOpen={isIdentitySwitcherOpen}
         activePersonaId={activePersona.id}
+        personas={personas}
         onClose={() => setIsIdentitySwitcherOpen(false)}
         onSelectPersona={(p) => {
           setActivePersona(p);
           showToast(`Switched active persona to ${p.name}`);
         }}
-        onAddPersona={() => showToast('Opening Channel / DAO Page Creator...')}
+        onAddPersona={() => {
+          setIsIdentitySwitcherOpen(false);
+          setIsIdentityCreatorOpen(true);
+        }}
       />
+
+      {/* 60% Detent Bottom Sheet: Identity & Channel Creator (#identityCreatorSheet) */}
+      {isIdentityCreatorOpen && (
+        <div
+          id="identityCreatorSheetOverlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+          }}
+          onClick={() => setIsIdentityCreatorOpen(false)}
+        >
+          <div
+            id="identityCreatorSheet"
+            style={{
+              height: '60vh',
+              maxHeight: '580px',
+              backgroundColor: '#0b1320',
+              borderTopLeftRadius: '24px',
+              borderTopRightRadius: '24px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              animation: 'slideUpModal 0.26s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Grab Handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 6px' }}>
+              <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: 'rgba(255, 255, 255, 0.3)' }} />
+            </div>
+
+            {/* Header */}
+            <div style={{ padding: '8px 20px 14px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>Create Sovereign Persona</div>
+                <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Ed25519 cryptographic sub-identity for channel or DAO</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsIdentityCreatorOpen(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: 'pointer', padding: '4px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <div style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
+              {/* Persona Selection */}
+              <div>
+                <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Persona Type</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                  {[
+                    { id: 'channel', icon: '🎬', label: 'Creator Channel', desc: 'Broadcast video & reels' },
+                    { id: 'dao', icon: '🏛️', label: 'Community DAO', desc: 'Governance & treasury' },
+                    { id: 'store', icon: '🛍️', label: 'Merchant Store', desc: 'SOV store & catalog' },
+                    { id: 'alias', icon: '🎭', label: 'Anonymous P2P Alias', desc: 'Zero-doxxing stealth' },
+                  ].map((t) => {
+                    const isSelected = newPersonaType === t.id;
+                    return (
+                      <div
+                        key={t.id}
+                        id={`personaType_${t.id}`}
+                        onClick={() => setNewPersonaType(t.id as any)}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
+                          backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255,255,255,0.03)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <div style={{ fontSize: '1.2rem', marginBottom: '4px' }}>{t.icon}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isSelected ? '#38bdf8' : '#f8fafc' }}>{t.label}</div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }}>{t.desc}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Display Name Input */}
+              <div>
+                <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Display Name</label>
+                <input
+                  type="text"
+                  id="inputPersonaDisplayName"
+                  placeholder="e.g. Sovereign Media Channel"
+                  value={newPersonaName}
+                  onChange={(e) => setNewPersonaName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '10px',
+                    padding: '9px 12px',
+                    color: '#fff',
+                    fontSize: '0.86rem',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Handle Input */}
+              <div>
+                <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Unique Handle</label>
+                <input
+                  type="text"
+                  id="inputPersonaHandle"
+                  placeholder="e.g. @sovra_channel"
+                  value={newPersonaHandle}
+                  onChange={(e) => setNewPersonaHandle(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '10px',
+                    padding: '9px 12px',
+                    color: '#fff',
+                    fontSize: '0.86rem',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Bio Input */}
+              <div>
+                <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Bio / Purpose</label>
+                <input
+                  type="text"
+                  id="inputPersonaBio"
+                  placeholder="Brief description of this channel or space"
+                  value={newPersonaBio}
+                  onChange={(e) => setNewPersonaBio(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '10px',
+                    padding: '9px 12px',
+                    color: '#fff',
+                    fontSize: '0.86rem',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Submit Action */}
+            <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: '#090e17' }}>
+              <button
+                type="button"
+                id="btnSubmitCreatePersona"
+                onClick={handleCreatePersona}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  backgroundColor: '#6366f1',
+                  color: '#fff',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span>✨ Generate Keypair &amp; Create Persona</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sovereign Checkout Bottom Sheet */}
       <SovereignCheckoutModal
