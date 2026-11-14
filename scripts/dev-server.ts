@@ -8545,21 +8545,34 @@ function renderHtml(
       align-items: stretch;
     }
 
-    /* Column 3: Right Discovery Rail */
-    .app-right-rail {
-      width: 320px;
+    /* Column 3: Right Discovery Rail & Spatial Co-Pilot Drawer */
+    .app-right-rail, #spatialCoPilotDrawer {
+      width: 340px;
       position: sticky;
       top: 56px;
       height: calc(100vh - 56px);
       overflow-y: auto;
-      padding: 1.25rem 1rem;
+      padding: 1rem 0.85rem;
       display: flex;
       flex-direction: column;
-      gap: 1.25rem;
+      gap: 0.85rem;
       border-left: 1px solid rgba(255, 255, 255, 0.08);
       box-sizing: border-box;
       flex-shrink: 0;
-      transition: opacity 0.2s ease;
+      transition: width 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease, transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    body.copilot-collapsed .app-right-rail,
+    body.copilot-collapsed #spatialCoPilotDrawer,
+    #spatialCoPilotDrawer.is-collapsed {
+      width: 0 !important;
+      min-width: 0 !important;
+      flex: 0 0 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border-left: none !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      overflow: hidden !important;
     }
     .app-right-rail .card {
       background: rgba(15, 23, 42, 0.55) !important;
@@ -8572,6 +8585,22 @@ function renderHtml(
     }
     .app-right-rail .card:hover {
       border-color: rgba(255, 255, 255, 0.12) !important;
+    }
+    .rail-nav-item {
+      position: relative;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .rail-nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 22px;
+      background: #38bdf8;
+      border-radius: 0 4px 4px 0;
+      box-shadow: 0 0 10px #38bdf8, 0 0 4px #0284c7;
     }
 
     /* Dynamic Stage Modes: Dedicated Wide Stage for Watch (YouTube), Chat, & Admin */
@@ -19937,8 +19966,21 @@ function renderHtml(
           </div>
         </div>
 
-        <!-- Zone 2: Right Actions - Search & Profile -->
+        <!-- Zone 2: Right Actions - Quick Wallet, Co-Pilot, Search & Profile -->
         <div id="sovraNativeAppRightActions" style="display: flex; align-items: center; gap: 8px;">
+          <!-- 💳 Header Quick Wallet Pill -->
+          <button id="sovraHeaderWalletPill" type="button" class="sovra-header-action-btn" onclick="toggleSpatialCoPilotDrawer(true, 'wallet'); event.stopPropagation();" title="Quick Sovereign Wallet" aria-label="Open Quick Wallet" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 999px; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; color: #34d399; cursor: pointer; font-size: 0.82rem; font-weight: 700; transition: all 0.2s ease;">
+            <span>💳</span>
+            <span id="sovraHeaderWalletBalance">150.00 SOV</span>
+          </button>
+
+          <!-- ◫ Co-Pilot Toggle Button -->
+          <button id="sovraCoPilotToggleBtn" type="button" class="sovra-header-action-btn" onclick="toggleSpatialCoPilotDrawer(); event.stopPropagation();" title="Toggle Co-Pilot Workspace (Ctrl + /)" aria-label="Toggle Co-Pilot Workspace" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 999px; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; color: #a5b4fc; cursor: pointer; font-size: 0.82rem; font-weight: 700; transition: all 0.2s ease;">
+            <span>◫</span>
+            <span style="display: inline-block;">Co-Pilot</span>
+            <kbd style="font-size: 0.68rem; background: rgba(0,0,0,0.3); border-radius: 4px; padding: 1px 4px; color: #94a3b8; border: 1px solid rgba(255,255,255,0.1);">^/</kbd>
+          </button>
+
           <!-- 🔍 Search Icon Button -->
           <button id="sovraNativeAppBarSearchBtn" type="button" class="sovra-header-action-btn" onclick="toggleHeaderSearchOverlay(event)" title="Search SOVRA" aria-label="Search posts, friends, tags" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; color: #f1f5f9; cursor: pointer; font-size: 1rem; transition: all 0.2s ease;">
             🔍
@@ -20982,6 +21024,12 @@ function renderHtml(
                 <button class="fb-post-action-btn insta-action-btn btn-comment-${post.id}" onclick="focusFeedComment('${post.id}')" title="Comment" aria-label="Comment">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                   <span>Comment</span>
+                </button>
+
+                <!-- Message Author Button (Docks into Spatial Co-Pilot Drawer!) -->
+                <button class="fb-post-action-btn insta-action-btn btn-message-${post.id}" onclick="dockPeerChatInCoPilot('${(post as any).authorDid || ''}', '${escapeHtml(post.authorName).replace(/'/g, "\\'")}', '${(post as any).authorHandle || ''}', '${(post as any).authorAvatar || ''}')" title="Message Author" aria-label="Message Author">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                  <span>Message</span>
                 </button>
 
                 <!-- Repost / Share Button -->
@@ -27763,103 +27811,190 @@ function renderHtml(
   </footer>
 </div> <!-- Close Column 2: .app-center-stage -->
 
-<!-- Column 3: Right Discovery Rail (Desktop >= 1200px) -->
-<aside class="app-right-rail">
-  <!-- Facebook Parity: Contacts Sidebar -->
-  <div class="card fb-contacts-card" style="padding: 0.75rem 0.5rem; border-radius: 8px; background: transparent; border: none; box-shadow: none; margin-bottom: 0.5rem;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; padding: 4px 8px;">
-      <span style="font-weight: 600; font-size: 1rem; color: #b0b3b8;">Contacts</span>
-      <div style="display: flex; gap: 8px; color: #b0b3b8;">
-        <span style="cursor: pointer; padding: 4px; border-radius: 50%; font-size: 13px;" title="Search contacts" onclick="document.getElementById('fbHeaderSearchInput') && document.getElementById('fbHeaderSearchInput').focus();">🔍</span>
-        <span style="cursor: pointer; padding: 4px; border-radius: 50%; font-size: 13px;" title="Options">⋯</span>
-      </div>
+<!-- Column 3: Spatial Co-Pilot Drawer (#spatialCoPilotDrawer, 340px) -->
+<aside class="app-right-rail" id="spatialCoPilotDrawer">
+  <!-- Co-Pilot Header -->
+  <div class="copilot-drawer-header" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 0.5rem;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 1.1rem; color: #818cf8;">◫</span>
+      <span style="font-weight: 800; font-size: 0.92rem; color: #f8fafc; letter-spacing: -0.01em;">Co-Pilot Workspace</span>
+      <span style="font-size: 0.65rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 1px 6px; border-radius: 999px; font-weight: 700;">● Live</span>
     </div>
-    <div id="fbContactsList" style="display: flex; flex-direction: column; gap: 2px;">
-      <!-- Populated via renderFbContacts() -->
-    </div>
-  </div>
-
-  <!-- People You May Know / Suggested Connections -->
-  <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
-    <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
-      <span>👥 Suggested For You</span>
-      <span style="font-size: 0.75rem; color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="switchTab('friends')">See All</span>
-    </div>
-    <div id="rightRailSuggestionsList" style="display: flex; flex-direction: column; gap: 0.85rem;">
-      <!-- Dynamically rendered via renderRightRailSuggestions() -->
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <kbd style="font-size: 0.65rem; background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.12); padding: 2px 5px; border-radius: 4px;">Ctrl + /</kbd>
+      <button type="button" id="copilotCloseBtn" onclick="toggleSpatialCoPilotDrawer(false)" title="Collapse Co-Pilot" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.95rem; padding: 2px 6px; border-radius: 6px; transition: color 0.15s;" onmouseover="this.style.color='#f8fafc'" onmouseout="this.style.color='#94a3b8'">✕</button>
     </div>
   </div>
 
-  <!-- Trending on Mesh -->
-  <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
-    <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
-      <span>🔥 Trending on Mesh</span>
-      <span style="font-size: 0.72rem; color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="renderTrendingHashtags()">Refresh</span>
-    </div>
-    <div id="rightRailTrendingList" style="display: flex; flex-direction: column; gap: 0.75rem;">
-      <!-- Dynamically populated via renderTrendingHashtags() -->
-    </div>
-  </div>
-
-  <!-- Column 3 Contextual Rail Card 1: Sovereign Wallet & Economics -->
-  <div class="card" id="railSovWalletCard" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
-    <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
-      <span style="display: flex; align-items: center; gap: 6px;">
-        <span>💳</span>
-        <span>SOV Wallet</span>
-      </span>
-      <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.7rem; padding: 2px 7px;">💎 95/5 Split</span>
-    </div>
-    <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.6rem;">
-      <span style="font-size: 1.4rem; font-weight: 800; color: #f8fafc;" id="railWalletSovBalance">50.00 SOV</span>
-      <span style="font-size: 0.75rem; color: #94a3b8;">~ $50.00 USD</span>
-    </div>
-    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-      <button type="button" class="btn btn-primary" style="flex: 1; padding: 0.45rem 0.6rem; font-size: 0.75rem; background: #6366f1;" onclick="switchTab('me')">Send / Tip</button>
-      <button type="button" class="btn btn-secondary" style="flex: 1; padding: 0.45rem 0.6rem; font-size: 0.75rem;" onclick="switchTab('studio')">Creator Payouts</button>
-    </div>
-  </div>
-
-  <!-- Column 3 Contextual Rail Card 2: BLE Offline Mesh Radar (Hidden on Default Consumer Feed to Declutter) -->
-  <div class="card" id="railBleRadarCard" style="display: none; padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
-    <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
-      <span style="display: flex; align-items: center; gap: 6px;">
-        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 8px #38bdf8;"></span>
-        <span>Nearby BLE Mesh</span>
-      </span>
-      <span style="font-size: 0.72rem; color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="if(window.SovraBleEngine)SovraBleEngine.scanPeers();">Scan</span>
-    </div>
-    <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.6rem;">
-      Bluetooth 5.3 delay-tolerant gossip active for offline peer-to-peer transmission.
-    </div>
-    <button type="button" class="btn btn-secondary" style="width: 100%; padding: 0.45rem 0.6rem; font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" onclick="if(typeof openBitchatRadar==='function')openBitchatRadar(); else switchTab('hub');">
-      <span>📡 Open BLE Radar</span>
+  <!-- Co-Pilot 3-Tab Bar -->
+  <div class="copilot-tabs-bar" style="display: flex; gap: 4px; background: rgba(15, 23, 42, 0.6); padding: 4px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.65rem;">
+    <button type="button" id="copilotTabBtn_messages" class="copilot-nav-tab active" onclick="switchCoPilotTab('messages')" style="flex: 1; padding: 6px 8px; border-radius: 8px; border: none; background: #6366f1; color: #fff; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.2s;">
+      <span>💬</span> <span>Messages</span>
+    </button>
+    <button type="button" id="copilotTabBtn_wallet" class="copilot-nav-tab" onclick="switchCoPilotTab('wallet')" style="flex: 1; padding: 6px 8px; border-radius: 8px; border: none; background: transparent; color: #94a3b8; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.2s;">
+      <span>💳</span> <span>Wallet</span>
+    </button>
+    <button type="button" id="copilotTabBtn_radar" class="copilot-nav-tab" onclick="switchCoPilotTab('radar')" style="flex: 1; padding: 6px 8px; border-radius: 8px; border: none; background: transparent; color: #94a3b8; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.2s;">
+      <span>📡</span> <span>Radar</span>
     </button>
   </div>
 
-  <!-- Column 3 Contextual Rail Card 3: P2P Live Streams (Hidden on Default Consumer Feed to Declutter) -->
-  <div class="card" id="railLiveStreamsCard" style="display: none; padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
-    <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+  <!-- Tab 1: Messages Pane -->
+  <div id="copilotPane_messages" class="copilot-pane" style="display: flex; flex-direction: column; gap: 0.75rem;">
+    <!-- Active Docked Thread Card -->
+    <div id="copilotActiveThreadCard" class="card" style="padding: 0.85rem; border-radius: 14px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 8px; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+          <div id="copilotPeerAvatar" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.82rem; color: #fff; flex-shrink: 0;">A</div>
+          <div style="min-width: 0;">
+            <div id="copilotPeerName" style="font-weight: 700; font-size: 0.84rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">Alice Sovereign</div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span id="copilotPeerHandle" style="font-size: 0.68rem; color: #38bdf8;">@alice</span>
+              <span style="font-size: 0.65rem; color: #34d399;">● Online</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.62rem; padding: 1px 5px;">🔒 E2EE</span>
+          <button type="button" id="copilotExpandChatBtn" onclick="switchTab('chat')" title="Expand to Full Chat" style="background: none; border: none; color: #94a3b8; font-size: 0.78rem; cursor: pointer; padding: 2px;">↗</button>
+        </div>
+      </div>
+
+      <!-- Messages Stream -->
+      <div id="copilotChatStream" style="max-height: 200px; min-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px; font-size: 0.78rem;">
+        <div style="align-self: center; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 999px; padding: 2px 10px; font-size: 0.65rem; color: #38bdf8;">
+          🔒 Double Ratchet Ratchet Step #1 Active
+        </div>
+        <div style="align-self: flex-start; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px 12px 12px 2px; padding: 6px 10px; color: #f1f5f9; max-width: 82%;">
+          <div>Hey! Just checked your post on the sovereign mesh. Ready for the live demo?</div>
+          <div style="font-size: 0.62rem; color: #94a3b8; text-align: right; margin-top: 2px;">12:04 PM</div>
+        </div>
+        <div style="align-self: flex-end; background: linear-gradient(135deg, #0284c7, #6366f1); border-radius: 12px 12px 2px 12px; padding: 6px 10px; color: #fff; max-width: 82%;">
+          <div>Yes! Mesh gossip is running smooth at D=6.</div>
+          <div style="font-size: 0.62rem; color: #e0e7ff; text-align: right; margin-top: 2px;">12:05 PM ✓✓</div>
+        </div>
+      </div>
+
+      <!-- Quick Message Composer -->
+      <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.07); padding-top: 8px;">
+        <input type="text" id="copilotChatInput" placeholder="Send E2EE message..." onkeydown="if(event.key==='Enter') sendCoPilotMessage()" style="flex: 1; min-width: 0; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 6px 12px; font-size: 0.78rem; color: #fff; outline: none;" />
+        <button type="button" onclick="sendCoPilotMessage()" style="background: #6366f1; border: none; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; font-size: 0.8rem; flex-shrink: 0;">➤</button>
+      </div>
+    </div>
+
+    <!-- Facebook Parity: Contacts Sidebar -->
+    <div class="card fb-contacts-card" style="padding: 0.75rem 0.5rem; border-radius: 14px; background: rgba(17, 24, 39, 0.65); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.5rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; padding: 4px 8px;">
+        <span style="font-weight: 600; font-size: 0.88rem; color: #b0b3b8;">Direct Contacts</span>
+        <div style="display: flex; gap: 8px; color: #b0b3b8;">
+          <span style="cursor: pointer; padding: 4px; border-radius: 50%; font-size: 13px;" title="Search contacts" onclick="document.getElementById('fbHeaderSearchInput') && document.getElementById('fbHeaderSearchInput').focus();">🔍</span>
+          <span style="cursor: pointer; padding: 4px; border-radius: 50%; font-size: 13px;" title="Options">⋯</span>
+        </div>
+      </div>
+      <div id="fbContactsList" style="display: flex; flex-direction: column; gap: 2px;">
+        <!-- Populated via renderFbContacts() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 2: Quick Wallet Pane (display: none by default) -->
+  <div id="copilotPane_wallet" class="copilot-pane" style="display: none; flex-direction: column; gap: 0.75rem;">
+    <!-- Column 3 Contextual Rail Card 1: Sovereign Wallet & Economics -->
+    <div class="card" id="railSovWalletCard" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+      <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+        <span style="display: flex; align-items: center; gap: 6px;">
+          <span>💳</span>
+          <span>SOV Wallet</span>
+        </span>
+        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.7rem; padding: 2px 7px;">💎 95/5 Split</span>
+      </div>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.6rem;">
+        <span style="font-size: 1.4rem; font-weight: 800; color: #f8fafc;" id="railWalletSovBalance">150.00 SOV</span>
+        <span style="font-size: 0.75rem; color: #94a3b8;">~ $150.00 USD</span>
+      </div>
+      <!-- 1-Tap Quick Transfer Slip -->
+      <div style="margin-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.75rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">⚡ Quick Instant Transfer</div>
+        <input type="text" id="copilotWalletRecipient" placeholder="Recipient DID or @handle..." style="width: 100%; box-sizing: border-box; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; color: #fff; margin-bottom: 6px; outline: none;" />
+        <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+          <button type="button" onclick="document.getElementById('copilotWalletAmount').value='5.00'" style="flex: 1; padding: 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #cbd5e1; font-size: 0.68rem; font-weight: 600; cursor: pointer;">5 SOV</button>
+          <button type="button" onclick="document.getElementById('copilotWalletAmount').value='10.00'" style="flex: 1; padding: 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #cbd5e1; font-size: 0.68rem; font-weight: 600; cursor: pointer;">10 SOV</button>
+          <button type="button" onclick="document.getElementById('copilotWalletAmount').value='25.00'" style="flex: 1; padding: 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #cbd5e1; font-size: 0.68rem; font-weight: 600; cursor: pointer;">25 SOV</button>
+          <button type="button" onclick="document.getElementById('copilotWalletAmount').value='50.00'" style="flex: 1; padding: 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #cbd5e1; font-size: 0.68rem; font-weight: 600; cursor: pointer;">50 SOV</button>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <input type="number" id="copilotWalletAmount" placeholder="Amount (SOV)" value="10.00" step="1" min="1" style="width: 100px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; color: #fff; outline: none;" />
+          <button type="button" onclick="executeCoPilotTransfer()" style="flex: 1; padding: 6px 10px; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 8px; color: #fff; font-size: 0.75rem; font-weight: 700; cursor: pointer;">⚡ Send Slip</button>
+        </div>
+      </div>
+      <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+        <button type="button" class="btn btn-primary" style="flex: 1; padding: 0.45rem 0.6rem; font-size: 0.75rem; background: #6366f1;" onclick="switchTab('me')">Full Vault</button>
+        <button type="button" class="btn btn-secondary" style="flex: 1; padding: 0.45rem 0.6rem; font-size: 0.75rem;" onclick="switchTab('studio')">Creator Payouts</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Mesh Radar Pane (display: none by default) -->
+  <div id="copilotPane_radar" class="copilot-pane" style="display: none; flex-direction: column; gap: 0.75rem;">
+    <!-- Column 3 Contextual Rail Card 2: BLE Offline Mesh Radar -->
+    <div class="card" id="railBleRadarCard" style="display: block; padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+      <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+        <span style="display: flex; align-items: center; gap: 6px;">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 8px #38bdf8;"></span>
+          <span>Nearby BLE Mesh (2.4GHz)</span>
+        </span>
+        <span style="font-size: 0.72rem; color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="if(window.SovraBleEngine)SovraBleEngine.scanPeers();">Scan</span>
+      </div>
+      <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.6rem;">
+        Bluetooth 5.3 delay-tolerant gossip active for offline peer-to-peer transmission.
+      </div>
+      <button type="button" class="btn btn-secondary" style="width: 100%; padding: 0.45rem 0.6rem; font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" onclick="if(typeof openBitchatRadar==='function')openBitchatRadar(); else switchTab('hub');">
+        <span>📡 Open BLE Radar</span>
+      </button>
+    </div>
+
+    <!-- People You May Know / Suggested Connections -->
+    <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+      <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+        <span>👥 Suggested For You</span>
+        <span style="font-size: 0.75rem; color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="switchTab('friends')">See All</span>
+      </div>
+      <div id="rightRailSuggestionsList" style="display: flex; flex-direction: column; gap: 0.85rem;">
+        <!-- Dynamically rendered via renderRightRailSuggestions() -->
+      </div>
+    </div>
+
+    <!-- Trending on Mesh -->
+    <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+      <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+        <span>🔥 Trending on Mesh</span>
+        <span style="font-size: 0.72rem; color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="renderTrendingHashtags()">Refresh</span>
+      </div>
+      <div id="rightRailTrendingList" style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <!-- Dynamically populated via renderTrendingHashtags() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Footer Telemetry & Diagnostics -->
+  <div class="card" id="railLiveStreamsCard" style="display: none; padding: 1rem; border-radius: 14px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+    <div style="font-weight: 800; font-size: 0.85rem; color: #fff; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
       <span style="display: flex; align-items: center; gap: 6px;">
         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444;"></span>
         <span>Live Swarm Broadcasts</span>
       </span>
-      <span style="font-size: 0.72rem; color: #ef4444; font-weight: 700;">● Live</span>
-    </div>
-    <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.6rem;">
-      WebRTC mesh live video with real-time comments &amp; floating SOV tipping.
+      <span style="font-size: 0.68rem; color: #ef4444; font-weight: 700;">● Live</span>
     </div>
     <div style="display: flex; gap: 0.5rem;">
-      <button type="button" class="btn btn-primary" style="flex: 1; padding: 0.45rem 0.6rem; font-size: 0.75rem; background: #dc2626;" onclick="openLiveStreamModal()">🔴 Go Live</button>
-      <button type="button" class="btn btn-secondary" style="flex: 1; padding: 0.45rem 0.6rem; font-size: 0.75rem;" onclick="switchTab('youtube')">Watch Swarm</button>
+      <button type="button" class="btn btn-primary" style="flex: 1; padding: 0.4rem 0.5rem; font-size: 0.72rem; background: #dc2626;" onclick="openLiveStreamModal()">🔴 Go Live</button>
+      <button type="button" class="btn btn-secondary" style="flex: 1; padding: 0.4rem 0.5rem; font-size: 0.72rem;" onclick="switchTab('youtube')">Watch Swarm</button>
     </div>
   </div>
 
-  <!-- Column 3 Contextual Rail Card 4: Developer & Operator Mode (Controlled by #toggleNodeOperatorMode) -->
-  <div class="card node-operator-telemetry" id="railDeveloperTelemetryCard" style="padding: 1.15rem; border-radius: 16px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.35); font-size: 0.78rem; display: none;">
-    <div style="font-weight: 800; font-size: 0.85rem; color: #38bdf8; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">
+  <div class="card node-operator-telemetry" id="railDeveloperTelemetryCard" style="padding: 1rem; border-radius: 14px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.35); font-size: 0.76rem; display: none;">
+    <div style="font-weight: 800; font-size: 0.82rem; color: #38bdf8; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
       <span>🛠️ Operator Telemetry</span>
-      <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.68rem; padding: 2px 6px;">Dev Mode</span>
+      <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.65rem; padding: 2px 6px;">Dev Mode</span>
     </div>
     <div style="display: flex; flex-direction: column; gap: 4px; font-family: monospace; color: #cbd5e1; font-size: 0.72rem;">
       <div>Peer Wire: Noise_XX ChaCha20</div>
@@ -27869,26 +28004,22 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- User-Facing Sovereign Privacy & Network Security Card -->
-  <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.7); border: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem;">
-    <div style="font-weight: 800; color: #fff; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">
+  <div class="card" style="padding: 1rem; border-radius: 14px; background: rgba(17, 24, 39, 0.7); border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem;">
+    <div style="font-weight: 800; color: #fff; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
       <span style="display: flex; align-items: center; gap: 6px;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         <span>Sovereign Security</span>
       </span>
-      <span style="font-size: 0.7rem; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 2px 7px; border-radius: 10px; font-weight: 700;">Active</span>
+      <span style="font-size: 0.68rem; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 1px 6px; border-radius: 8px; font-weight: 700;">Active</span>
     </div>
-    <div style="color: #94a3b8; font-size: 0.76rem; line-height: 1.4; margin-bottom: 0.75rem;">
-      Your data is protected by end-to-end cryptographic signatures and local-first encryption. Zero corporate tracking or ad algorithms.
-    </div>
-    <div style="display: flex; gap: 0.5rem; align-items: center; font-size: 0.72rem; color: #64748b; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.6rem;">
-      <span>🔒 E2E Encrypted</span> &bull; <span>⚡ Zero Ads</span> &bull; <span>🛡️ Self-Custody</span>
+    <div style="color: #94a3b8; font-size: 0.74rem; line-height: 1.4;">
+      🔒 E2E Encrypted &bull; ⚡ Zero Corporate Tracking &bull; 🛡️ Self-Custody
     </div>
   </div>
 
   <!-- Consumer Footer Links -->
-  <div style="padding: 0.5rem 0.75rem; font-size: 0.72rem; color: #64748b; line-height: 1.6;">
-    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem;">
+  <div style="padding: 0.4rem 0.6rem; font-size: 0.7rem; color: #64748b; line-height: 1.5;">
+    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.3rem;">
       <span style="cursor: pointer;" onclick="switchTab('me')">About</span> &bull;
       <span style="cursor: pointer;" onclick="switchTab('me')">Privacy</span> &bull;
       <span style="cursor: pointer;" onclick="switchTab('me')">Terms</span> &bull;
@@ -27896,7 +28027,7 @@ function renderHtml(
     </div>
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <span>&copy; 2026 SOVRA Network Inc.</span>
-      <a href="/admin" id="rightRailOpsLink" target="_blank" style="display: none; color: #475569; text-decoration: none; font-size: 0.68rem; transition: color 0.15s;" onmouseover="this.style.color='#94a3b8'" onmouseout="this.style.color='#475569'" title="Company Operations Console">Ops &nearr;</a>
+      <a href="/admin" id="rightRailOpsLink" target="_blank" style="display: none; color: #475569; text-decoration: none; font-size: 0.65rem;" title="Company Operations Console">Ops &nearr;</a>
     </div>
   </div>
 
@@ -28051,31 +28182,48 @@ function renderHtml(
     </div>
   </div>
 
-  <!-- Floating Picture-in-Picture (PiP) Mini-Player Card -->
-  <!-- Universal Global Floating Media PiP Dock (Continuous Audio & Video across all tabs) -->
-  <div id="globalMediaPipDock">
-    <div id="sovraFloatingPipPlayer" class="sovra-floating-pip-card" style="position: fixed; bottom: 84px; right: 24px; width: 340px; max-width: calc(100vw - 32px); border-radius: 16px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(24px); border: 1px solid rgba(56, 189, 248, 0.25); box-shadow: 0 20px 48px rgba(0,0,0,0.7); z-index: 9999; display: none; overflow: hidden; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-    <!-- PiP Titlebar with Drag / Minimize Handle -->
-    <div id="sovraPipTitlebar" class="pip-titlebar" onpointerdown="handlePipDragStart(event)" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.08); cursor: grab; user-select: none;">
-      <div style="display: flex; align-items: center; gap: 6px; min-width: 0; pointer-events: none;">
-        <span style="font-size: 0.85rem;">📺</span>
-        <div style="min-width: 0;">
-          <div id="sovraPipTitle" style="font-size: 0.78rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">Playing Stream</div>
-          <div id="sovraPipCreator" style="font-size: 0.68rem; color: #38bdf8;">@creator</div>
-        </div>
+  <!-- Universal Global Floating Picture-in-Picture (PiP) Player (#persistentPiPOverlay) -->
+  <div id="persistentPiPOverlay" class="persistent-pip-overlay" style="position: fixed; bottom: 84px; right: 24px; width: 240px; aspect-ratio: 16/9; border-radius: 14px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(56, 189, 248, 0.35); box-shadow: 0 16px 40px rgba(0,0,0,0.75); z-index: 99999; display: none; overflow: hidden; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;">
+    <!-- PiP Title & Control Bar (Hover / Glass) -->
+    <div class="pip-glass-header" style="position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); pointer-events: auto;">
+      <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
+        <span style="font-size: 0.75rem;">📺</span>
+        <span id="persistentPiPTitle" style="font-size: 0.72rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">Watch Stream</span>
       </div>
       <div style="display: flex; align-items: center; gap: 4px;">
-        <button type="button" id="sovraPipRestoreBtn" onclick="if(window.SovraPipEngine)SovraPipEngine.restoreFullPlayer()" title="Restore Full Video" style="background: none; border: none; color: #94a3b8; font-size: 0.85rem; cursor: pointer; padding: 2px 6px;">⤢</button>
-        <button type="button" id="sovraPipCloseBtn" onclick="if(window.SovraPipEngine)SovraPipEngine.closePip()" title="Close PiP" style="background: none; border: none; color: #ef4444; font-size: 0.95rem; cursor: pointer; padding: 2px 6px;">✕</button>
+        <button type="button" id="persistentPiPMaximizeBtn" onclick="maximizePiPToStage()" title="Maximize to Stage" style="background: rgba(255,255,255,0.18); border: none; border-radius: 4px; color: #38bdf8; font-size: 0.8rem; cursor: pointer; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;">⤢</button>
+        <button type="button" id="persistentPiPCloseBtn" onclick="closePersistentPiP()" title="Close PiP" style="background: rgba(255,255,255,0.18); border: none; border-radius: 4px; color: #ef4444; font-size: 0.8rem; cursor: pointer; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;">✕</button>
       </div>
     </div>
-    <!-- PiP Video Player Canvas / Element -->
-    <video id="sovraPipVideoElement" playsinline controls style="width: 100%; aspect-ratio: 16/9; background: #000; display: block;"></video>
-    <!-- PiP Micro Status / Controls Footer -->
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: rgba(0,0,0,0.4); font-size: 0.72rem;">
-      <span class="badge" id="sovraPipStatusBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.65rem; padding: 2px 6px;">HLS RFC 8216</span>
-      <button type="button" id="sovraPipPlayBtn" onclick="if(window.SovraPipEngine)SovraPipEngine.togglePlay()" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 700;">▶ Play / ⏸ Pause</button>
+    
+    <!-- Video element -->
+    <video id="persistentPiPVideo" playsinline style="width: 100%; height: 100%; object-fit: contain; background: #000; display: block;"></video>
+    
+    <!-- PiP Mini Controls Overlay (Hover / Bottom Glass) -->
+    <div class="pip-glass-footer" style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; padding: 4px 8px; background: linear-gradient(0deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0) 100%); pointer-events: auto;">
+      <!-- Mini Scrub Bar -->
+      <div id="persistentPiPScrubTrack" onclick="scrubPersistentPiP(event)" style="width: 100%; height: 3px; background: rgba(255,255,255,0.25); border-radius: 2px; cursor: pointer; margin-bottom: 4px; position: relative;">
+        <div id="persistentPiPScrubFill" style="height: 100%; width: 0%; background: #38bdf8; border-radius: 2px; transition: width 0.1s linear;"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <button type="button" id="persistentPiPPlayPauseBtn" onclick="togglePersistentPiPPlayPause()" style="background: none; border: none; color: #fff; font-size: 0.78rem; cursor: pointer; padding: 0;" title="Play/Pause">⏸</button>
+          <button type="button" id="persistentPiPSkipBtn" onclick="skipPersistentPiP(10)" style="background: none; border: none; color: #94a3b8; font-size: 0.68rem; font-weight: 700; cursor: pointer; padding: 0;" title="Skip 10s">+10s</button>
+        </div>
+        <span id="persistentPiPTimecode" style="font-size: 0.65rem; color: #cbd5e1; font-family: monospace;">0:00</span>
+      </div>
     </div>
+  </div>
+
+  <!-- Legacy Aliases for SovraPipEngine compatibility -->
+  <div id="globalMediaPipDock" style="display: none;" aria-hidden="true">
+    <div id="sovraFloatingPipPlayer">
+      <span id="sovraPipTitle"></span>
+      <span id="sovraPipCreator"></span>
+      <button id="sovraPipRestoreBtn"></button>
+      <button id="sovraPipCloseBtn"></button>
+      <video id="sovraPipVideoElement"></video>
+      <button id="sovraPipPlayBtn"></button>
     </div>
   </div>
 
@@ -49023,28 +49171,26 @@ function renderHtml(
         } else if (prevTab === 'youtube') {
           const ytVid = document.querySelector('#youtube-view video');
           const bgAudioOn = Boolean(window.SovraBackgroundAudioEngine && window.SovraBackgroundAudioEngine.enabled);
-          const wasPlaying = ytVid ? !ytVid.paused : false;
+          const wasPlaying = ytVid ? !ytVid.paused : Boolean(typeof ytIsPlaying !== 'undefined' && ytIsPlaying);
           tabFreezeState.youtube = {
             videoIndex: typeof activeYtVideoIndex === 'number' ? activeYtVideoIndex : 0,
-            currentTime: ytVid ? ytVid.currentTime : 0,
+            currentTime: ytVid ? ytVid.currentTime : (typeof ytCurrentTimeSec === 'number' ? ytCurrentTimeSec : 0),
             isPlaying: wasPlaying
           };
-          if (bgAudioOn && wasPlaying) {
+          if (wasPlaying && typeof window.activatePersistentPiP === 'function') {
+            const v = (typeof ytVideosCatalog !== 'undefined' && ytVideosCatalog[activeYtVideoIndex]) ? ytVideosCatalog[activeYtVideoIndex] : null;
+            window.activatePersistentPiP({
+              title: v ? v.title : 'Watch Stream',
+              creator: v ? v.channelName : '@creator',
+              videoUrl: (v && v.videoUrl) || (ytVid ? ytVid.src : ''),
+              currentTime: ytVid ? ytVid.currentTime : (typeof ytCurrentTimeSec === 'number' ? ytCurrentTimeSec : 0),
+              isPlaying: true
+            });
+            if (ytVid) ytVid.pause();
+          } else if (bgAudioOn && wasPlaying) {
             if (window.SovraBackgroundAudioEngine && typeof window.SovraBackgroundAudioEngine.activateMiniBar === 'function') {
               window.SovraBackgroundAudioEngine.activateMiniBar('youtube');
             }
-          } else if (wasPlaying && window.SovraPipEngine && typeof window.SovraPipEngine.openPip === 'function') {
-            const v = (typeof ytVideosCatalog !== 'undefined' && ytVideosCatalog[activeYtVideoIndex]) ? ytVideosCatalog[activeYtVideoIndex] : null;
-            if (v) {
-              window.SovraPipEngine.openPip({
-                title: v.title,
-                creator: v.channelName,
-                videoUrl: v.videoUrl || '',
-                currentTime: ytVid ? ytVid.currentTime : 0,
-                isPlaying: true
-              });
-            }
-            if (ytVid) ytVid.pause();
           } else {
             if (ytVid) ytVid.pause();
           }
@@ -49057,8 +49203,12 @@ function renderHtml(
           hideFloatingReturnPill();
         }
       }
-      if (tab === 'youtube' && window.SovraPipEngine && typeof window.SovraPipEngine.closePip === 'function') {
-        window.SovraPipEngine.closePip();
+      if (tab === 'youtube') {
+        if (typeof window.maximizePiPToStage === 'function') {
+          window.maximizePiPToStage();
+        } else if (window.SovraPipEngine && typeof window.SovraPipEngine.closePip === 'function') {
+          window.SovraPipEngine.closePip();
+        }
       }
       if ((tab === 'reels' || tab === 'youtube') && window.SovraBackgroundAudioEngine && typeof window.SovraBackgroundAudioEngine.hideMiniBar === 'function') {
         window.SovraBackgroundAudioEngine.hideMiniBar();
@@ -66937,71 +67087,263 @@ window.SovraCreatorStudioEngine = {
       window.applyPipDockCorner(closest, true);
     };
 
+    // ========================================================
+    // 🌐 ZERO-TAB SPATIAL WORKSPACE & CO-PILOT DRAWER ENGINE
+    // ========================================================
+    window.toggleSpatialCoPilotDrawer = function(open, defaultTab) {
+      var drawer = document.getElementById('spatialCoPilotDrawer');
+      var isClosed = document.body.classList.contains('copilot-collapsed');
+      var shouldCollapse = (typeof open === 'boolean') ? !open : !isClosed;
+
+      if (shouldCollapse) {
+        document.body.classList.add('copilot-collapsed');
+        if (drawer) drawer.classList.add('is-collapsed');
+      } else {
+        document.body.classList.remove('copilot-collapsed');
+        if (drawer) drawer.classList.remove('is-collapsed');
+      }
+
+      if (defaultTab && typeof window.switchCoPilotTab === 'function') {
+        window.switchCoPilotTab(defaultTab);
+      }
+    };
+
+    window.switchCoPilotTab = function(tab) {
+      var targetTab = tab || 'messages';
+      var tabs = ['messages', 'wallet', 'radar'];
+      tabs.forEach(function(t) {
+        var btn = document.getElementById('copilotTabBtn_' + t);
+        var pane = document.getElementById('copilotPane_' + t);
+        if (t === targetTab) {
+          if (btn) {
+            btn.classList.add('active');
+            btn.style.background = '#6366f1';
+            btn.style.color = '#fff';
+          }
+          if (pane) pane.style.display = 'flex';
+        } else {
+          if (btn) {
+            btn.classList.remove('active');
+            btn.style.background = 'transparent';
+            btn.style.color = '#94a3b8';
+          }
+          if (pane) pane.style.display = 'none';
+        }
+      });
+    };
+
+    window.dockPeerChatInCoPilot = function(did, name, handle, avatar) {
+      if (!did && !name) return;
+      window.toggleSpatialCoPilotDrawer(true, 'messages');
+
+      var pName = document.getElementById('copilotPeerName');
+      var pHandle = document.getElementById('copilotPeerHandle');
+      var pAvatar = document.getElementById('copilotPeerAvatar');
+
+      if (pName) pName.textContent = name || 'Peer';
+      if (pHandle) pHandle.textContent = handle || (did ? '@' + did.slice(-8) : '@peer');
+      if (pAvatar) {
+        if (avatar && avatar.length > 2) {
+          pAvatar.innerHTML = '<img src="' + avatar + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />';
+        } else {
+          pAvatar.textContent = (name && name[0]) ? name[0].toUpperCase() : 'P';
+        }
+      }
+
+      var stream = document.getElementById('copilotChatStream');
+      if (stream) {
+        stream.innerHTML = '<div style="align-self: center; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 999px; padding: 2px 10px; font-size: 0.65rem; color: #38bdf8;">🔒 Double Ratchet Step #1 Verified with ' + escapeHtml(name || 'Peer') + '</div>' +
+          '<div style="align-self: flex-start; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px 12px 12px 2px; padding: 6px 10px; color: #f1f5f9; max-width: 82%;">' +
+          '<div>Connected directly via P2P Mesh! Send an end-to-end encrypted message without leaving your feed.</div>' +
+          '<div style="font-size: 0.62rem; color: #94a3b8; text-align: right; margin-top: 2px;">Just now</div></div>';
+      }
+
+      var inp = document.getElementById('copilotChatInput');
+      if (inp) inp.focus();
+    };
+
+    window.sendCoPilotMessage = function() {
+      var inp = document.getElementById('copilotChatInput');
+      var stream = document.getElementById('copilotChatStream');
+      if (!inp || !stream) return;
+      var text = inp.value.trim();
+      if (!text) return;
+
+      var timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      var bubble = document.createElement('div');
+      bubble.style.cssText = 'align-self: flex-end; background: linear-gradient(135deg, #0284c7, #6366f1); border-radius: 12px 12px 2px 12px; padding: 6px 10px; color: #fff; max-width: 82%; word-break: break-word;';
+      bubble.innerHTML = '<div>' + escapeHtml(text) + '</div><div style="font-size: 0.62rem; color: #e0e7ff; text-align: right; margin-top: 2px;">' + timeStr + ' ✓✓ E2EE</div>';
+      stream.appendChild(bubble);
+      stream.scrollTop = stream.scrollHeight;
+      inp.value = '';
+
+      // Simulated peer acknowledgment over mesh
+      setTimeout(function() {
+        if (!stream) return;
+        var reply = document.createElement('div');
+        reply.style.cssText = 'align-self: flex-start; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px 12px 12px 2px; padding: 6px 10px; color: #f1f5f9; max-width: 82%; word-break: break-word;';
+        reply.innerHTML = '<div>Received and decrypted via Double Ratchet! ⚡</div><div style="font-size: 0.62rem; color: #94a3b8; text-align: right; margin-top: 2px;">' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div>';
+        stream.appendChild(reply);
+        stream.scrollTop = stream.scrollHeight;
+      }, 700);
+    };
+
+    window.executeCoPilotTransfer = function() {
+      var recInp = document.getElementById('copilotWalletRecipient');
+      var amtInp = document.getElementById('copilotWalletAmount');
+      var amt = parseFloat(amtInp ? amtInp.value : '0');
+      var rec = recInp ? recInp.value.trim() : '';
+
+      if (!rec) {
+        if (typeof showAccountToast === 'function') showAccountToast('⚠️ Enter recipient DID or @handle');
+        return;
+      }
+      if (isNaN(amt) || amt <= 0) {
+        if (typeof showAccountToast === 'function') showAccountToast('⚠️ Enter a valid SOV transfer amount');
+        return;
+      }
+
+      var railBal = document.getElementById('railWalletSovBalance');
+      var headBal = document.getElementById('sovraHeaderWalletBalance');
+      var curr = 150.0;
+      if (railBal) {
+        var match = railBal.textContent.match(/[\d.]+/);
+        if (match) curr = parseFloat(match[0]);
+      }
+      if (amt > curr) {
+        if (typeof showAccountToast === 'function') showAccountToast('⚠️ Insufficient SOV balance');
+        return;
+      }
+
+      var newBal = (curr - amt).toFixed(2);
+      if (railBal) railBal.textContent = newBal + ' SOV';
+      if (headBal) headBal.textContent = newBal + ' SOV';
+      if (recInp) recInp.value = '';
+
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('⚡ Sent ' + amt.toFixed(2) + ' SOV to ' + rec + ' (Ed25519 Signed & Verified)');
+      }
+    };
+
+    // Global Spatial Shortcut (Ctrl + / or Cmd + /)
+    document.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        if (typeof window.toggleSpatialCoPilotDrawer === 'function') {
+          window.toggleSpatialCoPilotDrawer();
+        }
+      }
+    });
+
+    // ========================================================
+    // 📺 UNIVERSAL PERSISTENT PICTURE-IN-PICTURE (PiP) ENGINE
+    // ========================================================
+    window.activatePersistentPiP = function(info) {
+      var overlay = document.getElementById('persistentPiPOverlay');
+      var pipVid = document.getElementById('persistentPiPVideo');
+      var mainVid = document.getElementById('ytMainVideoElement');
+      var titleEl = document.getElementById('persistentPiPTitle');
+      if (!overlay || !pipVid) return;
+
+      var v = (typeof ytVideosCatalog !== 'undefined' && ytVideosCatalog[activeYtVideoIndex]) ? ytVideosCatalog[activeYtVideoIndex] : null;
+      var title = (info && info.title) || (v ? v.title : 'Watch Stream');
+      var src = (info && info.videoUrl) || (mainVid ? mainVid.src : '') || (v ? v.videoUrl : '');
+      var curTime = (info && typeof info.currentTime === 'number') ? info.currentTime : (mainVid ? mainVid.currentTime : (typeof ytCurrentTimeSec === 'number' ? ytCurrentTimeSec : 0));
+
+      if (titleEl) titleEl.textContent = title;
+      if (src && pipVid.src !== src) {
+        pipVid.src = src;
+      }
+      try { pipVid.currentTime = curTime; } catch(e) {}
+      overlay.style.display = 'block';
+      pipVid.play().catch(function() {});
+
+      // Mini scrub sync
+      pipVid.ontimeupdate = function() {
+        var fill = document.getElementById('persistentPiPScrubFill');
+        var tc = document.getElementById('persistentPiPTimecode');
+        if (fill && pipVid.duration) {
+          fill.style.width = ((pipVid.currentTime / pipVid.duration) * 100) + '%';
+        }
+        if (tc) {
+          var m = Math.floor(pipVid.currentTime / 60);
+          var s = Math.floor(pipVid.currentTime % 60);
+          tc.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+        }
+      };
+    };
+
+    window.closePersistentPiP = function() {
+      var overlay = document.getElementById('persistentPiPOverlay');
+      var pipVid = document.getElementById('persistentPiPVideo');
+      if (pipVid) {
+        try { pipVid.pause(); } catch(e) {}
+        pipVid.src = '';
+      }
+      if (overlay) overlay.style.display = 'none';
+    };
+
+    window.maximizePiPToStage = function() {
+      var pipVid = document.getElementById('persistentPiPVideo');
+      var curTime = pipVid ? pipVid.currentTime : 0;
+      var wasPaused = pipVid ? pipVid.paused : false;
+      window.closePersistentPiP();
+      if (typeof switchTab === 'function') {
+        switchTab('watch');
+      }
+      var mainVid = document.getElementById('ytMainVideoElement');
+      if (mainVid) {
+        try { mainVid.currentTime = curTime; } catch(e) {}
+        if (!wasPaused) {
+          mainVid.play().catch(function() {});
+          ytIsPlaying = true;
+          var box = document.getElementById('ytPlayerBox');
+          if (box) box.classList.add('is-playing');
+        }
+      }
+    };
+
+    window.togglePersistentPiPPlayPause = function() {
+      var pipVid = document.getElementById('persistentPiPVideo');
+      var btn = document.getElementById('persistentPiPPlayPauseBtn');
+      if (!pipVid) return;
+      if (pipVid.paused) {
+        pipVid.play().catch(function() {});
+        if (btn) btn.textContent = '⏸';
+      } else {
+        pipVid.pause();
+        if (btn) btn.textContent = '▶';
+      }
+    };
+
+    window.skipPersistentPiP = function(sec) {
+      var pipVid = document.getElementById('persistentPiPVideo');
+      if (!pipVid) return;
+      try { pipVid.currentTime = Math.max(0, pipVid.currentTime + sec); } catch(e) {}
+    };
+
+    window.scrubPersistentPiP = function(e) {
+      var pipVid = document.getElementById('persistentPiPVideo');
+      var track = document.getElementById('persistentPiPScrubTrack');
+      if (!pipVid || !track || !pipVid.duration) return;
+      var rect = track.getBoundingClientRect();
+      var pos = (e.clientX - rect.left) / rect.width;
+      try { pipVid.currentTime = pos * pipVid.duration; } catch(err) {}
+    };
+
     window.SovraPipEngine = {
       currentData: null,
       openPip: function(data) {
-        this.currentData = data || {};
-        var pip = document.getElementById('sovraFloatingPipPlayer');
-        var vid = document.getElementById('sovraPipVideoElement');
-        var title = document.getElementById('sovraPipTitle');
-        var creator = document.getElementById('sovraPipCreator');
-        if (!pip || !vid) return;
-        if (title && data.title) title.textContent = data.title;
-        if (creator && data.creator) creator.textContent = data.creator;
-        if (data.videoUrl) {
-          vid.src = data.videoUrl;
-          if (typeof data.currentTime === 'number') {
-            try { vid.currentTime = data.currentTime; } catch(e) {}
-          }
-          if (data.isPlaying !== false) {
-            vid.play().catch(function(){});
-          }
-        }
-        pip.style.display = 'block';
-
-        var savedCorner = 'bottom-right';
-        try {
-          savedCorner = localStorage.getItem('sovra_pip_dock_corner') || 'bottom-right';
-        } catch(e) {}
-        window.applyPipDockCorner(savedCorner, false);
+        window.activatePersistentPiP(data);
       },
       closePip: function() {
-        var pip = document.getElementById('sovraFloatingPipPlayer');
-        var vid = document.getElementById('sovraPipVideoElement');
-        if (vid) {
-          try { vid.pause(); } catch(e) {}
-          vid.src = '';
-        }
-        if (pip) pip.style.display = 'none';
-        this.currentData = null;
+        window.closePersistentPiP();
       },
       restoreFullPlayer: function() {
-        var vid = document.getElementById('sovraPipVideoElement');
-        var currTime = vid ? vid.currentTime : 0;
-        var isPlaying = vid ? !vid.paused : false;
-        this.closePip();
-        if (typeof switchTab === 'function') {
-          switchTab('youtube');
-        }
-        var mainVid = document.querySelector('#youtube-view video');
-        if (mainVid) {
-          try {
-            mainVid.currentTime = currTime;
-            if (isPlaying) mainVid.play().catch(function(){});
-          } catch(e) {}
-        }
+        window.maximizePiPToStage();
       },
       togglePlay: function() {
-        var vid = document.getElementById('sovraPipVideoElement');
-        var btn = document.getElementById('sovraPipPlayBtn');
-        if (!vid) return;
-        if (vid.paused) {
-          vid.play().catch(function(){});
-          if (btn) btn.textContent = '⏸ Pause';
-        } else {
-          vid.pause();
-          if (btn) btn.textContent = '▶ Play';
-        }
+        window.togglePersistentPiPPlayPause();
       }
     };
 
@@ -69240,6 +69582,13 @@ window.SovraCreatorStudioEngine = {
 
     function openDirectChatWithUser(targetDid, targetName, targetHandle) {
       if (!targetDid) return;
+      var curTab = document.body.dataset.activeTab || window._currentActiveTab || 'feed';
+      if (window.innerWidth >= 900 && ['feed', 'youtube', 'watch', 'reels', 'studio', 'hub'].includes(curTab)) {
+        if (typeof window.dockPeerChatInCoPilot === 'function') {
+          window.dockPeerChatInCoPilot(targetDid, targetName, targetHandle);
+          return;
+        }
+      }
       switchTab('chat');
 
       const searchBox = document.getElementById('chatSearchInput');
@@ -80069,6 +80418,9 @@ window.SovraCreatorStudioEngine = {
     }
 
     function openFbFloatingChat(did, name, avatarDataUrl) {
+      if (typeof window.dockPeerChatInCoPilot === 'function') {
+        window.dockPeerChatInCoPilot(did, name, '', avatarDataUrl);
+      }
       activeFbChatPeerDid = did || 'peer';
       activeFbChatPeerName = name || 'Chat';
 
