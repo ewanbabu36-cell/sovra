@@ -19,6 +19,10 @@ import { DepositModal } from '../components/DepositModal.js';
 import type { UserAccountProfile } from '@sovra/identity';
 import { CallScreen } from '../screens/CallScreen.js';
 import { MeshDiagnosticsScreen } from '../screens/MeshDiagnosticsScreen.js';
+import { BleRadarScreen } from '../screens/BleRadarScreen.js';
+import { CometBftExplorerScreen } from '../screens/CometBftExplorerScreen.js';
+import { CommunityJuryScreen } from '../screens/CommunityJuryScreen.js';
+import { NodeTelemetryScreen } from '../screens/NodeTelemetryScreen.js';
 import {
   fetchMeshStatus,
   updateMeshControls,
@@ -76,8 +80,10 @@ export function BottomTabNavigator(): React.JSX.Element {
   const [installPromptEvent, setInstallPromptEvent] = useState<any | null>(null);
   const [isInstallDismissed, setIsInstallDismissed] = useState(false);
 
-  // Decoupled 4-Tier Surface Navigation State
-  const [activeSubModal, setActiveSubModal] = useState<'none' | 'wallet' | 'studio' | 'settings'>('none');
+  // Decoupled 4-Tier & Parity Surface Navigation State
+  const [activeSubModal, setActiveSubModal] = useState<
+    'none' | 'wallet' | 'studio' | 'settings' | 'radar' | 'explorer' | 'jury' | 'telemetry'
+  >('none');
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -518,6 +524,18 @@ export function BottomTabNavigator(): React.JSX.Element {
                   onBack={() => setActiveSubModal('none')}
                 />
               )}
+              {activeSubModal === 'radar' && (
+                <BleRadarScreen onClose={() => setActiveSubModal('none')} />
+              )}
+              {activeSubModal === 'explorer' && (
+                <CometBftExplorerScreen onClose={() => setActiveSubModal('none')} />
+              )}
+              {activeSubModal === 'jury' && (
+                <CommunityJuryScreen onClose={() => setActiveSubModal('none')} />
+              )}
+              {activeSubModal === 'telemetry' && (
+                <NodeTelemetryScreen onClose={() => setActiveSubModal('none')} />
+              )}
             </div>
           );
         }
@@ -802,6 +820,90 @@ export function BottomTabNavigator(): React.JSX.Element {
             >
               <span>📡 Open Full RF Simulator & Diagnostics HUD</span>
             </button>
+
+            {/* Parity Features Quick Access Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMeshDrawer(false);
+                  setActiveTab('me');
+                  setActiveSubModal('radar');
+                }}
+                style={{
+                  padding: '6px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  backgroundColor: 'rgba(56, 189, 248, 0.08)',
+                  color: '#38bdf8',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                📡 2.4GHz BLE Radar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMeshDrawer(false);
+                  setActiveTab('me');
+                  setActiveSubModal('explorer');
+                }}
+                style={{
+                  padding: '6px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                  color: '#a5b4fc',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                ⛓️ CometBFT L1 Explorer
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMeshDrawer(false);
+                  setActiveTab('me');
+                  setActiveSubModal('jury');
+                }}
+                style={{
+                  padding: '6px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                  color: '#f87171',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                ⚖️ 24h Community Jury
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMeshDrawer(false);
+                  setActiveTab('me');
+                  setActiveSubModal('telemetry');
+                }}
+                style={{
+                  padding: '6px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(52, 211, 153, 0.3)',
+                  backgroundColor: 'rgba(52, 211, 153, 0.08)',
+                  color: '#34d399',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                📊 BitSwap Telemetry
+              </button>
+            </div>
         </div>
       )}
 
