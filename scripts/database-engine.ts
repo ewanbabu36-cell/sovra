@@ -3977,6 +3977,21 @@ export class SovraDatabaseEngine {
     return [...this.db.posts];
   }
 
+  public getPostById(postId: string): FeedPostRecord | undefined {
+    this.load();
+    const inMem = this.db.posts.find(p => p.id === postId);
+    if (inMem) return inMem;
+    try {
+      return this.sqliteEngine?.findPostById(postId);
+    } catch (_) {
+      return undefined;
+    }
+  }
+
+  public findPostById(postId: string): FeedPostRecord | undefined {
+    return this.getPostById(postId);
+  }
+
   public getFeedPosts(viewerDid?: string): FeedPostRecord[] {
     this.load();
     if (!viewerDid) {

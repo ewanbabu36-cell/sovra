@@ -833,11 +833,55 @@ async function bootstrapLocalNode() {
 
   await node.start();
 
-  // Subscribe to core mesh topics
-  await node.pubsub.subscribe('sovra/feed/main', msg => {
+  // Subscribe to core mesh topics with full SQLite persistence
+  await node.pubsub.subscribe('sovra/feed/main', async msg => {
     try {
       const parsed = JSON.parse(new TextDecoder().decode(msg.data));
-      postsStore.unshift(parsed);
+      if (parsed && typeof parsed === 'object') {
+        const pId = parsed.id || ('p2p-' + Date.now());
+        const authorDid = parsed.authorDid || parsed.pubkey || 'did:key:unknown';
+        const content = parsed.content || parsed.caption || '';
+        const topic = parsed.topic || 'sovra/feed/main';
+        const timestamp = parsed.timestamp || parsed.createdAt || Date.now();
+        const signatureHex = parsed.signatureHex || parsed.sig || ('ed25519_sig_' + pId);
+
+        const record: PostRecord = {
+          id: pId,
+          authorDid,
+          authorPeerId: parsed.authorPeerId || '',
+          content,
+          topic,
+          isCreatorPost: Boolean(parsed.isCreatorPost),
+          timestamp,
+          signatureHex,
+        };
+        postsStore.unshift(record);
+
+        // Durability: Persist remote gossip post to SQLite if not already stored
+        if (!sovraDb.getPostById(pId)) {
+          const newPost = sovraDb.createPost({
+            id: pId,
+            authorDid,
+            authorName: parsed.authorName || parsed.author || 'P2P Peer',
+            caption: content,
+            postType: parsed.postType || 'text',
+            visibility: parsed.visibility || 'public',
+            timestamp,
+          });
+          indexPostInSearch(newPost);
+          dynamicSocialStore.posts = sovraDb.getAllPosts();
+        }
+
+        localFeed.appendEvent({
+          id: pId,
+          pubkey: authorDid,
+          createdAt: Math.floor(timestamp / 1000),
+          kind: 1,
+          tags: [['topic', topic]],
+          content,
+          sig: signatureHex,
+        });
+      }
     } catch {}
   });
   await node.pubsub.subscribe('sovra/creator/live');
@@ -872,16 +916,31 @@ async function bootstrapLocalNode() {
     } catch {}
   });
 
-  // Seed initial posts into local feed
-  for (const p of postsStore) {
+  // Seed initial posts into local feed and postsStore from persistent SQLite database
+  const persistedFeedPosts = sovraDb.getFeedPosts();
+  for (const p of persistedFeedPosts) {
+    const topic = (p.tags && String(p.tags).includes('creator')) ? 'sovra/creator/live' : 'sovra/feed/main';
+    const sig = (p as any).signatureHex || ('ed25519_sig_persisted_' + p.id);
+    const postRecord: PostRecord = {
+      id: p.id,
+      authorDid: p.authorDid,
+      authorPeerId: binding.peerId,
+      content: p.caption || '',
+      topic,
+      isCreatorPost: Boolean(p.tags && String(p.tags).includes('creator')),
+      timestamp: p.createdAt || p.timestamp || Date.now(),
+      signatureHex: sig,
+    };
+    postsStore.push(postRecord);
+
     localFeed.appendEvent({
       id: p.id,
       pubkey: p.authorDid,
-      createdAt: Math.floor(p.timestamp / 1000),
+      createdAt: Math.floor((p.createdAt || p.timestamp || Date.now()) / 1000),
       kind: 1, // ShortPost
-      tags: [['topic', p.topic]],
-      content: p.content,
-      sig: p.signatureHex,
+      tags: [['topic', topic]],
+      content: p.caption || '',
+      sig,
     });
   }
 
@@ -3120,7 +3179,7 @@ async function startDevServer() {
       return;
     }
 
-    // API: Publish Post
+    // API: Publish Post (Unified Canonical Publishing Pipeline)
     if (url.pathname === '/api/publish' && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 1024 * 1024);
       if (!ok) return;
@@ -3128,7 +3187,12 @@ async function startDevServer() {
         const parsed = JSON.parse(body);
         const principal = enforceAuth(req, res, parsed);
         if (!principal) return;
-        const content = String(parsed.content ?? '');
+        const content = String(parsed.content ?? parsed.caption ?? '').trim();
+        if (!content && !parsed.mediaImage && !parsed.mediaVideo) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Post content or media is required' }));
+          return;
+        }
         const isUserCreator = userCreatorModes.get(principal.did) || false;
 
         // P1-02: Cryptographic signature binding for user-published post
@@ -3152,38 +3216,103 @@ async function startDevServer() {
           authorSignatureHex = bytesToHex(deviceKey.sign(new TextEncoder().encode(content)));
         }
 
-        const record: PostRecord = {
-          id: `post-${Date.now()}`,
+        // Real content safety moderation scan
+        const scanRes = await moderationWorker.scanContent({
+          jobId: `publish_mod_${Date.now()}`,
+          contentCid: 'raw-' + Date.now(),
+          mimeType: 'text/plain',
+          textContent: content,
+        });
+
+        if (scanRes.ok && (scanRes.value.suggestedDecision === 'REJECT' || scanRes.value.suggestedDecision === 'QUARANTINE')) {
+          res.writeHead(422, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: false,
+            error: `Content safety policy violation: ${scanRes.value.detectedCategories.join(', ') || 'Prohibited content'}`,
+            decision: scanRes.value.suggestedDecision,
+            categories: scanRes.value.detectedCategories,
+          }));
+          return;
+        }
+
+        const authorUser = sovraDb.findUserByDid(principal.did);
+        const authorDisplayName = authorUser?.displayName || parsed.authorName || 'Sovereign Peer';
+        const authorAvatarInitial = authorUser?.avatar || parsed.authorAvatar || 'S';
+        const authorAvatarBgColor = authorUser?.avatarBg || parsed.authorAvatarBg || '#6366f1';
+        const authorAvatarUrl = authorUser?.avatarDataUrl || parsed.authorAvatarDataUrl;
+        const authorBadge = parsed.authorBadge || '👤 Personal';
+
+        const postId = parsed.id || `post-${Date.now()}`;
+        const topic = isUserCreator ? 'sovra/creator/live' : 'sovra/feed/main';
+        const postTimestamp = parsed.timestamp || Date.now();
+
+        // 1. Durability: Persist to SQLite and main sovraDb feed store
+        const newPost = sovraDb.createPost({
+          id: postId,
+          authorDid: principal.did,
+          authorName: authorDisplayName,
+          authorAvatar: authorAvatarInitial,
+          authorAvatarBg: authorAvatarBgColor,
+          authorAvatarDataUrl: authorAvatarUrl,
+          authorType: parsed.authorType || 'personal',
+          authorEntityId: parsed.authorEntityId,
+          authorEntityHandle: parsed.authorEntityHandle,
+          authorBadge,
+          caption: content,
+          postType: (parsed.postType as PostType) || 'text',
+          visibility: (parsed.visibility === 'only_me' || parsed.visibility === 'friends') ? parsed.visibility : 'public',
+          timestamp: postTimestamp,
+          tags: parsed.tags || '#sovra #p2p #mesh',
+        });
+
+        // 2. Index in search
+        indexPostInSearch(newPost);
+
+        // 3. Update dynamic store and bust HTML cache
+        dynamicSocialStore.posts = sovraDb.getAllPosts();
+        _cachedHtmlResponse = null;
+
+        // 4. Append to decentralized local feed engine
+        localFeed.appendEvent({
+          id: newPost.id,
+          pubkey: principal.did,
+          createdAt: Math.floor(newPost.timestamp / 1000),
+          kind: 1,
+          tags: [['topic', topic]],
+          content: newPost.caption,
+          sig: authorSignatureHex,
+        });
+
+        const record: PostRecord & { caption: string } = {
+          id: newPost.id,
           authorDid: principal.did,
           authorPeerId: binding.peerId,
           content,
-          topic: isUserCreator ? 'sovra/creator/live' : 'sovra/feed/main',
+          caption: content,
+          topic,
           isCreatorPost: isUserCreator,
-          timestamp: Date.now(),
+          timestamp: newPost.timestamp,
           signatureHex: authorSignatureHex,
         };
 
+        // 5. In-memory buffer sync
         postsStore.unshift(record);
 
-        // Durability: Persist to SQLite and main sovraDb feed store
+        // 6. Broadcast on real P2P GossipSub mesh
         try {
-          const authorUser = sovraDb.findUserByDid(principal.did);
-          sovraDb.createPost({
-            id: record.id,
-            authorDid: principal.did,
-            authorName: authorUser?.displayName || principal.did.slice(0, 14),
-            caption: content,
-            postType: 'text',
-            visibility: 'public',
-            timestamp: record.timestamp,
-          });
-        } catch (_) {}
-
-        // Broadcast on real P2P GossipSub mesh
-        await node.pubsub.publish(record.topic, new TextEncoder().encode(JSON.stringify(record)));
+          const gossipEvent = {
+            ...newPost,
+            topic,
+            authorPeerId: binding.peerId,
+            signatureHex: authorSignatureHex,
+          };
+          await node.pubsub.publish(record.topic, new TextEncoder().encode(JSON.stringify(gossipEvent)));
+        } catch (pubErr) {
+          console.warn('[GossipSub] Publish warning:', pubErr);
+        }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, post: record }));
+        res.end(JSON.stringify({ ok: true, success: true, post: record }));
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: String(e) }));
