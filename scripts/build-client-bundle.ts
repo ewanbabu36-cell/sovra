@@ -74,6 +74,30 @@ export async function buildClientBundle(): Promise<string> {
 
   const stats = fs.statSync(outFile);
   console.log(`[Build] Client bundle successfully generated: ${outFile} (${stats.size} bytes)`);
+
+  // Mirror to sovra.bundle.js for modern asset routing
+  const sovraOutFile = path.join(outDir, 'sovra.bundle.js');
+  fs.copyFileSync(outFile, sovraOutFile);
+  if (fs.existsSync(outFile + '.map')) {
+    fs.copyFileSync(outFile + '.map', sovraOutFile + '.map');
+  }
+
+  // Compile and minify CSS bundle
+  const cssEntryPath = path.resolve(rootDir, 'apps/sovra-app/src/styles/sovra.css');
+  const outCssFile = path.join(outDir, 'sovra.css');
+  if (fs.existsSync(cssEntryPath)) {
+    console.log('[Build] Compiling and minifying stylesheet assets...');
+    await esbuild.build({
+      entryPoints: [cssEntryPath],
+      outfile: outCssFile,
+      bundle: true,
+      minify: true,
+      sourcemap: true,
+    });
+    const cssStats = fs.statSync(outCssFile);
+    console.log(`[Build] Stylesheet bundle successfully generated: ${outCssFile} (${cssStats.size} bytes)`);
+  }
+
   return outFile;
 }
 

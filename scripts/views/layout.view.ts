@@ -4736,6 +4736,24 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     <!-- Tab 5: Profile & Sovereign Identity (Instagram Profile + Wallet + Creator Tools) -->
     <main class="main-content" id="profile-view" style="display: none;">
       <div class="profile-container">
+        <!-- Airtel-Inspired Top Sovereign Node & Wallet Hero Anchor Card in Profile -->
+        <div id="sovraHeroAnchorCardProfile" class="sovra-hero-anchor-card" style="margin-bottom: 1rem;">
+          <div class="hero-top-row">
+            <div class="hero-balance-wrap">
+              <span class="hero-balance-label">Active Sovereign Balance</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="heroActiveSovBalanceProfile" class="hero-sov-balance-text">0.00 SOV</span>
+                <button type="button" class="hero-privacy-eye-btn" onclick="toggleBalancePrivacy()" title="Mask / Unmask Balance" aria-label="Toggle Balance Privacy">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="hero-p2p-health-pill" title="P2P Mesh Network Status">
+              <span class="hero-health-pulse-dot"></span>
+              <span>🟢 0 Peers Connected</span>
+            </div>
+          </div>
+        </div>
         <!-- Profile Header Card -->
         <div class="profile-header-card">
           <!-- Cover Banner -->

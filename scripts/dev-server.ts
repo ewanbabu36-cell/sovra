@@ -10528,8 +10528,8 @@ async function startDevServer() {
     }
 
 
-    // Compiled Client Bundle Assets (Solution C)
-    if (url.pathname === '/assets/bundle.js' || url.pathname === '/dist/bundle.js') {
+    // Compiled Client Bundle Assets & Modular CSS
+    if (url.pathname === '/assets/bundle.js' || url.pathname === '/dist/bundle.js' || url.pathname === '/assets/sovra.bundle.js' || url.pathname === '/dist/sovra.bundle.js') {
       const bundlePath = path.resolve(import.meta.dirname, '../apps/sovra-app/dist/bundle.js');
       if (fs.existsSync(bundlePath)) {
         const stat = fs.statSync(bundlePath);
@@ -10548,7 +10548,7 @@ async function startDevServer() {
         return;
       }
     }
-    if (url.pathname === '/assets/bundle.js.map' || url.pathname === '/dist/bundle.js.map') {
+    if (url.pathname === '/assets/bundle.js.map' || url.pathname === '/dist/bundle.js.map' || url.pathname === '/assets/sovra.bundle.js.map' || url.pathname === '/dist/sovra.bundle.js.map') {
       const mapPath = path.resolve(import.meta.dirname, '../apps/sovra-app/dist/bundle.js.map');
       if (fs.existsSync(mapPath)) {
         const stat = fs.statSync(mapPath);
@@ -10561,6 +10561,44 @@ async function startDevServer() {
         res.writeHead(200, {
           'Content-Type': 'application/json; charset=utf-8',
           'Cache-Control': 'public, max-age=31536000, immutable',
+          'ETag': etag,
+        });
+        res.end(fs.readFileSync(mapPath));
+        return;
+      }
+    }
+    if (url.pathname === '/assets/sovra.css' || url.pathname === '/dist/sovra.css' || url.pathname === '/assets/bundle.css' || url.pathname === '/dist/bundle.css') {
+      const cssPath = path.resolve(import.meta.dirname, '../apps/sovra-app/dist/sovra.css');
+      if (fs.existsSync(cssPath)) {
+        const stat = fs.statSync(cssPath);
+        const etag = `"${stat.size}-${stat.mtimeMs.toString(36)}"`;
+        if (req.headers['if-none-match'] === etag) {
+          res.writeHead(304);
+          res.end();
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'text/css; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400',
+          'ETag': etag,
+        });
+        res.end(fs.readFileSync(cssPath));
+        return;
+      }
+    }
+    if (url.pathname === '/assets/sovra.css.map' || url.pathname === '/dist/sovra.css.map') {
+      const mapPath = path.resolve(import.meta.dirname, '../apps/sovra-app/dist/sovra.css.map');
+      if (fs.existsSync(mapPath)) {
+        const stat = fs.statSync(mapPath);
+        const etag = `"${stat.size}-${stat.mtimeMs.toString(36)}"`;
+        if (req.headers['if-none-match'] === etag) {
+          res.writeHead(304);
+          res.end();
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400',
           'ETag': etag,
         });
         res.end(fs.readFileSync(mapPath));
@@ -11458,12 +11496,14 @@ async function startDevServer() {
   // Automated Integrity Gate: Verify that NO client-side <script> tag contains a SyntaxError or unescaped string
   try {
     const renderedHtml = renderHtml(binding, masterKey, tcpPort, 0, storageDaemon, socialGraph, localFeed);
-    const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+    const scriptRegex = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
     let match;
     let scriptIdx = 0;
     while ((match = scriptRegex.exec(renderedHtml)) !== null) {
+      const attrs = match[1] || '';
+      if (/type\s*=\s*["'](application\/json|text\/plain)["']/i.test(attrs)) continue;
       scriptIdx++;
-      const code = match[1];
+      const code = match[2];
       if (!code.trim()) continue;
       new vm.Script(code, { filename: `served_script_${scriptIdx}.js` });
     }
