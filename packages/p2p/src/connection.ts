@@ -90,7 +90,7 @@ export class ConnectionManager {
 
   public async connect(multiaddr: string): Promise<Result<ActivePeerConnection>> {
     const parts = multiaddr.split('/p2p/');
-    const peerId = parts[1];
+    const peerId = parts[parts.length - 1];
     if (!peerId) {
       return err(
         new PeerConnectionError('Invalid multiaddr: missing /p2p/ Peer ID component', {

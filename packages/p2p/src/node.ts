@@ -23,7 +23,24 @@ import {
   IceFallbackEngine,
   IceNegotiationPlan,
   RelayCandidateMetrics,
+  isCgnatAddress,
+  AUTONAT_PROTOCOL,
+  AutoNatService,
+  AutoNatDialRequest,
+  AutoNatDialResponse,
+  DCUTR_PROTOCOL,
+  DcutrCoordinator,
+  DcutrMessage,
 } from './nat.js';
+import {
+  CircuitRelayV2,
+  CircuitRelayV2Client,
+  CircuitRelayV2Config,
+  CIRCUIT_RELAY_V2_HOP_PROTOCOL,
+  CIRCUIT_RELAY_V2_STOP_PROTOCOL,
+  RelayHopMessage,
+  RelayStopMessage,
+} from './relay-v2.js';
 import { SessionMigrationToken } from './light-client.js';
 import { NodeMetricsCollector } from './metrics.js';
 import { ConnectionManager, DEFAULT_RESOURCE_LIMITS, ActivePeerConnection } from './connection.js';
@@ -42,6 +59,8 @@ export interface SovraP2PNodeConfig {
   readonly bootstrapConfig?: Partial<BootstrapConfig>;
   readonly listenAddresses?: readonly string[];
   readonly relayAddresses?: readonly string[];
+  readonly enableRelayService?: boolean;
+  readonly relayConfig?: CircuitRelayV2Config;
 }
 
 function safeJsonStringify(obj: unknown): string {
@@ -87,6 +106,10 @@ export class SovraP2PNode implements P2PNode {
   public readonly metrics: NodeMetricsCollector;
   public readonly connManager: ConnectionManager;
   public readonly tcpTransport: TcpTransport;
+  public readonly relayV2?: CircuitRelayV2;
+  public readonly relayV2Client: CircuitRelayV2Client;
+  public readonly autoNat: AutoNatService;
+  private advertisedAddresses: string[] = [];
 
   private readonly customProtocolHandlers = new Map<
     string,
@@ -140,6 +163,13 @@ export class SovraP2PNode implements P2PNode {
 
     this.connManager = new ConnectionManager(this.limits);
     this.nat = new NatManager(config.listenAddresses ?? []);
+
+    if (config.enableRelayService) {
+      this.relayV2 = new CircuitRelayV2(config.relayConfig);
+    }
+    this.relayV2Client = new CircuitRelayV2Client(config.relayAddresses ?? []);
+    this.autoNat = new AutoNatService();
+    this.advertisedAddresses = [...(config.listenAddresses ?? [])];
 
     // Wire GossipSub with peer broadcast dispatcher
     this.pubsub = new GossipSubRouter(
@@ -231,6 +261,81 @@ export class SovraP2PNode implements P2PNode {
       }
     });
 
+    // Circuit Relay v2 Hop protocol (/libp2p/circuit/relay/0.2.0/hop)
+    this.reqResp.registerHandler(CIRCUIT_RELAY_V2_HOP_PROTOCOL, async (peerId, payload) => {
+      try {
+        if (!this.relayV2) {
+          const errRes: RelayHopMessage = {
+            type: 'STATUS',
+            status: 'PERMISSION_DENIED',
+            errorMessage: 'Relay service not enabled on this node',
+          };
+          return new TextEncoder().encode(safeJsonStringify(errRes));
+        }
+        const hopMsg: RelayHopMessage = JSON.parse(new TextDecoder().decode(payload));
+        const res = this.relayV2.handleHopMessage(peerId, hopMsg, this.advertisedAddresses);
+        return new TextEncoder().encode(safeJsonStringify(res));
+      } catch (e) {
+        const errRes: RelayHopMessage = {
+          type: 'STATUS',
+          status: 'MALFORMED_MESSAGE',
+          errorMessage: e instanceof Error ? e.message : 'Unknown Hop RPC error',
+        };
+        return new TextEncoder().encode(safeJsonStringify(errRes));
+      }
+    });
+
+    // Circuit Relay v2 Stop protocol (/libp2p/circuit/relay/0.2.0/stop)
+    this.reqResp.registerHandler(CIRCUIT_RELAY_V2_STOP_PROTOCOL, async (_peerId, _payload) => {
+      try {
+        const stopRes = this.relayV2Client.createStopResponse('OK');
+        return new TextEncoder().encode(safeJsonStringify(stopRes));
+      } catch {
+        const errRes: RelayStopMessage = { type: 'STATUS', status: 'MALFORMED_MESSAGE' };
+        return new TextEncoder().encode(safeJsonStringify(errRes));
+      }
+    });
+
+    // AutoNAT protocol (/libp2p/autonat/1.0.0)
+    this.reqResp.registerHandler(AUTONAT_PROTOCOL, async (peerId, payload) => {
+      try {
+        const req: AutoNatDialRequest = JSON.parse(new TextDecoder().decode(payload));
+        const conn = this.connManager.getConnection(peerId);
+        let remoteIp = '127.0.0.1';
+        let remotePort = 4001;
+        if (conn && conn.socket) {
+          remoteIp = conn.socket.remoteAddress || '127.0.0.1';
+          remotePort = conn.socket.remotePort || 4001;
+        }
+        const resp = await this.autoNat.handleDialRequest(peerId, remoteIp, remotePort, req);
+        return new TextEncoder().encode(safeJsonStringify(resp));
+      } catch (e) {
+        const errRes: AutoNatDialResponse = {
+          status: 'E_INTERNAL_ERROR',
+          message: e instanceof Error ? e.message : 'AutoNAT failed',
+        };
+        return new TextEncoder().encode(safeJsonStringify(errRes));
+      }
+    });
+
+    // DCUtR hole-punching protocol (/libp2p/dcutr)
+    this.reqResp.registerHandler(DCUTR_PROTOCOL, async (_peerId, payload) => {
+      try {
+        const dcutrMsg: DcutrMessage = JSON.parse(new TextDecoder().decode(payload));
+        if (dcutrMsg.type === 'CONNECT') {
+          const respMsg: DcutrMessage = {
+            type: 'SYNC',
+            addrs: this.getAdvertisedAddresses(),
+            delayMs: 100,
+          };
+          return new TextEncoder().encode(safeJsonStringify(respMsg));
+        }
+        return new TextEncoder().encode(safeJsonStringify({ type: 'SYNC', delayMs: 0 }));
+      } catch {
+        return new TextEncoder().encode(safeJsonStringify({ type: 'SYNC', delayMs: 0 }));
+      }
+    });
+
     // Parse listen port from multiaddrs if present
     if (config.listenAddresses) {
       for (const addr of config.listenAddresses) {
@@ -239,7 +344,11 @@ export class SovraP2PNode implements P2PNode {
           this.listenPort = parseInt(match[1], 10);
           const hostMatch = addr.match(/\/ip4\/([^/]+)/);
           if (hostMatch && hostMatch[1]) {
-            this.listenHost = hostMatch[1];
+            if (isCgnatAddress(hostMatch[1])) {
+              this.listenHost = '127.0.0.1';
+            } else {
+              this.listenHost = hostMatch[1];
+            }
           }
           break;
         }
@@ -262,12 +371,19 @@ export class SovraP2PNode implements P2PNode {
           this.handleInboundTcpSocket(socket).catch(() => {});
         });
       } catch (errListen) {
-        this._isRunning = false;
-        return err(
-          new PeerConnectionError(
-            `Failed to bind TCP listen port ${this.listenPort}: ${errListen instanceof Error ? errListen.message : String(errListen)}`,
-          ),
-        );
+        try {
+          await this.tcpTransport.listen(this.listenPort, '127.0.0.1', socket => {
+            this.handleInboundTcpSocket(socket).catch(() => {});
+          });
+          this.listenHost = '127.0.0.1';
+        } catch {
+          this._isRunning = false;
+          return err(
+            new PeerConnectionError(
+              `Failed to bind TCP listen port ${this.listenPort}: ${errListen instanceof Error ? errListen.message : String(errListen)}`,
+            ),
+          );
+        }
       }
     }
 
@@ -280,6 +396,9 @@ export class SovraP2PNode implements P2PNode {
         await this.relay.requestReservation(relayAddr);
       }
     }
+
+    // Cellular 4G/5G CGNAT and NAT traversal refresh
+    await this.refreshRelayReservations();
 
     return ok(undefined);
   }
@@ -467,7 +586,7 @@ export class SovraP2PNode implements P2PNode {
     }
 
     const parts = peerMultiaddr.split('/p2p/');
-    const peerId = parts[1];
+    const peerId = parts[parts.length - 1];
     if (!peerId) {
       return err(
         new PeerConnectionError('Invalid multiaddr: missing /p2p/ Peer ID component', {
@@ -654,6 +773,47 @@ export class SovraP2PNode implements P2PNode {
       }
     }
 
+    if (peerMultiaddr.includes('/p2p-circuit/')) {
+      const circuitParts = peerMultiaddr.split('/p2p-circuit/');
+      const relayAddr = circuitParts[0];
+      const targetSub = circuitParts[1] ?? '';
+      const targetPeerId = targetSub.replace(/^\/?p2p\//, '') || peerId;
+      const relayParts = (relayAddr || '').split('/p2p/');
+      const relayPeerId = relayParts[1];
+
+      // If connected to this relay with an active multiplexer, coordinate live Hop stream
+      const relayConn = relayPeerId ? this.connManager.getConnection(relayPeerId) : undefined;
+      if (relayPeerId && relayConn && relayConn.multiplexer) {
+        try {
+          const hopConnectReq: RelayHopMessage = this.relayV2Client.createConnectRequest(targetPeerId);
+          const reqBytes = new TextEncoder().encode(safeJsonStringify(hopConnectReq));
+          const hopRes = await this.reqResp.sendRequest(relayPeerId, CIRCUIT_RELAY_V2_HOP_PROTOCOL, reqBytes, {
+            timeoutMs: 2000,
+          });
+
+          if (hopRes.ok) {
+            const resMsg: RelayHopMessage = JSON.parse(new TextDecoder().decode(hopRes.value));
+            if (resMsg.status === 'OK') {
+              const peerInfo: PeerInfo = {
+                id: { peerId: targetPeerId, publicKeyHex: '' },
+                addresses: [peerMultiaddr],
+                status: 'connected',
+                score: this.scoring.getScore(targetPeerId),
+                connectionType: 'relayed',
+              };
+              this.connManager.registerPeerInfo(peerInfo);
+              this.pubsub.registerKnownPeer(targetPeerId);
+              this.dht.addPeer(peerInfo);
+
+              this.attemptDcutrUpgrade(targetPeerId, relayPeerId).catch(() => {});
+
+              return ok(peerInfo);
+            }
+          }
+        } catch {}
+      }
+    }
+
     // Fallback simulation / relayed path
     const connectResult = await this.connManager.connect(peerMultiaddr);
     if (!connectResult.ok) {
@@ -723,6 +883,112 @@ export class SovraP2PNode implements P2PNode {
       300000,
       token.issuedAt,
     );
+  }
+
+  public getAdvertisedAddresses(): readonly string[] {
+    const relayed = this.relayV2Client.getAdvertisedRelayedAddrs(this.identity.peerId);
+    return Array.from(new Set([...this.advertisedAddresses, ...relayed]));
+  }
+
+  public isCgnatActive(): boolean {
+    const hasCgnatAddr = this.advertisedAddresses.some(a => {
+      const match = a.match(/\/ip4\/([^/]+)/);
+      return match && match[1] && isCgnatAddress(match[1]);
+    });
+    return hasCgnatAddr || this.nat.status === 'symmetric_nat' || this.nat.status === 'relayed';
+  }
+
+  public getRelayStatus() {
+    return {
+      relayServiceEnabled: Boolean(this.relayV2),
+      activeReservationsCount: this.relayV2
+        ? this.relayV2.getAllReservations().length
+        : this.relayV2Client.getActiveReservations().length,
+      activeCircuitsCount: this.relayV2 ? this.relayV2.getActiveCircuits().length : 0,
+      advertisedRelayedAddresses: this.relayV2Client.getAdvertisedRelayedAddrs(this.identity.peerId),
+      natStatus: this.nat.status,
+      isCgnat: this.isCgnatActive(),
+      metrics: this.relayV2 ? this.relayV2.getMetrics() : null,
+    };
+  }
+
+  public async refreshRelayReservations(): Promise<void> {
+    const isBehindNat = this.nat.status !== 'direct';
+    const hasCgnat = this.advertisedAddresses.some(a => {
+      const match = a.match(/\/ip4\/([^/]+)/);
+      return match && match[1] && isCgnatAddress(match[1]);
+    });
+
+    if (isBehindNat || hasCgnat) {
+      const relays = this.relayV2Client.getRelayAddresses();
+      for (const relayAddr of relays) {
+        try {
+          await this.requestRelayV2Reservation(relayAddr);
+        } catch {}
+      }
+    }
+  }
+
+  public async requestRelayV2Reservation(relayMultiaddr: string): Promise<boolean> {
+    const parts = relayMultiaddr.split('/p2p/');
+    const relayPeerId = parts[1];
+    if (!relayPeerId) return false;
+
+    if (!this.connManager.getConnection(relayPeerId)) {
+      const dialRes = await this.dial(relayMultiaddr);
+      if (!dialRes.ok) return false;
+    }
+
+    const reqMsg: RelayHopMessage = this.relayV2Client.createReserveRequest(this.identity.peerId);
+    const reqBytes = new TextEncoder().encode(safeJsonStringify(reqMsg));
+    const rpcRes = await this.reqResp.sendRequest(relayPeerId, CIRCUIT_RELAY_V2_HOP_PROTOCOL, reqBytes, {
+      timeoutMs: 5000,
+      retries: 1,
+    });
+
+    if (rpcRes.ok) {
+      const respMsg: RelayHopMessage = JSON.parse(new TextDecoder().decode(rpcRes.value));
+      if (respMsg.status === 'OK' && respMsg.reservation) {
+        this.relayV2Client.setReservation(relayMultiaddr, respMsg.reservation);
+        const relayedAddrs = this.relayV2Client.getAdvertisedRelayedAddrs(this.identity.peerId);
+        for (const rAddr of relayedAddrs) {
+          if (!this.advertisedAddresses.includes(rAddr)) {
+            this.advertisedAddresses.push(rAddr);
+          }
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public async attemptDcutrUpgrade(targetPeerId: string, _relayPeerId: string): Promise<boolean> {
+    try {
+      const connectMsg = DcutrCoordinator.createConnectMessage(this.getAdvertisedAddresses());
+      const reqBytes = new TextEncoder().encode(safeJsonStringify(connectMsg));
+      const rpcRes = await this.reqResp.sendRequest(targetPeerId, DCUTR_PROTOCOL, reqBytes, {
+        timeoutMs: 3000,
+      });
+      if (rpcRes.ok) {
+        const syncMsg: DcutrMessage = JSON.parse(new TextDecoder().decode(rpcRes.value));
+        if (syncMsg.type === 'SYNC' && syncMsg.addrs && syncMsg.addrs.length > 0) {
+          const delay = syncMsg.delayMs || 100;
+          await new Promise(r => setTimeout(r, delay));
+          const directCand = syncMsg.addrs.find(a => !a.includes('/p2p-circuit/'));
+          if (directCand) {
+            const directDialRes = await this.dial(directCand);
+            if (directDialRes.ok) {
+              const conn = this.connManager.getConnection(targetPeerId);
+              if (conn) {
+                conn.status = 'connected';
+              }
+              return true;
+            }
+          }
+        }
+      }
+    } catch {}
+    return false;
   }
 }
 

@@ -1,6 +1,52 @@
 import { Result, ok, err } from '@sovra/shared';
 import { RelayUnavailableError } from './errors.js';
 
+export const CIRCUIT_RELAY_V2_HOP_PROTOCOL = '/libp2p/circuit/relay/0.2.0/hop';
+export const CIRCUIT_RELAY_V2_STOP_PROTOCOL = '/libp2p/circuit/relay/0.2.0/stop';
+
+export type RelayHopType = 'RESERVE' | 'CONNECT' | 'STATUS';
+export type RelayStopType = 'CONNECT' | 'STATUS';
+
+export type RelayResponseStatus =
+  | 'OK'
+  | 'RESERVATION_REFUSED'
+  | 'RESOURCE_LIMIT_EXCEEDED'
+  | 'PERMISSION_DENIED'
+  | 'CONNECTION_FAILED'
+  | 'NO_RESERVATION'
+  | 'MALFORMED_MESSAGE';
+
+export interface RelayLimit {
+  readonly durationSeconds: number;
+  readonly maxDataBytes: number;
+}
+
+export interface RelayReservationInfo {
+  readonly clientPeerId: string;
+  readonly expiresAt: number;
+  readonly relayAddrs: readonly string[];
+  readonly limit: RelayLimit;
+  readonly voucherHex?: string;
+}
+
+export interface RelayHopMessage {
+  readonly type: RelayHopType;
+  readonly peerId?: string;
+  readonly targetPeerId?: string;
+  readonly status?: RelayResponseStatus;
+  readonly reservation?: RelayReservationInfo;
+  readonly limit?: RelayLimit;
+  readonly errorMessage?: string;
+}
+
+export interface RelayStopMessage {
+  readonly type: RelayStopType;
+  readonly peerId?: string;
+  readonly status?: RelayResponseStatus;
+  readonly limit?: RelayLimit;
+  readonly errorMessage?: string;
+}
+
 export interface TokenBucketConfig {
   readonly capacity: number; // Maximum burst tokens/bytes
   readonly refillRatePerSecond: number; // Tokens added per second
@@ -64,24 +110,28 @@ export interface CircuitRelayV2Config {
   readonly defaultMaxBytesPerCircuit?: number;
   readonly peerBandwidthCapacityBytes?: number;
   readonly peerBandwidthRefillBytesPerSec?: number;
+  readonly maxReservations?: number;
+  readonly reservationDurationSeconds?: number;
 }
 
 export interface RelayMetricsV2 {
   readonly activeCircuits: number;
   readonly totalCircuitsRelayed: number;
   readonly totalBytesRelayed: number;
+  readonly activeReservations: number;
   readonly quotaExceededCount: number;
   readonly expiredCount: number;
   readonly rejectedCount: number;
 }
 
 /**
- * Circuit Relay v2 Protocol implementation.
+ * Circuit Relay v2 Protocol Server implementation.
  * Protects relay nodes against resource exhaustion attacks via:
  * - Token-bucket rate limiting per peer
  * - Strict maximum byte quotas per circuit
  * - Maximum circuit duration enforcement
  * - Global active circuit capacity boundaries
+ * - Long-lived client reservations with automatic TTL expiration
  */
 export class CircuitRelayV2 {
   private readonly maxConcurrentCircuits: number;
@@ -89,8 +139,11 @@ export class CircuitRelayV2 {
   private readonly defaultMaxBytesPerCircuit: number;
   private readonly peerBandwidthCapacityBytes: number;
   private readonly peerBandwidthRefillBytesPerSec: number;
+  private readonly maxReservations: number;
+  private readonly reservationDurationSeconds: number;
 
   private readonly circuits = new Map<string, CircuitReservationV2>();
+  private readonly reservations = new Map<string, RelayReservationInfo>();
   private readonly peerLimiters = new Map<string, TokenBucketLimiter>();
 
   private totalCircuitsRelayed = 0;
@@ -105,6 +158,8 @@ export class CircuitRelayV2 {
     this.defaultMaxBytesPerCircuit = config.defaultMaxBytesPerCircuit ?? 5 * 1024 * 1024; // 5 MB per circuit
     this.peerBandwidthCapacityBytes = config.peerBandwidthCapacityBytes ?? 10 * 1024 * 1024; // 10 MB burst
     this.peerBandwidthRefillBytesPerSec = config.peerBandwidthRefillBytesPerSec ?? 256 * 1024; // 256 KB/s
+    this.maxReservations = config.maxReservations ?? 500;
+    this.reservationDurationSeconds = config.reservationDurationSeconds ?? 7200; // 2 hours
   }
 
   private getLimiter(peerId: string): TokenBucketLimiter {
@@ -127,6 +182,65 @@ export class CircuitRelayV2 {
         this.expiredCount++;
       }
     }
+    for (const [peerId, res] of this.reservations) {
+      if (now >= res.expiresAt) {
+        this.reservations.delete(peerId);
+      }
+    }
+  }
+
+  public addReservation(
+    clientPeerId: string,
+    relayAddrs: readonly string[] = [],
+    customDurationSec?: number,
+  ): Result<RelayReservationInfo> {
+    this.cleanupExpired();
+
+    if (this.reservations.size >= this.maxReservations) {
+      this.rejectedCount++;
+      return err(new RelayUnavailableError(`Relay reached max reservations (${this.maxReservations})`));
+    }
+
+    const durationSec = customDurationSec ?? this.reservationDurationSeconds;
+    const expiresAt = Date.now() + durationSec * 1000;
+    const limit: RelayLimit = {
+      durationSeconds: this.defaultMaxDurationSeconds,
+      maxDataBytes: this.defaultMaxBytesPerCircuit,
+    };
+
+    const voucherHex = Array.from({ length: 16 }, () =>
+      Math.floor(Math.random() * 256).toString(16).padStart(2, '0'),
+    ).join('');
+
+    const info: RelayReservationInfo = {
+      clientPeerId,
+      expiresAt,
+      relayAddrs,
+      limit,
+      voucherHex,
+    };
+
+    this.reservations.set(clientPeerId, info);
+    return ok(info);
+  }
+
+  public getReservation(clientPeerId: string): RelayReservationInfo | undefined {
+    this.cleanupExpired();
+    return this.reservations.get(clientPeerId);
+  }
+
+  public hasReservation(clientPeerId: string): boolean {
+    this.cleanupExpired();
+    return this.reservations.has(clientPeerId);
+  }
+
+  public removeReservation(clientPeerId: string): void {
+    this.reservations.delete(clientPeerId);
+  }
+
+  public getAllReservations(): readonly RelayReservationInfo[] {
+    this.cleanupExpired();
+    return Array.from(this.reservations.values());
   }
 
   public createCircuit(
@@ -252,6 +366,73 @@ export class CircuitRelayV2 {
     return Array.from(this.circuits.values()).filter(c => c.status === 'active');
   }
 
+  public handleHopMessage(
+    fromPeerId: string,
+    msg: RelayHopMessage,
+    relayAddrs: readonly string[] = [],
+  ): RelayHopMessage {
+    this.cleanupExpired();
+
+    if (msg.type === 'RESERVE') {
+      const resResult = this.addReservation(fromPeerId, relayAddrs);
+      if (!resResult.ok) {
+        return {
+          type: 'STATUS',
+          status: 'RESERVATION_REFUSED',
+          errorMessage: resResult.error.message,
+        };
+      }
+      return {
+        type: 'STATUS',
+        status: 'OK',
+        reservation: resResult.value,
+        limit: resResult.value.limit,
+      };
+    }
+
+    if (msg.type === 'CONNECT') {
+      const targetId = msg.targetPeerId;
+      if (!targetId) {
+        return {
+          type: 'STATUS',
+          status: 'MALFORMED_MESSAGE',
+          errorMessage: 'targetPeerId missing from CONNECT request',
+        };
+      }
+
+      if (!this.hasReservation(targetId)) {
+        return {
+          type: 'STATUS',
+          status: 'NO_RESERVATION',
+          errorMessage: `Target peer ${targetId} has no active reservation on this relay`,
+        };
+      }
+
+      const circuitResult = this.createCircuit(fromPeerId, targetId);
+      if (!circuitResult.ok) {
+        return {
+          type: 'STATUS',
+          status: 'RESOURCE_LIMIT_EXCEEDED',
+          errorMessage: circuitResult.error.message,
+        };
+      }
+
+      return {
+        type: 'STATUS',
+        status: 'OK',
+        limit: {
+          durationSeconds: this.defaultMaxDurationSeconds,
+          maxDataBytes: circuitResult.value.maxBytes,
+        },
+      };
+    }
+
+    return {
+      type: 'STATUS',
+      status: 'OK',
+    };
+  }
+
   public getMetrics(): RelayMetricsV2 {
     this.cleanupExpired();
     const active = Array.from(this.circuits.values()).filter(c => c.status === 'active').length;
@@ -259,9 +440,110 @@ export class CircuitRelayV2 {
       activeCircuits: active,
       totalCircuitsRelayed: this.totalCircuitsRelayed,
       totalBytesRelayed: this.totalBytesRelayed,
+      activeReservations: this.reservations.size,
       quotaExceededCount: this.quotaExceededCount,
       expiredCount: this.expiredCount,
       rejectedCount: this.rejectedCount,
     };
+  }
+}
+
+/**
+ * Circuit Relay v2 Client for mobile handsets and CGNAT peers.
+ */
+export class CircuitRelayV2Client {
+  private readonly relayAddrs = new Set<string>();
+  private readonly activeReservations = new Map<string, RelayReservationInfo>();
+
+  constructor(initialRelays: readonly string[] = []) {
+    for (const r of initialRelays) {
+      this.relayAddrs.add(r);
+    }
+  }
+
+  public addRelayAddress(multiaddr: string): void {
+    this.relayAddrs.add(multiaddr);
+  }
+
+  public removeRelayAddress(multiaddr: string): void {
+    this.relayAddrs.delete(multiaddr);
+    this.activeReservations.delete(multiaddr);
+  }
+
+  public getRelayAddresses(): readonly string[] {
+    return Array.from(this.relayAddrs);
+  }
+
+  public setReservation(relayKey: string, res: RelayReservationInfo): void {
+    this.activeReservations.set(relayKey, res);
+  }
+
+  public getReservation(relayKey: string): RelayReservationInfo | undefined {
+    const res = this.activeReservations.get(relayKey);
+    if (res && Date.now() >= res.expiresAt) {
+      this.activeReservations.delete(relayKey);
+      return undefined;
+    }
+    return res;
+  }
+
+  public hasActiveReservation(relayKey?: string): boolean {
+    if (relayKey) {
+      return Boolean(this.getReservation(relayKey));
+    }
+    const now = Date.now();
+    for (const [k, v] of this.activeReservations) {
+      if (now < v.expiresAt) return true;
+      this.activeReservations.delete(k);
+    }
+    return false;
+  }
+
+  public getActiveReservations(): readonly RelayReservationInfo[] {
+    const now = Date.now();
+    const active: RelayReservationInfo[] = [];
+    for (const [k, v] of this.activeReservations) {
+      if (now < v.expiresAt) {
+        active.push(v);
+      } else {
+        this.activeReservations.delete(k);
+      }
+    }
+    return active;
+  }
+
+  public createReserveRequest(myPeerId: string): RelayHopMessage {
+    return {
+      type: 'RESERVE',
+      peerId: myPeerId,
+    };
+  }
+
+  public createConnectRequest(targetPeerId: string): RelayHopMessage {
+    return {
+      type: 'CONNECT',
+      targetPeerId,
+    };
+  }
+
+  public createStopResponse(status: RelayResponseStatus = 'OK'): RelayStopMessage {
+    return {
+      type: 'STATUS',
+      status,
+    };
+  }
+
+  /**
+   * Generates advertised multiaddrs with /p2p-circuit encapsulation.
+   * e.g. /dns4/relay1.sovra.network/tcp/4001/p2p/<RelayPeerId>/p2p-circuit/p2p/<MyPeerId>
+   */
+  public getAdvertisedRelayedAddrs(myPeerId: string): string[] {
+    const addrs: string[] = [];
+    for (const [relayAddr, res] of this.activeReservations) {
+      if (Date.now() >= res.expiresAt) continue;
+      const baseClean = relayAddr.replace(/\/p2p-circuit.*$/, '');
+      addrs.push(`${baseClean}/p2p-circuit/p2p/${myPeerId}`);
+    }
+    return addrs;
   }
 }

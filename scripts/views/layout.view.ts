@@ -2067,10 +2067,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div>
               <div style="font-size: 1rem; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 6px; letter-spacing: 0.02em;">
                 <span>📡</span> <span>Offline BLE Mesh Radar &amp; DTN Relay</span>
-                <span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 1px 7px; border-radius: 999px; font-weight: 800;">GATT 5.3 Active</span>
+                <span id="bleRadarTransportBadge" style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 1px 7px; border-radius: 999px; font-weight: 800;">GATT 5.3 Active</span>
               </div>
               <div id="bleRadarStatusText" style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">
                 ● 3 Verified Bluetooth Mesh Peers in physical range • Zero Internet Required
+              </div>
+              <div id="bleRadarPlatformNotice" style="display: none; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 6px 10px; margin-top: 6px; font-size: 0.7rem; color: #7dd3fc; line-height: 1.35;">
+                <span style="font-weight: 700;">🌐 Safari iOS &amp; Firefox Multi-Transport:</span> Web Bluetooth is restricted by Apple/Mozilla. Sovra automatically routes offline proximity discovery over high-speed Local Wi-Fi Subnet &amp; WebRTC Mesh.
               </div>
             </div>
             <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
@@ -5290,7 +5293,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div class="key-val">
                 <span class="key-label">NAT Traversal &amp; Relay</span>
-                <span class="key-data" style="color: #34d399; font-size: 0.82rem;">Circuit Relay v2 &bull; AutoNAT</span>
+                <span class="key-data" id="meNatRelayDisplay" style="color: #34d399; font-size: 0.82rem;">Circuit Relay v2 &bull; AutoNAT</span>
+              </div>
+              <div class="key-val">
+                <span class="key-label">Cellular CGNAT Status</span>
+                <span class="key-data" id="meCgnatStatusDisplay" style="color: #38bdf8; font-size: 0.82rem;">Direct / LAN (Relay v2 Ready)</span>
+              </div>
+              <div id="cgnatCellularNotice" style="display: none; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 6px 10px; margin-top: 8px; font-size: 0.72rem; color: #7dd3fc; line-height: 1.4;">
+                <span style="font-weight: 700;">📶 4G/5G Cellular CGNAT Active:</span> Carrier blocks incoming port 4001. Libp2p mesh traffic is automatically routed via Circuit Relay v2 with DCUtR hole-punching.
               </div>
               <div class="key-val">
                 <span class="key-label">Swarm Network Latency</span>

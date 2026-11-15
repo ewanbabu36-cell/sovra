@@ -104,6 +104,13 @@ async function main(): Promise<void> {
     deviceKey,
     binding,
     listenAddresses: [`/ip4/${P2P_HOST}/tcp/${P2P_PORT}`],
+    enableRelayService: true,
+    relayConfig: {
+      maxConcurrentCircuits: 250,
+      defaultMaxDurationSeconds: 1800,
+      defaultMaxBytesPerCircuit: 10 * 1024 * 1024,
+      maxReservations: 1000,
+    },
     limits: {
       maxInboundConnections: 1000,
       maxOutboundConnections: 500,
@@ -120,16 +127,18 @@ async function main(): Promise<void> {
   const peerId = p2pNode.identity.peerId;
   const did = identityKey.did;
   const multiaddrIp4 = `/ip4/${PUBLIC_IP}/tcp/${P2P_PORT}/p2p/${peerId}`;
+  const relayMultiaddr = `${multiaddrIp4}/p2p-circuit`;
 
   // Subscribe to core network GossipSub topics
   p2pNode.pubsub.subscribe('sovra/feed/main');
   p2pNode.pubsub.subscribe('sovra/creator/live');
   p2pNode.pubsub.subscribe('sovra/chats/mesh');
 
-  console.log(`[P2P] Seed Node Listening: ${P2P_HOST}:${P2P_PORT}`);
-  console.log(`[P2P] Peer ID:            ${peerId}`);
-  console.log(`[P2P] Sovereign DID:      ${did}`);
-  console.log(`[P2P] Public Multiaddr:   ${multiaddrIp4}`);
+  console.log(`[P2P] Seed Node Listening:     ${P2P_HOST}:${P2P_PORT}`);
+  console.log(`[P2P] Peer ID:                ${peerId}`);
+  console.log(`[P2P] Sovereign DID:          ${did}`);
+  console.log(`[P2P] Public Multiaddr:       ${multiaddrIp4}`);
+  console.log(`[P2P] Public Relay Multiaddr: ${relayMultiaddr}`);
 
   // HTTP Health & Status Server on port 8080
   const startTime = Date.now();
@@ -146,6 +155,8 @@ async function main(): Promise<void> {
         peerId,
         did,
         multiaddr: multiaddrIp4,
+        relayMultiaddr,
+        relayStatus: p2pNode.getRelayStatus(),
         listenPort: P2P_PORT,
         connectedPeersCount: activeConnections.length,
         connectedPeers: activeConnections.map(c => ({
@@ -167,6 +178,7 @@ async function main(): Promise<void> {
       // Prometheus format metrics
       const activeConns = p2pNode.connManager.getAllConnections().length;
       const uptimeSec = Math.floor((Date.now() - startTime) / 1000);
+      const relayStatus = p2pNode.getRelayStatus();
       const metricsText = [
         '# HELP sovra_seed_up Whether the seed node is online',
         '# TYPE sovra_seed_up gauge',
@@ -174,6 +186,12 @@ async function main(): Promise<void> {
         '# HELP sovra_connected_peers Number of active connected peers',
         '# TYPE sovra_connected_peers gauge',
         `sovra_connected_peers ${activeConns}`,
+        '# HELP sovra_relay_active_reservations Number of active circuit reservations',
+        '# TYPE sovra_relay_active_reservations gauge',
+        `sovra_relay_active_reservations ${relayStatus.activeReservationsCount}`,
+        '# HELP sovra_relay_active_circuits Number of active relayed circuits',
+        '# TYPE sovra_relay_active_circuits gauge',
+        `sovra_relay_active_circuits ${relayStatus.activeCircuitsCount}`,
         '# HELP sovra_uptime_seconds Total node uptime in seconds',
         '# TYPE sovra_uptime_seconds counter',
         `sovra_uptime_seconds ${uptimeSec}`,

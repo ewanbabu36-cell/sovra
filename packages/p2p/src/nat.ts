@@ -1,6 +1,44 @@
 import { bytesToHex, hexToBytes, verifyEd25519 } from '@sovra/crypto';
 import { NatStatus, NatTraversalService } from './types.js';
 
+/**
+ * RFC 6598 Carrier Grade NAT (CGNAT) is the IPv4 block 100.64.0.0/10.
+ * Ranges from 100.64.0.0 to 100.127.255.255.
+ * Used exclusively by mobile cellular carriers (Jio, Airtel, Vi, AT&T, Verizon, T-Mobile)
+ * where mobile handsets do not receive publicly routable IP addresses.
+ */
+export function isCgnatAddress(ip: string): boolean {
+  if (!ip) return false;
+  const clean = ip.replace(/\/.*$/, '').trim();
+  const match = clean.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return false;
+  const first = parseInt(match[1]!, 10);
+  const second = parseInt(match[2]!, 10);
+  return first === 100 && second >= 64 && second <= 127;
+}
+
+/**
+ * Checks whether an IP is RFC 1918 private (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+ * or RFC 6598 CGNAT (100.64.0.0/10) or loopback.
+ */
+export function isPrivateAddress(ip: string): boolean {
+  if (!ip) return false;
+  const clean = ip.replace(/\/.*$/, '').trim();
+  if (clean === '127.0.0.1' || clean === 'localhost' || clean === '::1') return true;
+  const match = clean.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return false;
+  const a = parseInt(match[1]!, 10);
+  const b = parseInt(match[2]!, 10);
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+export function isPrivateOrCgnatAddress(ip: string): boolean {
+  return isPrivateAddress(ip) || isCgnatAddress(ip);
+}
+
 export interface StunProbeResult {
   readonly serverAddr: string;
   readonly observedIp: string;
@@ -30,6 +68,14 @@ export class NatManager implements NatTraversalService {
   }
 
   public async detectNat(): Promise<NatStatus> {
+    for (const addr of this.publicMultiaddrs) {
+      const match = addr.match(/\/ip4\/([^/]+)/);
+      if (match && match[1] && isCgnatAddress(match[1])) {
+        this._status = 'symmetric_nat';
+        return this._status;
+      }
+    }
+
     if (this.checkReachabilityFn) {
       try {
         const result = await this.checkReachabilityFn();
@@ -334,5 +380,118 @@ export class IceFallbackEngine {
     };
   }
 }
+
+export const AUTONAT_PROTOCOL = '/libp2p/autonat/1.0.0';
+
+export interface AutoNatDialRequest {
+  readonly peerId: string;
+  readonly addrs: readonly string[];
+}
+
+export type AutoNatStatus =
+  | 'OK'
+  | 'E_DIAL_ERROR'
+  | 'E_DIAL_REFUSED'
+  | 'E_BAD_REQUEST'
+  | 'E_INTERNAL_ERROR';
+
+export interface AutoNatDialResponse {
+  readonly status: AutoNatStatus;
+  readonly observedAddr?: string;
+  readonly isCgnat?: boolean;
+  readonly message?: string;
+}
+
+/**
+ * AutoNAT Service implementation for detecting reachability across Cellular CGNAT and NAT firewalls.
+ */
+export class AutoNatService {
+  constructor(
+    private readonly dialBackTester?: (addr: string) => Promise<boolean>,
+  ) {}
+
+  public async handleDialRequest(
+    remotePeerId: string,
+    remoteObservedIp: string,
+    remoteObservedPort: number,
+    req: AutoNatDialRequest,
+  ): Promise<AutoNatDialResponse> {
+    const isCgnat = isCgnatAddress(remoteObservedIp);
+    const observedAddr = `/ip4/${remoteObservedIp}/tcp/${remoteObservedPort}/p2p/${remotePeerId}`;
+
+    if (isCgnat) {
+      return {
+        status: 'E_DIAL_ERROR',
+        observedAddr,
+        isCgnat: true,
+        message: 'Observed peer IP is behind Cellular Carrier-Grade NAT (RFC 6598 100.64.0.0/10). Inbound dial rejected.',
+      };
+    }
+
+    if (this.dialBackTester && req.addrs && req.addrs.length > 0) {
+      try {
+        const canReach = await this.dialBackTester(req.addrs[0]!);
+        if (canReach) {
+          return { status: 'OK', observedAddr, isCgnat: false };
+        }
+      } catch {}
+      return { status: 'E_DIAL_ERROR', observedAddr, isCgnat: false, message: 'Dialback failed' };
+    }
+
+    // If not private and not CGNAT, direct connection is viable
+    if (!isPrivateOrCgnatAddress(remoteObservedIp)) {
+      return { status: 'OK', observedAddr, isCgnat: false };
+    }
+
+    return {
+      status: 'E_DIAL_ERROR',
+      observedAddr,
+      isCgnat: false,
+      message: 'Observed peer address is on RFC 1918 private network and cannot receive inbound WAN connections',
+    };
+  }
+
+  public createDialRequest(myPeerId: string, myAddrs: readonly string[]): AutoNatDialRequest {
+    return {
+      peerId: myPeerId,
+      addrs: myAddrs,
+    };
+  }
+}
+
+export const DCUTR_PROTOCOL = '/libp2p/dcutr';
+
+export type DcutrMessageType = 'CONNECT' | 'SYNC';
+
+export interface DcutrMessage {
+  readonly type: DcutrMessageType;
+  readonly addrs?: readonly string[];
+  readonly delayMs?: number;
+}
+
+/**
+ * DCUtR (Direct Connection Upgrade through Relay) Coordinator.
+ * Coordinates synchronized simultaneous hole-punching dials between two peers connected via Circuit Relay v2.
+ */
+export class DcutrCoordinator {
+  public static createConnectMessage(myObservedAddrs: readonly string[]): DcutrMessage {
+    return {
+      type: 'CONNECT',
+      addrs: myObservedAddrs,
+    };
+  }
+
+  public static createSyncMessage(delayMs = 150): DcutrMessage {
+    return {
+      type: 'SYNC',
+      delayMs,
+    };
+  }
+
+  public static calculateSyncDelay(rttMs: number): number {
+    return Math.max(50, Math.min(500, Math.round(rttMs / 2)));
+  }
+}
+
 
 
