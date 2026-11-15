@@ -171,4 +171,32 @@ describe('Cycle 3: Multi-Host Live Broadcast Swarm & 3D Spatial Audio Stages', (
     expect(statusJson.hasActiveAuction).toBe(true);
     expect(statusJson.auction.highestBidSov).toBe(15.0);
   });
+
+  it('POST /api/live/auction/bid atomically handles concurrent competing bids without race condition', async () => {
+    // Two bids fired simultaneously with different amounts
+    const concurrent1 = createMockLiveContext('POST', '/api/live/auction/bid', {
+      sessionId: testSessionId,
+      bidderDid: 'did:key:bidder_concurrent_1',
+      bidderName: 'Collector One',
+      amountSov: 18.0,
+    });
+    const concurrent2 = createMockLiveContext('POST', '/api/live/auction/bid', {
+      sessionId: testSessionId,
+      bidderDid: 'did:key:bidder_concurrent_2',
+      bidderName: 'Collector Two',
+      amountSov: 22.0,
+    });
+
+    await Promise.all([
+      handleLiveStreamingRoutes(concurrent1.ctx),
+      handleLiveStreamingRoutes(concurrent2.ctx),
+    ]);
+
+    const statusCtx = createMockLiveContext('GET', '/api/live/auction/status', undefined, { sessionId: testSessionId });
+    await handleLiveStreamingRoutes(statusCtx.ctx);
+    const statusJson = statusCtx.getResponse().json();
+    expect(statusJson.ok).toBe(true);
+    expect(statusJson.auction.highestBidSov).toBe(22.0);
+    expect(statusJson.auction.highestBidderName).toBe('Collector Two');
+  });
 });

@@ -821,6 +821,30 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       return true;
     }
 
+    // Dynamic 16:9 holographic fallback thumbnail for timeline scrub preview (avoids 404 breaks)
+    if (filename.endsWith('.jpg') || filename.endsWith('.jpeg') || filename.endsWith('.png') || filename.endsWith('.webp')) {
+      const thumbSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16"/>
+      <stop offset="50%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#bg)"/>
+  <circle cx="160" cy="85" r="26" fill="#a855f7" opacity="0.25"/>
+  <polygon points="153,73 173,85 153,97" fill="#c084fc"/>
+  <text x="160" y="135" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" font-weight="700" letter-spacing="1" text-anchor="middle">SOVRA TIMELINE PREVIEW</text>
+</svg>`;
+      res.writeHead(200, {
+        'Content-Type': 'image/svg+xml; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=86400',
+      });
+      res.end(thumbSvg);
+      return true;
+    }
+
     res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ ok: false, error: 'Storyboard not found', code: 'STORYBOARD_NOT_FOUND', timestamp: Date.now() }));
     return true;

@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { SovraSqliteEngine } from '../../scripts/database-sqlite.ts';
 import sovraDb from '../../scripts/database-engine.ts';
@@ -275,7 +276,7 @@ describe('🚀 Sovra Enterprise Control Plane & Zero-Mock Settings Hardening Sui
     });
 
     it('purges fake alert() calls from dev-server client UI source code', () => {
-      const devServerSrc = fs.readFileSync(path.join(process.cwd(), 'scripts', 'dev-server.ts'), 'utf8');
+      const devServerSrc = loadServerContent();
 
       // The old fake alerts in settings-view must NOT exist
       expect(devServerSrc.includes("alert('Profile changes saved successfully!')")).toBe(false);
