@@ -7093,7 +7093,7 @@ async function startDevServer() {
     // ==========================================
     // 🧠 LOCAL EDGE AI CO-PILOT & TRANSLATION API (TITAN-KILLER)
     // ==========================================
-    if (await handleAiRoutes(req, res)) {
+    if (await handleAiRoutes(req, res, { node, storageDaemon, resolvePrincipal, binding, masterKey })) {
       return;
     }
 
