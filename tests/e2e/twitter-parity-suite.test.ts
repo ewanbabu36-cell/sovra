@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/twitter-parity-suite.test.ts
  * SOVRA TWITTER / X PARITY SUITE
@@ -33,7 +34,7 @@ import path from 'node:path';
 
 describe('SOVRA Twitter / X Parity Suite', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const serverContent = fs.readFileSync(devServerPath, 'utf8');
+  const serverContent = loadServerContent(devServerPath);
 
   describe('1. Circular 280-Character SVG Progress Ring', () => {
     it('renders #tweetCharRingContainer, #tweetCharProgress circle, and #tweetCharCount', () => {

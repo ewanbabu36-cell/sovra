@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, test, expect } from 'vitest';
 import vm from 'node:vm';
 import fs from 'node:fs';
@@ -16,7 +17,7 @@ describe('Automated Browser-Script Syntax Verification Gate', () => {
     } catch {
       // If server is not running on localhost, read dev-server.ts source to extract template
       const devServerFile = path.resolve(__dirname, '../../scripts/dev-server.ts');
-      html = fs.readFileSync(devServerFile, 'utf8').replace(/\$\{[^}]+\}/g, 'null');
+      html = loadServerContent(devServerFile).replace(/\$\{[^}]+\}/g, 'null');
     }
 
     expect(html).toBeTruthy();

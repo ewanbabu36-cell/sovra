@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/whatsapp-lockscreen-call-standard.test.ts
  * SOVRA WHATSAPP-GRADE LOCKSCREEN INCOMING CALL VERIFICATION SUITE
@@ -44,7 +45,7 @@ describe('WhatsApp-Standard Lockscreen Call Architecture & Integrity', () => {
 
   const manifestContent = fs.readFileSync(manifestPath, 'utf8');
   const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf8');
-  const devServerContent = fs.readFileSync(devServerPath, 'utf8');
+  const devServerContent = loadServerContent(devServerPath);
   const mobileApiContent = fs.readFileSync(mobileApiPath, 'utf8');
   const bottomNavContent = fs.readFileSync(bottomNavPath, 'utf8');
 

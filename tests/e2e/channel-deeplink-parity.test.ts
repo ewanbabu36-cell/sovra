@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/channel-deeplink-parity.test.ts
  * YouTube-Parity Channel Deep-Linking, Dynamic Shelves & Live Handle Validator Verification.
@@ -19,7 +20,7 @@ import { sovraDb } from '../../scripts/database-engine.js';
 describe('YouTube-Parity Channel Deep-Linking, Shelves & Live Handle Validator', () => {
   const devServerPath = path.resolve(process.cwd(), 'scripts', 'dev-server.ts');
   const studioRoutesPath = path.resolve(process.cwd(), 'scripts', 'routes', 'studio.routes.ts');
-  const devServerCode = fs.readFileSync(devServerPath, 'utf-8');
+  const devServerCode = loadServerContent(devServerPath);
   const studioRoutesCode = fs.readFileSync(studioRoutesPath, 'utf-8');
 
   beforeEach(() => {

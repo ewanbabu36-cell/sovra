@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/reliability/ble-realworld-hardening.test.ts
  * Real-World Hardening & Protocol Verification Suite for SOVRA BLE Mesh.
@@ -224,7 +225,7 @@ describe('SOVRA BLE Mesh 100% Real-World Hardening Suite (Task ID: SOVRA-BLE-REA
 
     it('contains AirDrop-Style Rings, Bluetooth OFF Banner, and Eco Relay in dev-server.ts', () => {
       const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-      const devServerContent = fs.readFileSync(devServerPath, 'utf8');
+      const devServerContent = loadServerContent(devServerPath);
       expect(devServerContent).toContain('Immediate Range (< 2m)');
       expect(devServerContent).toContain('Nearby Range (< 10m)');
       expect(devServerContent).toContain('Outer Mesh Range (< 30m)');

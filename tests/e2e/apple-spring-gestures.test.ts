@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/apple-spring-gestures.test.ts
  * SOVRA APPLE-GRADE SPRING INTERACTION & DOUBLE-TAP GESTURE VERIFICATION SUITE
@@ -14,7 +15,7 @@ import path from 'node:path';
 
 describe('Sovra Apple-Grade Spring Curve & Gesture Verification Suite', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const content = fs.readFileSync(devServerPath, 'utf8');
+  const content = loadServerContent(devServerPath);
 
   it('verifies Apple-grade cubic-bezier(0.16, 1, 0.3, 1) physics curve is configured across core components', () => {
     // Mode switch button

@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeAll } from 'vitest';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -252,7 +253,7 @@ describe('Cycle 1: Zero-Knowledge Proof-of-Humanity & Selective Disclosure (Worl
 
   it('confirms dev-server incorporates ZK-Human badge styling and client hook', () => {
     const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-    const content = fs.readFileSync(devServerPath, 'utf-8');
+    const content = loadServerContent(devServerPath);
     expect(content).toContain('checkAndRenderZkBadge');
     expect(content).toContain('🛡️ ZK-Human');
     expect(content).toContain('zk-human-badge');

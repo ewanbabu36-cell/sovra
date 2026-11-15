@@ -2826,6 +2826,11 @@ export class SovraDatabaseEngine {
     }
 
     this.save();
+    if (this.sqliteEngine && this.db) {
+      try {
+        this.sqliteEngine.syncFromSocialStateJson(this.db);
+      } catch (_) {}
+    }
   }
 
   public save(immediate = false): void {
@@ -6002,6 +6007,9 @@ export class SovraDatabaseEngine {
     });
 
     this.save();
+    try {
+      this.sqliteEngine?.followUser(followerDid, targetDid);
+    } catch (_) {}
     return { ok: true, following: true, record: newRecord };
   }
 
@@ -6015,6 +6023,9 @@ export class SovraDatabaseEngine {
     if (idx >= 0) {
       this.db.follows.splice(idx, 1);
       this.save();
+      try {
+        this.sqliteEngine?.unfollowUser(followerDid, targetDid);
+      } catch (_) {}
     }
     return { ok: true, following: false };
   }
@@ -10511,6 +10522,22 @@ export class SovraDatabaseEngine {
       story.expiresAt = now + 86400000;
     }
     this.save();
+    try {
+      if (this.sqliteEngine && story) {
+        this.sqliteEngine.saveEphemeralStoryRecord({
+          id: story.id,
+          creatorDid: story.creatorDid,
+          creatorHandle: story.creatorHandle,
+          creatorName: story.creatorName,
+          creatorAvatar: story.creatorAvatar,
+          creatorAvatarBg: story.creatorAvatarBg,
+          isCloseFriends: story.isCloseFriends,
+          segmentsJson: JSON.stringify(story.segments || []),
+          createdAt: story.createdAt,
+          expiresAt: story.expiresAt,
+        });
+      }
+    } catch (_) {}
     return story;
   }
 

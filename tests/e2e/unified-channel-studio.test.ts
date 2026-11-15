@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/unified-channel-studio.test.ts
  * End-to-end verification for Unified Sovereign Channel Engine & YouTube-Standard Studio Wiring.
@@ -164,7 +165,7 @@ describe('Unified Sovereign Channel Engine & YouTube-Standard Studio', () => {
 
   describe('3. Frontend Dev-Server Channel Engine & UI Markup Invariants', () => {
     const devServerPath = path.resolve(process.cwd(), 'scripts', 'dev-server.ts');
-    const devServerCode = fs.readFileSync(devServerPath, 'utf-8');
+    const devServerCode = loadServerContent(devServerPath);
 
     it('includes Smart Channel Creator with live preview and banner presets', () => {
       expect(devServerCode).toContain('id="createChannelModal"');

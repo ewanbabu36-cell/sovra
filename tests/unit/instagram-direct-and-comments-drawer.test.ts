@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,7 +12,7 @@ describe('Iteration #1 Verification: Instagram-Grade Direct Share & Comments Dra
   const getFullSource = () => [
     fs.existsSync(path.resolve(viewsDir, 'layout.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'layout.view.ts'), 'utf-8') : '',
     fs.existsSync(path.resolve(viewsDir, 'scripts.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'scripts.view.ts'), 'utf-8') : '',
-    fs.readFileSync(devServerPath, 'utf-8'),
+    loadServerContent(devServerPath),
   ].join('\n');
 
   it('verifies database-engine ChatMessageRecord and appendMessage support sharedPost metadata', () => {

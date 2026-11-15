@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -6,7 +7,7 @@ import * as vm from 'vm';
 
 describe('SOVRA Super App — Ecosystem Modules & Adaptive Architecture Verification', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const devServerCode = fs.readFileSync(devServerPath, 'utf-8');
+  const devServerCode = loadServerContent(devServerPath);
 
   it('declares all 12 specialized Super App module views in HTML structure', () => {
     // 1. SOVRA Home

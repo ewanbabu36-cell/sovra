@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -222,7 +223,7 @@ describe('MILITARY-GRADE BLE MESH HARDENING (6 Field-Testing Gaps)', () => {
     const devServerPath = path.resolve('scripts/dev-server.ts');
 
     it('contains Web Bluetooth GATT Client pairing implementation with Sovra service UUID', () => {
-      const devServerContent = fs.readFileSync(devServerPath, 'utf-8');
+      const devServerContent = loadServerContent(devServerPath);
 
       expect(devServerContent).toContain('00005356-0000-1000-8000-00805f9b34fb');
       expect(devServerContent).toContain('navigator.bluetooth.requestDevice');

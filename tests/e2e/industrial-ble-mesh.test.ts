@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -149,7 +150,7 @@ describe('Industrial BLE Mesh Hardening: Zero-Internet Offline Parity', () => {
   it('5. Ultra-Low Bitrate 6kbps Voice Mode in Dev Server and Mobile Screen', async () => {
     // Check scripts/dev-server.ts
     const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-    const devServerContent = fs.readFileSync(devServerPath, 'utf8');
+    const devServerContent = loadServerContent(devServerPath);
 
     expect(devServerContent).toContain('recOpts.audioBitsPerSecond = 6000');
     expect(devServerContent).toContain("timerEl.setAttribute('data-mesh-bitrate', '6kbps')");

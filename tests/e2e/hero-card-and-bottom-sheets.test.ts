@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/hero-card-and-bottom-sheets.test.ts
  * Master E2E Suite for Airtel-Inspired Glanceable Hero Cards, Identity Horizon Switcher & Glassmorphic Payment Sheets.
@@ -22,7 +23,7 @@ import * as vm from 'node:vm';
 
 describe('Airtel-Inspired Hero Cards, Horizon Switcher & Glassmorphic Checkout Suite', () => {
   const devServerPath = path.resolve(process.cwd(), 'scripts', 'dev-server.ts');
-  const devServerCode = fs.readFileSync(devServerPath, 'utf-8');
+  const devServerCode = loadServerContent(devServerPath);
 
   describe('1. Top Sovereign Node & Wallet Hero Anchor Card (#sovraHeroAnchorCard)', () => {
     it('should embed #sovraHeroAnchorCard inside #feed-view', () => {

@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -37,7 +38,7 @@ describe('Mobile LAN WebRTC & HTTPS Gateway Verification', () => {
 
   it('verifies insecure context notice and call HTTPS switch UI markup exist in rendered HTML', () => {
     const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-    const content = fs.readFileSync(devServerPath, 'utf8');
+    const content = loadServerContent(devServerPath);
 
     // Insecure context top notice banner
     expect(content).toContain('id="insecureContextNotice"');

@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { spawn, ChildProcess } from 'node:child_process';
@@ -459,7 +460,7 @@ describe('PHASE 2: Critical Adversarial Security Remediation Matrix (DOS-01, AUT
 
     it('19. audits codebase to ensure zero occurrences of localStorage.setItem for raw session tokens', async () => {
       const fs = await import('node:fs');
-      const devServerSrc = fs.readFileSync(path.resolve(__dirname, '../../scripts/dev-server.ts'), 'utf8');
+      const devServerSrc = loadServerContent();
       const adminConsoleSrc = fs.readFileSync(path.resolve(__dirname, '../../scripts/admin-console.ts'), 'utf8');
 
       // dev-server client JavaScript check

@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/god-level-admin-console.test.ts
  * Master E2E Suite for God-Level Sovereign Admin Console, Revenue Leakage Plug & Realtime War Room.
@@ -25,7 +26,7 @@ describe('God-Level Sovereign Admin Console & Revenue Leakage Plug Suite', () =>
   const adminSecurityPath = path.resolve(process.cwd(), 'scripts', 'admin-security.ts');
 
   const adminConsoleCode = fs.readFileSync(adminConsolePath, 'utf-8');
-  const devServerCode = fs.readFileSync(devServerPath, 'utf-8');
+  const devServerCode = loadServerContent(devServerPath);
   const adminSecurityCode = fs.readFileSync(adminSecurityPath, 'utf-8');
 
   beforeEach(() => {

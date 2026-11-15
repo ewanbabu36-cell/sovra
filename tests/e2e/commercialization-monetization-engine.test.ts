@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/commercialization-monetization-engine.test.ts
  * Master Commercialization, Revenue Engine & Competitor Parity E2E Suite.
@@ -20,7 +21,7 @@ import * as mobileApi from '../../apps/sovra-mobile/src/services/api.ts';
 describe('Master Commercialization & Sovereign Revenue Engine Suite', () => {
   const devServerPath = path.resolve(process.cwd(), 'scripts', 'dev-server.ts');
   const studioRoutesPath = path.resolve(process.cwd(), 'scripts', 'routes', 'studio.routes.ts');
-  const devServerCode = fs.readFileSync(devServerPath, 'utf-8');
+  const devServerCode = loadServerContent(devServerPath);
   const studioRoutesCode = fs.readFileSync(studioRoutesPath, 'utf-8');
 
   const testCreatorDid = 'did:sovra:creator_alpha_123';

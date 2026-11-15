@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeAll } from 'vitest';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -8,7 +9,7 @@ describe('Sovereign Key Vault & Multi-Device Pairing Suite (Loop #8)', () => {
   let devServerCode: string;
 
   beforeAll(() => {
-    devServerCode = fs.readFileSync(path.resolve(__dirname, '../../scripts/dev-server.ts'), 'utf-8');
+    devServerCode = loadServerContent();
   });
 
   // 1. Sovereign Key Vault & Multi-Device UI Integrations

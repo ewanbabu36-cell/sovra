@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,7 +17,7 @@ describe('Phase 3 (Offline BLE Mesh Radar) & Phase 4 (Universal Creator SOV Tipp
   let devServerCode: string;
 
   beforeAll(() => {
-    devServerCode = fs.readFileSync(path.resolve(__dirname, '../../scripts/dev-server.ts'), 'utf-8');
+    devServerCode = loadServerContent();
   });
 
   // =========================================================================

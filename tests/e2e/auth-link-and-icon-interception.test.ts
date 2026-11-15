@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/auth-link-and-icon-interception.test.ts
  * 👑 AUTH PRE-FLIGHT GUARD: UNIFIED LINK & APP ICON AUTH INTERCEPTION & ROLE-BASED ROUTING SUITE
@@ -37,7 +38,7 @@ describe('👑 Unified Auth Link & App Icon Interception Suite', { timeout: 3000
       }
     } catch (_) {
       const devServerFile = path.resolve(__dirname, '../../scripts/dev-server.ts');
-      serverHtml = fs.readFileSync(devServerFile, 'utf8');
+      serverHtml = loadServerContent(devServerFile);
     }
   });
 

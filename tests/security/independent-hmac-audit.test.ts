@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -107,7 +108,7 @@ describe('Phase 3.2 Independent HMAC-SHA256 Zero-Trust Audit', () => {
     const envExamplePath = path.resolve(__dirname, '../../.env.example');
 
     const dbCode = fs.readFileSync(dbPath, 'utf8');
-    const devServerCode = fs.readFileSync(devServerPath, 'utf8');
+    const devServerCode = loadServerContent(devServerPath);
     const envExample = fs.readFileSync(envExamplePath, 'utf8');
 
     // No hardcoded salts

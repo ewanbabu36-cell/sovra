@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/production-hardening-cycle-7.test.ts
  * Comprehensive End-to-End Verification Suite for Cycle 7 Production Hardening.
@@ -128,7 +129,7 @@ describe('Production Hardening Cycle 7 Verification Suite', () => {
 
       const devServerPath = path.resolve(process.cwd(), 'scripts/dev-server.ts');
       expect(fs.existsSync(devServerPath)).toBe(true);
-      const devServerContent = fs.readFileSync(devServerPath, 'utf8');
+      const devServerContent = loadServerContent(devServerPath);
 
       // Check Service Worker registration and script definition
       expect(devServerContent).toContain('sovra-pwa-v6');
@@ -144,7 +145,7 @@ describe('Production Hardening Cycle 7 Verification Suite', () => {
       const path = await import('node:path');
 
       const devServerPath = path.resolve(process.cwd(), 'scripts/dev-server.ts');
-      const devServerContent = fs.readFileSync(devServerPath, 'utf8');
+      const devServerContent = loadServerContent(devServerPath);
 
       expect(devServerContent).toContain('SOVRA_PWA_MANIFEST');
       expect(devServerContent).toContain('/manifest.json');
