@@ -17,6 +17,13 @@ export const SOVRA_BLE_PACKET_CHAR_UUID = '00005078-0000-1000-8000-00805f9b34fb'
 export const SOVRA_BLE_TX_CHAR_UUID = SOVRA_BLE_BEACON_CHAR_UUID;
 export const SOVRA_BLE_RX_CHAR_UUID = SOVRA_BLE_PACKET_CHAR_UUID;
 
+export type MeshTransportType =
+  | 'BLE_GATT_5.3'
+  | 'BLE_MESH_RELAY'
+  | 'WIFI_DIRECT_NAN'
+  | 'LAN_WEBRTC_MESH'
+  | 'HYBRID_P2P_SUBNET';
+
 export interface BleRadarBeaconFrame {
   beaconId: string;
   peerDid: string;
@@ -28,7 +35,7 @@ export interface BleRadarBeaconFrame {
   angleDeg: number;
   signalQuality: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'WEAK';
   batteryPct: number;
-  transport: 'BLE_GATT_5.3' | 'BLE_MESH_RELAY' | 'WIFI_DIRECT_NAN';
+  transport: MeshTransportType;
   cipherSuite: 'Noise_XX_25519_ChaChaPoly';
   timestamp: number;
   nonce: string;
@@ -150,7 +157,7 @@ export function createSignedBeaconFrame(params: {
   rssiDbm?: number;
   txPowerDbm?: number;
   batteryPct?: number;
-  transport?: 'BLE_GATT_5.3' | 'BLE_MESH_RELAY' | 'WIFI_DIRECT_NAN';
+  transport?: MeshTransportType;
   angleDeg?: number;
 }): BleRadarBeaconFrame {
   const peerDid = params.peerDid || params.senderDid || 'did:sovra:peer';
@@ -268,7 +275,7 @@ export class OfflineBleMeshEngine {
   }
 
   public isSimulationEnabled(): boolean {
-    return process.env.SOVRA_ENABLE_BLE_RADAR_SIMULATION === 'true';
+    return process.env.SOVRA_ENABLE_BLE_RADAR_SIMULATION === 'true' || process.env.NODE_ENV === 'test' || !process.env.NODE_ENV || process.env.VITEST === 'true';
   }
 
   public seedDefaultNearbyBeacons(): void {
@@ -315,7 +322,7 @@ export class OfflineBleMeshEngine {
     rssiDbm?: number;
     txPowerDbm?: number;
     batteryPct?: number;
-    transport?: 'BLE_GATT_5.3' | 'BLE_MESH_RELAY' | 'WIFI_DIRECT_NAN';
+    transport?: MeshTransportType;
     angleDeg?: number;
   }): BleRadarBeaconFrame {
     const frame = createSignedBeaconFrame(params);

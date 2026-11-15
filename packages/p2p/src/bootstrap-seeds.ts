@@ -40,6 +40,31 @@ export function getDefaultBootstrapMultiaddrs(): readonly string[] {
   return GLOBAL_DEFAULT_SEEDS.map(s => s.multiaddr);
 }
 
+export const GLOBAL_DEFAULT_RELAYS: readonly BootstrapSeedPeer[] = [
+  {
+    id: 'relay-global-1',
+    multiaddr: '/dns4/seed1.sovra.network/tcp/4001/p2p/12D3KooWSa1ChBCEzDMBGLtvcDbySca9mmdiYaQZ1mBZJBHPuU1n',
+    region: 'global',
+    isPrimary: true,
+  },
+  {
+    id: 'relay-ap-south',
+    multiaddr: '/dns4/ap-south.sovra.network/tcp/4001/p2p/12D3KooWCreatorBroadcaster',
+    region: 'ap-south',
+    isPrimary: false,
+  },
+  {
+    id: 'relay-local-fallback',
+    multiaddr: '/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWLocalDevRelay',
+    region: 'global',
+    isPrimary: false,
+  },
+];
+
+export function getDefaultRelayMultiaddrs(): readonly string[] {
+  return GLOBAL_DEFAULT_RELAYS.map(s => s.multiaddr);
+}
+
 export function filterSeedsByRegion(region: BootstrapSeedPeer['region']): readonly string[] {
   return GLOBAL_DEFAULT_SEEDS.filter(s => s.region === region || s.region === 'global').map(
     s => s.multiaddr,

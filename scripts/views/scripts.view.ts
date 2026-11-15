@@ -72,14 +72,20 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         var countBadge = document.getElementById('blePeerCountBadge');
         if (countBadge) countBadge.innerText = 'Scanning RF...';
 
-        // Truthful hardware check against navigator.bluetooth
+        // Truthful hardware check against navigator.bluetooth with Safari/Firefox multi-transport fallback
+        var hwBadge = document.getElementById('bleHardwareStatusBadge');
         if (typeof navigator !== 'undefined' && navigator.bluetooth && typeof navigator.bluetooth.getAvailability === 'function') {
           navigator.bluetooth.getAvailability().then(function(available) {
-            var hwBadge = document.getElementById('bleHardwareStatusBadge');
             if (hwBadge && available) {
               hwBadge.innerHTML = '<span style="font-size: 1.2rem;">⚡</span><div><div style="font-weight: 700; color: #38bdf8;">Hardware Mode: Web Bluetooth 5.3 Controller Active</div><div style="font-size: 0.72rem; color: #94a3b8;">Physical BLE 5.3 RF Active on Android APK • Web Simulation Node on Desktop</div></div>';
+            } else if (hwBadge) {
+              hwBadge.innerHTML = '<span style="font-size: 1.2rem;">🌐</span><div><div style="font-weight: 700; color: #38bdf8;">Multi-Transport Mode: Local Wi-Fi Subnet &amp; WebRTC Mesh</div><div style="font-size: 0.72rem; color: #94a3b8;">Apple Safari iOS &amp; Firefox Compliant • Zero Cloud Required</div></div>';
             }
-          }).catch(function() {});
+          }).catch(function() {
+            if (hwBadge) hwBadge.innerHTML = '<span style="font-size: 1.2rem;">🌐</span><div><div style="font-weight: 700; color: #38bdf8;">Multi-Transport Mode: Local Wi-Fi Subnet &amp; WebRTC Mesh</div><div style="font-size: 0.72rem; color: #94a3b8;">Apple Safari iOS &amp; Firefox Compliant • Zero Cloud Required</div></div>';
+          });
+        } else if (hwBadge) {
+          hwBadge.innerHTML = '<span style="font-size: 1.2rem;">🌐</span><div><div style="font-weight: 700; color: #38bdf8;">Multi-Transport Mode: Local Wi-Fi Subnet &amp; WebRTC Mesh</div><div style="font-size: 0.72rem; color: #94a3b8;">Apple Safari iOS &amp; Firefox Compliant • Zero Cloud Required</div></div>';
         }
 
         return fetch('/api/mesh/ble/scan?maxDistanceMeters=100')
@@ -28905,7 +28911,53 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       sweepDeg: 0,
       sweepTimer: null,
 
+      detectCapabilities: function() {
+        const hasWebBluetooth = typeof navigator !== 'undefined' && 'bluetooth' in navigator && typeof navigator.bluetooth.requestDevice === 'function';
+        const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+        const isApple = /iPhone|iPad|iPod|Macintosh/i.test(ua);
+        const isFirefox = /Firefox/i.test(ua);
+        return {
+          hasWebBluetooth: hasWebBluetooth,
+          isApple: isApple,
+          isFirefox: isFirefox,
+          isFallbackRequired: !hasWebBluetooth || isApple || isFirefox,
+          transportMode: hasWebBluetooth && !isApple && !isFirefox ? 'BLE_PHYSICAL_RF' : 'LAN_WEBRTC_MESH'
+        };
+      },
+
+      updatePlatformAdaptation: function() {
+        const caps = this.detectCapabilities();
+        const transportBadge = document.getElementById('bleRadarTransportBadge');
+        const noticeEl = document.getElementById('bleRadarPlatformNotice');
+        const scanBtn = document.getElementById('bleHardwareScanBtn');
+
+        if (caps.isFallbackRequired) {
+          if (transportBadge) {
+            transportBadge.innerHTML = '🌐 LAN / WebRTC Active';
+            transportBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+            transportBadge.style.color = '#38bdf8';
+            transportBadge.style.borderColor = '#0284c7';
+          }
+          if (noticeEl) {
+            noticeEl.style.display = 'block';
+          }
+          if (scanBtn) {
+            scanBtn.innerHTML = '<span>🌐</span> <span>Scan Local Mesh</span>';
+            scanBtn.title = 'Scan Local Wi-Fi Subnet & WebRTC Mesh (Safari iOS & Firefox Compatible)';
+          }
+        } else {
+          if (transportBadge) {
+            transportBadge.innerHTML = '⚡ GATT 5.3 Active';
+          }
+          if (scanBtn) {
+            scanBtn.innerHTML = '<span>🔍</span> <span>Scan BLE</span>';
+            scanBtn.title = 'Trigger Web Bluetooth GATT Hardware Discovery';
+          }
+        }
+      },
+
       init: function() {
+        this.updatePlatformAdaptation();
         this.startSweepAnimation();
         this.refreshScan();
       },
@@ -29010,10 +29062,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
       scanBleDevices: async function() {
         const self = this;
+        const caps = self.detectCapabilities();
         const btn = document.getElementById('bleHardwareScanBtn');
         if (btn) btn.innerHTML = '<span>⏳</span> <span>Scanning...</span>';
 
-        if (navigator.bluetooth && typeof navigator.bluetooth.requestDevice === 'function') {
+        if (caps.hasWebBluetooth && !caps.isApple && !caps.isFirefox) {
           try {
             const device = await navigator.bluetooth.requestDevice({
               filters: [{ services: [self.serviceUuid] }],
@@ -29022,50 +29075,59 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             if (device && typeof showAccountToast === 'function') {
               showAccountToast('📡 BLE GATT Hardware Device Paired: ' + (device.name || device.id));
             }
-          } catch (btErr) {}
-        } else {
-          // Safari & Firefox Fallback: Discover via Local Subnet & mDNS API
-          try {
-            const res = await fetch('/api/mesh/ble/scan?maxDistanceMeters=100').catch(() => null);
-            const peerData = res && res.ok ? await res.json() : null;
-            if (peerData && Array.isArray(peerData.peers) && peerData.peers.length > 0) {
-              self.peers = peerData.peers.map((p, idx) => ({
-                id: p.peerId || 'peer_' + idx,
-                name: p.name || 'Local Mesh Node ' + (idx + 1),
-                rssi: p.rssi || (-50 - (idx * 6)),
-                distanceMeters: String(p.distanceMeters || (1.2 + idx * 0.8).toFixed(1)),
-                hops: p.hops || 1,
-                lastSeen: 'Just now',
-                transport: 'Wi-Fi / WebRTC'
-              }));
-            }
-          } catch (_) {}
+          } catch (btErr) {
+            console.warn('[BLE-Radar] Hardware scan skipped or cancelled:', btErr);
+          }
         }
+
+        // Universal Discovery for Safari iOS, Firefox, and Subnet Mesh Peers
+        try {
+          const res = await fetch('/api/mesh/ble/scan?maxDistanceMeters=100').catch(() => null);
+          const peerData = res && res.ok ? await res.json() : null;
+          if (peerData && Array.isArray(peerData.peers) && peerData.peers.length > 0) {
+            self.peers = peerData.peers.map((p, idx) => ({
+              did: p.peerDid || p.did || 'peer_' + idx,
+              name: p.displayName || p.name || 'Mesh Node ' + (idx + 1),
+              handle: p.handle || '@peer_' + idx,
+              rssi: p.rssiDbm || p.rssi || (-50 - (idx * 6)),
+              distanceMeters: p.distanceMeters || (1.2 + idx * 0.8),
+              hops: p.hops || 1,
+              isSigned: Boolean(p.isSigned),
+              transport: p.transport || (caps.isFallbackRequired ? 'LAN_WEBRTC_MESH' : 'BLE_GATT_5.3')
+            }));
+          }
+        } catch (_) {}
 
         const myDid = (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : null) || (myProfile ? myProfile.did : 'self');
         const myName = myProfile ? myProfile.name : 'Local Node';
         const myHandle = myProfile ? myProfile.handle : '@local_node';
 
         try {
-          await fetch('/api/mesh/ble/beacon', {
+          await fetch('/api/mesh/lan-beacon', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               senderDid: myDid,
               senderName: myName,
               senderHandle: myHandle,
+              transport: caps.isFallbackRequired ? 'LAN_WEBRTC_MESH' : 'BLE_GATT_5.3',
               rssi: -54,
               txPower: -59
             })
-          });
+          }).catch(() => null);
         } catch (_) {}
 
         await self.refreshScan();
 
-        if (btn) btn.innerHTML = '<span>🔍</span> <span>Scan BLE</span>';
+        if (btn) {
+          btn.innerHTML = caps.isFallbackRequired
+            ? '<span>🌐</span> <span>Scan Local Mesh</span>'
+            : '<span>🔍</span> <span>Scan BLE</span>';
+        }
         if (typeof showAccountToast === 'function') {
           const peerCount = self.peers.length;
-          showAccountToast('📡 BLE Mesh Radar Scan Complete: ' + peerCount + ' active GATT peers discovered in RF range.');
+          const modeLabel = caps.isFallbackRequired ? 'Local Subnet & WebRTC Mesh' : 'BLE GATT 5.3 RF';
+          showAccountToast('📡 Radar Scan Complete: ' + peerCount + ' active peers identified via ' + modeLabel + '.');
         }
       },
 
@@ -29257,10 +29319,15 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
       renderRadarHud: function() {
         const self = this;
+        const caps = typeof self.detectCapabilities === 'function' ? self.detectCapabilities() : { isFallbackRequired: false };
         const statusEl = document.getElementById('bleRadarStatusText');
         if (statusEl) {
           const count = self.peers.length;
-          statusEl.innerHTML = '● <b>' + count + ' Verified Bluetooth Mesh Peer' + (count === 1 ? '' : 's') + '</b> in physical radio range &bull; Zero Internet Required';
+          if (caps.isFallbackRequired) {
+            statusEl.innerHTML = '● <b>' + count + ' Verified Mesh Peer' + (count === 1 ? '' : 's') + '</b> (Local Wi-Fi Subnet &amp; WebRTC Mesh) &bull; Zero Cloud Required';
+          } else {
+            statusEl.innerHTML = '● <b>' + count + ' Verified Bluetooth Mesh Peer' + (count === 1 ? '' : 's') + '</b> in physical radio range &bull; Zero Internet Required';
+          }
         }
 
         const outboxBadge = document.getElementById('bleMeshOutboxBadge');
@@ -37594,7 +37661,9 @@ window.SovraCreatorStudioEngine = {
     let _webBleNotifyChar = null;
 
     async function connectWebBluetoothRadar() {
-      if (!navigator.bluetooth) {
+      const isApple = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent || '');
+      const isFirefox = typeof navigator !== 'undefined' && /Firefox/i.test(navigator.userAgent || '');
+      if (!navigator.bluetooth || !navigator.bluetooth.requestDevice || isApple || isFirefox) {
         // Multi-transport Safari/Firefox Fallback: Query LAN Subnet & WebRTC Mesh Peers
         const pairBtn = document.getElementById('webBluetoothPairBtn');
         if (pairBtn) pairBtn.innerHTML = '<span>Scanning Mesh...</span>';
@@ -45667,12 +45736,39 @@ window.SovraCreatorStudioEngine = {
 
     async function pingSwarmLatency() {
       const display = document.getElementById('meSwarmLatencyDisplay');
+      const cgnatDisplay = document.getElementById('meCgnatStatusDisplay');
+      const cgnatNotice = document.getElementById('cgnatCellularNotice');
+      const natDisplay = document.getElementById('meNatRelayDisplay');
+
       if (display) display.innerText = 'Pinging swarm...';
       const t0 = performance.now();
       try {
         const res = await fetch('/api/status');
         const ms = Math.max(1, Math.round(performance.now() - t0));
         if (display) display.innerText = ms + 'ms (Swarm Active)';
+
+        // Query CGNAT & Relay status
+        const cgnatRes = await fetch('/api/mesh/cgnat/status').catch(() => null);
+        if (cgnatRes && cgnatRes.ok) {
+          const cgnatData = await cgnatRes.json();
+          if (cgnatData.isCgnatDetected) {
+            if (cgnatDisplay) {
+              cgnatDisplay.innerHTML = '📶 4G/5G CGNAT (Relay v2 Active)';
+              cgnatDisplay.style.color = '#38bdf8';
+            }
+            if (cgnatNotice) cgnatNotice.style.display = 'block';
+          } else {
+            if (cgnatDisplay) {
+              cgnatDisplay.innerHTML = 'Direct / LAN (Relay v2 Ready)';
+              cgnatDisplay.style.color = '#34d399';
+            }
+            if (cgnatNotice) cgnatNotice.style.display = 'none';
+          }
+          if (natDisplay && cgnatData.circuitRelayV2Active) {
+            natDisplay.innerHTML = 'Circuit Relay v2 &bull; AutoNAT &bull; DCUtR';
+          }
+        }
+
         showAccountToast('⚡ Swarm Latency Ping: ' + ms + 'ms round-trip');
       } catch (e) {
         if (display) display.innerText = '< 20ms (P2P Mesh)';
