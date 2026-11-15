@@ -155,6 +155,7 @@ describe('Production Social Graph & Multi-Device Session Lifecycle', () => {
       body: JSON.stringify({
         handle: aliceHandle,
         device: 'Alice Tablet Node',
+        pin: '123456',
       }),
     });
     expect(loginRes.status).toBe(200);
