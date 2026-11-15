@@ -2672,9 +2672,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
         <div style="margin-top: 1.25rem; display: flex; flex-direction: column; align-items: center;">
           <canvas id="webxrCanvas" width="720" height="400" style="width: 100%; max-height: 400px; border-radius: 16px; background: #030712; border: 1px solid rgba(255,255,255,0.08);"></canvas>
-          <div style="display: flex; gap: 12px; margin-top: 1rem; width: 100%; justify-content: center;">
+          <div style="display: flex; gap: 12px; margin-top: 1rem; width: 100%; justify-content: center; flex-wrap: wrap;">
             <button type="button" id="enterImmersiveVrBtn" onclick="launchWebXrSession()" style="padding: 0.6rem 1.2rem; border-radius: 12px; background: linear-gradient(135deg, #8b5cf6, #6366f1); color: #fff; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span>🥽</span> Enter Immersive VR
+            </button>
+            <button type="button" id="cardboardVrToggleBtn" onclick="toggleCardboardStereoMode()" style="padding: 0.6rem 1.2rem; border-radius: 12px; background: rgba(255,255,255,0.1); color: #c084fc; font-weight: 700; border: 1px solid rgba(139, 92, 246, 0.4); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <span>📱</span> Cardboard VR Split
             </button>
             <button type="button" onclick="closeWebxrSpatialTheater()" style="padding: 0.6rem 1.2rem; border-radius: 12px; background: rgba(255,255,255,0.1); color: #e2e8f0; font-weight: 600; border: 1px solid rgba(255,255,255,0.15); cursor: pointer;">
               Exit Theater

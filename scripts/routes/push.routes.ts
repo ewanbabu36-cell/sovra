@@ -216,6 +216,70 @@ export async function dispatchTipWebPush(recipientDid: string, tipData: {
   return dispatched;
 }
 
+export interface NativePushEntry {
+  userDid: string;
+  token?: string;
+  provider: 'ntfy' | 'fcm' | 'apns' | 'unifiedpush';
+  platform: 'android' | 'ios' | 'web';
+  topic: string;
+  updatedAt: number;
+}
+
+export const nativePushRegistry = new Map<string, NativePushEntry>();
+
+export async function sendNativePushNotification(payload: {
+  userDid: string;
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+}): Promise<{ ok: boolean; provider?: string; error?: string }> {
+  const entry = nativePushRegistry.get(payload.userDid);
+  const topic = entry?.topic || ('sovra_' + crypto.createHash('sha256').update(payload.userDid || 'sovra_broadcast').digest('hex').slice(0, 16));
+  const provider = entry?.provider || 'ntfy';
+
+  if (provider === 'ntfy' || provider === 'unifiedpush') {
+    return new Promise((resolve) => {
+      try {
+        const postData = JSON.stringify({
+          topic,
+          title: payload.title,
+          message: payload.body,
+          priority: 5,
+          tags: ['telephone_receiver', 'incoming_call'],
+          click: 'https://sovra.network',
+          actions: [
+            { action: 'view', label: '📞 Answer', url: 'https://sovra.network' }
+          ],
+          data: payload.data || {}
+        });
+
+        const req = https.request(`https://ntfy.sh/${topic}`, {
+          method: 'POST',
+          headers: {
+            'Title': payload.title,
+            'Priority': 'urgent',
+            'Tags': 'telephone_receiver,call',
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+          },
+          timeout: 4000
+        }, (res) => {
+          resolve({ ok: (res.statusCode || 0) < 400, provider: 'ntfy' });
+        });
+
+        req.on('error', (e) => resolve({ ok: false, provider: 'ntfy', error: e.message }));
+        req.on('timeout', () => { req.destroy(); resolve({ ok: false, provider: 'ntfy', error: 'ntfy timeout' }); });
+        req.write(postData);
+        req.end();
+      } catch (err: any) {
+        resolve({ ok: false, provider: 'ntfy', error: err?.message || String(err) });
+      }
+    });
+  }
+
+  return { ok: true, provider: 'mock' };
+}
+
 export async function handlePushRoutes(ctx: PushRouteContext): Promise<boolean> {
   const { req, res, url, blindPushRelay, readBoundedBody } = ctx;
 
@@ -260,6 +324,62 @@ export async function handlePushRoutes(ctx: PushRouteContext): Promise<boolean> 
     } catch (err: any) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Push registration failed' }));
+    }
+    return true;
+  }
+
+  // Native Push Token Registration (FCM, APNs, UnifiedPush, ntfy)
+  if (url.pathname === '/api/push/register-native' && req.method === 'POST') {
+    try {
+      const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+      if (!bodyOk) return true;
+      const parsed = reqBody ? JSON.parse(reqBody) : {};
+      const userDid = String(parsed.userDid || parsed.did || 'did:sovra:anonymous');
+      const token = String(parsed.token || parsed.pushToken || '');
+      const provider = (parsed.provider === 'fcm' || parsed.provider === 'apns' || parsed.provider === 'unifiedpush' || parsed.provider === 'ntfy') ? parsed.provider : 'ntfy';
+      const platform = (parsed.platform === 'ios' || parsed.platform === 'android' ? parsed.platform : 'android');
+      const topic = parsed.topic || ('sovra_' + crypto.createHash('sha256').update(userDid).digest('hex').slice(0, 16));
+
+      nativePushRegistry.set(userDid, {
+        userDid,
+        token,
+        provider,
+        platform,
+        topic,
+        updatedAt: Date.now()
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, registeredNative: true, userDid, provider, topic }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Native push registration failed' }));
+    }
+    return true;
+  }
+
+  // Native Push Dispatcher for Incoming Calls & Urgent Messages
+  if (url.pathname === '/api/push/dispatch-native' && req.method === 'POST') {
+    try {
+      const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+      if (!bodyOk) return true;
+      const parsed = reqBody ? JSON.parse(reqBody) : {};
+      const userDid = String(parsed.recipientDid || parsed.userDid || '');
+      const title = String(parsed.title || '📞 Sovra Incoming Call');
+      const body = String(parsed.body || 'Encrypted sovereign call incoming...');
+
+      const result = await sendNativePushNotification({
+        userDid,
+        title,
+        body,
+        data: parsed.data || {}
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: result.ok, provider: result.provider, error: result.error }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Native push dispatch failed' }));
     }
     return true;
   }
