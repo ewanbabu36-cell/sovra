@@ -14745,15 +14745,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
           break;
         case 'watch':
-          if (window.SovraCore) {
-            window.SovraCore.transitionToSurface();
-          }
-          if (typeof window.openSpatialWatchSurface === 'function') {
-            window.openSpatialWatchSurface(nodeEl);
-          } else {
-            closeHolographicNav();
-            setTimeout(function() { switchTab('youtube'); }, 140);
-          }
+          closeHolographicNav();
+          setTimeout(function() { switchTab('youtube'); }, 140);
           break;
         case 'logout':
           closeHolographicNav();
@@ -16322,17 +16315,20 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     };
 
     function switchTab(tab) {
-    if (tab === 'explore') tab = 'hub';
-    if (tab === 'vault') tab = 'me';
-    if (tab === 'watch') tab = 'youtube';
+      if (tab === 'explore') tab = 'hub';
+      if (tab === 'vault') tab = 'me';
+      if (tab === 'watch') tab = 'youtube';
 
       if (typeof triggerHapticFeedback === 'function') triggerHapticFeedback([8]);
-      // Pre-flight Auth Guard for navigation links & tab switches
+
+      // Pre-flight Auth Guard for protected private sections ONLY
+      // Public media & exploration surfaces (watch/youtube, feed, reels, hub, dapps, friends) are freely accessible to guests & visitors!
       var isAuth = (typeof window.isUserAuthenticated === 'function')
         ? window.isUserAuthenticated()
         : (window.SovraAndroidOS && typeof window.SovraAndroidOS.isUserAuthenticated === 'function' ? window.SovraAndroidOS.isUserAuthenticated() : false);
 
-      if (!isAuth) {
+      const protectedTabs = ['chat', 'chats', 'me', 'vault', 'studio', 'admin', 'calls'];
+      if (!isAuth && protectedTabs.includes(tab)) {
         window._pendingTargetAppId = tab;
         if (typeof window.showAuthLandingModal === 'function') {
           window.showAuthLandingModal('login');
@@ -16544,6 +16540,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           else tabs[key].classList.remove('active');
         }
       }
+      const watchSec = document.getElementById('watchSectionContainer');
+      if (watchSec) watchSec.style.display = (tab === 'youtube') ? 'contents' : (watchSec.style.display === 'none' ? 'contents' : watchSec.style.display);
+      const tabContentWatch = document.getElementById('tabContentWatch');
+      if (tabContentWatch) tabContentWatch.style.display = 'contents';
       if (tab === 'settings' && typeof loadUserSettingsIntoForm === 'function') { loadUserSettingsIntoForm(); }
 
       for (const key of Object.keys(bnavs)) {
@@ -44313,10 +44313,45 @@ window.SovraCreatorStudioEngine = {
     }
 
     function renderYtVideo(idx, autoStart) {
-      if (idx < 0 || idx >= ytVideosCatalog.length) idx = 0;
+      if (!Array.isArray(ytVideosCatalog) || ytVideosCatalog.length === 0) {
+        ytVideosCatalog = [{
+          id: 'sovra-core-broadcast',
+          title: 'SOVRA Sovereign BitSwap & P2P Stream Network',
+          channelName: 'Sovra Technical Broadcast',
+          channelHandle: '@sovralab',
+          channelAvatar: '⚡',
+          channelAvatarBg: 'linear-gradient(135deg, #0284c7, #38bdf8)',
+          views: 12450,
+          viewsText: '12.4K views',
+          likes: 3820,
+          publishedAt: 'Just now',
+          duration: '18:42',
+          durationSeconds: 1122,
+          cid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+          ambientColor: 'rgba(56, 189, 248, 0.25)',
+          gradient: 'linear-gradient(135deg, #0f172a, #1e1b4b)',
+          tags: ['#Web3', '#P2P', '#HLS', '#Sovra'],
+          chapters: [{ timecode: '00:00', timeSeconds: 0, title: 'Introduction to Sovra' }],
+          description: 'Sovereign 4K BitSwap distributed media broadcast stream.'
+        }];
+      }
+      if (typeof idx !== 'number' || idx < 0 || idx >= ytVideosCatalog.length) idx = 0;
       activeYtVideoIndex = idx;
-      const v = ytVideosCatalog[idx];
-      if (!v) return;
+      let v = ytVideosCatalog[idx];
+      if (!v) {
+        v = ytVideosCatalog[0] || {};
+      }
+      v.tags = Array.isArray(v.tags) ? v.tags : ['#Sovra', '#P2P'];
+      v.chapters = Array.isArray(v.chapters) ? v.chapters : [{ timecode: '00:00', timeSeconds: 0, title: 'Stream' }];
+      v.ambientColor = v.ambientColor || 'rgba(56, 189, 248, 0.25)';
+      v.gradient = v.gradient || 'linear-gradient(135deg, #0f172a, #1e1b4b)';
+      v.views = typeof v.views === 'number' ? v.views : 0;
+      v.likes = typeof v.likes === 'number' ? v.likes : 0;
+      v.cid = v.cid || 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi';
+      v.title = v.title || 'Sovereign 4K Stream';
+      v.channelName = v.channelName || 'Sovra Network';
+      v.duration = v.duration || '00:00';
+      v.durationSeconds = typeof v.durationSeconds === 'number' ? v.durationSeconds : 1;
 
       showYtSkeleton(v.title, v.channelName);
       setTimeout(hideYtSkeleton, 420);
@@ -56605,8 +56640,12 @@ window.SovraCreatorStudioEngine = {
       function openApp(appId) {
         if (navigator.vibrate) navigator.vibrate(12);
 
-        // Guard unauthenticated visitors: remember intended app and open Landing Gateway
-        if (!isUserAuthenticated()) {
+        var normalizedApp = (appId === 'watch') ? 'youtube' : ((appId === 'explore') ? 'hub' : ((appId === 'vault') ? 'me' : appId));
+        const protectedTabs = ['chat', 'chats', 'me', 'vault', 'studio', 'admin', 'calls'];
+
+        // Guard unauthenticated visitors: require auth ONLY for private surfaces (chat, vault, studio, admin, calls)
+        // Public surfaces (watch, feed, reels, hub, dapps, friends) are open for guest exploration
+        if (!isUserAuthenticated() && (protectedTabs.includes(appId) || protectedTabs.includes(normalizedApp))) {
           window._pendingTargetAppId = appId;
           if (typeof window.showAuthLandingModal === 'function') {
             window.showAuthLandingModal('login');
@@ -56713,6 +56752,14 @@ window.SovraCreatorStudioEngine = {
               var onclickAttr = link.getAttribute('onclick') || '';
               var match = onclickAttr.match(/switchTab\(['"]([^'"]+)['"]\)/);
               if (match) targetId = match[1];
+            }
+
+            // Only intercept protected private tabs (chat, vault, studio, admin, calls)
+            // Public tabs (watch, feed, explore, reels, hub, dapps, friends) must pass through cleanly!
+            var normalizedTarget = (targetId === 'watch') ? 'youtube' : ((targetId === 'explore') ? 'hub' : ((targetId === 'vault') ? 'me' : targetId));
+            const protectedTabs = ['chat', 'chats', 'me', 'vault', 'studio', 'admin', 'calls'];
+            if (!protectedTabs.includes(targetId) && !protectedTabs.includes(normalizedTarget)) {
+              return; // Allow public exploration & watch without forcing auth!
             }
 
             e.preventDefault();
