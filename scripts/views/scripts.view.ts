@@ -54240,149 +54240,744 @@ window.SovraCreatorStudioEngine = {
     }
     window.deployAutonomousMission = deployAutonomousMission;
 
-    // --- CYCLE 3: OPEN WEBXR SPATIAL HOLOGRAM THEATER ---
+    // =========================================================================
+    // 🥽 UNIVERSAL WEBXR & HIGH-FIDELITY 3D SPATIAL THEATER ENGINE (CYCLE 3)
+    // Supports: Native WebXR 6-DOF Headsets, Mobile Gyro 360°, Cardboard VR & Laptop 3D Orbit
+    // =========================================================================
+    var _spatialXrOrientation = { pitch: 0, roll: 0, yaw: 0 };
+    var _spatialCamPos = { x: 0, y: 1.6, z: -3.6 }; // VIP Center by default
+    var _spatialCamFov = 68;
+    var _spatialSeat = 'vip'; // 'front' | 'vip' | 'balcony'
+    var _spatialAmbiance = 'dark'; // 'dark' | 'neon' | 'warm'
+    var _isCurvedScreen = true;
+    var _isCardboardStereoMode = false;
+    var _xrAnimationId = null;
+    var _activeSpatialVideoSource = null;
+    var _spatialStarfield = [];
+    var _isDraggingSpatial = false;
+    var _lastMousePos = { x: 0, y: 0 };
+    var _spatialAudioCtx = null;
+    var _spatialWebxrPanner = null;
+    var _spatialListenersAttached = false;
+    var _spatialEqualizerPhase = 0;
+
+    function initSpatialStarfield() {
+      _spatialStarfield = [];
+      for (var i = 0; i < 60; i++) {
+        _spatialStarfield.push({
+          x: (Math.random() - 0.5) * 28,
+          y: Math.random() * 8 + 3.2,
+          z: (Math.random() - 0.5) * 24,
+          size: Math.random() * 2 + 0.8,
+          alpha: Math.random() * 0.6 + 0.3,
+          speed: Math.random() * 2 + 1,
+        });
+      }
+    }
+
+    function findActiveVideoSource(videoId) {
+      if (videoId) {
+        var elById = document.getElementById(videoId);
+        if (elById && (elById.src || (elById).srcObject)) return elById;
+      }
+      var candidateIds = [
+        'ytMainVideoElement',
+        'sovraActiveVideoElement',
+        'reelVideoPlayer',
+        'liveVideoPlayer'
+      ];
+      for (var i = 0; i < candidateIds.length; i++) {
+        var el = document.getElementById(candidateIds[i]);
+        if (el && (el.src || (el).srcObject || el.currentTime > 0)) {
+          return el;
+        }
+      }
+      return null;
+    }
+
+    function project3D(x, y, z, cam, viewportW, viewportH) {
+      var dx = x - cam.x;
+      var dy = y - cam.y;
+      var dz = z - cam.z;
+
+      // Yaw rotation (Y axis)
+      var radYaw = (cam.yaw * Math.PI) / 180;
+      var cosY = Math.cos(radYaw);
+      var sinY = Math.sin(radYaw);
+      var x1 = dx * cosY - dz * sinY;
+      var z1 = dx * sinY + dz * cosY;
+
+      // Pitch rotation (X axis)
+      var radPitch = (cam.pitch * Math.PI) / 180;
+      var cosP = Math.cos(radPitch);
+      var sinP = Math.sin(radPitch);
+      var y2 = dy * cosP - z1 * sinP;
+      var z2 = dy * sinP + z1 * cosP;
+
+      // Roll rotation (Z axis)
+      var radRoll = (cam.roll * Math.PI) / 180;
+      var cosR = Math.cos(radRoll);
+      var sinR = Math.sin(radRoll);
+      var x3 = x1 * cosR - y2 * sinR;
+      var y3 = x1 * sinR + y2 * cosR;
+      var z3 = z2;
+
+      // Clip behind camera
+      if (z3 <= 0.15) return null;
+
+      var f = (viewportW / 2) / Math.tan(((cam.fov || 68) * Math.PI) / 360);
+      var px = viewportW / 2 + (x3 * f) / z3;
+      var py = viewportH / 2 - (y3 * f) / z3;
+
+      return { x: px, y: py, z: z3, scale: f / z3 };
+    }
+
     function enterWebxrSpatialTheater(videoId) {
       var modal = document.getElementById('webxrTheaterModal');
       if (modal) {
         modal.style.display = 'flex';
       }
+
+      _activeSpatialVideoSource = findActiveVideoSource(videoId);
+
       // Initialize WebAudio Spatial Panning with HRTF
       try {
         var AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (AudioCtx) {
-          var audioCtx = new AudioCtx();
-          var panner = audioCtx.createPanner();
+          _spatialAudioCtx = new AudioCtx();
+          var panner = _spatialAudioCtx.createPanner();
           panner.panningModel = 'HRTF';
           panner.distanceModel = 'inverse';
-          panner.positionX.setValueAtTime(0, audioCtx.currentTime);
-          panner.positionY.setValueAtTime(1.6, audioCtx.currentTime); // Eye level
-          panner.positionZ.setValueAtTime(-2, audioCtx.currentTime); // 2m in front
+          panner.refDistance = 1.5;
+          panner.maxDistance = 100;
+          panner.rolloffFactor = 1.0;
+          panner.positionX.setValueAtTime(0, _spatialAudioCtx.currentTime);
+          panner.positionY.setValueAtTime(1.6, _spatialAudioCtx.currentTime); // Eye level
+          panner.positionZ.setValueAtTime(-2, _spatialAudioCtx.currentTime); // 2m in front
           window._spatialWebxrPanner = panner;
+          _spatialWebxrPanner = panner;
         }
       } catch (_) {}
+
+      if (_spatialStarfield.length === 0) {
+        initSpatialStarfield();
+      }
+
+      attachSpatialInteractionListeners();
+
       if (typeof showAccountToast === 'function') {
         showAccountToast('👓 WebXR Spatial Hologram Theater Activated');
       }
-      setTimeout(renderSpatial3dCanvas, 50);
+
+      if (_xrAnimationId) {
+        cancelAnimationFrame(_xrAnimationId);
+        _xrAnimationId = null;
+      }
+      setTimeout(function() {
+        renderSpatial3dCanvas();
+      }, 30);
     }
     window.enterWebxrSpatialTheater = enterWebxrSpatialTheater;
 
     function closeWebxrSpatialTheater() {
       var modal = document.getElementById('webxrTheaterModal');
       if (modal) modal.style.display = 'none';
+
+      if (_xrAnimationId) {
+        cancelAnimationFrame(_xrAnimationId);
+        _xrAnimationId = null;
+      }
+      _isDraggingSpatial = false;
+      if (document.fullscreenElement) {
+        try { document.exitFullscreen().catch(function() {}); } catch (e) {}
+      }
     }
     window.closeWebxrSpatialTheater = closeWebxrSpatialTheater;
     window.exitWebxrSpatialTheater = closeWebxrSpatialTheater;
 
-    // 🥽 SPATIAL 3D HOLOGRAM THEATER: GYROSCOPE MAGIC WINDOW & CARDBOARD VR
-    let _spatialXrOrientation = { pitch: 0, roll: 0, yaw: 0 };
-    let _isCardboardStereoMode = false;
-    let _xrAnimationId = null;
+    function attachSpatialInteractionListeners() {
+      var canvas = document.getElementById('webxrCanvas');
+      if (!canvas || _spatialListenersAttached) return;
+      _spatialListenersAttached = true;
+
+      // Mouse drag to look around (pitch & yaw)
+      canvas.addEventListener('mousedown', function(e) {
+        _isDraggingSpatial = true;
+        _lastMousePos = { x: e.clientX, y: e.clientY };
+        canvas.style.cursor = 'grabbing';
+      });
+
+      window.addEventListener('mousemove', function(e) {
+        if (!_isDraggingSpatial) return;
+        var dx = e.clientX - _lastMousePos.x;
+        var dy = e.clientY - _lastMousePos.y;
+        _spatialXrOrientation.yaw = Math.max(-85, Math.min(85, _spatialXrOrientation.yaw + dx * 0.22));
+        _spatialXrOrientation.pitch = Math.max(-55, Math.min(55, _spatialXrOrientation.pitch - dy * 0.22));
+        _lastMousePos = { x: e.clientX, y: e.clientY };
+      });
+
+      window.addEventListener('mouseup', function() {
+        _isDraggingSpatial = false;
+        if (canvas) canvas.style.cursor = 'grab';
+      });
+
+      // Mouse wheel to zoom distance
+      canvas.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        _spatialCamPos.z = Math.max(-6.5, Math.min(-1.5, _spatialCamPos.z + e.deltaY * 0.004));
+      }, { passive: false });
+
+      // Touch drag for mobile devices
+      canvas.addEventListener('touchstart', function(e) {
+        if (e.touches && e.touches.length > 0) {
+          _isDraggingSpatial = true;
+          _lastMousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+      });
+
+      canvas.addEventListener('touchmove', function(e) {
+        if (!_isDraggingSpatial || !e.touches || e.touches.length === 0) return;
+        var dx = e.touches[0].clientX - _lastMousePos.x;
+        var dy = e.touches[0].clientY - _lastMousePos.y;
+        _spatialXrOrientation.yaw = Math.max(-85, Math.min(85, _spatialXrOrientation.yaw + dx * 0.35));
+        _spatialXrOrientation.pitch = Math.max(-55, Math.min(55, _spatialXrOrientation.pitch - dy * 0.35));
+        _lastMousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      });
+
+      canvas.addEventListener('touchend', function() {
+        _isDraggingSpatial = false;
+      });
+
+      // Keyboard navigation (WASD & Arrows)
+      window.addEventListener('keydown', function(e) {
+        var modal = document.getElementById('webxrTheaterModal');
+        if (!modal || modal.style.display !== 'flex') return;
+
+        if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
+          _spatialCamPos.z = Math.min(-1.5, _spatialCamPos.z + 0.25);
+        } else if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') {
+          _spatialCamPos.z = Math.max(-6.5, _spatialCamPos.z - 0.25);
+        } else if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+          _spatialXrOrientation.yaw = Math.max(-85, _spatialXrOrientation.yaw - 4);
+        } else if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+          _spatialXrOrientation.yaw = Math.min(85, _spatialXrOrientation.yaw + 4);
+        } else if (e.key === 'Escape') {
+          closeWebxrSpatialTheater();
+        }
+      });
+    }
 
     function renderSpatial3dCanvas() {
-      const canvas = document.getElementById('webxrCanvas');
+      var modal = document.getElementById('webxrTheaterModal');
+      if (!modal || modal.style.display !== 'flex') return;
+
+      var canvas = document.getElementById('webxrCanvas');
       if (!canvas) return;
-      const ctx = canvas.getContext('2d');
+      var ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const w = canvas.width;
-      const h = canvas.height;
+      var w = canvas.width;
+      var h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Dark virtual cinema ambient gradient
-      const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, w / 1.5);
-      bgGrad.addColorStop(0, '#0f172a');
-      bgGrad.addColorStop(0.6, '#030712');
-      bgGrad.addColorStop(1, '#000000');
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, w, h);
+      _spatialEqualizerPhase += 0.05;
 
-      // Perspective pitch/roll offset from DeviceOrientation or Mouse drag
-      const offsetX = (_spatialXrOrientation.roll || 0) * 2.5;
-      const offsetY = (_spatialXrOrientation.pitch || 0) * 2.0;
+      var baseCam = {
+        x: _spatialCamPos.x,
+        y: _spatialCamPos.y,
+        z: _spatialCamPos.z,
+        yaw: _spatialXrOrientation.yaw,
+        pitch: _spatialXrOrientation.pitch,
+        roll: _spatialXrOrientation.roll,
+        fov: _spatialCamFov,
+      };
+
+      // Sync Web Audio HRTF 3D Panner Node with camera look angle
+      if (_spatialWebxrPanner) {
+        try {
+          var panAngle = (-baseCam.yaw * Math.PI) / 180;
+          var dist = Math.sqrt(baseCam.x * baseCam.x + (baseCam.y - 2.0) * (baseCam.y - 2.0) + baseCam.z * baseCam.z);
+          _spatialWebxrPanner.positionX.value = Math.sin(panAngle) * dist;
+          _spatialWebxrPanner.positionY.value = 1.6 - baseCam.y;
+          _spatialWebxrPanner.positionZ.value = -Math.cos(panAngle) * dist;
+        } catch (_) {}
+      }
 
       if (_isCardboardStereoMode) {
-        // Dual-Eye Stereoscopic Split Screen (Cardboard VR)
-        const eyeW = w / 2;
-        // Left Eye
-        drawCinemaScreen(ctx, eyeW / 2 - 12 + offsetX, h / 2 + offsetY, eyeW - 40, h - 90, '#8b5cf6');
-        // Right Eye (Disparity offset)
-        drawCinemaScreen(ctx, eyeW + eyeW / 2 + 12 + offsetX, h / 2 + offsetY, eyeW - 40, h - 90, '#ec4899');
+        // Dual-Eye Stereoscopic Split Screen (64mm IPD)
+        var eyeW = w / 2;
+        var ipdOffset = 0.032; // 32mm each side
 
-        // Center separator divider
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        // Left Eye Viewport
+        var leftCam = Object.assign({}, baseCam, { x: baseCam.x - ipdOffset });
+        renderSpatial3dViewport(ctx, leftCam, 0, 0, eyeW, h);
+
+        // Right Eye Viewport
+        var rightCam = Object.assign({}, baseCam, { x: baseCam.x + ipdOffset });
+        renderSpatial3dViewport(ctx, rightCam, eyeW, 0, eyeW, h);
+
+        // Center Optical Separator
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(eyeW, 0);
         ctx.lineTo(eyeW, h);
         ctx.stroke();
+
+        // Eye Center Reticles
+        drawReticle(ctx, eyeW / 2, h / 2);
+        drawReticle(ctx, eyeW + eyeW / 2, h / 2);
       } else {
-        // Single Magic Window Panoramic Hologram
-        drawCinemaScreen(ctx, w / 2 + offsetX, h / 2 + offsetY, w - 80, h - 80, '#8b5cf6');
+        // Fullscreen Panoramic Magic Window (Single Viewport)
+        renderSpatial3dViewport(ctx, baseCam, 0, 0, w, h);
       }
 
-      if (document.getElementById('webxrTheaterModal')?.style.display === 'flex') {
-        _xrAnimationId = requestAnimationFrame(renderSpatial3dCanvas);
-      }
+      _xrAnimationId = requestAnimationFrame(renderSpatial3dCanvas);
     }
 
-    function drawCinemaScreen(ctx, cx, cy, sw, sh, glowColor) {
-      ctx.save();
-      ctx.translate(cx, cy);
+    function drawReticle(ctx, cx, cy) {
+      ctx.strokeStyle = 'rgba(192, 132, 252, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
-      // Ambient Cyber Floor Grid
-      ctx.strokeStyle = 'rgba(139, 92, 246, 0.12)';
-      ctx.lineWidth = 1;
-      for (let x = -sw / 2; x <= sw / 2; x += 40) {
-        ctx.beginPath();
-        ctx.moveTo(x, sh / 2);
-        ctx.lineTo(x * 1.6, sh / 2 + 50);
-        ctx.stroke();
+    function renderSpatial3dViewport(ctx, cam, vpX, vpY, vpW, vpH) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(vpX, vpY, vpW, vpH);
+      ctx.clip();
+
+      // 1. Cinema Ambient Background
+      var bgGrad = ctx.createRadialGradient(vpX + vpW / 2, vpY + vpH / 2, 60, vpX + vpW / 2, vpY + vpH / 2, vpW / 1.3);
+      if (_spatialAmbiance === 'neon') {
+        bgGrad.addColorStop(0, '#0c102b');
+        bgGrad.addColorStop(0.5, '#050716');
+        bgGrad.addColorStop(1, '#000000');
+      } else if (_spatialAmbiance === 'warm') {
+        bgGrad.addColorStop(0, '#1c1305');
+        bgGrad.addColorStop(0.5, '#0c0702');
+        bgGrad.addColorStop(1, '#000000');
+      } else {
+        bgGrad.addColorStop(0, '#0f172a');
+        bgGrad.addColorStop(0.5, '#030712');
+        bgGrad.addColorStop(1, '#000000');
+      }
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(vpX, vpY, vpW, vpH);
+
+      // 2. 3D Ceiling Trusses & Starfield Particles
+      for (var s = 0; s < _spatialStarfield.length; s++) {
+        var star = _spatialStarfield[s];
+        var projStar = project3D(star.x, star.y, star.z, cam, vpW, vpH);
+        if (projStar) {
+          ctx.fillStyle = 'rgba(255, 255, 255, ' + star.alpha + ')';
+          ctx.beginPath();
+          ctx.arc(vpX + projStar.x, vpY + projStar.y, star.size * Math.min(2.5, projStar.scale), 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
-      // Curved Cinema Screen Frame
-      ctx.shadowColor = glowColor;
-      ctx.shadowBlur = 24;
-      ctx.fillStyle = '#090d16';
-      ctx.strokeStyle = glowColor;
-      ctx.lineWidth = 2.5;
+      // 3. 3D Floor Perspective Grid & Ambient Screen Glow
+      var gridColor = _spatialAmbiance === 'neon' ? 'rgba(56, 189, 248, 0.12)' : (_spatialAmbiance === 'warm' ? 'rgba(251, 191, 36, 0.12)' : 'rgba(139, 92, 246, 0.1)');
+      ctx.strokeStyle = gridColor;
+      ctx.lineWidth = 1;
 
-      const x = -sw / 2;
-      const y = -sh / 2;
-      ctx.beginPath();
-      ctx.roundRect(x, y, sw, sh, 14);
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      // Longitudinal lines
+      for (var gx = -7; gx <= 7; gx += 1.4) {
+        var pStart = project3D(gx, 0, -6.5, cam, vpW, vpH);
+        var pEnd = project3D(gx, 0, 1.2, cam, vpW, vpH);
+        if (pStart && pEnd) {
+          ctx.beginPath();
+          ctx.moveTo(vpX + pStart.x, vpY + pStart.y);
+          ctx.lineTo(vpX + pEnd.x, vpY + pEnd.y);
+          ctx.stroke();
+        }
+      }
 
-      // Holographic Cinema Display Artwork
-      const grad = ctx.createLinearGradient(x, y, x + sw, y + sh);
-      grad.addColorStop(0, 'rgba(139, 92, 246, 0.18)');
-      grad.addColorStop(0.5, 'rgba(236, 72, 153, 0.12)');
-      grad.addColorStop(1, 'rgba(56, 189, 248, 0.18)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.roundRect(x + 6, y + 6, sw - 12, sh - 12, 10);
-      ctx.fill();
+      // Latitudinal lines
+      for (var gz = -6.5; gz <= 1.2; gz += 1.2) {
+        var pLeft = project3D(-7, 0, gz, cam, vpW, vpH);
+        var pRight = project3D(7, 0, gz, cam, vpW, vpH);
+        if (pLeft && pRight) {
+          ctx.beginPath();
+          ctx.moveTo(vpX + pLeft.x, vpY + pLeft.y);
+          ctx.lineTo(vpX + pRight.x, vpY + pRight.y);
+          ctx.stroke();
+        }
+      }
 
-      // Cinema Hologram Text & HUD
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = '700 16px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⚡ SOVRA SPATIAL 3D CINEMA', 0, -10);
+      // Dynamic Cinema Screen Floor Bloom (Ambilight)
+      var screenBaseProj = project3D(0, 0, 0, cam, vpW, vpH);
+      if (screenBaseProj) {
+        var bloomGrad = ctx.createRadialGradient(
+          vpX + screenBaseProj.x, vpY + screenBaseProj.y, 10,
+          vpX + screenBaseProj.x, vpY + screenBaseProj.y, 160 * screenBaseProj.scale
+        );
+        var bloomColor = _spatialAmbiance === 'neon' ? 'rgba(56, 189, 248, 0.18)' : (_spatialAmbiance === 'warm' ? 'rgba(251, 191, 36, 0.18)' : 'rgba(168, 85, 247, 0.16)');
+        bloomGrad.addColorStop(0, bloomColor);
+        bloomGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = bloomGrad;
+        ctx.beginPath();
+        ctx.ellipse(vpX + screenBaseProj.x, vpY + screenBaseProj.y, 180 * screenBaseProj.scale, 50 * screenBaseProj.scale, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-      ctx.font = '11px monospace';
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText('HRTF 3D Audio Active • 4K Hologram Curve', 0, 14);
+      // 4. 3D Acoustic Side Walls
+      var wallAccent = _spatialAmbiance === 'neon' ? '#38bdf8' : (_spatialAmbiance === 'warm' ? '#fbbf24' : '#c084fc');
+      ctx.strokeStyle = wallAccent;
+      ctx.lineWidth = 1.5;
+
+      for (var wz = -5; wz <= 1; wz += 1.8) {
+        var pw1 = project3D(-6.5, 0, wz, cam, vpW, vpH);
+        var pw2 = project3D(-6.5, 3.8, wz, cam, vpW, vpH);
+        if (pw1 && pw2) {
+          ctx.beginPath();
+          ctx.moveTo(vpX + pw1.x, vpY + pw1.y);
+          ctx.lineTo(vpX + pw2.x, vpY + pw2.y);
+          ctx.stroke();
+        }
+        var pr1 = project3D(6.5, 0, wz, cam, vpW, vpH);
+        var pr2 = project3D(6.5, 3.8, wz, cam, vpW, vpH);
+        if (pr1 && pr2) {
+          ctx.beginPath();
+          ctx.moveTo(vpX + pr1.x, vpY + pr1.y);
+          ctx.lineTo(vpX + pr2.x, vpY + pr2.y);
+          ctx.stroke();
+        }
+      }
+
+      // 5. 3D Curved Cinema Screen Mesh (16 Segments)
+      drawCinemaScreen3D(ctx, cam, vpX, vpY, vpW, vpH);
+
+      // 6. 3D Holographic Equalizer Spectrum at Foot of Screen
+      drawEqualizer3D(ctx, cam, vpX, vpY, vpW, vpH);
+
+      // 7. Tiered 3D Stadium Seating Rows
+      drawTieredSeats3D(ctx, cam, vpX, vpY, vpW, vpH);
 
       ctx.restore();
     }
 
+    function drawCinemaScreen3D(ctx, cam, vpX, vpY, vpW, vpH) {
+      var segments = 16;
+      var screenW = 6.4;
+      var screenTopY = 3.6;
+      var screenBotY = 0.4;
+      var curveR = 8.0;
+      var arcAngle = 0.8; // radians
+
+      var projectedSegments = [];
+      for (var i = 0; i <= segments; i++) {
+        var frac = i / segments;
+        var x = 0;
+        var z = 0;
+        if (_isCurvedScreen) {
+          var angle = -arcAngle / 2 + frac * arcAngle;
+          x = curveR * Math.sin(angle);
+          z = curveR * (1 - Math.cos(angle));
+        } else {
+          x = -screenW / 2 + frac * screenW;
+          z = 0;
+        }
+
+        var topP = project3D(x, screenTopY, z, cam, vpW, vpH);
+        var botP = project3D(x, screenBotY, z, cam, vpW, vpH);
+        projectedSegments.push({ top: topP, bot: botP, x3d: x, z3d: z });
+      }
+
+      // Check if all segments are valid
+      var hasValidProj = projectedSegments.some(function(s) { return s.top && s.bot; });
+      if (!hasValidProj) return;
+
+      // Draw Screen Bezel / Frame
+      ctx.save();
+      var glowColor = _spatialAmbiance === 'neon' ? '#38bdf8' : (_spatialAmbiance === 'warm' ? '#fbbf24' : '#8b5cf6');
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = 18;
+      ctx.strokeStyle = glowColor;
+      ctx.lineWidth = 3;
+
+      ctx.beginPath();
+      var first = projectedSegments[0];
+      if (first.top) ctx.moveTo(vpX + first.top.x, vpY + first.top.y);
+      for (var t = 1; t <= segments; t++) {
+        if (projectedSegments[t].top) {
+          ctx.lineTo(vpX + projectedSegments[t].top.x, vpY + projectedSegments[t].top.y);
+        }
+      }
+      var last = projectedSegments[segments];
+      if (last.bot) ctx.lineTo(vpX + last.bot.x, vpY + last.bot.y);
+      for (var b = segments - 1; b >= 0; b--) {
+        if (projectedSegments[b].bot) {
+          ctx.lineTo(vpX + projectedSegments[b].bot.x, vpY + projectedSegments[b].bot.y);
+        }
+      }
+      ctx.closePath();
+      ctx.fillStyle = '#020617';
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+
+      // Screen Interior Projection: Live Video or Hologram Art
+      var isVideoPlaying = _activeSpatialVideoSource && !_activeSpatialVideoSource.paused && _activeSpatialVideoSource.readyState >= 2;
+
+      if (isVideoPlaying && _activeSpatialVideoSource.videoWidth > 0) {
+        var vw = _activeSpatialVideoSource.videoWidth;
+        var vh = _activeSpatialVideoSource.videoHeight;
+        var sliceW = vw / segments;
+
+        for (var s = 0; s < segments; s++) {
+          var pA = projectedSegments[s];
+          var pB = projectedSegments[s + 1];
+          if (!pA.top || !pA.bot || !pB.top || !pB.bot) continue;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(vpX + pA.top.x, vpY + pA.top.y);
+          ctx.lineTo(vpX + pB.top.x, vpY + pB.top.y);
+          ctx.lineTo(vpX + pB.bot.x, vpY + pB.bot.y);
+          ctx.lineTo(vpX + pA.bot.x, vpY + pA.bot.y);
+          ctx.closePath();
+          ctx.clip();
+
+          var destX = vpX + pA.top.x;
+          var destY = vpY + pA.top.y;
+          var destW = Math.max(1, (pB.top.x - pA.top.x));
+          var destH = Math.max(1, (pA.bot.y - pA.top.y));
+
+          try {
+            ctx.drawImage(
+              _activeSpatialVideoSource,
+              s * sliceW, 0, sliceW, vh,
+              destX, destY, destW, destH
+            );
+          } catch (_) {}
+          ctx.restore();
+        }
+      } else {
+        // Holographic Cinema Display Artwork
+        var centerP = project3D(0, (screenTopY + screenBotY) / 2, 0, cam, vpW, vpH);
+        if (centerP) {
+          var screenGrad = ctx.createLinearGradient(vpX + centerP.x - 120, vpY + centerP.y - 60, vpX + centerP.x + 120, vpY + centerP.y + 60);
+          screenGrad.addColorStop(0, 'rgba(139, 92, 246, 0.22)');
+          screenGrad.addColorStop(0.5, 'rgba(236, 72, 153, 0.16)');
+          screenGrad.addColorStop(1, 'rgba(56, 189, 248, 0.22)');
+          ctx.fillStyle = screenGrad;
+
+          ctx.beginPath();
+          var p0 = projectedSegments[0];
+          if (p0.top) ctx.moveTo(vpX + p0.top.x + 4, vpY + p0.top.y + 4);
+          for (var st = 1; st <= segments; st++) {
+            if (projectedSegments[st].top) {
+              ctx.lineTo(vpX + projectedSegments[st].top.x - 4, vpY + projectedSegments[st].top.y + 4);
+            }
+          }
+          for (var sb = segments; sb >= 0; sb--) {
+            if (projectedSegments[sb].bot) {
+              ctx.lineTo(vpX + projectedSegments[sb].bot.x - 4, vpY + projectedSegments[sb].bot.y - 4);
+            }
+          }
+          ctx.closePath();
+          ctx.fill();
+
+          // Title & Subtitle in perspective
+          var fontScale = Math.max(0.6, Math.min(1.8, centerP.scale));
+          ctx.fillStyle = '#f8fafc';
+          ctx.font = '700 ' + Math.round(18 * fontScale) + 'px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('⚡ SOVRA SPATIAL 3D CINEMA', vpX + centerP.x, vpY + centerP.y - 12 * fontScale);
+
+          ctx.font = '600 ' + Math.round(11 * fontScale) + 'px monospace';
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillText('HRTF 3D Audio Active • 4K Hologram Curve', vpX + centerP.x, vpY + centerP.y + 16 * fontScale);
+
+          // Simulated Audio Waveform on Screen
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 2 * fontScale;
+          ctx.beginPath();
+          var waveW = 180 * fontScale;
+          for (var wx = -waveW / 2; wx <= waveW / 2; wx += 6) {
+            var wave = Math.sin((wx + _spatialEqualizerPhase * 80) * 0.05) * Math.cos(_spatialEqualizerPhase * 1.5) * (14 * fontScale);
+            if (wx === -waveW / 2) ctx.moveTo(vpX + centerP.x + wx, vpY + centerP.y + 42 * fontScale + wave);
+            else ctx.lineTo(vpX + centerP.x + wx, vpY + centerP.y + 42 * fontScale + wave);
+          }
+          ctx.stroke();
+        }
+      }
+    }
+
+    function drawEqualizer3D(ctx, cam, vpX, vpY, vpW, vpH) {
+      var numBars = 16;
+      ctx.fillStyle = _spatialAmbiance === 'warm' ? '#fbbf24' : (_spatialAmbiance === 'neon' ? '#38bdf8' : '#a855f7');
+
+      for (var k = 0; k < numBars; k++) {
+        var bx = -2.8 + k * 0.37;
+        var bHeight = 0.15 + Math.abs(Math.sin(_spatialEqualizerPhase * 3 + k * 0.8)) * 0.42;
+
+        var pBot = project3D(bx, 0.15, 0.1, cam, vpW, vpH);
+        var pTop = project3D(bx, 0.15 + bHeight, 0.1, cam, vpW, vpH);
+        if (pBot && pTop) {
+          var bWidth = Math.max(2, 6 * pBot.scale);
+          ctx.fillRect(vpX + pBot.x - bWidth / 2, vpY + pTop.y, bWidth, Math.max(2, pBot.y - pTop.y));
+        }
+      }
+    }
+
+    function drawTieredSeats3D(ctx, cam, vpX, vpY, vpW, vpH) {
+      var rows = [
+        { z: -1.2, y: 0.35, count: 8, label: 'Row 1 (Front)' },
+        { z: -2.5, y: 0.70, count: 10, label: 'Row 2 (VIP)' },
+        { z: -4.2, y: 1.10, count: 12, label: 'Row 3 (Balcony)' }
+      ];
+
+      for (var r = 0; r < rows.length; r++) {
+        var row = rows[r];
+        // Only draw seats in front of camera
+        if (row.z <= cam.z + 0.3) continue;
+
+        var seatStep = 0.9;
+        var startX = -((row.count - 1) * seatStep) / 2;
+
+        for (var s = 0; s < row.count; s++) {
+          var sx = startX + s * seatStep;
+          // Chair Backrest
+          var pBackTop = project3D(sx, row.y + 0.45, row.z, cam, vpW, vpH);
+          var pBackBot = project3D(sx, row.y + 0.15, row.z, cam, vpW, vpH);
+          var pSeatFwd = project3D(sx, row.y + 0.15, row.z + 0.35, cam, vpW, vpH);
+
+          if (pBackTop && pBackBot && pSeatFwd) {
+            var seatW = Math.max(6, 22 * pBackTop.scale);
+
+            // Backrest
+            ctx.fillStyle = (r === 1) ? '#4c1d95' : '#1e1b4b';
+            ctx.strokeStyle = 'rgba(139, 92, 246, 0.35)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.rect(vpX + pBackTop.x - seatW / 2, vpY + pBackTop.y, seatW, pBackBot.y - pBackTop.y);
+            ctx.fill();
+            ctx.stroke();
+
+            // Seat Cushion
+            ctx.fillStyle = (r === 1) ? '#6d28d9' : '#312e81';
+            ctx.beginPath();
+            ctx.rect(vpX + pBackBot.x - seatW / 2, vpY + pBackBot.y, seatW, Math.max(2, pSeatFwd.y - pBackBot.y));
+            ctx.fill();
+            ctx.stroke();
+
+            // Armrest Accent
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(vpX + pBackBot.x - seatW / 2 - 2, vpY + pBackBot.y + 2, 3, 6 * pBackBot.scale);
+            ctx.fillRect(vpX + pBackBot.x + seatW / 2 - 1, vpY + pBackBot.y + 2, 3, 6 * pBackBot.scale);
+          }
+        }
+      }
+    }
+
+    // Controls: Seat presets
+    function setSpatialSeat(seat) {
+      _spatialSeat = seat;
+      if (seat === 'front') {
+        _spatialCamPos = { x: 0, y: 1.3, z: -2.0 };
+        _spatialCamFov = 76;
+      } else if (seat === 'balcony') {
+        _spatialCamPos = { x: 0, y: 2.5, z: -5.4 };
+        _spatialCamFov = 62;
+      } else {
+        // VIP
+        _spatialCamPos = { x: 0, y: 1.6, z: -3.6 };
+        _spatialCamFov = 68;
+      }
+
+      var badge = document.getElementById('spatialSeatBadge');
+      if (badge) {
+        badge.textContent = seat === 'front' ? '💺 Front Row (Immersive)' : (seat === 'balcony' ? '💺 Balcony Panorama' : '💺 VIP Center (Row 2)');
+      }
+
+      ['spatialSeatFrontBtn', 'spatialSeatVipBtn', 'spatialSeatBalconyBtn'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+          el.style.background = 'rgba(255,255,255,0.06)';
+          el.style.borderColor = 'rgba(255,255,255,0.15)';
+          el.style.color = '#cbd5e1';
+          el.style.fontWeight = 'normal';
+        }
+      });
+      var activeBtnId = seat === 'front' ? 'spatialSeatFrontBtn' : (seat === 'balcony' ? 'spatialSeatBalconyBtn' : 'spatialSeatVipBtn');
+      var activeEl = document.getElementById(activeBtnId);
+      if (activeEl) {
+        activeEl.style.background = 'rgba(139, 92, 246, 0.3)';
+        activeEl.style.borderColor = '#8b5cf6';
+        activeEl.style.color = '#fff';
+        activeEl.style.fontWeight = 'bold';
+      }
+    }
+    window.setSpatialSeat = setSpatialSeat;
+
+    function setSpatialAmbiance(theme) {
+      _spatialAmbiance = theme;
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('✨ Theater Ambiance: ' + (theme === 'dark' ? 'Cinema Obsidian' : (theme === 'neon' ? 'Cyber Neon' : 'Solar Warm')));
+      }
+    }
+    window.setSpatialAmbiance = setSpatialAmbiance;
+
+    function toggleSpatialScreenCurve() {
+      _isCurvedScreen = !_isCurvedScreen;
+      var badge = document.getElementById('spatialCurveBadge');
+      var btn = document.getElementById('spatialCurveBtn');
+      if (badge) badge.textContent = _isCurvedScreen ? 'Curved IMAX' : 'Flat Screen';
+      if (btn) btn.textContent = _isCurvedScreen ? 'Curve: ON' : 'Curve: OFF';
+    }
+    window.toggleSpatialScreenCurve = toggleSpatialScreenCurve;
+
+    function toggleSpatialTheaterVideoPlay() {
+      if (!_activeSpatialVideoSource) {
+        _activeSpatialVideoSource = findActiveVideoSource();
+      }
+      if (_activeSpatialVideoSource) {
+        if (_activeSpatialVideoSource.paused) {
+          _activeSpatialVideoSource.play().catch(function() {});
+          if (typeof showAccountToast === 'function') showAccountToast('▶ Theater Video Playing');
+        } else {
+          _activeSpatialVideoSource.pause();
+          if (typeof showAccountToast === 'function') showAccountToast('⏸ Theater Video Paused');
+        }
+      } else {
+        if (typeof showAccountToast === 'function') showAccountToast('ℹ️ No active video loaded; ambient cinema visualizer active');
+      }
+    }
+    window.toggleSpatialTheaterVideoPlay = toggleSpatialTheaterVideoPlay;
+
+    function toggleSpatialTheaterFullscreen() {
+      var box = document.getElementById('webxrTheaterContentBox') || document.getElementById('webxrTheaterModal');
+      if (!box) return;
+
+      if (!document.fullscreenElement) {
+        if (box.requestFullscreen) {
+          box.requestFullscreen().catch(function() {});
+        } else if ((box).webkitRequestFullscreen) {
+          (box).webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(function() {});
+        }
+      }
+    }
+    window.toggleSpatialTheaterFullscreen = toggleSpatialTheaterFullscreen;
+
     function toggleCardboardStereoMode() {
       _isCardboardStereoMode = !_isCardboardStereoMode;
-      const btn = document.getElementById('cardboardVrToggleBtn');
+      var btn = document.getElementById('cardboardVrToggleBtn');
       if (btn) {
-        btn.innerHTML = _isCardboardStereoMode ? '<span>📱</span> 2D Magic Window' : '<span>🥽</span> Cardboard VR Split';
+        btn.innerHTML = _isCardboardStereoMode ? '<span>📱</span> 2D Magic Window' : '<span>📱</span> Cardboard VR Split';
+      }
+      var trackBadge = document.getElementById('spatialTrackingBadge');
+      if (trackBadge) {
+        trackBadge.textContent = _isCardboardStereoMode ? '🥽 Cardboard Stereoscopic Active' : '🎮 6-DOF Orbit & Gyro Active';
       }
       if (typeof showAccountToast === 'function') {
         showAccountToast(_isCardboardStereoMode ? '🥽 Cardboard Stereoscopic VR Active (Insert Phone into VR Headset)' : '📱 Magic Window 3D Mode Active');
@@ -54409,13 +55004,14 @@ window.SovraCreatorStudioEngine = {
       }
 
       // 2. Hardware Gyroscope & Motion Sensor Permission (iOS 13+ & Android)
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof (DeviceOrientationEvent).requestPermission === 'function') {
         try {
-          const perm = await DeviceOrientationEvent.requestPermission();
+          var perm = await (DeviceOrientationEvent).requestPermission();
           if (perm === 'granted') {
             window.addEventListener('deviceorientation', function(ev) {
               _spatialXrOrientation.pitch = (ev.beta || 0) - 45; // eye tilt
               _spatialXrOrientation.roll = ev.gamma || 0;
+              if (ev.alpha) _spatialXrOrientation.yaw = (ev.alpha - 180) * 0.7;
             });
           }
         } catch (_) {}
@@ -54423,19 +55019,7 @@ window.SovraCreatorStudioEngine = {
         window.addEventListener('deviceorientation', function(ev) {
           _spatialXrOrientation.pitch = (ev.beta || 0) - 45;
           _spatialXrOrientation.roll = ev.gamma || 0;
-        });
-      }
-
-      // 3. Desktop / Touch Pan Listener
-      const canvas = document.getElementById('webxrCanvas');
-      if (canvas && !canvas.dataset.dragListening) {
-        canvas.dataset.dragListening = 'true';
-        canvas.addEventListener('mousemove', function(e) {
-          const rect = canvas.getBoundingClientRect();
-          const normX = (e.clientX - rect.left) / rect.width - 0.5;
-          const normY = (e.clientY - rect.top) / rect.height - 0.5;
-          _spatialXrOrientation.roll = normX * 25;
-          _spatialXrOrientation.pitch = normY * 25;
+          if (ev.alpha) _spatialXrOrientation.yaw = (ev.alpha - 180) * 0.7;
         });
       }
 
