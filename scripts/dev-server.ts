@@ -813,10 +813,16 @@ async function bootstrapLocalNode() {
   const binding = createPeerIdentityBinding(deviceKey, masterKey.did, delegation);
 
   const tcpPort = 4001;
+  const p2pListenHost = process.env.SOVRA_P2P_HOST || '0.0.0.0';
+  const nodeLanIp = getLanIpAddress();
   const node = new SovraP2PNode({
     deviceKey,
     binding,
-    listenAddresses: [`/ip4/127.0.0.1/tcp/${tcpPort}/p2p/${binding.peerId}`],
+    listenAddresses: [
+      `/ip4/${p2pListenHost}/tcp/${tcpPort}/p2p/${binding.peerId}`,
+      `/ip4/127.0.0.1/tcp/${tcpPort}/p2p/${binding.peerId}`,
+      ...(nodeLanIp && nodeLanIp !== '127.0.0.1' ? [`/ip4/${nodeLanIp}/tcp/${tcpPort}/p2p/${binding.peerId}`] : [])
+    ],
   });
 
   await node.start();
