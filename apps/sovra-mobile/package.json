@@ -4,15 +4,20 @@
   "private": true,
   "main": "App.tsx",
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "build:apk": "eas build -p android --profile preview",
-    "build:bundle": "eas build -p android --profile production",
-    "test": "vitest run ../../apps/sovra-mobile/test",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "cap:sync": "cap sync",
+    "cap:android": "cap open android",
+    "cap:ios": "cap open ios",
+    "test": "vitest run test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
     "@sovra/app": "workspace:*",
     "@sovra/crypto": "workspace:*",
     "@sovra/identity": "workspace:*",
@@ -20,11 +25,16 @@
     "@sovra/p2p": "workspace:*",
     "@sovra/protocol": "workspace:*",
     "@sovra/social": "workspace:*",
-    "@sovra/storage": "workspace:*"
+    "@sovra/storage": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.8.2",
+    "vite": "^6.2.0",
     "vitest": "^3.0.7"
   }
 }

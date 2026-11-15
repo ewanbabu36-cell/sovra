@@ -1,0 +1,15 @@
+{
+  "appId": "network.sovra.mobile",
+  "appName": "Sovra Mobile",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#090d16"
+    }
+  }
+}

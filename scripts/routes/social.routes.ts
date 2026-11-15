@@ -672,15 +672,16 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
         createdAt: new Date().toISOString(),
       };
       if (dynamicSocialStore) {
+        if (!Array.isArray(dynamicSocialStore.channels)) dynamicSocialStore.channels = [];
         dynamicSocialStore.channels.unshift(newChan);
         if (saveDynamicSocialState) saveDynamicSocialState(dynamicSocialStore);
       }
       sovraDb.upsertChannel(newChan);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, channel: newChan, message: 'Channel created successfully' }));
-    } catch {
+    } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
     }
     return true;
   }
@@ -1404,8 +1405,9 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
     }
 
     const mutuals = sovraDb.getMutualFriends(userDid, targetDid);
+    const isFriend = sovraDb.areFriends(userDid, targetDid);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, mutuals, count: mutuals.length }));
+    res.end(JSON.stringify({ ok: true, mutuals, count: mutuals.length, isFriend }));
     return true;
   }
 

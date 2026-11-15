@@ -267,7 +267,7 @@ describe('Sovra Mobile Durable Offline Mesh & Outbox Verification', () => {
   it('reconciles queued offline operations with dev server and retrieves server deltas', async () => {
     const { registerUserProfile, setActiveSession } = await import('../src/services/api.js');
     const reg = await registerUserProfile({
-      handle: `offline_sync_user_${Date.now()}`,
+      handle: `sync_${Date.now()}`,
       displayName: 'Offline Sync User',
     });
     if (reg.sessionToken && reg.user) {
