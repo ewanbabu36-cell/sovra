@@ -2940,6 +2940,41 @@ this.db.exec('COMMIT;');
     } catch (_) {}
   }
 
+  public recordPostLike(postId: string, likedByDids: string[], likesCount: number): void {
+    try {
+      this.prepareCached('UPDATE posts SET likes_count = ?, liked_by_dids_json = ? WHERE id = ?').run(
+        likesCount,
+        JSON.stringify(likedByDids),
+        postId
+      );
+    } catch (_) {}
+  }
+
+  public recordComment(comment: any, postId: string): void {
+    try {
+      this.prepareCached(`
+        INSERT OR REPLACE INTO comments (
+          id, post_id, author_did, author_handle, author_name,
+          author_avatar, author_avatar_bg, text, parent_id, likes_count,
+          liked_by_dids_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        comment.id,
+        postId,
+        comment.authorDid,
+        comment.authorHandle || '',
+        comment.author || comment.authorName || 'Peer',
+        comment.authorAvatar || 'S',
+        comment.authorAvatarBg || '#6366f1',
+        comment.text || '',
+        comment.parentId || null,
+        comment.likesCount || 0,
+        JSON.stringify(comment.likedByDids || []),
+        comment.timestamp || Date.now()
+      );
+    } catch (_) {}
+  }
+
   private mapPostRow(r: any, comments: any[]): FeedPostRecord {
     let tags = '';
     try {

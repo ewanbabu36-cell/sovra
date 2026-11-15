@@ -2833,9 +2833,13 @@ export class SovraDatabaseEngine {
     }
   }
 
+  private isFlushingAsync = false;
+  private isDirty = false;
+
   public save(immediate = false): void {
+    this.isDirty = true;
     const forceSync = process.env.SOVRA_FORCE_SYNC_WRITE === 'true';
-    if (immediate || forceSync) {
+    if (forceSync) {
       if (this.saveDebounceTimer) {
         clearTimeout(this.saveDebounceTimer);
         this.saveDebounceTimer = null;
@@ -2849,17 +2853,71 @@ export class SovraDatabaseEngine {
       return;
     }
 
-    // Phase 4.0 Database Modernization:
-    // Synchronous whole-file JSON writes are decoupled from the request path.
+    // Modern Non-Blocking Architecture:
+    // Synchronous whole-file disk writes are decoupled from the request path.
     // Durability is guaranteed in microsecond WAL mode by SQLite.
-    // Whole-state snapshotting is debounced in the background without blocking the event loop.
+    // Whole-state snapshotting is debounced in the background via flushAsync without blocking the Node.js event loop.
+    const debounceMs = immediate ? 50 : 250;
     this.saveDebounceTimer = setTimeout(() => {
       this.saveDebounceTimer = null;
       this.pendingFlushes = 0;
-      this.flushSync();
-    }, 250);
+      this.flushAsync().catch(() => {});
+    }, debounceMs);
     if (this.saveDebounceTimer && typeof (this.saveDebounceTimer as any).unref === 'function') {
       (this.saveDebounceTimer as any).unref();
+    }
+  }
+
+  public async flushAsync(): Promise<void> {
+    if (this.isFlushingAsync) return;
+    this.isFlushingAsync = true;
+    try {
+      if (!fs.existsSync(this.storageDir)) {
+        await fs.promises.mkdir(this.storageDir, { recursive: true });
+      }
+      this.db.schemaVersion = 1;
+      const data = JSON.stringify(this.db);
+      this.isDirty = false;
+
+      // Create rolling backup asynchronously if needed
+      const now = Date.now();
+      const isTestEnv = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
+      const shouldBackup = isTestEnv || !fs.existsSync(this.dbBackupPath) || !this.lastBackupAt || (now - this.lastBackupAt > 5000);
+      if (fs.existsSync(this.dbFilePath) && shouldBackup) {
+        try {
+          const stats = await fs.promises.stat(this.dbFilePath);
+          if (stats.size > 100) {
+            await fs.promises.copyFile(this.dbFilePath, this.dbBackupPath);
+            this.lastBackupAt = now;
+          }
+        } catch (_) {}
+      }
+
+      // Non-blocking atomic write using unique pid-timestamp temp file
+      const tempPath = path.join(
+        this.storageDir,
+        `dynamic-social-state.json.tmp.${process.pid}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`
+      );
+
+      await fs.promises.writeFile(tempPath, data, 'utf-8');
+
+      try {
+        await fs.promises.rename(tempPath, this.dbFilePath);
+      } catch (_) {
+        try {
+          await fs.promises.copyFile(tempPath, this.dbFilePath);
+        } catch (copyErr) {
+          console.warn('[DatabaseEngine] State snapshot copy warning:', copyErr);
+        }
+      } finally {
+        try {
+          if (fs.existsSync(tempPath)) await fs.promises.unlink(tempPath);
+        } catch (_) {}
+      }
+    } catch (err) {
+      console.error('[SovraDB] Non-blocking state snapshot write failed:', err);
+    } finally {
+      this.isFlushingAsync = false;
     }
   }
 
@@ -2870,6 +2928,7 @@ export class SovraDatabaseEngine {
       }
       this.db.schemaVersion = 1;
       const data = JSON.stringify(this.db);
+      this.isDirty = false;
 
       // Create rolling backup if valid primary exists
       const now = Date.now();
@@ -5599,6 +5658,9 @@ export class SovraDatabaseEngine {
     post.likesCount = post.likedByDids.length;
     post.isLiked = post.likedByDids.includes(userDid);
     this.save();
+    try {
+      this.sqliteEngine?.recordPostLike(postId, post.likedByDids, post.likesCount);
+    } catch (_) {}
 
     return { likesCount: post.likesCount, isLiked: post.isLiked };
   }
@@ -5629,6 +5691,9 @@ export class SovraDatabaseEngine {
 
     post.comments.push(record);
     this.save();
+    try {
+      this.sqliteEngine?.recordComment(record, postId);
+    } catch (_) {}
     return record;
   }
 
@@ -5660,6 +5725,9 @@ export class SovraDatabaseEngine {
     };
     parentComment.replies.push(replyRecord);
     this.save();
+    try {
+      this.sqliteEngine?.recordComment(replyRecord, postId);
+    } catch (_) {}
     return { ok: true, reply: replyRecord };
   }
 
