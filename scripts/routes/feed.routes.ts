@@ -14,7 +14,9 @@ export interface FeedRouteContext {
   req: http.IncomingMessage;
   res: http.ServerResponse;
   url: URL;
-  resolvePrincipal: (req: http.IncomingMessage) => AuthenticatedPrincipal | null;
+  resolvePrincipal: (req: http.IncomingMessage, parsedBody?: Record<string, any>) => AuthenticatedPrincipal | null;
+  enforceAuth?: (req: http.IncomingMessage, res: http.ServerResponse, parsedBody?: Record<string, any>) => AuthenticatedPrincipal | null;
+  readBoundedBody?: (req: http.IncomingMessage, res: http.ServerResponse, limit?: number) => Promise<{ body: string; ok: boolean }>;
 }
 
 export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
@@ -123,8 +125,8 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
     return true;
   }
 
-  // 3. Feed List
-  if ((url.pathname === '/api/feed' || url.pathname === '/api/feed/list' || url.pathname === '/api/feed/posts') && req.method === 'GET') {
+  // 3. Feed List & Posts
+  if ((url.pathname === '/api/feed' || url.pathname === '/api/feed/list' || url.pathname === '/api/feed/posts' || url.pathname === '/api/posts' || url.pathname === '/api/posts/list') && req.method === 'GET') {
     const principal = resolvePrincipal(req);
     const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 15;
     const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : undefined;
@@ -399,6 +401,26 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
     return true;
   }
 
+  // 8b. Reels List
+  if (url.pathname === '/api/reels/list' && req.method === 'GET') {
+    const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 15;
+    const cursor = url.searchParams.get('cursor');
+    let allReels = sovraDb.getAllReels();
+    if (cursor) {
+      allReels = allReels.filter(r => String(r.id) < cursor);
+    }
+    const paginated = (typeof limit === 'number' && !isNaN(limit) && limit > 0) ? allReels.slice(0, limit) : allReels;
+    const reels = paginated.map(r => ({
+      ...r,
+      title: r.caption || 'Reel',
+      likes: r.likesCount,
+    }));
+    const nextCursor = (typeof limit === 'number' && reels.length === limit) ? reels[reels.length - 1].id : null;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, reels, count: reels.length, nextCursor }));
+    return true;
+  }
+
   // 9. Reels By Audio Track Explorer
   if (url.pathname === '/api/reels/by-audio' && req.method === 'GET') {
     const rawTrack = url.searchParams.get('audio') || url.searchParams.get('track') || '';
@@ -496,3 +518,5 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
 
   return false;
 }
+
+export const handleFeedRoutes = handleFeedDiscoveryRoutes;
