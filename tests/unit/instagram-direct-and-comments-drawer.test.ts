@@ -4,8 +4,15 @@ import * as path from 'path';
 
 describe('Iteration #1 Verification: Instagram-Grade Direct Share & Comments Drawer', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
+  const viewsDir = path.resolve(__dirname, '../../scripts/views');
   const dbEnginePath = path.resolve(__dirname, '../../scripts/database-engine.ts');
   const chatRoutesPath = path.resolve(__dirname, '../../scripts/routes/chat.routes.ts');
+
+  const getFullSource = () => [
+    fs.existsSync(path.resolve(viewsDir, 'layout.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'layout.view.ts'), 'utf-8') : '',
+    fs.existsSync(path.resolve(viewsDir, 'scripts.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'scripts.view.ts'), 'utf-8') : '',
+    fs.readFileSync(devServerPath, 'utf-8'),
+  ].join('\n');
 
   it('verifies database-engine ChatMessageRecord and appendMessage support sharedPost metadata', () => {
     const dbSource = fs.readFileSync(dbEnginePath, 'utf-8');
@@ -24,13 +31,13 @@ describe('Iteration #1 Verification: Instagram-Grade Direct Share & Comments Dra
   });
 
   it('verifies dev-server.ts mounts feedShareModal and instaCommentsDrawer defaulting to hidden', () => {
-    const devSource = fs.readFileSync(devServerPath, 'utf-8');
+    const devSource = getFullSource();
     expect(devSource).toMatch(/<div id="feedShareModal"[^>]*style="[^"]*display:\s*none;[^"]*"/);
     expect(devSource).toMatch(/<div id="instaCommentsDrawer"[^>]*style="[^"]*display:\s*none;[^"]*"/);
   });
 
   it('verifies feedShareModal contains story reshare, search, contacts list, and direct send', () => {
-    const devSource = fs.readFileSync(devServerPath, 'utf-8');
+    const devSource = getFullSource();
     expect(devSource).toContain('id="shareModalContactsList"');
     expect(devSource).toContain('id="shareModalSearchInput"');
     expect(devSource).toContain('onclick="sharePostToMyStory()"');
@@ -39,7 +46,7 @@ describe('Iteration #1 Verification: Instagram-Grade Direct Share & Comments Dra
   });
 
   it('verifies instaCommentsDrawer contains comment stream, quick emoji picker, reply indicator, and composer', () => {
-    const devSource = fs.readFileSync(devServerPath, 'utf-8');
+    const devSource = getFullSource();
     expect(devSource).toContain('id="drawerCommentsStream"');
     expect(devSource).toContain('id="drawerCommentCountBadge"');
     expect(devSource).toContain('id="drawerReplyIndicator"');
@@ -49,7 +56,7 @@ describe('Iteration #1 Verification: Instagram-Grade Direct Share & Comments Dra
   });
 
   it('verifies client functions are bound to window in dev-server.ts', () => {
-    const devSource = fs.readFileSync(devServerPath, 'utf-8');
+    const devSource = getFullSource();
     expect(devSource).toContain('window.openFeedShareModal = openFeedShareModal;');
     expect(devSource).toContain('window.closeFeedShareModal = closeFeedShareModal;');
     expect(devSource).toContain('window.sendPostToPeerChat = sendPostToPeerChat;');
@@ -62,7 +69,7 @@ describe('Iteration #1 Verification: Instagram-Grade Direct Share & Comments Dra
   });
 
   it('verifies renderChatBubbles renders rich shared post card with jumpToSharedPost trigger', () => {
-    const devSource = fs.readFileSync(devServerPath, 'utf-8');
+    const devSource = getFullSource();
     expect(devSource).toContain('chat-shared-post-card');
     expect(devSource).toContain('jumpToSharedPost(');
     expect(devSource).toContain('sharedPostHtml + attachmentHtml + textHtml');

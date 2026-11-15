@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '../services/api.js';
 
 export interface TelemetryPeer {
   readonly peerId: string;
@@ -53,7 +54,7 @@ export function NodeTelemetryScreen({ onClose }: NodeTelemetryScreenProps): Reac
     let mounted = true;
     const fetchTelemetry = async () => {
       try {
-        const res = await fetch('/api/operator/telemetry');
+        const res = await fetch(`${getApiBaseUrl()}/api/operator/telemetry`);
         const data = await res.json();
         if (!mounted) return;
         if (data && data.ok) {
@@ -80,7 +81,7 @@ export function NodeTelemetryScreen({ onClose }: NodeTelemetryScreenProps): Reac
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const res = await fetch('/api/operator/telemetry');
+      const res = await fetch(`${getApiBaseUrl()}/api/operator/telemetry`);
       const data = await res.json();
       if (data && data.ok && data.bitswap) {
         setInboundSpeedKbps(Number((data.bitswap.inboundSpeedBps / 1024).toFixed(1)));

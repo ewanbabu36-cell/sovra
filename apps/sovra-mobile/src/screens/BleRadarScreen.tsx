@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { getApiBaseUrl } from '../services/api.js';
 
 export interface MobileBlePeer {
   readonly peerDid: string;
@@ -150,7 +151,7 @@ export function BleRadarScreen({ onClose, onDirectPing }: BleRadarScreenProps): 
   const handleScanRf = async () => {
     setIsScanning(true);
     try {
-      const res = await fetch('/api/mesh/ble/scan?maxDistanceMeters=100');
+      const res = await fetch(`${getApiBaseUrl()}/api/mesh/ble/scan?maxDistanceMeters=100`);
       const data = await res.json();
       if (data && data.ok && Array.isArray(data.peers) && data.peers.length > 0) {
         setPeers(data.peers);
@@ -165,7 +166,7 @@ export function BleRadarScreen({ onClose, onDirectPing }: BleRadarScreenProps): 
   const handlePing = (peer: MobileBlePeer) => {
     setLastPingFeedback(`⚡ Direct ping ACK from ${peer.handle} in 1.4ms`);
     if (onDirectPing) onDirectPing(peer.peerDid);
-    fetch('/api/mesh/ping', {
+    fetch(`${getApiBaseUrl()}/api/mesh/ping`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipientDid: peer.peerDid }),

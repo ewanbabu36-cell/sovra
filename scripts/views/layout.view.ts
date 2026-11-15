@@ -7799,7 +7799,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
           <div style="display: flex; align-items: center; gap: 10px;">
             <button type="button" class="btn btn-secondary" id="btnLiveFollowHost" onclick="toggleLiveHostFollow()" style="font-size: 0.8rem; padding: 6px 14px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; font-weight: 700;">+ Follow</button>
-            <button type="button" class="btn btn-primary" onclick="alert('Broadcasting feature: Initializing WebRTC MediaStream broadcaster!')" style="font-size: 0.8rem; padding: 6px 16px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff;">Go Live</button>
+            <button type="button" class="btn btn-primary" id="btnSovereignLiveToggle" onclick="toggleSovereignLiveBroadcast()" style="font-size: 0.8rem; padding: 6px 16px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff;">Go Live</button>
           </div>
         </div>
 
