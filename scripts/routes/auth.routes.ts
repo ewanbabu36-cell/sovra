@@ -204,6 +204,12 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
       const displayName = String(parsed.name || parsed.displayName || handle.replace('@', '')).trim();
       const securityPin = parsed.securityPin ? String(parsed.securityPin).trim() : (parsed.pin ? String(parsed.pin).trim() : '123456');
 
+      // Enforce Cosmos PBFT hard monetary policy: cap registration grants within 100M SOV lifetime limit
+      const requestedGrant = typeof parsed.balanceSov === 'number' ? parsed.balanceSov : (isTestEnv ? 500.0 : 100.0);
+      const currentSupply = typeof sovraDb.getTotalSovSupply === 'function' ? sovraDb.getTotalSovSupply() : null;
+      const remainingCap = currentSupply ? currentSupply.remainingMintableSov : 100_000_000;
+      const verifiedGrant = Math.max(0, Math.min(requestedGrant, remainingCap));
+
       const regResult = sovraDb.registerUser({
         did,
         handle,
@@ -216,7 +222,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         publicKey: userPubKeyHex,
         sessionToken,
         securityPin,
-        balanceSov: typeof parsed.balanceSov === 'number' ? parsed.balanceSov : (isTestEnv ? 500.0 : 100.0),
+        balanceSov: verifiedGrant,
       });
 
       if (!regResult.ok) {

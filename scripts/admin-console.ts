@@ -4289,13 +4289,13 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         if (data.ok && data.sessionToken) {
           sessionStorage.setItem('sovra_ops_session', data.sessionToken);
           window.__SOVRA_ADMIN_TOKEN__ = data.sessionToken;
-          alert('Authenticated successfully');
+          showOpsToast('Authenticated successfully');
           window.location.reload();
         } else {
-          alert('Authentication failed: ' + (data.error || 'Invalid credential'));
+          showOpsToast('Authentication failed: ' + (data.error || 'Invalid credential'));
         }
       } catch (err) {
-        alert('Authentication error: ' + err);
+        showOpsToast('Authentication error: ' + err);
       }
     }
 
@@ -4364,7 +4364,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           document.getElementById('rawJsonModal').style.display = 'flex';
         })
         .catch(err => {
-          alert('Failed to load status JSON: ' + err.message);
+          showOpsToast('Failed to load status JSON: ' + err.message);
         });
     }
 
@@ -4375,7 +4375,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     function copyRawJson() {
       const code = document.getElementById('rawJsonContent').innerText;
       navigator.clipboard.writeText(code).then(() => {
-        alert('Copied status JSON to clipboard!');
+        showOpsToast('Copied status JSON to clipboard!');
       });
     }
 
@@ -4385,7 +4385,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       if (conf) {
         localStorage.clear();
         fetch('/api/admin/panic', { method: 'POST' }).catch(() => {});
-        alert('Node keys wiped! Reloading console...');
+        showOpsToast('Node keys wiped! Reloading console...');
         window.location.reload();
       }
     }
@@ -4395,16 +4395,16 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       const input = document.getElementById('customCidPinInput');
       const cid = input?.value.trim();
       if (!cid) {
-        alert('Please enter a valid CIDv1 string');
+        showOpsToast('Please enter a valid CIDv1 string');
         return;
       }
-      alert('CID ' + cid + ' successfully queued for BitSwap swarm pin retrieval!');
+      showOpsToast('CID ' + cid + ' successfully queued for BitSwap swarm pin retrieval!');
       input.value = '';
     }
 
     // Scan 2.4GHz channels
     function scanP2pChannels() {
-      alert('📡 Scanning local BLE and Wi-Fi Direct spectrum...\\n\\nFound 2 active channels, 0 RF jamming detected, RSSI: -48dBm.');
+      showOpsToast('📡 Scanning local BLE and Wi-Fi Direct spectrum...\\n\\nFound 2 active channels, 0 RF jamming detected, RSSI: -48dBm.');
     }
 
     // Export Ledger CSV / JSON
@@ -4444,7 +4444,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     function exportAdminUsersCsv() {
       const rows = Array.from(document.querySelectorAll('#usersTableBody tr.admin-user-row'));
       if (rows.length === 0) {
-        alert('No users available to export.');
+        showOpsToast('No users available to export.');
         return;
       }
       let csv = 'Handle,Name,DID,Role,Device,Balance_SOV\\r\\n';
@@ -4479,13 +4479,13 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         });
         const data = await res.json();
         if (data.ok) {
-          alert('✅ User role updated to ' + newRole.toUpperCase() + ' successfully.');
+          showOpsToast('✅ User role updated to ' + newRole.toUpperCase() + ' successfully.');
           window.location.reload();
         } else {
-          alert('❌ Failed to update role: ' + (data.error || 'Unknown error'));
+          showOpsToast('❌ Failed to update role: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('❌ Error updating user role: ' + err.message);
+        showOpsToast('❌ Error updating user role: ' + err.message);
       }
     }
 
@@ -4494,7 +4494,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       if (!amountStr) return;
       const amount = parseFloat(amountStr);
       if (isNaN(amount) || amount === 0) {
-        alert('Invalid amount entered.');
+        showOpsToast('Invalid amount entered.');
         return;
       }
       const reason = prompt('Enter audit trail reason for this balance adjustment:', 'Administrative settlement') || 'Admin manual balance adjustment';
@@ -4509,13 +4509,13 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         });
         const data = await res.json();
         if (data.ok) {
-          alert('✅ User balance successfully adjusted. New balance: ' + (data.newBalanceSov ?? 0).toFixed(2) + ' SOV.');
+          showOpsToast('✅ User balance successfully adjusted. New balance: ' + (data.newBalanceSov ?? 0).toFixed(2) + ' SOV.');
           window.location.reload();
         } else {
-          alert('❌ Failed to adjust balance: ' + (data.error || 'Unknown error'));
+          showOpsToast('❌ Failed to adjust balance: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('❌ Error adjusting balance: ' + err.message);
+        showOpsToast('❌ Error adjusting balance: ' + err.message);
       }
     }
 
@@ -4531,13 +4531,13 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         });
         const data = await res.json();
         if (data.ok) {
-          alert('✅ User verification badge is now: ' + (data.isVerified ? 'VERIFIED' : 'UNVERIFIED'));
+          showOpsToast('✅ User verification badge is now: ' + (data.isVerified ? 'VERIFIED' : 'UNVERIFIED'));
           window.location.reload();
         } else {
-          alert('❌ Failed to toggle badge: ' + (data.error || 'Unknown error'));
+          showOpsToast('❌ Failed to toggle badge: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('❌ Error toggling badge: ' + err.message);
+        showOpsToast('❌ Error toggling badge: ' + err.message);
       }
     }
 
@@ -4581,12 +4581,12 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         });
         const data = await res.json();
         if (data.ok) {
-          alert('✅ Dynamic Protocol Revenue Take-Rate updated to ' + rate.toFixed(1) + '% across network.');
+          showOpsToast('✅ Dynamic Protocol Revenue Take-Rate updated to ' + rate.toFixed(1) + '% across network.');
         } else {
-          alert('Take-rate updated locally to ' + rate.toFixed(1) + '%.');
+          showOpsToast('Take-rate updated locally to ' + rate.toFixed(1) + '%.');
         }
       } catch (e) {
-        alert('Take-rate saved in node configuration: ' + rate.toFixed(1) + '%.');
+        showOpsToast('Take-rate saved in node configuration: ' + rate.toFixed(1) + '%.');
       }
     }
 
@@ -5101,14 +5101,14 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
 
         const data = await res.json();
         if (data.ok) {
-          alert('✅ Juror Ballot Cast Successfully!\\n\\nVerdict: ' + choice + '\\nCase: ' + caseId + '\\nConsensus updated across mesh.');
+          showOpsToast('✅ Juror Ballot Cast Successfully!\\n\\nVerdict: ' + choice + '\\nCase: ' + caseId + '\\nConsensus updated across mesh.');
           closeJurorBallotModal();
           location.reload();
         } else {
-          alert('Failed to cast juror ballot: ' + (data.error || 'Unknown error'));
+          showOpsToast('Failed to cast juror ballot: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Ballot submission error: ' + err.message);
+        showOpsToast('Ballot submission error: ' + err.message);
       } finally {
         if (btn) { btn.disabled = false; btn.innerText = '⚖️ Broadcast Verdict to Mesh'; }
       }
@@ -5131,7 +5131,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         });
         const data = await res.json();
         if (data.ok) {
-          alert('✅ AMM Swap Succeeded!\\n\\n' +
+          showOpsToast('✅ AMM Swap Succeeded!\\n\\n' +
                 'Direction: ' + data.direction.toUpperCase() + ' (SOV ➔ Tokens)\\n' +
                 'Input: ' + (Number(data.inputAmount)/1e6).toFixed(2) + ' SOV\\n' +
                 'Output Received: ' + (Number(data.outputAmount)/1e6).toFixed(2) + ' Tokens\\n' +
@@ -5140,10 +5140,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
                 'AMM reserves dynamically rebalanced.');
           location.reload();
         } else {
-          alert('AMM Swap Failed: ' + (data.error || 'Unknown error'));
+          showOpsToast('AMM Swap Failed: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Swap network error: ' + err.message);
+        showOpsToast('Swap network error: ' + err.message);
       }
     }
 
@@ -5157,14 +5157,14 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.ok) {
-          alert('Channel deleted successfully.');
+          showOpsToast('Channel deleted successfully.');
           location.reload();
         } else {
-          alert('Failed to delete channel: ' + (d.error || 'Unknown error'));
+          showOpsToast('Failed to delete channel: ' + (d.error || 'Unknown error'));
         }
       })
       .catch(function(err) {
-        alert('Delete error: ' + err.message);
+        showOpsToast('Delete error: ' + err.message);
       });
     }
 
@@ -5178,14 +5178,14 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.ok) {
-          alert('Page deleted successfully.');
+          showOpsToast('Page deleted successfully.');
           location.reload();
         } else {
-          alert('Failed to delete page: ' + (d.error || 'Unknown error'));
+          showOpsToast('Failed to delete page: ' + (d.error || 'Unknown error'));
         }
       })
       .catch(function(err) {
-        alert('Delete error: ' + err.message);
+        showOpsToast('Delete error: ' + err.message);
       });
     }
 
@@ -5197,11 +5197,11 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        alert('Purged ' + (d.purgedChannels || 0) + ' test channels and ' + (d.purgedPages || 0) + ' test pages.');
+        showOpsToast('Purged ' + (d.purgedChannels || 0) + ' test channels and ' + (d.purgedPages || 0) + ' test pages.');
         location.reload();
       })
       .catch(function(err) {
-        alert('Purge error: ' + err.message);
+        showOpsToast('Purge error: ' + err.message);
       });
     }
 
@@ -5363,10 +5363,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           // Refresh queue stats
           refreshModerationQueue();
         } else {
-          alert('Failed to enforce moderation action: ' + (data.error || 'Unknown error'));
+          showOpsToast('Failed to enforce moderation action: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Enforcement network error: ' + err.message);
+        showOpsToast('Enforcement network error: ' + err.message);
       }
     }
 
@@ -5473,10 +5473,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           }
           refreshMeshTelemetry();
         } else {
-          alert('Cache flush failed: ' + (data.error || 'Unknown error'));
+          showOpsToast('Cache flush failed: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Cache flush error: ' + err.message);
+        showOpsToast('Cache flush error: ' + err.message);
       }
     }
 
@@ -5498,10 +5498,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           }
           refreshMeshTelemetry();
         } else {
-          alert('Storage compaction failed: ' + (data.error || 'Unknown error'));
+          showOpsToast('Storage compaction failed: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Compaction error: ' + err.message);
+        showOpsToast('Compaction error: ' + err.message);
       }
     }
 
@@ -5563,10 +5563,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           if (row) row.remove();
           openSessionsModal();
         } else {
-          alert('Failed to revoke session: ' + (data.error || 'Unknown error'));
+          showOpsToast('Failed to revoke session: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Revoke session error: ' + err.message);
+        showOpsToast('Revoke session error: ' + err.message);
       }
     }
 
@@ -5619,10 +5619,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             terminal.scrollTop = terminal.scrollHeight;
           }
         } else {
-          alert('Failed to issue strike: ' + (data.error || 'Unknown error'));
+          showOpsToast('Failed to issue strike: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Strike submission error: ' + err.message);
+        showOpsToast('Strike submission error: ' + err.message);
       }
     }
 
@@ -5645,10 +5645,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           if (cell) cell.innerHTML = '<span class="ops-pill online">✅ PARDONED</span>';
           refreshStrikeLedger();
         } else {
-          alert('Failed to pardon strike: ' + (data.error || 'Unknown error'));
+          showOpsToast('Failed to pardon strike: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Pardon network error: ' + err.message);
+        showOpsToast('Pardon network error: ' + err.message);
       }
     }
 
@@ -5854,12 +5854,12 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
               '• Circular Cycles Detected: ' + (data.cyclesDetected || 0) + '\\n' +
               '• Suspicious Puppet Clusters: ' + ((data.sybilClusters && data.sybilClusters.length) || 0) + '\\n' +
               '• Auto-Frozen DIDs: ' + ((data.frozenDids && data.frozenDids.length) || 0);
-            alert(msg);
+            showOpsToast(msg);
           } else {
-            alert('Audit failed: ' + (data.error || 'Unknown'));
+            showOpsToast('Audit failed: ' + (data.error || 'Unknown'));
           }
         })
-        .catch(function(err) { alert('Audit error: ' + err.message); });
+        .catch(function(err) { showOpsToast('Audit error: ' + err.message); });
     }
 
     function loadSolvencyReport() {
@@ -6066,12 +6066,12 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d && d.ok) {
-          alert('Action ' + action.toUpperCase() + ' executed on ' + _selectedMeshNode.name);
+          showOpsToast('Action ' + action.toUpperCase() + ' executed on ' + _selectedMeshNode.name);
           var insp = document.getElementById('meshNodeInspector');
           if (insp) insp.style.display = 'none';
         }
       })
-      .catch(function(err) { alert('Action error: ' + err.message); });
+      .catch(function(err) { showOpsToast('Action error: ' + err.message); });
     }
 
     // --- MULTI-SIG 2-OF-3 GOVERNANCE ---
@@ -6100,14 +6100,14 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d && d.ok) {
-          alert('Proposal submitted successfully! Quorum: 1/2 signatures.');
+          showOpsToast('Proposal submitted successfully! Quorum: 1/2 signatures.');
           closeNewProposalModal();
           loadGovernanceProposals();
         } else {
-          alert('Submission error: ' + (d.error || 'Failed'));
+          showOpsToast('Submission error: ' + (d.error || 'Failed'));
         }
       })
-      .catch(function(e) { alert('Error: ' + e.message); });
+      .catch(function(e) { showOpsToast('Error: ' + e.message); });
     }
 
     function loadGovernanceProposals() {
@@ -6149,13 +6149,13 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d && d.ok) {
-          alert('Co-Signature accepted! Status: ' + (d.executed ? 'EXECUTED (Quorum Reached)' : 'PENDING'));
+          showOpsToast('Co-Signature accepted! Status: ' + (d.executed ? 'EXECUTED (Quorum Reached)' : 'PENDING'));
           loadGovernanceProposals();
         } else {
-          alert('Co-sign error: ' + (d.error || 'Failed'));
+          showOpsToast('Co-sign error: ' + (d.error || 'Failed'));
         }
       })
-      .catch(function(e) { alert('Error: ' + e.message); });
+      .catch(function(e) { showOpsToast('Error: ' + e.message); });
     }
 
     function toggleAdminCircuitBreaker() {
@@ -6169,14 +6169,14 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d && d.ok) {
-          alert('Circuit Breaker State Updated! Active: ' + d.circuitBreaker.active);
+          showOpsToast('Circuit Breaker State Updated! Active: ' + d.circuitBreaker.active);
           var dot = document.getElementById('circuitBreakerPulseDot');
           var label = document.getElementById('circuitBreakerLabel');
           if (dot) dot.style.background = d.circuitBreaker.active ? '#ef4444' : '#10b981';
           if (label) label.textContent = d.circuitBreaker.active ? 'Circuit Breaker: HALTED 🚨' : 'Circuit Breaker: Normal';
         }
       })
-      .catch(function(e) { alert('Circuit Breaker error: ' + e.message); });
+      .catch(function(e) { showOpsToast('Circuit Breaker error: ' + e.message); });
     }
 
     // ==============================================
@@ -6196,10 +6196,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         if (d && d.ok) {
           showAdminToast('🎛️ Algorithmic dial [' + key + '] set to ' + mult + 'x');
         } else {
-          alert('Failed to update dial: ' + (d.error || 'Unknown'));
+          showOpsToast('Failed to update dial: ' + (d.error || 'Unknown'));
         }
       })
-      .catch(function(e) { alert('Error: ' + e.message); });
+      .catch(function(e) { showOpsToast('Error: ' + e.message); });
     }
 
     function applyShadowban() {
@@ -6207,7 +6207,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       var decay = Number(document.getElementById('sbDecaySlider').value);
       var duration = Number(document.getElementById('sbDurationSelect').value);
       var reason = document.getElementById('sbReasonInput').value.trim();
-      if (!target) { alert('Please enter target DID or handle'); return; }
+      if (!target) { showOpsToast('Please enter target DID or handle'); return; }
       var expiresAt = duration > 0 ? (Date.now() + duration) : 0;
       fetch('/api/admin/moderation/shadowban', {
         method: 'POST',
@@ -6220,10 +6220,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           showAdminToast('👁️ Shadowban visibility filter enforced for ' + target);
           setTimeout(function() { window.location.reload(); }, 1200);
         } else {
-          alert('Failed to apply shadowban: ' + (d.error || 'Unknown'));
+          showOpsToast('Failed to apply shadowban: ' + (d.error || 'Unknown'));
         }
       })
-      .catch(function(e) { alert('Error: ' + e.message); });
+      .catch(function(e) { showOpsToast('Error: ' + e.message); });
     }
 
     function removeShadowban(did) {
@@ -6282,7 +6282,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       var actionLabel = document.getElementById('alertActionLabel').value.trim();
       var actionUrl = document.getElementById('alertActionUrl').value.trim();
       var isSticky = document.getElementById('alertStickyCheck').checked;
-      if (!title || !message) { alert('Title and message are required'); return; }
+      if (!title || !message) { showOpsToast('Title and message are required'); return; }
       fetch('/api/admin/broadcast/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -6294,7 +6294,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           showAdminToast('📢 Broadcast transmitted to active swarm!');
           setTimeout(function() { window.location.reload(); }, 1200);
         } else {
-          alert('Broadcast failed: ' + (d.error || 'Unknown'));
+          showOpsToast('Broadcast failed: ' + (d.error || 'Unknown'));
         }
       });
     }
@@ -6317,7 +6317,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     var _currentForensicDossier = null;
     function lookupForensicDossier() {
       var did = document.getElementById('forensicDidInput').value.trim();
-      if (!did) { alert('Enter target DID or handle'); return; }
+      if (!did) { showOpsToast('Enter target DID or handle'); return; }
       fetch('/api/admin/compliance/dossier/' + encodeURIComponent(did))
       .then(function(r) { return r.json(); })
       .then(function(d) {
@@ -6332,10 +6332,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           document.getElementById('dosSha256').textContent = d.sha256Seal;
           showAdminToast('🛡️ Cryptographic dossier generated & sealed');
         } else {
-          alert('Could not compile dossier: ' + (d.error || 'Unknown'));
+          showOpsToast('Could not compile dossier: ' + (d.error || 'Unknown'));
         }
       })
-      .catch(function(e) { alert('Error: ' + e.message); });
+      .catch(function(e) { showOpsToast('Error: ' + e.message); });
     }
 
     function downloadForensicDossier() {
@@ -6380,7 +6380,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           showAdminToast('Feature [' + id + '] ' + (!currentEnabled ? 'ENABLED' : 'DISABLED'));
           setTimeout(function() { window.location.reload(); }, 800);
         } else {
-          alert('Failed to update feature: ' + (d.error || 'Unknown error'));
+          showOpsToast('Failed to update feature: ' + (d.error || 'Unknown error'));
         }
       });
     }
@@ -6398,7 +6398,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           showAdminToast('Feature [' + id + '] deleted');
           setTimeout(function() { window.location.reload(); }, 800);
         } else {
-          alert('Failed to delete feature: ' + (d.error || 'Unknown error'));
+          showOpsToast('Failed to delete feature: ' + (d.error || 'Unknown error'));
         }
       });
     }
@@ -6410,7 +6410,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       var category = document.getElementById('newFeatureCategory').value;
       var desc = (document.getElementById('newFeatureDesc').value || '').trim();
       var order = Number(document.getElementById('newFeatureOrder').value || 99);
-      if (!id || !name) { alert('Feature ID and Name are required'); return; }
+      if (!id || !name) { showOpsToast('Feature ID and Name are required'); return; }
 
       fetch('/api/admin/features/create', {
         method: 'POST',
@@ -6423,7 +6423,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           showAdminToast('Platform feature [' + name + '] created!');
           setTimeout(function() { window.location.reload(); }, 800);
         } else {
-          alert('Failed to create feature: ' + (d.error || 'Unknown error'));
+          showOpsToast('Failed to create feature: ' + (d.error || 'Unknown error'));
         }
       });
     }
@@ -6440,7 +6440,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           showAdminToast('DApp [' + id + '] ' + action.toUpperCase());
           setTimeout(function() { window.location.reload(); }, 800);
         } else {
-          alert('Moderation action failed: ' + (d.error || 'Unknown error'));
+          showOpsToast('Moderation action failed: ' + (d.error || 'Unknown error'));
         }
       });
     }
@@ -7140,10 +7140,10 @@ export function renderAdminLoginHtml(): string {
         if (data.ok) {
           loadAdminAppeals();
         } else {
-          alert('Error: ' + (data.error || 'Failed to review appeal'));
+          showOpsToast('Error: ' + (data.error || 'Failed to review appeal'));
         }
       } catch (e) {
-        alert('Error: ' + e.message);
+        showOpsToast('Error: ' + e.message);
       }
     }
 

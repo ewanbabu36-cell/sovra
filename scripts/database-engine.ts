@@ -2885,7 +2885,7 @@ export class SovraDatabaseEngine {
         } catch (_) {}
       }
 
-      // Atomic write using unique pid-timestamp temp file and retry-based rename
+      // Atomic write using unique pid-timestamp temp file and safe replacement without busy-wait spinlocks
       const tempPath = path.join(
         this.storageDir,
         `dynamic-social-state.json.tmp.${process.pid}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`
@@ -2893,25 +2893,19 @@ export class SovraDatabaseEngine {
 
       fs.writeFileSync(tempPath, data, 'utf-8');
 
-      let replaced = false;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-          fs.renameSync(tempPath, this.dbFilePath);
-          replaced = true;
-          break;
-        } catch (_) {
-          const waitEnd = Date.now() + 15;
-          while (Date.now() < waitEnd) {}
-        }
-      }
-      if (!replaced) {
+      try {
+        fs.renameSync(tempPath, this.dbFilePath);
+      } catch (_) {
         try {
           fs.copyFileSync(tempPath, this.dbFilePath);
+        } catch (copyErr) {
+          console.warn('[DatabaseEngine] State snapshot copy warning:', copyErr);
+        }
+      } finally {
+        try {
+          if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
         } catch (_) {}
       }
-      try {
-        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-      } catch (_) {}
     } catch (err) {
       console.error('[SovraDB] Atomic write failed:', err);
     }
@@ -17418,7 +17412,7 @@ export class SovraDatabaseEngine {
         installsCount: 342,
         rating: 4.9,
         description: 'P2P tap-to-fly arcade game. Earn micro-SOV high-score bounties.',
-        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Flappy SOV</title><style>body{margin:0;background:#0d1117;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}button{background:#6366f1;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-size:16px;cursor:pointer;margin-top:16px}</style></head><body><h2>🎮 Flappy SOV</h2><p>Tap space or screen to fly. Top score: 42 SOV.</p><button onclick="window.parent.postMessage({type:'SOVRA_RPC_REQUEST',method:'wallet:pay',params:{amount:0.1,memo:'Flappy SOV Entry Fee'}},'*')">Play (0.1 SOV)</button><script>window.addEventListener('message',e=>{if(e.data.type==='SOVRA_RPC_RESPONSE'){alert('Payment Status: '+e.data.result.status);}});</script></body></html>`,
+        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Flappy SOV</title><style>body{margin:0;background:#0d1117;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}button{background:#6366f1;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-size:16px;cursor:pointer;margin-top:16px}</style></head><body><h2>🎮 Flappy SOV</h2><p>Tap space or screen to fly. Top score: 42 SOV.</p><button onclick="window.parent.postMessage({type:'SOVRA_RPC_REQUEST',method:'wallet:pay',params:{amount:0.1,memo:'Flappy SOV Entry Fee'}},'*')">Play (0.1 SOV)</button><script>window.addEventListener('message',e=>{if(e.data.type==='SOVRA_RPC_RESPONSE'){window.parent.postMessage({type:'SOVRA_TOAST',message:'Payment Status: '+e.data.result.status},'*');}});</script></body></html>`,
         createdAt: Date.now() - 50000000,
       },
       {
@@ -17448,7 +17442,7 @@ export class SovraDatabaseEngine {
         installsCount: 154,
         rating: 4.9,
         description: 'Conduct zero-knowledge, cryptographically verifiable surveys and anonymous quadratic voting.',
-        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ZK Forms</title><style>body{margin:0;background:#18181b;color:#fafafa;font-family:sans-serif;padding:24px}button{background:#8b5cf6;color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer}</style></head><body><h2>📝 ZK Anonymous Poll</h2><p>Should the sovereign protocol allocate 10% to seeder relays?</p><button onclick="alert('ZK Proof generated and broadcast anonymously!')">Vote YES [ZK-Proof]</button></body></html>`,
+        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ZK Forms</title><style>body{margin:0;background:#18181b;color:#fafafa;font-family:sans-serif;padding:24px}button{background:#8b5cf6;color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer}</style></head><body><h2>📝 ZK Anonymous Poll</h2><p>Should the sovereign protocol allocate 10% to seeder relays?</p><button onclick="window.parent.postMessage({type:'SOVRA_TOAST',message:'ZK Proof generated and broadcast anonymously!'},'*')">Vote YES [ZK-Proof]</button></body></html>`,
         createdAt: Date.now() - 30000000,
       },
       {
@@ -17463,7 +17457,7 @@ export class SovraDatabaseEngine {
         installsCount: 620,
         rating: 5.0,
         description: 'Private ephemeral group channels with forward secrecy and auto-destructing media.',
-        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Secret Circles</title><style>body{margin:0;background:#09090b;color:#e4e4e7;font-family:sans-serif;padding:24px}button{background:#ec4899;color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer}</style></head><body><h2>🔮 Secret Circles</h2><p>Encrypted mesh group: active.</p><button onclick="alert('Ephemeral broadcast dispatched to 14 peers')">Broadcast Whisper</button></body></html>`,
+        entryHtml: `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Secret Circles</title><style>body{margin:0;background:#09090b;color:#e4e4e7;font-family:sans-serif;padding:24px}button{background:#ec4899;color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer}</style></head><body><h2>🔮 Secret Circles</h2><p>Encrypted mesh group: active.</p><button onclick="window.parent.postMessage({type:'SOVRA_TOAST',message:'Ephemeral broadcast dispatched to 14 peers'},'*')">Broadcast Whisper</button></body></html>`,
         createdAt: Date.now() - 20000000,
       }
     ];
