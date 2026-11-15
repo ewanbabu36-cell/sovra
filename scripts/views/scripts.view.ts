@@ -17822,11 +17822,16 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
             return '<div class="explore-tile ' + spanClass + '" onclick="handleExploreTileClick(&quot;' + item.type + '&quot;, &quot;' + item.id + '&quot;)">' +
               mediaHtml +
+              (isReel ? '<div class="explore-play-indicator" aria-label="Play Reel">▶</div>' : '') +
               '<div class="explore-tile-overlay">' +
-                '<div style="font-weight: 700; font-size: 0.85rem; color: #fff; margin-bottom: 2px;">' + (item.authorName || item.creatorHandle || 'Sovereign') + '</div>' +
-                '<div style="font-size: 0.72rem; color: #cbd5e1; display: flex; gap: 8px;">' +
-                  '<span>❤️ ' + (item.likesCount || 0) + '</span>' +
-                  '<span>💬 ' + (item.commentsCount || 0) + '</span>' +
+                '<div style="font-weight: 700; font-size: 0.85rem; color: #fff; margin-bottom: 4px; text-shadow: 0 1px 3px rgba(0,0,0,0.8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + (item.authorName || item.creatorHandle || 'Sovereign') + '</div>' +
+                '<div class="explore-tile-actions">' +
+                  '<button type="button" class="explore-action-pill like-btn" onclick="event.stopPropagation(); window.likeExplorePost(&quot;' + item.id + '&quot;, this)" title="Like">' +
+                    '❤️ <span class="like-count">' + (item.likesCount || 0) + '</span>' +
+                  '</button>' +
+                  '<button type="button" class="explore-action-pill comment-btn" onclick="event.stopPropagation(); window.openExploreComments(&quot;' + item.id + '&quot;)" title="Comment">' +
+                    '💬 <span>' + (item.commentsCount || 0) + '</span>' +
+                  '</button>' +
                 '</div>' +
               '</div>' +
               (isReel ? '<div class="explore-tile-badge reel">🎬 Reel</div>' : (item.isCarousel ? '<div class="explore-tile-badge carousel">📷 Carousel</div>' : '')) +
@@ -17855,6 +17860,54 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }, 120);
       }
     }
+
+    window.likeExplorePost = async function(id, btn) {
+      if (!id) return;
+      const countSpan = btn ? btn.querySelector('.like-count') : null;
+      let isLiked = btn ? btn.classList.contains('liked') : false;
+      let currentCount = countSpan ? parseInt(countSpan.textContent || '0', 10) : 0;
+      if (isNaN(currentCount)) currentCount = 0;
+
+      if (btn) {
+        btn.classList.toggle('liked');
+        isLiked = btn.classList.contains('liked');
+        if (countSpan) {
+          countSpan.textContent = String(Math.max(0, currentCount + (isLiked ? 1 : -1)));
+        }
+      }
+
+      try {
+        const res = await fetch('/api/reels/like', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reelId: id, postId: id })
+        });
+        const data = await res.json();
+        if (data.ok && typeof data.likesCount === 'number' && countSpan) {
+          countSpan.textContent = String(data.likesCount);
+        }
+        if (typeof showAccountToast === 'function') {
+          showAccountToast(isLiked ? '✓ Liked' : 'Unliked');
+        }
+      } catch (err) {
+        console.warn('likeExplorePost error:', err);
+      }
+    };
+
+    window.openExploreComments = function(id) {
+      if (!id) return;
+      if (typeof switchTab === 'function') {
+        switchTab('feed');
+        setTimeout(() => {
+          const card = document.getElementById('card-' + id);
+          if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const commentBtn = card.querySelector('.comment-btn, button[onclick*="comment"], button[onclick*="Comment"]');
+            if (commentBtn) commentBtn.click();
+          }
+        }, 150);
+      }
+    };
 
     // --- Module 10: SOVRA Notifications Engine ---
     let dedicatedNotificationsStore = [];

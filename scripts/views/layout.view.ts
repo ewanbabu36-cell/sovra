@@ -5827,7 +5827,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Peer-to-peer delay-tolerant store-and-forward mesh routing without cellular or internet connectivity.
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #38bdf8; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #38bdf8; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
               <span>Open Radar &bull; Proximity Chat</span>
               <span>→</span>
             </div>
@@ -5847,7 +5847,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Full duplex WebRTC mesh video rooms with real-time peer comments and floating SOV micro-tips.
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #ef4444; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #ef4444; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
               <span>Go Live &bull; Swarm Stream</span>
               <span>→</span>
             </div>
@@ -5867,7 +5867,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Fullscreen workspace with adaptive bitrate transcoding, interactive SVG analytics, and supporter gating.
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #c084fc; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #c084fc; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
               <span>Open Studio Workspace</span>
               <span>→</span>
             </div>
@@ -5887,7 +5887,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Telegram-grade broadcast channels, subscriber dispatches, and cryptographic public brand storefronts.
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #c084fc; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #c084fc; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
               <span>Publishing Hub</span>
               <span>→</span>
             </div>
@@ -5907,7 +5907,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Hardware screen-time meters, session focus timers, bedtime wind-down reminders, and mindful usage audits.
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #34d399; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #34d399; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
               <span>Wellbeing Settings</span>
               <span>→</span>
             </div>
@@ -5927,7 +5927,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Self-custody peer settlement, live streaming tips, gated video unlocking, and creator earnings withdrawal.
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #fbbf24; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #fbbf24; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
               <span>Manage Wallet</span>
               <span>→</span>
             </div>
@@ -5947,7 +5947,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Hardware enclave authentication via WebAuthn, TouchID, and Windows Hello with phishing-resistant security.
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #38bdf8; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #38bdf8; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
               <span>Security Passkeys</span>
               <span>→</span>
             </div>
