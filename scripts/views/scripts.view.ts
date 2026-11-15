@@ -474,6 +474,12 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     // ==========================================
     // 📢 4. REAL CHANNELS & PAGES SURFACE
     // ==========================================
+    window.openChannelBrowseModal = function() {
+      if (typeof window.openSpatialChannelsPagesSurface === 'function') {
+        window.openSpatialChannelsPagesSurface();
+      }
+    };
+
     window.openSpatialChannelsPagesSurface = function(originEl) {
       var modal = document.getElementById('spatialChannelsPagesModal');
       if (modal) {
@@ -6531,7 +6537,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       let handle = handleInput ? handleInput.value.trim() : '';
       const cat = catInput ? catInput.value : 'tech';
       const desc = descInput ? descInput.value.trim() : '';
-      if (!name || name.length < 2) { alert('Valid channel name required (min 2 characters)'); return; }
+      if (!name || name.length < 2) { showAccountToast('Valid channel name required (min 2 characters)'); return; }
       if (!handle) handle = '@' + name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
       if (!handle.startsWith('@')) handle = '@' + handle;
 
@@ -6567,10 +6573,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             openSpatialStudioSurface(d.channel.id, 'channel');
           }
         } else {
-          alert('Failed to create channel: ' + (d.error || 'Unknown error'));
+          showAccountToast('Failed to create channel: ' + (d.error || 'Unknown error'));
         }
       })
-      .catch(function(err) { alert('Channel creation error: ' + err.message); });
+      .catch(function(err) { showAccountToast('Channel creation error: ' + err.message); });
     };
 
     window.openSpatialPageCreatorSurface = function(originEl) {
@@ -6614,7 +6620,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       const cat = catInput ? catInput.value : 'business';
       const ctaType = ctaInput ? ctaInput.value : 'message';
       const bio = bioInput ? bioInput.value.trim() : '';
-      if (!name || name.length < 2) { alert('Valid page name required (min 2 characters)'); return; }
+      if (!name || name.length < 2) { showAccountToast('Valid page name required (min 2 characters)'); return; }
       if (!handle) handle = '@' + name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
       if (!handle.startsWith('@')) handle = '@' + handle;
 
@@ -6640,10 +6646,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             openSpatialStudioSurface(d.page.id, 'page');
           }
         } else {
-          alert('Failed to create page: ' + (d.error || 'Unknown error'));
+          showAccountToast('Failed to create page: ' + (d.error || 'Unknown error'));
         }
       })
-      .catch(function(err) { alert('Page creation error: ' + err.message); });
+      .catch(function(err) { showAccountToast('Page creation error: ' + err.message); });
     };
 
     window.openSpatialGroupCreatorSurface = function(originEl) {
@@ -6679,7 +6685,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       let handle = handleInput ? handleInput.value.trim() : '';
       const privacy = privacyInput ? privacyInput.value : 'public';
       const desc = descInput ? descInput.value.trim() : '';
-      if (!name || name.length < 2) { alert('Valid group name required (min 2 characters)'); return; }
+      if (!name || name.length < 2) { showAccountToast('Valid group name required (min 2 characters)'); return; }
       if (!handle) handle = '@' + name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
       if (!handle.startsWith('@')) handle = '@' + handle;
 
@@ -6699,10 +6705,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             openSpatialStudioSurface(d.group.id, 'group');
           }
         } else {
-          alert('Failed to create group: ' + (d.error || 'Unknown error'));
+          showAccountToast('Failed to create group: ' + (d.error || 'Unknown error'));
         }
       })
-      .catch(function(err) { alert('Group creation error: ' + err.message); });
+      .catch(function(err) { showAccountToast('Group creation error: ' + err.message); });
     };
 
     window._spatialPostSelectedPhotoDataUrl = null;
@@ -7995,10 +8001,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                 if (typeof showAccountToast === 'function') showAccountToast('Role updated to ' + newRole);
                 renderActiveSection();
               } else {
-                alert('Failed to update role: ' + (d.error || 'Unknown error'));
+                showAccountToast('Failed to update role: ' + (d.error || 'Unknown error'));
               }
             })
-            .catch(function(err) { alert('Error updating role: ' + err.message); });
+            .catch(function(err) { showAccountToast('Error updating role: ' + err.message); });
           };
 
           window._pinSpaceAnnouncement = function(spId, postId, text) {
@@ -8014,10 +8020,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                 if (typeof showAccountToast === 'function') showAccountToast('📌 Announcement pinned to space!');
                 renderStudio();
               } else {
-                alert('Failed to pin announcement: ' + (d.error || 'Unknown error'));
+                showAccountToast('Failed to pin announcement: ' + (d.error || 'Unknown error'));
               }
             })
-            .catch(function(err) { alert('Error pinning: ' + err.message); });
+            .catch(function(err) { showAccountToast('Error pinning: ' + err.message); });
           };
 
           window._unpinSpaceAnnouncement = function(spId) {
@@ -8033,10 +8039,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                 if (typeof showAccountToast === 'function') showAccountToast('Unpinned announcement.');
                 renderStudio();
               } else {
-                alert('Failed to unpin announcement: ' + (d.error || 'Unknown error'));
+                showAccountToast('Failed to unpin announcement: ' + (d.error || 'Unknown error'));
               }
             })
-            .catch(function(err) { alert('Error unpinning: ' + err.message); });
+            .catch(function(err) { showAccountToast('Error unpinning: ' + err.message); });
           };
 
           window._publishStudioDispatch = function(spId) {
@@ -8067,10 +8073,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                 }
                 if (txtEl) txtEl.value = '';
               } else {
-                alert('Failed to publish dispatch: ' + (d.error || 'Unknown error'));
+                showAccountToast('Failed to publish dispatch: ' + (d.error || 'Unknown error'));
               }
             })
-            .catch(function(err) { alert('Error publishing: ' + err.message); });
+            .catch(function(err) { showAccountToast('Error publishing: ' + err.message); });
           };
 
           loadSpaceData();
@@ -9100,10 +9106,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                   if (typeof showAccountToast === 'function') showAccountToast('✓ Playlist created');
                   window.openSpatialPlaylistsSurface(chId, originEl);
                 } else {
-                  alert(data.error || 'Failed to create playlist');
+                  showAccountToast(data.error || 'Failed to create playlist');
                 }
               })
-              .catch(function(e) { alert(e.message); });
+              .catch(function(e) { showAccountToast(e.message); });
           };
         }
       });
@@ -9217,7 +9223,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                   if (typeof showAccountToast === 'function') showAccountToast('✓ Playlist deleted');
                   window.SovraSurfaceManager.popSurface();
                 } else {
-                  alert(d.error || 'Delete failed');
+                  showAccountToast(d.error || 'Delete failed');
                 }
               });
           };
@@ -9715,7 +9721,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             const catSelect = document.getElementById('liveCreateCategorySelect');
             const title = titleInput ? titleInput.value.trim() : '';
             if (!title) {
-              alert('Please enter a broadcast title.');
+              showAccountToast('Please enter a broadcast title.');
               return;
             }
 
@@ -9741,10 +9747,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                     window.openSpatialLiveViewerSurface(data.session.id, originEl);
                   });
                 } else {
-                  alert(data.error || 'Failed to start broadcast');
+                  showAccountToast(data.error || 'Failed to start broadcast');
                 }
               })
-              .catch(function(e) { alert(e.message); });
+              .catch(function(e) { showAccountToast(e.message); });
           };
         }
       });
@@ -9873,13 +9879,13 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                       '<button class="action-pill-btn action-pill-primary" style="padding: 8px 24px; font-size: 0.85rem;" onclick="window.SovraSurfaceManager.popSurface()">Done</button>' +
                     '</div>';
                   } else {
-                    alert(res.error || 'Failed to submit report');
+                    showAccountToast(res.error || 'Failed to submit report');
                     submitBtn.disabled = false;
                     submitBtn.innerText = 'Submit Report';
                   }
                 })
                 .catch(function(err) {
-                  alert(err.message || 'Network error while submitting report');
+                  showAccountToast(err.message || 'Network error while submitting report');
                   submitBtn.disabled = false;
                   submitBtn.innerText = 'Submit Report';
                 });
@@ -10125,7 +10131,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                   if (res.ok) {
                     window.openSpatialSecurityCenterSurface(originEl);
                   } else {
-                    alert(res.error || 'Failed to revoke other sessions');
+                    showAccountToast(res.error || 'Failed to revoke other sessions');
                     revokeOthersBtn.disabled = false;
                   }
                 });
@@ -10143,7 +10149,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                 if (res.ok) {
                   window.openSpatialSecurityCenterSurface(originEl);
                 } else {
-                  alert(res.error || 'Failed to revoke session');
+                  showAccountToast(res.error || 'Failed to revoke session');
                 }
               });
             };
@@ -10412,11 +10418,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             showAccountToast('Profile photo updated successfully!');
             registerPeerOnLan(myProfile);
           } else {
-            alert('Failed to update avatar: ' + (data.error || 'Server error'));
+            showAccountToast('Failed to update avatar: ' + (data.error || 'Server error'));
           }
         } catch (err) {
           console.error('[Avatar] Direct upload error:', err);
-          alert('Network error while updating avatar.');
+          showAccountToast('Network error while updating avatar.');
         }
       });
     }
@@ -10444,11 +10450,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           showAccountToast('Profile photo removed!');
           registerPeerOnLan(myProfile);
         } else {
-          alert('Failed to remove photo: ' + (data.error || 'Server error'));
+          showAccountToast('Failed to remove photo: ' + (data.error || 'Server error'));
         }
       } catch (err) {
         console.error('[Avatar] Direct remove error:', err);
-        alert('Network error while removing avatar.');
+        showAccountToast('Network error while removing avatar.');
       }
     }
 
@@ -10486,11 +10492,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             showAccountToast('Cover banner updated successfully!');
             registerPeerOnLan(myProfile);
           } else {
-            alert('Failed to update cover: ' + (data.error || 'Server error'));
+            showAccountToast('Failed to update cover: ' + (data.error || 'Server error'));
           }
         } catch (err) {
           console.error('[Cover] Direct upload error:', err);
-          alert('Network error while updating cover.');
+          showAccountToast('Network error while updating cover.');
         }
       });
     }
@@ -10518,11 +10524,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           showAccountToast('Cover banner removed!');
           registerPeerOnLan(myProfile);
         } else {
-          alert('Failed to remove cover: ' + (data.error || 'Server error'));
+          showAccountToast('Failed to remove cover: ' + (data.error || 'Server error'));
         }
       } catch (err) {
         console.error('[Cover] Direct remove error:', err);
-        alert('Network error while removing cover.');
+        showAccountToast('Network error while removing cover.');
       }
     }
 
@@ -11724,10 +11730,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           try { localStorage.setItem('sovra_lock_pin', newPin.trim()); } catch(e) {}
           triggerUserLogin();
         } else {
-          alert('PIN reset failed: ' + ((data && data.error) ? data.error : 'Invalid recovery phrase'));
+          showAccountToast('PIN reset failed: ' + ((data && data.error) ? data.error : 'Invalid recovery phrase'));
         }
       } catch (err) {
-        alert('Network failure: ' + (err.message || err));
+        showAccountToast('Network failure: ' + (err.message || err));
       }
     }
 
@@ -12001,7 +12007,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         });
         const data = await res.json();
         if (!res.ok || !data.ok) {
-          alert('Could not update profile: ' + (data.error || 'Server error'));
+          showAccountToast('Could not update profile: ' + (data.error || 'Server error'));
           return;
         }
 
@@ -12018,7 +12024,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         closeEditProfileModal();
         showAccountToast('Profile saved to database and announced to peer mesh!');
       } catch (err) {
-        alert('Network error while updating profile: ' + err);
+        showAccountToast('Network error while updating profile: ' + err);
       }
     }
 
@@ -13835,10 +13841,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           showAccountToast('🚨 Remote logout verified! Session "' + deviceName + '" was wiped permanently.', 'success');
           loadRealConnectedDevices();
         } else {
-          alert('Failed to revoke session: ' + (data?.error || 'Unknown error'));
+          showAccountToast('Failed to revoke session: ' + (data?.error || 'Unknown error'));
         }
       })
-      .catch(function(err) { alert('Error: ' + err.message); });
+      .catch(function(err) { showAccountToast('Error: ' + err.message); });
     }
 
     async function triggerBiometricAccountCreation() {
@@ -18310,7 +18316,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       } else if (navigator.clipboard) {
         navigator.clipboard.writeText(url).then(function() {
           if (typeof showAccountToast === 'function') showAccountToast('🔗 Profile link copied to clipboard!');
-          else alert('Link copied: ' + url);
+          else showAccountToast('Link copied: ' + url);
         }).catch(function() {
           if (typeof showAccountToast === 'function') showAccountToast('🔗 Profile link: ' + url);
         });
@@ -18325,7 +18331,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       const url = window.location.origin + '/@' + handle;
       navigator.clipboard.writeText(url).then(function() {
         if (typeof showAccountToast === 'function') showAccountToast('🔗 Profile link copied to clipboard!');
-        else alert('Link copied: ' + url);
+        else showAccountToast('Link copied: ' + url);
       }).catch(function() {
         if (typeof showAccountToast === 'function') showAccountToast('🔗 Profile link: ' + url);
       });
@@ -18338,7 +18344,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       if (!did) return;
       navigator.clipboard.writeText(did).then(function() {
         if (typeof showAccountToast === 'function') showAccountToast('📋 Sovereign DID copied to clipboard!');
-        else alert('DID copied: ' + did);
+        else showAccountToast('DID copied: ' + did);
       }).catch(function() {
         if (typeof showAccountToast === 'function') showAccountToast('📋 DID: ' + did);
       });
@@ -22296,7 +22302,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           '<div style="font-size: 1.25rem; font-weight: 800; color: #fff; line-height: 1.35; margin-bottom: 6px;">' + (art.title || post.caption) + '</div>' +
           (art.subtitle ? '<div style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 8px;">' + art.subtitle + '</div>' : '') +
           '<div style="font-size: 0.88rem; color: #cbd5e1; line-height: 1.5; max-height: 80px; overflow: hidden; text-overflow: ellipsis;">' + (art.body || post.caption) + '</div>' +
-          '<button class="action-pill-btn action-pill-primary" style="margin-top: 10px; font-size: 0.8rem;" onclick="alert(&quot;Article Title: &quot; + (&quot;' + (art.title || '').replace(/"/g, '\\"') + '&quot;) + &quot;\\n\\n&quot; + (&quot;' + (art.body || '').replace(/"/g, '\\"') + '&quot;))">📖 Read Full Post</button>' +
+          '<button class="action-pill-btn action-pill-primary" style="margin-top: 10px; font-size: 0.8rem;" onclick="showAccountToast(&quot;Article Title: &quot; + (&quot;' + (art.title || '').replace(/"/g, '\\"') + '&quot;) + &quot;\\n\\n&quot; + (&quot;' + (art.body || '').replace(/"/g, '\\"') + '&quot;))">📖 Read Full Post</button>' +
         '</div>';
       } else if (post.postType === 'rating' || post.ratingData) {
         var r = post.ratingData || { score: 5, averageScore: 5, ratingsCount: 1 };
@@ -25228,11 +25234,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
         } else {
           if (btn) { btn.disabled = false; btn.innerHTML = '<span>⚡ Claim 5.25 SOV</span>'; }
-          alert('Failed to claim rewards: ' + (data?.error || 'Server error'));
+          showAccountToast('Failed to claim rewards: ' + (data?.error || 'Server error'));
         }
       } catch (err) {
         if (btn) { btn.disabled = false; btn.innerHTML = '<span>⚡ Claim 5.25 SOV</span>'; }
-        alert('Network error while claiming rewards');
+        showAccountToast('Network error while claiming rewards');
       }
     }
 
@@ -26300,12 +26306,12 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       var targetAddress = (targetAddrInput ? targetAddrInput.value : '').trim();
 
       if (!targetAddress) {
-        alert('Please specify a valid counterparty IBC/Cosmos destination address.');
+        showAccountToast('Please specify a valid counterparty IBC/Cosmos destination address.');
         return;
       }
 
       if (!amt || amt <= 0) {
-        alert('Please enter a positive transfer amount.');
+        showAccountToast('Please enter a positive transfer amount.');
         return;
       }
 
@@ -26379,11 +26385,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
           loadBridgeHistory();
         } else {
-          alert('Bridge Transfer Error: ' + (data.error || 'Unknown failure'));
+          showAccountToast('Bridge Transfer Error: ' + (data.error || 'Unknown failure'));
         }
       } catch (err) {
         clearInterval(timerInterval);
-        alert('Bridge Network Exception: ' + err.message);
+        showAccountToast('Bridge Network Exception: ' + err.message);
       } finally {
         if (btn) {
           btn.disabled = false;
@@ -26839,11 +26845,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       var px = (currentTradingType === 'LIMIT' && pInput && pInput.value) ? parseFloat(pInput.value) : undefined;
 
       if (!inputVal || inputVal <= 0) {
-        alert(currentTradingInputMode === 'BUDGET' ? 'Please enter a positive fiat budget in ₹ INR.' : 'Please enter a positive fractional quantity.');
+        showAccountToast(currentTradingInputMode === 'BUDGET' ? 'Please enter a positive fiat budget in ₹ INR.' : 'Please enter a positive fractional quantity.');
         return;
       }
       if (currentTradingType === 'LIMIT' && (!px || px <= 0)) {
-        alert('Please specify a positive limit price in INR.');
+        showAccountToast('Please specify a positive limit price in INR.');
         return;
       }
 
@@ -26983,16 +26989,16 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           if (typeof showAccountToast === 'function') {
             showAccountToast('✅ ' + fillMsg);
           } else {
-            alert('Success: ' + fillMsg);
+            showAccountToast('Success: ' + fillMsg);
           }
           if (qInput) qInput.value = '';
           refreshTradingExchangeData();
         } else {
-          alert('Trading Error: ' + (data.error || 'Failed to place order'));
+          showAccountToast('Trading Error: ' + (data.error || 'Failed to place order'));
           if (commitBtn) commitBtn.disabled = false;
         }
       } catch (err) {
-        alert('Network Error: ' + err.message);
+        showAccountToast('Network Error: ' + err.message);
         if (commitBtn) commitBtn.disabled = false;
       }
     }
@@ -27012,10 +27018,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
           refreshTradingExchangeData();
         } else {
-          alert('Cancel Error: ' + (data.error || 'Failed to cancel order'));
+          showAccountToast('Cancel Error: ' + (data.error || 'Failed to cancel order'));
         }
       } catch (err) {
-        alert('Network Exception: ' + err.message);
+        showAccountToast('Network Exception: ' + err.message);
       }
     }
 
@@ -27033,10 +27039,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
           refreshTradingExchangeData();
         } else {
-          alert('Deposit failed: ' + (data.error || 'Server error'));
+          showAccountToast('Deposit failed: ' + (data.error || 'Server error'));
         }
       } catch (err) {
-        alert('Network Exception: ' + err.message);
+        showAccountToast('Network Exception: ' + err.message);
       }
     }
 
@@ -27330,7 +27336,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           var fileInp = document.getElementById('reelFileInput');
           if (fileInp) fileInp.click();
         } else {
-          alert('Please choose a vertical video file or enter a caption for your Reel.');
+          showAccountToast('Please choose a vertical video file or enter a caption for your Reel.');
         }
         return;
       }
@@ -27389,16 +27395,16 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             if (typeof showAccountToast === 'function') {
               showAccountToast('🎉 Reel published! Pinned to BitSwap pool: ' + finalCid.substring(0, 16) + '...');
             } else {
-              alert('🎉 Reel published successfully! Pinned to local BitSwap seed pool with CID: ' + finalCid);
+              showAccountToast('🎉 Reel published successfully! Pinned to local BitSwap seed pool with CID: ' + finalCid);
             }
           } else {
-            alert('Failed to publish reel: ' + (data.error || 'Unknown error'));
+            showAccountToast('Failed to publish reel: ' + (data.error || 'Unknown error'));
           }
         })
         .catch(err => {
           if (btn) btn.disabled = false;
           if (statusEl) statusEl.style.display = 'none';
-          alert('Upload network error: ' + err.message);
+          showAccountToast('Upload network error: ' + err.message);
         });
       }
 
@@ -27410,7 +27416,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         reader.onerror = function() {
           if (btn) btn.disabled = false;
           if (statusEl) statusEl.style.display = 'none';
-          alert('Failed to read video file.');
+          showAccountToast('Failed to read video file.');
         };
         reader.readAsDataURL(selectedReelFile);
       } else {
@@ -28284,7 +28290,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         return;
       }
       var names = currentMutualFriendsList.map(function(u) { return (u.displayName || u.name || u.handle) + ' (' + u.handle + ')'; }).join('\\n• ');
-      alert('🤝 Mutual Friends in common with ' + currentProfileSheetHandle + ' (' + currentMutualFriendsList.length + '):\\n\\n• ' + names);
+      showAccountToast('🤝 Mutual Friends in common with ' + currentProfileSheetHandle + ' (' + currentMutualFriendsList.length + '):\\n\\n• ' + names);
     }
 
     function toggleProfileFriendBtn() {
@@ -28338,7 +28344,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       const r = reelsData[currentReelIndex];
       const link = 'https://sovra.network/@' + (r ? r.creatorHandle : 'creator');
       navigator.clipboard.writeText(link);
-      alert('Creator profile link copied to clipboard:\\n' + link);
+      showAccountToast('Creator profile link copied to clipboard:\\n' + link);
     }
 
     function renderReelShareFriends() {
@@ -28376,7 +28382,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       closeReelsSheet('shareSheetOverlay');
       const r = reelsData[currentReelIndex];
       const cid = r ? r.cid : 'bafy...';
-      alert('Direct P2P Mesh: Forwarded Reel [' + (r ? r.caption : '') + '] (CID: ' + cid.substring(0, 14) + '...) to ' + peerName + ' via Noise_XX session.');
+      showAccountToast('Direct P2P Mesh: Forwarded Reel [' + (r ? r.caption : '') + '] (CID: ' + cid.substring(0, 14) + '...) to ' + peerName + ' via Noise_XX session.');
     }
 
     function copyActiveReelCid() {
@@ -28385,7 +28391,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       navigator.clipboard.writeText('ipfs://' + r.cid);
       r.sharesCount++;
       document.getElementById('reelShareCount').innerText = r.sharesCount;
-      alert('Decentralized CID copied to clipboard:\\nipfs://' + r.cid);
+      showAccountToast('Decentralized CID copied to clipboard:\\nipfs://' + r.cid);
       closeReelsSheet('shareSheetOverlay');
     }
 
@@ -28400,6 +28406,47 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         input.focus();
       }
     }
+
+    async function addActiveReelToStory() {
+      if (typeof closeReelsSheet === 'function') closeReelsSheet('shareSheetOverlay');
+      const r = (typeof reelsData !== 'undefined' && Array.isArray(reelsData)) ? reelsData[currentReelIndex] : null;
+      if (!r) {
+        if (typeof showAccountToast === 'function') showAccountToast('⚠️ No active reel selected');
+        return;
+      }
+      if (typeof showAccountToast === 'function') showAccountToast('⏳ Adding reel to your 24h ephemeral story...');
+
+      try {
+        const res = await fetch('/api/stories/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoUrl: r.videoUrl || ('/api/media/' + r.cid),
+            imageUrl: r.thumbnailUrl || undefined,
+            caption: '🎬 ' + (r.caption || 'Shared Reel'),
+            mediaCid: r.cid,
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data && data.ok) {
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('⚡ Reel added to your 24h Ephemeral Story!');
+          }
+          if (typeof window.loadStoriesFeed === 'function') {
+            window.loadStoriesFeed();
+          }
+        } else {
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('⚠️ Story upload failed: ' + (data.error || 'Server error'));
+          }
+        }
+      } catch (err) {
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('⚠️ Story upload error: ' + (err.message || 'Network error'));
+        }
+      }
+    }
+    window.addActiveReelToStory = addActiveReelToStory;
 
     function openAudioTrackSheet() {
       const r = reelsData[currentReelIndex];
@@ -29479,10 +29526,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               showAccountToast('⚡ ' + amount.toFixed(2) + ' SOV Tip Sent! 95% credited directly to ' + self.activeCreatorName + ', 5% to BitSwap Seeders.');
             }
           } else {
-            alert('Failed to send tip: ' + (data.error || 'Unknown error'));
+            showAccountToast('Failed to send tip: ' + (data.error || 'Unknown error'));
           }
         } catch (e) {
-          alert('Network error submitting tip: ' + e.message);
+          showAccountToast('Network error submitting tip: ' + e.message);
         } finally {
           if (submitBtn) {
             submitBtn.disabled = false;
@@ -30013,10 +30060,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           if (typeof showAccountToast === 'function') showAccountToast('✓ Membership tiers saved to Sovereign L1 ledger!');
           closeTierModal();
         } else {
-          alert('Failed to save tiers: ' + (d.error || 'Unknown error'));
+          showAccountToast('Failed to save tiers: ' + (d.error || 'Unknown error'));
         }
       })
-      .catch(e => alert('Error saving tiers: ' + e.message));
+      .catch(e => showAccountToast('Error saving tiers: ' + e.message));
     }
     window.saveMembershipTiers = saveMembershipTiers;
 
@@ -30091,10 +30138,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           if (joinBtn) joinBtn.textContent = 'Joined (Tier ' + tierLevel + ') ⭐';
           if (typeof showAccountToast === 'function') showAccountToast('🎉 Joined ' + ch.name + ' Tier ' + tierLevel + ' for ' + priceSov + ' SOV/mo!');
         } else {
-          alert('Membership subscription failed: ' + (res.error || 'Unknown error'));
+          showAccountToast('Membership subscription failed: ' + (res.error || 'Unknown error'));
         }
       })
-      .catch(err => alert('Subscription error: ' + err.message));
+      .catch(err => showAccountToast('Subscription error: ' + err.message));
     }
     window.subscribeToChannelTier = subscribeToChannelTier;
 
@@ -30148,7 +30195,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       const inp = document.getElementById('scMessageInput');
       const msg = inp ? inp.value.trim() : '';
       if (!msg) {
-        alert('Please enter a message for your Super-Chat.');
+        showAccountToast('Please enter a message for your Super-Chat.');
         return;
       }
 
@@ -30189,10 +30236,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           if (typeof showAccountToast === 'function') showAccountToast('⚡ Pinned Super-Chat (' + _activeScAmount + ' SOV) broadcasted to swarm!');
           refreshLiveSuperChatPins();
         } else {
-          alert('Super-Chat failed: ' + (res.error || 'Unknown error'));
+          showAccountToast('Super-Chat failed: ' + (res.error || 'Unknown error'));
         }
       })
-      .catch(err => alert('Super-Chat error: ' + err.message));
+      .catch(err => showAccountToast('Super-Chat error: ' + err.message));
     }
     window.submitLiveSuperChat = submitLiveSuperChat;
 
@@ -30312,10 +30359,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           closeChannelStorePurchaseModal();
           if (typeof showAccountToast === 'function') showAccountToast('🛍️ Purchase successful! Decryption key unlocked and saved to wallet.');
         } else {
-          alert('Purchase failed: ' + (res.error || 'Unknown error'));
+          showAccountToast('Purchase failed: ' + (res.error || 'Unknown error'));
         }
       })
-      .catch(err => alert('Purchase error: ' + err.message));
+      .catch(err => showAccountToast('Purchase error: ' + err.message));
     }
     window.confirmStorePurchase = confirmStorePurchase;
 
@@ -30770,11 +30817,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             avatar: data.organization.avatar || '🏢'
           });
         } else {
-          alert('Could not register organization: ' + (data && data.error ? data.error : 'Unknown error'));
+          showAccountToast('Could not register organization: ' + (data && data.error ? data.error : 'Unknown error'));
         }
       })
       .catch(function(err) {
-        alert('Registration request failed: ' + err.message);
+        showAccountToast('Registration request failed: ' + err.message);
       });
     }
     window.promptCreateOrgModal = promptCreateOrgModal;
@@ -30994,6 +31041,35 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       window._activeReplyMessageId = null;
     }
     window.cancelChatReply = cancelChatReply;
+
+    function jumpToPinnedMessage() {
+      const container = document.getElementById('chatMessagesContainer');
+      const targetId = window._activePinnedMessageId;
+      let targetEl = null;
+      if (targetId) {
+        targetEl = document.getElementById('msg_' + targetId) || document.querySelector('[data-msg-id="' + targetId + '"]');
+      }
+      if (!targetEl && container) {
+        targetEl = container.querySelector('.pinned-message, .chat-message-pinned, .chat-bubble');
+      }
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetEl.style.transition = 'box-shadow 0.3s ease';
+        targetEl.style.boxShadow = '0 0 0 2px #38bdf8, 0 0 16px rgba(56, 189, 248, 0.4)';
+        setTimeout(() => { if (targetEl) targetEl.style.boxShadow = 'none'; }, 2000);
+      } else {
+        if (typeof showAccountToast === 'function') showAccountToast('📌 Pinned message is no longer in active viewport');
+      }
+    }
+    window.jumpToPinnedMessage = jumpToPinnedMessage;
+
+    function unpinCurrentMessage() {
+      const bar = document.getElementById('chatStickyPinnedBar');
+      if (bar) bar.style.display = 'none';
+      window._activePinnedMessageId = null;
+      if (typeof showAccountToast === 'function') showAccountToast('📌 Message unpinned');
+    }
+    window.unpinCurrentMessage = unpinCurrentMessage;
 
     function cancelChatEdit() {
       const editBar = document.getElementById('chatEditBar') || document.querySelector('.chat-edit-preview');
@@ -31435,7 +31511,7 @@ window.SovraCreatorStudioEngine = {
         var text = textEl ? textEl.value.trim() : '';
         if (!text) {
           if (typeof showToast === 'function') showToast('Please enter your feedback text.', 'warning');
-          else alert('Please enter your feedback text.');
+          else showAccountToast('Please enter your feedback text.');
           return;
         }
 
@@ -31938,13 +32014,13 @@ window.SovraCreatorStudioEngine = {
 
         if (!name || name.length < 2) {
           if (typeof showToast === 'function') showToast('Please enter a channel name (at least 2 characters).', 'warning');
-          else alert('Please enter a channel name (at least 2 characters).');
+          else showAccountToast('Please enter a channel name (at least 2 characters).');
           if (nameEl) nameEl.focus();
           return;
         }
         if (!handle || handle.length < 2) {
           if (typeof showToast === 'function') showToast('Please choose a valid channel handle (at least 2 characters).', 'warning');
-          else alert('Please choose a valid channel handle (at least 2 characters).');
+          else showAccountToast('Please choose a valid channel handle (at least 2 characters).');
           if (handleEl) handleEl.focus();
           return;
         }
@@ -31999,7 +32075,7 @@ window.SovraCreatorStudioEngine = {
           } else {
             var err = (data && data.error) || 'Failed to create channel';
             if (typeof showToast === 'function') showToast('⚠️ ' + err, 'error');
-            else alert('Error: ' + err);
+            else showAccountToast('Error: ' + err);
           }
         })
         .catch(function(e) {
@@ -32230,11 +32306,11 @@ window.SovraCreatorStudioEngine = {
               }
               self.loadDashboard();
             } else {
-              alert('Upload error: ' + (data.error || 'Failed to transcode'));
+              showAccountToast('Upload error: ' + (data.error || 'Failed to transcode'));
             }
           })
           .catch(function(err) {
-            alert('Upload failed: ' + err.message);
+            showAccountToast('Upload failed: ' + err.message);
           });
       },
 
@@ -34039,7 +34115,7 @@ window.SovraCreatorStudioEngine = {
         var text = textEl ? textEl.value.trim() : '';
         if (!text) {
           if (typeof showToast === 'function') showToast('Please enter your feedback text.', 'warning');
-          else alert('Please enter your feedback text.');
+          else showAccountToast('Please enter your feedback text.');
           return;
         }
 
@@ -36100,7 +36176,7 @@ window.SovraCreatorStudioEngine = {
           status: 'sent',
           signatureHex: ' verified_ed25519_msg_sig'
         });
-        alert('Encrypted E2EE reply sent to ' + curCreator.creatorName + ' on WhatsApp chat!');
+        showAccountToast('Encrypted E2EE reply sent to ' + curCreator.creatorName + ' on WhatsApp chat!');
       }
       input.value = '';
     }
@@ -36179,7 +36255,7 @@ window.SovraCreatorStudioEngine = {
         if (typeof showAccountToast === 'function') {
           showAccountToast('💬 Response sent privately to creator!');
         } else {
-          alert('Response sent to creator!');
+          showAccountToast('Response sent to creator!');
         }
       })
       .catch(function() {
@@ -39990,7 +40066,7 @@ window.SovraCreatorStudioEngine = {
       if (typeof showAccountToast === 'function') {
         showAccountToast('🛡️ Safety numbers verified! E2EE cryptographic identity is confirmed authentic.', 'success');
       } else {
-        alert('✓ Security code verified! You verified that calls and messages with this peer are end-to-end encrypted with zero middleman inspection.');
+        showAccountToast('✓ Security code verified! You verified that calls and messages with this peer are end-to-end encrypted with zero middleman inspection.');
       }
     }
 
@@ -40000,12 +40076,12 @@ window.SovraCreatorStudioEngine = {
       if (typeof copyToClipboard === 'function') {
         copyToClipboard(raw, function() {
           if (typeof showAccountToast === 'function') showAccountToast('📋 60-digit safety numbers copied!', 'success');
-          else alert('Copied 60-digit safety numbers to clipboard!');
+          else showAccountToast('Copied 60-digit safety numbers to clipboard!');
         });
       } else {
         navigator.clipboard.writeText(raw).then(function() {
           if (typeof showAccountToast === 'function') showAccountToast('📋 60-digit safety numbers copied!', 'success');
-          else alert('Copied 60-digit safety numbers to clipboard!');
+          else showAccountToast('Copied 60-digit safety numbers to clipboard!');
         }).catch(function() {
           prompt('Copy safety numbers:', raw);
         });
@@ -43159,7 +43235,7 @@ window.SovraCreatorStudioEngine = {
       const nameInput = document.getElementById('newGroupNameInput');
       const groupName = nameInput ? nameInput.value.trim() : '';
       if (!groupName) {
-        alert('Please enter a group name');
+        showAccountToast('Please enter a group name');
         if (nameInput) nameInput.focus();
         return;
       }
@@ -44649,7 +44725,7 @@ window.SovraCreatorStudioEngine = {
           btn.innerHTML = '<span>✓</span> <span>Pinned to BitSwap</span>';
           btn.style.borderColor = '#10b981';
           btn.style.color = '#34d399';
-          alert('Local Storage Node: 4K Master Video (CID: ipfs://' + v.cid + ') pinned to local 50GB storage pool. Video is now available for offline zero-data streaming and P2P re-seeding!');
+          showAccountToast('Local Storage Node: 4K Master Video (CID: ipfs://' + v.cid + ') pinned to local 50GB storage pool. Video is now available for offline zero-data streaming and P2P re-seeding!');
         }, 800);
       }
     }
@@ -44707,7 +44783,7 @@ window.SovraCreatorStudioEngine = {
         else if (setting === 'personalized') icon.innerText = '🔕';
         else icon.innerText = '🔕';
       }
-      alert('Notification preference set to: ' + setting.toUpperCase());
+      showAccountToast('Notification preference set to: ' + setting.toUpperCase());
     }
 
     function toggleYtDescription() {
@@ -44966,7 +45042,7 @@ window.SovraCreatorStudioEngine = {
       closeYtModal('membershipModal');
       spawnConfetti();
       const v = ytVideosCatalog[activeYtVideoIndex];
-      alert('Channel Membership Activated: Joined ' + (v ? v.channelName : 'Channel') + ' as ' + selectedMembershipTier.name + ' (₹' + selectedMembershipTier.price + '/mo)! Signed with Ed25519 identity key.');
+      showAccountToast('Channel Membership Activated: Joined ' + (v ? v.channelName : 'Channel') + ' as ' + selectedMembershipTier.name + ' (₹' + selectedMembershipTier.price + '/mo)! Signed with Ed25519 identity key.');
     }
 
     function openSuperThanksModal() {
@@ -45087,7 +45163,7 @@ window.SovraCreatorStudioEngine = {
             if (stBalEl) stBalEl.innerText = walletBalanceSov.toFixed(2) + ' SOV';
           }
         } else if (data.error) {
-          alert('Tip failed: ' + data.error);
+          showAccountToast('Tip failed: ' + data.error);
         }
       } catch (err) {}
     }
@@ -45747,7 +45823,7 @@ window.SovraCreatorStudioEngine = {
         });
         if (res.ok) window.location.reload();
       } catch (e) {
-        alert('Follow action failed: ' + e);
+        showAccountToast('Follow action failed: ' + e);
       }
     }
 
@@ -45761,7 +45837,7 @@ window.SovraCreatorStudioEngine = {
         });
         if (res.ok) window.location.reload();
       } catch (e) {
-        alert('Block action failed: ' + e);
+        showAccountToast('Block action failed: ' + e);
       }
     }
 
@@ -45774,7 +45850,7 @@ window.SovraCreatorStudioEngine = {
         });
         if (res.ok) window.location.reload();
       } catch (e) {
-        alert('Mute action failed: ' + e);
+        showAccountToast('Mute action failed: ' + e);
       }
     }
 
@@ -45985,7 +46061,7 @@ window.SovraCreatorStudioEngine = {
                 '<div style="font-size: 0.75rem; color: #94a3b8;">' + pg.handle + ' &bull; ' + pg.bio + '</div>' +
               '</div>' +
             '<div style="display: flex; gap: 0.4rem;">' +
-              '<button class="action-pill-btn action-pill-secondary" style="border-color: #38bdf8; color: #38bdf8;" data-cta="' + (pg.cta ? pg.cta.replace(/"/g, '&quot;') : 'Visit') + '" onclick="event.stopPropagation(); alert(&quot;CTA Action: Redirecting to &quot; + this.dataset.cta)">' + (pg.cta || 'Visit') + '</button>' +
+              '<button class="action-pill-btn action-pill-secondary" style="border-color: #38bdf8; color: #38bdf8;" data-cta="' + (pg.cta ? pg.cta.replace(/"/g, '&quot;') : 'Visit') + '" onclick="event.stopPropagation(); showAccountToast(&quot;CTA Action: Redirecting to &quot; + this.dataset.cta)">' + (pg.cta || 'Visit') + '</button>' +
               '<button class="action-pill-btn ' + folClass + '" data-page-id="' + pg.id + '" onclick="event.stopPropagation(); togglePageFollowDemo(this.dataset.pageId)">' + folText + '</button>' +
             '</div>' +
           '</div>';
@@ -46021,7 +46097,7 @@ window.SovraCreatorStudioEngine = {
                 '<div style="font-size: 0.72rem; color: #94a3b8;">' + a.artist + ' &bull; ' + a.count.toLocaleString() + ' reels</div>' +
               '</div>' +
             '</div>' +
-            '<button class="action-pill-btn action-pill-secondary" data-title="' + a.title.replace(/"/g, '&quot;') + '" onclick="alert(&quot;Audio Preview: Playing 15s snippet for &quot; + this.dataset.title)">▶ Preview</button>' +
+            '<button class="action-pill-btn action-pill-secondary" data-title="' + a.title.replace(/"/g, '&quot;') + '" onclick="showAccountToast(&quot;Audio Preview: Playing 15s snippet for &quot; + this.dataset.title)">▶ Preview</button>' +
           '</div>';
         }
       }
@@ -46109,7 +46185,7 @@ window.SovraCreatorStudioEngine = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ targetPubkey: pubkey, reason: 'User blocked via UI' }),
         }).catch(err => console.warn('[Block] Error:', err));
-        alert('🚫 ' + name + ' has been blocked. Zero network packets will be accepted.');
+        showAccountToast('🚫 ' + name + ' has been blocked. Zero network packets will be accepted.');
         filterOmniSearch(document.getElementById('omniSearchInput').value || '');
       }
     }
@@ -46583,7 +46659,7 @@ window.SovraCreatorStudioEngine = {
             });
           }
         })
-        .catch(function(err) { alert('Could not unfriend: ' + err.message); });
+        .catch(function(err) { showAccountToast('Could not unfriend: ' + err.message); });
       }
     }
 
@@ -48319,7 +48395,7 @@ window.SovraCreatorStudioEngine = {
       const chosenAvatar = avatarInput ? avatarInput.value : (chanType === 'video' ? '🎬' : '📢');
 
       if (!name || !handle) {
-        alert('Please provide a channel name and handle.');
+        showAccountToast('Please provide a channel name and handle.');
         return;
       }
       if (!handle.startsWith('@')) handle = '@' + handle;
@@ -48372,11 +48448,11 @@ window.SovraCreatorStudioEngine = {
             showAccountToast('🎉 Sovereign Channel ' + handle + ' created in Creator Hub!');
           }
         } else {
-          alert('Failed to create channel: ' + (data.error || 'Unknown error'));
+          showAccountToast('Failed to create channel: ' + (data.error || 'Unknown error'));
         }
       })
       .catch(function(err) {
-        alert('Channel creation error: ' + err.message);
+        showAccountToast('Channel creation error: ' + err.message);
       });
     }
     window.openCreateChannelModal = openCreateChannelModal;
@@ -48431,7 +48507,7 @@ window.SovraCreatorStudioEngine = {
                     }
                   }, skipPushState, cleanQuery);
                 } else {
-                  alert('Channel not found: ' + cleanQuery);
+                  showAccountToast('Channel not found: ' + cleanQuery);
                 }
               });
           }
@@ -48439,7 +48515,7 @@ window.SovraCreatorStudioEngine = {
         })
         .catch(function(err) {
           console.error('Channel Hub load error:', err);
-          alert('Could not load channel: ' + err.message);
+          showAccountToast('Could not load channel: ' + err.message);
         });
     }
     window.openChannelHub = openChannelHub;
@@ -48845,7 +48921,7 @@ window.SovraCreatorStudioEngine = {
         }
       })
       .catch(function(err) {
-        alert('Subscription error: ' + err.message);
+        showAccountToast('Subscription error: ' + err.message);
       });
     }
     window.toggleChannelHubSubscription = toggleChannelHubSubscription;
@@ -48866,10 +48942,10 @@ window.SovraCreatorStudioEngine = {
           if (typeof showAccountToast === 'function') showAccountToast('📢 Community post published to P2P mesh swarms!');
           openChannelHub(channelId);
         } else {
-          alert('Failed to publish post: ' + (d.error || 'Unknown error'));
+          showAccountToast('Failed to publish post: ' + (d.error || 'Unknown error'));
         }
       })
-      .catch(function(e) { alert('Post failed: ' + e.message); });
+      .catch(function(e) { showAccountToast('Post failed: ' + e.message); });
     }
     window.submitChannelCommunityPost = submitChannelCommunityPost;
 
@@ -49035,7 +49111,7 @@ window.SovraCreatorStudioEngine = {
       const ctaType = document.getElementById('pageCtaInput').value;
       const bio = document.getElementById('pageBioInput').value.trim();
       if (!name || !handle) {
-        alert('Please provide a page name and handle.');
+        showAccountToast('Please provide a page name and handle.');
         return;
       }
       if (!handle.startsWith('@')) handle = '@' + handle;
@@ -49069,11 +49145,11 @@ window.SovraCreatorStudioEngine = {
           if (typeof renderCreatorHubEntities === 'function') renderCreatorHubEntities();
           showAccountToast('🎉 Sovereign Page ' + handle + ' created in Creator Hub!');
         } else {
-          alert('Failed to create page: ' + (data.error || 'Unknown error'));
+          showAccountToast('Failed to create page: ' + (data.error || 'Unknown error'));
         }
       })
       .catch(function(err) {
-        alert('Page creation error: ' + err.message);
+        showAccountToast('Page creation error: ' + err.message);
       });
     }
 
@@ -49112,14 +49188,14 @@ window.SovraCreatorStudioEngine = {
     function handleVideoWizardNext() {
       if (currentVideoWizardStep === 1) {
         if (!selectedVideoUploadFile && !window._selectedVideoThumbnail) {
-          alert('Please select a video file first to continue.');
+          showAccountToast('Please select a video file first to continue.');
           return;
         }
         setVideoUploadStep(2);
       } else if (currentVideoWizardStep === 2) {
         const title = document.getElementById('videoUploadTitleInput');
         if (!title || !title.value.trim()) {
-          alert('Please enter a Video Title / Headline before continuing.');
+          showAccountToast('Please enter a Video Title / Headline before continuing.');
           if (title) title.focus();
           return;
         }
@@ -49843,7 +49919,7 @@ window.SovraCreatorStudioEngine = {
       const audioTrack = (document.getElementById('videoUploadAudioTrackInput')?.value || '').trim();
 
       if (!title) {
-        alert('Please enter a video title or headline.');
+        showAccountToast('Please enter a video title or headline.');
         setVideoUploadStep(2);
         return;
       }
@@ -49947,7 +50023,7 @@ window.SovraCreatorStudioEngine = {
             closeVideoUploadModal();
             showAccountToast('🎉 Short "' + title + '" published to 60fps Sovereign Reels feed!');
           } else {
-            alert('Short publication failed: ' + (result.error || 'Unknown error'));
+            showAccountToast('Short publication failed: ' + (result.error || 'Unknown error'));
           }
         } else {
           // Route 2: 16:9 Landscape Long-Form Watch Ingestion
@@ -50102,12 +50178,12 @@ window.SovraCreatorStudioEngine = {
             closeVideoUploadModal();
             showAccountToast('🎉 Video "' + title + '" published to Sovereign Watch over P2P!');
           } else {
-            alert('Video upload failed: ' + (result.error || 'Unknown error'));
+            showAccountToast('Video upload failed: ' + (result.error || 'Unknown error'));
           }
         }
       } catch (err) {
         console.error('Video upload network error:', err);
-        alert('Failed to publish video: ' + (err.message || 'Network error'));
+        showAccountToast('Failed to publish video: ' + (err.message || 'Network error'));
       } finally {
         if (publishBtn) {
           publishBtn.disabled = false;
@@ -50314,11 +50390,11 @@ window.SovraCreatorStudioEngine = {
           if (typeof refreshComposerAuthorSelect === 'function') refreshComposerAuthorSelect();
           showAccountToast('✓ ' + typeLabel + ' deleted.');
         } else {
-          alert('Failed to delete entity: ' + (data.error || 'Unknown error'));
+          showAccountToast('Failed to delete entity: ' + (data.error || 'Unknown error'));
         }
       })
       .catch(function(err) {
-        alert('Delete error: ' + err.message);
+        showAccountToast('Delete error: ' + err.message);
       });
     }
 
@@ -51087,7 +51163,7 @@ window.SovraCreatorStudioEngine = {
       }
 
       if (!text && !channelPhotoDataUrl && !activeChannelVoiceDataUrl && !pollData) {
-        alert('Please enter a message, record voice, or attach media to broadcast.');
+        showAccountToast('Please enter a message, record voice, or attach media to broadcast.');
         return;
       }
       const channels = (typeof allChannelsData !== 'undefined' ? allChannelsData : []);
@@ -51130,12 +51206,12 @@ window.SovraCreatorStudioEngine = {
           if (typeof renderFeedPosts === 'function') renderFeedPosts();
           showAccountToast('📢 Broadcast dispatched to ' + ch.name + ' subscribers!');
         } else {
-          alert('Broadcast failed: ' + (data.error || 'Unknown error'));
+          showAccountToast('Broadcast failed: ' + (data.error || 'Unknown error'));
         }
       })
       .catch(function(err) {
         console.error('[Channel] Broadcast error:', err);
-        alert('Broadcast failed: ' + err.message);
+        showAccountToast('Broadcast failed: ' + err.message);
       });
     }
 
@@ -53324,10 +53400,10 @@ window.SovraCreatorStudioEngine = {
           if (iframe) iframe.src = data.sandboxUrl;
           if (modal) modal.style.display = 'flex';
         } else {
-          alert('Failed to launch DApp: ' + (data.error || 'Unknown error'));
+          showAccountToast('Failed to launch DApp: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('DApp launch error: ' + err.message);
+        showAccountToast('DApp launch error: ' + err.message);
       }
     }
     window.launchMiniDApp = launchMiniDApp;
@@ -53361,10 +53437,10 @@ window.SovraCreatorStudioEngine = {
         })
       }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.ok) {
-          alert('Mini-DApp registered successfully!');
+          showAccountToast('Mini-DApp registered successfully!');
           fetchDAppsList();
         } else {
-          alert('Error: ' + d.error);
+          showAccountToast('Error: ' + d.error);
         }
       });
     }
@@ -53430,7 +53506,7 @@ window.SovraCreatorStudioEngine = {
           }
         }
       } catch (err) {
-        alert('AI Summarization error: ' + err.message);
+        showAccountToast('AI Summarization error: ' + err.message);
       }
     }
     window.triggerAiStudioSummarization = triggerAiStudioSummarization;
@@ -53456,10 +53532,10 @@ window.SovraCreatorStudioEngine = {
             showAccountToast('🔊 Ultrasonic Voucher Transmitted (' + data.voucher.amountSov + ' SOV)');
           }
         } else {
-          alert('Error: ' + data.error);
+          showAccountToast('Error: ' + data.error);
         }
       } catch (err) {
-        alert('Offline pay error: ' + err.message);
+        showAccountToast('Offline pay error: ' + err.message);
       }
     }
     window.triggerUltrasonicSoundPay = triggerUltrasonicSoundPay;
@@ -53592,7 +53668,7 @@ window.SovraCreatorStudioEngine = {
           }
         }
       } catch (err) {
-        alert('Agent deployment error: ' + err.message);
+        showAccountToast('Agent deployment error: ' + err.message);
       }
     }
     window.deployAutonomousMission = deployAutonomousMission;
@@ -53676,7 +53752,7 @@ window.SovraCreatorStudioEngine = {
         // --- CYCLE 6: WEBAUTHN PRF HARDWARE ENCLAVE LOGIN (REMEDIATED SEC-02) ---
     async function loginWithHardwareEnclavePrf() {
       if (!window.PublicKeyCredential) {
-        alert("WebAuthn Secure Enclave is not supported on this browser.");
+        showAccountToast("WebAuthn Secure Enclave is not supported on this browser.");
         return;
       }
       try {
@@ -53686,7 +53762,7 @@ window.SovraCreatorStudioEngine = {
         // Verify platform authenticator availability
         const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
         if (!isAvailable) {
-          alert("Hardware platform authenticator (TouchID / FaceID / Windows Hello) is not available on this device. Please authenticate using your 12-word recovery mnemonic.");
+          showAccountToast("Hardware platform authenticator (TouchID / FaceID / Windows Hello) is not available on this device. Please authenticate using your 12-word recovery mnemonic.");
           return;
         }
         
@@ -53723,7 +53799,7 @@ window.SovraCreatorStudioEngine = {
         }
       } catch (err) {
         if (err.name !== "NotAllowedError" && err.name !== "AbortError") {
-          alert("Hardware Enclave Authentication: " + err.message + ". Please use your 12-word recovery mnemonic or standard passkey.");
+          showAccountToast("Hardware Enclave Authentication: " + err.message + ". Please use your 12-word recovery mnemonic or standard passkey.");
         }
       }
     }

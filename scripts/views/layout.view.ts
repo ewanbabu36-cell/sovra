@@ -2489,7 +2489,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <button class="profile-btn profile-btn-secondary" style="padding: 0.75rem; text-align: left; display: flex; align-items: center; gap: 0.5rem;" onclick="shareToWhatsAppChat()">
                     <span>💬</span> <span>Forward to WhatsApp E2EE Chat</span>
                   </button>
-                  <button class="profile-btn profile-btn-secondary" style="padding: 0.75rem; text-align: left; display: flex; align-items: center; gap: 0.5rem;" onclick="alert('Added to your 24h Ephemeral Story!')">
+                  <button class="profile-btn profile-btn-secondary" style="padding: 0.75rem; text-align: left; display: flex; align-items: center; gap: 0.5rem;" onclick="addActiveReelToStory()">
                     <span>⚡</span> <span>Add Reel to Your Story</span>
                   </button>
                 </div>
