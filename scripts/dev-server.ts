@@ -7386,6 +7386,48 @@ async function startDevServer() {
       return;
     }
 
+    if (url.pathname === '/api/mesh/lan-beacon' && (req.method === 'POST' || req.method === 'GET')) {
+      if (req.method === 'GET') {
+        const peers = sovraBleMesh.scanNearbyPeers({ maxDistanceMeters: 100 });
+        const lanPeers = peers.filter((p) => p.transport === 'LAN_WEBRTC_MESH' || p.transport === 'HYBRID_P2P_SUBNET');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, peers: lanPeers, totalPeers: peers.length }));
+        return;
+      }
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const principal = resolvePrincipal(req, parsed);
+        const peerDid = String(parsed.senderDid || parsed.peerDid || principal?.did || masterKey.did);
+        const handle = String(parsed.senderHandle || parsed.handle || principal?.handle || '@sovereign_node');
+        const displayName = String(parsed.senderName || parsed.displayName || principal?.displayName || 'Sovereign LAN Node');
+        const rssiDbm = typeof parsed.rssi === 'number' ? parsed.rssi : (typeof parsed.rssiDbm === 'number' ? parsed.rssiDbm : -54);
+        const txPowerDbm = typeof parsed.txPower === 'number' ? parsed.txPower : (typeof parsed.txPowerDbm === 'number' ? parsed.txPowerDbm : -59);
+        const transport = (parsed.transport === 'BLE_GATT_5.3' || parsed.transport === 'BLE_MESH_RELAY' || parsed.transport === 'WIFI_DIRECT_NAN' || parsed.transport === 'HYBRID_P2P_SUBNET')
+          ? parsed.transport
+          : 'LAN_WEBRTC_MESH';
+
+        const beacon = sovraBleMesh.registerBeacon({
+          peerDid,
+          handle,
+          displayName,
+          rssiDbm,
+          txPowerDbm,
+          batteryPct: typeof parsed.batteryPct === 'number' ? parsed.batteryPct : 90,
+          transport,
+          angleDeg: typeof parsed.angleDeg === 'number' ? parsed.angleDeg : undefined,
+        });
+        const verification = verifyBeaconFrame(beacon);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, beacon, verified: verification.valid, transport }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid LAN beacon JSON' }));
+      }
+      return;
+    }
+
     if (url.pathname === '/api/mesh/ble/relay-packet' && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;

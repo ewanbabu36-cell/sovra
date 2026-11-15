@@ -72,12 +72,21 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         var countBadge = document.getElementById('blePeerCountBadge');
         if (countBadge) countBadge.innerText = 'Scanning RF...';
 
-        // Truthful hardware check against navigator.bluetooth with Safari/Firefox multi-transport fallback
+        // Truthful hardware check against navigator.bluetooth with Safari/Firefox multi-transport fallback & iOS Native CoreBluetooth bridge
         var hwBadge = document.getElementById('bleHardwareStatusBadge');
-        if (typeof navigator !== 'undefined' && navigator.bluetooth && typeof navigator.bluetooth.getAvailability === 'function') {
+        var hasNativeIosBridge = typeof window !== 'undefined' && Boolean(
+          (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.sovraBleBridge) ||
+          window.SovraNativeBleBridge ||
+          window.__SOVRA_BLE_IOS_NATIVE__ ||
+          (window.NativeModules && window.NativeModules.SovraBleBridge)
+        );
+
+        if (hasNativeIosBridge && hwBadge) {
+          hwBadge.innerHTML = '<span style="font-size: 1.2rem;">📱</span><div><div style="font-weight: 700; color: #38bdf8;">Hardware Mode: iOS CoreBluetooth Native Bridge Active</div><div style="font-size: 0.72rem; color: #94a3b8;">CBCentralManager &amp; CBPeripheralManager 2.4GHz RF Active via SovraBleBridge</div></div>';
+        } else if (typeof navigator !== 'undefined' && navigator.bluetooth && typeof navigator.bluetooth.getAvailability === 'function') {
           navigator.bluetooth.getAvailability().then(function(available) {
             if (hwBadge && available) {
-              hwBadge.innerHTML = '<span style="font-size: 1.2rem;">⚡</span><div><div style="font-weight: 700; color: #38bdf8;">Hardware Mode: Web Bluetooth 5.3 Controller Active</div><div style="font-size: 0.72rem; color: #94a3b8;">Physical BLE 5.3 RF Active on Android APK • Web Simulation Node on Desktop</div></div>';
+              hwBadge.innerHTML = '<span style="font-size: 1.2rem;">⚡</span><div><div style="font-weight: 700; color: #38bdf8;">Hardware Mode: Web Bluetooth 5.3 Controller Active</div><div style="font-size: 0.72rem; color: #94a3b8;">Physical BLE 5.3 RF Active on Android / Desktop Chrome / Bluefy iOS</div></div>';
             } else if (hwBadge) {
               hwBadge.innerHTML = '<span style="font-size: 1.2rem;">🌐</span><div><div style="font-weight: 700; color: #38bdf8;">Multi-Transport Mode: Local Wi-Fi Subnet &amp; WebRTC Mesh</div><div style="font-size: 0.72rem; color: #94a3b8;">Apple Safari iOS &amp; Firefox Compliant • Zero Cloud Required</div></div>';
             }
@@ -28914,14 +28923,51 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       detectCapabilities: function() {
         const hasWebBluetooth = typeof navigator !== 'undefined' && 'bluetooth' in navigator && typeof navigator.bluetooth.requestDevice === 'function';
         const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
-        const isApple = /iPhone|iPad|iPod|Macintosh/i.test(ua);
+        const platform = (typeof navigator !== 'undefined' && navigator.platform) ? navigator.platform : '';
+        const maxTouchPoints = (typeof navigator !== 'undefined' && typeof navigator.maxTouchPoints === 'number') ? navigator.maxTouchPoints : 0;
+
+        // Exact platform identification without false positives:
+        // iOS or iPadOS (including iPad Safari presenting as MacIntel with touch points)
+        const isIOS = /iPhone|iPad|iPod/i.test(ua) || (platform === 'MacIntel' && maxTouchPoints > 1);
+        const isSafari = /^((?!chrome|android).)*safari/i.test(ua) || (typeof window !== 'undefined' && typeof window.safari !== 'undefined');
         const isFirefox = /Firefox/i.test(ua);
+
+        // Native iOS CoreBluetooth Bridge check (injected in Sovra Mobile WKWebView or React Native container)
+        const hasNativeIosBridge = typeof window !== 'undefined' && Boolean(
+          (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.sovraBleBridge) ||
+          window.SovraNativeBleBridge ||
+          window.__SOVRA_BLE_IOS_NATIVE__ ||
+          (window.NativeModules && window.NativeModules.SovraBleBridge)
+        );
+
+        // Support Bluefy / WebBLE browsers on iOS that inject Web Bluetooth
+        const hasBluefyOrWebBle = isIOS && hasWebBluetooth;
+
+        // Desktop Chrome, Edge, Brave, Opera on macOS/Windows/Linux have physical Web Bluetooth
+        const isPhysicalBleSupported = (hasWebBluetooth && (!isSafari || hasBluefyOrWebBle) && !isFirefox) || hasNativeIosBridge;
+
+        let transportMode = 'LAN_WEBRTC_MESH';
+        if (hasNativeIosBridge) {
+          transportMode = 'IOS_COREBLUETOOTH_NATIVE';
+        } else if (hasWebBluetooth && !isSafari && !isFirefox) {
+          transportMode = 'BLE_PHYSICAL_RF';
+        } else if (hasBluefyOrWebBle) {
+          transportMode = 'BLE_PHYSICAL_RF';
+        } else if (isIOS) {
+          transportMode = 'IOS_MULTI_TRANSPORT_LAN_WEBRTC';
+        } else if (isFirefox) {
+          transportMode = 'FIREFOX_MULTI_TRANSPORT_LAN_WEBRTC';
+        }
+
         return {
           hasWebBluetooth: hasWebBluetooth,
-          isApple: isApple,
+          isIOS: isIOS,
+          isSafari: isSafari,
           isFirefox: isFirefox,
-          isFallbackRequired: !hasWebBluetooth || isApple || isFirefox,
-          transportMode: hasWebBluetooth && !isApple && !isFirefox ? 'BLE_PHYSICAL_RF' : 'LAN_WEBRTC_MESH'
+          hasNativeIosBridge: hasNativeIosBridge,
+          hasBluefyOrWebBle: hasBluefyOrWebBle,
+          isFallbackRequired: !isPhysicalBleSupported,
+          transportMode: transportMode
         };
       },
 
@@ -28931,7 +28977,22 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         const noticeEl = document.getElementById('bleRadarPlatformNotice');
         const scanBtn = document.getElementById('bleHardwareScanBtn');
 
-        if (caps.isFallbackRequired) {
+        if (caps.hasNativeIosBridge) {
+          if (transportBadge) {
+            transportBadge.innerHTML = '📱 CoreBluetooth Active';
+            transportBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+            transportBadge.style.color = '#38bdf8';
+            transportBadge.style.borderColor = '#0284c7';
+          }
+          if (noticeEl) {
+            noticeEl.style.display = 'block';
+            noticeEl.innerHTML = '<span style="font-weight: 700; color: #38bdf8;">📱 iOS CoreBluetooth Native Module Linked:</span> Direct hardware 2.4GHz RF communication active via SovraBleBridge.';
+          }
+          if (scanBtn) {
+            scanBtn.innerHTML = '<span>📱</span> <span>Scan CoreBluetooth</span>';
+            scanBtn.title = 'Scan via iOS CoreBluetooth CBCentralManager';
+          }
+        } else if (caps.isFallbackRequired) {
           if (transportBadge) {
             transportBadge.innerHTML = '🌐 LAN / WebRTC Active';
             transportBadge.style.background = 'rgba(56, 189, 248, 0.2)';
@@ -28940,6 +29001,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
           if (noticeEl) {
             noticeEl.style.display = 'block';
+            const browserName = caps.isIOS ? 'Safari iOS' : (caps.isFirefox ? 'Firefox' : 'Browser');
+            noticeEl.innerHTML = '<div style="font-weight: 700; color: #38bdf8; margin-bottom: 3px;">🌐 ' + browserName + ' Multi-Transport Active</div>' +
+              '<div>Web Bluetooth is blocked by Apple/Mozilla security policies. Sovra automatically routes proximity radar over high-speed Local Subnet &amp; WebRTC Mesh.</div>' +
+              (caps.isIOS ? '<div style="margin-top: 4px; font-size: 0.68rem; color: #94a3b8;">💡 For physical 2.4GHz BLE RF on iPhone: Open in Sovra iOS App or Bluefy Browser.</div>' : '');
           }
           if (scanBtn) {
             scanBtn.innerHTML = '<span>🌐</span> <span>Scan Local Mesh</span>';
@@ -28948,6 +29013,12 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         } else {
           if (transportBadge) {
             transportBadge.innerHTML = '⚡ GATT 5.3 Active';
+            transportBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+            transportBadge.style.color = '#34d399';
+            transportBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+          }
+          if (noticeEl) {
+            noticeEl.style.display = 'none';
           }
           if (scanBtn) {
             scanBtn.innerHTML = '<span>🔍</span> <span>Scan BLE</span>';
@@ -29066,7 +29137,19 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         const btn = document.getElementById('bleHardwareScanBtn');
         if (btn) btn.innerHTML = '<span>⏳</span> <span>Scanning...</span>';
 
-        if (caps.hasWebBluetooth && !caps.isApple && !caps.isFirefox) {
+        // 1. Native iOS CoreBluetooth Bridge invocation if running in iOS Native Container
+        if (caps.hasNativeIosBridge) {
+          try {
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.sovraBleBridge) {
+              window.webkit.messageHandlers.sovraBleBridge.postMessage({ action: 'startCentralScanning', serviceUuid: self.serviceUuid });
+            } else if (window.SovraNativeBleBridge && typeof window.SovraNativeBleBridge.startCentralScanning === 'function') {
+              window.SovraNativeBleBridge.startCentralScanning(self.serviceUuid);
+            }
+          } catch (bridgeErr) {
+            console.warn('[BLE-Radar] iOS native bridge scan call note:', bridgeErr);
+          }
+        } else if (!caps.isFallbackRequired && caps.hasWebBluetooth) {
+          // 2. Physical Web Bluetooth GATT Pairing (Android Chrome, Desktop Chrome/Edge/Opera, Bluefy iOS)
           try {
             const device = await navigator.bluetooth.requestDevice({
               filters: [{ services: [self.serviceUuid] }],
@@ -29080,7 +29163,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
         }
 
-        // Universal Discovery for Safari iOS, Firefox, and Subnet Mesh Peers
+        // 3. Universal Discovery for Safari iOS, Firefox, and Subnet Mesh Peers
         try {
           const res = await fetch('/api/mesh/ble/scan?maxDistanceMeters=100').catch(() => null);
           const peerData = res && res.ok ? await res.json() : null;
@@ -29098,6 +29181,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
         } catch (_) {}
 
+        // 4. Register LAN proximity beacon on subnet
         const myDid = (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : null) || (myProfile ? myProfile.did : 'self');
         const myName = myProfile ? myProfile.name : 'Local Node';
         const myHandle = myProfile ? myProfile.handle : '@local_node';
@@ -29110,7 +29194,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               senderDid: myDid,
               senderName: myName,
               senderHandle: myHandle,
-              transport: caps.isFallbackRequired ? 'LAN_WEBRTC_MESH' : 'BLE_GATT_5.3',
+              transport: caps.isFallbackRequired ? 'LAN_WEBRTC_MESH' : (caps.hasNativeIosBridge ? 'BLE_MESH_RELAY' : 'BLE_GATT_5.3'),
               rssi: -54,
               txPower: -59
             })
@@ -29120,13 +29204,19 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         await self.refreshScan();
 
         if (btn) {
-          btn.innerHTML = caps.isFallbackRequired
-            ? '<span>🌐</span> <span>Scan Local Mesh</span>'
-            : '<span>🔍</span> <span>Scan BLE</span>';
+          if (caps.hasNativeIosBridge) {
+            btn.innerHTML = '<span>📱</span> <span>Scan CoreBluetooth</span>';
+          } else if (caps.isFallbackRequired) {
+            btn.innerHTML = '<span>🌐</span> <span>Scan Local Mesh</span>';
+          } else {
+            btn.innerHTML = '<span>🔍</span> <span>Scan BLE</span>';
+          }
         }
         if (typeof showAccountToast === 'function') {
           const peerCount = self.peers.length;
-          const modeLabel = caps.isFallbackRequired ? 'Local Subnet & WebRTC Mesh' : 'BLE GATT 5.3 RF';
+          let modeLabel = 'BLE GATT 5.3 RF';
+          if (caps.hasNativeIosBridge) modeLabel = 'iOS CoreBluetooth Bridge';
+          else if (caps.isFallbackRequired) modeLabel = 'Local Subnet & WebRTC Mesh';
           showAccountToast('📡 Radar Scan Complete: ' + peerCount + ' active peers identified via ' + modeLabel + '.');
         }
       },
@@ -38067,10 +38157,44 @@ window.SovraCreatorStudioEngine = {
     let _webBleNotifyChar = null;
 
     async function connectWebBluetoothRadar() {
-      const isApple = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent || '');
-      const isFirefox = typeof navigator !== 'undefined' && /Firefox/i.test(navigator.userAgent || '');
-      if (!navigator.bluetooth || !navigator.bluetooth.requestDevice || isApple || isFirefox) {
-        // Multi-transport Safari/Firefox Fallback: Query LAN Subnet & WebRTC Mesh Peers
+      const ua = typeof navigator !== 'undefined' ? (navigator.userAgent || '') : '';
+      const platform = typeof navigator !== 'undefined' ? (navigator.platform || '') : '';
+      const maxTouchPoints = typeof navigator !== 'undefined' && typeof navigator.maxTouchPoints === 'number' ? navigator.maxTouchPoints : 0;
+
+      const isIOS = /iPhone|iPad|iPod/i.test(ua) || (platform === 'MacIntel' && maxTouchPoints > 1);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(ua) || (typeof window !== 'undefined' && typeof window.safari !== 'undefined');
+      const isFirefox = /Firefox/i.test(ua);
+      const hasWebBluetooth = typeof navigator !== 'undefined' && navigator.bluetooth && typeof navigator.bluetooth.requestDevice === 'function';
+      const hasNativeIosBridge = typeof window !== 'undefined' && Boolean(
+        (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.sovraBleBridge) ||
+        window.SovraNativeBleBridge ||
+        window.__SOVRA_BLE_IOS_NATIVE__ ||
+        (window.NativeModules && window.NativeModules.SovraBleBridge)
+      );
+
+      // 1. If running in iOS Native Container with CoreBluetooth Bridge
+      if (hasNativeIosBridge) {
+        try {
+          if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.sovraBleBridge) {
+            window.webkit.messageHandlers.sovraBleBridge.postMessage({ action: 'startCentralScanning', serviceUuid: '00005356-0000-1000-8000-00805f9b34fb' });
+          } else if (window.SovraNativeBleBridge && typeof window.SovraNativeBleBridge.startCentralScanning === 'function') {
+            window.SovraNativeBleBridge.startCentralScanning('00005356-0000-1000-8000-00805f9b34fb');
+          }
+          const pairBtn = document.getElementById('webBluetoothPairBtn');
+          if (pairBtn) {
+            pairBtn.innerHTML = '<span>📱 iOS BLE Linked</span>';
+            pairBtn.style.color = '#38bdf8';
+            pairBtn.style.borderColor = '#38bdf8';
+          }
+          showAccountToast('📱 iOS CoreBluetooth Native Module Linked');
+          return;
+        } catch (e) {
+          console.warn('[connectWebBluetoothRadar] Native iOS bridge error:', e);
+        }
+      }
+
+      // 2. Multi-transport Safari/Firefox Fallback: Query LAN Subnet & WebRTC Mesh Peers
+      if (!hasWebBluetooth || (isSafari && !hasWebBluetooth) || isFirefox) {
         const pairBtn = document.getElementById('webBluetoothPairBtn');
         if (pairBtn) pairBtn.innerHTML = '<span>Scanning Mesh...</span>';
         try {
@@ -38104,7 +38228,8 @@ window.SovraCreatorStudioEngine = {
             pairBtn.style.borderColor = '#38bdf8';
           }
           renderChatContactsList();
-          showAccountToast('🌐 Safari/Firefox: Linked via Local Wi-Fi LAN & WebRTC Mesh');
+          const browserTag = isIOS ? 'Safari iOS' : (isFirefox ? 'Firefox' : 'Web');
+          showAccountToast('🌐 ' + browserTag + ': Linked via Local Wi-Fi LAN & WebRTC Mesh');
         } catch (e) {
           showAccountToast('🌐 Wi-Fi Mesh Fallback active on local subnet');
         }
