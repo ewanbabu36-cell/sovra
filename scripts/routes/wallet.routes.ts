@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { sovraDb } from '../database-engine.ts';
+import { l1ChainSupervisor } from '../chain-supervisor.ts';
 import { signEd25519, bytesToHex, verifyMetaTransaction, type MetaTransactionRequest } from '../../packages/crypto/dist/index.js';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
 
@@ -21,20 +22,25 @@ const L1_PROBE_TTL_MS = 10_000;
 
 export async function isL1RpcAvailable(): Promise<boolean> {
   const now = Date.now();
-  if (now - l1RpcAvailableCache.timestamp < L1_PROBE_TTL_MS) {
-    return l1RpcAvailableCache.available;
+  if (now - l1RpcAvailableCache.timestamp < L1_PROBE_TTL_MS && l1RpcAvailableCache.available) {
+    return true;
   }
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120);
+    const timeoutId = setTimeout(() => controller.abort(), 600);
     const res = await fetch(`${PRIMARY_RPC}/status`, { signal: controller.signal });
     clearTimeout(timeoutId);
-    l1RpcAvailableCache = { available: res.ok, timestamp: now };
-    return res.ok;
+    if (res.ok) {
+      l1RpcAvailableCache = { available: true, timestamp: now };
+      return true;
+    }
   } catch {
-    l1RpcAvailableCache = { available: false, timestamp: now };
-    return false;
+    // If probing fails, consult the L1 Chain Supervisor to start or adopt the node
   }
+
+  const ready = await l1ChainSupervisor.ensureReady(3000);
+  l1RpcAvailableCache = { available: ready, timestamp: Date.now() };
+  return ready;
 }
 
 export interface WalletRouteContext {

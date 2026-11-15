@@ -117,6 +117,7 @@ import { handleStudioTranscoderRoutes } from './routes/studio.routes.ts';
 import { handleLiveStreamingRoutes } from './routes/live.routes.ts';
 import { renderExplorerHtml } from './blockchain-explorer.ts';
 import { handleExplorerRoutes, initCometBftStreamHub, cometBftStreamHub } from './routes/explorer.routes.ts';
+import { l1ChainSupervisor } from './chain-supervisor.ts';
 import { handleWalletRoutes } from './routes/wallet.routes.ts';
 import { handleTradingRoutes } from './routes/trading.routes.ts';
 import { handleReferralRoutes } from './routes/referral.routes.ts';
@@ -9386,9 +9387,15 @@ server.listen(HTTP_PORT, '0.0.0.0', () => {
       });
     }
 
-    // Initialize Native CometBFT WebSocket & SSE Stream Hub
+    // Initialize Native CometBFT Consensus Supervisor & Stream Hub
     try {
-      initCometBftStreamHub();
+      l1ChainSupervisor.start().then(() => {
+        try {
+          initCometBftStreamHub();
+        } catch (_) {}
+      }).catch(err => {
+        console.warn('[L1 CONSENSUS] Chain supervisor init error:', err);
+      });
     } catch (wsErr) {
       console.warn('[EXPLORER] CometBFT Stream Hub init warning:', wsErr);
     }
