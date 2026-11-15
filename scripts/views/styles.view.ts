@@ -15,7 +15,7 @@ const distCssPath = path.resolve(__dirname, '../../apps/sovra-app/dist/sovra.css
 let cachedCss: string | null = null;
 
 export function renderGlobalStyles(isCreatorModeActive: boolean = false): string {
-  if (!cachedCss) {
+  if (!cachedCss || process.env.NODE_ENV !== 'production') {
     if (fs.existsSync(cssFilePath)) {
       cachedCss = fs.readFileSync(cssFilePath, 'utf-8');
     } else if (fs.existsSync(distCssPath)) {

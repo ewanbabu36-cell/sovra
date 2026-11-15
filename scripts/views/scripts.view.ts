@@ -16506,8 +16506,24 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
       }
       if (tab === 'youtube') {
-        if (typeof window.maximizePiPToStage === 'function') {
-          window.maximizePiPToStage();
+        const pipOverlay = document.getElementById('persistentPiPOverlay');
+        if (pipOverlay && pipOverlay.style.display !== 'none') {
+          const pipVid = document.getElementById('persistentPiPVideo');
+          const curTime = pipVid ? pipVid.currentTime : 0;
+          const wasPaused = pipVid ? pipVid.paused : false;
+          if (typeof window.closePersistentPiP === 'function') {
+            window.closePersistentPiP();
+          }
+          const mainVid = document.getElementById('ytMainVideoElement');
+          if (mainVid) {
+            try { mainVid.currentTime = curTime; } catch(e) {}
+            if (!wasPaused) {
+              mainVid.play().catch(function() {});
+              ytIsPlaying = true;
+              const box = document.getElementById('ytPlayerBox');
+              if (box) box.classList.add('is-playing');
+            }
+          }
         } else if (window.SovraPipEngine && typeof window.SovraPipEngine.closePip === 'function') {
           window.SovraPipEngine.closePip();
         }
@@ -35139,7 +35155,7 @@ window.SovraCreatorStudioEngine = {
       var curTime = pipVid ? pipVid.currentTime : 0;
       var wasPaused = pipVid ? pipVid.paused : false;
       window.closePersistentPiP();
-      if (typeof switchTab === 'function') {
+      if (window._currentActiveTab !== 'youtube' && typeof switchTab === 'function') {
         switchTab('watch');
       }
       var mainVid = document.getElementById('ytMainVideoElement');
