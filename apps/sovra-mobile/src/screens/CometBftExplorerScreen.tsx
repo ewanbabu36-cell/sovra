@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '../services/api.js';
 
 export interface BlockSummary {
   readonly height: number;
@@ -59,7 +60,7 @@ export function CometBftExplorerScreen({ onClose }: CometBftExplorerScreenProps)
     let mounted = true;
     const fetchStatus = async () => {
       try {
-        const res = await fetch('/api/explorer/status');
+        const res = await fetch(`${getApiBaseUrl()}/api/explorer/status`);
         const data = await res.json();
         if (!mounted) return;
         if (data && data.ok) {
@@ -85,7 +86,7 @@ export function CometBftExplorerScreen({ onClose }: CometBftExplorerScreenProps)
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const res = await fetch('/api/explorer/blocks?limit=5');
+      const res = await fetch(`${getApiBaseUrl()}/api/explorer/blocks?limit=5`);
       const data = await res.json();
       if (data && data.ok && Array.isArray(data.blocks)) {
         setRecentBlocks(data.blocks);

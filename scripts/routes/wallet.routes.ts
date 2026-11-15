@@ -583,6 +583,15 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
       let senderDid = principal.did;
       let recipientDid = String(parsed.recipientDid || parsed.recipient || '').trim();
 
+      // Resolve @handle or plain handle to DID if not already a did:
+      if (recipientDid && (recipientDid.startsWith('@') || !recipientDid.startsWith('did:'))) {
+        const cleanHandle = recipientDid.replace(/^@/, '');
+        const targetUser = sovraDb.findUserByHandle(cleanHandle);
+        if (targetUser && targetUser.did) {
+          recipientDid = targetUser.did;
+        }
+      }
+
       // Handle signed offline DTN voucher submission
       if (parsed.voucher) {
         const vch = parsed.voucher;

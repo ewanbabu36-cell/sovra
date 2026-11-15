@@ -5,7 +5,8 @@
  * Peers review reported disputes, author defense, and cast anonymous quadratic votes.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '../services/api.js';
 
 export interface DisputeCase {
   readonly id: string;
@@ -51,7 +52,32 @@ export function CommunityJuryScreen({ onClose }: CommunityJuryScreenProps): Reac
   ]);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
-  const handleVote = (caseId: string, choice: 'keep' | 'remove') => {
+  useEffect(() => {
+    let mounted = true;
+    const fetchCases = async () => {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/api/moderation/cases`);
+        const data = await res.json();
+        if (mounted && data && data.ok && Array.isArray(data.cases) && data.cases.length > 0) {
+          setActiveCases(data.cases.map((c: any) => ({
+            id: c.caseId || c.id,
+            targetType: c.targetType || 'Content Violation',
+            reportedHandle: c.reportedHandle || '@peer',
+            reason: c.reason || 'Community Guidelines Review',
+            evidenceSummary: c.evidenceSummary || 'Pending juror consensus.',
+            authorDefense: c.authorDefense || 'No defense submitted.',
+            hoursRemaining: c.hoursRemaining || 24,
+            votesKeep: c.votesKeep || 0,
+            votesRemove: c.votesRemove || 0,
+          })));
+        }
+      } catch (_) {}
+    };
+    fetchCases();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleVote = async (caseId: string, choice: 'keep' | 'remove') => {
     setActiveCases((prev) =>
       prev.map((c) => {
         if (c.id === caseId) {
@@ -66,6 +92,13 @@ export function CommunityJuryScreen({ onClose }: CommunityJuryScreenProps): Reac
       })
     );
     setFeedbackMsg(`⚖️ Anonymous quadratic vote cast: ${choice === 'keep' ? 'Preserve Content' : 'Quarantine Content'}`);
+    try {
+      await fetch(`${getApiBaseUrl()}/api/jury/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ballotId: caseId, vote: choice, weight: 1 }),
+      });
+    } catch (_) {}
     setTimeout(() => setFeedbackMsg(null), 3000);
   };
 

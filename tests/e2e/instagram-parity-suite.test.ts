@@ -36,7 +36,13 @@ import { SovraDatabaseEngine } from '../../scripts/database-engine';
 
 describe('SOVRA Instagram Full-Feature Parity Suite', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const serverContent = fs.readFileSync(devServerPath, 'utf8');
+  const viewsDir = path.resolve(__dirname, '../../scripts/views');
+  const serverContent = [
+    fs.existsSync(path.resolve(viewsDir, 'styles.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'styles.view.ts'), 'utf8') : '',
+    fs.existsSync(path.resolve(viewsDir, 'layout.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'layout.view.ts'), 'utf8') : '',
+    fs.existsSync(path.resolve(viewsDir, 'scripts.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'scripts.view.ts'), 'utf8') : '',
+    fs.readFileSync(devServerPath, 'utf8'),
+  ].join('\n');
 
   // =========================================================================
   // 1. STORY FEATURE PARITY

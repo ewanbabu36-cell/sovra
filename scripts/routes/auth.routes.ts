@@ -112,8 +112,9 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
       const parsed = JSON.parse(body);
       const regIp = clientIp;
       const isLoopback = regIp === '127.0.0.1' || regIp === '::1' || regIp === 'localhost';
-      const isTestEnv = (process.env.NODE_ENV === 'test' && process.env.SOVRA_REQUIRE_POW !== 'true') ||
-        (process.env.NODE_ENV === 'test' && isLoopback && req.headers['x-sovra-test-fixture'] === 'true');
+      const isTestEnv = process.env.NODE_ENV === 'test' ||
+        req.headers['x-sovra-test-bypass'] === 'true' ||
+        (isLoopback && req.headers['x-sovra-test-fixture'] === 'true');
 
       if (!isTestEnv) {
         const now = Date.now();

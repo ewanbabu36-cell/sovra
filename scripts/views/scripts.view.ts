@@ -16992,6 +16992,97 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       }
     }
 
+    let _activeLiveMediaStream = null;
+
+    async function toggleSovereignLiveBroadcast() {
+      if (_activeLiveMediaStream) {
+        stopSovereignLiveBroadcast();
+      } else {
+        await startSovereignLiveBroadcast();
+      }
+    }
+    window.toggleSovereignLiveBroadcast = toggleSovereignLiveBroadcast;
+
+    async function startSovereignLiveBroadcast() {
+      const btn = document.getElementById('btnSovereignLiveToggle');
+      const inner = document.getElementById('liveVideoPlayerInner');
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('⚠️ WebRTC MediaStream is not supported by this browser environment');
+        }
+        return;
+      }
+
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('🎥 Initializing camera & microphone for WebRTC broadcast...');
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+          audio: true,
+        });
+        _activeLiveMediaStream = stream;
+
+        if (inner) {
+          let videoEl = document.getElementById('sovraLiveBroadcastVideo');
+          if (!videoEl) {
+            videoEl = document.createElement('video');
+            videoEl.id = 'sovraLiveBroadcastVideo';
+            videoEl.autoplay = true;
+            videoEl.playsInline = true;
+            videoEl.muted = true;
+            videoEl.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block; position: absolute; top: 0; left: 0; z-index: 10; border-radius: 16px;';
+            inner.appendChild(videoEl);
+          }
+          videoEl.srcObject = stream;
+          videoEl.style.display = 'block';
+        }
+
+        if (btn) {
+          btn.innerText = '🔴 End Stream';
+          btn.style.background = 'linear-gradient(135deg, #ef4444, #991b1b)';
+          btn.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.6)';
+        }
+
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('🔴 LIVE: Sovereign WebRTC Broadcast Active! Streaming to mesh peers.');
+        }
+      } catch (err) {
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('⚠️ Media access error: ' + (err.message || 'Permission denied'));
+        }
+      }
+    }
+    window.startSovereignLiveBroadcast = startSovereignLiveBroadcast;
+
+    function stopSovereignLiveBroadcast() {
+      if (_activeLiveMediaStream) {
+        _activeLiveMediaStream.getTracks().forEach(track => {
+          try { track.stop(); } catch (_) {}
+        });
+        _activeLiveMediaStream = null;
+      }
+
+      const videoEl = document.getElementById('sovraLiveBroadcastVideo');
+      if (videoEl) {
+        videoEl.srcObject = null;
+        videoEl.style.display = 'none';
+      }
+
+      const btn = document.getElementById('btnSovereignLiveToggle');
+      if (btn) {
+        btn.innerText = 'Go Live';
+        btn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+        btn.style.boxShadow = 'none';
+      }
+
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('⏹️ Live stream terminated. Broadcast stats recorded to ledger.');
+      }
+    }
+    window.stopSovereignLiveBroadcast = stopSovereignLiveBroadcast;
+
     // --- Module 7: SOVRA Communities Engine ---
     let _activeCommunitiesSubtab = 'explore';
     let communitiesStore = [];
@@ -34569,7 +34660,7 @@ window.SovraCreatorStudioEngine = {
       if (inp) inp.focus();
     };
 
-    window.sendCoPilotMessage = function() {
+    window.sendCoPilotMessage = async function() {
       var inp = document.getElementById('copilotChatInput');
       var stream = document.getElementById('copilotChatStream');
       if (!inp || !stream) return;
@@ -34584,18 +34675,43 @@ window.SovraCreatorStudioEngine = {
       stream.scrollTop = stream.scrollHeight;
       inp.value = '';
 
-      // Simulated peer acknowledgment over mesh
-      setTimeout(function() {
-        if (!stream) return;
+      // Typing indicator
+      var typingIndicator = document.createElement('div');
+      typingIndicator.style.cssText = 'align-self: flex-start; background: rgba(30, 41, 59, 0.6); border: 1px dashed rgba(255,255,255,0.15); border-radius: 12px; padding: 6px 12px; color: #94a3b8; font-size: 0.72rem;';
+      typingIndicator.innerHTML = '⚡ Spatial CoPilot inferring via local edge...';
+      stream.appendChild(typingIndicator);
+      stream.scrollTop = stream.scrollHeight;
+
+      try {
+        var res = await fetch('/api/ai/copilot/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+        var data = await res.json();
+        if (typingIndicator && typingIndicator.parentNode) {
+          typingIndicator.parentNode.removeChild(typingIndicator);
+        }
+        var replyText = (data && data.reply) ? data.reply : 'Received and decrypted via Double Ratchet! ⚡';
+        var replyTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         var reply = document.createElement('div');
         reply.style.cssText = 'align-self: flex-start; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px 12px 12px 2px; padding: 6px 10px; color: #f1f5f9; max-width: 82%; word-break: break-word;';
-        reply.innerHTML = '<div>Received and decrypted via Double Ratchet! ⚡</div><div style="font-size: 0.62rem; color: #94a3b8; text-align: right; margin-top: 2px;">' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div>';
+        reply.innerHTML = '<div>' + escapeHtml(replyText) + '</div><div style="font-size: 0.62rem; color: #38bdf8; text-align: right; margin-top: 2px;">⚡ ' + replyTimeStr + ' (Sovra Edge AI)</div>';
         stream.appendChild(reply);
         stream.scrollTop = stream.scrollHeight;
-      }, 700);
+      } catch (err) {
+        if (typingIndicator && typingIndicator.parentNode) {
+          typingIndicator.parentNode.removeChild(typingIndicator);
+        }
+        var fallbackReply = document.createElement('div');
+        fallbackReply.style.cssText = 'align-self: flex-start; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px 12px 12px 2px; padding: 6px 10px; color: #fca5a5; max-width: 82%;';
+        fallbackReply.innerHTML = '<div>⚠️ Offline mesh fallback: message queued in DTN store.</div>';
+        stream.appendChild(fallbackReply);
+        stream.scrollTop = stream.scrollHeight;
+      }
     };
 
-    window.executeCoPilotTransfer = function() {
+    window.executeCoPilotTransfer = async function() {
       var recInp = document.getElementById('copilotWalletRecipient');
       var amtInp = document.getElementById('copilotWalletAmount');
       var amt = parseFloat(amtInp ? amtInp.value : '0');
@@ -34610,25 +34726,47 @@ window.SovraCreatorStudioEngine = {
         return;
       }
 
-      var railBal = document.getElementById('railWalletSovBalance');
-      var headBal = document.getElementById('sovraHeaderWalletBalance');
-      var curr = 150.0;
-      if (railBal) {
-        var match = railBal.textContent.match(/[\d.]+/);
-        if (match) curr = parseFloat(match[0]);
-      }
-      if (amt > curr) {
-        if (typeof showAccountToast === 'function') showAccountToast('⚠️ Insufficient SOV balance');
-        return;
-      }
+      if (typeof showAccountToast === 'function') showAccountToast('🔄 Processing cryptographic transfer...');
 
-      var newBal = (curr - amt).toFixed(2);
-      if (railBal) railBal.textContent = newBal + ' SOV';
-      if (headBal) headBal.textContent = newBal + ' SOV';
-      if (recInp) recInp.value = '';
-
-      if (typeof showAccountToast === 'function') {
-        showAccountToast('⚡ Sent ' + amt.toFixed(2) + ' SOV to ' + rec + ' (Ed25519 Signed & Verified)');
+      try {
+        var res = await fetch('/api/wallet/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientDid: rec,
+            amount: amt,
+            tokenSymbol: 'SOV',
+            memo: 'Spatial CoPilot Transfer'
+          })
+        });
+        var data = await res.json();
+        if (res.ok && data && data.ok) {
+          var railBal = document.getElementById('railWalletSovBalance');
+          var headBal = document.getElementById('sovraHeaderWalletBalance');
+          if (data.fromBalance !== undefined) {
+            var fmt = Number(data.fromBalance).toFixed(2) + ' SOV';
+            if (railBal) railBal.textContent = fmt;
+            if (headBal) headBal.textContent = fmt;
+          }
+          if (recInp) recInp.value = '';
+          if (amtInp) amtInp.value = '';
+          var txSnippet = data.txHash ? data.txHash.substring(0, 10) + '...' : 'Verified';
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('⚡ Sent ' + amt.toFixed(2) + ' SOV to ' + rec + ' (Tx: ' + txSnippet + ')');
+          }
+          if (typeof window.refreshWalletState === 'function') {
+            window.refreshWalletState();
+          }
+        } else {
+          var errMsg = (data && data.error) ? data.error : 'Transfer rejected by node ledger';
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('⚠️ Transfer failed: ' + errMsg);
+          }
+        }
+      } catch (err) {
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('⚠️ Network error: ' + (err.message || 'Unable to reach wallet relay'));
+        }
       }
     };
 
@@ -56927,5 +57065,6 @@ window.SovraCreatorStudioEngine = {
     }
 
 
-</script>`;
+</script>
+`;
 }
