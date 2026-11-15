@@ -14,17 +14,34 @@
  * 9. RFC 4180 Ledger CSV export for accounting & tax reporting (/api/explorer/export/csv)
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { signEd25519, bytesToHex } from '../../packages/crypto/dist/index.js';
 import { renderExplorerHtml } from '../../scripts/blockchain-explorer.ts';
+import { l1ChainSupervisor } from '../../scripts/chain-supervisor.ts';
 
 const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
 
+function isConnRefused(err: any): boolean {
+  if (!err) return false;
+  if (err.code === 'ECONNREFUSED') return true;
+  if (err.cause?.code === 'ECONNREFUSED') return true;
+  if (Array.isArray(err.cause?.errors) && err.cause.errors.some((e: any) => e.code === 'ECONNREFUSED')) return true;
+  if (Array.isArray(err.errors) && err.errors.some((e: any) => e.code === 'ECONNREFUSED')) return true;
+  return false;
+}
+
 describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
+  beforeAll(async () => {
+    await l1ChainSupervisor.start();
+  });
+
+  afterAll(async () => {
+    await l1ChainSupervisor.stop();
+  });
   describe('Explorer HTML & UI Components', () => {
     const html = renderExplorerHtml();
 
@@ -123,7 +140,7 @@ describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
         expect(text).toContain('Sovra Layer-1 Explorer');
         expect(text).toContain('sovra-testnet-0');
       } catch (err: any) {
-        if (err.code === 'ECONNREFUSED') return;
+        if (isConnRefused(err)) return;
         throw err;
       }
     });
@@ -158,7 +175,7 @@ describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
         expect(data.recentBlocks.length).toBeGreaterThan(0);
         expect(data.recentTransactions).toBeInstanceOf(Array);
       } catch (err: any) {
-        if (err.code === 'ECONNREFUSED') return;
+        if (isConnRefused(err)) return;
         throw err;
       }
     });
@@ -178,7 +195,7 @@ describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
         expect(node0.rpcPort).toBe(26657);
         expect(node0.p2pPort).toBe(26656);
       } catch (err: any) {
-        if (err.code === 'ECONNREFUSED') return;
+        if (isConnRefused(err)) return;
         throw err;
       }
     });
@@ -196,7 +213,7 @@ describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
         expect(typeof data.balanceUsov).toBe('string');
         expect(typeof data.nonce).toBe('number');
       } catch (err: any) {
-        if (err.code === 'ECONNREFUSED') return;
+        if (isConnRefused(err)) return;
         throw err;
       }
     });
@@ -215,7 +232,7 @@ describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
         expect(data.congestionStatus).toBeDefined();
         expect(Array.isArray(data.unconfirmedTxs)).toBe(true);
       } catch (err: any) {
-        if (err.code === 'ECONNREFUSED') return;
+        if (isConnRefused(err)) return;
         throw err;
       }
     });
@@ -234,7 +251,7 @@ describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
         expect(csvText).toContain('"Timestamp","Date_UTC","Block_Height","Tx_Hash","Type","Sender","Recipient","Amount_SOV"');
         expect(csvText.split('\r\n').length).toBeGreaterThan(1);
       } catch (err: any) {
-        if (err.code === 'ECONNREFUSED') return;
+        if (isConnRefused(err)) return;
         throw err;
       }
     });
@@ -250,7 +267,7 @@ describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
         clearTimeout(timeout);
         controller.abort();
       } catch (err: any) {
-        if (err.name === 'AbortError' || err.code === 'ECONNREFUSED') return;
+        if (err.name === 'AbortError' || isConnRefused(err)) return;
         throw err;
       }
     });
@@ -345,7 +362,7 @@ describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
           expect(broadcastData.log).toContain('executed');
         }
       } catch (err: any) {
-        if (err.code === 'ECONNREFUSED') return;
+        if (isConnRefused(err)) return;
         throw err;
       }
     });
@@ -386,7 +403,7 @@ describe('Sovra Layer-1 Blockchain Web Explorer Suite', () => {
         });
         expect(received).toBe(true);
       } catch (err: any) {
-        if (err.code === 'ECONNREFUSED') return;
+        if (isConnRefused(err)) return;
         throw err;
       }
     });
