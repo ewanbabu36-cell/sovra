@@ -8913,7 +8913,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <span style="font-size: 0.68rem; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 1px 6px; border-radius: 8px; font-weight: 700;">Active</span>
     </div>
     <div style="color: #94a3b8; font-size: 0.74rem; line-height: 1.4;">
-      🔒 E2E Encrypted &bull; ⚡ Zero Corporate Tracking &bull; 🛡️ Self-Custody
+      🔒 E2E Encrypted &bull; ⚡ Zero corporate tracking or ad algorithms &bull; 🛡️ Self-Custody
     </div>
   </div>
 

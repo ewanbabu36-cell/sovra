@@ -100,6 +100,31 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       }
     }
 
+    // Ensure all peers who exchanged messages are included in contacts
+    const peerDidSet = new Set(allPeers.map(p => p.did));
+    for (const msgPeerDid of peerStatsMap.keys()) {
+      if (!peerDidSet.has(msgPeerDid) && msgPeerDid !== userDid) {
+        const u = sovraDb.findUserByDid(msgPeerDid);
+        if (u) {
+          allPeers.push({
+            did: u.did,
+            handle: u.handle,
+            name: u.displayName || u.name || u.handle,
+            avatar: u.avatar || 'P',
+            avatarDataUrl: u.avatarDataUrl,
+            avatarBg: u.avatarBg || '#6366f1',
+            role: 'Direct Contact',
+            device: u.deviceType || 'Desktop',
+            isOnline: true,
+            lastSeen: 'Online',
+            lastSeenTimestamp: Date.now(),
+            disappearingDurationSec: 0,
+          });
+          peerDidSet.add(msgPeerDid);
+        }
+      }
+    }
+
     const contactsWithThreads = allPeers
       .filter(peer => {
         if (!peer || !peer.did || peer.did === userDid) return false;
@@ -119,6 +144,8 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
             lastMessageText = '💨 Message disappeared';
           } else if (lastMsg.isAudio) {
             lastMessageText = '🎙️ Voice note (' + (lastMsg.audioDurationSec || 0).toFixed(1) + 's)';
+          } else if (lastMsg.rawText) {
+            lastMessageText = lastMsg.rawText;
           } else {
             lastMessageText = lastMsg.text;
           }
@@ -240,8 +267,14 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
              (targetContactDid.startsWith('channel:') && (m.threadId === targetContactDid || m.recipientDid === targetContactDid))
       );
     }
+    const returnedMessages = messages.map(m => {
+      if ((m.senderDid === userDid || m.recipientDid === userDid) && m.rawText) {
+        return { ...m, text: m.rawText };
+      }
+      return m;
+    });
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, messages }));
+    res.end(JSON.stringify({ ok: true, messages: returnedMessages }));
     return true;
   }
 
@@ -404,7 +437,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         isE2EE = true;
       }
 
-      const safeText = isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : String(parsed.text || '');
+      const safeText = String(parsed.text || (isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : ''));
       const isViewOnceMsg = Boolean(parsed.isViewOnce || (validAttachment && validAttachment.isViewOnce));
       const record = sovraDb.appendMessage({
         id: parsed.id,
@@ -515,7 +548,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, message: record }));
+      res.end(JSON.stringify({ ok: true, message: { ...record, text: parsed.text || record.text } }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));

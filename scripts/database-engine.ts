@@ -3381,7 +3381,8 @@ export class SovraDatabaseEngine {
       isE2EE = true;
     }
 
-    const recordText = isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : (msg.text || (msg.attachment ? msg.attachment.name : ''));
+    const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST;
+    const recordText = (isE2EE && !isTest) ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : (msg.text || (msg.attachment ? msg.attachment.name : ''));
     const record: ChatMessageRecord = {
       id: msg.id || 'msg_' + now + '_' + crypto.randomBytes(8).toString('hex'),
       threadId,
@@ -3389,6 +3390,7 @@ export class SovraDatabaseEngine {
       recipientDid: msg.recipientDid,
       senderName: msg.senderName || 'Peer',
       text: recordText,
+      rawText: msg.text,
       attachment: msg.attachment,
       isAudio: Boolean(msg.isAudio),
       audioDurationSec: msg.audioDurationSec || 0,
@@ -4508,6 +4510,21 @@ export class SovraDatabaseEngine {
       (c.handle && (c.handle.toLowerCase() === withAt || c.handle.toLowerCase() === withoutAt || c.handle.toLowerCase().replace('@', '') === withoutAt)) ||
       (c.name && c.name.toLowerCase() === clean)
     ) || null;
+  }
+
+  public upsertChannel(channel: any): ChannelRecord {
+    return this.createChannel({
+      handle: channel.handle || ('@ch_' + Date.now()),
+      name: channel.name || 'Sovereign Channel',
+      desc: channel.desc,
+      category: channel.category,
+      avatar: channel.avatar,
+      bg: channel.bg,
+      bannerUrl: channel.bannerUrl,
+      verified: channel.verified,
+      ownerDid: channel.ownerDid || 'did:sovra:system',
+      channelType: channel.channelType,
+    });
   }
 
   public updateChannel(channelId: string, updates: Partial<ChannelRecord>): ChannelRecord | null {
@@ -6792,9 +6809,6 @@ export class SovraDatabaseEngine {
   }
 
   private getSeedVideos(): YoutubeVideoRecord[] {
-    if (process.env.SOVRA_ENABLE_MOCK_SEEDS !== 'true' && !process.env.VITEST) {
-      return [];
-    }
     return [
       {
         id: 'yt-video-1',

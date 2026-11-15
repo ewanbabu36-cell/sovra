@@ -793,7 +793,7 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
         return true;
       }
 
-      const bidderName = bidder.displayName || bidder.handle || 'Sovereign Collector';
+      const bidderName = parsed.bidderName || bidder.displayName || bidder.handle || 'Sovereign Collector';
       const amount = Number(parsed.amountSov);
 
       if (!Number.isFinite(amount) || amount <= 0) {
