@@ -672,6 +672,27 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
     endsAt: number;
   }>());
 
+  // Atomic auction mutexes to guarantee serial execution of concurrent bids
+  const auctionMutexes = (globalThis as any)._sovraAuctionMutexes || ((globalThis as any)._sovraAuctionMutexes = new Map<string, Promise<void>>());
+
+  async function withAuctionLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = auctionMutexes.get(key) || Promise.resolve();
+    let release: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    auctionMutexes.set(key, current);
+    try {
+      await prev;
+      return await fn();
+    } finally {
+      release!();
+      if (auctionMutexes.get(key) === current) {
+        auctionMutexes.delete(key);
+      }
+    }
+  }
+
   // 10. POST /api/live/cohost/invite & /api/live/cohost/join
   if (url.pathname === '/api/live/cohost/invite' && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
@@ -812,39 +833,41 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
         return true;
       }
 
-      const auction = liveAuctions.get(sessionId);
-      if (!auction || auction.status !== 'ACTIVE') {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'No active auction for this session' }));
-        return true;
-      }
+      return await withAuctionLock(sessionId, async () => {
+        const auction = liveAuctions.get(sessionId);
+        if (!auction || auction.status !== 'ACTIVE') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'No active auction for this session' }));
+          return true;
+        }
 
-      if (amount <= auction.highestBidSov) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
+        if (amount <= auction.highestBidSov) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: false,
+            error: `Bid must be higher than current highest bid (${auction.highestBidSov} SOV)`,
+          }));
+          return true;
+        }
+
+        auction.highestBidSov = amount;
+        auction.highestBidderDid = bidderDid;
+        auction.highestBidderName = bidderName;
+        auction.bids.unshift({
+          bidderDid,
+          bidderName,
+          amountSov: amount,
+          timestamp: Date.now(),
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          ok: false,
-          error: `Bid must be higher than current highest bid (${auction.highestBidSov} SOV)`,
+          ok: true,
+          message: 'Bid accepted and locked in live escrow',
+          auction,
         }));
         return true;
-      }
-
-      auction.highestBidSov = amount;
-      auction.highestBidderDid = bidderDid;
-      auction.highestBidderName = bidderName;
-      auction.bids.unshift({
-        bidderDid,
-        bidderName,
-        amountSov: amount,
-        timestamp: Date.now(),
       });
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        ok: true,
-        message: 'Bid accepted and locked in live escrow',
-        auction,
-      }));
-      return true;
     } catch (err: any) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err.message }));

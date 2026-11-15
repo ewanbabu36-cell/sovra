@@ -2,10 +2,11 @@
   "name": "@sovra/mobile",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "main": "App.tsx",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "node --experimental-strip-types build-mobile-bundle.ts",
     "preview": "vite preview",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",

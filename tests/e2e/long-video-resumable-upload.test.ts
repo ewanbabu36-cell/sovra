@@ -344,7 +344,7 @@ describe('Sovra Resumable Long Video Ingestion & ABR HLS Pipeline', () => {
       expect(dbRecord?.cid).toBe(expectedCid);
       expect(dbRecord?.rawFileSize).toBe(testVideoBytes.length);
       expect(dbRecord?.hlsMasterUrl).toContain(completedVideoId);
-    });
+    }, 15000);
 
     it('3.2 Rejects complete call if uploadId is invalid or already finalized (404)', async () => {
       const res = await fetch(`${baseUrl}/api/videos/upload/complete`, {

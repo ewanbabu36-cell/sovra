@@ -41,11 +41,32 @@ export interface TranscodeResult {
 export class VideoTranscodePipeline {
   private static ffmpegChecked = false;
   private static ffmpegAvailable = false;
+  private static ffmpegBinaryPath = 'ffmpeg';
+
+  public static getFFmpegPath(): string {
+    const candidates = [
+      process.env.FFMPEG_PATH,
+      'ffmpeg',
+      path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links', 'ffmpeg.exe'),
+      'C:\\ffmpeg\\bin\\ffmpeg.exe',
+      'C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe',
+    ].filter(Boolean) as string[];
+
+    for (const bin of candidates) {
+      try {
+        execSync(`"${bin}" -version`, { stdio: 'ignore' });
+        this.ffmpegBinaryPath = bin;
+        return bin;
+      } catch (_) {}
+    }
+    return 'ffmpeg';
+  }
 
   public static isFFmpegAvailable(): boolean {
     if (this.ffmpegChecked) return this.ffmpegAvailable;
     try {
-      execSync('ffmpeg -version', { stdio: 'ignore' });
+      const bin = this.getFFmpegPath();
+      execSync(`"${bin}" -version`, { stdio: 'ignore' });
       this.ffmpegAvailable = true;
     } catch {
       this.ffmpegAvailable = false;
@@ -273,15 +294,28 @@ export class VideoTranscodePipeline {
         variantM3u8,
       ];
 
-      const child = spawn('ffmpeg', args);
+      const bin = this.getFFmpegPath();
+      const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      let completed = false;
+      const timer = setTimeout(() => {
+        if (!completed) {
+          try { child.kill(); } catch (_) {}
+        }
+      }, 4000);
 
       child.on('error', async () => {
+        if (completed) return;
+        completed = true;
+        clearTimeout(timer);
         // Fallback to pure node on spawn failure
         const fallback = await this.transcodeWithPureNodeFallback(videoId, rawFilePath, hlsDir, storyboardDir, options);
         resolve(fallback);
       });
 
       child.on('close', async (code) => {
+        if (completed) return;
+        completed = true;
+        clearTimeout(timer);
         if (code !== 0) {
           const fallback = await this.transcodeWithPureNodeFallback(videoId, rawFilePath, hlsDir, storyboardDir, options);
           resolve(fallback);
