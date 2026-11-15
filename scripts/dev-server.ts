@@ -823,6 +823,11 @@ async function bootstrapLocalNode() {
       `/ip4/127.0.0.1/tcp/${tcpPort}/p2p/${binding.peerId}`,
       ...(nodeLanIp && nodeLanIp !== '127.0.0.1' ? [`/ip4/${nodeLanIp}/tcp/${tcpPort}/p2p/${binding.peerId}`] : [])
     ],
+    relayAddresses: [
+      process.env.SOVRA_RELAY_ADDR || `/ip4/${nodeLanIp || '127.0.0.1'}/tcp/4001/p2p-circuit`,
+      '/dns4/relay.libp2p.io/tcp/443/wss/p2p-circuit',
+      '/dns4/wrtc-star1.par.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
+    ],
   });
 
   await node.start();
