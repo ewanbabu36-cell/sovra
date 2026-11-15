@@ -2665,7 +2665,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
     <!-- 🥽 CYCLE 3: OPEN WEBXR SPATIAL HOLOGRAM THEATER MODAL -->
     <div id="webxrTheaterModal" class="webxr-theater-container" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;" onclick="closeWebxrSpatialTheater()">
-      <div style="background: linear-gradient(135deg, #090d16, #111827); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 24px; width: 100%; max-width: 800px; padding: 1.5rem; box-shadow: 0 25px 60px rgba(139, 92, 246, 0.25); color: #f8fafc;" onclick="event.stopPropagation()">
+      <div id="webxrTheaterContentBox" style="background: linear-gradient(135deg, #090d16, #111827); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 24px; width: 100%; max-width: 960px; padding: 1.25rem; box-shadow: 0 25px 60px rgba(139, 92, 246, 0.25); color: #f8fafc; transition: all 0.3s ease;" onclick="event.stopPropagation()">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.75rem;">
           <div style="display: flex; align-items: center; gap: 10px;">
             <div style="width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #ec4899); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">🥽</div>
@@ -2674,18 +2674,65 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div style="font-size: 0.78rem; color: #94a3b8;">Open WebXR Spatial 3D Virtual Theater • HRTF 3D Audio</div>
             </div>
           </div>
-          <button type="button" onclick="closeWebxrSpatialTheater()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" id="spatialFullscreenToggleBtn" onclick="toggleSpatialTheaterFullscreen()" title="Toggle Cinema Fullscreen" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; border-radius: 8px; padding: 5px 9px; font-size: 0.85rem; cursor: pointer;">⛶</button>
+            <button type="button" onclick="closeWebxrSpatialTheater()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; padding: 4px;">✕</button>
+          </div>
         </div>
-        <div style="margin-top: 1.25rem; display: flex; flex-direction: column; align-items: center;">
-          <canvas id="webxrCanvas" width="720" height="400" style="width: 100%; max-height: 400px; border-radius: 16px; background: #030712; border: 1px solid rgba(255,255,255,0.08);"></canvas>
-          <div style="display: flex; gap: 12px; margin-top: 1rem; width: 100%; justify-content: center; flex-wrap: wrap;">
-            <button type="button" id="enterImmersiveVrBtn" onclick="launchWebXrSession()" style="padding: 0.6rem 1.2rem; border-radius: 12px; background: linear-gradient(135deg, #8b5cf6, #6366f1); color: #fff; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+        
+        <!-- 3D Canvas Viewport Container with Badges -->
+        <div style="margin-top: 1rem; position: relative; width: 100%; border-radius: 16px; overflow: hidden; background: #000; border: 1px solid rgba(139, 92, 246, 0.3);">
+          <canvas id="webxrCanvas" width="960" height="540" style="width: 100%; aspect-ratio: 16/9; max-height: 480px; display: block; cursor: grab; background: #030712;"></canvas>
+
+          <!-- Floating Badges Overlay -->
+          <div style="position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; pointer-events: none; z-index: 5;">
+            <span id="spatialSeatBadge" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(139, 92, 246, 0.5); color: #c084fc; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">💺 VIP Center (Row 2)</span>
+            <span id="spatialCurveBadge" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">Curved IMAX</span>
+          </div>
+
+          <div style="position: absolute; top: 10px; right: 10px; pointer-events: none; z-index: 5;">
+            <span id="spatialTrackingBadge" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">🎮 6-DOF Orbit &amp; Gyro Active</span>
+          </div>
+
+          <div id="spatialControlsHint" style="position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; font-size: 0.68rem; padding: 3px 12px; border-radius: 9999px; pointer-events: none; z-index: 5; white-space: nowrap;">
+            🖱️ Drag to Look Around • Scroll to Zoom • WASD to Move • 📱 Tilt for 360°
+          </div>
+        </div>
+
+        <!-- Theater Control Deck -->
+        <div style="margin-top: 0.85rem; display: flex; flex-direction: column; gap: 8px;">
+          <!-- Row 1: Seat Presets & Ambiance Controls -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 0.76rem;">
+            <!-- Seat Presets -->
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #94a3b8; font-weight: 700;">Seat:</span>
+              <button type="button" id="spatialSeatFrontBtn" onclick="setSpatialSeat('front')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; border-radius: 8px; padding: 3px 8px; font-size: 0.72rem; cursor: pointer;">Front Row</button>
+              <button type="button" id="spatialSeatVipBtn" onclick="setSpatialSeat('vip')" style="background: rgba(139, 92, 246, 0.3); border: 1px solid #8b5cf6; color: #fff; font-weight: 700; border-radius: 8px; padding: 3px 8px; font-size: 0.72rem; cursor: pointer;">VIP Center</button>
+              <button type="button" id="spatialSeatBalconyBtn" onclick="setSpatialSeat('balcony')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; border-radius: 8px; padding: 3px 8px; font-size: 0.72rem; cursor: pointer;">Balcony</button>
+            </div>
+
+            <!-- Lighting Ambiance -->
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #94a3b8; font-weight: 700;">Ambiance:</span>
+              <button type="button" onclick="setSpatialAmbiance('dark')" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; border-radius: 8px; padding: 3px 7px; font-size: 0.72rem; cursor: pointer;">Dark</button>
+              <button type="button" onclick="setSpatialAmbiance('neon')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 8px; padding: 3px 7px; font-size: 0.72rem; cursor: pointer;">Cyber Neon</button>
+              <button type="button" onclick="setSpatialAmbiance('warm')" style="background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.4); color: #fbbf24; border-radius: 8px; padding: 3px 7px; font-size: 0.72rem; cursor: pointer;">Solar Warm</button>
+              <button type="button" id="spatialCurveBtn" onclick="toggleSpatialScreenCurve()" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; border-radius: 8px; padding: 3px 8px; font-size: 0.72rem; cursor: pointer;">Curve: ON</button>
+            </div>
+          </div>
+
+          <!-- Row 2: Video Playback & VR Launchers -->
+          <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 4px;">
+            <button type="button" id="spatialPlayToggleBtn" onclick="toggleSpatialTheaterVideoPlay()" style="padding: 0.55rem 1rem; border-radius: 12px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.4); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <span>⏯</span> Video Play/Pause
+            </button>
+            <button type="button" id="enterImmersiveVrBtn" onclick="launchWebXrSession()" style="padding: 0.55rem 1.1rem; border-radius: 12px; background: linear-gradient(135deg, #8b5cf6, #6366f1); color: #fff; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span>🥽</span> Enter Immersive VR
             </button>
-            <button type="button" id="cardboardVrToggleBtn" onclick="toggleCardboardStereoMode()" style="padding: 0.6rem 1.2rem; border-radius: 12px; background: rgba(255,255,255,0.1); color: #c084fc; font-weight: 700; border: 1px solid rgba(139, 92, 246, 0.4); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <button type="button" id="cardboardVrToggleBtn" onclick="toggleCardboardStereoMode()" style="padding: 0.55rem 1.1rem; border-radius: 12px; background: rgba(255,255,255,0.1); color: #c084fc; font-weight: 700; border: 1px solid rgba(139, 92, 246, 0.4); cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span>📱</span> Cardboard VR Split
             </button>
-            <button type="button" onclick="closeWebxrSpatialTheater()" style="padding: 0.6rem 1.2rem; border-radius: 12px; background: rgba(255,255,255,0.1); color: #e2e8f0; font-weight: 600; border: 1px solid rgba(255,255,255,0.15); cursor: pointer;">
+            <button type="button" onclick="closeWebxrSpatialTheater()" style="padding: 0.55rem 1rem; border-radius: 12px; background: rgba(255,255,255,0.08); color: #e2e8f0; font-weight: 600; border: 1px solid rgba(255,255,255,0.15); cursor: pointer;">
               Exit Theater
             </button>
           </div>
@@ -4115,6 +4162,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       <button class="yt-btn yt-btn-cc" id="btnCcToggle" onclick="toggleYtCaptions()" title="Subtitles / Closed Captions (c)">CC</button>
                       <button class="yt-btn" id="btnAmbientGlow" onclick="toggleYtAmbientGlow()" title="Toggle Dynamic Ambient Cinema Glow">✨</button>
                       <button class="yt-btn" id="btnTheaterMode" onclick="toggleTheaterMode()" title="Theater Mode (t)">🔲</button>
+                      <button class="yt-btn" id="btnSpatialVrTheater" onclick="enterWebxrSpatialTheater()" title="Enter WebXR 3D Spatial Theater (v)">🥽</button>
                       <button class="yt-btn" id="btnPipMode" onclick="launchYtPip()" title="Picture-in-Picture Mini-Player (p)">⧉</button>
                       <button class="yt-btn" id="btnStatsForNerds" onclick="toggleStatsForNerds(event)" title="Stats for Nerds">📊</button>
                       <button class="yt-btn" id="btnShortcutsHelp" onclick="openYtKeyboardShortcutsModal()" title="Keyboard Shortcuts (Shift + ?)">⌨️</button>
