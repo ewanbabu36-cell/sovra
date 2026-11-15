@@ -5791,7 +5791,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div style="max-width: 1080px; width: 100%; margin: 0 auto; padding: 1.25rem 1rem 5rem; box-sizing: border-box;">
         
         <!-- Super App Hero Banner -->
-        <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98)); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 20px; padding: 1.75rem; margin-bottom: 1.5rem; box-shadow: 0 12px 30px rgba(0,0,0,0.45); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div class="hub-hero-banner" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98)); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 20px; padding: 1.75rem; margin-bottom: 1.5rem; box-shadow: 0 12px 30px rgba(0,0,0,0.45); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; position: relative; z-index: 15; transform: translateZ(0);">
           <div>
             <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.74rem; font-weight: 800; padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.35); text-transform: uppercase; margin-bottom: 0.6rem;">
               ⚡ SOVRA SUPER APP ECOSYSTEM
@@ -5814,7 +5814,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.2rem; margin-bottom: 2rem;">
           
           <!-- Card 1: Offline BLE Mesh Radar -->
-          <div class="card hub-app-card" id="hubAppBleRadar" onclick="if(typeof openBitchatRadar==='function')openBitchatRadar(); else switchTab('chat');" style="cursor: pointer; padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.2s, border-color 0.2s;">
+          <div class="card hub-app-card" id="hubAppBleRadar" onclick="if(typeof openBitchatRadar==='function')openBitchatRadar(); else switchTab('chat');">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
               <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.35rem;">
                 📡
@@ -5827,14 +5827,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Peer-to-peer delay-tolerant store-and-forward mesh routing without cellular or internet connectivity.
             </div>
-            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #38bdf8; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn">
               <span>Open Radar &bull; Proximity Chat</span>
               <span>→</span>
             </div>
           </div>
 
           <!-- Card 2: P2P Live Swarm Broadcast -->
-          <div class="card hub-app-card" id="hubAppLiveSwarm" onclick="openLiveStreamModal()" style="cursor: pointer; padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.2s, border-color 0.2s;">
+          <div class="card hub-app-card" id="hubAppLiveSwarm" onclick="openLiveStreamModal()">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
               <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.35rem;">
                 🔴
@@ -5847,14 +5847,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Full duplex WebRTC mesh video rooms with real-time peer comments and floating SOV micro-tips.
             </div>
-            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #ef4444; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.12);">
               <span>Go Live &bull; Swarm Stream</span>
               <span>→</span>
             </div>
           </div>
 
           <!-- Card 3: Smart Creator Studio Pro -->
-          <div class="card hub-app-card" id="hubAppStudioPro" onclick="switchTab('studio')" style="cursor: pointer; padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.2s, border-color 0.2s;">
+          <div class="card hub-app-card" id="hubAppStudioPro" onclick="switchTab('studio')">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
               <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.35rem;">
                 🎬
@@ -5867,14 +5867,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Fullscreen workspace with adaptive bitrate transcoding, interactive SVG analytics, and supporter gating.
             </div>
-            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #c084fc; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="color: #c084fc; border-color: rgba(168, 85, 247, 0.35); background: rgba(168, 85, 247, 0.12);">
               <span>Open Studio Workspace</span>
               <span>→</span>
             </div>
           </div>
 
           <!-- Card 3b: Broadcast Channels & Public Pages -->
-          <div class="card hub-app-card" id="hubAppChannelsPages" onclick="if(typeof openSpatialChannelsPagesSurface==='function')openSpatialChannelsPagesSurface(this);else switchTab('me');" style="cursor: pointer; padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.2s, border-color 0.2s;">
+          <div class="card hub-app-card" id="hubAppChannelsPages" onclick="if(typeof openSpatialChannelsPagesSurface==='function')openSpatialChannelsPagesSurface(this);else switchTab('me');">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
               <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.35rem;">
                 📢
@@ -5887,14 +5887,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Telegram-grade broadcast channels, subscriber dispatches, and cryptographic public brand storefronts.
             </div>
-            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #c084fc; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="color: #c084fc; border-color: rgba(168, 85, 247, 0.35); background: rgba(168, 85, 247, 0.12);">
               <span>Publishing Hub</span>
               <span>→</span>
             </div>
           </div>
 
           <!-- Card 4: Digital Wellbeing & Limits -->
-          <div class="card hub-app-card" id="hubAppWellbeing" onclick="openWellbeingModal()" style="cursor: pointer; padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.2s, border-color 0.2s;">
+          <div class="card hub-app-card" id="hubAppWellbeing" onclick="openWellbeingModal()">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
               <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.35rem;">
                 🌱
@@ -5907,14 +5907,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Hardware screen-time meters, session focus timers, bedtime wind-down reminders, and mindful usage audits.
             </div>
-            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #34d399; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="color: #34d399; border-color: rgba(52, 211, 153, 0.35); background: rgba(52, 211, 153, 0.12);">
               <span>Wellbeing Settings</span>
               <span>→</span>
             </div>
           </div>
 
           <!-- Card 5: Sovereign SOV Wallet & Micro-Tipping -->
-          <div class="card hub-app-card" id="hubAppWallet" onclick="switchTab('me')" style="cursor: pointer; padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.2s, border-color 0.2s;">
+          <div class="card hub-app-card" id="hubAppWallet" onclick="switchTab('me')">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
               <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.35rem;">
                 💳
@@ -5927,14 +5927,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Self-custody peer settlement, live streaming tips, gated video unlocking, and creator earnings withdrawal.
             </div>
-            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #fbbf24; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="color: #fbbf24; border-color: rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.12);">
               <span>Manage Wallet</span>
               <span>→</span>
             </div>
           </div>
 
           <!-- Card 6: Hardware Biometrics Enclave -->
-          <div class="card hub-app-card" id="hubAppBiometrics" onclick="if(window.openSpatialSecuritySurface)openSpatialSecuritySurface(); else switchTab('me');" style="cursor: pointer; padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.2s, border-color 0.2s;">
+          <div class="card hub-app-card" id="hubAppBiometrics" onclick="if(window.openSpatialSecuritySurface)openSpatialSecuritySurface(); else switchTab('me');">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
               <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.35rem;">
                 🛡️
@@ -5947,7 +5947,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
               Hardware enclave authentication via WebAuthn, TouchID, and Windows Hello with phishing-resistant security.
             </div>
-            <div class="hub-card-action-btn" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #38bdf8; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.75rem;">
+            <div class="hub-card-action-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.12);">
+              <span>Security Passkeys</span>
+              <span>→</span>
+            </div>
+          </div>
               <span>Security Passkeys</span>
               <span>→</span>
             </div>

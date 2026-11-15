@@ -17606,3 +17606,175 @@
       animation: uploadToastPulse 1.8s infinite ease-in-out;
     }
 
+    /* ========================================================================= */
+    /* 🌐 INDUSTRY-STANDARD EXPLORE SURFACE & WATCH RESPONSIVE COMPOSITING FIX  */
+    /* ========================================================================= */
+    
+    /* 1. Dedicated Hub & Explore Stage Stacking Contexts */
+    #hub-view,
+    #search-view,
+    #youtube-view {
+      position: relative !important;
+      z-index: 15 !important;
+      background: #070a13 !important;
+      width: 100% !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+
+    /* 2. Super App Hero Banner Permanent Composite Layer */
+    .hub-hero-banner,
+    #hub-view > div > div:first-child {
+      position: relative !important;
+      z-index: 15 !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      transform: translateZ(0) !important;
+      -webkit-transform: translateZ(0) !important;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98)) !important;
+      border: 1px solid rgba(56, 189, 248, 0.35) !important;
+      border-radius: 20px !important;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45) !important;
+    }
+
+    /* 3. Super App Hub Cards: Forced Hardware Compositing & Hover Lift (Zero Hover Concealment) */
+    .hub-app-card {
+      position: relative !important;
+      z-index: 15 !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      min-height: 195px !important;
+      box-sizing: border-box !important;
+      padding: 1.25rem !important;
+      border-radius: 18px !important;
+      background: rgba(17, 24, 39, 0.94) !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
+      transform: translateZ(0) !important;
+      -webkit-transform: translateZ(0) !important;
+      will-change: transform, box-shadow, border-color !important;
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, box-shadow 0.22s ease, background 0.22s ease !important;
+      cursor: pointer !important;
+    }
+
+    .hub-app-card:hover {
+      transform: translateY(-4px) translateZ(0) !important;
+      -webkit-transform: translateY(-4px) translateZ(0) !important;
+      background: rgba(22, 32, 50, 0.98) !important;
+      border-color: rgba(56, 189, 248, 0.6) !important;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 24px rgba(56, 189, 248, 0.22) !important;
+    }
+
+    .hub-app-card:active {
+      transform: translateY(-1px) translateZ(0) scale(0.99) !important;
+      -webkit-transform: translateY(-1px) translateZ(0) scale(0.99) !important;
+    }
+
+    /* 4. Super App Hub Action Buttons: Always Visible High-Contrast Interactive Buttons */
+    .hub-card-action-btn {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      padding: 9px 14px !important;
+      background: rgba(56, 189, 248, 0.12) !important;
+      border: 1px solid rgba(56, 189, 248, 0.35) !important;
+      border-radius: 10px !important;
+      color: #38bdf8 !important;
+      font-weight: 700 !important;
+      font-size: 0.8rem !important;
+      line-height: 1.2 !important;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      margin-top: 0.85rem !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      cursor: pointer !important;
+    }
+
+    .hub-app-card:hover .hub-card-action-btn,
+    .hub-card-action-btn:hover {
+      background: rgba(56, 189, 248, 0.24) !important;
+      border-color: #38bdf8 !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35) !important;
+      transform: translateY(-1px) !important;
+    }
+
+    .hub-card-action-btn:active {
+      transform: translateY(0px) scale(0.98) !important;
+    }
+
+    /* 5. Left Rail Navigation: Explore & Watch Hover & Active Effects */
+    .rail-nav-item#tab-hub:hover,
+    .rail-nav-item#tab-youtube:hover,
+    .rail-nav-item:hover {
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: #ffffff !important;
+      transform: translateX(3px) !important;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+
+    .rail-nav-item#tab-hub:hover .rail-icon,
+    .rail-nav-item#tab-youtube:hover .rail-icon,
+    .rail-nav-item:hover .rail-icon {
+      transform: scale(1.15) !important;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5)) !important;
+      transition: transform 0.2s ease, filter 0.2s ease !important;
+    }
+
+    .rail-nav-item#tab-hub.active,
+    .rail-nav-item#tab-youtube.active,
+    .rail-nav-item.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(99, 102, 241, 0.18)) !important;
+      color: #38bdf8 !important;
+      border: 1px solid rgba(56, 189, 248, 0.35) !important;
+      box-shadow: inset 3px 0 0 #38bdf8, 0 2px 10px rgba(56, 189, 248, 0.15) !important;
+      font-weight: 700 !important;
+    }
+
+    .rail-nav-item#tab-hub.active:hover,
+    .rail-nav-item#tab-youtube.active:hover,
+    .rail-nav-item.active:hover {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.26), rgba(99, 102, 241, 0.26)) !important;
+      border-color: rgba(56, 189, 248, 0.55) !important;
+      box-shadow: inset 3px 0 0 #38bdf8, 0 4px 16px rgba(56, 189, 248, 0.25) !important;
+    }
+
+    /* 6. Mobile Bottom Dock: Explore & Watch Hover & Active Effects */
+    .bottom-nav-item#bnav-hub:hover,
+    .bottom-nav-item#bnav-youtube:hover,
+    .bottom-nav-item:hover {
+      color: #ffffff !important;
+      background: rgba(255, 255, 255, 0.08) !important;
+      transform: translateY(-2px) !important;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+
+    .bottom-nav-item#bnav-hub:hover .bnav-icon,
+    .bottom-nav-item#bnav-youtube:hover .bnav-icon,
+    .bottom-nav-item:hover .bnav-icon {
+      transform: scale(1.18) !important;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6)) !important;
+      transition: transform 0.2s ease, filter 0.2s ease !important;
+    }
+
+    .bottom-nav-item#bnav-hub.active,
+    .bottom-nav-item#bnav-youtube.active,
+    .bottom-nav-item.active {
+      color: #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.12) !important;
+      border-radius: 14px !important;
+    }
+
+    .bottom-nav-item#bnav-hub.active .bnav-icon,
+    .bottom-nav-item#bnav-youtube.active .bnav-icon,
+    .bottom-nav-item.active .bnav-icon {
+      transform: scale(1.14) !important;
+      filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.6)) !important;
+    }
+
+

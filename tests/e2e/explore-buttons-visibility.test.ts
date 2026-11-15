@@ -49,6 +49,18 @@ describe('Explore Surface Button Visibility & UX Parity', { timeout: 25000 }, ()
     // 3. Hub card action buttons
     expect(cssContent).toContain('.hub-card-action-btn');
     expect(cssContent).toContain('.hub-card-action-btn:hover');
+
+    // 4. Hub app cards hardware GPU compositing & hover effects
+    expect(cssContent).toContain('.hub-app-card');
+    expect(cssContent).toContain('.hub-app-card:hover');
+    expect(cssContent).toContain('transform: translateZ(0) !important');
+    expect(cssContent).toContain('transform: translateY(-4px) translateZ(0) !important');
+
+    // 5. Left Rail & Bottom Dock Explore button hover effects
+    expect(cssContent).toContain('.rail-nav-item#tab-hub:hover');
+    expect(cssContent).toContain('.rail-nav-item#tab-hub.active');
+    expect(cssContent).toContain('.bottom-nav-item#bnav-hub:hover');
+    expect(cssContent).toContain('.bottom-nav-item#bnav-hub.active');
   });
 
   it('ensures explore mosaic grid generates interactive buttons and play indicators in scripts.view.ts', () => {

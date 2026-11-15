@@ -63,4 +63,21 @@ describe('Watch Navigation & Guest Video Streaming Accessibility', { timeout: 25
 
     expect(html).toContain("case 'watch':\n          closeHolographicNav();\n          setTimeout(function() { switchTab('youtube'); }, 140);\n          break;");
   });
+
+  it('guarantees switchTab("watch") / switchTab("youtube") avoids recursive PiP loop and call stack overflow', async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const html = await res.text();
+
+    // 1. switchTab('youtube') directly manages PiP element without mutual recursion
+    expect(html).toContain("if (tab === 'youtube') {");
+    expect(html).toContain("const pipOverlay = document.getElementById('persistentPiPOverlay');");
+    expect(html).toContain("if (pipOverlay && pipOverlay.style.display !== 'none') {");
+
+    // 2. maximizePiPToStage guards against re-calling switchTab('watch') if active
+    expect(html).toContain("if (window._currentActiveTab !== 'youtube' && typeof switchTab === 'function')");
+
+    // 3. Desktop and mobile watch navigation buttons have smooth hover effects
+    expect(html).toContain('.rail-nav-item#tab-youtube:hover');
+    expect(html).toContain('.bottom-nav-item#bnav-youtube:hover');
+  });
 });
