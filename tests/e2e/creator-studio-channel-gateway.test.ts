@@ -27,16 +27,12 @@ import path from 'node:path';
 import http from 'node:http';
 import { sovraDb } from '../../scripts/database-engine.ts';
 import { handleStudioTranscoderRoutes } from '../../scripts/routes/studio.routes.ts';
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 
 describe('Creator Studio Channel Gateway & YouTube Parity Suite', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
   const studioRoutesPath = path.resolve(__dirname, '../../scripts/routes/studio.routes.ts');
-  const viewsDir = path.resolve(__dirname, '../../scripts/views');
-  const serverContent = [
-    fs.existsSync(path.resolve(viewsDir, 'layout.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'layout.view.ts'), 'utf8') : '',
-    fs.existsSync(path.resolve(viewsDir, 'scripts.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'scripts.view.ts'), 'utf8') : '',
-    fs.readFileSync(devServerPath, 'utf8'),
-  ].join('\n');
+  const serverContent = loadServerContent(devServerPath);
   const studioRoutesContent = fs.readFileSync(studioRoutesPath, 'utf8');
 
   const testNewUserDid = 'did:sovra:brand_new_creator_' + Date.now();

@@ -43,6 +43,24 @@ export function loadServerContent(customDevServerPath?: string): string {
     } catch (_) {}
   }
 
+  // Modern Modular Frontend Architecture: styles and modules in apps/sovra-app/src
+  const appSrcDir = path.resolve(root, 'apps', 'sovra-app', 'src');
+  if (fs.existsSync(appSrcDir)) {
+    try {
+      const readAllFiles = (dir: string) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== 'test') {
+            readAllFiles(fullPath);
+          } else if (entry.isFile() && (entry.name.endsWith('.ts') || entry.name.endsWith('.css') || entry.name.endsWith('.js'))) {
+            parts.push(fs.readFileSync(fullPath, 'utf-8'));
+          }
+        }
+      };
+      readAllFiles(appSrcDir);
+    } catch (_) {}
+  }
+
   const full = parts.join('\n');
   if (!customDevServerPath) {
     cachedServerContent = full;

@@ -2,6 +2,8 @@ import { SovraClient } from './client.js';
 import * as routes from './routes.js';
 import * as ui from './ui/index.js';
 import * as hooks from './hooks/index.js';
+import * as modules from './modules/index.js';
+import { initializeAllSovraModules } from './modules/index.js';
 
 declare global {
   interface Window {
@@ -10,6 +12,7 @@ declare global {
       routes: typeof routes;
       ui: typeof ui;
       hooks: typeof hooks;
+      modules: typeof modules;
       version: string;
       isBundleLoaded: boolean;
     };
@@ -19,15 +22,18 @@ declare global {
 const client = new SovraClient();
 
 if (typeof window !== 'undefined') {
+  initializeAllSovraModules();
+
   window.Sovra = {
     client,
     routes,
     ui,
     hooks,
+    modules,
     version: '1.0.0',
     isBundleLoaded: true,
   };
   console.log('[Sovra] Compiled client bundle loaded successfully.');
 }
 
-export { client, routes, ui, hooks };
+export { client, routes, ui, hooks, modules, initializeAllSovraModules };

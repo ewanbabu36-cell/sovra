@@ -146,10 +146,29 @@ export function renderAppHtml(params: RenderAppHtmlParams): string {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700;800&family=Roboto+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
-  <script src="/assets/bundle.js" defer></script>
-  <style>
-${renderGlobalStyles(isCreatorModeActive)}
-  </style>
+  <link rel="stylesheet" href="/assets/sovra.css">
+  <script id="sovra-hydrated-state" type="application/json">
+${JSON.stringify({
+  hostSession: {
+    did: masterKey.did,
+    handle: hostUser ? hostUser.handle : "@laptop_host",
+    token: hostSessionToken,
+  },
+  knownHandleDids: Object.fromEntries(sovraDb.getAllUsers().map(u => [u.handle.toLowerCase(), u.did])),
+  knownUserTokens: Object.fromEntries(sovraDb.getAllUsers().filter(u => u.sessionToken).map(u => [u.did, u.sessionToken])),
+  livePosts,
+  reelsStore,
+  creatorProfiles,
+  bitchatPeersStore,
+  reelCommentsStore,
+  longFormVideosCatalog: safeVideosCatalog,
+  youtubeCommentsStore,
+})}
+  </script>
+  <script>
+    window.__SOVRA_HYDRATED_STATE__ = JSON.parse(document.getElementById('sovra-hydrated-state').textContent || '{}');
+  </script>
+  <script src="/assets/sovra.bundle.js" defer></script>
 </head>
 ${renderAppLayout(layoutCtx)}
 ${renderClientScripts(scriptCtx)}

@@ -1,0 +1,89 @@
+/* @file apps/sovra-app/src/styles/variables.css */
+
+:root, [data-theme="normal"], body.theme-normal {
+      color-scheme: light;
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --surface-card: #ffffff;
+      --surface-border: #e4e6eb;
+      --surface-border-hover: #ced0d4;
+      --primary: #1877f2;
+      --primary-hover: #166fe5;
+      --accent: #31a24c;
+      --accent-cyan: #0284c7;
+      --accent-creator: #f59e0b;
+      --text: #050505;
+      --text-muted: #65676b;
+      --text-subtle: #8a8d91;
+      --danger: #fa383e;
+      --input-bg: #f0f2f5;
+      --hover-bg: #e4e6eb;
+      --fb-bg: #f0f2f5;
+      --fb-card: #ffffff;
+      --fb-popover: #ffffff;
+      --fb-input: #f0f2f5;
+      --fb-btn-hover: #e4e6eb;
+      --fb-primary: #1877f2;
+      --fb-primary-hover: #166fe5;
+      --fb-active-green: #31a24c;
+      --fb-text: #050505;
+      --fb-secondary-text: #65676b;
+      --fb-divider: #ced0d4;
+      --glass-bg: rgba(255, 255, 255, 0.95);
+      --glass-border: #e4e6eb;
+      /* Unified Composer Tokens */
+      --composer-bg: #ffffff;
+      --composer-border: #e4e6eb;
+      --composer-publish-bg: linear-gradient(135deg, #1877f2, #166fe5);
+      /* Apple & Linear Tier Spring Curves */
+      --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+      --spring-easing: cubic-bezier(0.16, 1, 0.3, 1);
+      --spring-fast: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      --spring-normal: 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+      --spring-smooth: 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="black"], body.theme-black {
+      color-scheme: dark;
+      --bg: #000000;
+      --surface: #121212;
+      --surface-card: #18191a;
+      --surface-border: rgba(255, 255, 255, 0.12);
+      --surface-border-hover: rgba(255, 255, 255, 0.22);
+      --primary: #1877f2;
+      --primary-hover: #166fe5;
+      --accent: #31a24c;
+      --accent-cyan: #38bdf8;
+      --accent-creator: #f59e0b;
+      --text: #e4e6eb;
+      --text-muted: #b0b3b8;
+      --text-subtle: #8a8d91;
+      --danger: #fa383e;
+      --input-bg: #242526;
+      --hover-bg: #3a3b3c;
+      --fb-bg: #000000;
+      --fb-card: #18191a;
+      --fb-popover: #18191a;
+      --fb-input: #242526;
+      --fb-btn-hover: #3a3b3c;
+      --fb-primary: #1877f2;
+      --fb-primary-hover: #166fe5;
+      --fb-active-green: #31a24c;
+      --fb-text: #e4e6eb;
+      --fb-secondary-text: #b0b3b8;
+      --fb-divider: rgba(255, 255, 255, 0.12);
+      --glass-bg: rgba(15, 23, 42, 0.82);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --composer-bg: #18191a;
+      --composer-border: rgba(255, 255, 255, 0.12);
+      --composer-publish-bg: linear-gradient(135deg, #0284c7, #38bdf8);
+    }
+
+    html {
+      scrollbar-gutter: stable;
+      overflow-y: scroll;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+    }

@@ -33,16 +33,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { SovraDatabaseEngine } from '../../scripts/database-engine';
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 
 describe('SOVRA Instagram Full-Feature Parity Suite', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const viewsDir = path.resolve(__dirname, '../../scripts/views');
-  const serverContent = [
-    fs.existsSync(path.resolve(viewsDir, 'styles.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'styles.view.ts'), 'utf8') : '',
-    fs.existsSync(path.resolve(viewsDir, 'layout.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'layout.view.ts'), 'utf8') : '',
-    fs.existsSync(path.resolve(viewsDir, 'scripts.view.ts')) ? fs.readFileSync(path.resolve(viewsDir, 'scripts.view.ts'), 'utf8') : '',
-    fs.readFileSync(devServerPath, 'utf8'),
-  ].join('\n');
+  const serverContent = loadServerContent(devServerPath);
 
   // =========================================================================
   // 1. STORY FEATURE PARITY
