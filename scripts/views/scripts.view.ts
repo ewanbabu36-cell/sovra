@@ -35117,15 +35117,28 @@ window.SovraCreatorStudioEngine = {
       activeSessionId: null,
       isHost: false,
       pollTimer: null,
+      signalingTimer: null,
       lastEventTimestamp: 0,
+      localStream: null,
+      canvasAnimationId: null,
+      peerConnections: new Map(),
+      viewerPc: null,
+      processedSignalIds: new Set(),
+      rtcConfig: {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun2.l.google.com:19302" }
+        ]
+      },
 
       openModal: function(sessionId, isHost) {
-        const modal = document.getElementById("sovraLiveStreamModal");
+        var modal = document.getElementById("sovraLiveStreamModal");
         if (modal) {
           modal.style.display = "flex";
         }
         this.isHost = Boolean(isHost);
-        const hostControls = document.getElementById("liveBroadcasterControls");
+        var hostControls = document.getElementById("liveBroadcasterControls");
         if (hostControls) {
           hostControls.style.display = this.isHost ? "flex" : "none";
         }
@@ -35139,7 +35152,7 @@ window.SovraCreatorStudioEngine = {
       },
 
       closeModal: function() {
-        const modal = document.getElementById("sovraLiveStreamModal");
+        var modal = document.getElementById("sovraLiveStreamModal");
         if (modal) {
           modal.style.display = "none";
         }
@@ -35147,29 +35160,65 @@ window.SovraCreatorStudioEngine = {
           clearInterval(this.pollTimer);
           this.pollTimer = null;
         }
+        if (this.signalingTimer) {
+          clearInterval(this.signalingTimer);
+          this.signalingTimer = null;
+        }
+        if (this.canvasAnimationId) {
+          cancelAnimationFrame(this.canvasAnimationId);
+          this.canvasAnimationId = null;
+        }
+        if (this.localStream) {
+          try {
+            this.localStream.getTracks().forEach(function(t) { t.stop(); });
+          } catch (e) {}
+          this.localStream = null;
+        }
+        if (this.peerConnections) {
+          this.peerConnections.forEach(function(pc) {
+            try { pc.close(); } catch (e) {}
+          });
+          this.peerConnections.clear();
+        }
+        if (this.viewerPc) {
+          try { this.viewerPc.close(); } catch (e) {}
+          this.viewerPc = null;
+        }
+        var player = document.getElementById("liveVideoPlayer");
+        if (player) {
+          try { player.srcObject = null; } catch (e) {}
+        }
+        var badge = document.getElementById("liveWebRtcStatusBadge");
+        if (badge) {
+          badge.textContent = "📡 WebRTC Mesh";
+          badge.style.color = "#34d399";
+        }
         if (this.activeSessionId && !this.isHost) {
           this.leaveStream(this.activeSessionId);
         }
+        this.activeSessionId = null;
+        this.isHost = false;
+        this.processedSignalIds.clear();
       },
 
       loadOrStartStream: function() {
-        const self = this;
+        var self = this;
         fetch("/api/live/streams?status=LIVE")
-          .then(res => res.json())
-          .then(data => {
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
             if (data && data.ok && Array.isArray(data.streams) && data.streams.length > 0) {
               self.joinStream(data.streams[0].id);
             } else {
               self.startLiveBroadcast("Sovereign Node Broadcast", "tech");
             }
           })
-          .catch(() => {
+          .catch(function() {
             self.startLiveBroadcast("Sovereign Node Broadcast", "tech");
           });
       },
 
       startLiveBroadcast: function(title, category) {
-        const self = this;
+        var self = this;
         fetch("/api/live/stream/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -35178,46 +35227,402 @@ window.SovraCreatorStudioEngine = {
             category: category || "tech",
           }),
         })
-          .then(res => res.json())
-          .then(data => {
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
             if (data && data.ok && data.session) {
               self.activeSessionId = data.session.id;
               self.isHost = true;
-              const hostControls = document.getElementById("liveBroadcasterControls");
+              var hostControls = document.getElementById("liveBroadcasterControls");
               if (hostControls) hostControls.style.display = "flex";
               self.updateSessionUI(data.session);
               self.startEventPolling();
+              self.setupBroadcasterMedia();
               if (typeof showToast === "function") {
                 showToast("🔴 You are now LIVE on the decentralized mesh!", "success");
               }
             }
           })
-          .catch(() => {});
+          .catch(function() {});
+      },
+
+      setupBroadcasterMedia: function() {
+        var self = this;
+        if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function") {
+          navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+            audio: true
+          })
+            .then(function(stream) {
+              self.localStream = stream;
+              self.attachStreamToPlayer(stream, true);
+              self.startBroadcasterSignaling();
+            })
+            .catch(function(err) {
+              console.warn("Physical camera unavailable, activating simulated 30fps track:", err);
+              self.setupFallbackCanvasMedia();
+              self.startBroadcasterSignaling();
+            });
+        } else {
+          self.setupFallbackCanvasMedia();
+          self.startBroadcasterSignaling();
+        }
+      },
+
+      setupFallbackCanvasMedia: function() {
+        var self = this;
+        var canvas = document.createElement("canvas");
+        canvas.width = 1280;
+        canvas.height = 720;
+        var ctx = canvas.getContext("2d");
+        var frame = 0;
+
+        function renderFrame() {
+          if (!self.isHost || !self.activeSessionId) return;
+          frame++;
+
+          // Rich cyber-mesh background gradient
+          var grad = ctx.createLinearGradient(0, 0, 1280, 720);
+          grad.addColorStop(0, "#090d16");
+          grad.addColorStop(0.5, "#0f172a");
+          grad.addColorStop(1, "#020617");
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 1280, 720);
+
+          // Dynamic grid overlay
+          ctx.strokeStyle = "rgba(56, 189, 248, 0.08)";
+          ctx.lineWidth = 1;
+          var step = 40;
+          var offset = (frame * 0.5) % step;
+          for (var x = offset; x < 1280; x += step) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 720); ctx.stroke();
+          }
+          for (var y = offset; y < 720; y += step) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1280, y); ctx.stroke();
+          }
+
+          // Radar sweep animation
+          var cx = 640, cy = 360, maxR = 220;
+          for (var i = 0; i < 3; i++) {
+            var r = ((frame * 1.5 + i * 70) % maxR);
+            var alpha = Math.max(0, 1 - r / maxR) * 0.4;
+            ctx.strokeStyle = "rgba(239, 68, 68, " + alpha + ")";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // Center pulsing beacon
+          ctx.fillStyle = "#ef4444";
+          ctx.beginPath();
+          ctx.arc(cx, cy, 14 + Math.sin(frame * 0.1) * 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Title & Status
+          ctx.font = "bold 36px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif";
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.fillText("🔴 SOVRA P2P LIVE STREAM", cx, 220);
+
+          ctx.font = "600 20px monospace";
+          ctx.fillStyle = "#38bdf8";
+          ctx.fillText("WebRTC Mesh Video Relay | Session: " + (self.activeSessionId || "LIVE"), cx, 260);
+
+          // Audio waveform visualizer
+          ctx.strokeStyle = "#fbbf24";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          var waveY = 460;
+          for (var wx = 340; wx <= 940; wx += 10) {
+            var wave = Math.sin((wx + frame * 8) * 0.04) * Math.cos(frame * 0.06) * 24;
+            if (wx === 340) ctx.moveTo(wx, waveY + wave);
+            else ctx.lineTo(wx, waveY + wave);
+          }
+          ctx.stroke();
+
+          // Live stats footer
+          ctx.font = "14px monospace";
+          ctx.fillStyle = "#94a3b8";
+          ctx.fillText(new Date().toISOString() + " | 30 FPS | 1280x720 | 1-to-Many Swarm Relay", cx, 520);
+
+          self.canvasAnimationId = requestAnimationFrame(renderFrame);
+        }
+
+        renderFrame();
+
+        try {
+          var stream = canvas.captureStream ? canvas.captureStream(30) : ((canvas).mozCaptureStream ? (canvas).mozCaptureStream(30) : null);
+          if (stream) {
+            try {
+              var AudioCtx = window.AudioContext || window.webkitAudioContext;
+              if (AudioCtx) {
+                var actx = new AudioCtx();
+                var osc = actx.createOscillator();
+                var gain = actx.createGain();
+                gain.gain.value = 0.0001;
+                var dest = actx.createMediaStreamDestination();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.start();
+                var audioTrack = dest.stream.getAudioTracks()[0];
+                if (audioTrack) stream.addTrack(audioTrack);
+              }
+            } catch (ae) {}
+
+            self.localStream = stream;
+            self.attachStreamToPlayer(stream, true);
+          }
+        } catch (err) {
+          console.error("Canvas captureStream error:", err);
+        }
+      },
+
+      attachStreamToPlayer: function(stream, muted) {
+        var player = document.getElementById("liveVideoPlayer");
+        if (player) {
+          player.srcObject = stream;
+          player.muted = Boolean(muted);
+          player.play().catch(function() {
+            player.muted = true;
+            player.play().catch(function() {});
+          });
+        }
+        var badge = document.getElementById("liveWebRtcStatusBadge");
+        if (badge) {
+          badge.textContent = "📡 WebRTC: Connected";
+          badge.style.color = "#34d399";
+        }
+      },
+
+      startBroadcasterSignaling: function() {
+        if (this.signalingTimer) clearInterval(this.signalingTimer);
+        var self = this;
+        var myDid = (window.currentUser && window.currentUser.did) || "did:sovra:broadcaster";
+
+        this.signalingTimer = setInterval(function() {
+          if (!self.activeSessionId || !self.isHost) return;
+
+          fetch("/api/live/stream/signals?sessionId=" + encodeURIComponent(self.activeSessionId) + "&peerDid=" + encodeURIComponent(myDid))
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (!data || !data.ok || !Array.isArray(data.signals)) return;
+
+              data.signals.forEach(function(sig) {
+                if (self.processedSignalIds.has(sig.id)) return;
+                self.processedSignalIds.add(sig.id);
+
+                var viewerDid = sig.fromDid;
+                if (!viewerDid || viewerDid === myDid) return;
+
+                // 1. Viewer join -> create offer for this viewer
+                if (sig.type === "join") {
+                  self.handleViewerJoin(viewerDid);
+                }
+                // 2. Viewer answer -> setRemoteDescription
+                else if (sig.type === "answer") {
+                  var pc = self.peerConnections.get(viewerDid);
+                  if (pc && pc.signalingState !== "stable") {
+                    try {
+                      pc.setRemoteDescription(new RTCSessionDescription(sig.payload)).catch(function(e) {
+                        console.warn("Broadcaster setRemoteDescription error:", e);
+                      });
+                    } catch (e) {}
+                  }
+                }
+                // 3. Viewer ICE candidate -> addIceCandidate
+                else if (sig.type === "candidate") {
+                  var candidatePc = self.peerConnections.get(viewerDid);
+                  if (candidatePc && sig.payload) {
+                    try {
+                      candidatePc.addIceCandidate(new RTCIceCandidate(sig.payload)).catch(function() {});
+                    } catch (e) {}
+                  }
+                }
+              });
+            })
+            .catch(function() {});
+        }, 1000);
+      },
+
+      handleViewerJoin: function(viewerDid) {
+        var self = this;
+        if (!this.localStream || !window.RTCPeerConnection) return;
+
+        var pc = this.peerConnections.get(viewerDid);
+        if (pc) {
+          try { pc.close(); } catch (e) {}
+        }
+
+        try {
+          pc = new RTCPeerConnection(this.rtcConfig);
+          this.peerConnections.set(viewerDid, pc);
+
+          this.localStream.getTracks().forEach(function(track) {
+            pc.addTrack(track, self.localStream);
+          });
+
+          pc.onicecandidate = function(event) {
+            if (event.candidate && self.activeSessionId) {
+              fetch("/api/live/stream/signal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionId: self.activeSessionId,
+                  toDid: viewerDid,
+                  type: "candidate",
+                  payload: event.candidate,
+                }),
+              }).catch(function() {});
+            }
+          };
+
+          pc.createOffer()
+            .then(function(offer) {
+              return pc.setLocalDescription(offer);
+            })
+            .then(function() {
+              return fetch("/api/live/stream/signal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionId: self.activeSessionId,
+                  toDid: viewerDid,
+                  type: "offer",
+                  payload: pc.localDescription,
+                }),
+              });
+            })
+            .catch(function(err) {
+              console.error("Broadcaster offer creation error:", err);
+            });
+        } catch (err) {
+          console.error("Error in handleViewerJoin:", err);
+        }
       },
 
       joinStream: function(sessionId) {
-        const self = this;
+        var self = this;
         this.activeSessionId = sessionId;
+        this.isHost = false;
+
         fetch("/api/live/stream/join", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId: sessionId }),
         })
-          .then(res => res.json())
-          .then(data => {
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
             if (data && data.ok) {
               if (data.session) self.updateSessionUI(data.session);
               if (data.viewerCount !== undefined) {
-                const countEl = document.getElementById("liveViewerCount");
+                var countEl = document.getElementById("liveViewerCount");
                 if (countEl) countEl.textContent = String(data.viewerCount);
               }
               if (data.recentComments) {
                 self.renderComments(data.recentComments);
               }
               self.startEventPolling();
+              self.startViewerWebRtc(sessionId, data.session ? data.session.creatorDid : null);
             }
           })
-          .catch(() => {});
+          .catch(function() {});
+      },
+
+      startViewerWebRtc: function(sessionId, hostDid) {
+        if (!window.RTCPeerConnection) return;
+        var self = this;
+        if (this.viewerPc) {
+          try { this.viewerPc.close(); } catch (e) {}
+          this.viewerPc = null;
+        }
+
+        var myDid = (window.currentUser && window.currentUser.did) || ("did:sovra:viewer_" + Math.random().toString(36).substring(2, 9));
+
+        try {
+          var pc = new RTCPeerConnection(this.rtcConfig);
+          this.viewerPc = pc;
+
+          pc.ontrack = function(event) {
+            if (event.streams && event.streams[0]) {
+              self.attachStreamToPlayer(event.streams[0], false);
+            }
+          };
+
+          pc.onicecandidate = function(event) {
+            if (event.candidate && self.activeSessionId) {
+              fetch("/api/live/stream/signal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionId: self.activeSessionId,
+                  toDid: hostDid,
+                  type: "candidate",
+                  payload: event.candidate,
+                }),
+              }).catch(function() {});
+            }
+          };
+
+          // Send join signal to host to initiate WebRTC offer
+          fetch("/api/live/stream/signal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: sessionId,
+              toDid: hostDid,
+              type: "join",
+              payload: { did: myDid },
+            }),
+          }).catch(function() {});
+
+          if (this.signalingTimer) clearInterval(this.signalingTimer);
+          this.signalingTimer = setInterval(function() {
+            if (!self.activeSessionId || self.isHost) return;
+
+            fetch("/api/live/stream/signals?sessionId=" + encodeURIComponent(self.activeSessionId) + "&peerDid=" + encodeURIComponent(myDid))
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                if (!data || !data.ok || !Array.isArray(data.signals)) return;
+
+                data.signals.forEach(function(sig) {
+                  if (self.processedSignalIds.has(sig.id)) return;
+                  self.processedSignalIds.add(sig.id);
+
+                  if (sig.type === "offer" && self.viewerPc) {
+                    self.viewerPc.setRemoteDescription(new RTCSessionDescription(sig.payload))
+                      .then(function() {
+                        return self.viewerPc.createAnswer();
+                      })
+                      .then(function(answer) {
+                        return self.viewerPc.setLocalDescription(answer);
+                      })
+                      .then(function() {
+                        return fetch("/api/live/stream/signal", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            sessionId: self.activeSessionId,
+                            toDid: sig.fromDid,
+                            type: "answer",
+                            payload: self.viewerPc.localDescription,
+                          }),
+                        });
+                      })
+                      .catch(function(err) {
+                        console.warn("Viewer setRemoteDescription / createAnswer error:", err);
+                      });
+                  } else if (sig.type === "candidate" && self.viewerPc && sig.payload) {
+                    try {
+                      self.viewerPc.addIceCandidate(new RTCIceCandidate(sig.payload)).catch(function() {});
+                    } catch (e) {}
+                  }
+                });
+              })
+              .catch(function() {});
+          }, 1000);
+        } catch (err) {
+          console.error("Error starting viewer WebRTC:", err);
+        }
       },
 
       leaveStream: function(sessionId) {
@@ -35226,14 +35631,14 @@ window.SovraCreatorStudioEngine = {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId: sessionId }),
-        }).catch(() => {});
+        }).catch(function() {});
       },
 
       updateSessionUI: function(session) {
-        const titleEl = document.getElementById("liveStreamModalTitle");
-        const subEl = document.getElementById("liveStreamModalSubtitle");
-        const countEl = document.getElementById("liveViewerCount");
-        const tipsEl = document.getElementById("liveTipsTotalSov");
+        var titleEl = document.getElementById("liveStreamModalTitle");
+        var subEl = document.getElementById("liveStreamModalSubtitle");
+        var countEl = document.getElementById("liveViewerCount");
+        var tipsEl = document.getElementById("liveTipsTotalSov");
 
         if (titleEl && session.title) titleEl.textContent = session.title;
         if (subEl && session.creatorName) subEl.textContent = "Host: " + session.creatorName + " (" + session.creatorHandle + ")";
@@ -35243,16 +35648,16 @@ window.SovraCreatorStudioEngine = {
 
       startEventPolling: function() {
         if (this.pollTimer) clearInterval(this.pollTimer);
-        const self = this;
+        var self = this;
         this.pollTimer = setInterval(function() {
           if (!self.activeSessionId) return;
           fetch("/api/live/stream/events?sessionId=" + encodeURIComponent(self.activeSessionId) + "&since=" + self.lastEventTimestamp)
-            .then(res => res.json())
-            .then(data => {
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
               if (data && data.ok) {
                 self.lastEventTimestamp = data.timestamp || Date.now();
-                const countEl = document.getElementById("liveViewerCount");
-                const tipsEl = document.getElementById("liveTipsTotalSov");
+                var countEl = document.getElementById("liveViewerCount");
+                var tipsEl = document.getElementById("liveTipsTotalSov");
                 if (countEl && data.viewerCount !== undefined) countEl.textContent = String(data.viewerCount);
                 if (tipsEl && data.tipTotalSov !== undefined) tipsEl.textContent = Number(data.tipTotalSov).toFixed(2);
 
@@ -35266,31 +35671,31 @@ window.SovraCreatorStudioEngine = {
                 }
               }
             })
-            .catch(() => {});
+            .catch(function() {});
         }, 2000);
       },
 
       renderComments: function(comments) {
-        const overlay = document.getElementById("liveCommentsOverlay");
+        var overlay = document.getElementById("liveCommentsOverlay");
         if (!overlay) return;
         overlay.innerHTML = "";
         this.appendComments(comments);
       },
 
       appendComments: function(comments) {
-        const overlay = document.getElementById("liveCommentsOverlay");
+        var overlay = document.getElementById("liveCommentsOverlay");
         if (!overlay) return;
         comments.forEach(function(c) {
-          const item = document.createElement("div");
+          var item = document.createElement("div");
           item.style.cssText = "background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(6px); border-radius: 8px; padding: 3px 8px; font-size: 0.72rem; color: #f1f5f9; max-width: 85%; animation: fadeIn 0.2s ease;";
-          const sender = c.senderName || c.senderHandle || "Peer";
-          const isTip = c.isTip;
+          var sender = c.senderName || c.senderHandle || "Peer";
+          var isTip = c.isTip;
           if (isTip) {
             item.style.background = "rgba(245, 158, 11, 0.2)";
             item.style.border = "1px solid rgba(251, 191, 36, 0.4)";
-            item.innerHTML = '<b style="color: #fbbf24;">⚡ ' + sender + ':</b> ' + (c.text || '');
+            item.innerHTML = '<b style="color: #fbbf24;">⚡ ' + sender + ':</b> ' + (c.text || "");
           } else {
-            item.innerHTML = '<b style="color: #38bdf8;">' + sender + ':</b> ' + (c.text || '');
+            item.innerHTML = '<b style="color: #38bdf8;">' + sender + ':</b> ' + (c.text || "");
           }
           overlay.appendChild(item);
         });
@@ -35298,11 +35703,12 @@ window.SovraCreatorStudioEngine = {
       },
 
       submitComment: function() {
-        const input = document.getElementById("liveCommentInput");
+        var input = document.getElementById("liveCommentInput");
         if (!input || !input.value.trim() || !this.activeSessionId) return;
-        const text = input.value.trim();
+        var text = input.value.trim();
         input.value = "";
 
+        var self = this;
         fetch("/api/live/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -35311,18 +35717,18 @@ window.SovraCreatorStudioEngine = {
             text: text,
           }),
         })
-          .then(res => res.json())
-          .then(data => {
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
             if (data && data.ok && data.message) {
-              this.appendComments([data.message]);
+              self.appendComments([data.message]);
             }
           })
-          .catch(() => {});
+          .catch(function() {});
       },
 
       sendTip: function(amountSov, note) {
         if (!this.activeSessionId) return;
-        const self = this;
+        var self = this;
         fetch("/api/live/stream/tip", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -35332,12 +35738,12 @@ window.SovraCreatorStudioEngine = {
             note: note || "Live Stream Supporter",
           }),
         })
-          .then(res => res.json())
-          .then(data => {
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
             if (data && data.ok) {
               self.triggerFloatingCoins(amountSov);
               if (data.tipTotalSov !== undefined) {
-                const tipsEl = document.getElementById("liveTipsTotalSov");
+                var tipsEl = document.getElementById("liveTipsTotalSov");
                 if (tipsEl) tipsEl.textContent = Number(data.tipTotalSov).toFixed(2);
               }
               if (typeof showToast === "function") {
@@ -35345,17 +35751,17 @@ window.SovraCreatorStudioEngine = {
               }
             }
           })
-          .catch(() => {});
+          .catch(function() {});
       },
 
       triggerFloatingCoins: function(amount) {
-        const container = document.getElementById("liveFloatingCoinsContainer");
+        var container = document.getElementById("liveFloatingCoinsContainer");
         if (!container) return;
-        const count = Math.min(12, Math.max(4, Math.round(Number(amount) || 5)));
-        for (let i = 0; i < count; i++) {
-          const coin = document.createElement("div");
-          const left = 20 + Math.random() * 60;
-          const delay = Math.random() * 0.4;
+        var count = Math.min(12, Math.max(4, Math.round(Number(amount) || 5)));
+        for (var i = 0; i < count; i++) {
+          var coin = document.createElement("div");
+          var left = 20 + Math.random() * 60;
+          var delay = Math.random() * 0.4;
           coin.textContent = "🪙";
           coin.style.cssText = "position: absolute; bottom: 20px; left: " + left + "%; font-size: 1.6rem; animation: floatCoinUp 1.6s ease-out " + delay + "s forwards; z-index: 100;";
           container.appendChild(coin);
@@ -35367,14 +35773,14 @@ window.SovraCreatorStudioEngine = {
 
       endBroadcast: function() {
         if (!this.activeSessionId) return;
-        const self = this;
+        var self = this;
         fetch("/api/live/stream/end", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId: this.activeSessionId }),
         })
-          .then(res => res.json())
-          .then(data => {
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
             if (data && data.ok) {
               if (typeof showToast === "function") {
                 showToast("Broadcast ended! Recording archived to Watch catalog.", "success");
@@ -35382,7 +35788,7 @@ window.SovraCreatorStudioEngine = {
               self.closeModal();
             }
           })
-          .catch(() => {});
+          .catch(function() {});
       }
     };
 

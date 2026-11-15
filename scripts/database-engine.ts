@@ -1509,7 +1509,7 @@ export interface LiveSignalRecord {
   sessionId: string;
   fromDid: string;
   toDid?: string;
-  type: 'offer' | 'answer' | 'candidate';
+  type: 'offer' | 'answer' | 'candidate' | 'join';
   payload: any;
   timestamp: number;
 }
@@ -12700,7 +12700,7 @@ export class SovraDatabaseEngine {
     sessionId: string;
     fromDid: string;
     toDid?: string;
-    type: 'offer' | 'answer' | 'candidate';
+    type: 'offer' | 'answer' | 'candidate' | 'join';
     payload: any;
   }): { ok: boolean; signal?: LiveSignalRecord; error?: string } {
     this.load();

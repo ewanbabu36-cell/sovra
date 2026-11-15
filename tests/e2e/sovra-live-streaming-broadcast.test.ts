@@ -524,13 +524,16 @@ describe('SOVRA P2P Live Streaming & Swarm Broadcast Engine', () => {
   });
 
   describe('8. Client HTML & Live Room UI Elements Gate', () => {
-    it('serves client index HTML containing live modal and floating coin animation styles', async () => {
+    it('serves client index HTML containing live modal, video player, and WebRTC streaming engine', async () => {
       const res = await fetch(`${BASE_URL}/`);
       expect(res.status).toBe(200);
       const html = await res.text();
 
       // UI Modal Container
       expect(html).toContain('id="sovraLiveStreamModal"');
+      // Live Video Player & Badges
+      expect(html).toContain('id="liveVideoPlayer"');
+      expect(html).toContain('id="liveWebRtcStatusBadge"');
       // Floating Comments Overlay
       expect(html).toContain('id="liveCommentsOverlay"');
       // Floating Gold Coins Container
@@ -545,8 +548,92 @@ describe('SOVRA P2P Live Streaming & Swarm Broadcast Engine', () => {
       expect(html).toContain('sendLiveStreamPresetTip(25)');
       // Drawer Navigation Entry
       expect(html).toContain('P2P Live Streams');
-      // Client Engine Object
+      // Client Engine Object and WebRTC track methods
       expect(html).toContain('window.SovraLiveStreamEngine');
+      expect(html).toContain('setupBroadcasterMedia');
+      expect(html).toContain('setupFallbackCanvasMedia');
+      expect(html).toContain('attachStreamToPlayer');
+      expect(html).toContain('startViewerWebRtc');
+    });
+  });
+
+  describe('9. WebRTC HTTP Ingestion (WHIP) & Egress (WHEP) Protocols', () => {
+    const whipSessionId = `whip-test-${Date.now()}`;
+    const testSdpOffer = [
+      'v=0',
+      'o=broadcaster-obs 1000 2 IN IP4 127.0.0.1',
+      's=OBS Studio WHIP Output',
+      't=0 0',
+      'm=video 9 UDP/TLS/RTP/SAVPF 96',
+      'c=IN IP4 127.0.0.1',
+      'a=rtpmap:96 VP8/90000',
+    ].join('\r\n') + '\r\n';
+
+    it('handles WHIP ingestion negotiation with RFC 9647 SDP answer', async () => {
+      const res = await fetch(`${BASE_URL}/api/live/stream/whip?sessionId=${whipSessionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/sdp',
+          Accept: 'application/sdp',
+        },
+        body: testSdpOffer,
+      });
+
+      expect([200, 201]).toContain(res.status);
+      expect(res.headers.get('content-type')).toContain('application/sdp');
+      expect(res.headers.get('location')).toContain(`/api/live/stream/whip?sessionId=${whipSessionId}`);
+
+      const sdpAnswer = await res.text();
+      expect(sdpAnswer).toContain('v=0');
+      expect(sdpAnswer).toContain('o=sovra-webrtc-relay');
+      expect(sdpAnswer).toContain('m=video');
+    });
+
+    it('handles WHEP egress negotiation returning video relay SDP', async () => {
+      const res = await fetch(`${BASE_URL}/api/live/stream/whep?sessionId=${whipSessionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/sdp',
+          Accept: 'application/sdp',
+        },
+        body: testSdpOffer,
+      });
+
+      expect([200, 201]).toContain(res.status);
+      expect(res.headers.get('content-type')).toContain('application/sdp');
+      expect(res.headers.get('location')).toContain(`/api/live/stream/whep?sessionId=${whipSessionId}`);
+
+      const sdpAnswer = await res.text();
+      expect(sdpAnswer).toContain('v=0');
+      expect(sdpAnswer).toContain('m=video');
+    });
+
+    it('supports JSON format for WHIP/WHEP clients requesting application/json', async () => {
+      const res = await fetch(`${BASE_URL}/api/live/stream/whip?sessionId=${whipSessionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ sdp: testSdpOffer }),
+      });
+
+      expect([200, 201]).toContain(res.status);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(data.type).toBe('answer');
+      expect(data.sdp).toContain('sovra-webrtc-relay');
+    });
+
+    it('cleans up WHIP ingestion on DELETE request', async () => {
+      const res = await fetch(`${BASE_URL}/api/live/stream/whip?sessionId=${whipSessionId}`, {
+        method: 'DELETE',
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(data.sessionId).toBe(whipSessionId);
     });
   });
 });

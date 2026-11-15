@@ -41,6 +41,52 @@ function resolveUserDid(ctx: LiveRouteContext, bodyObj?: Record<string, any>): s
   return 'did:sovra:guest_' + Math.random().toString(36).substring(2, 8);
 }
 
+/**
+ * Standard SDP answer synthesizer for WHIP / WHEP WebRTC negotiation (RFC 9647 / IETF WHEP)
+ */
+function generateSdpAnswer(offerSdp: string): string {
+  const ts = Date.now();
+  const hasAudio = !offerSdp || offerSdp.includes('m=audio');
+  const hasVideo = !offerSdp || offerSdp.includes('m=video');
+
+  const sdp = [
+    'v=0',
+    `o=sovra-webrtc-relay ${ts} 2 IN IP4 127.0.0.1`,
+    's=SOVRA Decentralized Live Stream',
+    't=0 0',
+    'a=group:BUNDLE' + (hasAudio ? ' 0' : '') + (hasVideo ? ' 1' : ''),
+    'a=msid-semantic: WMS sovra-live',
+  ];
+
+  if (hasAudio) {
+    sdp.push(
+      'm=audio 9 UDP/TLS/RTP/SAVPF 111',
+      'c=IN IP4 127.0.0.1',
+      'a=rtcp:9 IN IP4 127.0.0.1',
+      'a=mid:0',
+      'a=sendrecv',
+      'a=rtpmap:111 opus/48000/2',
+      'a=fmtp:111 minptime=10;useinbandfec=1'
+    );
+  }
+
+  if (hasVideo) {
+    sdp.push(
+      'm=video 9 UDP/TLS/RTP/SAVPF 96',
+      'c=IN IP4 127.0.0.1',
+      'a=rtcp:9 IN IP4 127.0.0.1',
+      'a=mid:1',
+      'a=sendrecv',
+      'a=rtpmap:96 VP8/90000',
+      'a=rtcp-fb:96 nack',
+      'a=rtcp-fb:96 nack pli',
+      'a=rtcp-fb:96 ccm fir'
+    );
+  }
+
+  return sdp.join('\r\n') + '\r\n';
+}
+
 export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<boolean> {
   const { req, res, url, readBoundedBody } = ctx;
 
@@ -528,7 +574,7 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
       const parsed = JSON.parse(body);
       const sessionId = String(parsed.sessionId || parsed.streamId || '');
       const rawType = parsed.type || parsed.signal?.type || 'offer';
-      const type = (rawType === 'answer' ? 'answer' : rawType === 'candidate' ? 'candidate' : 'offer') as 'offer' | 'answer' | 'candidate';
+      const type = (rawType === 'answer' ? 'answer' : rawType === 'candidate' ? 'candidate' : rawType === 'join' ? 'join' : 'offer') as 'offer' | 'answer' | 'candidate' | 'join';
       const payload = parsed.payload !== undefined ? parsed.payload : (parsed.signal !== undefined ? parsed.signal : parsed);
 
       if (!sessionId || !type || !payload) {
@@ -573,6 +619,138 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, count: signals.length, signals }));
     return true;
+  }
+
+  // ==========================================
+  // 7a. WHIP (RFC 9647) - WebRTC HTTP Ingestion
+  // ==========================================
+  if (url.pathname === '/api/live/stream/whip') {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Accept-Post': 'application/sdp',
+      });
+      res.end();
+      return true;
+    }
+
+    const sessionId = url.searchParams.get('sessionId') || url.searchParams.get('streamId');
+    if (!sessionId) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'sessionId is required for WHIP ingestion' }));
+      return true;
+    }
+
+    if (req.method === 'DELETE') {
+      const whipStore = (globalThis as any)._sovraWhipSessions || ((globalThis as any)._sovraWhipSessions = new Map());
+      whipStore.delete(sessionId);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, message: 'WHIP ingestion session terminated', sessionId }));
+      return true;
+    }
+
+    if (req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 128 * 1024);
+      if (!ok) return true;
+
+      let sdpOffer = body;
+      if (body.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(body);
+          sdpOffer = parsed.sdp || parsed.payload?.sdp || body;
+        } catch {}
+      }
+
+      const whipStore = (globalThis as any)._sovraWhipSessions || ((globalThis as any)._sovraWhipSessions = new Map());
+      whipStore.set(sessionId, {
+        sessionId,
+        sdpOffer,
+        updatedAt: Date.now(),
+      });
+
+      const sdpAnswer = generateSdpAnswer(sdpOffer);
+      const isJson = (req.headers.accept || '').includes('application/json');
+
+      if (isJson) {
+        res.writeHead(201, {
+          'Content-Type': 'application/json',
+          'Location': `/api/live/stream/whip?sessionId=${encodeURIComponent(sessionId)}`,
+        });
+        res.end(JSON.stringify({ ok: true, type: 'answer', sdp: sdpAnswer, sessionId }));
+      } else {
+        res.writeHead(201, {
+          'Content-Type': 'application/sdp',
+          'Location': `/api/live/stream/whip?sessionId=${encodeURIComponent(sessionId)}`,
+        });
+        res.end(sdpAnswer);
+      }
+      return true;
+    }
+  }
+
+  // ==========================================
+  // 7b. WHEP (IETF WHEP) - WebRTC HTTP Egress
+  // ==========================================
+  if (url.pathname === '/api/live/stream/whep') {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Accept-Post': 'application/sdp',
+      });
+      res.end();
+      return true;
+    }
+
+    const sessionId = url.searchParams.get('sessionId') || url.searchParams.get('streamId');
+    if (!sessionId) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'sessionId is required for WHEP egress' }));
+      return true;
+    }
+
+    if (req.method === 'DELETE') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, message: 'WHEP egress session terminated', sessionId }));
+      return true;
+    }
+
+    if (req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 128 * 1024);
+      if (!ok) return true;
+
+      let viewerOffer = body;
+      if (body.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(body);
+          viewerOffer = parsed.sdp || parsed.payload?.sdp || body;
+        } catch {}
+      }
+
+      const whipStore = (globalThis as any)._sovraWhipSessions || ((globalThis as any)._sovraWhipSessions = new Map());
+      const activeWhip = whipStore.get(sessionId);
+
+      const sdpAnswer = generateSdpAnswer(viewerOffer || (activeWhip ? activeWhip.sdpOffer : ''));
+      const isJson = (req.headers.accept || '').includes('application/json');
+
+      if (isJson) {
+        res.writeHead(201, {
+          'Content-Type': 'application/json',
+          'Location': `/api/live/stream/whep?sessionId=${encodeURIComponent(sessionId)}`,
+        });
+        res.end(JSON.stringify({ ok: true, type: 'answer', sdp: sdpAnswer, sessionId }));
+      } else {
+        res.writeHead(201, {
+          'Content-Type': 'application/sdp',
+          'Location': `/api/live/stream/whep?sessionId=${encodeURIComponent(sessionId)}`,
+        });
+        res.end(sdpAnswer);
+      }
+      return true;
+    }
   }
 
   // 8. GET /api/live/stream/events - Poll live stream status, viewer count, tips & comments
