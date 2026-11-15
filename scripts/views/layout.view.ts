@@ -782,6 +782,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div class="dev-drawer-item" onclick="openCreatorStudioModal(); switchTab('studio'); toggleDevMainMenu(false);">
             <span>🎬</span> <span style="color: #fb7185; font-weight: 600;">Creator Studio Pro</span>
           </div>
+          <div class="dev-drawer-item" onclick="openLiveStreamModal(); toggleDevMainMenu(false);">
+            <span>🔴</span> <span style="color: #ef4444; font-weight: 600;">P2P Live Streams</span>
+          </div>
           <div class="dev-drawer-item" onclick="if(typeof openSpatialChannelsPagesSurface==='function')openSpatialChannelsPagesSurface(this);else switchTab('me'); toggleDevMainMenu(false);">
             <span>📢</span> <span style="color: #38bdf8; font-weight: 600;">Channels &amp; Public Pages</span>
           </div>
@@ -2967,6 +2970,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div style="position: absolute; top: 10px; left: 10px; display: flex; gap: 8px; align-items: center; z-index: 10;">
             <span id="liveIndicatorBadge" style="background: #ef4444; color: #fff; font-size: 0.68rem; font-weight: 900; padding: 2px 8px; border-radius: 9999px; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);">
               <span style="width: 6px; height: 6px; border-radius: 50%; background: #fff; display: inline-block;"></span> LIVE
+            </span>
+            <span id="liveWebRtcStatusBadge" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">
+              📡 WebRTC Mesh
             </span>
             <span id="liveViewerCountBadge" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.15); color: #38bdf8; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">
               👥 <span id="liveViewerCount">1</span>
