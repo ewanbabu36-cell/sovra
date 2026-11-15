@@ -1,10 +1,11 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
 describe('SOVRA Pre-Launch Master Zero-Friction & Invisible Web3 Audit', () => {
   const devServerPath = path.resolve(process.cwd(), 'scripts/dev-server.ts');
-  const content = fs.readFileSync(devServerPath, 'utf8');
+  const content = loadServerContent(devServerPath);
 
   it('1. Button Logic Audit: Zero missing onclick handlers across 1,395 UI buttons', () => {
     // Assert all 38 critical actions are defined

@@ -15,10 +15,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { handleVideoRoutes } from '../../scripts/routes/video.routes.ts';
 import { sovraDb } from '../../scripts/database-engine.ts';
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 
 describe('Cycle 2: ABR Streaming & P2P Seeder Relay Reward Pipeline', () => {
   const devServerPath = path.resolve(process.cwd(), 'scripts', 'dev-server.ts');
-  const devServerCode = fs.readFileSync(devServerPath, 'utf-8');
+  const devServerCode = loadServerContent(devServerPath);
 
   // Helper mock server context for handleVideoRoutes
   function createMockContext(method: string, urlPath: string, bodyJson?: any) {

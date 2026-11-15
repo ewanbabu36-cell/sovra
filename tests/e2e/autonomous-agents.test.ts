@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -112,7 +113,7 @@ describe('Cycle 2: Self-Sovereign Autonomous On-Node AI Agents (OpenAI Swarm Kil
 
   it('verifies client UI exposes deployAutonomousMission agent launcher', () => {
     const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-    const content = fs.readFileSync(devServerPath, 'utf-8');
+    const content = loadServerContent(devServerPath);
     expect(content).toContain('deployAutonomousMission');
     expect(content).toContain('autonomous-agent-card');
   });

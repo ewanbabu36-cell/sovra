@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/long-video-resumable-upload.test.ts
  * SOVRA ENTERPRISE RESUMABLE VIDEO INGESTION & ABR HLS TRANSCODING SUITE
@@ -521,7 +522,7 @@ describe('Sovra Resumable Long Video Ingestion & ABR HLS Pipeline', () => {
   // =========================================================================
   describe('Suite 6: Client Script UI Verification & Removal of 25MB Limits', () => {
     const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-    const devServerContent = fs.readFileSync(devServerPath, 'utf8');
+    const devServerContent = loadServerContent(devServerPath);
 
     it('6.1 Guarantees no 25MB upload hardcoding exists in submitVideoUpload', () => {
       expect(devServerContent).not.toMatch(/if\s*\(\s*file\.size\s*>\s*25\s*\*\s*1024\s*\*\s*1024\s*\)/);

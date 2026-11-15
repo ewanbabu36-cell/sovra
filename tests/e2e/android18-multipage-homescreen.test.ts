@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeEach } from 'vitest';
 import vm from 'node:vm';
 import fs from 'node:fs';
@@ -16,7 +17,7 @@ describe('Sovra Android 18 Multi-Page Desktop Canvas & Spatial Engine Test Suite
         }
       } catch (_) {
         const devServerFile = path.resolve(__dirname, '../../scripts/dev-server.ts');
-        serverHtml = fs.readFileSync(devServerFile, 'utf8');
+        serverHtml = loadServerContent(devServerFile);
       }
     }
   });

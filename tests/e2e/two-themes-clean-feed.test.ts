@@ -1,10 +1,11 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
 describe('Strict 2-Theme Architecture (Normal & Black) & Clean Consumer Feed Suite', () => {
   const devServerPath = path.resolve(process.cwd(), 'scripts', 'dev-server.ts');
-  const code = fs.readFileSync(devServerPath, 'utf-8');
+  const code = loadServerContent(devServerPath);
 
   it('1. Verifies devAdvanceTelemetryHud is permanently suppressed and hidden from the consumer feed', () => {
     // Both HTML and CSS must enforce display: none !important

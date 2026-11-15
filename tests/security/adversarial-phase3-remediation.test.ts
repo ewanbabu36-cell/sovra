@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { spawn, ChildProcess } from 'node:child_process';
@@ -460,7 +461,7 @@ describe('PHASE 3: Final Security Hardening & Zero-Trust Adversarial Suite (AUTH
   // =========================================================================
   describe('SESS-02: Elimination of Query-String Tokens & Cookie-First Enforcement', () => {
     it('9. confirms 0 occurrences of sessionToken= or token= URL construction in client codebase', () => {
-      const devServerContent = fs.readFileSync(path.resolve(__dirname, '../../scripts/dev-server.ts'), 'utf8');
+      const devServerContent = loadServerContent();
 
       // Check for dead patterns in client-side script tags
       expect(devServerContent).not.toMatch(/sessionToken=\s*'\s*\+/);

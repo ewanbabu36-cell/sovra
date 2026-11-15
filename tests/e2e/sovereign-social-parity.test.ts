@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/sovereign-social-parity.test.ts
  * SOVRA BIG-TECH PARITY SUITE (Instagram Stories, WhatsApp Voice Memos, Twitter/X Trending, Biometric Shield)
@@ -28,7 +29,7 @@ import path from 'node:path';
 
 describe('SOVRA Big-Tech Parity Suite: Stories, Voice Memos, Mesh Trending & Biometric Shield', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const serverContent = fs.readFileSync(devServerPath, 'utf8');
+  const serverContent = loadServerContent(devServerPath);
 
   describe('1. Instagram & WhatsApp Stories Parity', () => {
     it('renders #sovereignStoriesBar with creator story rings and unread gradient borders', () => {

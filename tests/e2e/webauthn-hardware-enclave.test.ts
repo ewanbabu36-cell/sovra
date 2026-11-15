@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect, beforeAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +15,7 @@ describe('E2E Native WebAuthn Fingerprint / Face ID Hardware Enclave Suite (Phas
   let devServerCode: string;
 
   beforeAll(() => {
-    devServerCode = fs.readFileSync(path.resolve(__dirname, '../../scripts/dev-server.ts'), 'utf-8');
+    devServerCode = loadServerContent();
   });
 
   it('proves dev-server exposes all 5 W3C WebAuthn API endpoints', () => {

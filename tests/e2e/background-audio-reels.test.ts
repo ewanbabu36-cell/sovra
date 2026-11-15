@@ -1,10 +1,11 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
 describe('Phase 2: Background Audio, Lock-Screen MediaSession & Web Audio DSP Reels Mixer', () => {
   const devServerPath = path.resolve(process.cwd(), 'scripts/dev-server.ts');
-  const source = fs.readFileSync(devServerPath, 'utf-8');
+  const source = loadServerContent(devServerPath);
 
   it('includes Phase 2 Background Audio & Spatial Mixer Studio HTML controls', () => {
     expect(source).toContain('id="reelBgAudioToggleBtn"');

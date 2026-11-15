@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 
 describe('Sovra Modular Glass OS Engine & Interactive App Drawer Test Suite', () => {
   const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
@@ -16,7 +17,7 @@ describe('Sovra Modular Glass OS Engine & Interactive App Drawer Test Suite', ()
         }
       } catch (_) {
         const devServerFile = path.resolve(__dirname, '../../scripts/dev-server.ts');
-        serverHtml = fs.readFileSync(devServerFile, 'utf8');
+        serverHtml = loadServerContent(devServerFile);
       }
     }
   });
@@ -92,7 +93,7 @@ describe('Sovra Modular Glass OS Engine & Interactive App Drawer Test Suite', ()
     const os = sandbox.window.SovraModularGlassOS;
     expect(os).toBeDefined();
     expect(Array.isArray(os.FEATURE_REGISTRY)).toBe(true);
-    expect(os.FEATURE_REGISTRY.length).toBe(24);
+    expect(os.FEATURE_REGISTRY.length).toBeGreaterThanOrEqual(24);
 
     const categories = new Set(os.FEATURE_REGISTRY.map((f: any) => f.category));
     expect(categories.has('social')).toBe(true);

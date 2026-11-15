@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -6,7 +7,7 @@ import vm from 'node:vm';
 import { renderAdminHtml, renderAdminLoginHtml } from '../../scripts/admin-console.ts';
 
 describe('SOVRA Phase 3.8 — Admin CSP Remediation & Zero-Trust Verification (SEC-P37-01)', () => {
-  const devServerSource = fs.readFileSync(path.resolve(__dirname, '../../scripts/dev-server.ts'), 'utf8');
+  const devServerSource = loadServerContent();
 
   function injectCspNonce(html: string, nonce: string): string {
     if (!nonce) return html;

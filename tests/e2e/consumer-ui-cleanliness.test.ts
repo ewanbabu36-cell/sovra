@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -5,7 +6,7 @@ import { sovraDb } from '../../scripts/database-engine.ts';
 
 describe('Consumer Social UI Cleanliness & Admin Segregation Suite', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const content = fs.readFileSync(devServerPath, 'utf8');
+  const content = loadServerContent(devServerPath);
 
   it('proves developer ops links and raw TCP port badges are hidden in consumer CSS', () => {
     // Hidden via global CSS rules to keep pure consumer experience

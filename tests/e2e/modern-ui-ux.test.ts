@@ -1,10 +1,11 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
 describe('Modern UI/UX Design System & Smart Omnibar E2E Suite', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const content = fs.readFileSync(devServerPath, 'utf8');
+  const content = loadServerContent(devServerPath);
 
   it('verifies modernized top header features unified search bar with Ctrl+K shortcut badge', () => {
     expect(content).toContain('class="header-search-wrap"');

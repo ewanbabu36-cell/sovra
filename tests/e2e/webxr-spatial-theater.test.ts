@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,7 +8,7 @@ describe('Cycle 3: Open WebXR Spatial Hologram Theater (Meta Horizon & Vision Pr
   let content = '';
 
   it('loads dev-server template and verifies WebXR theater modal existence', () => {
-    content = fs.readFileSync(devServerPath, 'utf-8');
+    content = loadServerContent(devServerPath);
     expect(content).toContain('id="webxrTheaterModal"');
     expect(content).toContain('enterWebxrSpatialTheater');
     expect(content).toContain('exitWebxrSpatialTheater');

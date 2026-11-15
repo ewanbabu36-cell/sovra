@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/webrtc-call-camera-flip-and-incall-chat.test.ts
  * SOVRA WEBRTC CALL CAMERA FLIP, IN-CALL CHAT DRAWER & OFFLINE BLE MESH TEST SUITE
@@ -18,7 +19,7 @@ import * as path from 'path';
 
 describe('WebRTC Call Camera Flip, In-Call Chat & Offline BLE Mesh Integrity', () => {
   const devServerPath = path.resolve(process.cwd(), 'scripts/dev-server.ts');
-  const devServerContent = fs.readFileSync(devServerPath, 'utf8');
+  const devServerContent = loadServerContent(devServerPath);
 
   it('contains camera flip UI button and handler for E2EE video calling', () => {
     // E2EE Call Modal Flip Camera button

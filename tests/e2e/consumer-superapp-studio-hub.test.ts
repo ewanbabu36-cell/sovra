@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/consumer-superapp-studio-hub.test.ts
  * SOVRA CONSUMER SUPER APP, CREATOR STUDIO PRO & HUB SUITE
@@ -22,7 +23,7 @@ import { sovraDb } from '../../scripts/database-engine.ts';
 
 describe('SOVRA Consumer Super App, Creator Studio Pro & Hub Architecture', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const serverContent = fs.readFileSync(devServerPath, 'utf8');
+  const serverContent = loadServerContent(devServerPath);
 
   it('1. Core 5-Pillar Navigation: establishes unified 5-pillar navigation across Rail, Dock and Drawer', () => {
     // 1.1 Desktop Rail Navigation contains the 5 pillars

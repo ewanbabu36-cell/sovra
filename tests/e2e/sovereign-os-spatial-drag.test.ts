@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/sovereign-os-spatial-drag.test.ts
  * 👑 SOVRA ANDROID SPATIAL OS — DRAWER-TO-HOME DRAG & DROP, CONTEXT MENU, FOLDERS & JIGGLE UNPIN ENGINE
@@ -42,7 +43,7 @@ describe('👑 Sovra Android Spatial OS: Drag & Drop, App Folders, Context Menu 
       }
     } catch (_) {
       const devServerFile = path.resolve(__dirname, '../../scripts/dev-server.ts');
-      serverHtml = fs.readFileSync(devServerFile, 'utf8');
+      serverHtml = loadServerContent(devServerFile);
     }
   });
 

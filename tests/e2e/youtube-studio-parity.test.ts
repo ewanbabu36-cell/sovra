@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/youtube-studio-parity.test.ts
  * 100% YOUTUBE STUDIO FLAGSHIP FEATURE PARITY FOR SOVRA
@@ -25,7 +26,7 @@ import { handleStudioRoutes } from '../../scripts/routes/studio.routes.ts';
 describe('100% YouTube Studio Flagship Parity Verification Suite', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
   const studioRoutesPath = path.resolve(__dirname, '../../scripts/routes/studio.routes.ts');
-  const serverContent = fs.readFileSync(devServerPath, 'utf8');
+  const serverContent = loadServerContent(devServerPath);
   const studioRoutesContent = fs.readFileSync(studioRoutesPath, 'utf8');
 
   const testCreatorDid = 'did:sovra:creator_studio_test_did';

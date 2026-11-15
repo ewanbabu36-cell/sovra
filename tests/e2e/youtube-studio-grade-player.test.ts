@@ -1,3 +1,4 @@
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 /**
  * @file tests/e2e/youtube-studio-grade-player.test.ts
  * SOVRA YOUTUBE STUDIO GRADE WATCH & REELS PLAYER VERIFICATION SUITE
@@ -17,7 +18,7 @@ import path from 'node:path';
 
 describe('Sovra YouTube Studio Grade Watch & Reels Player Suite', () => {
   const devServerPath = path.resolve(__dirname, '../../scripts/dev-server.ts');
-  const content = fs.readFileSync(devServerPath, 'utf8');
+  const content = loadServerContent(devServerPath);
 
   it('1. Smooth loading skeleton bars: verifies Watch & Reels shimmer skeleton overlays and helpers', () => {
     // Watch skeleton markup

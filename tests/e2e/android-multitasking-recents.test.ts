@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadServerContent } from '../helpers/test-source-loader.ts';
 
 describe('Sovra Android Smartphone Multitasking & Recents Overview Test Suite', () => {
   const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
@@ -16,7 +17,7 @@ describe('Sovra Android Smartphone Multitasking & Recents Overview Test Suite', 
         }
       } catch (_) {
         const devServerFile = path.resolve(__dirname, '../../scripts/dev-server.ts');
-        serverHtml = fs.readFileSync(devServerFile, 'utf8');
+        serverHtml = loadServerContent(devServerFile);
       }
     }
   });
@@ -80,7 +81,11 @@ describe('Sovra Android Smartphone Multitasking & Recents Overview Test Suite', 
         removeItem(key: string) { delete this._store[key]; }
       },
       localStorage: {
-        _store: {} as Record<string, string>,
+        _store: {
+          sovra_auth_active: 'true',
+          sovra_explicit_os_mode: 'home',
+          sovra_user_profile: JSON.stringify({ did: 'did:sovra:tester', handle: '@tester' })
+        } as Record<string, string>,
         getItem(key: string) { return this._store[key] || null; },
         setItem(key: string, val: string) { this._store[key] = String(val); },
         removeItem(key: string) { delete this._store[key]; }
