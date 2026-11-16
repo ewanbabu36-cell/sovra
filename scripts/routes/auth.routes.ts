@@ -1281,16 +1281,29 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
           recoveryPhraseSalt: recSalt,
           balanceSov: 500.0,
         });
-      } else if (!user.sessionToken) {
+      } else {
+        const oldToken = user.sessionToken;
         const newToken = 'stk_' + crypto.randomBytes(24).toString('hex');
         user.sessionToken = newToken;
         sovraDb.upsertUser(user);
+
+        if (oldToken) {
+          sovraDb.revokeToken(oldToken, 'Emergency restore on new device');
+        }
+        if (parsed.revokeOthers) {
+          sovraDb.revokeAllOtherSessions(user.did, newToken);
+        }
       }
 
+      const isSecureRestore = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'Referrer-Policy': 'no-referrer',
         'X-Content-Type-Options': 'nosniff',
+        'Set-Cookie': [
+          `sovra_session=${encodeURIComponent(user.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureRestore ? '; Secure' : ''}`,
+          `sovra_session_token=${encodeURIComponent(user.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureRestore ? '; Secure' : ''}`,
+        ],
       });
       res.end(JSON.stringify({
         ok: true,

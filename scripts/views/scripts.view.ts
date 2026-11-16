@@ -12088,6 +12088,74 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     }
     window.loginAsDefaultHost = loginAsDefaultHost;
 
+    function openEmergencyRestoreModal() {
+      var modal = document.getElementById('emergencyRestoreModal');
+      if (modal) modal.style.display = 'flex';
+      var input = document.getElementById('emergencyPhraseInput');
+      if (input) setTimeout(function() { input.focus(); }, 150);
+    }
+    window.openEmergencyRestoreModal = openEmergencyRestoreModal;
+
+    function closeEmergencyRestoreModal() {
+      var modal = document.getElementById('emergencyRestoreModal');
+      if (modal) modal.style.display = 'none';
+    }
+    window.closeEmergencyRestoreModal = closeEmergencyRestoreModal;
+
+    async function submitEmergencyRestore() {
+      var input = document.getElementById('emergencyPhraseInput');
+      var phrase = input ? input.value.trim() : '';
+      if (!phrase) {
+        showAccountToast('⚠️ Please enter your 12-word recovery phrase.');
+        return;
+      }
+      var words = phrase.split(/\s+/).filter(Boolean);
+      if (words.length < 12) {
+        showAccountToast('⚠️ Recovery phrase must contain at least 12 words.');
+        return;
+      }
+      var revokeOthers = Boolean(document.getElementById('emergencyRevokeOthersCheck') && (document.getElementById('emergencyRevokeOthersCheck') as HTMLInputElement).checked);
+      var btn = document.getElementById('emergencySubmitBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Restoring Identity... ⏳';
+      }
+
+      try {
+        var res = await fetch('/api/user/restore-mnemonic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recoveryPhrase: phrase, revokeOthers: revokeOthers })
+        });
+        var data = await res.json();
+        if (data && data.ok) {
+          closeEmergencyRestoreModal();
+          completeLoginSuccess(data.user, data.sessionToken, false);
+          showAccountToast('🎉 Sovereign identity restored! Welcome back, ' + (data.user.displayName || data.user.handle) + '!', 'success');
+          if (window.isSecureContext && window.PublicKeyCredential) {
+            setTimeout(function() {
+              if (confirm('Activate ' + (data.user.handle) + ' on this phone with Fingerprint / Face ID for instant 1-tap logins?')) {
+                triggerUniversalBiometricTouch();
+              }
+            }, 800);
+          }
+        } else {
+          showAccountToast('⚠️ ' + (data.error || 'Restore failed. Please verify your 12 words.'));
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = '✓ Restore Account & Activate Device';
+          }
+        }
+      } catch (err: any) {
+        showAccountToast('Network error restoring account: ' + (err.message || err));
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = '✓ Restore Account & Activate Device';
+        }
+      }
+    }
+    window.submitEmergencyRestore = submitEmergencyRestore;
+
     async function autoRegisterAndLogin(handle, pin) {
       const errBox = document.getElementById('womLoginErrorMsg');
       const btn = document.getElementById('womLoginSubmitBtn');
