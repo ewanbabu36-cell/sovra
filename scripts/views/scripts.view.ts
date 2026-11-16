@@ -46,16 +46,37 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     var _knownHandleDids = ${safeJsonForScript(Object.fromEntries(sovraDb.getAllUsers().map(u => [u.handle.toLowerCase(), u.did])))};
     var _knownUserTokens = ${safeJsonForScript(Object.fromEntries(sovraDb.getAllUsers().filter(u => u.sessionToken).map(u => [u.did, u.sessionToken])))};
 
-    // SESS-02: Purge any legacy session tokens from localStorage
+    // SESS-02: Purge legacy or logged-out session artifacts from localStorage
     try {
-      localStorage.removeItem('sovra_session_token');
+      if (localStorage.getItem('sovra_logged_out') === 'true') {
+        localStorage.removeItem('sovra_session_token');
+        localStorage.removeItem('sovra_admin_token');
+        localStorage.removeItem('sovra_auth_active');
+      }
       localStorage.removeItem('sovra_session_token_enc');
-      localStorage.removeItem('sovra_admin_token');
     } catch(e) {}
 
     window.getEffectiveSessionToken = function() {
-      // Browser authentication is mediated securely via HttpOnly cookies
-      // No raw bearer tokens are returned or read from localStorage
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('sovra_logged_out') === 'true') {
+        return '';
+      }
+      if (typeof myProfile !== 'undefined' && myProfile && myProfile.sessionToken) {
+        return myProfile.sessionToken;
+      }
+      if (typeof localStorage !== 'undefined') {
+        var token = localStorage.getItem('sovra_session_token');
+        if (token) return token;
+        try {
+          var saved = localStorage.getItem('sovra_user_profile');
+          if (saved) {
+            var parsed = JSON.parse(saved);
+            if (parsed && parsed.sessionToken) return parsed.sessionToken;
+          }
+        } catch(e) {}
+      }
+      if (typeof window !== 'undefined' && window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) {
+        return window.SOVRA_HOST_SESSION.token;
+      }
       return '';
     };
 
@@ -687,9 +708,13 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     var currentReelIndex = 0;
     try {
       var _storedProfile = localStorage.getItem('sovra_user_profile');
-      if (_storedProfile) {
+      var _isLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
+      if (_storedProfile && !_isLoggedOut) {
         myProfile = JSON.parse(_storedProfile);
         if (myProfile) {
+          window.myProfile = myProfile;
+          try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+          try { localStorage.setItem('sovra_auth_active', 'true'); } catch(e) {}
           if (myProfile.handle) {
             var _cleanH = (myProfile.handle.startsWith('@') ? myProfile.handle : '@' + myProfile.handle).toLowerCase();
             if (_knownHandleDids && _knownHandleDids[_cleanH] && myProfile.did !== _knownHandleDids[_cleanH]) {
@@ -698,7 +723,6 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
           if (_knownUserTokens && myProfile.did && _knownUserTokens[myProfile.did]) {
             myProfile.sessionToken = _knownUserTokens[myProfile.did];
-            try { localStorage.setItem('sovra_auth_active', 'true'); } catch(e) {}
           }
           try { localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile)); } catch(e) {}
         }
@@ -10307,10 +10331,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       } catch (e) {}
 
       if (myProfile) {
-        const activeSavedToken = localStorage.getItem('sovra_session_token');
-        if ((!activeSavedToken || activeSavedToken === 'undefined' || activeSavedToken === 'null') && myProfile.sessionToken) {
-          try { localStorage.setItem('sovra_auth_active', 'true'); } catch(e) {}
-        }
+        window.myProfile = myProfile;
+        try { localStorage.setItem('sovra_auth_active', 'true'); } catch(e) {}
       }
     } else {
       myProfile = null;
@@ -11276,6 +11298,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       try {
         try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
         try { localStorage.removeItem('sovra_logged_out'); } catch(e) {}
+        try { localStorage.setItem('sovra_auth_active', 'true'); } catch(e) {}
         const appLayout = document.querySelector('.app-layout');
         if (appLayout) appLayout.classList.remove('app-hidden');
         const bottomNav = document.querySelector('.mobile-bottom-nav');
@@ -11758,6 +11781,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     window.enterAsGuest = enterAsGuest;
 
     function loginAsDefaultHost() {
+      try {
+        localStorage.removeItem('sovra_logged_out');
+        localStorage.setItem('sovra_auth_active', 'true');
+      } catch(e) {}
       var handleInput = document.getElementById('womLoginHandleInput');
       var pinInput = document.getElementById('womLoginPinInput');
       if (handleInput) handleInput.value = '@laptop_host';
@@ -12096,10 +12123,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       }
 
       const isExplicitlyLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
-      const sessionToken = localStorage.getItem('sovra_session_token');
       const savedProfile = localStorage.getItem('sovra_user_profile');
+      const sessionToken = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
 
-      if (isExplicitlyLoggedOut || !sessionToken || !savedProfile) {
+      if (isExplicitlyLoggedOut || !savedProfile) {
         myProfile = null;
         currentUserHandle = '@guest';
         updateUserDisplayInUI();
@@ -12110,78 +12137,138 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         return;
       }
 
+      // Restore active user profile immediately to eliminate any UI flicker
+      try {
+        myProfile = JSON.parse(savedProfile);
+        if (sessionToken && !myProfile.sessionToken) {
+          myProfile.sessionToken = sessionToken;
+        }
+        currentUserHandle = myProfile.handle || (myProfile.name ? ('@' + myProfile.name.toLowerCase().replace(/\s+/g, '_')) : '@guest');
+        window.myProfile = myProfile;
+        try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+        showAuthenticatedAppView();
+        updateUserDisplayInUI();
+      } catch (e) {
+        myProfile = null;
+        currentUserHandle = '@guest';
+        updateUserDisplayInUI();
+        showAuthLandingGate(true);
+        return;
+      }
+
+      const _meDidParam = (myProfile && myProfile.did) ? ('?did=' + encodeURIComponent(myProfile.did)) : '';
+      const _meHandleParam = (myProfile && myProfile.handle) ? ((_meDidParam ? '&' : '?') + 'handle=' + encodeURIComponent(myProfile.handle)) : '';
+      const meHeaders = {};
       if (sessionToken) {
-        const _meDidParam = (myProfile && myProfile.did) ? ('?did=' + encodeURIComponent(myProfile.did)) : '';
-        const _meHandleParam = (myProfile && myProfile.handle) ? ((_meDidParam ? '&' : '?') + 'handle=' + encodeURIComponent(myProfile.handle)) : '';
-        fetch('/api/user/me' + _meDidParam + _meHandleParam, {
-          credentials: 'same-origin',
-          headers: { 'Authorization': 'Bearer ' + sessionToken }
-        })
-          .then(r => r.json())
-          .then(data => {
-            if (data.ok && data.user) {
-              myProfile = data.user;
-              currentUserHandle = myProfile.handle;
-              try {
-                localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-                localStorage.removeItem('sovra_logged_out');
-              } catch(e) {}
-              showAuthenticatedAppView();
-              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
-          window.SovraAndroidOS.openApp('feed');
-        } else if (typeof switchTab === 'function') {
-          switchTab('feed');
-        } else {
-          routeByRespectedProfileRole(myProfile.role);
-              }
-              if (typeof fetchNotifications === 'function') fetchNotifications();
-              if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
-              if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
-              if (typeof fetchAndRenderStories === 'function') fetchAndRenderStories();
-              // Register heartbeat with server
-              registerPeerOnLan(myProfile);
-            } else {
-              myProfile = null;
-              currentUserHandle = '@guest';
-              localStorage.removeItem('sovra_user_profile');
-              localStorage.removeItem('sovra_session_token');
-              updateUserDisplayInUI();
-              showAuthLandingGate(true);
-              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
-                window.SovraAndroidOS.goHome();
-              }
+        meHeaders['Authorization'] = 'Bearer ' + sessionToken;
+      }
+      fetch('/api/user/me' + _meDidParam + _meHandleParam, {
+        credentials: 'same-origin',
+        headers: meHeaders
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok && data.user) {
+            myProfile = Object.assign({}, myProfile, data.user);
+            if (sessionToken && !myProfile.sessionToken) {
+              myProfile.sessionToken = sessionToken;
             }
-          })
-          .catch(() => {
+            window.myProfile = myProfile;
+            currentUserHandle = myProfile.handle;
+            try {
+              localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+              localStorage.removeItem('sovra_logged_out');
+              localStorage.setItem('sovra_auth_active', 'true');
+            } catch(e) {}
+            try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+            showAuthenticatedAppView();
+            updateUserDisplayInUI();
+            if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+              window.SovraAndroidOS.openApp('feed');
+            } else if (typeof switchTab === 'function') {
+              switchTab('feed');
+            } else {
+              routeByRespectedProfileRole(myProfile.role);
+            }
+            if (typeof fetchNotifications === 'function') fetchNotifications();
+            if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
+            if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
+            if (typeof fetchAndRenderStories === 'function') fetchAndRenderStories();
+            // Register heartbeat with server
+            registerPeerOnLan(myProfile);
+          } else {
+            // Explicit session revocation fallback: keep local profile alive if available
             if (savedProfile && !isExplicitlyLoggedOut) {
               try {
                 myProfile = JSON.parse(savedProfile);
+                window.myProfile = myProfile;
                 currentUserHandle = myProfile.handle;
+                try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
                 showAuthenticatedAppView();
+                updateUserDisplayInUI();
                 if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
-          window.SovraAndroidOS.openApp('feed');
-        } else if (typeof switchTab === 'function') {
-          switchTab('feed');
-        } else {
-          routeByRespectedProfileRole(myProfile.role);
+                  window.SovraAndroidOS.openApp('feed');
+                } else if (typeof switchTab === 'function') {
+                  switchTab('feed');
+                } else {
+                  routeByRespectedProfileRole(myProfile.role);
                 }
               } catch(e) {
+                myProfile = null;
+                currentUserHandle = '@guest';
+                localStorage.removeItem('sovra_user_profile');
+                localStorage.removeItem('sovra_session_token');
+                localStorage.removeItem('sovra_auth_active');
+                localStorage.setItem('sovra_logged_out', 'true');
+                updateUserDisplayInUI();
                 showAuthLandingGate(true);
                 if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
                   window.SovraAndroidOS.goHome();
                 }
               }
             } else {
+              myProfile = null;
+              currentUserHandle = '@guest';
+              localStorage.removeItem('sovra_user_profile');
+              localStorage.removeItem('sovra_session_token');
+              localStorage.removeItem('sovra_auth_active');
+              localStorage.setItem('sovra_logged_out', 'true');
+              updateUserDisplayInUI();
               showAuthLandingGate(true);
               if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
                 window.SovraAndroidOS.goHome();
               }
             }
-          });
-      } else {
-        updateUserDisplayInUI();
-        showAuthLandingGate(true);
-      }
+          }
+        })
+        .catch(() => {
+          if (savedProfile && !isExplicitlyLoggedOut) {
+            try {
+              myProfile = JSON.parse(savedProfile);
+              currentUserHandle = myProfile.handle;
+              try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+              showAuthenticatedAppView();
+              updateUserDisplayInUI();
+              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
+                window.SovraAndroidOS.openApp('feed');
+              } else if (typeof switchTab === 'function') {
+                switchTab('feed');
+              } else {
+                routeByRespectedProfileRole(myProfile.role);
+              }
+            } catch(e) {
+              showAuthLandingGate(true);
+              if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+                window.SovraAndroidOS.goHome();
+              }
+            }
+          } else {
+            showAuthLandingGate(true);
+            if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
+              window.SovraAndroidOS.goHome();
+            }
+          }
+        });
 
       if (!isSovraAppInstalled()) {
         setTimeout(function() {
@@ -14040,6 +14127,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     }
 
     function closeOnboardingModal() {
+      if (!myProfile || !myProfile.sessionToken) {
+        showAccountToast('⚠️ Please create an account or sign in to enter Sovra.');
+        return;
+      }
       closeOnboardingModalAndEnter();
     }
     window.closeOnboardingModal = closeOnboardingModal;
@@ -56348,10 +56439,10 @@ window.SovraCreatorStudioEngine = {
           if (rawMode === 'app' || rawMode === 'home') {
             currentMode = rawMode;
           } else {
-            currentMode = 'home';
+            currentMode = (typeof isUserAuthenticated === 'function' && isUserAuthenticated()) ? 'app' : 'home';
           }
         } catch (_) {
-          currentMode = 'home';
+          currentMode = (typeof isUserAuthenticated === 'function' && isUserAuthenticated()) ? 'app' : 'home';
         }
       }
 
@@ -58077,7 +58168,7 @@ window.SovraCreatorStudioEngine = {
         refreshTelemetry();
 
         // 🌟 Social Media First: If user is authenticated or has active session, boot directly into feed
-        if (typeof isUserAuthenticated === 'function' && isUserAuthenticated() && typeof localStorage !== 'undefined' && localStorage.getItem('sovra_session_token')) {
+        if (typeof isUserAuthenticated === 'function' && isUserAuthenticated()) {
           const explicitChoice = localStorage.getItem('sovra_explicit_os_mode');
           if (explicitChoice !== 'home') {
             if (typeof openApp === 'function') openApp('feed');

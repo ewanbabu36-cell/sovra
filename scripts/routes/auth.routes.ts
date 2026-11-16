@@ -1087,9 +1087,11 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     let user: any = null;
     if (did) {
       user = sovraDb.findUserByDid(did);
-    } else if (handle) {
+    }
+    if (!user && handle) {
       user = sovraDb.findUserByHandle(handle);
-    } else if (principal) {
+    }
+    if (!user && principal) {
       user = sovraDb.findUserByDid(principal.did);
     }
     if (!user && (did || handle)) {

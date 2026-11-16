@@ -231,8 +231,16 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         var isLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
         var sessionToken = localStorage.getItem('sovra_session_token');
         var savedProfile = localStorage.getItem('sovra_user_profile');
-        if (isLoggedOut || !sessionToken || !savedProfile) {
+        var isAuthActive = localStorage.getItem('sovra_auth_active') === 'true';
+        if (isLoggedOut || !savedProfile) {
           document.documentElement.classList.add('sovra-unauthenticated');
+        } else {
+          document.documentElement.classList.remove('sovra-unauthenticated');
+          if (document.body) {
+            document.body.classList.remove('sovra-mode-home');
+            document.body.classList.add('sovra-mode-app', 'tab-active-feed');
+            document.body.setAttribute('data-active-tab', 'feed');
+          }
         }
       } catch(e) {}
     })();

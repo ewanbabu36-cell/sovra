@@ -8,6 +8,10 @@ describe('Multi-Device Sovereign Landing & Authentication Gate Suite', () => {
   let devServerCode: string;
 
   beforeAll(() => {
+    if (!process.env.SOVRA_THROTTLE_SECRET) {
+      process.env.SOVRA_THROTTLE_SECRET = 'e9f0c2a87d4b1e5f8a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a';
+    }
+    sovraDb.loadThrottleSecrets();
     devServerCode = loadServerContent();
   });
 
