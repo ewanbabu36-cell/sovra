@@ -13466,8 +13466,13 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         m.style.display = 'flex';
       }
       clearDeviceLinkNotice();
-      switchDeviceLinkTab('qr');
-      refreshDeviceLinkTicket();
+      var isAuth = (typeof isUserAuthenticated === 'function') ? isUserAuthenticated() : Boolean(myProfile && myProfile.did);
+      if (isAuth) {
+        switchDeviceLinkTab('qr');
+        refreshDeviceLinkTicket();
+      } else {
+        switchDeviceLinkTab('enter');
+      }
     }
 
     function closeDeviceLinkModal() {

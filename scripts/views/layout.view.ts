@@ -10261,9 +10261,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <!-- TAB 2: CLAIM TICKET (SECONDARY DEVICE VIEW) -->
       <div id="deviceLinkEnterPane" style="display: none;">
-        <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 1rem 0;">
-          Enter the ephemeral pairing ticket shown on your primary device to authenticate this companion session.
+        <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 0.85rem 0;">
+          Enter the ephemeral pairing ticket shown on your primary device to authenticate this companion session with zero passwords.
         </p>
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 10px 12px; margin-bottom: 1rem; font-size: 0.76rem; color: #93c5fd; line-height: 1.45;">
+          📱 <strong>On your primary phone:</strong> Open Sovra ➔ Tap Profile / Settings ➔ Select <em>"📲 Link Device via QR"</em> ➔ Copy the ticket code or scan!
+        </div>
 
         <div style="margin-bottom: 0.75rem;">
           <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">PAIRING TICKET CODE</label>
