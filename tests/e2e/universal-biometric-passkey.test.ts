@@ -140,4 +140,47 @@ describe('Universal 1-Tap Biometric Passkey & Auto-Handle Suite', () => {
     expect(loginRes.ok).toBe(true);
     expect(loginRes.sessionToken).toBeTruthy();
   });
+
+  it('6. Emergency Disaster Recovery: Restores identity from 12 words on new phone and revokes stolen phone session', () => {
+    const rawPhrase = 'abandon ability able about above absent absorb abstract absurd abuse access accident';
+    const did = `did:sovra:pioneer_${crypto.randomBytes(6).toString('hex')}`;
+    const handle = `@pioneer_${crypto.randomBytes(3).toString('hex')}`;
+    const oldStolenToken = 'stk_old_stolen_' + crypto.randomBytes(16).toString('hex');
+    const { hash: recHash, salt: recSalt } = sovraDb.hashRecoveryPhrase(rawPhrase);
+
+    // Initial user created on old phone
+    const user = sovraDb.createUser({
+      did,
+      handle,
+      name: 'Original Pioneer',
+      displayName: 'Original Pioneer',
+      role: 'peer',
+      sessionToken: oldStolenToken,
+      recoveryPhrase: rawPhrase,
+      recoveryPhraseHash: recHash,
+      recoveryPhraseSalt: recSalt,
+    });
+    expect(user).toBeDefined();
+
+    // Verify recovery verification by phrase
+    const userToRecover = sovraDb.findUserByDid(did);
+    expect(userToRecover).toBeDefined();
+    expect(sovraDb.verifyRecoveryPhrase(rawPhrase, userToRecover!.recoveryPhraseHash!, userToRecover!.recoveryPhraseSalt!)).toBe(true);
+
+    // User gets a new phone after old phone is stolen:
+    const newPhoneToken = 'stk_new_phone_' + crypto.randomBytes(16).toString('hex');
+    userToRecover!.sessionToken = newPhoneToken;
+    sovraDb.upsertUser(userToRecover!);
+
+    // Revoke old stolen token & any active sessions
+    sovraDb.revokeToken(oldStolenToken, 'Old phone stolen');
+    sovraDb.revokeAllOtherSessions(userToRecover!.did, newPhoneToken);
+
+    // Old token MUST now be revoked
+    expect(sovraDb.isSessionRevoked(oldStolenToken)).toBe(true);
+
+    // New phone token is valid and active
+    expect(sovraDb.isSessionRevoked(newPhoneToken)).toBe(false);
+    expect(sovraDb.findUserByDid(did)?.sessionToken).toBe(newPhoneToken);
+  });
 });

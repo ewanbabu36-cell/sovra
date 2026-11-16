@@ -11446,6 +11446,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <button type="button" id="womBiometricLoginBtn" onclick="triggerWebAuthnBiometricLogin()" style="width: 100%; padding: 0.8rem; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; color: #38bdf8; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease;">
               <span style="font-size: 1.15rem;">👆</span> <span>Sign In with Fingerprint / Face ID</span>
             </button>
+            <button type="button" id="womEmergencyRestoreBtn" onclick="openEmergencyRestoreModal()" style="width: 100%; margin-top: 8px; padding: 0.68rem; background: rgba(168, 85, 247, 0.1); border: 1px dashed rgba(168, 85, 247, 0.4); border-radius: 12px; color: #c084fc; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease;">
+              <span>🆘</span> <span>Lost / Broken Old Phone? Restore with 12 Words</span>
+            </button>
           </div>
 
           <!-- TAB A: REGISTER (New User) -->
@@ -11686,6 +11689,38 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
       </div>
+    </div>
+  </div>
+
+  <!-- 🆘 EMERGENCY ACCOUNT RESTORE MODAL (Lost/Broken/Stolen Phone Recovery) -->
+  <div id="emergencyRestoreModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(5, 8, 16, 0.92); backdrop-filter: blur(20px); z-index: 1000000; align-items: center; justify-content: center; padding: 1.25rem;">
+    <div style="background: #0f172a; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 24px; max-width: 480px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.85); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div style="font-size: 1.2rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; color: #c084fc;">
+          <span>🆘</span> <span>Restore Sovereign Account</span>
+        </div>
+        <button onclick="closeEmergencyRestoreModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; padding: 4px;" aria-label="Close modal">✕</button>
+      </div>
+      
+      <p style="font-size: 0.84rem; color: #94a3b8; line-height: 1.5; margin: 0 0 1.25rem 0;">
+        If your old phone was broken, lost, or stolen, enter your <b>12-word master recovery phrase</b> below to permanently restore your handle, balance, and identity on this new device.
+      </p>
+
+      <div style="margin-bottom: 1.2rem; text-align: left;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 6px;">12-Word Master Recovery Phrase</label>
+        <textarea id="emergencyPhraseInput" placeholder="word1 word2 word3 ... word12" rows="3" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #f8fafc; font-family: monospace; font-size: 0.85rem; padding: 10px 12px; resize: none; outline: none;"></textarea>
+      </div>
+
+      <div style="margin-bottom: 1.25rem; display: flex; align-items: flex-start; gap: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 10px 12px;">
+        <input type="checkbox" id="emergencyRevokeOthersCheck" checked style="margin-top: 3px; cursor: pointer;">
+        <label for="emergencyRevokeOthersCheck" style="font-size: 0.78rem; color: #fca5a5; line-height: 1.4; cursor: pointer;">
+          <strong>Revoke Old / Stolen Devices:</strong> Immediately terminate sessions and block the lost device from accessing this account.
+        </label>
+      </div>
+
+      <button id="emergencySubmitBtn" onclick="submitEmergencyRestore()" style="width: 100%; padding: 0.95rem; background: linear-gradient(135deg, #9333ea, #4f46e5); color: #fff; border: none; border-radius: 14px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 8px 20px -4px rgba(147, 51, 234, 0.45);">
+        <span>✓ Restore Account &amp; Activate Device</span>
+      </button>
     </div>
   </div>
 

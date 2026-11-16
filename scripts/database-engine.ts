@@ -3107,12 +3107,12 @@ export class SovraDatabaseEngine {
     const normInput = phrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
     if (!normInput) return undefined;
     return this.db.users.find(u => {
-      if (u.recoveryPhraseHash && u.recoveryPhraseSalt) {
-        return this.verifyRecoveryPhrase(normInput, u.recoveryPhraseHash, u.recoveryPhraseSalt);
-      }
       if (u.recoveryPhrase) {
         const normStored = u.recoveryPhrase.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
-        return normStored === normInput;
+        if (normStored === normInput) return true;
+      }
+      if (u.recoveryPhraseHash && u.recoveryPhraseSalt) {
+        return this.verifyRecoveryPhrase(normInput, u.recoveryPhraseHash, u.recoveryPhraseSalt);
       }
       return false;
     });
