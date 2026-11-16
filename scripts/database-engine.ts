@@ -2515,7 +2515,54 @@ export class SovraDatabaseEngine {
             : [],
           contacts_and_peers: Array.isArray(parsed.contacts_and_peers) ? parsed.contacts_and_peers : [],
           chatMessages: Array.isArray(parsed.chatMessages) ? parsed.chatMessages : [],
-          posts: Array.isArray(parsed.posts) ? parsed.posts : [],
+          posts: (() => {
+            const rawList = Array.isArray(parsed.posts) ? parsed.posts : [];
+            const badPatterns = [
+              'Hello from sovereign node Bob!',
+              'KILL AND EXPLOIT',
+              'Adversarial post',
+              'Alice Secret Vault Key',
+              'Bench test post',
+              'Confidential footage',
+              'Quorum test post',
+              'Sybil test post',
+              'COI test post',
+              'Defense test post',
+              'Epoch test post',
+              'Post past voting deadline',
+              'Post to be removed then appealed',
+              'Controversial political debate',
+              'Flagrant violation post',
+              'Post for testing report consolidation',
+              'Sovereign broadcast via /api/publish',
+              'Legitimate Post from Authenticated User',
+              'Post submitted for jury testing',
+              'Flagged content subject to full moderation lifecycle',
+              'Full Audit Test Video',
+              'High risk content under test',
+              'Privacy test post'
+            ];
+            const seenCaptions = new Set<string>();
+            const cleaned: FeedPostRecord[] = [];
+            for (const p of rawList) {
+              if (!p || !p.id) continue;
+              const cap = (p.caption || '').trim();
+              if (!cap && p.id.startsWith('p2p-')) continue;
+              let isSpam = false;
+              for (const pat of badPatterns) {
+                if (cap.includes(pat)) { isSpam = true; break; }
+              }
+              if (isSpam) continue;
+              // Deduplicate identical repetitive posts
+              if (cap && seenCaptions.has(cap)) continue;
+              if (cap) seenCaptions.add(cap);
+              cleaned.push(p);
+            }
+            if (cleaned.length === 0) {
+              return this.getSeedPosts();
+            }
+            return cleaned;
+          })(),
           channels: (() => {
             const list = Array.isArray(parsed.channels) ? parsed.channels : this.db.channels;
             const seenIds = new Set<string>();
@@ -9934,7 +9981,7 @@ export class SovraDatabaseEngine {
   // ==========================================
 
   public getSeedPosts(): FeedPostRecord[] {
-    return [];
+    return this._unusedSeedPosts();
   }
 
   private _unusedSeedPosts(): FeedPostRecord[] {
