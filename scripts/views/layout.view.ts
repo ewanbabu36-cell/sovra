@@ -960,6 +960,17 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     <!-- Tab 1: Instagram Main Feed (Stories, Photo Stream, Double-Tap Hearts) -->
     <main class="main-content" id="feed-view" style="display: flex;">
       <div class="feed-container" id="feedStreamContainer">
+        <!-- 🌟 PROMPT TO CLAIM PERMANENT HANDLE (Visible for auto-generated IDs like @sovra_xxxx) -->
+        <div id="sovraClaimHandleBanner" style="display: none; background: linear-gradient(135deg, rgba(14, 165, 233, 0.18), rgba(99, 102, 241, 0.22)); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.25);">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: #f8fafc; font-weight: 600;">
+            <span style="font-size: 1.1rem;">✨</span>
+            <span id="sovraClaimHandleBannerText">Welcome! Your temporary ID is active.</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button type="button" onclick="openClaimHandleModal()" style="background: linear-gradient(135deg, #0284c7, #6366f1); color: #fff; border: none; border-radius: 8px; padding: 6px 12px; font-weight: 700; font-size: 0.78rem; cursor: pointer; white-space: nowrap;">Claim Handle</button>
+            <button type="button" onclick="document.getElementById('sovraClaimHandleBanner').style.display='none'" style="background: none; border: none; color: #94a3b8; font-size: 0.95rem; cursor: pointer; padding: 2px 4px;">✕</button>
+          </div>
+        </div>
         <!-- Native Mobile Pull-to-Refresh Spring Indicator -->
         <div id="feedPullToRefreshIndicator" style="display: flex; align-items: center; justify-content: center; height: 0px; max-height: 70px; overflow: hidden; transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; opacity: 0; pointer-events: none; margin-bottom: 4px;">
           <div style="display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 9999px; padding: 6px 14px; box-shadow: 0 4px 18px rgba(0,0,0,0.4);">
@@ -9697,6 +9708,33 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
   </div>
 
+  <!-- 🏷️ CLAIM PERMANENT HANDLE MODAL -->
+  <div id="claimHandleModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(14px); z-index: 100001; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.14); border-radius: 24px; max-width: 440px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center; position: relative;">
+      <div style="display: flex; justify-content: flex-end; margin-bottom: -0.5rem;">
+        <button type="button" onclick="closeClaimHandleModal()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.9rem;" title="Close">✕</button>
+      </div>
+      <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 0.75rem auto;">
+        ✨
+      </div>
+      <h3 style="font-size: 1.3rem; font-weight: 800; margin: 0 0 0.25rem 0;">Personalize Your Username</h3>
+      <p style="font-size: 0.8rem; color: #94a3b8; margin: 0 0 1.25rem 0; line-height: 1.4;">
+        Replace your temporary ID with your real name or alias. Your cryptographic keys &amp; balance will stay 100% intact.
+      </p>
+      <div style="text-align: left; margin-bottom: 1rem;">
+        <label style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Choose Sovereign Handle</label>
+        <div style="position: relative;">
+          <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
+          <input type="text" id="claimHandleInput" placeholder="your_name" oninput="checkClaimHandleAvailability()" onkeydown="if(event.key==='Enter'){event.preventDefault();executeClaimHandle();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+        </div>
+        <div id="claimHandleFeedback" style="font-size: 0.72rem; color: #94a3b8; margin-top: 5px;">Type letters, numbers, or underscores (e.g. rahul)</div>
+      </div>
+      <button type="button" id="btnSubmitClaimHandle" onclick="executeClaimHandle()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #0284c7, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.92rem; cursor: pointer;">
+        Save &amp; Claim Username
+      </button>
+    </div>
+  </div>
+
   <!-- ⚙️ 2. ACCOUNT LIFECYCLE & REMOTE LOGOUT MODAL -->
   <div id="accountLifecycleModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(14px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;">
     <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; max-width: 470px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;">
@@ -11333,6 +11371,21 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             Sovereign Social &amp; Creator Network
           </p>
 
+          <!-- 🌟 HERO 1-TAP UNIVERSAL BIOMETRIC PASSKEY GATE -->
+          <button type="button" id="womUniversalBiometricBtn" onclick="triggerUniversalBiometricTouch()" style="width: 100%; margin-bottom: 0.6rem; padding: 1.05rem 1.25rem; background: linear-gradient(135deg, #0284c7 0%, #4f46e5 50%, #9333ea 100%); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 16px; font-weight: 800; font-size: 1.02rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 8px 25px -4px rgba(79, 70, 229, 0.5); transition: all 0.2s ease;">
+            <span style="font-size: 1.35rem;">👆</span>
+            <span>Touch to Enter Sovra (Biometric Passkey)</span>
+          </button>
+          <div style="font-size: 0.74rem; color: #94a3b8; margin: 0 0 1.15rem 0; line-height: 1.4;">
+            ✨ Universal 1-Tap &bull; Auto-detects existing account or registers instantly
+          </div>
+
+          <div style="display: flex; align-items: center; margin-bottom: 1.1rem; gap: 8px;">
+            <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.12);"></div>
+            <span style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase;">or use credentials / link device</span>
+            <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.12);"></div>
+          </div>
+
           <!-- Segmented Tab Switcher: Sign In vs Create Account -->
           <div style="display: flex; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 4px; margin-bottom: 1.25rem; gap: 4px;">
             <button type="button" id="womTabLoginBtn" onclick="switchWomAuthTab('login')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 9px; font-size: 0.86rem; font-weight: 700; cursor: pointer; background: #3b82f6; color: #fff; transition: all 0.2s ease;">
@@ -11373,6 +11426,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </button>
             <button type="button" id="womQuickHostLoginBtn" onclick="loginAsDefaultHost()" style="width: 100%; margin-top: 8px; padding: 0.72rem; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 12px; color: #60a5fa; font-weight: 700; font-size: 0.86rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
               <span>💻</span> <span>1-Tap Host Node Login (@laptop_host)</span>
+            </button>
+            <button type="button" id="womDeviceLinkQrBtn" onclick="openDeviceLinkModal()" style="width: 100%; margin-top: 8px; padding: 0.72rem; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; color: #34d399; font-weight: 700; font-size: 0.86rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>📲</span> <span>Link This Device via QR (Scan with Phone)</span>
             </button>
 
             <div style="display: flex; align-items: center; margin: 0.85rem 0; gap: 8px;">

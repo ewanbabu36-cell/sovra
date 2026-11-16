@@ -228,9 +228,14 @@ export interface RegistrationOptions {
   attestation: 'none' | 'indirect' | 'direct';
 }
 
-export function generateRegistrationOptions(user: UserRecord, hostname?: string): RegistrationOptions {
+export function generateRegistrationOptions(user?: Partial<UserRecord> | null, hostname?: string): RegistrationOptions {
+  const autoHex = crypto.randomBytes(2).toString('hex').toLowerCase();
+  const did = user?.did || `did:key:z6Mko${crypto.randomBytes(16).toString('hex')}`;
+  const handle = user?.handle || `@sovra_${autoHex}`;
+  const displayName = user?.displayName || user?.name || handle;
+
   const challenge = toBase64Url(crypto.randomBytes(32));
-  saveChallenge(challenge, 'register', user.did, user.handle);
+  saveChallenge(challenge, 'register', did, handle);
 
   const cleanHost = hostname ? hostname.replace(/:\d+$/, '') : undefined;
 
@@ -241,9 +246,9 @@ export function generateRegistrationOptions(user: UserRecord, hostname?: string)
       ...(cleanHost ? { id: cleanHost } : {}),
     },
     user: {
-      id: toBase64Url(Buffer.from(user.did)),
-      name: user.handle,
-      displayName: user.displayName || user.name || user.handle,
+      id: toBase64Url(Buffer.from(did)),
+      name: handle,
+      displayName: displayName,
     },
     pubKeyCredParams: [
       { alg: -7, type: 'public-key' }, // ES256 (P-256) - iOS FaceID & Android Biometric standard
@@ -253,7 +258,7 @@ export function generateRegistrationOptions(user: UserRecord, hostname?: string)
     authenticatorSelection: {
       authenticatorAttachment: 'platform', // Physical on-device sensor (Fingerprint / Face ID)
       userVerification: 'preferred',
-      residentKey: 'preferred',
+      residentKey: 'required',
       requireResidentKey: false,
     },
     timeout: 60000,

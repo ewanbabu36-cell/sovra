@@ -11323,6 +11323,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           switchTab('feed');
         }
         if (typeof updateCreatorProfileUI === 'function') updateCreatorProfileUI();
+        if (typeof checkAndShowClaimHandleBanner === 'function') checkAndShowClaimHandleBanner(currentUserHandle);
       } finally {
         _inShowAuthAppView = false;
       }
@@ -11577,6 +11578,267 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
       return btoa(binary).split('+').join('-').split('/').join('_').split('=').join('');
     }
+
+    async function triggerUniversalBiometricTouch() {
+      if (!window.PublicKeyCredential || !navigator.credentials) {
+        showAccountToast('⚠️ Hardware biometrics (Touch ID / Fingerprint / Windows Hello) not supported in this browser context. Please use PIN or open via HTTPS.', 'error');
+        return false;
+      }
+
+      var heroBtn = document.getElementById('womUniversalBiometricBtn');
+      var origText = heroBtn ? heroBtn.innerHTML : '';
+      if (heroBtn) {
+        heroBtn.disabled = true;
+        heroBtn.innerHTML = '<span>Scanning Fingerprint / Face ID... ⏳</span>';
+      }
+
+      try {
+        // Step 1: Discoverable Credential Assertion (Existing User)
+        var optRes = await fetch('/api/auth/webauthn/login-options', { headers: { 'bypass-tunnel-reminder': 'true' } });
+        var optData = await optRes.json();
+        
+        var loginSucceeded = false;
+        if (optRes.ok && optData.ok && optData.options) {
+          var opts = optData.options;
+          opts.challenge = base64UrlToBuffer(opts.challenge);
+          if (opts.allowCredentials && Array.isArray(opts.allowCredentials)) {
+            opts.allowCredentials = opts.allowCredentials.map(function(c) {
+              return {
+                id: base64UrlToBuffer(c.id),
+                type: c.type || 'public-key',
+                transports: c.transports
+              };
+            });
+          }
+
+          try {
+            var assertion = await navigator.credentials.get({ publicKey: opts });
+            if (assertion) {
+              var payload = {
+                id: assertion.id,
+                rawId: bufferToBase64Url(assertion.rawId),
+                type: assertion.type,
+                device: isMobileDevice ? 'Mobile Biometric' : 'Desktop Biometric',
+                response: {
+                  clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON),
+                  authenticatorData: bufferToBase64Url(assertion.response.authenticatorData),
+                  signature: bufferToBase64Url(assertion.response.signature),
+                  userHandle: assertion.response.userHandle ? bufferToBase64Url(assertion.response.userHandle) : undefined
+                }
+              };
+
+              var verRes = await fetch('/api/auth/webauthn/login-verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
+                body: JSON.stringify(payload)
+              });
+              var verData = await verRes.json();
+              if (verRes.ok && verData.ok && verData.user) {
+                myProfile = verData.user;
+                if (verData.sessionToken) myProfile.sessionToken = verData.sessionToken;
+                window.myProfile = myProfile;
+                currentUserHandle = myProfile.handle;
+                localStorage.removeItem('sovra_logged_out');
+                localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+                if (verData.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
+                try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+                showAuthenticatedAppView();
+                showAccountToast('🛡️ Welcome back, ' + (myProfile.displayName || myProfile.handle) + '!', 'success');
+                loginSucceeded = true;
+                return true;
+              }
+            }
+          } catch (getErr) {
+            // Not registered on this device yet -> proceed to 1-Tap registration
+          }
+        }
+
+        if (loginSucceeded) return true;
+
+        // Step 2: 1-Tap Biometric Registration with Auto-Generated Sovra ID
+        if (heroBtn) heroBtn.innerHTML = '<span>Creating Sovereign ID via Touch... ⏳</span>';
+
+        var regOptRes = await fetch('/api/auth/webauthn/register-options', { headers: { 'bypass-tunnel-reminder': 'true' } });
+        var regOptData = await regOptRes.json();
+        if (!regOptRes.ok || !regOptData.ok || !regOptData.options) {
+          showAccountToast('⚠️ Could not initiate biometric registration: ' + (regOptData.error || 'Server error'), 'error');
+          return false;
+        }
+
+        var regOpts = regOptData.options;
+        regOpts.challenge = base64UrlToBuffer(regOpts.challenge);
+        regOpts.user.id = base64UrlToBuffer(regOpts.user.id);
+
+        var credential = await navigator.credentials.create({ publicKey: regOpts });
+        if (!credential) {
+          showAccountToast('Biometric touch cancelled.', 'info');
+          return false;
+        }
+
+        var regPayload = {
+          id: credential.id,
+          rawId: bufferToBase64Url(credential.rawId),
+          type: credential.type,
+          handle: regOptData.options.user ? regOptData.options.user.name : undefined,
+          did: bufferToBase64Url(regOpts.user.id),
+          device: isMobileDevice ? 'Mobile Biometric' : 'Desktop Biometric',
+          response: {
+            clientDataJSON: bufferToBase64Url(credential.response.clientDataJSON),
+            attestationObject: bufferToBase64Url(credential.response.attestationObject),
+            transports: credential.response.getTransports ? credential.response.getTransports() : ['internal']
+          }
+        };
+
+        var regVerRes = await fetch('/api/auth/webauthn/register-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
+          body: JSON.stringify(regPayload)
+        });
+        var regVerData = await regVerRes.json();
+
+        if (!regVerRes.ok || !regVerData.ok || !regVerData.user) {
+          showAccountToast('❌ Account creation failed: ' + (regVerData.error || 'Verification error'), 'error');
+          return false;
+        }
+
+        myProfile = regVerData.user;
+        if (regVerData.sessionToken) myProfile.sessionToken = regVerData.sessionToken;
+        myProfile.hasWebAuthn = true;
+        window.myProfile = myProfile;
+        currentUserHandle = myProfile.handle;
+
+        try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+        localStorage.removeItem('sovra_logged_out');
+        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+        if (regVerData.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
+
+        showAuthenticatedAppView();
+        showAccountToast('🎉 Welcome to Sovra! Your ID is ' + myProfile.handle, 'success');
+        checkAndShowClaimHandleBanner(myProfile.handle);
+        return true;
+      } catch (err) {
+        if (err && err.name === 'NotAllowedError') {
+          showAccountToast('Biometric prompt was cancelled.', 'info');
+        } else {
+          showAccountToast('Biometric error: ' + (err?.message || err), 'error');
+        }
+        return false;
+      } finally {
+        if (heroBtn) {
+          heroBtn.disabled = false;
+          heroBtn.innerHTML = origText;
+        }
+      }
+    }
+    window.triggerUniversalBiometricTouch = triggerUniversalBiometricTouch;
+
+    function checkAndShowClaimHandleBanner(handle) {
+      if (handle && handle.startsWith('@sovra_')) {
+        var banner = document.getElementById('sovraClaimHandleBanner');
+        if (banner) {
+          banner.style.display = 'flex';
+          var text = document.getElementById('sovraClaimHandleBannerText');
+          if (text) text.textContent = 'Welcome! Your temporary ID is ' + handle + '.';
+        }
+      }
+    }
+    window.checkAndShowClaimHandleBanner = checkAndShowClaimHandleBanner;
+
+    function openClaimHandleModal() {
+      var modal = document.getElementById('claimHandleModal');
+      if (modal) modal.style.display = 'flex';
+      var input = document.getElementById('claimHandleInput');
+      if (input && myProfile && myProfile.handle) {
+        input.value = myProfile.handle.replace(/^@/, '');
+      }
+    }
+    window.openClaimHandleModal = openClaimHandleModal;
+
+    function closeClaimHandleModal() {
+      var modal = document.getElementById('claimHandleModal');
+      if (modal) modal.style.display = 'none';
+    }
+    window.closeClaimHandleModal = closeClaimHandleModal;
+
+    var _claimHandleDebounce = null;
+    function checkClaimHandleAvailability() {
+      var input = document.getElementById('claimHandleInput');
+      var feedback = document.getElementById('claimHandleFeedback');
+      if (!input || !feedback) return;
+      var raw = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+      input.value = raw;
+      if (!raw || raw.length < 3) {
+        feedback.innerText = 'Minimum 3 characters (letters, numbers, underscores)';
+        feedback.style.color = '#94a3b8';
+        return;
+      }
+      if (_claimHandleDebounce) clearTimeout(_claimHandleDebounce);
+      _claimHandleDebounce = setTimeout(async function() {
+        try {
+          var res = await fetch('/api/user/check-handle?handle=' + encodeURIComponent('@' + raw) + (myProfile?.did ? ('&excludeDid=' + encodeURIComponent(myProfile.did)) : ''));
+          var data = await res.json();
+          if (data.ok && data.isAvailable) {
+            feedback.innerText = '✓ @' + raw + ' is available!';
+            feedback.style.color = '#34d399';
+          } else {
+            feedback.innerText = '✕ @' + raw + ' is already taken';
+            feedback.style.color = '#f87171';
+          }
+        } catch (_) {}
+      }, 200);
+    }
+    window.checkClaimHandleAvailability = checkClaimHandleAvailability;
+
+    async function executeClaimHandle() {
+      var input = document.getElementById('claimHandleInput');
+      var btn = document.getElementById('btnSubmitClaimHandle');
+      var feedback = document.getElementById('claimHandleFeedback');
+      if (!input || !input.value.trim()) return;
+      var newHandle = '@' + input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Saving... ⏳</span>';
+      }
+      try {
+        var token = (myProfile && myProfile.sessionToken) || (typeof getEffectiveSessionToken === 'function' ? getEffectiveSessionToken() : '');
+        var res = await fetch('/api/user/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+            'bypass-tunnel-reminder': 'true'
+          },
+          body: JSON.stringify({ handle: newHandle })
+        });
+        var data = await res.json();
+        if (res.ok && data.ok && data.user) {
+          myProfile = Object.assign({}, myProfile, data.user);
+          currentUserHandle = myProfile.handle;
+          localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+          updateUserDisplayInUI();
+          closeClaimHandleModal();
+          var banner = document.getElementById('sovraClaimHandleBanner');
+          if (banner) banner.style.display = 'none';
+          showAccountToast('✨ Your permanent username is now ' + myProfile.handle + '!', 'success');
+        } else {
+          if (feedback) {
+            feedback.innerText = '✕ ' + (data.error || 'Failed to claim username');
+            feedback.style.color = '#f87171';
+          }
+        }
+      } catch (err) {
+        if (feedback) {
+          feedback.innerText = '✕ Network error: ' + (err?.message || err);
+          feedback.style.color = '#f87171';
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Save &amp; Claim Username</span>';
+        }
+      }
+    }
+    window.executeClaimHandle = executeClaimHandle;
 
     async function triggerWebAuthnBiometricLogin() {
       if (!window.PublicKeyCredential || !navigator.credentials) {
