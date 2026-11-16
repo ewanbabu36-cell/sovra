@@ -949,7 +949,6 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
       </div>
 
-      <div class="container">
     <!-- Tab 1: Instagram Main Feed (Stories, Photo Stream, Double-Tap Hearts) -->
     <main class="main-content" id="feed-view" style="display: flex;">
       <div class="feed-container" id="feedStreamContainer">
@@ -2628,7 +2627,6 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
           </div>
         </div>
-      </div>
 
         <!-- Snap Navigation Controls (Keyboard & Click Alternatives) -->
         <div class="reels-nav-controls">
@@ -2638,7 +2636,6 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             SWIPE / FLICK / KEYS
           </div>
         </div>
-      </div>
     </main>
 
     <!-- 🎧 GLOBAL FLOATING BACKGROUND AUDIO & REELS MIXER BAR (Phase 2) -->
@@ -4433,7 +4430,6 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
         </aside>
       </div>
-      </div>
     </main>
     </div>
 
@@ -5948,10 +5944,6 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               Hardware enclave authentication via WebAuthn, TouchID, and Windows Hello with phishing-resistant security.
             </div>
             <div class="hub-card-action-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.12);">
-              <span>Security Passkeys</span>
-              <span>→</span>
-            </div>
-          </div>
               <span>Security Passkeys</span>
               <span>→</span>
             </div>
@@ -8790,7 +8782,6 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
       </div>
     </main>
-  </div>
 
   <footer id="appStageFooter" style="text-align: center; padding: 1.5rem 1.5rem 5rem 1.5rem; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--surface-border);">
     Sovra Protocol & Monorepo Foundation &bull; Production P2P Stack &bull; Localhost Dev Runner
