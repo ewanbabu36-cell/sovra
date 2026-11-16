@@ -11627,59 +11627,61 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
       if (canTryHardwareWebAuthn) {
         try {
-          if (heroBtn) heroBtn.innerHTML = '<span>Scanning Fingerprint / Face ID... ⏳</span>';
-          // Step 1: Discoverable Credential Assertion (Existing User)
-          var optRes = await fetch('/api/auth/webauthn/login-options', { headers: { 'bypass-tunnel-reminder': 'true' } });
-          var optData = await optRes.json();
-          
-          if (optRes.ok && optData.ok && optData.options) {
-            var opts = optData.options;
-            opts.challenge = base64UrlToBuffer(opts.challenge);
-            if (opts.allowCredentials && Array.isArray(opts.allowCredentials)) {
-              opts.allowCredentials = opts.allowCredentials.map(function(c) {
-                return {
-                  id: base64UrlToBuffer(c.id),
-                  type: c.type || 'public-key',
-                  transports: c.transports
-                };
-              });
-            }
+          var hasPasskeyOnDevice = localStorage.getItem('sovra_has_passkey') === 'true';
 
-            try {
-              var assertion = await navigator.credentials.get({ publicKey: opts });
-              if (assertion) {
-                var payload = {
-                  id: assertion.id,
-                  rawId: bufferToBase64Url(assertion.rawId),
-                  type: assertion.type,
-                  device: isMobileDevice ? 'Mobile Biometric' : 'Desktop Biometric',
-                  response: {
-                    clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON),
-                    authenticatorData: bufferToBase64Url(assertion.response.authenticatorData),
-                    signature: bufferToBase64Url(assertion.response.signature),
-                    userHandle: assertion.response.userHandle ? bufferToBase64Url(assertion.response.userHandle) : undefined
-                  }
-                };
-
-                var verRes = await fetch('/api/auth/webauthn/login-verify', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
-                  body: JSON.stringify(payload)
+          // If device already registered a passkey before, do assertion (login)
+          if (hasPasskeyOnDevice) {
+            if (heroBtn) heroBtn.innerHTML = '<span>Scan Fingerprint to Sign In... ⏳</span>';
+            var optRes = await fetch('/api/auth/webauthn/login-options', { headers: { 'bypass-tunnel-reminder': 'true' } });
+            var optData = await optRes.json();
+            if (optRes.ok && optData.ok && optData.options) {
+              var opts = optData.options;
+              opts.challenge = base64UrlToBuffer(opts.challenge);
+              if (opts.allowCredentials && Array.isArray(opts.allowCredentials)) {
+                opts.allowCredentials = opts.allowCredentials.map(function(c) {
+                  return {
+                    id: base64UrlToBuffer(c.id),
+                    type: c.type || 'public-key',
+                    transports: c.transports
+                  };
                 });
-                var verData = await verRes.json();
-                if (verRes.ok && verData.ok && verData.user) {
-                  completeLoginSuccess(verData.user, verData.sessionToken, false);
-                  return true;
-                }
               }
-            } catch (getErr) {
-              // Not registered on this device yet -> proceed to 1-Tap registration
+
+              try {
+                var assertion = await navigator.credentials.get({ publicKey: opts });
+                if (assertion) {
+                  var payload = {
+                    id: assertion.id,
+                    rawId: bufferToBase64Url(assertion.rawId),
+                    type: assertion.type,
+                    device: isMobileDevice ? 'Mobile Biometric' : 'Desktop Biometric',
+                    response: {
+                      clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON),
+                      authenticatorData: bufferToBase64Url(assertion.response.authenticatorData),
+                      signature: bufferToBase64Url(assertion.response.signature),
+                      userHandle: assertion.response.userHandle ? bufferToBase64Url(assertion.response.userHandle) : undefined
+                    }
+                  };
+
+                  var verRes = await fetch('/api/auth/webauthn/login-verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
+                    body: JSON.stringify(payload)
+                  });
+                  var verData = await verRes.json();
+                  if (verRes.ok && verData.ok && verData.user) {
+                    completeLoginSuccess(verData.user, verData.sessionToken, false);
+                    return true;
+                  }
+                }
+              } catch (assertionErr) {
+                // Assertion failed -> might need re-registration
+              }
             }
           }
 
-          // Step 2: 1-Tap Biometric Registration with Auto-Generated Sovra ID
-          if (heroBtn) heroBtn.innerHTML = '<span>Creating Sovereign ID via Touch... ⏳</span>';
-
+          // Otherwise (New User or First Passkey on this device), invoke Native Biometric Registration
+          if (heroBtn) heroBtn.innerHTML = '<span>Scan Fingerprint to Register... ⏳</span>';
           var regOptRes = await fetch('/api/auth/webauthn/register-options', { headers: { 'bypass-tunnel-reminder': 'true' } });
           var regOptData = await regOptRes.json();
           if (regOptRes.ok && regOptData.ok && regOptData.options) {
@@ -11711,6 +11713,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               var regVerData = await regVerRes.json();
 
               if (regVerRes.ok && regVerData.ok && regVerData.user) {
+                localStorage.setItem('sovra_has_passkey', 'true');
                 completeLoginSuccess(regVerData.user, regVerData.sessionToken, true);
                 return true;
               }
@@ -11725,7 +11728,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             }
             return false;
           }
-          // If biometric hardware throws error, gracefully proceed to Universal Device Touch!
+          console.warn('[WebAuthn] Hardware biometric error:', err);
         }
       }
 
@@ -12410,6 +12413,14 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           var noticeLink = document.getElementById('insecureContextNoticeLink');
           if (noticeLink) {
             noticeLink.href = 'https://' + window.location.hostname + ':3443' + window.location.pathname;
+          }
+        }
+        var womHint = document.getElementById('womSecureContextHint');
+        if (womHint) {
+          womHint.style.display = 'block';
+          var womLink = document.getElementById('womHttpsSwitchLink');
+          if (womLink) {
+            womLink.href = 'https://' + window.location.hostname + ':3443' + window.location.pathname;
           }
         }
       }

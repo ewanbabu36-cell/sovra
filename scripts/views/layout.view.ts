@@ -11376,8 +11376,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <span style="font-size: 1.35rem;">👆</span>
             <span>Touch to Enter Sovra (Biometric Passkey)</span>
           </button>
-          <div style="font-size: 0.74rem; color: #94a3b8; margin: 0 0 1.15rem 0; line-height: 1.4;">
+          <div style="font-size: 0.74rem; color: #94a3b8; margin: 0 0 0.65rem 0; line-height: 1.4;">
             ✨ Universal 1-Tap &bull; Auto-detects existing account or registers instantly
+          </div>
+          <div id="womSecureContextHint" style="display: none; margin: 0 0 1rem 0; padding: 7px 10px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; font-size: 0.72rem; color: #38bdf8; text-align: left; line-height: 1.4;">
+            🔒 <strong>Hardware Fingerprint:</strong> Mobile browsers require HTTPS for real biometrics. <a id="womHttpsSwitchLink" href="https://10.42.22.224:3443/" style="color: #67e8f9; text-decoration: underline; font-weight: 700;">Switch to Secure Mode</a>.
           </div>
 
           <div style="display: flex; align-items: center; margin-bottom: 1.1rem; gap: 8px;">
