@@ -148,6 +148,7 @@ export interface UserRecord {
   recoveryPhraseHash?: string; // Salted scrypt key-derivation verifier (PRIV-01)
   recoveryPhraseSalt?: string; // Cryptographic 16-byte salt (hex)
   webauthnCredentials?: WebAuthnCredentialRecord[]; // Native Hardware Enclave / Biometric credentials
+  deviceToken?: string; // 1-Tap Universal Device Key for seamless multi-device / Wi-Fi fallback
   contactHashes?: string[]; // SHA-256 digests of verified telephone/email identifiers for ZK contact discovery
   closeFriendsDids?: string[]; // Instagram-grade Close Friends whitelist DIDs
   strikesCount?: number;
@@ -3044,6 +3045,12 @@ export class SovraDatabaseEngine {
     );
   }
 
+  public findUserByDeviceToken(token: string): UserRecord | undefined {
+    if (!token) return undefined;
+    this.load();
+    return this.db.users.find(u => (u as any).deviceToken === token);
+  }
+
   public addWebauthnCredential(did: string, cred: WebAuthnCredentialRecord): boolean {
     this.load();
     const user = this.db.users.find(u => u.did === did);
@@ -3279,6 +3286,7 @@ export class SovraDatabaseEngine {
       recoveryPhraseHash: computedRecHash,
       recoveryPhraseSalt: computedRecSalt,
       webauthnCredentials: user.webauthnCredentials || (existingIdx >= 0 ? this.db.users[existingIdx]!.webauthnCredentials : undefined),
+      deviceToken: user.deviceToken !== undefined ? user.deviceToken : (existingIdx >= 0 ? this.db.users[existingIdx]!.deviceToken : undefined),
       role: user.role || (existingIdx >= 0 ? this.db.users[existingIdx]!.role : undefined),
       createdAt: existingIdx >= 0 ? this.db.users[existingIdx]!.createdAt : now,
       updatedAt: now,

@@ -11579,156 +11579,187 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       return btoa(binary).split('+').join('-').split('/').join('_').split('=').join('');
     }
 
-    async function triggerUniversalBiometricTouch() {
-      if (!window.PublicKeyCredential || !navigator.credentials) {
-        showAccountToast('⚠️ Hardware biometrics (Touch ID / Fingerprint / Windows Hello) not supported in this browser context. Please use PIN or open via HTTPS.', 'error');
-        return false;
-      }
+    function completeLoginSuccess(user, sessionToken, isNewUser) {
+      myProfile = user;
+      if (sessionToken) myProfile.sessionToken = sessionToken;
+      window.myProfile = myProfile;
+      currentUserHandle = myProfile.handle;
 
+      localStorage.removeItem('sovra_logged_out');
+      localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
+      if (sessionToken) localStorage.setItem('sovra_auth_active', 'true');
+
+      // Dismiss onboarding modal immediately
+      var wom = document.getElementById('welcomeOnboardingModal');
+      if (wom) {
+        wom.classList.add('modal-dismissed');
+        wom.style.setProperty('display', 'none', 'important');
+      }
+      try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+
+      showAuthenticatedAppView();
+
+      if (isNewUser) {
+        showAccountToast('🎉 Welcome to Sovra! Your ID is ' + myProfile.handle, 'success');
+        checkAndShowClaimHandleBanner(myProfile.handle);
+      } else {
+        showAccountToast('🛡️ Welcome back, ' + (myProfile.displayName || myProfile.handle) + '!', 'success');
+      }
+    }
+    window.completeLoginSuccess = completeLoginSuccess;
+
+    async function triggerUniversalBiometricTouch() {
       var heroBtn = document.getElementById('womUniversalBiometricBtn');
       var origText = heroBtn ? heroBtn.innerHTML : '';
       if (heroBtn) {
         heroBtn.disabled = true;
-        heroBtn.innerHTML = '<span>Scanning Fingerprint / Face ID... ⏳</span>';
+        heroBtn.innerHTML = '<span>⚡ Entering Sovra... ⏳</span>';
       }
 
-      try {
-        // Step 1: Discoverable Credential Assertion (Existing User)
-        var optRes = await fetch('/api/auth/webauthn/login-options', { headers: { 'bypass-tunnel-reminder': 'true' } });
-        var optData = await optRes.json();
-        
-        var loginSucceeded = false;
-        if (optRes.ok && optData.ok && optData.options) {
-          var opts = optData.options;
-          opts.challenge = base64UrlToBuffer(opts.challenge);
-          if (opts.allowCredentials && Array.isArray(opts.allowCredentials)) {
-            opts.allowCredentials = opts.allowCredentials.map(function(c) {
-              return {
-                id: base64UrlToBuffer(c.id),
-                type: c.type || 'public-key',
-                transports: c.transports
-              };
-            });
+      // Check if Hardware WebAuthn is supported in this browser context (Requires HTTPS or localhost)
+      var canTryHardwareWebAuthn = Boolean(
+        window.isSecureContext &&
+        window.PublicKeyCredential &&
+        navigator.credentials &&
+        typeof navigator.credentials.get === 'function' &&
+        typeof navigator.credentials.create === 'function'
+      );
+
+      if (canTryHardwareWebAuthn) {
+        try {
+          if (heroBtn) heroBtn.innerHTML = '<span>Scanning Fingerprint / Face ID... ⏳</span>';
+          // Step 1: Discoverable Credential Assertion (Existing User)
+          var optRes = await fetch('/api/auth/webauthn/login-options', { headers: { 'bypass-tunnel-reminder': 'true' } });
+          var optData = await optRes.json();
+          
+          if (optRes.ok && optData.ok && optData.options) {
+            var opts = optData.options;
+            opts.challenge = base64UrlToBuffer(opts.challenge);
+            if (opts.allowCredentials && Array.isArray(opts.allowCredentials)) {
+              opts.allowCredentials = opts.allowCredentials.map(function(c) {
+                return {
+                  id: base64UrlToBuffer(c.id),
+                  type: c.type || 'public-key',
+                  transports: c.transports
+                };
+              });
+            }
+
+            try {
+              var assertion = await navigator.credentials.get({ publicKey: opts });
+              if (assertion) {
+                var payload = {
+                  id: assertion.id,
+                  rawId: bufferToBase64Url(assertion.rawId),
+                  type: assertion.type,
+                  device: isMobileDevice ? 'Mobile Biometric' : 'Desktop Biometric',
+                  response: {
+                    clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON),
+                    authenticatorData: bufferToBase64Url(assertion.response.authenticatorData),
+                    signature: bufferToBase64Url(assertion.response.signature),
+                    userHandle: assertion.response.userHandle ? bufferToBase64Url(assertion.response.userHandle) : undefined
+                  }
+                };
+
+                var verRes = await fetch('/api/auth/webauthn/login-verify', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
+                  body: JSON.stringify(payload)
+                });
+                var verData = await verRes.json();
+                if (verRes.ok && verData.ok && verData.user) {
+                  completeLoginSuccess(verData.user, verData.sessionToken, false);
+                  return true;
+                }
+              }
+            } catch (getErr) {
+              // Not registered on this device yet -> proceed to 1-Tap registration
+            }
           }
 
-          try {
-            var assertion = await navigator.credentials.get({ publicKey: opts });
-            if (assertion) {
-              var payload = {
-                id: assertion.id,
-                rawId: bufferToBase64Url(assertion.rawId),
-                type: assertion.type,
+          // Step 2: 1-Tap Biometric Registration with Auto-Generated Sovra ID
+          if (heroBtn) heroBtn.innerHTML = '<span>Creating Sovereign ID via Touch... ⏳</span>';
+
+          var regOptRes = await fetch('/api/auth/webauthn/register-options', { headers: { 'bypass-tunnel-reminder': 'true' } });
+          var regOptData = await regOptRes.json();
+          if (regOptRes.ok && regOptData.ok && regOptData.options) {
+            var regOpts = regOptData.options;
+            regOpts.challenge = base64UrlToBuffer(regOpts.challenge);
+            regOpts.user.id = base64UrlToBuffer(regOpts.user.id);
+
+            var credential = await navigator.credentials.create({ publicKey: regOpts });
+            if (credential) {
+              var regPayload = {
+                id: credential.id,
+                rawId: bufferToBase64Url(credential.rawId),
+                type: credential.type,
+                handle: regOptData.options.user ? regOptData.options.user.name : undefined,
+                did: bufferToBase64Url(regOpts.user.id),
                 device: isMobileDevice ? 'Mobile Biometric' : 'Desktop Biometric',
                 response: {
-                  clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON),
-                  authenticatorData: bufferToBase64Url(assertion.response.authenticatorData),
-                  signature: bufferToBase64Url(assertion.response.signature),
-                  userHandle: assertion.response.userHandle ? bufferToBase64Url(assertion.response.userHandle) : undefined
+                  clientDataJSON: bufferToBase64Url(credential.response.clientDataJSON),
+                  attestationObject: bufferToBase64Url(credential.response.attestationObject),
+                  transports: credential.response.getTransports ? credential.response.getTransports() : ['internal']
                 }
               };
 
-              var verRes = await fetch('/api/auth/webauthn/login-verify', {
+              var regVerRes = await fetch('/api/auth/webauthn/register-verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(regPayload)
               });
-              var verData = await verRes.json();
-              if (verRes.ok && verData.ok && verData.user) {
-                myProfile = verData.user;
-                if (verData.sessionToken) myProfile.sessionToken = verData.sessionToken;
-                window.myProfile = myProfile;
-                currentUserHandle = myProfile.handle;
-                localStorage.removeItem('sovra_logged_out');
-                localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-                if (verData.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
-                try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
-                showAuthenticatedAppView();
-                showAccountToast('🛡️ Welcome back, ' + (myProfile.displayName || myProfile.handle) + '!', 'success');
-                loginSucceeded = true;
+              var regVerData = await regVerRes.json();
+
+              if (regVerRes.ok && regVerData.ok && regVerData.user) {
+                completeLoginSuccess(regVerData.user, regVerData.sessionToken, true);
                 return true;
               }
             }
-          } catch (getErr) {
-            // Not registered on this device yet -> proceed to 1-Tap registration
           }
-        }
-
-        if (loginSucceeded) return true;
-
-        // Step 2: 1-Tap Biometric Registration with Auto-Generated Sovra ID
-        if (heroBtn) heroBtn.innerHTML = '<span>Creating Sovereign ID via Touch... ⏳</span>';
-
-        var regOptRes = await fetch('/api/auth/webauthn/register-options', { headers: { 'bypass-tunnel-reminder': 'true' } });
-        var regOptData = await regOptRes.json();
-        if (!regOptRes.ok || !regOptData.ok || !regOptData.options) {
-          showAccountToast('⚠️ Could not initiate biometric registration: ' + (regOptData.error || 'Server error'), 'error');
-          return false;
-        }
-
-        var regOpts = regOptData.options;
-        regOpts.challenge = base64UrlToBuffer(regOpts.challenge);
-        regOpts.user.id = base64UrlToBuffer(regOpts.user.id);
-
-        var credential = await navigator.credentials.create({ publicKey: regOpts });
-        if (!credential) {
-          showAccountToast('Biometric touch cancelled.', 'info');
-          return false;
-        }
-
-        var regPayload = {
-          id: credential.id,
-          rawId: bufferToBase64Url(credential.rawId),
-          type: credential.type,
-          handle: regOptData.options.user ? regOptData.options.user.name : undefined,
-          did: bufferToBase64Url(regOpts.user.id),
-          device: isMobileDevice ? 'Mobile Biometric' : 'Desktop Biometric',
-          response: {
-            clientDataJSON: bufferToBase64Url(credential.response.clientDataJSON),
-            attestationObject: bufferToBase64Url(credential.response.attestationObject),
-            transports: credential.response.getTransports ? credential.response.getTransports() : ['internal']
+        } catch (err) {
+          if (err && err.name === 'NotAllowedError') {
+            showAccountToast('Biometric prompt was cancelled.', 'info');
+            if (heroBtn) {
+              heroBtn.disabled = false;
+              heroBtn.innerHTML = origText;
+            }
+            return false;
           }
-        };
+          // If biometric hardware throws error, gracefully proceed to Universal Device Touch!
+        }
+      }
 
-        var regVerRes = await fetch('/api/auth/webauthn/register-verify', {
+      // Step 3: Universal 1-Tap Cryptographic Device Touch (Always succeeds on mobile Wi-Fi IP / HTTP / Non-WebAuthn)
+      try {
+        if (heroBtn) heroBtn.innerHTML = '<span>Connecting Sovereign Node... ⏳</span>';
+        var devToken = localStorage.getItem('sovra_device_token') || '';
+        var devRes = await fetch('/api/auth/universal-touch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
-          body: JSON.stringify(regPayload)
+          body: JSON.stringify({
+            deviceToken: devToken,
+            device: isMobileDevice ? 'Mobile Touch' : 'Desktop Touch'
+          })
         });
-        var regVerData = await regVerRes.json();
-
-        if (!regVerRes.ok || !regVerData.ok || !regVerData.user) {
-          showAccountToast('❌ Account creation failed: ' + (regVerData.error || 'Verification error'), 'error');
-          return false;
-        }
-
-        myProfile = regVerData.user;
-        if (regVerData.sessionToken) myProfile.sessionToken = regVerData.sessionToken;
-        myProfile.hasWebAuthn = true;
-        window.myProfile = myProfile;
-        currentUserHandle = myProfile.handle;
-
-        try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
-        localStorage.removeItem('sovra_logged_out');
-        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-        if (regVerData.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
-
-        showAuthenticatedAppView();
-        showAccountToast('🎉 Welcome to Sovra! Your ID is ' + myProfile.handle, 'success');
-        checkAndShowClaimHandleBanner(myProfile.handle);
-        return true;
-      } catch (err) {
-        if (err && err.name === 'NotAllowedError') {
-          showAccountToast('Biometric prompt was cancelled.', 'info');
+        var devData = await devRes.json();
+        if (devRes.ok && devData.ok && devData.user) {
+          if (devData.deviceToken) {
+            localStorage.setItem('sovra_device_token', devData.deviceToken);
+          }
+          completeLoginSuccess(devData.user, devData.sessionToken, devData.isNewUser);
+          return true;
         } else {
-          showAccountToast('Biometric error: ' + (err?.message || err), 'error');
+          showAccountToast('❌ Touch sign-in failed: ' + (devData.error || 'Server error'), 'error');
         }
-        return false;
+      } catch (fallbackErr) {
+        showAccountToast('❌ Touch sign-in error: ' + (fallbackErr?.message || fallbackErr), 'error');
       } finally {
         if (heroBtn) {
           heroBtn.disabled = false;
           heroBtn.innerHTML = origText;
         }
       }
+      return false;
     }
     window.triggerUniversalBiometricTouch = triggerUniversalBiometricTouch;
 
@@ -11841,9 +11872,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     window.executeClaimHandle = executeClaimHandle;
 
     async function triggerWebAuthnBiometricLogin() {
-      if (!window.PublicKeyCredential || !navigator.credentials) {
-        showAccountToast('⚠️ Hardware biometrics not supported on this browser context. Please use Security PIN or open via HTTPS.', 'error');
-        return false;
+      if (!window.isSecureContext || !window.PublicKeyCredential || !navigator.credentials) {
+        return triggerUniversalBiometricTouch();
       }
       var btn = document.getElementById('womBiometricLoginBtn');
       var origText = btn ? btn.innerHTML : '';
