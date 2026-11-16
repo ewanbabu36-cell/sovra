@@ -10,6 +10,7 @@
  */
 
 import crypto from 'node:crypto';
+import net from 'node:net';
 import type { UserRecord, WebAuthnCredentialRecord } from './database-engine.ts';
 
 // ==========================================
@@ -238,12 +239,14 @@ export function generateRegistrationOptions(user?: Partial<UserRecord> | null, h
   saveChallenge(challenge, 'register', did, handle);
 
   const cleanHost = hostname ? hostname.replace(/:\d+$/, '') : undefined;
+  const isIpHost = cleanHost ? Boolean(net.isIP(cleanHost)) : false;
+  const validRpId = (cleanHost && !isIpHost) ? cleanHost : undefined;
 
   return {
     challenge,
     rp: {
       name: 'SOVRA Sovereign Network',
-      ...(cleanHost ? { id: cleanHost } : {}),
+      ...(validRpId ? { id: validRpId } : {}),
     },
     user: {
       id: toBase64Url(Buffer.from(did)),
@@ -383,6 +386,8 @@ export function generateLoginOptions(
   saveChallenge(challenge, 'login', user?.did, user?.handle);
 
   const cleanHost = hostname ? hostname.replace(/:\d+$/, '') : undefined;
+  const isIpHost = cleanHost ? Boolean(net.isIP(cleanHost)) : false;
+  const validRpId = (cleanHost && !isIpHost) ? cleanHost : undefined;
   const allowCredentials = (user?.webauthnCredentials || []).map(c => ({
     id: c.id,
     type: 'public-key' as const,
@@ -392,7 +397,7 @@ export function generateLoginOptions(
   return {
     challenge,
     timeout: 60000,
-    ...(cleanHost ? { rpId: cleanHost } : {}),
+    ...(validRpId ? { rpId: validRpId } : {}),
     allowCredentials,
     userVerification: 'preferred',
   };
