@@ -309,18 +309,13 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     return true;
   }
 
-  // 4. WebAuthn Registration Options
+  // 4. WebAuthn Registration Options (Supports 1-Tap Anonymous Registration or Authenticated User)
   if (url.pathname === '/api/auth/webauthn/register-options' && req.method === 'GET') {
-    const principal = enforceAuth(req, res);
+    const principal = resolvePrincipal(req);
     let user = principal ? sovraDb.findUserByDid(principal.did) : undefined;
     const handleParam = url.searchParams.get('handle') || url.searchParams.get('identifier');
     if (!user && handleParam) {
       user = sovraDb.findUserByHandle(handleParam) || sovraDb.findUserByDid(handleParam);
-    }
-    if (!user) {
-      res.writeHead(401, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: 'User session or identifier required to generate biometric options' }));
-      return true;
     }
     const host = (req.headers.host || 'localhost').split(':')[0];
     const options = generateRegistrationOptions(user, host);
@@ -329,22 +324,18 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     return true;
   }
 
-  // 5. WebAuthn Registration Verify
+  // 5. WebAuthn Registration Verify (Supports 1-Tap Account Creation & Instant Session)
   if (url.pathname === '/api/auth/webauthn/register-verify' && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body || '{}');
-      const principal = enforceAuth(req, res, parsed);
+      const principal = resolvePrincipal(req, parsed);
       let user = principal ? sovraDb.findUserByDid(principal.did) : undefined;
       if (!user && parsed.identifier) {
         user = sovraDb.findUserByHandle(parsed.identifier) || sovraDb.findUserByDid(parsed.identifier);
       }
-      if (!user) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'User session required to register biometric credentials' }));
-        return true;
-      }
+      
       const host = (req.headers.host || 'localhost').split(':')[0];
       const verifyRes = verifyRegistrationResponse(parsed, host);
       if (!verifyRes.ok || !verifyRes.credential) {
@@ -352,12 +343,49 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         res.end(JSON.stringify({ ok: false, error: verifyRes.error || 'Biometric verification failed' }));
         return true;
       }
-      sovraDb.addWebauthnCredential(user.did, verifyRes.credential);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+
+      let isNewUser = false;
+      if (!user) {
+        isNewUser = true;
+        const autoHex = crypto.randomBytes(2).toString('hex').toLowerCase();
+        const autoHandle = parsed.handle || `@sovra_${autoHex}`;
+        const autoDid = parsed.did || `did:key:z6Mko${crypto.randomBytes(16).toString('hex')}`;
+        const cleanName = autoHandle.replace(/^@/, '');
+        user = sovraDb.createUser({
+          did: autoDid,
+          handle: autoHandle,
+          name: cleanName,
+          displayName: cleanName,
+          bio: 'Sovereign Peer Node',
+          avatar: '⚡',
+          avatarBg: '#6366f1',
+          role: 'peer',
+          sessionToken: 'stk_' + crypto.randomBytes(24).toString('hex'),
+          webauthnCredentials: [verifyRes.credential],
+        });
+      } else {
+        sovraDb.addWebauthnCredential(user.did, verifyRes.credential);
+      }
+
+      const deviceName = String(parsed.device || (req.headers['user-agent']?.includes('Mobile') ? 'Mobile Biometric' : 'Desktop Biometric'));
+      const loginRes = sovraDb.loginUser(user.handle, deviceName, clientIp, req.headers['user-agent'] as string, { webauthnVerified: true });
+      const sessionToken = (loginRes.ok && loginRes.sessionToken) ? loginRes.sessionToken : (user.sessionToken || 'stk_' + Date.now());
+
+      const isSecureWebAuthn = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Set-Cookie': [
+          `sovra_session=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureWebAuthn ? '; Secure' : ''}`,
+          `sovra_session_token=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureWebAuthn ? '; Secure' : ''}`,
+        ],
+      });
       res.end(JSON.stringify({
         ok: true,
+        user: toPublicUserDTO(user),
+        sessionToken,
+        isNewUser,
         credentialId: verifyRes.credential.id,
-        message: 'Biometric passkey (Fingerprint/Face ID) linked successfully!'
+        message: isNewUser ? 'Sovereign account created via Biometrics!' : 'Biometric passkey linked successfully!'
       }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
