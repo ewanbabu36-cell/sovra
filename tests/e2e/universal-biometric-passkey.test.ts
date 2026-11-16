@@ -113,4 +113,31 @@ describe('Universal 1-Tap Biometric Passkey & Auto-Handle Suite', () => {
     expect(sovraDb.findUserByHandle(permHandle)?.did).toBe(did);
     expect(sovraDb.isHandleTaken(permHandle)).toBe(true);
   });
+
+  it('5. Allows 1-Tap Universal Device Touch registration and subsequent auto-detection on mobile Wi-Fi IP', () => {
+    const devToken = 'devtok_' + crypto.randomBytes(24).toString('hex');
+    const autoHex = crypto.randomBytes(2).toString('hex').toLowerCase();
+    const autoHandle = `@sovra_${autoHex}`;
+    const autoDid = `did:key:z6Mko${crypto.randomBytes(16).toString('hex')}`;
+
+    const newUser = sovraDb.createUser({
+      did: autoDid,
+      handle: autoHandle,
+      name: autoHandle.replace(/^@/, ''),
+      displayName: autoHandle.replace(/^@/, ''),
+      role: 'peer',
+      deviceToken: devToken,
+      sessionToken: 'stk_' + crypto.randomBytes(24).toString('hex'),
+    } as any);
+
+    expect(newUser).toBeDefined();
+    const found = sovraDb.findUserByDeviceToken(devToken);
+    expect(found).toBeDefined();
+    expect(found?.handle).toBe(autoHandle);
+    expect(found?.did).toBe(autoDid);
+
+    const loginRes = sovraDb.loginUser(found!.handle, 'Mobile Touch', '10.42.22.224', 'Mozilla/5.0 Android');
+    expect(loginRes.ok).toBe(true);
+    expect(loginRes.sessionToken).toBeTruthy();
+  });
 });
