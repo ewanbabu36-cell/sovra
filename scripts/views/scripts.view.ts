@@ -749,19 +749,25 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       init.headers = init.headers || {};
 
       // Anti-Replay Cryptographic Nonce & Timestamp Header Injection
-      const reqNonce = 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36));
+      const reqNonce = 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Math.random().toString(36).substring(2, 10));
       const reqTimestamp = String(Date.now());
       if (init.headers instanceof Headers) {
         init.headers.set('X-Sovra-Nonce', reqNonce);
         init.headers.set('X-Sovra-Timestamp', reqTimestamp);
+        init.headers.set('X-Sovra-CSRF', '1');
+        init.headers.set('X-Requested-With', 'XMLHttpRequest');
         init.headers.set('bypass-tunnel-reminder', 'true');
       } else if (Array.isArray(init.headers)) {
         init.headers.push(['X-Sovra-Nonce', reqNonce]);
         init.headers.push(['X-Sovra-Timestamp', reqTimestamp]);
+        init.headers.push(['X-Sovra-CSRF', '1']);
+        init.headers.push(['X-Requested-With', 'XMLHttpRequest']);
         init.headers.push(['bypass-tunnel-reminder', 'true']);
       } else {
         init.headers['X-Sovra-Nonce'] = reqNonce;
         init.headers['X-Sovra-Timestamp'] = reqTimestamp;
+        init.headers['X-Sovra-CSRF'] = '1';
+        init.headers['X-Requested-With'] = 'XMLHttpRequest';
         init.headers['bypass-tunnel-reminder'] = 'true';
       }
 
@@ -820,16 +826,30 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               }
             } catch(e) {}
             const retryInit = Object.assign({}, init);
+            const freshNonce = 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Math.random().toString(36).substring(2, 10));
+            const freshTs = String(Date.now());
             if (retryInit.headers instanceof Headers) {
               retryInit.headers.set('Authorization', 'Bearer ' + freshTok);
               retryInit.headers.set('X-Sovra-Session-Token', freshTok);
+              retryInit.headers.set('X-Sovra-Nonce', freshNonce);
+              retryInit.headers.set('X-Sovra-Timestamp', freshTs);
+              retryInit.headers.set('X-Sovra-CSRF', '1');
             } else if (Array.isArray(retryInit.headers)) {
-              retryInit.headers = retryInit.headers.map(function(h) {
-                return h[0].toLowerCase() === 'authorization' ? ['Authorization', 'Bearer ' + freshTok] : (h[0].toLowerCase() === 'x-sovra-session-token' ? ['X-Sovra-Session-Token', freshTok] : h);
+              retryInit.headers = retryInit.headers.filter(function(h) {
+                var k = String(h[0]).toLowerCase();
+                return k !== 'authorization' && k !== 'x-sovra-session-token' && k !== 'x-sovra-nonce' && k !== 'x-sovra-timestamp' && k !== 'x-sovra-csrf';
               });
+              retryInit.headers.push(['Authorization', 'Bearer ' + freshTok]);
+              retryInit.headers.push(['X-Sovra-Session-Token', freshTok]);
+              retryInit.headers.push(['X-Sovra-Nonce', freshNonce]);
+              retryInit.headers.push(['X-Sovra-Timestamp', freshTs]);
+              retryInit.headers.push(['X-Sovra-CSRF', '1']);
             } else if (retryInit.headers) {
               retryInit.headers['Authorization'] = 'Bearer ' + freshTok;
               retryInit.headers['X-Sovra-Session-Token'] = freshTok;
+              retryInit.headers['X-Sovra-Nonce'] = freshNonce;
+              retryInit.headers['X-Sovra-Timestamp'] = freshTs;
+              retryInit.headers['X-Sovra-CSRF'] = '1';
             }
             response = await _origFetch.call(window, input, retryInit);
           }
@@ -850,8 +870,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         'Authorization': token ? ('Bearer ' + token) : '',
         'X-Sovra-Session-Token': token,
         'X-Sovra-DID': myDid,
-        'X-Sovra-Nonce': 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Date.now().toString(36)),
-        'X-Sovra-Timestamp': String(Date.now())
+        'X-Sovra-Nonce': 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Math.random().toString(36).substring(2, 10)),
+        'X-Sovra-Timestamp': String(Date.now()),
+        'X-Sovra-CSRF': '1',
+        'X-Requested-With': 'XMLHttpRequest'
       };
     };
 
