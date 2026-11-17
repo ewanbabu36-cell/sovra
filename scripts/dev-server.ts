@@ -2283,7 +2283,32 @@ async function startDevServer() {
         if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
           const secFetchSite = req.headers['sec-fetch-site'];
           const csrfHeader = req.headers['x-csrf-token'] || req.headers['x-sovra-csrf'] || req.headers['x-requested-with'];
-          if (secFetchSite === 'cross-site' || (!csrfHeader && req.headers.origin && req.headers.origin !== 'null' && !req.headers.origin.includes('localhost') && !req.headers.origin.includes('127.0.0.1'))) {
+          const hasCustomAuthHeader = Boolean(req.headers['x-sovra-session-token'] || req.headers['x-sovra-nonce'] || req.headers['authorization']);
+          let isSameOriginOrTrusted = Boolean(
+            secFetchSite === 'same-origin' ||
+            secFetchSite === 'same-site' ||
+            secFetchSite === 'none' ||
+            csrfHeader ||
+            hasCustomAuthHeader
+          );
+
+          if (!isSameOriginOrTrusted && req.headers.origin && req.headers.origin !== 'null') {
+            try {
+              const originUrl = new URL(String(req.headers.origin));
+              const hostHeader = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+              if (
+                originUrl.host === hostHeader ||
+                originUrl.hostname === 'localhost' ||
+                originUrl.hostname === '127.0.0.1' ||
+                originUrl.hostname.endsWith('.trycloudflare.com') ||
+                net.isIP(originUrl.hostname)
+              ) {
+                isSameOriginOrTrusted = true;
+              }
+            } catch (_) {}
+          }
+
+          if (!isSameOriginOrTrusted && secFetchSite === 'cross-site') {
             return null; // CSRF blocked!
           }
         }
@@ -2399,8 +2424,16 @@ async function startDevServer() {
 
   // Anti-Replay Protection: LRU Nonce Cache with Expiration & Timestamp Skew Check
   const replayNonceCache = new Map<string, number>();
-  function checkAndRecordReplayNonce(nonce: string, _timestampStr?: string | string[]): boolean {
+  function checkAndRecordReplayNonce(nonce: string, timestampStr?: string | string[]): boolean {
     const now = Date.now();
+    // Validate timestamp skew if provided (max 300 seconds = 5 minutes)
+    if (timestampStr) {
+      const rawTs = Array.isArray(timestampStr) ? timestampStr[0] : timestampStr;
+      const ts = Number(rawTs);
+      if (!Number.isNaN(ts) && Math.abs(now - ts) > 300_000) {
+        return false; // Skew exceeds 300s
+      }
+    }
     // Clean cache if too large
     if (replayNonceCache.size > 10000) {
       for (const [k, exp] of replayNonceCache) {

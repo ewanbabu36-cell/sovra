@@ -68,11 +68,22 @@ export async function handleSecurityCanaryRoutes(ctx: SecurityCanaryRouteContext
     }
   }
 
-  // 3. Anti-Replay Nonce Validation for cryptographic assertions
+  // 3. Anti-Replay Nonce Validation for cryptographic assertions & high-value mutations
   const nonceHeader = req.headers['x-sovra-nonce'];
   if (nonceHeader && typeof nonceHeader === 'string') {
+    const isStrictAntiReplayEndpoint = Boolean(
+      url.pathname.startsWith('/api/transfer') ||
+      url.pathname.startsWith('/api/wallet') ||
+      url.pathname.startsWith('/api/voucher') ||
+      url.pathname.startsWith('/api/tip') ||
+      url.pathname.startsWith('/api/offline-pay') ||
+      url.pathname.startsWith('/api/pay') ||
+      url.pathname.startsWith('/api/security') ||
+      url.pathname.startsWith('/api/auth/webauthn') ||
+      url.pathname.startsWith('/api/keys/revoke')
+    );
     const isValidNonce = checkAndRecordReplayNonce(nonceHeader, req.headers['x-sovra-timestamp']);
-    if (!isValidNonce) {
+    if (!isValidNonce && isStrictAntiReplayEndpoint) {
       res.writeHead(403, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Forbidden: Anti-replay protection violation. Nonce already seen or timestamp skew exceeds 300s.' }));
       return true;
