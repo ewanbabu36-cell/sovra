@@ -10268,6 +10268,19 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           📱 <strong>On your primary phone:</strong> Open Sovra ➔ Tap Profile / Settings ➔ Select <em>"📲 Link Device via QR"</em> ➔ Copy the ticket code or scan!
         </div>
 
+        <!-- 📷 Instant Camera Scanner Action -->
+        <div style="margin-bottom: 0.95rem;">
+          <button type="button" id="btnScanDeviceLinkCamera" onclick="openQrScannerModal()" style="width: 100%; padding: 0.8rem; background: rgba(56, 189, 248, 0.12); border: 1.5px solid #38bdf8; border-radius: 12px; color: #38bdf8; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease;">
+            <span style="font-size: 1.15rem;">📷</span> <span>Scan QR Code with Camera (Instant Pair)</span>
+          </button>
+        </div>
+
+        <div style="display: flex; align-items: center; margin-bottom: 0.95rem; gap: 8px;">
+          <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+          <span style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase;">or enter code manually</span>
+          <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+        </div>
+
         <div style="margin-bottom: 0.75rem;">
           <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">PAIRING TICKET CODE</label>
           <input type="text" id="deviceLinkTicketInput" placeholder="slt_1729..." style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 0.65rem 0.9rem; border-radius: 10px; font-size: 0.85rem; font-family: monospace;" />
@@ -11370,9 +11383,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             S
           </div>
           <h2 style="font-size: 1.45rem; font-weight: 800; margin: 0 0 0.25rem 0; letter-spacing: -0.02em;">Welcome to Sovra</h2>
-          <p style="font-size: 0.82rem; color: #94a3b8; margin: 0 0 1.25rem 0;">
+          <p style="font-size: 0.82rem; color: #94a3b8; margin: 0 0 0.65rem 0;">
             Sovereign Social &amp; Creator Network
           </p>
+
+          <div id="womPwaInstallChip" style="display: none; margin: 0 auto 0.85rem auto; width: fit-content; padding: 4px 12px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 20px; font-size: 0.72rem; color: #a5b4fc; cursor: pointer; transition: all 0.2s ease;" onclick="triggerPwaInstall()">
+            📲 <strong>Install App</strong> &bull; Fullscreen without URL bar
+          </div>
 
           <!-- 🌟 HERO 1-TAP UNIVERSAL BIOMETRIC PASSKEY GATE -->
           <button type="button" id="womUniversalBiometricBtn" onclick="triggerUniversalBiometricTouch()" style="width: 100%; margin-bottom: 0.6rem; padding: 1.05rem 1.25rem; background: linear-gradient(135deg, #0284c7 0%, #4f46e5 50%, #9333ea 100%); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 16px; font-weight: 800; font-size: 1.02rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 8px 25px -4px rgba(79, 70, 229, 0.5); transition: all 0.2s ease;">
