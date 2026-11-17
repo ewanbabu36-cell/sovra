@@ -60,6 +60,7 @@ Thumbs.db
 tmp/
 *.tmp
 .sovra-storage-dev/
+.sovra-storage-dev.backup*/
 *.exe
 scripts/cloudflared.exe
 scripts/cloudflare-url.txt
