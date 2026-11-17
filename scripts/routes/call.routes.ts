@@ -187,6 +187,7 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
               callerAvatarBg: (senderUser as any)?.avatarBg || '#10b981',
               recipientDid,
               callType,
+              sdpOffer: session.sdpOffer,
             }, 'call_signal');
           } catch (_) {}
         }

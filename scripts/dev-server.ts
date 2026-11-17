@@ -2426,12 +2426,13 @@ async function startDevServer() {
   const replayNonceCache = new Map<string, number>();
   function checkAndRecordReplayNonce(nonce: string, timestampStr?: string | string[]): boolean {
     const now = Date.now();
-    // Validate timestamp skew if provided (max 300 seconds = 5 minutes)
+    // Validate timestamp skew if provided (max 900s = 15 minutes to allow for mobile network/device clock drift)
     if (timestampStr) {
       const rawTs = Array.isArray(timestampStr) ? timestampStr[0] : timestampStr;
       const ts = Number(rawTs);
-      if (!Number.isNaN(ts) && Math.abs(now - ts) > 300_000) {
-        return false; // Skew exceeds 300s
+      const maxSkewMs = Number(process.env.SOVRA_MAX_CLOCK_SKEW_MS || 900_000);
+      if (!Number.isNaN(ts) && Math.abs(now - ts) > maxSkewMs) {
+        return false; // Skew exceeds allowed skew window
       }
     }
     // Clean cache if too large
@@ -2925,8 +2926,11 @@ async function startDevServer() {
       const authHeader = req.headers.authorization;
       let token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.substring(7).trim() : '';
       if (!token && req.headers.cookie) {
-        const match = req.headers.cookie.match(/(?:^|;\s*)sovra_session_token=([^;]+)/);
+        const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
         if (match) token = decodeURIComponent(match[1]).trim();
+      }
+      if (!token) {
+        token = String(url.searchParams.get('token') || url.searchParams.get('sessionToken') || '').trim();
       }
       if (!token) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
