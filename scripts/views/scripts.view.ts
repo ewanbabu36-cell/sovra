@@ -15494,7 +15494,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         if (_realtimeEventSource) {
           _realtimeEventSource.close();
         }
-        _realtimeEventSource = new EventSource('/api/realtime/stream');
+        var sseToken = (typeof window.getEffectiveSessionToken === 'function')
+          ? window.getEffectiveSessionToken()
+          : (localStorage.getItem('sovra_session_token') || (myProfile ? myProfile.sessionToken : '') || '');
+        var sseUrl = '/api/realtime/stream' + (sseToken ? ('?token=' + encodeURIComponent(sseToken)) : '');
+        _realtimeEventSource = new EventSource(sseUrl);
         updateLiveStatus('connecting');
 
         _realtimeEventSource.onopen = function() {
@@ -15621,10 +15625,15 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                   callerName: data.callerName || 'Peer',
                   callerAvatar: data.callerAvatar || '📞',
                   callerAvatarBg: data.callerAvatarBg || '#10b981',
-                  callType: data.callType || 'audio'
+                  callType: data.callType || 'audio',
+                  sdpOffer: data.sdpOffer || data.sdp || ''
                 });
               }
               if (typeof window.pollIncomingCalls === 'function') window.pollIncomingCalls();
+            } else if (data && (data.type === 'call_accept' || data.signalType === 'call_accept' || data.type === 'answer')) {
+              if (typeof window.syncActiveCallSession === 'function') {
+                window.syncActiveCallSession();
+              }
             } else if (data && data.type === 'candidate' && data.candidate) {
               if (typeof window.handleRealtimeCallCandidate === 'function') {
                 window.handleRealtimeCallCandidate(data);
@@ -16658,40 +16667,15 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     let _callSeconds = 0;
 
     function startEncryptedCall(peerDid, peerName, type) {
-      const idleDash = document.getElementById('callsIdleDashboard');
-      const activeSess = document.getElementById('callsActiveSession');
-      const peerLabel = document.getElementById('activeCallPeerName');
-      const remoteLabel = document.getElementById('remoteCallPeerLabel');
-      const timerPill = document.getElementById('callsTimerPill');
-
-      if (idleDash) idleDash.style.display = 'none';
-      if (activeSess) activeSess.style.display = 'flex';
-      if (peerLabel) peerLabel.textContent = peerName || 'Sovereign Peer';
-      if (remoteLabel) remoteLabel.textContent = peerName || 'Sovereign Peer';
-      
-      _callSeconds = 0;
-      if (timerPill) timerPill.textContent = '00:00';
-      if (_activeCallTimer) clearInterval(_activeCallTimer);
-      _activeCallTimer = setInterval(() => {
-        _callSeconds++;
-        const mins = String(Math.floor(_callSeconds / 60)).padStart(2, '0');
-        const secs = String(_callSeconds % 60).padStart(2, '0');
-        if (timerPill) timerPill.textContent = mins + ':' + secs;
-      }, 1000);
-
-      _callHistoryData.unshift({
-        id: 'c_' + Date.now(),
-        name: peerName || 'Peer',
-        did: peerDid,
-        type: 'outgoing',
-        time: 'Just now',
-        duration: 'Connecting...',
-        avatar: '👤',
-        avatarBg: '#6366f1'
-      });
-
-      if (typeof showAccountToast === 'function') {
-        showAccountToast('🔒 Encrypted ' + (type === 'video' ? 'Video' : 'Audio') + ' Call Offer sent to ' + peerName);
+      if (!peerDid) {
+        if (typeof showAccountToast === 'function') showAccountToast('Select a peer to call', 'warning');
+        return;
+      }
+      activeContactDid = peerDid;
+      if (typeof startE2eeCall === 'function') {
+        startE2eeCall(type || 'audio', peerDid, peerName);
+      } else {
+        if (typeof showAccountToast === 'function') showAccountToast('Starting encrypted call...', 'info');
       }
     }
     window.startEncryptedCall = startEncryptedCall;
@@ -42040,6 +42024,8 @@ window.SovraCreatorStudioEngine = {
                 }
               }
               if (!_isCallAnswered || _callState !== CallState.CALL_CONNECTED) {
+                _isCallAnswered = true;
+                stopCallAudioRinging();
                 setCallState(CallState.CALL_CONNECTED);
                 onCallMediaFlowConfirmed();
               }
@@ -43523,11 +43509,14 @@ window.SovraCreatorStudioEngine = {
       }
     }
 
-    async function startE2eeCall(type) {
-      let contact = contactsData.find(function(c) { return c.did === activeContactDid; }) ||
-        (typeof friendsData !== 'undefined' && friendsData ? (friendsData.friends || []).find(function(f) { return f.did === activeContactDid; }) : null);
+    async function startE2eeCall(type, targetPeerDid, targetPeerName) {
+      if (targetPeerDid) {
+        activeContactDid = targetPeerDid;
+      }
+      let contact = (Array.isArray(contactsData) ? contactsData.find(function(c) { return c.did === activeContactDid; }) : null) ||
+        (typeof friendsData !== 'undefined' && friendsData && Array.isArray(friendsData.friends) ? friendsData.friends.find(function(f) { return f.did === activeContactDid; }) : null);
       if (!contact && activeContactDid && activeContactDid !== 'self' && !activeContactDid.startsWith('channel:')) {
-        const peerName = document.getElementById('activePeerName')?.innerText || 'Peer';
+        const peerName = targetPeerName || (document.getElementById('activePeerName') ? document.getElementById('activePeerName').innerText : 'Peer');
         contact = {
           did: activeContactDid,
           name: peerName,
@@ -43535,8 +43524,12 @@ window.SovraCreatorStudioEngine = {
           avatar: peerName ? peerName.charAt(0).toUpperCase() : 'P',
           avatarBg: '#0284c7'
         };
+        if (Array.isArray(contactsData)) contactsData.push(contact);
       }
-      if (!contact) return;
+      if (!contact) {
+        if (typeof showAccountToast === 'function') showAccountToast('Select a contact to call', 'warning');
+        return;
+      }
 
       window._activeCallId = null;
       _currentCallType = (type === 'video') ? 'video' : 'audio';
@@ -43945,8 +43938,9 @@ window.SovraCreatorStudioEngine = {
     }
 
     function pollIncomingCalls() {
-      if (!myProfile) return;
-      if (window._activeCallId && document.getElementById('e2eeCallModal').style.display === 'flex') {
+      var isAuth = Boolean(myProfile || localStorage.getItem('sovra_session_token') || (typeof isUserAuthenticated === 'function' && isUserAuthenticated()));
+      if (!isAuth) return;
+      if (window._activeCallId && document.getElementById('e2eeCallModal') && document.getElementById('e2eeCallModal').style.display === 'flex') {
         syncActiveCallSession();
       }
       callFetch('/api/call/incoming')
@@ -44057,6 +44051,15 @@ window.SovraCreatorStudioEngine = {
       let answer = null;
       try {
         if (!inc.sdpOffer) {
+          try {
+            const pollRes = await callFetch('/api/call/incoming');
+            const pollData = await pollRes.json();
+            if (pollData && pollData.incomingCall && pollData.incomingCall.sdpOffer) {
+              inc.sdpOffer = pollData.incomingCall.sdpOffer;
+            }
+          } catch (_) {}
+        }
+        if (!inc.sdpOffer) {
           throw new Error('Missing SDP offer in incoming call');
         }
         await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: inc.sdpOffer }));
@@ -44086,12 +44089,14 @@ window.SovraCreatorStudioEngine = {
         }),
       }).then(function(r) { return r.json(); }).then(function(ansData) {
         if (ansData && ansData.ok) {
+          _isCallAnswered = true;
           setCallState(CallState.CALL_CONNECTED);
           onCallMediaFlowConfirmed();
           syncActiveCallSession();
         }
       }).catch(function(e) { console.warn('[Call] Answer error:', e); });
 
+      _isCallAnswered = true;
       setCallState(CallState.CALL_CONNECTED);
       onCallMediaFlowConfirmed();
 

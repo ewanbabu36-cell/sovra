@@ -71,7 +71,8 @@ export async function handleSecurityCanaryRoutes(ctx: SecurityCanaryRouteContext
   // 3. Anti-Replay Nonce Validation for cryptographic assertions & high-value mutations
   const nonceHeader = req.headers['x-sovra-nonce'];
   if (nonceHeader && typeof nonceHeader === 'string') {
-    const isStrictAntiReplayEndpoint = Boolean(
+    const isMutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes((req.method || 'GET').toUpperCase());
+    const isStrictAntiReplayEndpoint = isMutating && Boolean(
       url.pathname.startsWith('/api/transfer') ||
       url.pathname.startsWith('/api/wallet') ||
       url.pathname.startsWith('/api/voucher') ||
