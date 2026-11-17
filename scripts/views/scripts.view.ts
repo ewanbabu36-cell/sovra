@@ -11613,7 +11613,14 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
       localStorage.removeItem('sovra_logged_out');
       localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-      if (sessionToken) localStorage.setItem('sovra_auth_active', 'true');
+      if (sessionToken) {
+        localStorage.setItem('sovra_auth_active', 'true');
+        localStorage.setItem('sovra_session_token', sessionToken);
+        try {
+          document.cookie = 'sovra_session_token=' + encodeURIComponent(sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+          document.cookie = 'sovra_session=' + encodeURIComponent(sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+        } catch (_) {}
+      }
 
       // Dismiss onboarding modal immediately
       var wom = document.getElementById('welcomeOnboardingModal');
@@ -11624,6 +11631,12 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
 
       showAuthenticatedAppView();
+
+      try {
+        if (typeof initRealtimeLiveConnection === 'function') {
+          initRealtimeLiveConnection();
+        }
+      } catch (_) {}
 
       if (isNewUser) {
         showAccountToast('🎉 Welcome to Sovra! Your ID is ' + myProfile.handle, 'success');
@@ -15479,7 +15492,9 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
       }
 
-      const token = localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || '';
+      const token = (typeof window.getEffectiveSessionToken === 'function')
+        ? window.getEffectiveSessionToken()
+        : (localStorage.getItem('sovra_session_token') || (myProfile && myProfile.sessionToken) || '');
       if (!token || !window.EventSource) {
         updateLiveStatus(navigator.onLine ? 'connected' : 'offline');
         return;
