@@ -11724,15 +11724,21 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             }
           }
         } catch (err) {
-          if (err && err.name === 'NotAllowedError') {
-            showAccountToast('Biometric prompt was cancelled.', 'info');
-            if (heroBtn) {
-              heroBtn.disabled = false;
-              heroBtn.innerHTML = origText;
-            }
-            return false;
-          }
           console.warn('[WebAuthn] Hardware biometric error:', err);
+          var isIpAddressHost = /^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname);
+          if (err && err.name === 'NotAllowedError') {
+            if (isIpAddressHost) {
+              console.warn('[WebAuthn] Hardware passkeys are restricted on IP addresses by W3C spec. Proceeding with 1-Tap Device Touch...');
+              // Fall through to Step 3 so device touch completes and signs user in!
+            } else {
+              showAccountToast('Biometric prompt was cancelled.', 'info');
+              if (heroBtn) {
+                heroBtn.disabled = false;
+                heroBtn.innerHTML = origText;
+              }
+              return false;
+            }
+          }
         }
       }
 
@@ -12496,6 +12502,19 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             womLink.href = 'https://' + window.location.hostname + ':3443' + window.location.pathname;
           }
         }
+      }
+
+      var isIpHost = /^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname);
+      if (isIpHost) {
+        fetch('/api/status').then(function(r) { return r.json(); }).then(function(d) {
+          if (d && d.cloudflareUrl) {
+            var womHint = document.getElementById('womSecureContextHint');
+            if (womHint) {
+              womHint.innerHTML = '✨ <strong>Real Hardware Fingerprint:</strong> Mobile biometrics require a trusted domain. <a href="' + d.cloudflareUrl + '" style="color: #67e8f9; text-decoration: underline; font-weight: 700;">Open on Live HTTPS Domain ➔</a>';
+              womHint.style.display = 'block';
+            }
+          }
+        }).catch(function() {});
       }
 
       const isExplicitlyLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';

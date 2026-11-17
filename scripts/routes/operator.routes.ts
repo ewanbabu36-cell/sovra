@@ -163,6 +163,13 @@ export async function handleOperatorRoutes(ctx: OperatorRouteContext): Promise<b
   // 6. GET /api/status
   if (url.pathname === '/api/status' && req.method === 'GET') {
     const currentLanIp = getLanIpAddress();
+    let cloudflareUrl = '';
+    try {
+      if (fs.existsSync(path.resolve('scripts', 'cloudflare-url.txt'))) {
+        cloudflareUrl = fs.readFileSync(path.resolve('scripts', 'cloudflare-url.txt'), 'utf8').trim();
+      }
+    } catch (_) {}
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
       JSON.stringify({
@@ -185,6 +192,7 @@ export async function handleOperatorRoutes(ctx: OperatorRouteContext): Promise<b
         httpPort: HTTP_PORT,
         httpsUrl: `https://${currentLanIp}:${HTTPS_PORT}`,
         httpUrl: `http://${currentLanIp}:${HTTP_PORT}`,
+        cloudflareUrl: cloudflareUrl || undefined,
       }),
     );
     return true;
