@@ -12118,7 +12118,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         showAccountToast('⚠️ Recovery phrase must contain at least 12 words.');
         return;
       }
-      var revokeOthers = Boolean(document.getElementById('emergencyRevokeOthersCheck') && (document.getElementById('emergencyRevokeOthersCheck') as HTMLInputElement).checked);
+      var chk = document.getElementById('emergencyRevokeOthersCheck');
+      var revokeOthers = Boolean(chk && chk.checked);
       var btn = document.getElementById('emergencySubmitBtn');
       if (btn) {
         btn.disabled = true;
@@ -12150,7 +12151,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             btn.innerText = '✓ Restore Account & Activate Device';
           }
         }
-      } catch (err: any) {
+      } catch (err) {
         showAccountToast('Network error restoring account: ' + (err.message || err));
         if (btn) {
           btn.disabled = false;
