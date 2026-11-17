@@ -89,7 +89,7 @@ export function checkAndPruneCallHeartbeats(): void {
       const callerAge = hb ? now - hb.callerLastSeen : now - session.createdAt;
       const calleeAge = hb ? now - hb.calleeLastSeen : now - session.createdAt;
       const isConnected = session.status === 'connected' || session.status === 'answered';
-      const timeoutThreshold = isConnected ? 12000 : 15000;
+      const timeoutThreshold = isConnected ? 15000 : 45000;
 
       if (callerAge > timeoutThreshold && calleeAge > timeoutThreshold) {
         try {
@@ -97,7 +97,7 @@ export function checkAndPruneCallHeartbeats(): void {
           broadcastCallSse(session.callId, 'call_timeout', {
             callId: session.callId,
             reason: 'ended_timeout',
-            message: 'Call timed out due to heartbeat inactivity (>12s)',
+            message: 'Call timed out due to heartbeat inactivity',
           });
           callHeartbeatMap.delete(session.callId);
           callAudioChunkStore.delete(session.callId);

@@ -2271,69 +2271,114 @@ async function startDevServer() {
     req: http.IncomingMessage,
     _parsedBody?: Record<string, any>,
   ): AuthenticatedPrincipal | null {
-    let token = '';
+    // Helper to validate and convert a session token to an AuthenticatedPrincipal
+    const tryResolveToken = (t: string): AuthenticatedPrincipal | null => {
+      if (!t || typeof t !== 'string') return null;
+      const cleanToken = t.trim();
+      if (!cleanToken) return null;
 
-    // Step 1: Cookie-first extraction for web security (HttpOnly, SameSite=Strict, Secure)
+      const adminPrinc = adminSecurity.resolveAdminSession(cleanToken);
+      if (adminPrinc) return adminPrinc;
+
+      if (sovraDb.isSessionRevoked(cleanToken)) {
+        return null;
+      }
+
+      const user = sovraDb.findUserBySessionToken(cleanToken);
+      if (user) {
+        return createAuthenticatedPrincipal({
+          did: user.did,
+          sessionId: cleanToken,
+          role: user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' ? user.role : 'USER',
+          authenticationMethod: 'BEARER_TOKEN',
+        });
+      }
+      return null;
+    };
+
+    // Candidate 1: Explicit Authorization header (highest priority, immune to ambient cookie pollution)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const candidate = authHeader.substring(7).trim();
+      const princ = tryResolveToken(candidate);
+      if (princ) return princ;
+    }
+
+    // Candidate 2: Explicit X-Sovra-Session-Token custom header
+    if (req.headers['x-sovra-session-token']) {
+      const candidate = String(req.headers['x-sovra-session-token']).trim();
+      const princ = tryResolveToken(candidate);
+      if (princ) return princ;
+    }
+
+    // Candidate 3: Request body sessionToken
+    if (_parsedBody && typeof _parsedBody === 'object') {
+      const bodyCandidate = String(_parsedBody.sessionToken || _parsedBody.peer?.sessionToken || '').trim();
+      if (bodyCandidate) {
+        const princ = tryResolveToken(bodyCandidate);
+        if (princ) return princ;
+      }
+    }
+
+    // Candidate 4: Browser Cookie (sovra_session or sovra_session_token)
     if (req.headers.cookie) {
       const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
       if (match) {
-        token = decodeURIComponent(match[1]).trim();
-        // SEC-07: CSRF Protection for Cookie-Authenticated Mutating Requests
-        const method = (req.method || 'GET').toUpperCase();
-        if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
-          const secFetchSite = req.headers['sec-fetch-site'];
-          const csrfHeader = req.headers['x-csrf-token'] || req.headers['x-sovra-csrf'] || req.headers['x-requested-with'];
-          const hasCustomAuthHeader = Boolean(req.headers['x-sovra-session-token'] || req.headers['x-sovra-nonce'] || req.headers['authorization']);
-          let isSameOriginOrTrusted = Boolean(
-            secFetchSite === 'same-origin' ||
-            secFetchSite === 'same-site' ||
-            secFetchSite === 'none' ||
-            csrfHeader ||
-            hasCustomAuthHeader
-          );
+        const cookieCandidate = decodeURIComponent(match[1]).trim();
+        const princ = tryResolveToken(cookieCandidate);
+        if (princ) {
+          // SEC-07: CSRF Protection for Cookie-Authenticated Mutating Requests
+          const method = (req.method || 'GET').toUpperCase();
+          if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+            const secFetchSite = req.headers['sec-fetch-site'];
+            const csrfHeader = req.headers['x-csrf-token'] || req.headers['x-sovra-csrf'] || req.headers['x-requested-with'];
+            const hasCustomAuthHeader = Boolean(req.headers['x-sovra-session-token'] || req.headers['x-sovra-nonce'] || req.headers['authorization']);
+            let isSameOriginOrTrusted = Boolean(
+              secFetchSite === 'same-origin' ||
+              secFetchSite === 'same-site' ||
+              secFetchSite === 'none' ||
+              csrfHeader ||
+              hasCustomAuthHeader
+            );
 
-          if (!isSameOriginOrTrusted && req.headers.origin && req.headers.origin !== 'null') {
-            try {
-              const originUrl = new URL(String(req.headers.origin));
-              const hostHeader = String(req.headers['x-forwarded-host'] || req.headers.host || '');
-              if (
-                originUrl.host === hostHeader ||
-                originUrl.hostname === 'localhost' ||
-                originUrl.hostname === '127.0.0.1' ||
-                originUrl.hostname.endsWith('.trycloudflare.com') ||
-                net.isIP(originUrl.hostname)
-              ) {
-                isSameOriginOrTrusted = true;
-              }
-            } catch (_) {}
-          }
+            if (!isSameOriginOrTrusted && req.headers.origin && req.headers.origin !== 'null') {
+              try {
+                const originUrl = new URL(String(req.headers.origin));
+                const hostHeader = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+                if (
+                  originUrl.host === hostHeader ||
+                  originUrl.hostname === 'localhost' ||
+                  originUrl.hostname === '127.0.0.1' ||
+                  originUrl.hostname.endsWith('.trycloudflare.com') ||
+                  net.isIP(originUrl.hostname)
+                ) {
+                  isSameOriginOrTrusted = true;
+                }
+              } catch (_) {}
+            }
 
-          if (!isSameOriginOrTrusted && secFetchSite === 'cross-site') {
-            return null; // CSRF blocked!
+            if (!isSameOriginOrTrusted && secFetchSite === 'cross-site') {
+              return null; // CSRF blocked!
+            }
           }
+          return princ;
         }
       }
     }
 
-    // Step 2: Graceful fallback to Authorization: Bearer <token> or header for mobile API clients
-    if (!token) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7).trim();
-      } else if (req.headers['x-sovra-session-token']) {
-        token = String(req.headers['x-sovra-session-token']).trim();
-      }
+    // If explicit or cookie authentication tokens were provided but all failed to resolve
+    const hasAnyTokenProvided = Boolean(
+      (authHeader && authHeader.startsWith('Bearer ')) ||
+      req.headers['x-sovra-session-token'] ||
+      (_parsedBody && typeof _parsedBody === 'object' && (_parsedBody.sessionToken || _parsedBody.peer?.sessionToken)) ||
+      (req.headers.cookie && /(?:^|;\s*)(?:sovra_session|sovra_session_token)=/.test(req.headers.cookie))
+    );
+    if (hasAnyTokenProvided) {
+      // Invalid or expired token was presented
+      return null;
     }
 
-    // PRIV-01 & SESS-02: Query-parameter authentication tokens are strictly prohibited (CWE-598)
-    if (!token && _parsedBody && typeof _parsedBody === 'object') {
-      if (_parsedBody.sessionToken) {
-        token = String(_parsedBody.sessionToken).trim();
-      } else if (_parsedBody.peer && typeof _parsedBody.peer === 'object' && _parsedBody.peer.sessionToken) {
-        token = String(_parsedBody.peer.sessionToken).trim();
-      }
-    }
-
+    // Sovereign direct node authorization via explicit X-Sovra-DID header or verified actor DID
     const claimedDid = String(
       req.headers['x-sovra-did'] ||
       _parsedBody?.actorDid ||
@@ -2342,30 +2387,6 @@ async function startDevServer() {
       _parsedBody?.fromDid ||
       ''
     ).trim();
-
-    if (token) {
-      const adminPrinc = adminSecurity.resolveAdminSession(token);
-      if (adminPrinc) return adminPrinc;
-
-      if (sovraDb.isSessionRevoked(token)) {
-        return null;
-      }
-
-      const user = sovraDb.findUserBySessionToken(token);
-      if (user) {
-        return createAuthenticatedPrincipal({
-          did: user.did,
-          sessionId: token,
-          role: user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' ? user.role : 'USER',
-          authenticationMethod: 'BEARER_TOKEN',
-        });
-      }
-
-      // Invalid or tampered token
-      return null;
-    }
-
-    // Sovereign direct node authorization via explicit X-Sovra-DID header or verified actor DID
     const sovereignDidHeader = req.headers['x-sovra-did'] ? String(req.headers['x-sovra-did']).trim() : '';
     const actorDid = sovereignDidHeader || claimedDid;
     if (actorDid) {
@@ -2923,37 +2944,51 @@ async function startDevServer() {
     // ⚡ REALTIME SERVER-SENT EVENTS (SSE) STREAM
     // ==========================================
     if ((url.pathname === '/api/realtime/stream' || url.pathname === '/api/chat/events' || url.pathname === '/api/chat/stream') && req.method === 'GET') {
+      const queryToken = String(url.searchParams.get('token') || url.searchParams.get('sessionToken') || '').trim();
       const authHeader = req.headers.authorization;
-      let token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.substring(7).trim() : '';
-      if (!token && req.headers.cookie) {
+      const headerBearer = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.substring(7).trim() : '';
+      const customHeaderToken = String(req.headers['x-sovra-session-token'] || '').trim();
+      let cookieToken = '';
+      if (req.headers.cookie) {
         const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
-        if (match) token = decodeURIComponent(match[1]).trim();
+        if (match) cookieToken = decodeURIComponent(match[1]).trim();
       }
-      if (!token) {
-        token = String(url.searchParams.get('token') || url.searchParams.get('sessionToken') || '').trim();
-      }
-      if (!token) {
+
+      // Check candidate tokens: explicit query/bearer token first, then cookie
+      const candidateTokens = [queryToken, headerBearer, customHeaderToken, cookieToken].filter(Boolean);
+      if (candidateTokens.length === 0) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Valid session token required for realtime stream' }));
         return;
       }
-      if (sovraDb.isSessionRevoked(token)) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Session revoked' }));
-        return;
+
+      let userDid = '';
+      let matchedToken = '';
+      let validUser: any = null;
+
+      for (const cand of candidateTokens) {
+        if (sovraDb.isSessionRevoked(cand)) continue;
+        const adminPrinc = adminSecurity.resolveAdminSession(cand);
+        if (adminPrinc) {
+          userDid = adminPrinc.did;
+          matchedToken = cand;
+          break;
+        }
+        const u = sovraDb.findUserBySessionToken(cand);
+        if (u) {
+          userDid = u.did;
+          matchedToken = cand;
+          validUser = u;
+          break;
+        }
       }
-      const adminPrinc = adminSecurity.resolveAdminSession(token);
-      let userDid = adminPrinc ? adminPrinc.did : '';
-      if (!userDid) {
-        const u = sovraDb.findUserBySessionToken(token);
-        if (u) userDid = u.did;
-      }
+
       if (!userDid) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid session token' }));
         return;
       }
-      const user = sovraDb.findUserByDid(userDid) || { did: userDid };
+      const user = validUser || sovraDb.findUserByDid(userDid) || { did: userDid };
 
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
