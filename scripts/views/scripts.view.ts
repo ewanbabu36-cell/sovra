@@ -10286,6 +10286,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         if (banner) {
           banner.style.display = isStandalone ? 'none' : (sessionStorage.getItem('pwa_dismissed') ? 'none' : 'flex');
         }
+        const womChip = document.getElementById('womPwaInstallChip');
+        if (womChip) {
+          womChip.style.display = isStandalone ? 'none' : 'block';
+        }
         const pwaMeBtn = document.getElementById('pwaMeInstallBtn');
         if (pwaMeBtn && isStandalone) {
           pwaMeBtn.style.display = 'none';
@@ -13682,17 +13686,18 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       });
     }
 
-    async function claimDeviceLinkTicket() {
+    async function claimDeviceLinkTicket(ticketOverride) {
       clearDeviceLinkNotice();
       var ticketInput = document.getElementById('deviceLinkTicketInput');
       var nameInput = document.getElementById('deviceLinkDeviceNameInput');
-      var ticket = ticketInput ? ticketInput.value.trim() : '';
+      var ticket = (typeof ticketOverride === 'string' && ticketOverride) ? ticketOverride.trim() : (ticketInput ? ticketInput.value.trim() : '');
       var deviceName = nameInput ? nameInput.value.trim() : '';
 
       if (!ticket) {
         showDeviceLinkNotice('⚠️ Please enter the pairing ticket code.', false);
         return;
       }
+      if (ticketInput) ticketInput.value = ticket;
 
       var btn = document.getElementById('btnClaimDeviceLink');
       if (btn) {
@@ -31228,6 +31233,17 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       if (!payload) return;
       closeQrScannerModal();
       
+      if (typeof payload === 'string' && (payload.startsWith('sovra:link:') || payload.startsWith('slt_'))) {
+        const ticket = payload.replace(/^sovra:link:/, '').trim();
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('📲 Pairing ticket detected! Connecting companion device...', 'success');
+        }
+        if (typeof claimDeviceLinkTicket === 'function') {
+          claimDeviceLinkTicket(ticket);
+        }
+        return;
+      }
+
       let parsed = null;
       try {
         parsed = JSON.parse(payload);
