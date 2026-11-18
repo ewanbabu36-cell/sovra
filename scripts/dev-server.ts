@@ -1335,7 +1335,7 @@ const SOVRA_PWA_MANIFEST = {
   ],
 };
 
-const SOVRA_SERVICE_WORKER_SCRIPT = `const CACHE_NAME = 'sovra-pwa-v7';
+const SOVRA_SERVICE_WORKER_SCRIPT = `const CACHE_NAME = 'sovra-pwa-v8';
 const STATIC_ASSETS = [
   '/',
   '/manifest.webmanifest',

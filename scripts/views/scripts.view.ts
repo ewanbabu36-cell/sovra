@@ -11301,14 +11301,12 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
           const isLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
           const hostBtn = document.getElementById('womQuickHostLoginBtn');
-          if (hostBtn) hostBtn.style.display = isLocal ? 'flex' : 'none';
+          if (hostBtn) hostBtn.style.display = 'none';
 
           const handleIn = document.getElementById('womLoginHandleInput');
           const pinIn = document.getElementById('womLoginPinInput');
-          if (!isLocal) {
-            if (handleIn && (handleIn.value === 'laptop_host' || handleIn.value === '@laptop_host')) handleIn.value = '';
-            if (pinIn && pinIn.value === '123456') pinIn.value = '';
-          }
+          if (handleIn && (handleIn.value === 'laptop_host' || handleIn.value === '@laptop_host')) handleIn.value = '';
+          if (pinIn && pinIn.value === '123456') pinIn.value = '';
         } else {
           wom.classList.add('modal-dismissed');
           wom.style.display = 'none';
