@@ -11428,7 +11428,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <label style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Username or Handle</label>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-                <input type="text" id="womLoginHandleInput" value="@laptop_host" placeholder="username (e.g. rahul)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+                <input type="text" id="womLoginHandleInput" value="laptop_host" placeholder="username (e.g. rahul)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
               </div>
             </div>
 
