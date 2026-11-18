@@ -20,5 +20,6 @@ export * from './light-client.js';
 export * from './chameleon.js';
 export * from './delay-skew.js';
 export * from './bootstrap-seeds.js';
+export * from './signaling.js';
 export * from './mesh/index.js';
 
