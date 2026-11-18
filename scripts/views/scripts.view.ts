@@ -11299,6 +11299,16 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           if (typeof switchWomAuthTab === 'function') {
             switchWomAuthTab('login');
           }
+          const isLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+          const hostBtn = document.getElementById('womQuickHostLoginBtn');
+          if (hostBtn) hostBtn.style.display = isLocal ? 'flex' : 'none';
+
+          const handleIn = document.getElementById('womLoginHandleInput');
+          const pinIn = document.getElementById('womLoginPinInput');
+          if (!isLocal) {
+            if (handleIn && (handleIn.value === 'laptop_host' || handleIn.value === '@laptop_host')) handleIn.value = '';
+            if (pinIn && pinIn.value === '123456') pinIn.value = '';
+          }
         } else {
           wom.classList.add('modal-dismissed');
           wom.style.display = 'none';
@@ -12566,8 +12576,24 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       let savedProfile = localStorage.getItem('sovra_user_profile');
       let sessionToken = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
 
-      // Seamless Auto-Login: If no profile saved and not explicitly logged out, adopt default host session
-      if (!isExplicitlyLoggedOut && !savedProfile && window.__SOVRA_HYDRATED_STATE__ && window.__SOVRA_HYDRATED_STATE__.hostSession) {
+      const isLocalHostMachine = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+      // Remote device safety: If visiting from an external device/domain and cached profile is default host, wipe it
+      if (!isLocalHostMachine && savedProfile) {
+        try {
+          const parsedProf = JSON.parse(savedProfile);
+          if (parsedProf && (parsedProf.handle === '@laptop_host' || parsedProf.handle === 'laptop_host')) {
+            localStorage.removeItem('sovra_user_profile');
+            localStorage.removeItem('sovra_session_token');
+            localStorage.setItem('sovra_logged_out', 'true');
+            savedProfile = null;
+            sessionToken = '';
+          }
+        } catch (_) {}
+      }
+
+      // Seamless Auto-Login: ONLY if directly accessing on localhost host machine (not remote clients/ngrok)
+      if (isLocalHostMachine && !isExplicitlyLoggedOut && !savedProfile && window.__SOVRA_HYDRATED_STATE__ && window.__SOVRA_HYDRATED_STATE__.hostSession) {
         try {
           const _hs = window.__SOVRA_HYDRATED_STATE__.hostSession;
           const _autoProf = {
@@ -14177,6 +14203,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
       const handleInput = document.getElementById('womLoginHandleInput');
       if (handleInput) handleInput.value = '';
+      const pinInput = document.getElementById('womLoginPinInput');
+      if (pinInput) pinInput.value = '';
       const regHandleInput = document.getElementById('womHandleInput');
       if (regHandleInput) regHandleInput.value = '';
       const regNameInput = document.getElementById('womNameInput');

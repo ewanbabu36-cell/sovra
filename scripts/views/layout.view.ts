@@ -11425,10 +11425,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <!-- Identifier: Handle or DID -->
             <div style="margin-bottom: 1rem; text-align: left;">
-              <label style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 5px;">Username or Handle</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1;">Username or Handle</label>
+              </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-                <input type="text" id="womLoginHandleInput" value="laptop_host" placeholder="username (e.g. rahul)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+                <input type="text" id="womLoginHandleInput" value="" placeholder="username (e.g. rahul)" autocomplete="username" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
               </div>
             </div>
 
@@ -11440,14 +11442,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #94a3b8; font-size: 0.9rem;">🔒</span>
-                <input type="password" id="womLoginPinInput" maxlength="8" value="123456" placeholder="Enter PIN (e.g. 123456)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
+                <input type="password" id="womLoginPinInput" maxlength="8" value="" placeholder="Enter PIN (e.g. 123456)" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
               </div>
             </div>
 
             <button id="womLoginSubmitBtn" onclick="triggerUserLogin()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);">
               <span>Sign In</span> <span>➔</span>
             </button>
-            <button type="button" id="womQuickHostLoginBtn" onclick="loginAsDefaultHost()" style="width: 100%; margin-top: 8px; padding: 0.72rem; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 12px; color: #60a5fa; font-weight: 700; font-size: 0.86rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <button type="button" id="womQuickHostLoginBtn" onclick="loginAsDefaultHost()" style="display: none; width: 100%; margin-top: 8px; padding: 0.72rem; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 12px; color: #60a5fa; font-weight: 700; font-size: 0.86rem; cursor: pointer; align-items: center; justify-content: center; gap: 6px;">
               <span>💻</span> <span>1-Tap Host Node Login (@laptop_host)</span>
             </button>
             <button type="button" id="womDeviceLinkQrBtn" onclick="openDeviceLinkModal()" style="width: 100%; margin-top: 8px; padding: 0.72rem; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; color: #34d399; font-weight: 700; font-size: 0.86rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
