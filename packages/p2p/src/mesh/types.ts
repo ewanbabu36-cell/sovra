@@ -103,7 +103,10 @@ export type MeshEnvelopeType =
   | 'SYNC_RESPONSE'
   | 'DELIVERY_RECEIPT'
   | 'MEDIA_CHUNK_REQUEST'
-  | 'MEDIA_CHUNK_RESPONSE';
+  | 'MEDIA_CHUNK_RESPONSE'
+  | 'HANDOVER_REQUEST'
+  | 'HANDOVER_OFFER'
+  | 'HANDOVER_COMPLETE';
 
 export interface MeshEnvelope {
   readonly envelopeId: string; // SHA-256 hash of (originDid + payloadBytes + timestamp + nonce)
@@ -193,4 +196,38 @@ export interface MeshDiagnostics {
   readonly duplicatePacketsDropped: number;
   readonly lastSyncTimestamp: number;
   readonly currentNetworkStatus: MeshNetworkStatus;
+}
+
+// ==========================================
+// DUAL-RADIO HYBRID HANDOVER (BLE <-> WI-FI DIRECT)
+// ==========================================
+
+export const MESH_MEDIA_HANDOVER_THRESHOLD_BYTES = 64 * 1024; // 64 KB
+
+export type MeshHandoverType = 'ble_to_wifi_direct' | 'wifi_direct_to_ble';
+
+export interface HandoverRequestMessage {
+  readonly transferId: string;
+  readonly payloadSizeBytes: number;
+  readonly sha256Hex: string;
+  readonly mimeType: string;
+  readonly fileName?: string | undefined;
+  readonly senderDid?: string | undefined;
+}
+
+export interface HandoverOfferMessage {
+  readonly transferId: string;
+  readonly groupOwnerAddress: string;
+  readonly port: number;
+  readonly authSecretToken: string;
+  readonly status?: 'ACCEPTED' | 'REJECTED' | undefined;
+}
+
+export interface HandoverCompleteMessage {
+  readonly transferId: string;
+  readonly status: 'SUCCESS' | 'FAILED';
+  readonly bytesTransferred: number;
+  readonly receiptSignature: string;
+  readonly sha256Hex?: string | undefined;
+  readonly error?: string | undefined;
 }

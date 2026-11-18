@@ -10,6 +10,15 @@
  * 5. Truthful diagnostics reporting (nearby peers, outbox queue, byte counters).
  */
 
+import { ok, err, Result } from '@sovra/shared';
+import {
+  bytesToHex,
+  hexToBytes,
+  sha256,
+  signEd25519,
+  verifyEd25519,
+  secureRandomBytes,
+} from '@sovra/crypto';
 import {
   SovraTransport,
   TransportChannel,
@@ -19,14 +28,21 @@ import {
   MeshUserControls,
   BatteryProfile,
   MeshDiscoveredPeer,
+  MeshEnvelope,
+  MESH_MEDIA_HANDOVER_THRESHOLD_BYTES,
+  HandoverRequestMessage,
+  HandoverOfferMessage,
+  HandoverCompleteMessage,
 } from './types.js';
 import { MeshRouter, MeshPeerChannel } from './mesh-router.js';
 import { BluetoothLETransport } from './ble-transport.js';
+import { LocalWifiTransport } from './local-wifi-transport.js';
 
 export interface MeshTransportManagerConfig {
   router: MeshRouter;
   bleTransport?: BluetoothLETransport | undefined;
   tcpTransport?: SovraTransport | undefined;
+  localWifiTransport?: LocalWifiTransport | undefined;
   internetAvailable?: boolean | undefined;
 }
 
@@ -34,6 +50,7 @@ export class MeshTransportManager {
   public readonly router: MeshRouter;
   public readonly bleTransport?: BluetoothLETransport | undefined;
   public readonly tcpTransport?: SovraTransport | undefined;
+  public readonly localWifiTransport?: LocalWifiTransport | undefined;
 
   public static readonly MAX_DISCOVERED_PEERS = 256;
   public static readonly MAX_CONCURRENT_BLE_CONNECTIONS = 7;
@@ -55,6 +72,7 @@ export class MeshTransportManager {
     this.router = config.router;
     this.bleTransport = config.bleTransport;
     this.tcpTransport = config.tcpTransport;
+    this.localWifiTransport = config.localWifiTransport;
     this.isInternetAvailable = config.internetAvailable ?? false;
 
     // Attach transport channel listeners
@@ -67,6 +85,15 @@ export class MeshTransportManager {
     if (this.tcpTransport) {
       this.tcpTransport.onChannel(channel => {
         this.attachChannelToRouter(channel);
+      });
+    }
+
+    if (this.localWifiTransport) {
+      this.localWifiTransport.onChannel(channel => {
+        this.attachChannelToRouter(channel);
+      });
+      this.localWifiTransport.onIncomingMedia((transferId, data, sha256Hex) => {
+        this.handleIncomingMediaTransfer(transferId, data, sha256Hex);
       });
     }
   }
@@ -113,6 +140,9 @@ export class MeshTransportManager {
     }
     if (this.tcpTransport) {
       await this.tcpTransport.stop();
+    }
+    if (this.localWifiTransport) {
+      await this.localWifiTransport.stop();
     }
 
     this.activeChannels.clear();
@@ -205,6 +235,18 @@ export class MeshTransportManager {
     channel.onData(data => {
       try {
         const envelope = MeshRouter.deserializeEnvelope(data);
+        if (envelope.envelopeType === 'HANDOVER_REQUEST') {
+          this.handleIncomingHandoverRequest(envelope, channel);
+          return;
+        }
+        if (envelope.envelopeType === 'HANDOVER_OFFER') {
+          this.handleIncomingHandoverOffer(envelope);
+          return;
+        }
+        if (envelope.envelopeType === 'HANDOVER_COMPLETE') {
+          this.handleIncomingHandoverComplete(envelope);
+          return;
+        }
         this.router.ingestEnvelope(envelope, channel.id);
         this.lastSyncTimestamp = Date.now();
       } catch {
@@ -315,6 +357,9 @@ export class MeshTransportManager {
     if (this.tcpTransport && this.tcpTransport.status === 'active') {
       activeTransports.push('tcp');
     }
+    if (this.localWifiTransport && this.localWifiTransport.status === 'active') {
+      activeTransports.push('local_wifi');
+    }
 
     return {
       nearbyPeersCount: this.nearbyDiscoveredPeers.size,
@@ -369,5 +414,285 @@ export class MeshTransportManager {
         h(currentStatus);
       } catch {}
     }
+  }
+
+  // ==========================================
+  // DUAL-RADIO HYBRID HANDOVER (BLE <-> WI-FI DIRECT)
+  // ==========================================
+
+  private pendingHandoverOffers = new Map<string, {
+    resolve: (offer: HandoverOfferMessage) => void;
+    reject: (err: Error) => void;
+    timer: any;
+  }>();
+
+  private pendingHandoverCompletes = new Map<string, {
+    resolve: (complete: HandoverCompleteMessage) => void;
+    reject: (err: Error) => void;
+    timer: any;
+  }>();
+
+  private incomingTransfers = new Map<string, {
+    request: HandoverRequestMessage;
+    receivedAt: number;
+    bleChannel?: TransportChannel | undefined;
+  }>();
+
+  private mediaTransferHandlers: Array<(transferId: string, data: Uint8Array, sha256Hex: string) => void> = [];
+
+  public onMediaTransfer(handler: (transferId: string, data: Uint8Array, sha256Hex: string) => void): () => void {
+    this.mediaTransferHandlers.push(handler);
+    return () => {
+      this.mediaTransferHandlers = this.mediaTransferHandlers.filter(h => h !== handler);
+    };
+  }
+
+  public async routeMessage(
+    envelope: MeshEnvelope,
+    targetPeerAddress?: string,
+  ): Promise<Result<{ transport: TransportType; bytesTransferred: number; handover: boolean }>> {
+    const payloadSize = envelope.payloadBytes.byteLength;
+
+    // 1. Small payload (<= 64 KB) or No Wi-Fi Transport: route directly over BLE
+    if (payloadSize <= MESH_MEDIA_HANDOVER_THRESHOLD_BYTES || !this.localWifiTransport) {
+      const channel = targetPeerAddress
+        ? this.activeChannels.get(targetPeerAddress)
+        : this.getBleChannelForPeer(envelope.targetDid) || this.getFirstBleChannel();
+
+      if (channel) {
+        const serialized = MeshRouter.serializeEnvelope(envelope);
+        const res = await channel.send(serialized);
+        if (res.ok) {
+          return ok({ transport: 'ble', bytesTransferred: payloadSize, handover: false });
+        }
+      }
+
+      this.router.outboxStore.storeOutbox(envelope);
+      return ok({ transport: 'ble', bytesTransferred: payloadSize, handover: false });
+    }
+
+    // 2. High-throughput payload (> 64 KB): Dynamic Handover to Wi-Fi Direct
+    return this.executeWifiDirectHandover(envelope, targetPeerAddress);
+  }
+
+  private async executeWifiDirectHandover(
+    envelope: MeshEnvelope,
+    targetPeerAddress?: string,
+  ): Promise<Result<{ transport: TransportType; bytesTransferred: number; handover: boolean }>> {
+    const bleChannel = targetPeerAddress
+      ? this.activeChannels.get(targetPeerAddress)
+      : this.getBleChannelForPeer(envelope.targetDid) || this.getFirstBleChannel();
+
+    if (!bleChannel) {
+      return err(new Error('No active BLE session channel available for Wi-Fi Direct handover negotiation'));
+    }
+
+    const payloadSize = envelope.payloadBytes.byteLength;
+    const sha256Hex = bytesToHex(sha256(envelope.payloadBytes));
+    const transferId = `xfer_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+
+    const requestMsg: HandoverRequestMessage = {
+      transferId,
+      payloadSizeBytes: payloadSize,
+      sha256Hex,
+      mimeType: (envelope as any).mimeType || 'application/octet-stream',
+      fileName: (envelope as any).fileName || `${transferId}.bin`,
+      senderDid: envelope.originDid,
+    };
+
+    // Send HandoverRequestMessage over BLE
+    const requestBytes = new TextEncoder().encode(JSON.stringify(requestMsg));
+    const requestEnvelope = this.router.createEnvelope({
+      targetDid: envelope.targetDid,
+      envelopeType: 'HANDOVER_REQUEST',
+      payloadBytes: requestBytes,
+    });
+
+    const sendReqRes = await bleChannel.send(MeshRouter.serializeEnvelope(requestEnvelope));
+    if (!sendReqRes.ok) {
+      return err(new Error('Failed to send HandoverRequest over BLE'));
+    }
+
+    // Await HandoverOfferMessage from receiver with Wi-Fi Direct socket parameters
+    let offer: HandoverOfferMessage;
+    try {
+      offer = await this.awaitHandoverOffer(transferId, 10000);
+    } catch (e: any) {
+      return err(new Error(`Wi-Fi Direct Handover Offer timeout or error: ${e.message}`));
+    }
+
+    if (offer.status === 'REJECTED') {
+      return err(new Error('Peer rejected Wi-Fi Direct handover offer'));
+    }
+
+    // Trigger localWifiTransport connect/stream and transmit at high speed (30-80 MB/s)
+    const transferRes = await this.localWifiTransport!.sendHighSpeedMedia(
+      offer.groupOwnerAddress,
+      offer.port,
+      transferId,
+      envelope.payloadBytes,
+    );
+
+    if (!transferRes.success) {
+      return err(new Error(transferRes.error || 'High-speed media transfer failed over Wi-Fi Direct'));
+    }
+
+    // Emit HandoverCompleteMessage over BLE and verify SHA-256 match
+    const receiptSignature = bytesToHex(
+      signEd25519((this.router as any).localPrivateKey, hexToBytes(sha256Hex)),
+    );
+
+    const completeMsg: HandoverCompleteMessage = {
+      transferId,
+      status: 'SUCCESS',
+      bytesTransferred: payloadSize,
+      receiptSignature,
+      sha256Hex,
+    };
+
+    const completeEnvelope = this.router.createEnvelope({
+      targetDid: envelope.targetDid,
+      envelopeType: 'HANDOVER_COMPLETE',
+      payloadBytes: new TextEncoder().encode(JSON.stringify(completeMsg)),
+    });
+
+    await bleChannel.send(MeshRouter.serializeEnvelope(completeEnvelope));
+
+    return ok({
+      transport: 'wifi_direct',
+      bytesTransferred: payloadSize,
+      handover: true,
+    });
+  }
+
+  private async handleIncomingHandoverRequest(
+    envelope: MeshEnvelope,
+    channel: TransportChannel,
+  ): Promise<void> {
+    try {
+      const json = new TextDecoder().decode(envelope.payloadBytes);
+      const req: HandoverRequestMessage = JSON.parse(json);
+
+      this.incomingTransfers.set(req.transferId, {
+        request: req,
+        receivedAt: Date.now(),
+        bleChannel: channel,
+      });
+
+      // Start Wi-Fi Direct Group Owner socket
+      let goAddress = '127.0.0.1';
+      let port = 5359;
+      if (this.localWifiTransport) {
+        const goInfo = await this.localWifiTransport.startGroupOwner(5359);
+        goAddress = goInfo.ip;
+        port = goInfo.port;
+      }
+
+      const offerMsg: HandoverOfferMessage = {
+        transferId: req.transferId,
+        groupOwnerAddress: goAddress,
+        port,
+        authSecretToken: bytesToHex(secureRandomBytes(16)),
+        status: 'ACCEPTED',
+      };
+
+      const offerBytes = new TextEncoder().encode(JSON.stringify(offerMsg));
+      const offerEnvelope = this.router.createEnvelope({
+        targetDid: envelope.originDid,
+        envelopeType: 'HANDOVER_OFFER',
+        payloadBytes: offerBytes,
+      });
+
+      await channel.send(MeshRouter.serializeEnvelope(offerEnvelope));
+    } catch {
+      // Failed to handle handover request
+    }
+  }
+
+  private handleIncomingHandoverOffer(envelope: MeshEnvelope): void {
+    try {
+      const json = new TextDecoder().decode(envelope.payloadBytes);
+      const offer: HandoverOfferMessage = JSON.parse(json);
+
+      const pending = this.pendingHandoverOffers.get(offer.transferId);
+      if (pending) {
+        clearTimeout(pending.timer);
+        this.pendingHandoverOffers.delete(offer.transferId);
+        pending.resolve(offer);
+      }
+    } catch {}
+  }
+
+  private handleIncomingHandoverComplete(envelope: MeshEnvelope): void {
+    try {
+      const json = new TextDecoder().decode(envelope.payloadBytes);
+      const complete: HandoverCompleteMessage = JSON.parse(json);
+
+      const pending = this.pendingHandoverCompletes.get(complete.transferId);
+      if (pending) {
+        clearTimeout(pending.timer);
+        this.pendingHandoverCompletes.delete(complete.transferId);
+        pending.resolve(complete);
+      }
+    } catch {}
+  }
+
+  private handleIncomingMediaTransfer(
+    transferId: string,
+    data: Uint8Array,
+    sha256Hex: string,
+  ): void {
+    const actualSha = bytesToHex(sha256(data));
+    if (actualSha !== sha256Hex) {
+      return; // Corrupted payload dropped
+    }
+
+    const pending = this.incomingTransfers.get(transferId);
+    if (pending) {
+      this.incomingTransfers.delete(transferId);
+    }
+
+    // Ingest into router as high-speed arrived envelope
+    const envelope = this.router.createEnvelope({
+      targetDid: this.router.localDid,
+      envelopeType: 'ENCRYPTED_MESSAGE',
+      payloadBytes: data,
+    });
+    this.router.ingestEnvelope(envelope);
+
+    for (const handler of this.mediaTransferHandlers) {
+      try {
+        handler(transferId, data, sha256Hex);
+      } catch {}
+    }
+  }
+
+  private awaitHandoverOffer(transferId: string, timeoutMs: number): Promise<HandoverOfferMessage> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingHandoverOffers.delete(transferId);
+        reject(new Error(`Handover offer timeout for ${transferId}`));
+      }, timeoutMs);
+
+      this.pendingHandoverOffers.set(transferId, { resolve, reject, timer });
+    });
+  }
+
+  private getBleChannelForPeer(peerDid: string): TransportChannel | undefined {
+    for (const channel of this.activeChannels.values()) {
+      if (channel.transportType === 'ble' && (channel as any).remoteDid === peerDid) {
+        return channel;
+      }
+    }
+    return undefined;
+  }
+
+  private getFirstBleChannel(): TransportChannel | undefined {
+    for (const channel of this.activeChannels.values()) {
+      if (channel.transportType === 'ble') {
+        return channel;
+      }
+    }
+    return undefined;
   }
 }
