@@ -12,5 +12,6 @@ export * from './mesh-router.js';
 export * from './sync-protocol.js';
 export * from './ble-transport.js';
 export * from './local-wifi-transport.js';
+export * from './wifi-adapters.js';
 export * from './sync-chunks.js';
 export * from './coordinator.js';

@@ -10,6 +10,7 @@
  */
 
 import { ok, err, Result } from '@sovra/shared';
+import { bytesToHex, sha256 } from '@sovra/crypto';
 import {
   SovraTransport,
   TransportChannel,
@@ -19,6 +20,7 @@ import {
   MeshDiscoveredPeer,
   DiscoveryAdvertisement,
 } from './types.js';
+import { WifiDirectPlatformAdapter } from './wifi-adapters.js';
 
 export class LocalWifiBus {
   private static instance: LocalWifiBus | null = null;
@@ -146,6 +148,7 @@ export class LocalWifiBus {
 export interface LocalWifiTransportConfig {
   localAddress: string;
   bus?: LocalWifiBus;
+  adapter?: WifiDirectPlatformAdapter;
   id?: string;
 }
 
@@ -153,6 +156,7 @@ export class LocalWifiTransport implements SovraTransport {
   public readonly id: string;
   public readonly type: TransportType = 'local_wifi';
   public readonly localAddress: string;
+  public readonly adapter?: WifiDirectPlatformAdapter | undefined;
   public status: TransportStatus = 'inactive';
 
   public readonly capabilities: TransportCapabilities = {
@@ -173,12 +177,63 @@ export class LocalWifiTransport implements SovraTransport {
   private discoveryHandler: ((peer: MeshDiscoveredPeer) => void) | null = null;
   private channelHandlers: Array<(channel: TransportChannel) => void> = [];
   private connectedChannels = new Map<string, TransportChannel>();
+  private incomingMediaHandlers: Array<(transferId: string, data: Uint8Array, sha256Hex: string) => void> = [];
 
   constructor(config: LocalWifiTransportConfig) {
     this.localAddress = config.localAddress;
     this.id = config.id ?? `wifi-${config.localAddress}`;
+    this.adapter = config.adapter;
     this.bus = config.bus ?? LocalWifiBus.getInstance();
     this.bus.register(this.localAddress, this);
+
+    if (this.adapter) {
+      this.adapter.onIncomingMedia((transferId, data, sha256Hex) => {
+        for (const handler of this.incomingMediaHandlers) {
+          try {
+            handler(transferId, data, sha256Hex);
+          } catch {}
+        }
+      });
+    }
+  }
+
+  public onIncomingMedia(
+    handler: (transferId: string, data: Uint8Array, sha256Hex: string) => void,
+  ): () => void {
+    this.incomingMediaHandlers.push(handler);
+    return () => {
+      this.incomingMediaHandlers = this.incomingMediaHandlers.filter(h => h !== handler);
+    };
+  }
+
+  public async startGroupOwner(port = 5359): Promise<{ ip: string; port: number }> {
+    if (this.adapter) {
+      return this.adapter.startGroupOwner(port);
+    }
+    return { ip: '127.0.0.1', port };
+  }
+
+  public async sendHighSpeedMedia(
+    targetHost: string,
+    port: number,
+    transferId: string,
+    payload: Uint8Array,
+    onProgress?: (bytesTransferred: number, totalBytes: number) => void,
+  ): Promise<{ success: boolean; sha256Hex?: string; error?: string }> {
+    if (this.adapter?.sendMedia) {
+      return this.adapter.sendMedia(targetHost, port, transferId, payload, onProgress);
+    }
+
+    const connRes = await this.connect(`${targetHost}:${port}`);
+    if (!connRes.ok) {
+      return { success: false, error: connRes.error.message };
+    }
+    const sendRes = await connRes.value.send(payload);
+    if (!sendRes.ok) {
+      return { success: false, error: sendRes.error.message };
+    }
+    const shaHex = bytesToHex(sha256(payload));
+    return { success: true, sha256Hex: shaHex };
   }
 
   public get isDiscoveringActive(): boolean {
@@ -195,6 +250,9 @@ export class LocalWifiTransport implements SovraTransport {
     this.isDiscovering = false;
     this.discoveryHandler = null;
     this.bus.stopAdvertisement(this.localAddress);
+    if (this.adapter) {
+      await this.adapter.stopWifiDirect().catch(() => {});
+    }
     for (const channel of this.connectedChannels.values()) {
       await channel.close();
     }
@@ -225,6 +283,26 @@ export class LocalWifiTransport implements SovraTransport {
     const existing = this.connectedChannels.get(peerAddress);
     if (existing) {
       return ok(existing);
+    }
+
+    if (this.adapter) {
+      let host = peerAddress;
+      let port = 5359;
+      if (peerAddress.includes(':')) {
+        const parts = peerAddress.split(':');
+        host = parts[0];
+        port = parseInt(parts[1], 10) || 5359;
+      }
+      try {
+        const channel = await this.adapter.connectToGroupOwner(host, port);
+        this.connectedChannels.set(peerAddress, channel);
+        channel.onClose(() => {
+          this.connectedChannels.delete(peerAddress);
+        });
+        return ok(channel);
+      } catch (e: any) {
+        return err(new Error(e.message || 'Failed to connect via Wi-Fi Direct adapter'));
+      }
     }
 
     const { channelA, channelB } = this.bus.createLink(this.localAddress, peerAddress);
