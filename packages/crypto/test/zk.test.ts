@@ -6,8 +6,12 @@ import fs from 'fs';
 import path from 'path';
 
 describe('BN254 Groth16 Zero-Knowledge Cryptography', () => {
-  const vkeyPath = path.resolve(__dirname, '../../../scratch/semaphore_16_vkey.json');
-  const proofPath = path.resolve(__dirname, '../../../scratch/zk-test/semaphore_proof_depth16.json');
+  const vkeyPath = fs.existsSync(path.resolve(__dirname, '../../../tests/fixtures/semaphore_16_vkey.json'))
+    ? path.resolve(__dirname, '../../../tests/fixtures/semaphore_16_vkey.json')
+    : path.resolve(__dirname, '../../../scratch/semaphore_16_vkey.json');
+  const proofPath = fs.existsSync(path.resolve(__dirname, '../../../tests/fixtures/semaphore_proof_depth16.json'))
+    ? path.resolve(__dirname, '../../../tests/fixtures/semaphore_proof_depth16.json')
+    : path.resolve(__dirname, '../../../scratch/zk-test/semaphore_proof_depth16.json');
 
   it('validates canonical Semaphore verification key on BN254 curve', () => {
     const vkey = JSON.parse(fs.readFileSync(vkeyPath, 'utf8'));
