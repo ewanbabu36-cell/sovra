@@ -4864,31 +4864,24 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                 <span>Edit Profile</span>
               </button>
-              <button class="profile-btn profile-btn-secondary" id="profileOpenWalletBtn" onclick="openFullPageWallet()" aria-label="Open Sovereign Wallet" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #34d399; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-                <span>Wallet</span>
-              </button>
-              <button class="profile-btn profile-btn-secondary" id="profileShareBtn" onclick="openShareProfileModal(event)" aria-label="Share Profile" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;" title="Share Profile">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                <span>Share</span>
-              </button>
-              <button class="profile-btn profile-btn-secondary" id="btnBackupSovereignIdentity" onclick="openSovereignBackupModal()" aria-label="Backup Sovereign Identity" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.35); color: #a5b4fc; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" title="Backup 12-Word Sovereign Mnemonic Seed Phrase">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-                <span>Backup</span>
-              </button>
-              <!-- Hidden duplicate to preserve ID without visual redundancy (Single Authoritative trigger below Bio) -->
-              <button class="profile-btn profile-btn-secondary" id="profileChannelsBtn" onclick="openSpatialChannelsPagesSurface(this)" aria-label="Channels &amp; Public Pages" style="display: none;">
-                <span>Channels &amp; Pages</span>
-              </button>
-              <button class="profile-btn profile-btn-secondary" id="profileSettingsBtn" onclick="openSpatialSettingsSurface(this)" aria-label="Settings" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                <span>Settings</span>
-              </button>
-              <div class="profile-overflow-wrap">
-                <button class="profile-btn profile-btn-secondary" id="profileOverflowMenuBtn" onclick="toggleProfileOverflowMenu(event)" aria-label="More account and sovereign options" aria-haspopup="menu" aria-expanded="false" title="More Options (•••)">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              <div class="profile-secondary-actions">
+                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileOpenWalletBtn" onclick="openFullPageWallet()" aria-label="Open Sovereign Wallet" title="Wallet" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #34d399;">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                 </button>
-                <div id="profileOverflowDropdown" class="profile-overflow-dropdown" role="menu" style="display: none;">
+                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileShareBtn" onclick="openShareProfileModal(event)" aria-label="Share Profile" title="Share Profile" style="color: #38bdf8;">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                </button>
+                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="btnBackupSovereignIdentity" onclick="openSovereignBackupModal()" aria-label="Backup Sovereign Identity" title="Backup Sovereign Identity (Mnemonic)" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.35); color: #a5b4fc;">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                </button>
+                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileSettingsBtn" onclick="openSpatialSettingsSurface(this)" aria-label="Settings" title="Settings & Security" style="color: #94a3b8;">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+                <div class="profile-overflow-wrap">
+                  <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileOverflowMenuBtn" onclick="toggleProfileOverflowMenu(event)" aria-label="More account and sovereign options" aria-haspopup="menu" aria-expanded="false" title="More Options (•••)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                  </button>
+                  <div id="profileOverflowDropdown" class="profile-overflow-dropdown" role="menu" style="display: none;">
                   <div class="overflow-menu-item" id="profileBackupMenuItem" role="menuitem" tabindex="0" onclick="openSovereignBackupModal(); hideProfileOverflowMenu();" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a5b4fc;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
                     <span>🔑 Backup Sovereign Identity</span>
@@ -10508,10 +10501,19 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Live Diagnostics -->
-      <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.75rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-        <div>Service Worker: <b style="color: #34d399;">Active ✓</b></div>
-        <div>Offline Cache: <b style="color: #34d399;">Ready ✓</b></div>
-        <div>Display Mode: <b id="pwaDisplayModeBadge" style="color: #38bdf8;">Browser</b></div>
+      <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 0.65rem 0.5rem; font-size: 0.72rem; color: #94a3b8; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; margin-bottom: 1.25rem;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+          <span style="color: #64748b; font-size: 0.68rem;">SW Engine</span>
+          <b style="color: #34d399;">Active ✓</b>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+          <span style="color: #64748b; font-size: 0.68rem;">Offline Cache</span>
+          <b style="color: #34d399;">Ready ✓</b>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+          <span style="color: #64748b; font-size: 0.68rem;">Display Mode</span>
+          <b id="pwaDisplayModeBadge" style="color: #38bdf8;">Browser</b>
+        </div>
       </div>
 
       <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -11434,7 +11436,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-                <input type="text" id="womLoginHandleInput" value="" placeholder="username (e.g. rahul)" autocomplete="username" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+                <input type="text" id="womLoginHandleInput" value="" placeholder="username (e.g. rahul)" autocomplete="off" autocapitalize="none" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
               </div>
             </div>
 
@@ -11446,14 +11448,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #94a3b8; font-size: 0.9rem;">🔒</span>
-                <input type="password" id="womLoginPinInput" maxlength="8" value="" placeholder="Enter PIN (e.g. 123456)" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
+                <input type="password" id="womLoginPinInput" maxlength="8" value="" placeholder="Enter PIN (e.g. 123456)" autocomplete="new-password" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
               </div>
             </div>
 
             <button id="womLoginSubmitBtn" onclick="triggerUserLogin()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);">
               <span>Sign In</span> <span>➔</span>
             </button>
-            <button type="button" id="womQuickHostLoginBtn" onclick="loginAsDefaultHost()" style="display: none; width: 100%; margin-top: 8px; padding: 0.72rem; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 12px; color: #60a5fa; font-weight: 700; font-size: 0.86rem; cursor: pointer; align-items: center; justify-content: center; gap: 6px;">
+            <button type="button" id="womQuickHostLoginBtn" onclick="loginAsDefaultHost()" style="display: none !important; width: 100%; margin-top: 8px; padding: 0.72rem; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 12px; color: #60a5fa; font-weight: 700; font-size: 0.86rem; cursor: pointer; align-items: center; justify-content: center; gap: 6px;">
               <span>💻</span> <span>1-Tap Host Node Login (@laptop_host)</span>
             </button>
             <button type="button" id="womDeviceLinkQrBtn" onclick="openDeviceLinkModal()" style="width: 100%; margin-top: 8px; padding: 0.72rem; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; color: #34d399; font-weight: 700; font-size: 0.86rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
