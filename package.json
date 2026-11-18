@@ -10,7 +10,8 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "build": "pnpm -r run build",
+    "start": "node --experimental-strip-types scripts/dev-server.ts",
+    "build": "node --experimental-strip-types scripts/build-client-bundle.ts",
     "build:client": "node --experimental-strip-types scripts/build-client-bundle.ts",
     "test:prod-build": "node --check scripts/dev-server.ts && node --check scripts/database-engine.ts && node --experimental-strip-types scripts/build-client-bundle.ts",
     "dev": "node --experimental-strip-types scripts/dev-server.ts",
