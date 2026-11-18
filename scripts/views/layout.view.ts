@@ -3786,10 +3786,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             Incoming Sovra E2EE Voice Call
           </div>
           <div style="display: flex; justify-content: center; gap: 2rem;">
-            <button class="chat-btn-round" style="background: #ef4444; color: #fff; width: 56px; height: 56px; font-size: 1.35rem; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.5);" title="Decline Call" onclick="declineIncomingCall()">
+            <button class="chat-btn-round" id="incomingCallDeclineBtn" style="background: #ef4444; color: #fff; width: 56px; height: 56px; font-size: 1.35rem; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.5);" title="Decline Call" onclick="declineIncomingCall()">
               📞
             </button>
-            <button class="chat-btn-round" style="background: #22c55e; color: #fff; width: 56px; height: 56px; font-size: 1.35rem; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.5);" title="Accept Call" onclick="acceptIncomingCall()">
+            <button class="chat-btn-round" id="incomingCallAcceptBtn" style="background: #22c55e; color: #fff; width: 56px; height: 56px; font-size: 1.35rem; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.5);" title="Accept Call" onclick="acceptIncomingCall()">
               📞
             </button>
           </div>
