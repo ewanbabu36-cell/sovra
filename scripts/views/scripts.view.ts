@@ -43751,6 +43751,8 @@ window.SovraCreatorStudioEngine = {
       }
 
       _isCallAnswered = false;
+      _isCallAccepting = false;
+      _currentIncomingCall = null;
       _callConnectedSeconds = 0;
       setCallState(CallState.ENDED);
 
@@ -43836,6 +43838,11 @@ window.SovraCreatorStudioEngine = {
         }
         if (subEl) {
           subEl.innerText = 'Incoming ' + (inc.callType === 'video' ? 'Video' : 'Voice') + ' Call • Sovra P2P E2EE';
+        }
+        const accBtn = document.getElementById('incomingCallAcceptBtn');
+        if (accBtn) {
+          accBtn.disabled = false;
+          accBtn.style.opacity = '1';
         }
         incModal.style.display = 'flex';
       }
@@ -43957,6 +43964,8 @@ window.SovraCreatorStudioEngine = {
       }
     }
 
+    let _isCallAccepting = false;
+
     function pollIncomingCalls() {
       var isAuth = Boolean(myProfile || localStorage.getItem('sovra_session_token') || (typeof isUserAuthenticated === 'function' && isUserAuthenticated()));
       if (!isAuth) return;
@@ -43968,12 +43977,12 @@ window.SovraCreatorStudioEngine = {
         .then(function(data) {
           if (data && data.ok && data.incomingCall) {
             const inc = data.incomingCall;
-            if (window._activeCallId === inc.callId) return;
+            if (window._activeCallId === inc.callId || _isCallAnswered || _isCallAccepting) return;
             if (!_currentIncomingCall || _currentIncomingCall.callId !== inc.callId) {
               dispatchSystemIncomingCallNotification(inc);
             }
           } else {
-            if (_currentIncomingCall && !_isCallAnswered) {
+            if (_currentIncomingCall && !_isCallAnswered && !_isCallAccepting && !window._activeCallId) {
               dismissSystemIncomingCallNotification(_currentIncomingCall.callId);
             }
           }
@@ -43982,20 +43991,76 @@ window.SovraCreatorStudioEngine = {
     }
 
     async function acceptIncomingCall() {
-      const activeCallId = _currentIncomingCall ? _currentIncomingCall.callId : null;
-      dismissSystemIncomingCallNotification(activeCallId);
+      if (_isCallAccepting) {
+        console.log('[Call] acceptIncomingCall already in progress, ignoring duplicate call');
+        return;
+      }
+      _isCallAccepting = true;
+
+      // Disable incoming accept button for instant feedback
+      const accBtn = document.getElementById('incomingCallAcceptBtn');
+      if (accBtn) {
+        accBtn.disabled = true;
+        accBtn.style.opacity = '0.6';
+      }
+
+      // 1. Resolve incoming call details safely
+      let inc = _currentIncomingCall;
+      if (!inc || !inc.callId) {
+        try {
+          const pollRes = await callFetch('/api/call/incoming');
+          const pollData = await pollRes.json();
+          if (pollData && pollData.ok && pollData.incomingCall) {
+            inc = pollData.incomingCall;
+            _currentIncomingCall = inc;
+          }
+        } catch (_) {}
+      }
+
+      if (!inc || !inc.callId) {
+        console.warn('[Call] No valid incoming call available to accept');
+        _isCallAccepting = false;
+        if (accBtn) { accBtn.disabled = false; accBtn.style.opacity = '1'; }
+        return;
+      }
+
+      // 2. Stop ringing, vibration, wake lock and close system notifications WITHOUT nullifying _currentIncomingCall
+      releaseCallScreenWakeLock();
+      stopCallVibration();
       stopCallAudioRinging();
+
       const incModal = document.getElementById('incomingCallModal');
       if (incModal) incModal.style.display = 'none';
 
-      if (!_currentIncomingCall) return;
-      const inc = _currentIncomingCall;
+      if (_activeCallSystemNotification) {
+        try { _activeCallSystemNotification.close(); } catch (_) {}
+        _activeCallSystemNotification = null;
+      }
+
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        try {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'CANCEL_INCOMING_CALL_NOTIFICATION',
+            callId: inc.callId
+          });
+        } catch (_) {}
+      }
+
+      if (window.SovraCallNative && typeof window.SovraCallNative.cancelIncomingCallNotification === 'function') {
+        try {
+          window.SovraCallNative.cancelIncomingCallNotification(inc.callId);
+        } catch (_) {}
+      }
+
+      // 3. Mark active call state immediately
       window._activeCallId = inc.callId;
+      _isCallAnswered = true;
       _relayedBytesSent = 0;
       _relayedBytesRecv = 0;
       _relayedPktsSent = 0;
       _relayedPktsRecv = 0;
 
+      // Prime media playback within user gesture context
       primeMediaPlayback();
 
       const avatarEl = document.getElementById('callAvatarIcon');
@@ -44025,8 +44090,9 @@ window.SovraCreatorStudioEngine = {
       const switchWrapInit = document.getElementById('callHttpsSwitchWrap');
       if (switchWrapInit) switchWrapInit.style.display = 'none';
 
-      document.getElementById('e2eeCallModal').style.display = 'flex';
-      _isCallAnswered = false;
+      const callModal = document.getElementById('e2eeCallModal');
+      if (callModal) callModal.style.display = 'flex';
+
       _callConnectedSeconds = 0;
       _currentCallType = (inc.callType === 'video') ? 'video' : 'audio';
       _callVideoEnabled = (_currentCallType === 'video');
@@ -44038,6 +44104,7 @@ window.SovraCreatorStudioEngine = {
         localStream = await initCallLocalMediaStream(_currentCallType);
       } catch (permErr) {
         console.error('[Call] Media permission error on accept:', permErr);
+        _isCallAccepting = false;
         if (statusEl) {
           statusEl.innerText = '⚠️ ' + permErr.message;
           statusEl.style.color = '#ef4444';
@@ -44053,7 +44120,7 @@ window.SovraCreatorStudioEngine = {
           }
         } else {
           setTimeout(function() {
-            document.getElementById('e2eeCallModal').style.display = 'none';
+            if (callModal) callModal.style.display = 'none';
             cleanupActiveCallSession();
           }, 3000);
         }
@@ -44062,6 +44129,7 @@ window.SovraCreatorStudioEngine = {
 
       const pc = createRTCPeerConnectionInstance();
       if (!pc) {
+        _isCallAccepting = false;
         showAccountToast('Failed to initialize WebRTC engine', 'error');
         endE2eeCall('pc_init_failed');
         return;
@@ -44072,10 +44140,19 @@ window.SovraCreatorStudioEngine = {
       try {
         if (!inc.sdpOffer) {
           try {
-            const pollRes = await callFetch('/api/call/incoming');
+            const pollRes = await callFetch('/api/call/poll?callId=' + encodeURIComponent(inc.callId));
             const pollData = await pollRes.json();
-            if (pollData && pollData.incomingCall && pollData.incomingCall.sdpOffer) {
-              inc.sdpOffer = pollData.incomingCall.sdpOffer;
+            if (pollData && pollData.ok && pollData.session && pollData.session.sdpOffer) {
+              inc.sdpOffer = pollData.session.sdpOffer;
+            }
+          } catch (_) {}
+        }
+        if (!inc.sdpOffer) {
+          try {
+            const pollRes2 = await callFetch('/api/call/incoming');
+            const pollData2 = await pollRes2.json();
+            if (pollData2 && pollData2.incomingCall && pollData2.incomingCall.sdpOffer) {
+              inc.sdpOffer = pollData2.incomingCall.sdpOffer;
             }
           } catch (_) {}
         }
@@ -44091,6 +44168,7 @@ window.SovraCreatorStudioEngine = {
         await waitForInitialIceGathering(pc, 450);
       } catch (err) {
         console.error('[Call] WebRTC answer error:', err);
+        _isCallAccepting = false;
         showAccountToast('WebRTC negotiation error: ' + err.message, 'error');
         endE2eeCall('answer_creation_failed');
         return;
@@ -44116,6 +44194,7 @@ window.SovraCreatorStudioEngine = {
         }
       }).catch(function(e) { console.warn('[Call] Answer error:', e); });
 
+      _isCallAccepting = false;
       _isCallAnswered = true;
       setCallState(CallState.CALL_CONNECTED);
       onCallMediaFlowConfirmed();
