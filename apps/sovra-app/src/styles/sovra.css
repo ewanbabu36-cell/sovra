@@ -17812,3 +17812,145 @@
     }
 
 
+
+/* =========================================================================
+   📱 SOVRA UNIVERSAL MOBILE VIEWPORT FORENSIC POLISH (360px - 768px)
+   Prevents any element from overflowing or leaking beyond viewport boundaries
+   ========================================================================= */
+
+/* 1. Global Viewport Anchoring (Eliminates horizontal drift/shaking) */
+html, body {
+  overflow-x: hidden !important;
+  width: 100% !important;
+  max-width: 100vw !important;
+  position: relative;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 2. Top Header & Dropdown Mobile Bounds */
+@media (max-width: 600px) {
+  #messengerDropdown,
+  #notificationDropdown {
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    max-width: calc(100vw - 16px) !important;
+  }
+  
+  .header-quick-slots,
+  #headerQuickActionSlots {
+    display: none !important;
+  }
+}
+
+/* 3. Universal Modal Clamping */
+@media (max-width: 768px) {
+  .wa-modal-card,
+  .omni-modal-card,
+  .story-card-modal,
+  .sovra-landing-card,
+  .holo-card-perspective-stage,
+  #e2eeCallModalCard,
+  #spatialCallCard,
+  #webxrTheaterContentBox,
+  #sovraBgAudioMiniBar {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    box-sizing: border-box !important;
+  }
+
+  .sovra-landing-card {
+    padding: 1.25rem 1rem !important;
+    border-radius: 20px !important;
+  }
+
+  .story-card-modal {
+    max-height: calc(100dvh - 24px) !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+}
+
+/* 4. Multi-Column Grids -> Responsive Single Column */
+@media (max-width: 768px) {
+  .settings-grid-layout,
+  .admin-layout,
+  .sovra-live-container,
+  .studio-dashboard-3col {
+    grid-template-columns: 1fr !important;
+  }
+
+  .communities-grid,
+  .search-categories-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Home app launcher grid: fit 4 icons symmetrically within 360px */
+  .sovra-home-app-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* 5. Responsive Data Tables (Zero Overflow) */
+.table-responsive,
+.studio-table-responsive {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: thin;
+}
+
+.table-responsive table,
+.studio-content-table {
+  min-width: 480px;
+}
+
+/* 6. Cryptographic DIDs, Hashes & Long Strings (No Horizontal Blowout) */
+.holo-v,
+.key-data,
+[id*="Did"],
+[id*="PeerId"],
+[id*="PublicKey"],
+[id*="Hash"] {
+  min-width: 0 !important;
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* 7. Bottom Navigation Clearance (Prevents button/input overlap) */
+@media (max-width: 860px) {
+  .feed-container,
+  .container,
+  #feed-view,
+  #chat-view,
+  #watch-view,
+  #profile-view,
+  #studio-view,
+  #wallet-view,
+  #explore-view,
+  .profile-container {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;
+    border-radius: 0 !important;
+    height: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    z-index: 9999 !important;
+  }
+}

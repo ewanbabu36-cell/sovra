@@ -7270,19 +7270,21 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
                   <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
                     <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">Recent Peer Micro-Tips &amp; Payout Receipts</div>
-                    <table class="studio-content-table">
-                      <thead>
-                        <tr>
-                          <th>DATE</th>
-                          <th>TRANSACTION TYPE</th>
-                          <th>SUPPORTER DID</th>
-                          <th>NET REVENUE</th>
-                          <th>STATUS</th>
-                        </tr>
-                      </thead>
-                      <tbody id="studioEarnReceiptsTableBody">
-                      </tbody>
-                    </table>
+                    <div class="table-responsive" style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;">
+                      <table class="studio-content-table">
+                        <thead>
+                          <tr>
+                            <th>DATE</th>
+                            <th>TRANSACTION TYPE</th>
+                            <th>SUPPORTER DID</th>
+                            <th>NET REVENUE</th>
+                            <th>STATUS</th>
+                          </tr>
+                        </thead>
+                        <tbody id="studioEarnReceiptsTableBody">
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
 
@@ -7448,22 +7450,24 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem;">
                   <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.5rem;">Merkle Original Authorship Claims</div>
                   <div style="font-size: 0.76rem; color: #94a3b8; margin-bottom: 1rem;">Every video uploaded receives an immutable cryptographic timestamp and Ed25519 signature registered across all bootstrap nodes.</div>
-                  <table class="studio-content-table">
-                    <thead>
-                      <tr>
-                        <th>VIDEO</th>
-                        <th>IPFS CIDv1 HASH</th>
-                        <th>SIGNATURE TIMESTAMP</th>
-                        <th>MATCH STATUS</th>
-                        <th style="text-align: right;">ACTION</th>
-                      </tr>
-                    </thead>
-                    <tbody id="studioProvenanceTableBody">
-                      <tr>
-                        <td colspan="5" style="text-align: center; padding: 25px; color: #64748b;">Loading Merkle provenance registry...</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div class="table-responsive" style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;">
+                    <table class="studio-content-table">
+                      <thead>
+                        <tr>
+                          <th>VIDEO</th>
+                          <th>IPFS CIDv1 HASH</th>
+                          <th>SIGNATURE TIMESTAMP</th>
+                          <th>MATCH STATUS</th>
+                          <th style="text-align: right;">ACTION</th>
+                        </tr>
+                      </thead>
+                      <tbody id="studioProvenanceTableBody">
+                        <tr>
+                          <td colspan="5" style="text-align: center; padding: 25px; color: #64748b;">Loading Merkle provenance registry...</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -9469,7 +9473,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <!-- ✨ INSTAGRAM PROFILE STORY HIGHLIGHT CREATOR MODAL (ZERO-PROMPT) -->
   <!-- ========================================================================= -->
   <div id="storyHighlightModal" class="story-modal-overlay" style="display: none; z-index: 10010;" onclick="closeStoryHighlightModal(event)">
-    <div class="story-card-modal" style="width: 340px; height: auto; min-height: 380px; padding: 1.25rem; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+    <div class="story-card-modal" style="width: 340px; max-width: calc(100vw - 24px); box-sizing: border-box; height: auto; min-height: 380px; padding: 1.25rem; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
         <span style="font-weight: 800; font-size: 1.05rem; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
           <span>✨</span> <span>New Highlight</span>
@@ -9513,7 +9517,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <!-- 🗑️ STORY DELETE CONFIRMATION MODAL (ZERO-CONFIRM) -->
   <!-- ========================================================================= -->
   <div id="storyDeleteConfirmModal" class="story-modal-overlay" style="display: none; z-index: 10012;" onclick="closeStoryDeleteConfirmModal()">
-    <div class="story-card-modal" style="width: 320px; height: auto; min-height: 200px; padding: 1.25rem; display: flex; flex-direction: column; text-align: center;" onclick="event.stopPropagation()">
+    <div class="story-card-modal" style="width: 320px; max-width: calc(100vw - 24px); box-sizing: border-box; height: auto; min-height: 200px; padding: 1.25rem; display: flex; flex-direction: column; text-align: center;" onclick="event.stopPropagation()">
       <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🗑️</div>
       <div style="font-weight: 800; font-size: 1rem; color: #fff; margin-bottom: 0.4rem;">Delete Story Segment?</div>
       <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1.25rem;">
@@ -9530,7 +9534,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <!-- 💬 FEED Q&A ANSWER MODAL (ZERO-PROMPT) -->
   <!-- ========================================================================= -->
   <div id="feedQaAnswerModal" class="story-modal-overlay" style="display: none; z-index: 10015;" onclick="closeFeedQaAnswerModal()">
-    <div class="story-card-modal" style="width: 340px; height: auto; min-height: 240px; padding: 1.25rem; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+    <div class="story-card-modal" style="width: 340px; max-width: calc(100vw - 24px); box-sizing: border-box; height: auto; min-height: 240px; padding: 1.25rem; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
         <span style="font-weight: 800; font-size: 0.95rem; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
           <span>💬</span> <span>Answer Question</span>
@@ -9552,7 +9556,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <!-- ✍️ FEED COMMENT EDIT MODAL (ZERO-PROMPT) -->
   <!-- ========================================================================= -->
   <div id="feedCommentEditModal" class="story-modal-overlay" style="display: none; z-index: 10015;" onclick="closeFeedCommentEditModal()">
-    <div class="story-card-modal" style="width: 340px; height: auto; min-height: 220px; padding: 1.25rem; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+    <div class="story-card-modal" style="width: 340px; max-width: calc(100vw - 24px); box-sizing: border-box; height: auto; min-height: 220px; padding: 1.25rem; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
         <span style="font-weight: 800; font-size: 0.95rem; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
           <span>✍️</span> <span>Edit Comment</span>
@@ -9571,7 +9575,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <!-- 🛡️ SOVEREIGN UNIVERSAL CONFIRM MODAL (ZERO-POPUP) -->
   <!-- ========================================================================= -->
   <div id="sovereignConfirmModal" class="story-modal-overlay" style="display: none; z-index: 10020;" onclick="closeSovereignConfirmModal()">
-    <div class="story-card-modal" style="width: 330px; height: auto; min-height: 200px; padding: 1.25rem; display: flex; flex-direction: column; text-align: center;" onclick="event.stopPropagation()">
+    <div class="story-card-modal" style="width: 330px; max-width: calc(100vw - 24px); box-sizing: border-box; height: auto; min-height: 200px; padding: 1.25rem; display: flex; flex-direction: column; text-align: center;" onclick="event.stopPropagation()">
       <div id="sovConfirmModalIcon" style="font-size: 2.2rem; margin-bottom: 0.5rem;">🗑️</div>
       <div id="sovConfirmModalTitle" style="font-weight: 800; font-size: 1.05rem; color: #fff; margin-bottom: 0.4rem;">Confirm Action</div>
       <div id="sovConfirmModalMessage" style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1.25rem;">
