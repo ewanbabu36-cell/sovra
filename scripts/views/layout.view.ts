@@ -7393,6 +7393,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       <button type="button" class="btn btn-secondary" id="studioWsScheduleBtn" onclick="SovraCreatorStudioEngine.promptScheduleRelease()" style="flex: 1; padding: 0.75rem; font-size: 0.82rem; font-weight: 700;">
                         ⏳ Schedule
                       </button>
+                      <button type="button" class="btn btn-secondary" id="studioWsResetBtn" onclick="SovraCreatorStudioEngine.resetWorkspaceUploadForm()" style="padding: 0.75rem 1rem; font-size: 0.82rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.15);" title="Clear upload form">
+                        ✕ Reset
+                      </button>
                     </div>
 
                     <div id="studioWsTranscodeMonitor" style="display: none; margin-top: 1rem; padding: 0.85rem; border-radius: 12px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.35);">
