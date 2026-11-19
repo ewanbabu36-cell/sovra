@@ -15341,6 +15341,12 @@
       box-sizing: border-box;
       white-space: nowrap;
     }
+    #btnBackupSovereignIdentity {
+      flex-shrink: 0;
+    }
+    #profileSettingsBtn {
+      flex-shrink: 0;
+    }
     .profile-btn-icon-only {
       width: 42px;
       height: 42px;
@@ -16389,7 +16395,13 @@
         max-width: 100% !important;
         flex-wrap: nowrap !important;
       }
-      .profile-btn-icon-only {
+      #btnBackupSovereignIdentity {
+      flex-shrink: 0;
+    }
+    #profileSettingsBtn {
+      flex-shrink: 0;
+    }
+    .profile-btn-icon-only {
         width: 42px !important;
         height: 42px !important;
         min-width: 42px !important;

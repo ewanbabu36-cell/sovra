@@ -24,6 +24,13 @@ const client = new SovraClient();
 if (typeof window !== 'undefined') {
   initializeAllSovraModules();
 
+  // Register BitSwap Streaming Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sovra-sw.js').catch(() => {});
+    });
+  }
+
   window.Sovra = {
     client,
     routes,

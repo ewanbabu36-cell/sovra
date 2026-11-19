@@ -13,7 +13,7 @@ export function initReelsModule(): void {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trackId, title, cid, artist }),
       });
-      const data = await res.json();
+      await res.json();
       if ((window as any).showAccountToast) {
         (window as any).showAccountToast(`Saved "${title}" to your decentralized audio collection!`, 'success');
       }
@@ -33,7 +33,7 @@ export function initReelsModule(): void {
     (window as any).saveAudioTrackToCollection(trackId, title, cid, artist);
   };
 
-  (window as any).openReelCommentsDrawer = function(reelId: string): void {
+  (window as any).openReelCommentsDrawer = function(_reelId: string): void {
     const drawer = document.getElementById('reelCommentsDrawer');
     if (drawer) {
       drawer.classList.add('open');

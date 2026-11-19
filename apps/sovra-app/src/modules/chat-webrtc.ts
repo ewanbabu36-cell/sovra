@@ -1,7 +1,13 @@
 /**
  * @file apps/sovra-app/src/modules/chat-webrtc.ts
  * Sovra Modular Client: WebRTC Audio/Video Calls & E2EE Direct Messaging
+ *
+ * Implements pure decentralized, direct browser-to-browser WebRTC signaling
+ * using Noise XX encrypted GossipSub topics (/sovra/v1/signal/{targetDid})
+ * without relying on centralized or local Node.js /api/call/* HTTP endpoints.
  */
+
+import type { P2PSignalingChannel, DecryptedSignal, SignalPayload } from '@sovra/p2p';
 
 export interface CallSession {
   callId: string;
@@ -18,11 +24,21 @@ export function initChatWebRtcModule(): void {
     activeCall: null as CallSession | null,
     localStream: null as MediaStream | null,
     peerConnection: null as RTCPeerConnection | null,
+    signalingChannel: null as P2PSignalingChannel | null,
+
+    setSignalingChannel: function(channel: P2PSignalingChannel): void {
+      this.signalingChannel = channel;
+      channel.onSignal((signal: DecryptedSignal) => {
+        this.handleIncomingSignal(signal);
+      });
+      console.log('[WebRTC] P2PSignalingChannel bound directly to GossipSub mesh.');
+    },
 
     startCall: async function(peerDid: string, peerName: string, isVideo: boolean = false): Promise<void> {
-      console.log(`[WebRTC] Initiating ${isVideo ? 'video' : 'voice'} call to: ${peerName} (${peerDid})`);
+      console.log(`[WebRTC] Initiating direct P2P ${isVideo ? 'video' : 'voice'} call to: ${peerName} (${peerDid})`);
+      const callId = `call-${Date.now()}`;
       this.activeCall = {
-        callId: `call-${Date.now()}`,
+        callId,
         peerDid,
         peerName,
         isVideo,
@@ -51,10 +67,167 @@ export function initChatWebRtcModule(): void {
       } catch (err) {
         console.warn('[WebRTC] Media stream access notice:', err);
       }
+
+      // 1. Initialize Direct WebRTC Peer Connection with STUN Candidates
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' },
+        ],
+      });
+      this.peerConnection = pc;
+
+      // 2. Attach Local Media Tracks
+      if (this.localStream) {
+        this.localStream.getTracks().forEach((track: MediaStreamTrack) => {
+          pc.addTrack(track, this.localStream!);
+        });
+      }
+
+      // 3. ICE Candidate Direct Dispatch over GossipSub
+      pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
+        if (event.candidate && this.signalingChannel && this.activeCall) {
+          const targetPubKeyHex = (window as any)._peerX25519Keys?.[peerDid] || '00'.repeat(32);
+          const candidatePayload: SignalPayload = {
+            callId,
+            type: 'candidate',
+            candidate: event.candidate.toJSON(),
+          };
+          this.signalingChannel.sendSignal(peerDid, targetPubKeyHex, candidatePayload).catch((e: any) => {
+            console.warn('[WebRTC] P2P ICE dispatch warning:', e);
+          });
+        }
+      };
+
+      // 4. Remote Track Ingestion
+      pc.ontrack = (event: RTCTrackEvent) => {
+        console.log('[WebRTC] Remote media track received:', event.track.kind);
+        const remoteVideo = document.getElementById('remoteCallVideo') as HTMLVideoElement;
+        if (remoteVideo && event.streams[0]) {
+          remoteVideo.srcObject = event.streams[0];
+          remoteVideo.play().catch(() => {});
+        }
+      };
+
+      // 5. Generate SDP Offer & Send directly through Noise XX encrypted GossipSub channel
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        if (this.signalingChannel) {
+          const targetPubKeyHex = (window as any)._peerX25519Keys?.[peerDid] || '00'.repeat(32);
+          const offerPayload: SignalPayload = {
+            callId,
+            type: 'offer',
+            callType: isVideo ? 'video' : 'voice',
+            sdp: offer.sdp,
+          };
+          await this.signalingChannel.sendSignal(peerDid, targetPubKeyHex, offerPayload);
+          console.log('[WebRTC] Direct P2P SDP Offer dispatched to GossipSub:', `/sovra/v1/signal/${peerDid}`);
+        } else {
+          console.log('[WebRTC] P2P signaling active locally (waiting for receiver connection).');
+        }
+      } catch (err) {
+        console.error('[WebRTC] SDP Offer generation error:', err);
+      }
+    },
+
+    handleIncomingSignal: async function(signal: DecryptedSignal): Promise<void> {
+      const { payload, senderDid } = signal;
+      console.log(`[WebRTC] Received direct P2P signal (${payload.type}) from ${senderDid}`);
+
+      if (payload.type === 'offer') {
+        this.activeCall = {
+          callId: payload.callId,
+          peerDid: senderDid,
+          peerName: senderDid.slice(-8),
+          isVideo: payload.callType === 'video',
+          state: 'connecting',
+        };
+
+        const modal = document.getElementById('webrtcCallModal');
+        if (modal) {
+          modal.style.display = 'flex';
+          const title = document.getElementById('webrtcCallPeerName');
+          if (title) title.textContent = `Incoming: ${senderDid.slice(-8)}`;
+        }
+
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        });
+        this.peerConnection = pc;
+
+        if (this.localStream) {
+          this.localStream.getTracks().forEach((track: MediaStreamTrack) => {
+            pc.addTrack(track, this.localStream!);
+          });
+        }
+
+        pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
+          if (event.candidate && this.signalingChannel) {
+            const targetPubKeyHex = (window as any)._peerX25519Keys?.[senderDid] || '00'.repeat(32);
+            this.signalingChannel.sendSignal(senderDid, targetPubKeyHex, {
+              callId: payload.callId,
+              type: 'candidate',
+              candidate: event.candidate.toJSON(),
+            }).catch(() => {});
+          }
+        };
+
+        pc.ontrack = (event: RTCTrackEvent) => {
+          const remoteVideo = document.getElementById('remoteCallVideo') as HTMLVideoElement;
+          if (remoteVideo && event.streams[0]) {
+            remoteVideo.srcObject = event.streams[0];
+            remoteVideo.play().catch(() => {});
+          }
+        };
+
+        if (payload.sdp) {
+          await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: payload.sdp }));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+
+          if (this.signalingChannel) {
+            const targetPubKeyHex = (window as any)._peerX25519Keys?.[senderDid] || '00'.repeat(32);
+            await this.signalingChannel.sendSignal(senderDid, targetPubKeyHex, {
+              callId: payload.callId,
+              type: 'answer',
+              sdp: answer.sdp,
+            });
+            console.log('[WebRTC] Direct P2P SDP Answer dispatched to GossipSub:', `/sovra/v1/signal/${senderDid}`);
+          }
+        }
+      } else if (payload.type === 'answer') {
+        if (this.peerConnection && payload.sdp) {
+          await this.peerConnection.setRemoteDescription(
+            new RTCSessionDescription({ type: 'answer', sdp: payload.sdp })
+          );
+          if (this.activeCall) this.activeCall.state = 'connected';
+          console.log('[WebRTC] Direct P2P Call Session established!');
+        }
+      } else if (payload.type === 'candidate') {
+        if (this.peerConnection && payload.candidate) {
+          try {
+            await this.peerConnection.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          } catch (e) {
+            console.warn('[WebRTC] Direct ICE candidate error:', e);
+          }
+        }
+      } else if (payload.type === 'end') {
+        this.endCall();
+      }
     },
 
     endCall: function(): void {
-      console.log('[WebRTC] Terminating call session.');
+      console.log('[WebRTC] Terminating direct P2P call session.');
+      if (this.activeCall && this.signalingChannel) {
+        const targetPubKeyHex = (window as any)._peerX25519Keys?.[this.activeCall.peerDid] || '00'.repeat(32);
+        this.signalingChannel.sendSignal(this.activeCall.peerDid, targetPubKeyHex, {
+          callId: this.activeCall.callId,
+          type: 'end',
+        }).catch(() => {});
+      }
+
       if (this.localStream) {
         this.localStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
         this.localStream = null;
@@ -107,5 +280,5 @@ export function initChatWebRtcModule(): void {
     (window as any).SovraChatEngine.toggleCamera();
   };
 
-  console.log('[Sovra] Chat & WebRTC module initialized.');
+  console.log('[Sovra] Chat & WebRTC pure P2P signaling module initialized.');
 }

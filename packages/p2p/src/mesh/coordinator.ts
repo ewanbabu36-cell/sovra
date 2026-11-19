@@ -16,7 +16,6 @@ import {
   hexToBytes,
   sha256,
   signEd25519,
-  verifyEd25519,
   secureRandomBytes,
 } from '@sovra/crypto';
 import {
@@ -467,7 +466,7 @@ export class MeshTransportManager {
         }
       }
 
-      this.router.outboxStore.storeOutbox(envelope);
+      this.router.outboxStore.enqueueOutbox(envelope);
       return ok({ transport: 'ble', bytesTransferred: payloadSize, handover: false });
     }
 

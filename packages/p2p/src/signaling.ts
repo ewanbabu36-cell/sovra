@@ -17,7 +17,6 @@ import {
   hkdfDerive,
   encryptChaCha20Poly1305,
   decryptChaCha20Poly1305,
-  signEd25519,
   verifyEd25519,
   sha256,
   decodeBase58Btc,

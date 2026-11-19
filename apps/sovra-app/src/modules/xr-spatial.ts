@@ -94,7 +94,7 @@ export function initXrSpatialModule(): void {
   };
 
   // 3. Spatial Channels & Pages Surface Controls
-  (window as any).openSpatialChannelsPagesSurface = function(originEl?: HTMLElement): void {
+  (window as any).openSpatialChannelsPagesSurface = function(_originEl?: HTMLElement): void {
     const modal = document.getElementById('spatialChannelsModal');
     if (modal) modal.style.display = 'flex';
   };

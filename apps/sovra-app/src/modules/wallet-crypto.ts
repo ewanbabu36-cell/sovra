@@ -30,7 +30,7 @@ export function initWalletCryptoModule(): void {
       }
     },
 
-    openTipModal(targetType: string, targetId: string, meta: { creatorName?: string; creatorHandle?: string } = {}): void {
+    openTipModal(_targetType: string, _targetId: string, meta: { creatorName?: string; creatorHandle?: string } = {}): void {
       const modal = document.getElementById('sovereignTipModal');
       if (modal) {
         modal.style.display = 'flex';
@@ -53,7 +53,7 @@ export function initWalletCryptoModule(): void {
     (window as any).SovraWalletEngine.closeTipModal();
   };
 
-  (window as any).verifyMerkleReceipt = async function(cid: string, rootHash: string): Promise<void> {
+  (window as any).verifyMerkleReceipt = async function(cid: string, _rootHash: string): Promise<void> {
     const modal = document.getElementById('merkleProofModal');
     if (modal) modal.style.display = 'flex';
     const cidEl = document.getElementById('merkleCidDisplay');
