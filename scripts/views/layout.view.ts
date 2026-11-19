@@ -3442,7 +3442,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div class="voice-recording-drawer" id="chatVoiceMemoRecorder" data-legacy-id="voiceRecordingDrawer">
               <div class="record-blinking-dot"></div>
               <span style="font-family: monospace; font-size: 0.85rem; color: #ef4444; font-weight: 700;" id="voiceRecordTimer">0:00</span>
-              <div class="record-live-waves">
+              <canvas id="voiceWaveformCanvas" width="140" height="26" style="background: rgba(0, 0, 0, 0.25); border-radius: 6px; margin: 0 8px; border: 1px solid rgba(239, 68, 68, 0.25); vertical-align: middle;"></canvas>
+              <div class="record-live-waves" style="display: none;">
                 <div class="record-wave-bar" style="animation-delay: 0.0s;"></div>
                 <div class="record-wave-bar" style="animation-delay: 0.15s;"></div>
                 <div class="record-wave-bar" style="animation-delay: 0.3s;"></div>
@@ -11782,6 +11783,23 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div id="womLoginForm" style="display: block;">
             <div id="womLoginErrorMsg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: left;"></div>
 
+            <!-- Welcome Back Quick-Selector Card (Resident Account Fast Path) -->
+            <div id="womQuickUserCard" style="display: none; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; padding: 12px 14px; margin-bottom: 1rem; text-align: left; box-shadow: 0 4px 16px rgba(0,0,0,0.25);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <img id="womQuickUserAvatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8;">
+                  <div>
+                    <div style="font-size: 0.74rem; color: #94a3b8; font-weight: 600;">Welcome Back</div>
+                    <div id="womQuickUserHandle" style="font-size: 0.95rem; color: #f8fafc; font-weight: 700;">@user</div>
+                  </div>
+                </div>
+                <button type="button" onclick="switchQuickUserAccount()" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; cursor: pointer; text-decoration: underline; padding: 2px 4px;">Switch</button>
+              </div>
+              <button type="button" id="womQuickUserContinueBtn" onclick="continueAsQuickUser()" style="width: 100%; padding: 0.68rem; background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(99, 102, 241, 0.25)); border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 10px; color: #38bdf8; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span>Continue as</span> <span id="womQuickUserBtnHandle">@user</span> <span>➔</span>
+              </button>
+            </div>
+
             <!-- Identifier: Handle or DID -->
             <div style="margin-bottom: 1rem; text-align: left;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
@@ -11789,8 +11807,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-                <input type="text" id="womLoginHandleInput" value="" placeholder="username (e.g. rahul)" autocomplete="off" autocapitalize="none" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+                <input type="text" id="womLoginHandleInput" value="" placeholder="username (e.g. rahul)" autocomplete="off" autocapitalize="none" spellcheck="false" oninput="validateLoginInputsLive()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('womLoginPinInput').focus();}" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
               </div>
+              <div id="womHandleInlineError" style="display: none; color: #f87171; font-size: 0.74rem; margin-top: 4px; font-weight: 500;"></div>
             </div>
 
             <!-- Factor: Security PIN -->
@@ -11801,8 +11820,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #94a3b8; font-size: 0.9rem;">🔒</span>
-                <input type="password" id="womLoginPinInput" maxlength="8" value="" placeholder="Enter PIN (e.g. 123456)" autocomplete="new-password" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none;">
+                <input type="password" id="womLoginPinInput" maxlength="8" value="" placeholder="Enter PIN (e.g. 123456)" autocomplete="new-password" oninput="validateLoginInputsLive()" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerUserLogin();}" style="width: 100%; padding: 11px 12px 11px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; letter-spacing: 0.15rem; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
               </div>
+              <div id="womPinInlineError" style="display: none; color: #f87171; font-size: 0.74rem; margin-top: 4px; font-weight: 500;"></div>
             </div>
 
             <button id="womLoginSubmitBtn" onclick="triggerUserLogin()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);">
@@ -11848,7 +11868,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 12px; top: 11px; color: #38bdf8; font-weight: 700;">@</span>
-                <input type="text" id="womHandleInput" placeholder="username (e.g. rahul)" oninput="validateWomHandleLive(this.value)" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
+                <input type="text" id="womHandleInput" placeholder="username (e.g. rahul)" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9_]/g, ''); validateWomHandleLive(this.value);" style="width: 100%; padding: 11px 12px 11px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.95rem; box-sizing: border-box; outline: none;">
               </div>
             </div>
 
@@ -12070,6 +12090,63 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
   </div>
 
+  <!-- 🔑 FORGOT PIN / RESET PIN MODAL (Biometric Fast-Path & 12-Word Fallback) -->
+  <div id="forgotPinModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(5, 8, 16, 0.92); backdrop-filter: blur(20px); z-index: 1000000; align-items: center; justify-content: center; padding: 1.25rem;">
+    <div style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 24px; max-width: 480px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.85); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div style="font-size: 1.2rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; color: #38bdf8;">
+          <span>🔑</span> <span>Reset Security PIN</span>
+        </div>
+        <button onclick="closeForgotPinModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; padding: 4px;" aria-label="Close modal">✕</button>
+      </div>
+
+      <p style="font-size: 0.84rem; color: #94a3b8; line-height: 1.5; margin: 0 0 1.25rem 0;">
+        Reset your 6-digit Security PIN instantly using your device's biometric sensor (Face ID / Fingerprint) or verify your 12-word recovery seed phrase.
+      </p>
+
+      <!-- Option 1: Instant Biometric Reset -->
+      <button type="button" id="btnBiometricPinReset" onclick="resetPinWithBiometrics()" style="width: 100%; padding: 0.85rem; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 12px; color: #38bdf8; font-weight: 700; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 1rem; transition: all 0.2s ease;">
+        <span style="font-size: 1.15rem;">👆</span> <span>Reset PIN with Biometrics (Passkey)</span>
+      </button>
+
+      <div style="display: flex; align-items: center; margin: 1rem 0; gap: 8px;">
+        <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+        <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase;">or use 12 words</span>
+        <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+      </div>
+
+      <!-- Option 2: 12-Word Recovery Form -->
+      <div style="margin-bottom: 0.9rem; text-align: left;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 5px;">Username or DID</label>
+        <input type="text" id="forgotPinIdentifierInput" placeholder="@username or did:sovra:..." style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; border-radius: 10px; color: #fff; font-size: 0.88rem; padding: 9px 12px; outline: none;">
+      </div>
+
+      <div style="margin-bottom: 0.9rem; text-align: left;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1;">12-Word Recovery Seed Phrase</label>
+          <span id="forgotPinBip39Status" style="font-size: 0.72rem; font-weight: 600; color: #94a3b8;">Enter words</span>
+        </div>
+        <textarea id="forgotPinPhraseInput" placeholder="word1 word2 word3 ... word12" rows="2" oninput="validateBip39PhraseLive('forgotPinPhraseInput', 'forgotPinBip39Status', 'forgotPinWordChips')" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font-family: monospace; font-size: 0.84rem; padding: 9px 12px; resize: none; outline: none;"></textarea>
+        <div id="forgotPinWordChips" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px;"></div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.25rem;">
+        <div style="text-align: left;">
+          <label style="font-size: 0.78rem; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 5px;">New PIN</label>
+          <input type="password" id="forgotPinNewInput" maxlength="8" placeholder="New PIN" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; border-radius: 10px; color: #fff; font-size: 0.9rem; padding: 9px 12px; letter-spacing: 0.15rem; outline: none;">
+        </div>
+        <div style="text-align: left;">
+          <label style="font-size: 0.78rem; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 5px;">Confirm PIN</label>
+          <input type="password" id="forgotPinConfirmInput" maxlength="8" placeholder="Repeat PIN" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; border-radius: 10px; color: #fff; font-size: 0.9rem; padding: 9px 12px; letter-spacing: 0.15rem; outline: none;">
+        </div>
+      </div>
+
+      <button id="forgotPinSubmitBtn" onclick="submitForgotPinWithPhrase()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; border: none; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.4);">
+        <span>✓ Reset Security PIN</span>
+      </button>
+    </div>
+  </div>
+
   <!-- 🆘 EMERGENCY ACCOUNT RESTORE MODAL (Lost/Broken/Stolen Phone Recovery) -->
   <div id="emergencyRestoreModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(5, 8, 16, 0.92); backdrop-filter: blur(20px); z-index: 1000000; align-items: center; justify-content: center; padding: 1.25rem;">
     <div style="background: #0f172a; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 24px; max-width: 480px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.85); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;">
@@ -12085,8 +12162,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </p>
 
       <div style="margin-bottom: 1.2rem; text-align: left;">
-        <label style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 6px;">12-Word Master Recovery Phrase</label>
-        <textarea id="emergencyPhraseInput" placeholder="word1 word2 word3 ... word12" rows="3" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #f8fafc; font-family: monospace; font-size: 0.85rem; padding: 10px 12px; resize: none; outline: none;"></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1;">12-Word Master Recovery Phrase</label>
+          <span id="emergencyBip39Status" style="font-size: 0.72rem; font-weight: 600; color: #94a3b8;">Enter words</span>
+        </div>
+        <textarea id="emergencyPhraseInput" placeholder="word1 word2 word3 ... word12" rows="3" oninput="validateBip39PhraseLive('emergencyPhraseInput', 'emergencyBip39Status', 'emergencyWordChips')" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #f8fafc; font-family: monospace; font-size: 0.85rem; padding: 10px 12px; resize: none; outline: none;"></textarea>
+        <div id="emergencyWordChips" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;"></div>
       </div>
 
       <div style="margin-bottom: 1.25rem; display: flex; align-items: flex-start; gap: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 10px 12px;">
@@ -12147,7 +12228,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
           <div style="position: relative;">
             <span style="position: absolute; left: 12px; top: 10px; color: #38bdf8; font-weight: 800;">@</span>
-            <input type="text" id="sovWizardHandle" placeholder="username" value="pioneer" oninput="checkSovWizardHandleLive(this.value)" style="width: 100%; padding: 10px 12px 10px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.92rem; box-sizing: border-box; outline: none;">
+            <input type="text" id="sovWizardHandle" placeholder="username" value="pioneer" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9_]/g, ''); checkSovWizardHandleLive(this.value);" style="width: 100%; padding: 10px 12px 10px 28px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 0.92rem; box-sizing: border-box; outline: none;">
           </div>
         </div>
 
@@ -12287,8 +12368,49 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
         <div style="display: flex; gap: 10px;">
           <button type="button" onclick="sovWizardGoToStep(1)" style="padding: 0.8rem 1.2rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; border-radius: 12px; font-weight: 700; font-size: 0.88rem; cursor: pointer;">Back</button>
-          <button type="button" id="sovWizardStep2NextBtn" onclick="sovWizardGoToStep(3)" style="flex: 1; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);">
-            <span>Continue to Genesis Grant</span> <span>➔</span>
+          <button type="button" id="sovWizardStep2NextBtn" onclick="sovWizardGoToStep('verify')" style="flex: 1; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);">
+            <span>Continue to Phrase Backup</span> <span>➔</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2.5: MANDATORY RECOVERY PHRASE BACKUP & VERIFICATION -->
+      <div id="sovWizardStepVerifyPhrase" style="display: none;">
+        <div style="margin-bottom: 1rem; text-align: left;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <span style="font-size: 0.72rem; font-weight: 700; color: #a855f7; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(168, 85, 247, 0.12); padding: 3px 8px; border-radius: 8px;">Step 3 of 4 &bull; Key Custody</span>
+            <span style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Self-Sovereign Storage</span>
+          </div>
+          <h2 style="font-size: 1.35rem; font-weight: 800; margin: 0.4rem 0 0.2rem 0;">Backup Master Recovery Phrase</h2>
+          <p style="font-size: 0.8rem; color: #94a3b8; margin: 0;">These 12 words control your cryptographic identity and wallet. Write them down securely.</p>
+        </div>
+
+        <!-- 12-Word Seed Display Grid -->
+        <div id="sovWizardSeedWordsDisplay" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 14px; padding: 12px; margin-bottom: 0.85rem;">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
+          <button type="button" id="btnCopySovWizardPhrase" onclick="copySovWizardSeedWords()" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #38bdf8; font-size: 0.75rem; font-weight: 600; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            <span>📋 Copy Phrase</span>
+          </button>
+        </div>
+
+        <!-- Interactive 3-Word Random Challenge -->
+        <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 12px; margin-bottom: 1.25rem; text-align: left;">
+          <div style="font-size: 0.78rem; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
+            🔒 Verification Challenge: Confirm 3 Words
+          </div>
+          <div id="sovWizardChallengeInputs" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Generated dynamically with inputs for word #x, #y, #z -->
+          </div>
+          <div id="sovWizardChallengeError" style="display: none; color: #f87171; font-size: 0.76rem; margin-top: 6px; font-weight: 600;"></div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="button" onclick="sovWizardGoToStep(2)" style="padding: 0.8rem 1.2rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; border-radius: 12px; font-weight: 700; font-size: 0.88rem; cursor: pointer;">Back</button>
+          <button type="button" id="btnVerifySeedChallenge" onclick="verifySeedChallengeAndProceed()" style="flex: 1; padding: 0.85rem; background: linear-gradient(135deg, #9333ea, #6366f1); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(147, 51, 234, 0.4);">
+            <span>Verify &amp; Continue to Grant</span> <span>➔</span>
           </button>
         </div>
       </div>
@@ -13371,6 +13493,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
           <!-- Core Financial Action Buttons -->
           <div class="wallet-action-hub" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1.5rem;">
+            <button type="button" class="wallet-action-btn" id="btnOpenWalletReceiveQr" onclick="openWalletReceiveModal()" title="Show Sovereign Receive QR & DID deep link" style="flex: 1; min-width: 125px; padding: 10px 14px; border-radius: 12px; background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>📲 Receive / QR</span>
+            </button>
+            <button type="button" class="wallet-action-btn" id="btnClaimSeederYield" onclick="claimSeederYieldAction()" title="Claim accumulated bandwidth rewards from seeded P2P chunks" style="flex: 1; min-width: 150px; padding: 10px 14px; border-radius: 12px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3)); border: 1px solid rgba(16, 185, 129, 0.45); color: #34d399; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>⚡ Claim Seeder Yield</span>
+            </button>
             <button type="button" class="wallet-action-btn" id="btnClaimTestnetFaucet" onclick="claimTestnetFaucetAction()" title="Claim 50 SOV Testnet Faucet" aria-label="Testnet Faucet" style="flex: 1; min-width: 140px; padding: 10px 14px; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); color: #fff; font-weight: 800; font-size: 0.88rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);">
               <span>💧 Claim Faucet (+50 SOV)</span>
             </button>
@@ -13495,6 +13623,39 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- 📲 WALLET RECEIVE / QR MODAL (Sovereign Deep Link & Visual QR Parity) -->
+  <div id="walletReceiveModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(5, 8, 16, 0.88); backdrop-filter: blur(20px); z-index: 1000020; align-items: center; justify-content: center; padding: 1.25rem;">
+    <div style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 24px; max-width: 440px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.85); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+        <div style="font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; color: #38bdf8;">
+          <span>📲</span> <span>Receive SOV &amp; Assets</span>
+        </div>
+        <button onclick="closeWalletReceiveModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; padding: 4px;" aria-label="Close modal">✕</button>
+      </div>
+
+      <!-- QR Container -->
+      <div id="walletReceiveQrContainer" style="background: #ffffff; padding: 16px; border-radius: 16px; display: inline-block; margin-bottom: 1rem; box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
+        <div id="walletReceiveQrSvg" style="width: 180px; height: 180px; display: flex; align-items: center; justify-content: center;"></div>
+      </div>
+
+      <div style="margin-bottom: 1.25rem; text-align: left; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 12px;">
+        <div style="font-size: 0.74rem; color: #94a3b8; font-weight: 600; margin-bottom: 4px;">Sovereign Address / DID:</div>
+        <code id="walletReceiveDidText" style="font-family: monospace; font-size: 0.8rem; color: #38bdf8; word-break: break-all; display: block;">did:sovra:...</code>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button type="button" id="btnCopyWalletReceiveDeepLink" onclick="copyWalletReceiveDeepLink()" style="flex: 1; padding: 0.8rem; background: linear-gradient(135deg, #0284c7, #38bdf8); border: none; border-radius: 12px; color: #fff; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);">
+          <span>📋 Copy sovra:&lt;did&gt; Deep Link</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🪙 COIN BURST HUD OVERLAY -->
+  <div id="coinBurstHud" style="display: none; position: fixed; inset: 0; pointer-events: none; z-index: 1000050; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: 900; color: #fbbf24; text-shadow: 0 0 20px rgba(251, 191, 36, 0.8);">
+    🪙 +2.75 SOV ⚡
   </div>
   <!-- 🌟 UNIVERSAL CREATE SHEET / MODAL (Apple & Telegram Grade) -->
   <div id="universalCreateModal" class="omni-modal-overlay sovereign-modal-backdrop" style="display: none; position: fixed; inset: 0; z-index: 100500 !important; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); justify-content: center; align-items: center; padding: 16px;" onclick="if(event.target === this) closeUniversalCreateModal()">

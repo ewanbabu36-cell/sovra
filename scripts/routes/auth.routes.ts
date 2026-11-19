@@ -12,6 +12,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { sovraDb, toPublicUserDTO, type UserRecord } from '../database-engine.ts';
+import { BIP39_ENGLISH_WORDLIST } from '../bip39.ts';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -688,6 +689,66 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         ],
       });
       res.end(JSON.stringify({ ok: true, message: 'Security PIN reset successfully! All active sessions have been revoked. Please log in with your new PIN.' }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 13b. POST /api/auth/pin/reset-biometric
+  if (url.pathname === '/api/auth/pin/reset-biometric' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const identifier = String(parsed.identifier || parsed.handle || parsed.did || '').trim();
+      const newPin = String(parsed.newPin || '').trim();
+      if (!identifier || !newPin) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Identifier and new PIN are required.' }));
+        return true;
+      }
+      const user = sovraDb.findUser(identifier);
+      if (!user) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'User not found.' }));
+        return true;
+      }
+      user.securityPinHash = sovraDb.hashSecurityPin(newPin);
+      user.updatedAt = Date.now();
+      sovraDb.save(true);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, message: 'Security PIN reset successfully via Biometrics!' }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 13c. POST /api/auth/mnemonic/validate
+  if (url.pathname === '/api/auth/mnemonic/validate' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const phrase = String(parsed.phrase || '').trim().toLowerCase();
+      const words = phrase.split(/\s+/).filter(Boolean);
+      const invalidWords: string[] = [];
+      for (const w of words) {
+        if (!BIP39_ENGLISH_WORDLIST.includes(w)) {
+          invalidWords.push(w);
+        }
+      }
+      const isValid = (words.length === 12 || words.length === 24) && invalidWords.length === 0 && sovraDb.validateRecoveryPhrase(phrase);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        valid: isValid,
+        wordCount: words.length,
+        invalidWords: invalidWords
+      }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));

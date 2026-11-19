@@ -11970,6 +11970,14 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         } else {
           routeByRespectedProfileRole(myProfile.role);
         }
+        try {
+          localStorage.setItem('sovra_last_active_user', JSON.stringify({
+            handle: myProfile.handle,
+            name: myProfile.name,
+            avatar: myProfile.avatar || myProfile.avatarDataUrl,
+            did: myProfile.did
+          }));
+        } catch(e) {}
         showAccountToast('🎉 Welcome back, ' + (myProfile.name || myProfile.handle) + '!');
       } catch (err) {
         if (errBox) {
@@ -12916,6 +12924,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
     // Auto-check onboarding on first visit & restore session from server
     window.addEventListener('DOMContentLoaded', function() {
+      if (typeof checkResidentQuickUser === 'function') checkResidentQuickUser();
       if (!window.isSecureContext && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
         var notice = document.getElementById('insecureContextNotice');
         if (notice) {
@@ -17166,6 +17175,103 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       }
     }
     window.claimTestnetFaucetAction = claimTestnetFaucetAction;
+
+    function openWalletReceiveModal() {
+      var modal = document.getElementById('walletReceiveModal');
+      if (modal) modal.style.display = 'flex';
+
+      var did = (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : null) || (myProfile ? myProfile.did : 'did:sovra:pioneer_node_01');
+      var didEl = document.getElementById('walletReceiveDidText');
+      if (didEl) didEl.innerText = 'sovra:' + did;
+
+      var svgEl = document.getElementById('walletReceiveQrSvg');
+      if (svgEl) {
+        svgEl.innerHTML = '<svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">' +
+          '<rect width="180" height="180" fill="#ffffff" rx="10"/>' +
+          '<rect x="15" y="15" width="45" height="45" fill="#0f172a" rx="4"/>' +
+          '<rect x="22" y="22" width="31" height="31" fill="#ffffff" rx="2"/>' +
+          '<rect x="29" y="29" width="17" height="17" fill="#0284c7" rx="2"/>' +
+          '<rect x="120" y="15" width="45" height="45" fill="#0f172a" rx="4"/>' +
+          '<rect x="127" y="22" width="31" height="31" fill="#ffffff" rx="2"/>' +
+          '<rect x="134" y="29" width="17" height="17" fill="#0284c7" rx="2"/>' +
+          '<rect x="15" y="120" width="45" height="45" fill="#0f172a" rx="4"/>' +
+          '<rect x="22" y="127" width="31" height="31" fill="#ffffff" rx="2"/>' +
+          '<rect x="29" y="134" width="17" height="17" fill="#0284c7" rx="2"/>' +
+          '<rect x="70" y="20" width="12" height="12" fill="#0f172a"/>' +
+          '<rect x="90" y="35" width="14" height="14" fill="#0f172a"/>' +
+          '<rect x="75" y="55" width="20" height="20" fill="#38bdf8"/>' +
+          '<rect x="70" y="85" width="40" height="14" fill="#0f172a"/>' +
+          '<rect x="120" y="75" width="15" height="30" fill="#0f172a"/>' +
+          '<rect x="145" y="90" width="15" height="15" fill="#38bdf8"/>' +
+          '<rect x="20" y="75" width="15" height="25" fill="#0f172a"/>' +
+          '<rect x="45" y="85" width="15" height="15" fill="#38bdf8"/>' +
+          '<rect x="75" y="115" width="25" height="20" fill="#0f172a"/>' +
+          '<rect x="110" y="130" width="30" height="18" fill="#0284c7"/>' +
+          '<rect x="150" y="145" width="15" height="15" fill="#0f172a"/>' +
+          '<circle cx="90" cy="90" r="10" fill="#0284c7"/>' +
+        '</svg>';
+      }
+    }
+    window.openWalletReceiveModal = openWalletReceiveModal;
+
+    function closeWalletReceiveModal() {
+      var modal = document.getElementById('walletReceiveModal');
+      if (modal) modal.style.display = 'none';
+    }
+    window.closeWalletReceiveModal = closeWalletReceiveModal;
+
+    function copyWalletReceiveDeepLink() {
+      var didEl = document.getElementById('walletReceiveDidText');
+      var text = didEl ? didEl.innerText : 'sovra:did:sovra:pioneer_node_01';
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+        showAccountToast('📋 Copied deep link: ' + text, 'success');
+      }
+    }
+    window.copyWalletReceiveDeepLink = copyWalletReceiveDeepLink;
+
+    async function claimSeederYieldAction() {
+      var did = (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : null) || (myProfile ? myProfile.did : 'did:sovra:laptop_host');
+      try {
+        var res = await fetch('/api/wallet/claim-seeder-yield', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ did: did })
+        });
+        var data = await res.json();
+        if (data && data.ok) {
+          showAccountToast('⚡ Successfully claimed +' + Number(data.claimedSov).toFixed(2) + ' SOV Seeder Yield!', 'success');
+          
+          var balEl = document.getElementById('walletBalanceSovDisplay');
+          if (balEl && data.newBalanceSov !== undefined) {
+            balEl.innerText = Number(data.newBalanceSov).toFixed(2) + ' SOV';
+          }
+          var earnedEl = document.getElementById('walletBandwidthEarned');
+          if (earnedEl) {
+            var cur = parseFloat(earnedEl.innerText.replace(/[^0-9.]/g, '')) || 0;
+            earnedEl.innerText = '+' + (cur + data.claimedSov).toFixed(2) + ' SOV';
+          }
+
+          var hud = document.getElementById('coinBurstHud');
+          if (hud) {
+            hud.innerText = '🪙 +' + Number(data.claimedSov).toFixed(2) + ' SOV ⚡';
+            hud.style.display = 'flex';
+            setTimeout(function() {
+              hud.style.display = 'none';
+            }, 1200);
+          }
+          if (typeof refreshWalletBalanceLive === 'function') {
+            refreshWalletBalanceLive();
+          }
+        } else {
+          showAccountToast('Failed to claim yield: ' + ((data && data.error) ? data.error : 'Unknown error'));
+        }
+      } catch (err) {
+        showAccountToast('Claim yield network error: ' + (err.message || err));
+      }
+    }
+    window.claimSeederYieldAction = claimSeederYieldAction;
+
     
     // 1-Tap Instant Emoji Micro-Tipping (95/5 Direct Creator Revenue)
     window.executeInstantEmojiTip = async function(amount, emoji, targetType, targetId) {
@@ -33031,6 +33137,12 @@ _scheduleTargetContext: 'workspace',
 
       switchStudioTab: function(tab) {
         this.activeStudioTab = tab;
+        try {
+          if (typeof window !== 'undefined' && window.history && window.history.pushState) {
+            var chanParam = this.activeChannelId ? ('&channel=' + encodeURIComponent(this.activeChannelId)) : '';
+            window.history.pushState({ tab: tab, channelId: this.activeChannelId }, '', '/studio#tab=' + tab + chanParam);
+          }
+        } catch(_) {}
         var subtabs = ['dashboard', 'content', 'playlists', 'analytics', 'comments', 'community', 'subtitles', 'copyright', 'earn', 'customization', 'audio', 'ingest', 'schedule', 'settings', 'feedback'];
         subtabs.forEach(function(s) {
           var cap = s.charAt(0).toUpperCase() + s.slice(1);
@@ -40412,7 +40524,7 @@ _scheduleTargetContext: 'workspace',
         // Ticks
         let tickHtml = '';
         if (isOutgoing) {
-          if (m.status === 'pending_sync') tickHtml = '<span class="tick-icon" style="color: #94a3b8; font-size: 0.72rem;" title="Queued in Offline Outbox (Pending Sync)">⏱️</span>';
+          if (m.status === 'pending_sync') tickHtml = '<span class="tick-icon" style="color: #fbbf24; font-size: 0.72rem;" title="Queued in Offline Outbox (Pending Sync)">🕒</span>';
           else if (m.status === 'sending') tickHtml = '<span class="tick-icon tick-sending" title="Sending to sovereign relay...">🕒</span>';
           else if (m.status === 'sent') tickHtml = '<span class="tick-icon" title="Sent to P2P network">✓</span>';
           else if (m.status === 'delivered') tickHtml = '<span class="tick-icon" title="Delivered to peer node">✓✓</span>';
@@ -42107,6 +42219,38 @@ _scheduleTargetContext: 'workspace',
         }
       }
     }
+
+    
+    var _voiceAnimFrame = null;
+    var _voiceAudioContext = null;
+    var _voiceAnalyser = null;
+
+    function drawVoiceWaveformCanvas() {
+      var canvas = document.getElementById('voiceWaveformCanvas');
+      if (!canvas || !isRecordingVoice || !_voiceAnalyser) return;
+      var ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      var bufferLength = _voiceAnalyser.frequencyBinCount;
+      var dataArray = new Uint8Array(bufferLength);
+
+      function render() {
+        if (!isRecordingVoice || !_voiceAnalyser) return;
+        _voiceAnimFrame = requestAnimationFrame(render);
+        _voiceAnalyser.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var barWidth = (canvas.width / bufferLength) * 1.5;
+        var x = 0;
+        for (var i = 0; i < bufferLength; i++) {
+          var barHeight = (dataArray[i] / 255) * canvas.height;
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(x, (canvas.height - barHeight) / 2, Math.max(barWidth - 1, 1), Math.max(barHeight, 2));
+          x += barWidth + 1;
+        }
+      }
+      render();
+    }
+    window.drawVoiceWaveformCanvas = drawVoiceWaveformCanvas;
 
     function stopVoiceCaptureHardware() {
       if (_voiceMediaRecorder) {
@@ -45951,7 +46095,17 @@ _scheduleTargetContext: 'workspace',
       if (typeof showAccountToast === 'function') {
         showAccountToast(ytCaptionsEnabled ? '🔤 Closed Captions: ON' : 'Closed Captions: OFF');
       }
-      updateYtSubtitles();
+      if (v.subtitles && Array.isArray(v.subtitles) && v.subtitles.length > 0) {
+              var userLang = (navigator.language || 'en').toLowerCase().split('-')[0];
+              var matchSub = v.subtitles.find(function(s) {
+                return (s.lang && s.lang.toLowerCase().indexOf(userLang) !== -1) ||
+                       (s.label && s.label.toLowerCase().indexOf(userLang) !== -1);
+              });
+              if (matchSub) {
+                activeSubtitleTrack = matchSub.id || matchSub.lang || 0;
+              }
+            }
+            updateYtSubtitles();
     }
 
     function updateYtSubtitles() {
@@ -46315,6 +46469,16 @@ _scheduleTargetContext: 'workspace',
             hls.loadSource(mediaSrc);
             hls.attachMedia(videoEl);
             window._currentHlsInstance = hls;
+
+            hls.on(Hls.Events.FRAG_LOADED, function(event, data) {
+              try {
+                if (window.caches && data && data.frag) {
+                  window.caches.open('sovra-hls-cache').then(function(cache) {
+                    if (data.frag.url) cache.add(data.frag.url).catch(function(){});
+                  }).catch(function(){});
+                }
+              } catch (_) {}
+            });
           } else if (videoEl.src !== mediaSrc && !videoEl.src.endsWith(mediaSrc)) {
             videoEl.src = mediaSrc;
             videoEl.load();
@@ -55247,6 +55411,69 @@ _scheduleTargetContext: 'workspace',
       }
     }
     window.sovWizardGoToStep = sovWizardGoToStep;
+
+    var _wizardMnemonicWords = [
+      'venture', 'galaxy', 'quantum', 'cipher', 'stellar', 'matrix',
+      'gravity', 'beacon', 'nebula', 'cosmic', 'orbit', 'zenith'
+    ];
+    var _wizardChallengedIndices = [2, 6, 10]; // Word 3, Word 7, Word 11
+
+    function renderSovWizardSeedPhraseChallenge() {
+      var disp = document.getElementById('sovWizardSeedWordsDisplay');
+      if (disp) {
+        disp.innerHTML = _wizardMnemonicWords.map(function(w, i) {
+          return '<div style="background: rgba(30, 41, 59, 0.9); padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); font-family: monospace; font-size: 0.78rem; text-align: left;"><span style="color: #94a3b8; margin-right: 4px;">' + (i+1) + '.</span><span style="color: #f8fafc; font-weight: 700;">' + w + '</span></div>';
+        }).join('');
+      }
+      var container = document.getElementById('sovWizardChallengeInputs');
+      if (container) {
+        container.innerHTML = _wizardChallengedIndices.map(function(idx) {
+          return '<div style="display: flex; align-items: center; gap: 8px;">' +
+            '<span style="font-size: 0.76rem; color: #a855f7; font-weight: 700; width: 68px;">Word #' + (idx + 1) + ':</span>' +
+            '<input type="text" id="sovWizardChallengeWord_' + idx + '" placeholder="Type word #' + (idx + 1) + '" style="flex: 1; padding: 7px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-family: monospace; font-size: 0.82rem; outline: none;">' +
+          '</div>';
+        }).join('');
+      }
+      var errEl = document.getElementById('sovWizardChallengeError');
+      if (errEl) errEl.style.display = 'none';
+    }
+    window.renderSovWizardSeedPhraseChallenge = renderSovWizardSeedPhraseChallenge;
+
+    function copySovWizardSeedWords() {
+      var phrase = _wizardMnemonicWords.join(' ');
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(phrase);
+        showAccountToast('📋 12-Word seed phrase copied to clipboard!', 'success');
+      }
+    }
+    window.copySovWizardSeedWords = copySovWizardSeedWords;
+
+    function verifySeedChallengeAndProceed() {
+      var errEl = document.getElementById('sovWizardChallengeError');
+      var allCorrect = true;
+      for (var i = 0; i < _wizardChallengedIndices.length; i++) {
+        var idx = _wizardChallengedIndices[i];
+        var inEl = document.getElementById('sovWizardChallengeWord_' + idx);
+        var val = inEl ? inEl.value.trim().toLowerCase() : '';
+        if (val !== _wizardMnemonicWords[idx]) {
+          allCorrect = false;
+          if (inEl) inEl.style.borderColor = '#ef4444';
+        } else {
+          if (inEl) inEl.style.borderColor = '#10b981';
+        }
+      }
+      if (!allCorrect) {
+        if (errEl) {
+          errEl.innerText = '⚠️ One or more words do not match your seed phrase. Please check and try again.';
+          errEl.style.display = 'block';
+        }
+        return;
+      }
+      if (errEl) errEl.style.display = 'none';
+      showAccountToast('✓ Recovery phrase successfully verified!', 'success');
+      sovWizardGoToStep(3);
+    }
+    window.verifySeedChallengeAndProceed = verifySeedChallengeAndProceed;
 
     var _sovHandleTimer = null;
     function checkSovWizardHandleLive(handle) {

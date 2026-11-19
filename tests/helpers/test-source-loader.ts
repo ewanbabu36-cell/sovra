@@ -9,7 +9,7 @@ let cachedServerContent: string | null = null;
  * and scripts/routes/ to maintain 100% backward-compatibility for legacy test suites.
  */
 export function loadServerContent(customDevServerPath?: string): string {
-  if (cachedServerContent && !customDevServerPath) {
+  if (cachedServerContent) {
     return cachedServerContent;
   }
 

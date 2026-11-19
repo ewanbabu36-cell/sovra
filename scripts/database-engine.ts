@@ -3234,6 +3234,33 @@ export class SovraDatabaseEngine {
       deviceType: record.deviceType as any,
     });
 
+    // Grant 5.00 SOV Welcome Gas Voucher
+    if (!this.db.wallets) {
+      this.db.wallets = {};
+    }
+    const welcomeVoucher = {
+      id: 'voucher_' + now + '_' + crypto.randomBytes(4).toString('hex'),
+      amountSov: 5.0,
+      type: 'WELCOME_GAS_VOUCHER',
+      status: 'ACTIVE',
+      grantedAt: now,
+      description: '5.00 SOV Welcome Gas Voucher'
+    };
+    if (!this.db.wallets[record.did]) {
+      this.db.wallets[record.did] = {
+        did: record.did,
+        balance: record.balanceSov,
+        vouchers: [welcomeVoucher],
+        welcomeVoucher: welcomeVoucher
+      };
+    } else {
+      if (!this.db.wallets[record.did].vouchers) {
+        this.db.wallets[record.did].vouchers = [];
+      }
+      this.db.wallets[record.did].vouchers.push(welcomeVoucher);
+      this.db.wallets[record.did].welcomeVoucher = welcomeVoucher;
+    }
+
     this.save(true);
     try {
       this.sqliteEngine?.registerUser(record);
