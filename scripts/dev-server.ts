@@ -52,6 +52,8 @@ import {
   verifyEd25519,
   sha256,
   deriveKeyFromWebAuthnPrf,
+  verifyProofOfWork,
+  computeProofOfWork,
 } from '../packages/crypto/dist/index.js';
 import {
   SovraIdentityKey,
@@ -846,7 +848,7 @@ async function bootstrapLocalNode() {
 
   await node.start();
 
-  // Subscribe to core mesh topics with full SQLite persistence
+  // Subscribe to core mesh topics with full PoW Sybil resistance & SQLite persistence
   await node.pubsub.subscribe('sovra/feed/main', async msg => {
     try {
       const parsed = JSON.parse(new TextDecoder().decode(msg.data));
@@ -857,6 +859,20 @@ async function bootstrapLocalNode() {
         const topic = parsed.topic || 'sovra/feed/main';
         const timestamp = parsed.timestamp || parsed.createdAt || Date.now();
         const signatureHex = parsed.signatureHex || parsed.sig || ('ed25519_sig_' + pId);
+
+        // 🛡️ Sybil Defense: Decentralized Hashcash Proof-of-Work verification
+        if (parsed.powNonce !== undefined) {
+          const reqDiff = Math.min(24, Math.max(8, Number(parsed.powDifficulty || 12)));
+          const isPoWValid = verifyProofOfWork(
+            new TextEncoder().encode(pId),
+            BigInt(parsed.powNonce),
+            reqDiff,
+          );
+          if (!isPoWValid) {
+            console.warn(`[GossipSub] 🛑 Dropping unverified PoW spam envelope ${pId} from ${authorDid}`);
+            return;
+          }
+        }
 
         const record: PostRecord = {
           id: pId,
@@ -897,6 +913,35 @@ async function bootstrapLocalNode() {
       }
     } catch {}
   });
+
+  // 🌐 Decentralized CRDT Ops Mesh (/sovra/v1/ops)
+  await node.pubsub.subscribe('/sovra/v1/ops', async msg => {
+    try {
+      const op = JSON.parse(new TextDecoder().decode(msg.data));
+      if (op && op.id && op.authorDid) {
+        if (op.powNonce !== undefined) {
+          const isValid = verifyProofOfWork(
+            new TextEncoder().encode(op.id),
+            BigInt(op.powNonce),
+            Number(op.powDifficulty || 12),
+          );
+          if (!isValid) return;
+        }
+        broadcastChatEvent('all', op, 'social_op');
+      }
+    } catch (_) {}
+  });
+
+  // 📞 Host Sovereign WebRTC Signaling Topic (/sovra/v1/signal/{hostDid})
+  if (masterKey && masterKey.did) {
+    await node.pubsub.subscribe(`/sovra/v1/signal/${masterKey.did}`, async msg => {
+      try {
+        const signal = JSON.parse(new TextDecoder().decode(msg.data));
+        broadcastChatEvent(masterKey.did, signal, 'call_signal');
+      } catch (_) {}
+    });
+  }
+
   await node.pubsub.subscribe('sovra/creator/live');
 
   // Initialize Storage Node Daemon
@@ -1381,6 +1426,25 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.pathname.startsWith('/api/realtime/') || url.pathname.startsWith('/api/call/')) {
+    return;
+  }
+
+  // ⚡ BitSwap Swarm & Content-Addressed Media Interceptor (/ipfs/, /swarm/, /api/feed/video/, /api/video/stream)
+  if (url.pathname.startsWith('/ipfs/') || url.pathname.startsWith('/swarm/') || url.pathname.startsWith('/api/feed/video/') || url.pathname.startsWith('/api/video/stream')) {
+    event.respondWith(
+      caches.open('sovra-bitswap-media-v1').then(async (mediaCache) => {
+        const cached = await mediaCache.match(req).catch(() => null);
+        if (cached) return cached;
+        return fetch(req).then((netRes) => {
+          if (netRes && (netRes.status === 200 || netRes.status === 206)) {
+            try { mediaCache.put(req, netRes.clone()); } catch (_) {}
+          }
+          return netRes;
+        }).catch(() => {
+          return new Response(new Uint8Array(0), { status: 404, statusText: 'BitSwap Block Not Found Offline' });
+        });
+      })
+    );
     return;
   }
 
@@ -3004,6 +3068,19 @@ async function startDevServer() {
       const set = realtimeSubscribers.get(user.did)!;
       set.add(res);
 
+      // 🌐 Autonomous P2P GossipSub Signaling Bridge (/sovra/v1/signal/{did})
+      const p2pSignalTopic = `/sovra/v1/signal/${user.did}`;
+      const onP2pSignal = (msg: any) => {
+        try {
+          const wireStr = new TextDecoder().decode(msg.data);
+          const parsedSignal = JSON.parse(wireStr);
+          broadcastChatEvent(user.did, parsedSignal, 'call_signal');
+        } catch (_) {}
+      };
+      if (node && node.pubsub) {
+        node.pubsub.subscribe(p2pSignalTopic, onP2pSignal).catch(() => {});
+      }
+
       const keepAliveInterval = setInterval(() => {
         try {
           res.write(': ping\n\n');
@@ -3015,7 +3092,12 @@ async function startDevServer() {
       req.on('close', () => {
         clearInterval(keepAliveInterval);
         set.delete(res);
-        if (set.size === 0) realtimeSubscribers.delete(user.did);
+        if (set.size === 0) {
+          realtimeSubscribers.delete(user.did);
+          if (node && node.pubsub) {
+            node.pubsub.unsubscribe(p2pSignalTopic).catch(() => {});
+          }
+        }
       });
       return;
     }
@@ -8450,6 +8532,7 @@ async function startDevServer() {
       resolvePrincipal,
       enforceAuth,
       broadcastChatEvent,
+      p2pNode: node,
     })) {
       return;
     }
