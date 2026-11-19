@@ -11194,21 +11194,22 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
         }
 
+        const fallbackBg = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarBg) ? myProfile.avatarBg : 'linear-gradient(135deg, #1877f2, #7c3aed)';
+        const fallbackText = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) 
+          ? (myProfile.displayName || myProfile.name).charAt(0).toUpperCase() 
+          : ((typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : '👤');
+
         // If an active story exists, show its media preview
         if (activeStoryMedia) {
-          coverEl.innerHTML = '<img src="' + activeStoryMedia + '" alt="Your story" style="width: 100%; height: 100%; object-fit: cover; display: block;" /><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+          coverEl.innerHTML = '<img src="' + activeStoryMedia + '" alt="Your story" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.onerror=null; this.parentElement.innerHTML=\'<div style=\\\'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ' + fallbackBg + '; font-size: 2.8rem; font-weight: 800; color: #fff;\\\'>' + fallbackText + '</div>\';" /><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
           return;
         }
 
-        // 2. Otherwise show currently logged-in user\'s profile photo
+        // 2. Otherwise show currently logged-in user\'s profile photo or styled monogram
         if (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) {
-          coverEl.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" alt="Your avatar" style="width: 100%; height: 100%; object-fit: cover; display: block;" /><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
-        } else if (typeof myProfile !== 'undefined' && myProfile && (myProfile.name || myProfile.displayName || myProfile.avatar)) {
-          const bg = myProfile.avatarBg || 'linear-gradient(135deg, #4f46e5, #06b6d4)';
-          const text = (myProfile.displayName || myProfile.name) ? (myProfile.displayName || myProfile.name).charAt(0).toUpperCase() : (myProfile.avatar || 'S');
-          coverEl.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ' + bg + '; font-size: 2.8rem; font-weight: 800; color: #fff;">' + text + '</div><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+          coverEl.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" alt="Your avatar" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.onerror=null; this.parentElement.innerHTML=\'<div style=\\\'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ' + fallbackBg + '; font-size: 2.8rem; font-weight: 800; color: #fff;\\\'>' + fallbackText + '</div>\';" /><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
         } else {
-          coverEl.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1e293b, #0f172a); font-size: 2.8rem; font-weight: 800; color: #94a3b8;">👤</div><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+          coverEl.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ' + fallbackBg + '; font-size: 2.8rem; font-weight: 800; color: #fff;">' + fallbackText + '</div><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
         }
       } catch (e) {
         console.warn('[Stories] updateCreateStoryCoverUI error:', e);
