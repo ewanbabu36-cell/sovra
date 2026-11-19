@@ -107,7 +107,7 @@ export class MeshTransportManager {
 
       if (this.router.userControls.discoverabilityEnabled) {
         // Start advertising rotating discovery token
-        const token = Math.random().toString(16).slice(2, 10);
+        const token = bytesToHex(secureRandomBytes(4));
         await this.bleTransport.advertise({
           serviceUuid: '00005356-0000-1000-8000-00805f9b34fb',
           protocolVersion: 1,
