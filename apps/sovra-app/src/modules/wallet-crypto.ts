@@ -14,20 +14,33 @@ export function initWalletCryptoModule(): void {
 
   (window as any).SovraWalletEngine = {
     async transferSov(recipientDidOrHandle: string, amountSov: number): Promise<{ ok: boolean; txHash?: string; error?: string }> {
-      try {
-        const res = await fetch('/api/wallet/transfer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recipient: recipientDidOrHandle,
-            amount: Number(amountSov),
-          }),
-        });
-        const data = await res.json();
-        return data;
-      } catch (err: any) {
-        return { ok: false, error: err.message };
-      }
+      return new Promise((resolve) => {
+        const doCommit = async () => {
+          try {
+            const res = await fetch('/api/wallet/transfer', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                recipient: recipientDidOrHandle,
+                amount: Number(amountSov),
+              }),
+            });
+            const data = await res.json();
+            resolve(data);
+          } catch (err: any) {
+            resolve({ ok: false, error: err.message });
+          }
+        };
+
+        if (typeof (window as any).bufferAndExecuteSovraTx === 'function') {
+          (window as any).bufferAndExecuteSovraTx(
+            { recipientDid: recipientDidOrHandle, amount: amountSov },
+            doCommit
+          );
+        } else {
+          doCommit();
+        }
+      });
     },
 
     openTipModal(_targetType: string, _targetId: string, meta: { creatorName?: string; creatorHandle?: string } = {}): void {

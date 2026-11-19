@@ -2683,6 +2683,15 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
     <!-- 🥽 CYCLE 3: OPEN WEBXR SPATIAL HOLOGRAM THEATER MODAL -->
     <div id="webxrTheaterModal" class="webxr-theater-container" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;" onclick="closeWebxrSpatialTheater()">
+      <!-- Floating Top Exit Bar (reveals on hover / tap) -->
+      <div id="webxrTopFloatingBar" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10000; display: flex; align-items: center; gap: 10px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.18); border-radius: 999px; padding: 6px 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); transition: opacity 0.3s ease, transform 0.3s ease; opacity: 1; pointer-events: auto;" onclick="event.stopPropagation()">
+        <button type="button" onclick="closeWebxrSpatialTheater()" style="background: none; border: none; color: #fff; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <span>← Exit Cinema</span>
+          <span style="font-size: 0.68rem; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,0.15); color: #94a3b8;">Esc / Swipe Down</span>
+        </button>
+        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.2);"></div>
+        <button type="button" onclick="toggleSpatialTheaterFullscreen()" style="background: none; border: none; color: #38bdf8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">⛶ Normal View</button>
+      </div>
       <div id="webxrTheaterContentBox" style="background: linear-gradient(135deg, #090d16, #111827); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 24px; width: 100%; max-width: 960px; padding: 1.25rem; box-shadow: 0 25px 60px rgba(139, 92, 246, 0.25); color: #f8fafc; transition: all 0.3s ease;" onclick="event.stopPropagation()">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.75rem;">
           <div style="display: flex; align-items: center; gap: 10px;">
@@ -14011,6 +14020,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <!-- 🛸 ALIEN HOLOGRAPHIC CENTRAL COMMAND CORE OVERLAY -->
   <div id="holographicNavOverlay" class="holo-nav-overlay" role="dialog" aria-modal="true" aria-label="SOVRA Holographic Central Navigation">
     <div class="holo-backdrop" onclick="closeHolographicNav()"></div>
+    <div class="holo-top-exit-bar" style="position: absolute; top: 22px; left: 0; right: 0; display: flex; justify-content: center; z-index: 1000; pointer-events: auto;">
+      <button type="button" class="holo-exit-pill" onclick="closeHolographicNav()" aria-label="Back" title="Close Holographic Command Core (Esc)" style="display: inline-flex; align-items: center; gap: 8px; padding: 7px 18px; border-radius: 999px; background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.2); color: #f8fafc; font-size: 0.82rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.5); transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+        <span>← Back</span>
+        <span style="font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,0.14); color: #94a3b8; font-weight: 600;">Esc</span>
+      </button>
+    </div>
     <div class="holo-stage" id="holoStage">
       <!-- 3D Perspective Floor Pedestal & Concentric Rings -->
       <div class="holo-floor-pedestal" aria-hidden="true">
@@ -14667,5 +14682,46 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </button>
       </div>
     </div>
-  </div>`;
+  </div>
+
+  <!-- BITCHAT EMERGENCY PANIC WIPE CONFIRMATION MODAL -->
+  <div id="bitchatPanicConfirmModal" class="omni-modal-overlay" style="display: none; z-index: 1000005; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); background: rgba(15, 6, 8, 0.92); align-items: center; justify-content: center;">
+    <div class="omni-modal-card" style="max-width: 460px; width: 92%; border: 1.5px solid rgba(239, 68, 68, 0.45); border-radius: 24px; background: linear-gradient(145deg, #18090b 0%, #200d11 100%); box-shadow: 0 25px 60px -10px rgba(239, 68, 68, 0.35); padding: 1.5rem; color: #fff;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;">
+        <div style="width: 44px; height: 44px; border-radius: 14px; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🚨</div>
+        <div>
+          <div style="font-weight: 800; font-size: 1.1rem; color: #f87171;">Emergency Panic Wipe</div>
+          <div style="font-size: 0.74rem; color: #fca5a5;">Sovra Stealth Cryptographic Zeroization</div>
+        </div>
+      </div>
+      <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 14px; padding: 12px 14px; font-size: 0.82rem; color: #fecaca; line-height: 1.5; margin-bottom: 1.25rem;">
+        ⚠️ <strong>PERMANENT CRYPTOGRAPHIC PURGE:</strong> This action immediately zeroizes all offline mesh packets, local encryption sessions, routing paths, and un-synced peer state. There is <strong>no undo or recovery</strong>.
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" id="btnHoldPanicWipe" class="panic-hold-shred-btn" style="position: relative; overflow: hidden; width: 100%; height: 46px; border-radius: 12px; background: linear-gradient(135deg, #dc2626, #b91c1c); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4); user-select: none;">
+          <div id="panicHoldProgressBar" style="position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: rgba(0, 0, 0, 0.4); transition: width 0.05s linear; pointer-events: none;"></div>
+          <span style="position: relative; z-index: 2;" id="panicHoldBtnText">Hold 3s to Shred 💥</span>
+        </button>
+        <button type="button" onclick="closeBitChatPanicModal()" style="width: 100%; height: 40px; border-radius: 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #cbd5e1; font-weight: 700; font-size: 0.85rem; cursor: pointer;">Cancel (Keep Data Safe)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5-SECOND TRANSACTION BUFFER & UNDO TOAST -->
+  <div id="sovraTxUndoToast" style="display: none; position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 1000008; max-width: 480px; width: 92%; background: linear-gradient(135deg, #0f172a, #1e1b4b); border: 1.5px solid #38bdf8; border-radius: 18px; padding: 12px 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); align-items: center; justify-content: space-between; gap: 12px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+      <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0;">⏳</div>
+      <div style="min-width: 0;">
+        <div id="txUndoMessage" style="font-size: 0.82rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sending 10 SOV to @peer...</div>
+        <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+          <div style="width: 100px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden;">
+            <div id="txUndoProgressBar" style="width: 100%; height: 100%; background: #38bdf8; transition: width 0.1s linear;"></div>
+          </div>
+          <span id="txUndoCountdownText" style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">5s</span>
+        </div>
+      </div>
+    </div>
+    <button type="button" id="btnCancelPendingTx" onclick="cancelPendingSovraTx()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.45); color: #f87171; border-radius: 10px; padding: 6px 14px; font-size: 0.78rem; font-weight: 800; cursor: pointer; flex-shrink: 0; transition: all 0.15s;">UNDO</button>
+  </div>
+`;
 }

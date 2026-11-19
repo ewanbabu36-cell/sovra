@@ -3445,6 +3445,20 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
         // 3. Modals and overlays
         const openOverlays = [
+          '#holographicNavOverlay',
+          '#webxrTheaterModal',
+          '#bitchatRadarModal',
+          '#bleRadarModal',
+          '#bitchatPanicConfirmModal',
+          '#sovereignTipModal',
+          '#identitySwitcherSheet',
+          '#sovereignBackupModal',
+          '#uploadReelSheetOverlay',
+          '#storyViewersSheetOverlay',
+          '#chatAttachmentLightboxModal',
+          '#viewOnceModal',
+          '#spatialCallOverlay',
+          '#e2eeCallModal',
           '#sovereignKeyVaultModal',
           '#deviceLinkModal',
           '#sovereignStoryViewerModal',
@@ -3469,8 +3483,30 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         ];
         for (let i = 0; i < openOverlays.length; i++) {
           const el = document.querySelector(openOverlays[i]);
-          if (el && (el.style.display === 'flex' || el.style.display === 'block' || el.classList.contains('active') || el.classList.contains('open'))) {
-            if (openOverlays[i] === '#notificationDropdown' || openOverlays[i] === '#headerSearchDropdown') {
+          if (el && (el.style.display === 'flex' || el.style.display === 'block' || el.classList.contains('active') || el.classList.contains('open') || el.classList.contains('is-open') || el.classList.contains('is-active'))) {
+            if (openOverlays[i] === '#holographicNavOverlay') {
+              if (typeof closeHolographicNav === 'function') closeHolographicNav(true); else el.classList.remove('is-active', 'is-open');
+            } else if (openOverlays[i] === '#webxrTheaterModal') {
+              if (typeof closeWebxrSpatialTheater === 'function') closeWebxrSpatialTheater(); else el.style.display = 'none';
+            } else if (openOverlays[i] === '#bitchatRadarModal' || openOverlays[i] === '#bleRadarModal') {
+              if (typeof closeBitchatRadar === 'function') closeBitchatRadar(); else el.style.display = 'none';
+            } else if (openOverlays[i] === '#bitchatPanicConfirmModal') {
+              if (typeof closeBitChatPanicModal === 'function') closeBitChatPanicModal(); else el.style.display = 'none';
+            } else if (openOverlays[i] === '#sovereignTipModal') {
+              if (window.SovraWalletEngine && typeof window.SovraWalletEngine.closeTipModal === 'function') window.SovraWalletEngine.closeTipModal(); else el.style.display = 'none';
+            } else if (openOverlays[i] === '#identitySwitcherSheet') {
+              el.classList.remove('open'); el.style.display = 'none';
+            } else if (openOverlays[i] === '#sovereignBackupModal') {
+              if (typeof closeSovereignBackupModal === 'function') closeSovereignBackupModal(); else el.style.display = 'none';
+            } else if (openOverlays[i] === '#uploadReelSheetOverlay') {
+              if (typeof closeReelsSheet === 'function') closeReelsSheet('uploadReelSheetOverlay'); else el.style.display = 'none';
+            } else if (openOverlays[i] === '#storyViewersSheetOverlay') {
+              if (typeof closeStoryViewersDrawer === 'function') closeStoryViewersDrawer(); else el.style.display = 'none';
+            } else if (openOverlays[i] === '#chatAttachmentLightboxModal') {
+              if (typeof closeChatAttachmentLightbox === 'function') closeChatAttachmentLightbox(); else el.style.display = 'none';
+            } else if (openOverlays[i] === '#viewOnceModal') {
+              if (typeof closeViewOnceModal === 'function') closeViewOnceModal(); else el.style.display = 'none';
+            } else if (openOverlays[i] === '#notificationDropdown' || openOverlays[i] === '#headerSearchDropdown') {
               el.style.display = 'none';
             } else if (openOverlays[i] === '#quickReplyDrawer') {
               el.classList.remove('open');
@@ -3515,6 +3551,24 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
         window.handleMobileBackPress(e);
       });
+
+      // 🧭 Central Sovra History Navigation Manager for seamless Back button handling
+      window.SovraHistoryNavigationManager = {
+        pushModal: function(modalId) {
+          try {
+            window.history.pushState({ sovraModalId: modalId, timestamp: Date.now() }, '');
+          } catch (_) {}
+        },
+        popModal: function(modalId, fromPopstate) {
+          if (!fromPopstate) {
+            try {
+              if (window.history.state && window.history.state.sovraModalId === modalId) {
+                window.history.back();
+              }
+            } catch (_) {}
+          }
+        }
+      };
 
       // Keyboard navigation: Global Escape key handling
       document.addEventListener('keydown', function(e) {
@@ -15537,6 +15591,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       SovraCoreStateMachine.transition('opening');
       playHolographicPulseSound();
 
+      if (window.SovraHistoryNavigationManager) {
+        window.SovraHistoryNavigationManager.pushModal('holographicNavOverlay');
+      }
+
       calculateHolographicPositions();
       refreshHolographicBadges();
 
@@ -15567,8 +15625,13 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     }
 
     function closeHolographicNav() {
+      var fromPopstate = arguments[0];
       if (SovraCoreStateMachine.isClosed()) return;
       playHolographicCollapseSound();
+
+      if (!fromPopstate && window.SovraHistoryNavigationManager) {
+        window.SovraHistoryNavigationManager.popModal('holographicNavOverlay');
+      }
 
       const overlay = document.getElementById('holographicNavOverlay');
       const triggerBtn = document.getElementById('sovraCoreBtn');
@@ -36106,6 +36169,69 @@ window.SovraCreatorStudioEngine = {
       }
     };
 
+    let _pendingSovraTx = null;
+    let _txCountdownInterval = null;
+
+    function cancelPendingSovraTx() {
+      if (_txCountdownInterval) {
+        clearInterval(_txCountdownInterval);
+        _txCountdownInterval = null;
+      }
+      var toast = document.getElementById('sovraTxUndoToast');
+      if (toast) toast.style.display = 'none';
+      _pendingSovraTx = null;
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('↩️ Transfer cancelled. No SOV deducted.');
+      }
+    }
+    window.cancelPendingSovraTx = cancelPendingSovraTx;
+
+    function bufferAndExecuteSovraTx(txData, commitFn) {
+      if (_txCountdownInterval) {
+        clearInterval(_txCountdownInterval);
+        _txCountdownInterval = null;
+      }
+      _pendingSovraTx = { txData: txData, commitFn: commitFn };
+      var toast = document.getElementById('sovraTxUndoToast');
+      var msg = document.getElementById('txUndoMessage');
+      var bar = document.getElementById('txUndoProgressBar');
+      var countText = document.getElementById('txUndoCountdownText');
+
+      if (toast && msg) {
+        var targetLabel = txData.recipientHandle || txData.recipientName || txData.recipientDid || 'peer';
+        msg.textContent = 'Sending ' + Number(txData.amount || 0).toFixed(2) + ' SOV to ' + targetLabel + '...';
+        toast.style.display = 'flex';
+        if (bar) bar.style.width = '100%';
+        if (countText) countText.textContent = '5s';
+
+        var startTime = Date.now();
+        var duration = 5000;
+        _txCountdownInterval = setInterval(function() {
+          var elapsed = Date.now() - startTime;
+          var remainingMs = Math.max(0, duration - elapsed);
+          var remainingSec = Math.ceil(remainingMs / 1000);
+          var pct = (remainingMs / duration) * 100;
+
+          if (bar) bar.style.width = pct + '%';
+          if (countText) countText.textContent = remainingSec + 's';
+
+          if (remainingMs <= 0) {
+            clearInterval(_txCountdownInterval);
+            _txCountdownInterval = null;
+            toast.style.display = 'none';
+            if (_pendingSovraTx && typeof _pendingSovraTx.commitFn === 'function') {
+              var fn = _pendingSovraTx.commitFn;
+              _pendingSovraTx = null;
+              fn();
+            }
+          }
+        }, 100);
+      } else {
+        commitFn();
+      }
+    }
+    window.bufferAndExecuteSovraTx = bufferAndExecuteSovraTx;
+
     window.executeCoPilotTransfer = async function() {
       var recInp = document.getElementById('copilotWalletRecipient');
       var amtInp = document.getElementById('copilotWalletAmount');
@@ -36121,92 +36247,100 @@ window.SovraCreatorStudioEngine = {
         return;
       }
 
-      if (typeof showAccountToast === 'function') showAccountToast('🔄 Processing cryptographic transfer...');
+      var performTransfer = async function() {
+        if (typeof showAccountToast === 'function') showAccountToast('🔄 Processing cryptographic transfer...');
 
-      // 🛡️ Zero-Trust Client-Side Signing for Direct CometBFT RPC Execution
-      var clientSig = null;
-      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : 'did:sovra:self';
-      if (window.SovraCryptoVault && typeof window.SovraCryptoVault.sign === 'function') {
+        // 🛡️ Zero-Trust Client-Side Signing for Direct CometBFT RPC Execution
+        var clientSig = null;
+        var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : 'did:sovra:self';
+        if (window.SovraCryptoVault && typeof window.SovraCryptoVault.sign === 'function') {
+          try {
+            var canonicalTx = JSON.stringify({
+              Sender: myDid,
+              Recipient: rec,
+              Amount: String(Math.round(amt * 1000000)),
+              Fee: '0',
+              Timestamp: Date.now()
+            });
+            clientSig = await window.SovraCryptoVault.sign(canonicalTx);
+          } catch (_) {}
+        }
+
+        // Try Direct CometBFT L1 RPC Broadcast first (Zero Server Scaffolding)
+        var directRpcCommitted = false;
+        var directL1TxHash = null;
+        var l1RpcEndpoint = (typeof window.__SOVRA_L1_RPC__ !== 'undefined' && window.__SOVRA_L1_RPC__) ? window.__SOVRA_L1_RPC__ : 'http://127.0.0.1:26657';
         try {
-          var canonicalTx = JSON.stringify({
+          var directPayload = {
             Sender: myDid,
             Recipient: rec,
             Amount: String(Math.round(amt * 1000000)),
             Fee: '0',
-            Timestamp: Date.now()
+            PubKeyHex: clientSig ? (clientSig.pubkey || clientSig.did || '') : '',
+            SigHex: clientSig ? clientSig.signatureHex : ''
+          };
+          var rpcDirectRes = await fetch(l1RpcEndpoint + '/broadcast_tx_commit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(directPayload)
           });
-          clientSig = await window.SovraCryptoVault.sign(canonicalTx);
+          if (rpcDirectRes.ok) {
+            var rpcData = await rpcDirectRes.json();
+            if (rpcData && (rpcData.tx_hash || rpcData.hash || (rpcData.check_tx && rpcData.check_tx.code === 0))) {
+              directRpcCommitted = true;
+              directL1TxHash = rpcData.tx_hash || rpcData.hash || 'l1_verified';
+            }
+          }
         } catch (_) {}
-      }
 
-      // Try Direct CometBFT L1 RPC Broadcast first (Zero Server Scaffolding)
-      var directRpcCommitted = false;
-      var directL1TxHash = null;
-      var l1RpcEndpoint = (typeof window.__SOVRA_L1_RPC__ !== 'undefined' && window.__SOVRA_L1_RPC__) ? window.__SOVRA_L1_RPC__ : 'http://127.0.0.1:26657';
-      try {
-        var directPayload = {
-          Sender: myDid,
-          Recipient: rec,
-          Amount: String(Math.round(amt * 1000000)),
-          Fee: '0',
-          PubKeyHex: clientSig ? (clientSig.pubkey || clientSig.did || '') : '',
-          SigHex: clientSig ? clientSig.signatureHex : ''
-        };
-        var rpcDirectRes = await fetch(l1RpcEndpoint + '/broadcast_tx_commit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(directPayload)
-        });
-        if (rpcDirectRes.ok) {
-          var rpcData = await rpcDirectRes.json();
-          if (rpcData && (rpcData.tx_hash || rpcData.hash || (rpcData.check_tx && rpcData.check_tx.code === 0))) {
-            directRpcCommitted = true;
-            directL1TxHash = rpcData.tx_hash || rpcData.hash || 'l1_verified';
+        try {
+          var res = await fetch('/api/wallet/transfer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipientDid: rec,
+              amount: amt,
+              tokenSymbol: 'SOV',
+              signature: clientSig ? clientSig.signatureHex : undefined,
+              signedTx: directPayload,
+              memo: directRpcCommitted ? ('Direct L1 Tx: ' + directL1TxHash) : 'Spatial CoPilot Transfer'
+            })
+          });
+          var data = await res.json();
+          if (res.ok && data && data.ok) {
+            var railBal = document.getElementById('railWalletSovBalance');
+            var headBal = document.getElementById('sovraHeaderWalletBalance');
+            if (data.fromBalance !== undefined) {
+              var fmt = Number(data.fromBalance).toFixed(2) + ' SOV';
+              if (railBal) railBal.textContent = fmt;
+              if (headBal) headBal.textContent = fmt;
+            }
+            if (recInp) recInp.value = '';
+            if (amtInp) amtInp.value = '';
+            var txSnippet = data.txHash ? data.txHash.substring(0, 10) + '...' : 'Verified';
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('⚡ Sent ' + amt.toFixed(2) + ' SOV to ' + rec + ' (Tx: ' + txSnippet + ')');
+            }
+            if (typeof window.refreshWalletState === 'function') {
+              window.refreshWalletState();
+            }
+          } else {
+            var errMsg = (data && data.error) ? data.error : 'Transfer rejected by node ledger';
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('⚠️ Transfer failed: ' + errMsg);
+            }
+          }
+        } catch (err) {
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('⚠️ Network error: ' + (err.message || 'Unable to reach wallet relay'));
           }
         }
-      } catch (_) {}
+      };
 
-      try {
-        var res = await fetch('/api/wallet/transfer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recipientDid: rec,
-            amount: amt,
-            tokenSymbol: 'SOV',
-            signature: clientSig ? clientSig.signatureHex : undefined,
-            signedTx: directPayload,
-            memo: directRpcCommitted ? ('Direct L1 Tx: ' + directL1TxHash) : 'Spatial CoPilot Transfer'
-          })
-        });
-        var data = await res.json();
-        if (res.ok && data && data.ok) {
-          var railBal = document.getElementById('railWalletSovBalance');
-          var headBal = document.getElementById('sovraHeaderWalletBalance');
-          if (data.fromBalance !== undefined) {
-            var fmt = Number(data.fromBalance).toFixed(2) + ' SOV';
-            if (railBal) railBal.textContent = fmt;
-            if (headBal) headBal.textContent = fmt;
-          }
-          if (recInp) recInp.value = '';
-          if (amtInp) amtInp.value = '';
-          var txSnippet = data.txHash ? data.txHash.substring(0, 10) + '...' : 'Verified';
-          if (typeof showAccountToast === 'function') {
-            showAccountToast('⚡ Sent ' + amt.toFixed(2) + ' SOV to ' + rec + ' (Tx: ' + txSnippet + ')');
-          }
-          if (typeof window.refreshWalletState === 'function') {
-            window.refreshWalletState();
-          }
-        } else {
-          var errMsg = (data && data.error) ? data.error : 'Transfer rejected by node ledger';
-          if (typeof showAccountToast === 'function') {
-            showAccountToast('⚠️ Transfer failed: ' + errMsg);
-          }
-        }
-      } catch (err) {
-        if (typeof showAccountToast === 'function') {
-          showAccountToast('⚠️ Network error: ' + (err.message || 'Unable to reach wallet relay'));
-        }
+      if (typeof window.bufferAndExecuteSovraTx === 'function') {
+        window.bufferAndExecuteSovraTx({ recipientDid: rec, amount: amt }, performTransfer);
+      } else {
+        await performTransfer();
       }
     };
 
@@ -39325,17 +39459,89 @@ window.SovraCreatorStudioEngine = {
       }
     }
 
-    function executeBitChatPanicWipe() {
-      if (!confirm('🚨 EMERGENCY PANIC WIPE (Sovra Stealth Security):\\n\\nThis will immediately zeroize all local Sovra mesh packets, in-memory encryption keys, and peer session routing tables.\\n\\nAre you sure you want to proceed?')) {
-        return;
+    function openBitChatPanicModal() {
+      const modal = document.getElementById('bitchatPanicConfirmModal');
+      if (modal) {
+        modal.style.display = 'flex';
+        resetPanicHoldButton();
+        initBitChatPanicHoldListener();
       }
+    }
+    window.openBitChatPanicModal = openBitChatPanicModal;
+
+    function closeBitChatPanicModal() {
+      const modal = document.getElementById('bitchatPanicConfirmModal');
+      if (modal) modal.style.display = 'none';
+      resetPanicHoldButton();
+    }
+    window.closeBitChatPanicModal = closeBitChatPanicModal;
+
+    let _panicHoldStart = 0;
+    let _panicHoldInterval = null;
+
+    function resetPanicHoldButton() {
+      if (_panicHoldInterval) { clearInterval(_panicHoldInterval); _panicHoldInterval = null; }
+      const bar = document.getElementById('panicHoldProgressBar');
+      const text = document.getElementById('panicHoldBtnText');
+      if (bar) bar.style.width = '0%';
+      if (text) text.innerText = 'Hold 3s to Shred 💥';
+    }
+
+    function confirmAndPerformBitChatPanicWipe() {
       chatMessages = chatMessages.filter(function(m) { return !m.isBitChat; });
       bitchatPeersData = [];
       const badgeCount = document.getElementById('bitchatPeersCountBadge');
       if (badgeCount) badgeCount.innerText = '0 peers (Wiped)';
       renderChatContactsList();
       renderChatBubbles();
-      showAccountToast('🚨 EMERGENCY PANIC WIPE: All local Sovra packets, keys, and peer tables zeroized.');
+      closeBitChatPanicModal();
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('🚨 EMERGENCY PANIC WIPE: All local Sovra packets, keys, and peer tables zeroized.');
+      }
+    }
+    window.confirmAndPerformBitChatPanicWipe = confirmAndPerformBitChatPanicWipe;
+
+    function executeBitChatPanicWipe() {
+      openBitChatPanicModal();
+    }
+    window.executeBitChatPanicWipe = executeBitChatPanicWipe;
+
+    function initBitChatPanicHoldListener() {
+      const btn = document.getElementById('btnHoldPanicWipe');
+      if (!btn || btn.dataset.panicBound) return;
+      btn.dataset.panicBound = 'true';
+
+      const startHold = function(e) {
+        e.preventDefault();
+        _panicHoldStart = Date.now();
+        const bar = document.getElementById('panicHoldProgressBar');
+        const text = document.getElementById('panicHoldBtnText');
+
+        if (_panicHoldInterval) clearInterval(_panicHoldInterval);
+        _panicHoldInterval = setInterval(function() {
+          const elapsed = Date.now() - _panicHoldStart;
+          const pct = Math.min(100, (elapsed / 3000) * 100);
+          if (bar) bar.style.width = pct + '%';
+          const remaining = Math.max(0, Math.ceil((3000 - elapsed) / 1000));
+          if (text) text.innerText = 'Holding... ' + remaining + 's';
+          if (elapsed >= 3000) {
+            clearInterval(_panicHoldInterval);
+            _panicHoldInterval = null;
+            confirmAndPerformBitChatPanicWipe();
+          }
+        }, 50);
+      };
+
+      const cancelHold = function() {
+        resetPanicHoldButton();
+      };
+
+      btn.addEventListener('mousedown', startHold);
+      btn.addEventListener('touchstart', startHold, { passive: false });
+      btn.addEventListener('mouseup', cancelHold);
+      btn.addEventListener('mouseleave', cancelHold);
+      btn.addEventListener('touchend', cancelHold);
+      btn.addEventListener('touchcancel', cancelHold);
     }
 
     // Web Bluetooth API GATT Client Pairing Engine for Chrome / Edge / PWA
@@ -55815,6 +56021,11 @@ window.SovraCreatorStudioEngine = {
         showAccountToast('👓 WebXR Spatial Hologram Theater Activated');
       }
 
+      if (window.SovraHistoryNavigationManager) {
+        window.SovraHistoryNavigationManager.pushModal('webxrTheaterModal');
+      }
+      initSpatialCinemaInteractions();
+
       if (_xrAnimationId) {
         cancelAnimationFrame(_xrAnimationId);
         _xrAnimationId = null;
@@ -55826,8 +56037,13 @@ window.SovraCreatorStudioEngine = {
     window.enterWebxrSpatialTheater = enterWebxrSpatialTheater;
 
     function closeWebxrSpatialTheater() {
+      var fromPopstate = arguments[0];
       var modal = document.getElementById('webxrTheaterModal');
       if (modal) modal.style.display = 'none';
+
+      if (!fromPopstate && window.SovraHistoryNavigationManager) {
+        window.SovraHistoryNavigationManager.popModal('webxrTheaterModal');
+      }
 
       if (_xrAnimationId) {
         cancelAnimationFrame(_xrAnimationId);
@@ -55840,6 +56056,51 @@ window.SovraCreatorStudioEngine = {
     }
     window.closeWebxrSpatialTheater = closeWebxrSpatialTheater;
     window.exitWebxrSpatialTheater = closeWebxrSpatialTheater;
+
+    function initSpatialCinemaInteractions() {
+      var modal = document.getElementById('webxrTheaterModal');
+      var bar = document.getElementById('webxrTopFloatingBar');
+      if (!modal || modal.dataset.interactionsBound) return;
+      modal.dataset.interactionsBound = 'true';
+
+      var hideBarTimeout = null;
+      var revealBar = function() {
+        if (!bar) return;
+        bar.style.opacity = '1';
+        bar.style.transform = 'translateX(-50%) translateY(0)';
+        if (hideBarTimeout) clearTimeout(hideBarTimeout);
+        hideBarTimeout = setTimeout(function() {
+          bar.style.opacity = '0';
+          bar.style.transform = 'translateX(-50%) translateY(-10px)';
+        }, 3500);
+      };
+
+      modal.addEventListener('mousemove', revealBar);
+      modal.addEventListener('touchstart', revealBar, { passive: true });
+
+      // Swipe down on viewport gesture to dismiss cinema theater
+      var touchStartY = 0;
+      var touchStartX = 0;
+      modal.addEventListener('touchstart', function(e) {
+        if (e.touches && e.touches[0]) {
+          touchStartY = e.touches[0].clientY;
+          touchStartX = e.touches[0].clientX;
+        }
+      }, { passive: true });
+
+      modal.addEventListener('touchend', function(e) {
+        if (e.changedTouches && e.changedTouches[0]) {
+          var deltaY = e.changedTouches[0].clientY - touchStartY;
+          var deltaX = Math.abs(e.changedTouches[0].clientX - touchStartX);
+          if (deltaY > 80 && deltaX < 60 && !_isDraggingSpatial) {
+            closeWebxrSpatialTheater();
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('⬇️ Exited Cinema Theater');
+            }
+          }
+        }
+      }, { passive: true });
+    }
 
     function attachSpatialInteractionListeners() {
       var canvas = document.getElementById('webxrCanvas');

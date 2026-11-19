@@ -33,14 +33,20 @@ export function initP2pMeshModule(): void {
   };
 
   (window as any).openBitchatRadar = function(): void {
-    const modal = document.getElementById('bitchatRadarModal');
+    const modal = document.getElementById('bitchatRadarModal') || document.getElementById('bleRadarModal');
     if (modal) modal.style.display = 'flex';
+    if ((window as any).SovraHistoryNavigationManager) {
+      (window as any).SovraHistoryNavigationManager.pushModal('bitchatRadarModal');
+    }
     (window as any).SovraBleEngine.scanNearbyMesh();
   };
 
-  (window as any).closeBitchatRadar = function(): void {
-    const modal = document.getElementById('bitchatRadarModal');
+  (window as any).closeBitchatRadar = function(fromPopstate?: boolean): void {
+    const modal = document.getElementById('bitchatRadarModal') || document.getElementById('bleRadarModal');
     if (modal) modal.style.display = 'none';
+    if (!fromPopstate && (window as any).SovraHistoryNavigationManager) {
+      (window as any).SovraHistoryNavigationManager.popModal('bitchatRadarModal');
+    }
     (window as any).SovraBleEngine.stopScan();
   };
 
