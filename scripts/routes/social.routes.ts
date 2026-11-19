@@ -1237,12 +1237,12 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
   if (url.pathname === '/api/friends/list' && req.method === 'GET') {
     const principal = resolvePrincipal(req);
     let userDid = principal?.did;
-    if (!userDid) {
-      const queryDid = url.searchParams.get('userDid') || '';
+    const queryDid = url.searchParams.get('userDid') || url.searchParams.get('did') || '';
+    if (queryDid && sovraDb.findUserByDid(queryDid)) {
+      userDid = queryDid;
+    } else if (!userDid) {
       const localHostUser = sovraDb.findUserByDid(masterKey?.did);
-      if (queryDid && sovraDb.findUserByDid(queryDid)) {
-        userDid = queryDid;
-      } else if (localHostUser?.did) {
+      if (localHostUser?.did) {
         userDid = localHostUser.did;
       } else if (masterKey?.did) {
         userDid = masterKey.did;
@@ -1253,7 +1253,7 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
       res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to view friends list' }));
       return true;
     }
-    const allRels = sovraDb.getFriendRelationships(userDid);
+    const allRels = sovraDb.getFriendRelationships(userDid).filter(r => r && r.fromDid && r.toDid && r.fromDid !== r.toDid);
     const allUsers = sovraDb.getAllUsers();
     const allPeers = sovraDb.getAllPeers(userDid);
 
@@ -1406,8 +1406,16 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
 
     const mutuals = sovraDb.getMutualFriends(userDid, targetDid);
     const isFriend = sovraDb.areFriends(userDid, targetDid);
+    const allRels = sovraDb.getFriendRelationships(userDid).filter(r => r && r.fromDid && r.toDid && r.fromDid !== r.toDid);
+    const rel = allRels.find(r => (r.fromDid === targetDid || r.toDid === targetDid));
+    let relationshipStatus: 'none' | 'pending_sent' | 'pending_received' | 'accepted' | 'rejected' | 'blocked' = 'none';
+    if (rel) {
+      if (rel.status === 'accepted') relationshipStatus = 'accepted';
+      else if (rel.status === 'pending') relationshipStatus = rel.fromDid === userDid ? 'pending_sent' : 'pending_received';
+      else relationshipStatus = rel.status as any;
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, mutuals, count: mutuals.length, isFriend }));
+    res.end(JSON.stringify({ ok: true, mutuals, count: mutuals.length, isFriend, relationshipStatus }));
     return true;
   }
 

@@ -17152,7 +17152,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
     function switchTab(tab) {
       if (tab === 'explore') tab = 'hub';
-      if (tab === 'vault') tab = 'me';
+      if (tab === 'vault' || tab === 'profile' || tab === 'you') tab = 'me';
       if (tab === 'watch') tab = 'youtube';
 
       if (typeof triggerHapticFeedback === 'function') triggerHapticFeedback([8]);
@@ -25011,10 +25011,14 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     }
 
     function viewMyProfileFriends() {
-      switchTab('profile');
-      switchProfileGridTab('friends');
-      var c = document.getElementById('profileGridContainer');
-      if (c) c.scrollIntoView({ behavior: 'smooth' });
+      if (typeof openSocialConnectionsModal === 'function') {
+        openSocialConnectionsModal('friends');
+      } else {
+        switchTab('me');
+        switchProfileGridTab('friends');
+        var c = document.getElementById('profileGridContainer');
+        if (c) c.scrollIntoView({ behavior: 'smooth' });
+      }
     }
 
     function switchProfileGridTab(tab) {
@@ -25027,6 +25031,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           if (t === tab) el.classList.add('active');
           else el.classList.remove('active');
         }
+      }
+      if (tab === 'friends' && typeof syncFriendsRelationships === 'function') {
+        syncFriendsRelationships(function() {
+          renderProfileGrid('friends');
+        });
       }
       renderProfileGrid(tab);
     }
@@ -25282,10 +25291,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       if (banner) banner.style.display = 'none';
     }
 
-    // --- Social Connections (Followers & Following) Modal Logic ---
-    let currentSocialModalTab = 'followers';
+    // --- Social Connections (Friends, Requests, Followers & Following) Modal Logic ---
+    let currentSocialModalTab = 'friends';
     function openSocialConnectionsModal(tab) {
-      currentSocialModalTab = tab || 'followers';
+      currentSocialModalTab = tab || 'friends';
       const m = document.getElementById('socialConnectionsModal');
       if (m) m.style.display = 'flex';
       switchSocialModalTab(currentSocialModalTab);
@@ -25298,20 +25307,166 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
     function switchSocialModalTab(tab) {
       currentSocialModalTab = tab;
+      const btnFri = document.getElementById('scmTabFriends');
+      const btnReq = document.getElementById('scmTabRequests');
       const btnFol = document.getElementById('scmTabFollowers');
       const btnFng = document.getElementById('scmTabFollowing');
       const title = document.getElementById('socialModalTitle');
-      if (tab === 'followers') {
-        if (btnFol) { btnFol.style.background = '#334155'; btnFol.style.color = '#fff'; }
-        if (btnFng) { btnFng.style.background = 'transparent'; btnFng.style.color = '#94a3b8'; }
+
+      const allBtns = [
+        { el: btnFri, key: 'friends', bg: '#38bdf8', col: '#0f172a' },
+        { el: btnReq, key: 'requests', bg: '#fbbf24', col: '#0f172a' },
+        { el: btnFol, key: 'followers', bg: '#334155', col: '#ffffff' },
+        { el: btnFng, key: 'following', bg: '#334155', col: '#ffffff' }
+      ];
+
+      allBtns.forEach(function(b) {
+        if (!b.el) return;
+        if (b.key === tab) {
+          b.el.style.background = b.bg;
+          b.el.style.color = b.col;
+          b.el.style.borderColor = 'transparent';
+        } else {
+          b.el.style.background = 'transparent';
+          b.el.style.color = '#94a3b8';
+          b.el.style.borderColor = '#334155';
+        }
+      });
+
+      if (tab === 'friends') {
+        if (title) title.innerText = 'Friends & Connections';
+        loadFriendsList();
+      } else if (tab === 'requests') {
+        if (title) title.innerText = 'Pending Friend Requests';
+        loadFriendRequestsList();
+      } else if (tab === 'followers') {
         if (title) title.innerText = 'Followers';
         loadFollowersList();
       } else {
-        if (btnFng) { btnFng.style.background = '#334155'; btnFng.style.color = '#fff'; }
-        if (btnFol) { btnFol.style.background = 'transparent'; btnFol.style.color = '#94a3b8'; }
         if (title) title.innerText = 'Following';
         loadFollowingList();
       }
+    }
+
+    function loadFriendsList() {
+      const listEl = document.getElementById('scmUsersList');
+      if (!listEl) return;
+      listEl.innerHTML = '<div style="color: #64748b; font-size: 0.85rem; text-align: center; padding: 1.5rem;">Loading friends list...</div>';
+      const myDid = (myProfile && myProfile.did) ? myProfile.did : ((typeof window.SOVRA_HOST_SESSION !== 'undefined' && window.SOVRA_HOST_SESSION) ? window.SOVRA_HOST_SESSION.did : '');
+      const authHeaders = (typeof getAuthHeaders === 'function') ? getAuthHeaders() : { 'Content-Type': 'application/json' };
+      fetch('/api/friends/list?userDid=' + encodeURIComponent(myDid), {
+        credentials: 'same-origin',
+        headers: authHeaders
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data || !data.ok) {
+          listEl.innerHTML = '<div style="color: #ef4444; font-size: 0.85rem; text-align: center; padding: 1.5rem;">Could not load friends list.</div>';
+          return;
+        }
+        friendsData = data;
+        const friends = data.friends || [];
+        const incoming = data.incoming || [];
+        const fCnt = document.getElementById('scmCountFriends');
+        if (fCnt) fCnt.innerText = friends.length.toString();
+        const rCnt = document.getElementById('scmCountRequests');
+        if (rCnt) {
+          rCnt.innerText = incoming.length.toString();
+          const rBtn = document.getElementById('scmTabRequests');
+          if (rBtn) rBtn.style.display = incoming.length > 0 ? 'inline-block' : 'none';
+        }
+        const meCnt = document.getElementById('meFriendsCount');
+        if (meCnt) meCnt.innerText = friends.length.toString();
+        const ptabCnt = document.getElementById('ptabFriendsCount');
+        if (ptabCnt) ptabCnt.innerText = friends.length.toString();
+
+        if (friends.length === 0) {
+          listEl.innerHTML = '<div style="color: #94a3b8; font-size: 0.85rem; text-align: center; padding: 2rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">' +
+            '<div style="font-size: 2.2rem;">🤝</div>' +
+            '<div style="font-weight: 700; color: #fff; font-size: 0.95rem;">No Connected Friends Yet</div>' +
+            '<div style="font-size: 0.78rem; color: #64748b; max-width: 290px;">Connect with peers over Sovereign mesh or Wi-Fi to establish bilateral friendships.</div>' +
+            '<button type="button" onclick="closeSocialConnectionsModal(); switchTab(&quot;friends&quot;);" style="margin-top: 0.5rem; background: #0284c7; color: #fff; border: none; padding: 6px 16px; border-radius: 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">🔍 Discover Peers on Mesh</button>' +
+          '</div>';
+          return;
+        }
+
+        var html = '';
+        for (var i = 0; i < friends.length; i++) {
+          var f = friends[i];
+          var fName = String(f.displayName || f.name || 'Friend').replace(/"/g, '&quot;');
+          var avatarContent = f.avatarDataUrl ?
+            '<img src="' + f.avatarDataUrl + '" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />' :
+            ('<span style="font-weight: 800; color: #fff;">' + (f.avatar || 'F') + '</span>');
+          html += '<div style="background: #1e293b; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">' +
+              '<div style="position: relative; width: 40px; height: 40px; border-radius: 50%; background: ' + (f.avatarBg || '#10b981') + '; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">' +
+                avatarContent +
+                '<span style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background: ' + (f.isOnline ? '#10b981' : '#64748b') + '; border: 2px solid #1e293b;"></span>' +
+              '</div>' +
+              '<div style="min-width: 0;">' +
+                '<div style="font-weight: 700; font-size: 0.88rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + fName + '</div>' +
+                '<div style="font-size: 0.75rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (f.handle || '@friend') + ' &bull; <span style="color: #34d399;">⚡ Friend</span></div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0;">' +
+              '<button type="button" onclick="closeSocialConnectionsModal(); messageFriend(&quot;' + f.did + '&quot;, &quot;' + fName + '&quot;)" style="padding: 5px 12px; background: #6366f1; border: none; border-radius: 8px; color: #fff; font-size: 0.75rem; font-weight: 700; cursor: pointer;">💬 Chat</button>' +
+              '<button type="button" onclick="unfriendUser(&quot;' + f.did + '&quot;, &quot;' + fName + '&quot;); setTimeout(loadFriendsList, 500);" style="padding: 5px 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; color: #f87171; font-size: 0.75rem; cursor: pointer;" title="Remove Friend">✕</button>' +
+            '</div>' +
+          '</div>';
+        }
+        listEl.innerHTML = html;
+      })
+      .catch(function(err) {
+        listEl.innerHTML = '<div style="color: #ef4444; font-size: 0.85rem; text-align: center; padding: 1.5rem;">Could not load friends: ' + err.message + '</div>';
+      });
+    }
+
+    function loadFriendRequestsList() {
+      const listEl = document.getElementById('scmUsersList');
+      if (!listEl) return;
+      listEl.innerHTML = '<div style="color: #64748b; font-size: 0.85rem; text-align: center; padding: 1.5rem;">Loading friend requests...</div>';
+      const myDid = (myProfile && myProfile.did) ? myProfile.did : ((typeof window.SOVRA_HOST_SESSION !== 'undefined' && window.SOVRA_HOST_SESSION) ? window.SOVRA_HOST_SESSION.did : '');
+      const authHeaders = (typeof getAuthHeaders === 'function') ? getAuthHeaders() : { 'Content-Type': 'application/json' };
+      fetch('/api/friends/list?userDid=' + encodeURIComponent(myDid), {
+        credentials: 'same-origin',
+        headers: authHeaders
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data || !data.ok) return;
+        const incoming = data.incoming || [];
+        const rCnt = document.getElementById('scmCountRequests');
+        if (rCnt) rCnt.innerText = incoming.length.toString();
+        if (incoming.length === 0) {
+          listEl.innerHTML = '<div style="color: #94a3b8; font-size: 0.85rem; text-align: center; padding: 2rem 1rem;">No pending friend requests.</div>';
+          return;
+        }
+        var html = '';
+        for (var i = 0; i < incoming.length; i++) {
+          var req = incoming[i];
+          var u = req.user || {};
+          var uName = String(u.displayName || u.name || 'Peer').replace(/"/g, '&quot;');
+          var avatarContent = u.avatarDataUrl ?
+            '<img src="' + u.avatarDataUrl + '" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />' :
+            ('<span style="font-weight: 800; color: #fff;">' + (u.avatar || 'P') + '</span>');
+          html += '<div style="background: #1e293b; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">' +
+              '<div style="width: 40px; height: 40px; border-radius: 50%; background: ' + (u.avatarBg || '#6366f1') + '; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">' +
+                avatarContent +
+              '</div>' +
+              '<div style="min-width: 0;">' +
+                '<div style="font-weight: 700; font-size: 0.88rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + uName + '</div>' +
+                '<div style="font-size: 0.75rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (u.handle || '@peer') + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0;">' +
+              '<button type="button" onclick="acceptFriendRequest(&quot;' + req.id + '&quot;, &quot;' + uName + '&quot;); setTimeout(loadFriendRequestsList, 600);" style="padding: 5px 12px; background: #10b981; border: none; border-radius: 8px; color: #fff; font-size: 0.75rem; font-weight: 700; cursor: pointer;">✓ Accept</button>' +
+              '<button type="button" onclick="rejectFriendRequest(&quot;' + req.id + '&quot;, &quot;' + uName + '&quot;); setTimeout(loadFriendRequestsList, 600);" style="padding: 5px 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; color: #f87171; font-size: 0.75rem; cursor: pointer;">✕</button>' +
+            '</div>' +
+          '</div>';
+        }
+        listEl.innerHTML = html;
+      });
     }
 
     function loadFollowersList() {
@@ -39306,8 +39461,8 @@ window.SovraCreatorStudioEngine = {
           if (reqBar) reqBar.style.display = 'none';
           const c = (contactsData || []).find(function(x) { return x.did === activeContactDid; });
           if (c) {
-            c.isFriend = true;
-            c.role = 'Mutual Friend';
+            c.role = 'Direct Contact';
+            c.inboxCategory = 'primary';
           }
           if (typeof showAccountToast === 'function') {
             showAccountToast('✓ Message request accepted! Moved to Primary.');
@@ -49780,19 +49935,13 @@ window.SovraCreatorStudioEngine = {
         .then(function(res) { return res.json(); })
         .then(function(data) {
           var contacts = [];
-          if (data && data.ok && Array.isArray(data.friends) && data.friends.length > 0) {
+          if (data && data.ok && Array.isArray(data.friends)) {
             contacts = data.friends;
-          } else if (typeof cachedRightRailSuggestions !== 'undefined' && cachedRightRailSuggestions.length > 0) {
-            contacts = cachedRightRailSuggestions;
           }
           displayFbContacts(contacts);
         })
         .catch(function() {
-          if (typeof cachedRightRailSuggestions !== 'undefined' && cachedRightRailSuggestions.length > 0) {
-            displayFbContacts(cachedRightRailSuggestions);
-          } else {
-            displayFbContacts([]);
-          }
+          displayFbContacts([]);
         });
     }
 

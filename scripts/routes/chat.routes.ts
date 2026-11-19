@@ -63,7 +63,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     const allPeers = sovraDb.getAllPeers(userDid);
     const allRels = sovraDb.getFriendRelationships(userDid);
     const friendDids = new Set(
-      allRels.filter(r => r.status === 'accepted').map(r => r.fromDid === userDid ? r.toDid : r.fromDid)
+      allRels.filter(r => r.status === 'accepted' && r.fromDid !== r.toDid).map(r => r.fromDid === userDid ? r.toDid : r.fromDid)
     );
     const allMessages = sovraDb.getState().chatMessages.filter(
       m => m.senderDid === userDid || m.recipientDid === userDid || m.recipientDid.startsWith('channel:')
