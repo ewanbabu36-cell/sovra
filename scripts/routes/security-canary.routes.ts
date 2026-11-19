@@ -37,7 +37,7 @@ export async function handleSecurityCanaryRoutes(ctx: SecurityCanaryRouteContext
 
   // 1. 🍯 HONEYPOT CANARY TRAPS (CRAWLER & EXPLOIT NEUTRALIZER)
   if (url.pathname === '/.env' || url.pathname === '/wp-admin' || url.pathname === '/api/internal/debug-keys' || url.pathname === '/admin/config.json') {
-    const clientIp = req.socket.remoteAddress || '127.0.0.1';
+    const clientIp = req.socket?.remoteAddress || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'Unknown Crawler';
     const sqlite = sovraDb.getSqliteEngine();
     if (sqlite) {
