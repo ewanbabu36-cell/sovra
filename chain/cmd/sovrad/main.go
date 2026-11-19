@@ -5,10 +5,12 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,6 +28,9 @@ import (
 	issuancetypes "github.com/sovra/chain/x/issuance/types"
 	"github.com/sovra/chain/x/wasm/vm"
 )
+
+//go:embed static/*
+var staticWebFS embed.FS
 
 type Config struct {
 	Moniker      string        `json:"moniker"`
@@ -1542,12 +1547,24 @@ func startNode(flags NodeFlags) {
 	mux.HandleFunc("/broadcast_tx", handleBroadcastTx)
 	mux.HandleFunc("/broadcast_tx_commit", handleBroadcastTx)
 
-	// Embedded Static UI / Protocol Node Cockpit
+	// Mount Embedded Static PWA Assets (/static/*)
+	subFS, err := fs.Sub(staticWebFS, "static")
+	if err == nil {
+		fileServer := http.FileServer(http.FS(subFS))
+		mux.Handle("/static/", http.StripPrefix("/static", fileServer))
+	}
+
+	// Embedded Static UI / Protocol Node Cockpit Root Handler
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
+		if r.URL.Path == "/" || r.URL.Path == "/app" || r.URL.Path == "/index.html" {
+			indexData, readErr := staticWebFS.ReadFile("static/index.html")
+			if readErr == nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Write(indexData)
+				return
+			}
 		}
+		// Fallback to minimal cockpit card
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		html := fmt.Sprintf(`<!DOCTYPE html>
 <html>

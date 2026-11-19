@@ -22,6 +22,7 @@ export interface ChatRouteContext {
   url: URL;
   blindPushRelay: BlindPushRelayServer;
   storageDaemon?: any;
+  p2pNode?: any;
   ATTACHMENTS_DIR: string;
   broadcastChatEvent: (recipientDid: string, payload: any, eventType?: string) => void;
   validateMediaMagicBytes: (buffer: Buffer, declaredMime?: string) => { valid: boolean; detectedMime?: string; error?: string };
@@ -37,6 +38,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     url,
     blindPushRelay,
     storageDaemon,
+    p2pNode,
     ATTACHMENTS_DIR,
     broadcastChatEvent,
     validateMediaMagicBytes,
@@ -517,6 +519,36 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         // Deliver message instantly to active realtime SSE subscriber
         broadcastChatEvent(record.recipientDid, record);
         broadcastChatEvent(record.recipientDid, { type: 'message', messageId: record.id, senderDid: principal.did }, 'notification');
+
+        // 🌐 Autonomous P2P Cross-Node Mesh Broadcast (/sovra/v1/chat/direct)
+        if (p2pNode?.pubsub) {
+          const chatMeshPayload = {
+            type: 'CHAT_DIRECT_MESSAGE',
+            record,
+            timestamp: Date.now(),
+          };
+          const wireBytes = new TextEncoder().encode(JSON.stringify(chatMeshPayload));
+          p2pNode.pubsub.publish('/sovra/v1/chat/direct', wireBytes).catch(() => {});
+          p2pNode.pubsub.publish(`/sovra/v1/chat/${record.recipientDid}`, wireBytes).catch(() => {});
+        }
+
+        // 🗄️ DHT-Backed Store-and-Forward Mailbox indexing (BEP 44 / Kademlia)
+        if (p2pNode?.dht && record.isE2EE && (record.ciphertextHex || record.text)) {
+          try {
+            const epochDay = Math.floor(Date.now() / (86400 * 1000));
+            const mailboxDhtKey = crypto.createHash('sha256').update(`sovra:mailbox:${record.recipientDid}:${epochDay}`).digest('hex');
+            const mailboxItem = {
+              id: record.id,
+              senderDid: principal.did,
+              recipientDid: record.recipientDid,
+              encryptedPayload: record.ciphertextHex || record.text,
+              ivHex: record.ivHex,
+              tagHex: record.tagHex,
+              timestamp: Date.now(),
+            };
+            p2pNode.dht.putValue(mailboxDhtKey, new TextEncoder().encode(JSON.stringify(mailboxItem))).catch(() => {});
+          } catch (_) {}
+        }
 
         // Auto-deposit into Zero-Knowledge Encrypted Mailbox for store-and-forward offline reliability
         if (record.isE2EE && (record.ciphertextHex || record.text)) {
