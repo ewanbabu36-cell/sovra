@@ -23,21 +23,33 @@ function enrichCampaign(c?: any) {
   };
 }
 
-function parseJsonBody(req: http.IncomingMessage): Promise<any> {
+function parseJsonBody(req: http.IncomingMessage, maxBytes = 2 * 1024 * 1024): Promise<any> {
   return new Promise((resolve, reject) => {
     let body = '';
+    let received = 0;
+    let aborted = false;
     req.on('data', chunk => {
+      if (aborted) return;
+      received += chunk.length;
+      if (received > maxBytes) {
+        aborted = true;
+        req.destroy();
+        reject(new Error('Payload too large'));
+        return;
+      }
       body += chunk;
-      if (body.length > 2 * 1024 * 1024) reject(new Error('Payload too large'));
     });
     req.on('end', () => {
+      if (aborted) return;
       try {
         resolve(body ? JSON.parse(body) : {});
       } catch (err) {
         reject(err);
       }
     });
-    req.on('error', reject);
+    req.on('error', (err) => {
+      if (!aborted) reject(err);
+    });
   });
 }
 

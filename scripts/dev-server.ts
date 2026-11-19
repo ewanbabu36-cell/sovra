@@ -1570,6 +1570,10 @@ const SOVRA_SERVICE_WORKER_SCRIPT = `// Supported cache versions: sovra-pwa-v6, 
 const CACHE_NAME = 'sovra-pwa-v8';
 const STATIC_ASSETS = [
   '/',
+  '/dist/bundle.js',
+  '/dist/sovra.css',
+  '/bundle.js',
+  '/sovra.css',
   '/manifest.webmanifest',
   '/manifest.json',
   '/icon.svg',
@@ -1706,7 +1710,7 @@ self.addEventListener('fetch', (event) => {
         const networkRes = await fetchPromise;
         if (networkRes) return networkRes;
 
-        return new Response('<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Sovra Mesh Offline</title><style>body{background:#090d16;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:40px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:85vh;margin:0;}:root{color-scheme:dark;}</style></head><body><div style=\"width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#00f0ff,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:2rem;margin-bottom:16px;box-shadow:0 0 25px rgba(99,102,241,0.5);\">⚡</div><h1 style=\"font-size:1.6rem;font-weight:800;margin:0 0 8px 0;\">Sovra Mesh Offline Mode</h1><p style=\"color:#94a3b8;max-width:440px;font-size:0.95rem;line-height:1.5;margin:0 0 24px 0;\">Operating in disconnected local mode. Autonomous Bluetooth Low Energy (BLE) Mesh &amp; DTN Store-and-Forward Outbox are ready.</p><div style=\"display:flex;gap:12px;flex-wrap:wrap;justify-content:center;\"><button onclick=\"window.location.href=\\\'/\'\" style=\"background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;font-size:0.95rem;cursor:pointer;\">🚀 Launch Sovra App</button><button onclick=\"window.location.reload()\" style=\"background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.2);padding:12px 20px;border-radius:12px;font-weight:600;font-size:0.95rem;cursor:pointer;\">🔄 Retry Connection</button></div></body></html>', {
+        return new Response('<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Sovra Offline</title><style>body{background:#090d16;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:40px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:85vh;margin:0;}:root{color-scheme:dark;}</style></head><body><div style=\"width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#00f0ff,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:2rem;margin-bottom:16px;box-shadow:0 0 25px rgba(99,102,241,0.5);\">⚡</div><h1 style=\"font-size:1.6rem;font-weight:800;margin:0 0 8px 0;\">Sovra Offline Mode</h1><p style=\"color:#94a3b8;max-width:440px;font-size:0.95rem;line-height:1.5;margin:0 0 24px 0;\">Operating in private offline mode. Your offline outbox and local media are ready.</p><div style=\"display:flex;gap:12px;flex-wrap:wrap;justify-content:center;\"><button onclick=\"window.location.href=\\\'/\'\" style=\"background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;font-size:0.95rem;cursor:pointer;\">🚀 Open Sovra App</button><button onclick=\"window.location.reload()\" style=\"background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.2);padding:12px 20px;border-radius:12px;font-weight:600;font-size:0.95rem;cursor:pointer;\">🔄 Reconnect</button></div></body></html>', {
           headers: { 'Content-Type': 'text/html; charset=utf-8' }
         });
       })
