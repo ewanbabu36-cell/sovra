@@ -1537,6 +1537,36 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
+  // 18.5 GET /api/studio/settings - Get studio default upload & bitrate settings
+  if (url.pathname === '/api/studio/settings' && req.method === 'GET') {
+    const creatorDid = resolveCreatorDid(ctx);
+    const result = sovraDb.getCreatorStudioSettings(creatorDid);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+    return true;
+  }
+
+  // 18.6 POST /api/studio/settings - Save studio default upload & bitrate settings
+  if ((url.pathname === '/api/studio/settings' || url.pathname === '/api/studio/settings/save') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body);
+      const creatorDid = resolveCreatorDid(ctx);
+      const result = sovraDb.saveCreatorStudioSettings(creatorDid, {
+        defaultCategory: parsed.defaultCategory,
+        defaultTags: parsed.defaultTags,
+        bitrateCap: parsed.bitrateCap,
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Studio settings save failed: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
   // 19. GET /api/studio/audio-library - Sovereign Royalty-Free Audio & SFX Library
   if (url.pathname === '/api/studio/audio-library' && req.method === 'GET') {
     let tracks = sovraDb.getCreatorAudioLibrary();

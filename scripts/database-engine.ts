@@ -9231,6 +9231,8 @@ export class SovraDatabaseEngine {
         if (updates.monetization) vid.monetization = updates.monetization;
         if (updates.thumbnailUrl) vid.thumbnailUrl = updates.thumbnailUrl;
         if (updates.subtitleTracks) (vid as any).subtitleTracks = updates.subtitleTracks;
+        if (updates.endScreenVideoId !== undefined) (vid as any).endScreenVideoId = updates.endScreenVideoId;
+        if (updates.endScreenType !== undefined) (vid as any).endScreenType = updates.endScreenType;
         this.save();
         return { ok: true, item: vid };
       }
@@ -9247,6 +9249,8 @@ export class SovraDatabaseEngine {
         if (updates.monetization) job.monetization = updates.monetization;
         if (updates.thumbnailUrl) job.thumbnailUrl = updates.thumbnailUrl;
         if (updates.subtitleTracks) (job as any).subtitleTracks = updates.subtitleTracks;
+        if (updates.endScreenVideoId !== undefined) (job as any).endScreenVideoId = updates.endScreenVideoId;
+        if (updates.endScreenType !== undefined) (job as any).endScreenType = updates.endScreenType;
         this.save();
         return { ok: true, item: job };
       }
@@ -9684,6 +9688,47 @@ export class SovraDatabaseEngine {
         guidelines: (this.db as any).creator_customizations[creatorDid].guidelines,
         blockedWords: (this.db as any).creator_customizations[creatorDid].blockedWords,
       },
+    };
+  }
+
+  public getCreatorStudioSettings(creatorDid: string): { ok: boolean; settings: { defaultCategory: string; defaultTags: string; bitrateCap: string } } {
+    this.load();
+    const stored = (this.db as any).creator_customizations?.[creatorDid]?.studioSettings || {};
+    return {
+      ok: true,
+      settings: {
+        defaultCategory: stored.defaultCategory || 'Tech',
+        defaultTags: stored.defaultTags || '#sovra #p2p #sovereign',
+        bitrateCap: stored.bitrateCap || 'unlimited',
+      },
+    };
+  }
+
+  public saveCreatorStudioSettings(
+    creatorDid: string,
+    data: { defaultCategory?: string; defaultTags?: string; bitrateCap?: string }
+  ): { ok: boolean; settings: { defaultCategory: string; defaultTags: string; bitrateCap: string } } {
+    this.load();
+    if (!(this.db as any).creator_customizations) {
+      (this.db as any).creator_customizations = {};
+    }
+    const current = (this.db as any).creator_customizations[creatorDid] || {};
+    const currentSettings = current.studioSettings || {};
+    const newSettings = {
+      defaultCategory: data.defaultCategory !== undefined ? String(data.defaultCategory).trim() : (currentSettings.defaultCategory || 'Tech'),
+      defaultTags: data.defaultTags !== undefined ? String(data.defaultTags).trim() : (currentSettings.defaultTags || '#sovra #p2p #sovereign'),
+      bitrateCap: data.bitrateCap !== undefined ? String(data.bitrateCap).trim() : (currentSettings.bitrateCap || 'unlimited'),
+      updatedAt: Date.now(),
+    };
+    (this.db as any).creator_customizations[creatorDid] = {
+      ...current,
+      studioSettings: newSettings,
+      updatedAt: Date.now(),
+    };
+    this.save();
+    return {
+      ok: true,
+      settings: newSettings,
     };
   }
 

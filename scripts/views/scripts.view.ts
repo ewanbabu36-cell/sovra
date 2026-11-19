@@ -17285,13 +17285,13 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           p.role === 'SUPER_ADMIN' ||
           p.role === 'OPERATOR'
         ));
+        // Universal access: never block users with a dead-end modal or toast!
+        // If not yet a creator, route them smoothly into Onboarding Gateway
+        var onboardingView = document.getElementById('studioChannelOnboardingView');
+        var dashboardShell = document.getElementById('studioDashboardShell');
         if (!isCreator) {
-          if (typeof window.showCreatorUpgradeModal === 'function') {
-            window.showCreatorUpgradeModal();
-          } else if (typeof showAccountToast === 'function') {
-            showAccountToast('🎙️ Switch to a Creator Account in Profile to access Creator Studio Pro & 95% revenue.');
-          }
-          return;
+          if (onboardingView) onboardingView.style.display = 'block';
+          if (dashboardShell) dashboardShell.style.display = 'none';
         }
       }
       if (tab === 'saved') {
@@ -32618,50 +32618,15 @@ window.SovraCreatorStudioEngine = {
             if (uploadBtn) uploadBtn.disabled = false;
           });
       },
-      cancelOnboardingOrExit: function() {
-        const modal = document.getElementById('studioOnboardingModal') || document.getElementById('sovraCreatorStudioModal');
-        if (modal) modal.style.display = 'none';
-        if (typeof switchTab === 'function') switchTab('feed');
-      },
-
       selectOnboardingEmoji: function(emoji) {
-        const el = document.getElementById('channelAvatarEmoji') || document.getElementById('onboardingEmojiPreview');
+        var el = document.getElementById('studioNewChanAvatarPreview') || document.getElementById('channelAvatarEmoji') || document.getElementById('onboardingEmojiPreview');
         if (el) el.textContent = emoji;
+        var inEl = document.getElementById('studioNewChanAvatarInput');
+        if (inEl) inEl.value = emoji;
         document.querySelectorAll('.btn-emoji-pick').forEach(function(b) {
           b.style.borderColor = (b.textContent.trim() === emoji) ? '#38bdf8' : 'rgba(255,255,255,0.15)';
           b.style.background = (b.textContent.trim() === emoji) ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.06)';
         });
-      },
-
-      createChannelAndEnterStudio: async function() {
-        const nameInput = document.getElementById('inputChannelName') || document.getElementById('studioChannelNameInput');
-        const bioInput = document.getElementById('inputChannelBio') || document.getElementById('studioChannelBioInput');
-        const name = (nameInput && nameInput.value.trim()) || 'Sovereign Channel';
-        const bio = (bioInput && bioInput.value.trim()) || 'Official 4K decentralized broadcast channel.';
-        
-        try {
-          const res = await fetch('/api/channels/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, bio: bio, isPublic: true })
-          });
-          const data = await res.json();
-          if (data && data.ok) {
-            if (typeof showAccountToast === 'function') {
-              showAccountToast('🎉 Sovereign Channel "' + name + '" created successfully!');
-            }
-            const modal = document.getElementById('studioOnboardingModal');
-            if (modal) modal.style.display = 'none';
-            if (typeof switchTab === 'function') switchTab('studio');
-            this.loadDashboard();
-          } else {
-            if (typeof showAccountToast === 'function') showAccountToast('Channel created! Welcome to Studio Pro.');
-            if (typeof switchTab === 'function') switchTab('studio');
-          }
-        } catch (_) {
-          if (typeof showAccountToast === 'function') showAccountToast('Channel ready! Entering Studio Pro.');
-          if (typeof switchTab === 'function') switchTab('studio');
-        }
       },
 
       cycleInsiderSlide: function(dir) {
@@ -32766,61 +32731,7 @@ window.SovraCreatorStudioEngine = {
         });
       },
 
-      downloadWebVTT: function() {
-        const vttLines = [
-          'WEBVTT', '',
-          '1', '00:00:00.000 --> 00:00:04.000', 'Welcome to the sovereign decentralized media revolution.', '',
-          '2', '00:00:04.500 --> 00:00:09.000', '95% of all streaming revenue goes directly to creators without intermediaries.'
-        ];
-        const vttContent = vttLines.join(String.fromCharCode(10));
-        const blob = new Blob([vttContent], { type: 'text/vtt;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'subtitles_' + Date.now() + '.vtt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        if (typeof showAccountToast === 'function') showAccountToast('⬇️ WebVTT subtitle track downloaded.');
-      },
 
-      saveSubtitles: function() {
-        if (typeof showAccountToast === 'function') showAccountToast('💾 Subtitle cue track saved to active release.');
-      },
-
-      addSubtitleCue: function() {
-        const list = document.getElementById('subtitlesCuesContainer');
-        if (list) {
-          const count = list.children.length + 1;
-          const row = document.createElement('div');
-          row.className = 'subtitle-cue-row';
-          row.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
-          row.innerHTML = '<span style="font-size: 0.72rem; color: #64748b; width: 24px;">#' + count + '</span>' +
-            '<input type="text" class="input input-sm" placeholder="00:00:00.000" style="width: 100px; font-size: 0.75rem;" />' +
-            '<input type="text" class="input input-sm" placeholder="Cue text..." style="flex: 1; font-size: 0.75rem;" />' +
-            '<button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #f87171; cursor: pointer;">✕</button>';
-          list.appendChild(row);
-        }
-      },
-
-      saveCustomization: function() {
-        if (typeof showAccountToast === 'function') showAccountToast('🎨 Channel customization & layout saved.');
-      },
-
-      switchCustomSubtab: function(tab) {
-        ['layout', 'branding', 'info'].forEach(function(t) {
-          const btn = document.getElementById('customSubtab' + (t === 'layout' ? 'Layout' : (t === 'branding' ? 'Branding' : 'Info')));
-          const panel = document.getElementById('customPanel' + (t === 'layout' ? 'Layout' : (t === 'branding' ? 'Branding' : 'Info')));
-          if (btn) {
-            if (t === tab) btn.classList.add('active');
-            else btn.classList.remove('active');
-          }
-          if (panel) {
-            panel.style.display = (t === tab) ? 'block' : 'none';
-          }
-        });
-      },
 
       filterAudioByGenre: function(genre) {
         document.querySelectorAll('.studio-comments-filter-pill').forEach(function(p) { p.classList.remove('active'); });
@@ -32859,32 +32770,7 @@ window.SovraCreatorStudioEngine = {
         }
       },
 
-      submitWorkspaceUpload: function(isDraft) {
-        const titleEl = document.getElementById('studioInputTitle') || document.getElementById('studioWsTitleInput');
-        const title = (titleEl && titleEl.value.trim()) || 'Creator Release ' + new Date().toLocaleTimeString();
-        if (typeof showAccountToast === 'function') {
-          showAccountToast(isDraft ? '📝 Draft release saved.' : '🚀 4K Multi-bitrate video published to sovereign feed!');
-        }
-        if (!isDraft) {
-          if (typeof switchTab === 'function') switchTab('youtube');
-        }
-      },
 
-      promptScheduleRelease: function() {
-        const modal = document.getElementById('studioScheduleModal');
-        if (modal) modal.style.display = 'flex';
-      },
-
-      loadScheduledQueue: function() {
-        if (typeof showAccountToast === 'function') showAccountToast('⏱️ Scheduled dispatches refreshed.');
-      },
-
-      claimSovereignEarnings: function() {
-        if (typeof showAccountToast === 'function') {
-          showAccountToast('💰 420.50 SOV claimed! Transferred directly to your self-custody wallet (95% creator split).');
-        }
-        if (typeof refreshWalletBalanceLive === 'function') refreshWalletBalanceLive();
-      },
 
       exportChannelDidKey: function() {
         var activeDid = (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did) || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || (window.SovraCreatorStudioEngine && window.SovraCreatorStudioEngine.activeChannelId ? ('did:sovra:channel:' + window.SovraCreatorStudioEngine.activeChannelId) : 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD');
@@ -32980,30 +32866,7 @@ window.SovraCreatorStudioEngine = {
         }
       },
 
-      saveVideoDetails: function() {
-        const modal = document.getElementById('studioVideoDetailsModal');
-        if (modal) modal.style.display = 'none';
-        if (typeof showAccountToast === 'function') showAccountToast('💾 Video release details saved successfully.');
-      },
 
-      closeStudioScheduleModal: function() {
-        const modal = document.getElementById('studioScheduleModal');
-        if (modal) modal.style.display = 'none';
-      },
-
-      selectSchedulePreset: function(hours) {
-        const dateInput = document.getElementById('studioScheduleDateInput');
-        if (dateInput) {
-          const d = new Date(Date.now() + hours * 3600 * 1000);
-          dateInput.value = d.toISOString().slice(0, 16);
-        }
-      },
-
-      confirmStudioScheduleRelease: function() {
-        const modal = document.getElementById('studioScheduleModal');
-        if (modal) modal.style.display = 'none';
-        if (typeof showAccountToast === 'function') showAccountToast('⏱️ Video scheduled for automated release!');
-      }
 ,
 
       _scheduleTargetContext: 'workspace',
@@ -33178,8 +33041,16 @@ window.SovraCreatorStudioEngine = {
             self.channelsList = myChannels;
 
             if (!myChannels.length) {
-              if (window.__forceStudioOnboardingTest) {
-                // 🎬 Test Harness Enforced State
+              var p = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
+              var isCreator = Boolean(p && (
+                p.isCreator === true ||
+                p.role === 'CREATOR' ||
+                p.role === 'ADMIN' ||
+                p.role === 'SUPER_ADMIN' ||
+                p.role === 'OPERATOR'
+              ));
+              if (!isCreator || window.__forceStudioOnboardingTest) {
+                // 🎬 Display YouTube-style Onboarding Gateway for users without an existing channel
                 if (onboardingView) onboardingView.style.display = 'block';
                 if (dashboardShell) dashboardShell.style.display = 'none';
 
@@ -33447,6 +33318,17 @@ window.SovraCreatorStudioEngine = {
             submitBtn.innerHTML = '🚀 Create Channel &amp; Enter Studio';
           }
           if (data && data.ok && data.channel) {
+            if (window.SovraState && window.SovraState.currentUser) {
+              window.SovraState.currentUser.isCreator = true;
+            }
+            if (typeof myProfile !== 'undefined' && myProfile) {
+              myProfile.isCreator = true;
+            }
+            var onboardingView = document.getElementById('studioChannelOnboardingView');
+            var dashboardShell = document.getElementById('studioDashboardShell');
+            if (onboardingView) onboardingView.style.display = 'none';
+            if (dashboardShell) dashboardShell.style.display = 'block';
+
             if (typeof showAccountToast === 'function') {
               showAccountToast('🎉 Sovereign Video Channel @' + handle + ' launched! Welcome to Studio Pro.');
             } else if (typeof showToast === 'function') {
@@ -33917,6 +33799,10 @@ window.SovraCreatorStudioEngine = {
               if (catIn && v.category) catIn.value = v.category;
               if (cidEl) cidEl.textContent = v.cid || ('bafybeicreator_' + videoId);
               if (prevThumb && v.thumbnailUrl) prevThumb.src = v.thumbnailUrl;
+              var endScreenSelect = document.getElementById('editVideoEndScreenSelect');
+              if (endScreenSelect && v.endScreenVideoId) {
+                endScreenSelect.value = v.endScreenVideoId;
+              }
 
               var charCnt = document.getElementById('editVideoTitleCount');
               if (charCnt && v.title) charCnt.textContent = v.title.length + '/100';
@@ -34002,6 +33888,8 @@ window.SovraCreatorStudioEngine = {
         var desc = document.getElementById('editVideoDesc')?.value;
         var cat = document.getElementById('editVideoCategory')?.value;
         var audience = document.getElementById('editVideoAudience')?.value;
+        var endScreenSelect = document.getElementById('editVideoEndScreenSelect');
+        var endScreenVideoId = endScreenSelect ? endScreenSelect.value : undefined;
         var self = this;
 
         fetch('/api/studio/video/update', {
@@ -34013,6 +33901,8 @@ window.SovraCreatorStudioEngine = {
             description: desc,
             category: cat,
             audience: audience,
+            endScreenVideoId: endScreenVideoId,
+            endScreenType: endScreenVideoId && endScreenVideoId !== 'none' ? 'video' : 'none',
           })
         })
         .then(function(r) { return r.json(); })
@@ -34291,6 +34181,7 @@ window.SovraCreatorStudioEngine = {
 
       downloadWebVTT: function() {
         var curTrack = this.currentSubtitlesTracks.find(function(t) { return t.langCode === this.activeSubtitleLang; }.bind(this));
+        var cues = (curTrack && curTrack.cues) ? curTrack.cues : [];
         var nl = String.fromCharCode(10);
         var vttContent = 'WEBVTT' + nl + nl + cues.map(function(c, i) {
           var s = typeof c.start === 'number' ? '00:00:' + (c.start < 10 ? '0' : '') + c.start + '.000' : c.start;
@@ -34479,10 +34370,31 @@ window.SovraCreatorStudioEngine = {
       },
 
       activePlayingAudioId: null,
+      _activeAudioSynth: null,
+
+      _stopActiveAudioPreview: function() {
+        if (this._activeAudioSynth) {
+          try {
+            if (this._activeAudioSynth.oscillators) {
+              this._activeAudioSynth.oscillators.forEach(function(osc) {
+                try { osc.stop(); osc.disconnect(); } catch (_) {}
+              });
+            }
+            if (this._activeAudioSynth.gainNode) {
+              try { this._activeAudioSynth.gainNode.disconnect(); } catch (_) {}
+            }
+            if (this._activeAudioSynth.audioEl) {
+              try { this._activeAudioSynth.audioEl.pause(); this._activeAudioSynth.audioEl.currentTime = 0; } catch (_) {}
+            }
+          } catch (_) {}
+          this._activeAudioSynth = null;
+        }
+      },
 
       togglePlayAudioTrack: function(id) {
         var btn = document.getElementById('audioPlayBtn-' + id);
         if (this.activePlayingAudioId === id) {
+          this._stopActiveAudioPreview();
           this.activePlayingAudioId = null;
           if (btn) btn.textContent = '▶';
           if (typeof showToast === 'function') showToast('Audio playback paused', 'info');
@@ -34491,8 +34403,41 @@ window.SovraCreatorStudioEngine = {
             var prevBtn = document.getElementById('audioPlayBtn-' + this.activePlayingAudioId);
             if (prevBtn) prevBtn.textContent = '▶';
           }
+          this._stopActiveAudioPreview();
           this.activePlayingAudioId = id;
           if (btn) btn.textContent = '⏸';
+
+          var track = (this.audioLibraryTracks || []).find(function(t) { return (t.id || t.title) === id; });
+          var trackUrl = track && (track.url || track.audioUrl);
+
+          if (trackUrl && typeof Audio !== 'undefined') {
+            try {
+              var a = new Audio(trackUrl);
+              a.play().catch(function() {});
+              this._activeAudioSynth = { audioEl: a };
+            } catch (_) {}
+          } else {
+            try {
+              var AudioCtx = window.AudioContext || window.webkitAudioContext;
+              if (AudioCtx) {
+                var ctx = new AudioCtx();
+                var gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                gain.connect(ctx.destination);
+                var freqs = [440, 554.37, 659.25]; // A4, C#5, E5 soothing major chord
+                var oscs = freqs.map(function(f) {
+                  var osc = ctx.createOscillator();
+                  osc.type = 'sine';
+                  osc.frequency.setValueAtTime(f, ctx.currentTime);
+                  osc.connect(gain);
+                  osc.start();
+                  return osc;
+                });
+                this._activeAudioSynth = { ctx: ctx, oscillators: oscs, gainNode: gain };
+              }
+            } catch (_) {}
+          }
+
           if (typeof showToast === 'function') showToast('🎵 Previewing royalty-free track...', 'info');
         }
       },
@@ -35624,7 +35569,70 @@ window.SovraCreatorStudioEngine = {
       },
 
       loadStudioSettings: function() {
-        // Studio settings ready
+        var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did)
+          ? myProfile.did
+          : ((window.SovraState && window.SovraState.currentUser && window.SovraState.currentUser.did) ? window.SovraState.currentUser.did : '');
+        fetch('/api/studio/settings' + (myDid ? '?creatorDid=' + encodeURIComponent(myDid) : ''))
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data && data.ok && data.settings) {
+              var s = data.settings;
+              var cat = document.getElementById('studioSettingDefaultCategory');
+              var tags = document.getElementById('studioSettingDefaultTags');
+              var bitrate = document.getElementById('studioSettingBitrateCap');
+              if (cat && s.defaultCategory) cat.value = s.defaultCategory;
+              if (tags && s.defaultTags) tags.value = s.defaultTags;
+              if (bitrate && s.bitrateCap) bitrate.value = s.bitrateCap;
+            }
+          })
+          .catch(function() {});
+      },
+
+      saveStudioSettings: function() {
+        var cat = document.getElementById('studioSettingDefaultCategory');
+        var tags = document.getElementById('studioSettingDefaultTags');
+        var bitrate = document.getElementById('studioSettingBitrateCap');
+        var saveBtn = document.getElementById('btnSaveStudioSettings');
+
+        var payload = {
+          defaultCategory: cat ? cat.value : 'Tech',
+          defaultTags: tags ? tags.value.trim() : '#sovra #p2p #sovereign',
+          bitrateCap: bitrate ? bitrate.value : 'unlimited'
+        };
+
+        if (saveBtn) {
+          saveBtn.disabled = true;
+          saveBtn.textContent = '⏳ Saving...';
+        }
+
+        fetch('/api/studio/settings/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '💾 Save Settings';
+          }
+          if (data && data.ok) {
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('⚙️ Studio upload & bitrate defaults saved successfully.');
+            } else if (typeof showToast === 'function') {
+              showToast('Studio settings saved successfully ✓', 'success');
+            }
+          } else {
+            if (typeof showToast === 'function') showToast('Failed to save settings: ' + ((data && data.error) || 'Unknown error'), 'error');
+          }
+        })
+        .catch(function(err) {
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '💾 Save Settings';
+          }
+          if (typeof showToast === 'function') showToast('Network error saving settings: ' + err.message, 'error');
+        });
       },
 
       loadStudioFeedback: function() {
