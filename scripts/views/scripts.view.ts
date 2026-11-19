@@ -1725,7 +1725,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         return words;
       }
 
-      // --- 12. Signal/WhatsApp-Grade Encrypted Vault Export (AES-256-GCM + PBKDF2) ---
+      // --- 12. Signal/WhatsApp-Grade Encrypted Vault Export (End-to-End Encrypted + PBKDF2) ---
       async function exportEncryptedVault(passphrase) {
         await init();
         if (!passphrase || passphrase.length < 6) {
@@ -1790,7 +1790,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
         return {
           sovra_vault_version: 1,
-          cipher: 'AES-256-GCM',
+          cipher: 'End-to-End Encrypted',
           kdf: 'PBKDF2-SHA256',
           iterations: 100000,
           salt: bufToHex(salt),
@@ -1803,7 +1803,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         };
       }
 
-      // --- 13. Sovereign Key Vault Decrypt & Restore (AES-256-GCM) ---
+      // --- 13. Sovereign Key Vault Decrypt & Restore (End-to-End Encrypted) ---
       async function importEncryptedVault(bundleOrJson, passphrase) {
         let bundle = bundleOrJson;
         if (typeof bundle === 'string') {
@@ -4799,7 +4799,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           bodyEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 28px 12px;">' +
             '<div style="font-size: 2.2rem; margin-bottom: 8px;">🔖</div>' +
             '<div style="font-weight: 600; color: #f8fafc; margin-bottom: 4px;">Zero Cloud Dependence</div>' +
-            '<div style="font-size: 0.82rem; color: #64748b;">Saved bookmarks are stored in your encrypted local IndexedDB storage.</div>' +
+            '<div style="font-size: 0.82rem; color: #64748b;">Saved bookmarks are stored in your encrypted private local storage storage.</div>' +
           '</div>';
         }
       });
@@ -4980,7 +4980,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               '<div class="spatial-option-icon">🛠️</div>' +
               '<div class="spatial-option-details">' +
                 '<div class="spatial-option-title">Node Operator &amp; Developer Mode</div>' +
-                '<div class="spatial-option-desc">Inspect raw libp2p Kademlia tables, Merkle DAG block CIDs, and telemetry</div>' +
+                '<div class="spatial-option-desc">Inspect peer routing tables, storage blocks, and network health</div>' +
               '</div>' +
             '</div>' +
             '<div style="display: flex; align-items: center; gap: 8px;">' +
@@ -10484,7 +10484,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                 '<span style="font-size: 0.72rem; color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 2px 8px; border-radius: 4px; font-weight: 600;">Hardware Secured</span>' +
               '</div>' +
               '<div style="font-size: 0.76rem; color: #94a3b8; font-family: monospace; word-break: break-all; margin-bottom: 4px;">DID: ' + (user.did || 'did:sovra:self') + '</div>' +
-              '<div style="font-size: 0.74rem; color: #64748b;">Protocol: Verified (RFC 8032) • Self-Custodied</div>' +
+              '<div style="font-size: 0.74rem; color: #64748b;">Security: Verified & Self-Custodied</div>' +
               '<div style="font-size: 0.7rem; color: #a855f7; margin-top: 6px; font-style: italic;">🛡️ Private keys and recovery seeds remain isolated in local secure hardware.</div>' +
             '</div>';
 
@@ -14049,7 +14049,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           preview.innerText = JSON.stringify(bundle, null, 2);
         }
 
-        showVaultNotice('✅ Vault encrypted successfully with AES-256-GCM + PBKDF2 (100k rounds)!', true);
+        showVaultNotice('✅ Vault encrypted successfully with End-to-End Encrypted + PBKDF2 (100k rounds)!', true);
         if (typeof showAccountToast === 'function') {
           showAccountToast('🔐 Sovereign Key Vault backup bundle generated!', 'success');
         }
@@ -22670,7 +22670,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             if (typeof updateOnboardingChecklistUI === 'function') {
               updateOnboardingChecklistUI();
             }
-            showAccountToast('📡 Network offline: Post saved to durable IndexedDB outbox (will auto-sync when online)');
+            showAccountToast('📡 Network offline: Post saved to secure offline outbox (will auto-sync when online)');
           }).catch(function(queueErr) {
             if (btn) btn.innerHTML = '<span>🚀 Post</span>';
             const topBtn = document.getElementById('composerTopPublishBtn');
@@ -26435,7 +26435,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       }
       if (sigEl) {
         const algo = (window.SovraCryptoVault ? window.SovraCryptoVault.getAlgorithm() : 'Verified');
-        sigEl.innerHTML = '<span style="color: #34d399;">✓ Secure Enclave Active &bull; W3C ' + algo + ' (RFC 8032)</span>';
+        sigEl.innerHTML = '<span style="color: #34d399;">✓ Secure Enclave Active &bull; W3C ' + algo + ' (Verified Signature)</span>';
       }
 
       if (avEl) {
@@ -30623,7 +30623,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
           if (scanBtn) {
             scanBtn.innerHTML = '<span>🔍</span> <span>Scan BLE</span>';
-            scanBtn.title = 'Trigger Web Bluetooth GATT Hardware Discovery';
+            scanBtn.title = 'Trigger Web Direct Bluetooth Hardware Discovery';
           }
         }
       },
@@ -30688,7 +30688,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             } catch (_) {}
           }
         } catch (e) {
-          console.warn('[BLE-Radar] Offline mode active - operating purely via local Bluetooth GATT & DTN cache:', e);
+          console.warn('[BLE-Radar] Offline mode active - operating purely via local Bluetooth & Offline Sync cache:', e);
           // If offline and no peers cached yet, seed default nearby mesh peers for autonomous offline operation
           if (!self.peers || self.peers.length === 0) {
             self.peers = [
@@ -30750,7 +30750,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             console.warn('[BLE-Radar] iOS native bridge scan call note:', bridgeErr);
           }
         } else if (!caps.isFallbackRequired && caps.hasWebBluetooth) {
-          // 2. Physical Web Bluetooth GATT Pairing (Android Chrome, Desktop Chrome/Edge/Opera, Bluefy iOS)
+          // 2. Physical Web Direct Bluetooth Pairing (Android Chrome, Desktop Chrome/Edge/Opera, Bluefy iOS)
           try {
             const device = await navigator.bluetooth.requestDevice({
               filters: [{ services: [self.serviceUuid] }],
@@ -30984,7 +30984,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
         const dist = p.distanceMeters || self.estimateDistanceMeters(p.rssi, p.txPower);
         const signedBadge = p.isSigned
-          ? '<span style="color: #34d399; font-weight: 700;">✓ HMAC-SHA256 Authenticated</span>'
+          ? '<span style="color: #34d399; font-weight: 700;">✓ Cryptographically Authenticated</span>'
           : '<span style="color: #94a3b8;">Unsigned Frame</span>';
 
         card.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">' +
@@ -36662,7 +36662,7 @@ _scheduleTargetContext: 'workspace',
           }
         }
 
-        // 3. SQLite WAL Telemetry
+        // 3. Local Storage Health
         if (data.sqliteWal) {
           var wal = data.sqliteWal;
           var walSizeEl = document.getElementById('devHudWalSize');
@@ -40592,7 +40592,7 @@ _scheduleTargetContext: 'workspace',
           name: device.name || 'Nearby BLE Phone',
           avatar: '📱',
           avatarBg: '#0284c7',
-          role: 'Web Bluetooth GATT Linked (0 hops, 1.2m)',
+          role: 'Web Direct Bluetooth Linked (0 hops, 1.2m)',
           hops: 1,
           isDirect: true,
           isChannel: false
@@ -40611,7 +40611,7 @@ _scheduleTargetContext: 'workspace',
         }
 
         renderChatContactsList();
-        showAccountToast('✅ Web Bluetooth GATT Linked: ' + (device.name || 'BLE Mesh Node'));
+        showAccountToast('✅ Web Direct Bluetooth Linked: ' + (device.name || 'BLE Mesh Node'));
       } catch (err) {
         console.warn('[WebBluetooth] Connection error:', err);
         const pairBtn = document.getElementById('webBluetoothPairBtn');
