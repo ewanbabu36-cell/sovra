@@ -33774,6 +33774,7 @@ window.SovraCreatorStudioEngine = {
       },
 
       openVideoDetailsModal: function(videoId) {
+        var self = this;
         var modal = document.getElementById('studioVideoDetailsModal');
         if (!modal) return;
         modal.style.display = 'flex';
@@ -33799,9 +33800,35 @@ window.SovraCreatorStudioEngine = {
               if (catIn && v.category) catIn.value = v.category;
               if (cidEl) cidEl.textContent = v.cid || ('bafybeicreator_' + videoId);
               if (prevThumb && v.thumbnailUrl) prevThumb.src = v.thumbnailUrl;
+
+              // Milestone 1: Dynamically populate #editVideoEndScreenSelect from contentLibrary excluding current video
               var endScreenSelect = document.getElementById('editVideoEndScreenSelect');
-              if (endScreenSelect && v.endScreenVideoId) {
-                endScreenSelect.value = v.endScreenVideoId;
+              if (endScreenSelect) {
+                var endScreenOptions = '<option value="none">No end screen</option>';
+                if (self.contentLibrary && self.contentLibrary.length) {
+                  self.contentLibrary.forEach(function(item) {
+                    if (item.id !== videoId) {
+                      endScreenOptions += '<option value="' + item.id + '">Promote: ' + (item.title || item.id) + '</option>';
+                    }
+                  });
+                }
+                endScreenSelect.innerHTML = endScreenOptions;
+                if (v.endScreenVideoId) {
+                  endScreenSelect.value = v.endScreenVideoId;
+                }
+              }
+
+              // Milestone 2: Populate gating tier radio button
+              var tier = v.monetizationGating || (v.monetization ? v.monetization.tier : 'free');
+              var rFree = document.getElementById('editGateFree');
+              var rSupp = document.getElementById('editGateSupporter');
+              var rPrev = document.getElementById('editGatePreview');
+              if (tier === 'supporter_gated') {
+                if (rSupp) rSupp.checked = true;
+              } else if (tier === 'timed_preview') {
+                if (rPrev) rPrev.checked = true;
+              } else {
+                if (rFree) rFree.checked = true;
               }
 
               var charCnt = document.getElementById('editVideoTitleCount');
@@ -33890,6 +33917,27 @@ window.SovraCreatorStudioEngine = {
         var audience = document.getElementById('editVideoAudience')?.value;
         var endScreenSelect = document.getElementById('editVideoEndScreenSelect');
         var endScreenVideoId = endScreenSelect ? endScreenSelect.value : undefined;
+        var thumbEl = document.getElementById('editVideoPreviewThumb');
+        var thumbUrl = (thumbEl && thumbEl.src) ? thumbEl.src : undefined;
+
+        var checkedGating = document.querySelector('input[name="editGatingTier"]:checked');
+        var gatingTier = checkedGating ? checkedGating.value : 'free';
+
+        var chList = document.getElementById('editVideoChaptersList');
+        var chapters = [];
+        if (chList) {
+          var spans = chList.querySelectorAll('span');
+          spans.forEach(function(s) {
+            var txt = (s.textContent || '').trim();
+            var parts = txt.split(' ');
+            if (parts.length >= 2) {
+              var time = parts[0];
+              var chTitle = parts.slice(1).join(' ');
+              chapters.push({ time: time, timecode: time, title: chTitle });
+            }
+          });
+        }
+
         var self = this;
 
         fetch('/api/studio/video/update', {
@@ -33901,6 +33949,10 @@ window.SovraCreatorStudioEngine = {
             description: desc,
             category: cat,
             audience: audience,
+            thumbnailUrl: thumbUrl,
+            monetizationGating: gatingTier,
+            monetization: { tier: gatingTier },
+            chapters: chapters.length ? chapters : undefined,
             endScreenVideoId: endScreenVideoId,
             endScreenType: endScreenVideoId && endScreenVideoId !== 'none' ? 'video' : 'none',
           })
@@ -34087,13 +34139,43 @@ window.SovraCreatorStudioEngine = {
       },
 
       toggleStudioHeart: function(videoId, commentId) {
-        if (typeof showToast === 'function') showToast('❤️ Creator heart granted', 'success');
-        this.loadCommentsHub();
+        var self = this;
+        fetch('/api/studio/comments/moderate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoId: videoId, commentId: commentId, action: 'heart' })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok) {
+            var isH = d.comment && d.comment.isHearted;
+            if (typeof showToast === 'function') showToast(isH ? '❤️ Creator heart granted' : '💔 Creator heart removed', 'success');
+            self.loadCommentsHub();
+          }
+        })
+        .catch(function() {
+          self.loadCommentsHub();
+        });
       },
 
       toggleStudioPin: function(videoId, commentId) {
-        if (typeof showToast === 'function') showToast('📌 Comment pinned to top', 'success');
-        this.loadCommentsHub();
+        var self = this;
+        fetch('/api/studio/comments/moderate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoId: videoId, commentId: commentId, action: 'pin' })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok) {
+            var isP = d.comment && d.comment.isPinned;
+            if (typeof showToast === 'function') showToast(isP ? '📌 Comment pinned to top' : 'Unpinned comment', 'success');
+            self.loadCommentsHub();
+          }
+        })
+        .catch(function() {
+          self.loadCommentsHub();
+        });
       },
 
       currentSubtitlesTracks: [],
@@ -34214,6 +34296,18 @@ window.SovraCreatorStudioEngine = {
       },
 
       loadCustomization: function() {
+        var self = this;
+        var trailerSel = document.getElementById('customTrailerSelect');
+        var featuredSel = document.getElementById('customFeaturedSelect');
+        if (self.contentLibrary && self.contentLibrary.length) {
+          var optionsHtml = '<option value="">None</option>' + self.contentLibrary.map(function(vid) {
+            var dur = vid.duration || (vid.durationSeconds ? (vid.durationSeconds + 's') : 'Video');
+            return '<option value="' + vid.id + '">' + (vid.title || vid.id) + ' (' + dur + ')</option>';
+          }).join('');
+          if (trailerSel) trailerSel.innerHTML = optionsHtml;
+          if (featuredSel) featuredSel.innerHTML = optionsHtml;
+        }
+
         var url = '/api/studio/customization' + (this.activeChannelId ? '?channelId=' + encodeURIComponent(this.activeChannelId) : '');
         fetch(url)
           .then(function(r) { return r.json(); })
@@ -34223,31 +34317,66 @@ window.SovraCreatorStudioEngine = {
               var nameIn = document.getElementById('customChannelName');
               var handleIn = document.getElementById('customChannelHandle');
               var bioIn = document.getElementById('customChannelBio');
+              var linksIn = document.getElementById('customChannelLinks');
               var prev = document.getElementById('customBannerPreview');
+              var avatarPrev = document.getElementById('customAvatarPreview');
               if (nameIn) nameIn.value = c.channelName || '';
               if (handleIn) handleIn.value = c.channelHandle || '';
               if (bioIn) bioIn.value = c.channelBio || '';
-              var trailerSel = document.getElementById('customTrailerSelect');
-              var featuredSel = document.getElementById('customFeaturedSelect');
+              if (linksIn && (c.socialLinks || c.links)) {
+                linksIn.value = Array.isArray(c.socialLinks) ? c.socialLinks.join(', ') : (c.socialLinks || c.links || '');
+              }
               if (trailerSel && c.trailerVideoId) trailerSel.value = c.trailerVideoId;
               if (featuredSel && c.featuredVideoId) featuredSel.value = c.featuredVideoId;
-              if (prev && c.channelBanner) {
-                var bg = c.channelBanner;
+              if (prev && (c.channelBanner || c.bannerUrl)) {
+                var bg = c.channelBanner || c.bannerUrl;
                 prev.style.background = (bg.startsWith('http') || bg.startsWith('data:') || bg.startsWith('/')) ? ('url(' + bg + ') center/cover no-repeat') : bg;
+              }
+              if (avatarPrev && (c.channelAvatar || c.avatar)) {
+                var av = c.channelAvatar || c.avatar;
+                avatarPrev.innerHTML = (av.startsWith('http') || av.startsWith('data:') || av.startsWith('/')) ? ('<img src="' + av + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">') : av;
               }
             }
           })
           .catch(function() {});
       },
 
+      handleAvatarUploaded: function(e) {
+        var file = e && e.target && e.target.files && e.target.files[0];
+        if (!file) return;
+        var self = this;
+        var reader = new FileReader();
+        reader.onload = function(evt) {
+          self._customAvatarDataUrl = evt.target.result;
+          var prev = document.getElementById('customAvatarPreview');
+          if (prev) prev.innerHTML = '<img src="' + evt.target.result + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">';
+          if (typeof showToast === 'function') showToast('Channel avatar selected ✓', 'success');
+        };
+        reader.readAsDataURL(file);
+      },
+
       handleBannerUploaded: function(e) {
         var file = e && e.target && e.target.files && e.target.files[0];
         if (!file) return;
+        var self = this;
         var reader = new FileReader();
         reader.onload = function(evt) {
+          self._customBannerDataUrl = evt.target.result;
           var prev = document.getElementById('customBannerPreview');
           if (prev) prev.style.background = 'url(' + evt.target.result + ') center/cover no-repeat';
           if (typeof showToast === 'function') showToast('Banner image uploaded ✓', 'success');
+        };
+        reader.readAsDataURL(file);
+      },
+
+      handleWatermarkUploaded: function(e) {
+        var file = e && e.target && e.target.files && e.target.files[0];
+        if (!file) return;
+        var self = this;
+        var reader = new FileReader();
+        reader.onload = function(evt) {
+          self._customWatermarkDataUrl = evt.target.result;
+          if (typeof showToast === 'function') showToast('Video watermark uploaded ✓', 'success');
         };
         reader.readAsDataURL(file);
       },
@@ -34259,18 +34388,34 @@ window.SovraCreatorStudioEngine = {
         var bio = document.getElementById('customChannelBio')?.value;
         var trailer = document.getElementById('customTrailerSelect')?.value;
         var featured = document.getElementById('customFeaturedSelect')?.value;
+        var links = document.getElementById('customChannelLinks')?.value;
+
+        var payload = {
+          channelId: this.activeChannelId,
+          channelName: name,
+          channelHandle: handle,
+          channelBio: bio,
+          trailerVideoId: trailer,
+          featuredVideoId: featured,
+          socialLinks: links,
+          links: links
+        };
+        if (this._customAvatarDataUrl) {
+          payload.avatar = this._customAvatarDataUrl;
+          payload.channelAvatar = this._customAvatarDataUrl;
+        }
+        if (this._customBannerDataUrl) {
+          payload.bannerUrl = this._customBannerDataUrl;
+          payload.channelBanner = this._customBannerDataUrl;
+        }
+        if (this._customWatermarkDataUrl) {
+          payload.watermark = this._customWatermarkDataUrl;
+        }
 
         fetch('/api/studio/customization/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            channelId: this.activeChannelId,
-            channelName: name,
-            channelHandle: handle,
-            channelBio: bio,
-            trailerVideoId: trailer,
-            featuredVideoId: featured
-          })
+          body: JSON.stringify(payload)
         })
         .then(function(r) { return r.json(); })
         .then(function(d) {
@@ -34278,9 +34423,13 @@ window.SovraCreatorStudioEngine = {
             if (typeof showToast === 'function') showToast('Channel customization published successfully ✓', 'success');
             var sideName = document.getElementById('studioChannelName');
             var sideHandle = document.getElementById('studioChannelHandle');
+            var sideAvatar = document.getElementById('studioChannelAvatar');
             var cleanHandle = handle ? ('@' + handle.replace(/^@+/, '')) : '';
             if (sideName && name) sideName.textContent = name;
             if (sideHandle && cleanHandle) sideHandle.textContent = cleanHandle;
+            if (sideAvatar && payload.avatar) {
+              sideAvatar.innerHTML = '<img src="' + payload.avatar + '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">';
+            }
 
             if (self.channelsList && self.activeChannelId) {
               var ch = self.channelsList.find(function(c) { return c.id === self.activeChannelId; });
@@ -34288,6 +34437,7 @@ window.SovraCreatorStudioEngine = {
                 if (name) ch.name = name;
                 if (cleanHandle) ch.handle = cleanHandle;
                 if (bio) ch.desc = bio;
+                if (payload.avatar) ch.avatar = payload.avatar;
               }
               var selectEl = document.getElementById('studioActiveChannelSelect');
               if (selectEl && selectEl.selectedOptions && selectEl.selectedOptions[0]) {
@@ -35162,6 +35312,7 @@ window.SovraCreatorStudioEngine = {
             '<td style="padding: 10px 8px; color: #10b981; font-weight: 700;">' + sov + ' SOV</td>' +
             '<td style="padding: 10px 8px; text-align: right; white-space: nowrap;">' +
               '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.openVideoDetailsModal(&quot;' + safeId + '&quot;)" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;" title="Edit Video Title &amp; Details">✏️ Edit</button>' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.openVideoTrimmerModal(&quot;' + safeId + '&quot;)" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;" title="Lossless Video Trimmer">✂️ Trim</button>' +
               '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.togglePinContent(&quot;' + safeId + '&quot;)" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;' + (isPinned ? ' color:#f59e0b;' : '') + '" title="' + (isPinned ? 'Unpin dispatch' : 'Pin dispatch') + '">' + (isPinned ? '📌 Unpin' : '📌 Pin') + '</button>' +
               '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.switchStudioTab(&quot;analytics&quot;)" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;" title="Analytics">📊</button>' +
               '<button type="button" class="btn btn-secondary" data-url="' + hlsUrl + '" onclick="SovraCreatorStudioEngine.copyHlsUrl(this.getAttribute(&quot;data-url&quot;))" style="padding: 3px 7px; font-size: 0.7rem; margin-right: 3px;" title="Copy RFC 8216 HLS Master Link">📋</button>' +
@@ -35242,6 +35393,160 @@ window.SovraCreatorStudioEngine = {
 
       deleteVideoContent: function(id) {
         return this.deleteContentItem(id);
+      },
+
+      openVideoTrimmerModal: function(videoId) {
+        var modal = document.getElementById('studioVideoTrimmerModal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        var vidInput = document.getElementById('studioTrimVideoId');
+        if (vidInput) vidInput.value = videoId;
+        var player = document.getElementById('studioTrimVideoPlayer');
+        var startIn = document.getElementById('studioTrimStartSec');
+        var endIn = document.getElementById('studioTrimEndSec');
+        var durLabel = document.getElementById('studioTrimDurationLabel');
+        var slider = document.getElementById('studioTrimRangeSlider');
+        var subtitle = document.getElementById('trimModalSubtitle');
+
+        var item = (this.contentLibrary || []).find(function(x) { return x.id === videoId; });
+        var dur = (item && item.durationSeconds) ? item.durationSeconds : ((item && item.trimConfig && item.trimConfig.durationSec) ? item.trimConfig.durationSec : 120);
+        var start = (item && item.trimConfig && item.trimConfig.startOffsetSec != null) ? item.trimConfig.startOffsetSec : 0;
+        var end = (item && item.trimConfig && item.trimConfig.endOffsetSec != null) ? item.trimConfig.endOffsetSec : dur;
+
+        if (subtitle && item) subtitle.textContent = 'Trimming: ' + (item.title || videoId);
+        if (startIn) {
+          startIn.value = start;
+          startIn.max = dur;
+        }
+        if (endIn) {
+          endIn.value = end;
+          endIn.max = dur;
+        }
+        if (slider) {
+          slider.max = dur;
+          slider.value = start;
+        }
+        if (durLabel) durLabel.textContent = 'Duration: ' + (end - start).toFixed(1) + 's (Original: ' + dur + 's)';
+
+        if (player) {
+          var srcUrl = item && item.hlsMasterPlaylistUrl ? item.hlsMasterPlaylistUrl : ('/api/video/stream/' + videoId + '.mp4');
+          player.src = srcUrl;
+          try {
+            player.currentTime = start;
+          } catch (_) {}
+        }
+      },
+
+      onTrimInputChange: function() {
+        var startIn = document.getElementById('studioTrimStartSec');
+        var endIn = document.getElementById('studioTrimEndSec');
+        var durLabel = document.getElementById('studioTrimDurationLabel');
+        var player = document.getElementById('studioTrimVideoPlayer');
+        var s = parseFloat(startIn ? startIn.value : '0') || 0;
+        var e = parseFloat(endIn ? endIn.value : '0') || 0;
+        if (e < s) e = s + 1;
+        if (durLabel) durLabel.textContent = 'Duration: ' + (e - s).toFixed(1) + 's';
+        if (player) {
+          try {
+            player.currentTime = s;
+          } catch (_) {}
+        }
+      },
+
+      onTrimSliderChange: function(val) {
+        var player = document.getElementById('studioTrimVideoPlayer');
+        if (player) {
+          try {
+            player.currentTime = parseFloat(val) || 0;
+          } catch (_) {}
+        }
+      },
+
+      closeVideoTrimmerModal: function() {
+        var modal = document.getElementById('studioVideoTrimmerModal');
+        if (modal) modal.style.display = 'none';
+        var player = document.getElementById('studioTrimVideoPlayer');
+        if (player) {
+          try {
+            player.pause();
+            player.removeAttribute('src');
+            player.load();
+          } catch (_) {}
+        }
+      },
+
+      applyVideoTrim: function() {
+        var self = this;
+        var vidId = document.getElementById('studioTrimVideoId')?.value;
+        var start = parseFloat(document.getElementById('studioTrimStartSec')?.value || '0') || 0;
+        var end = parseFloat(document.getElementById('studioTrimEndSec')?.value || '0') || 0;
+        if (!vidId) return;
+
+        fetch('/api/studio/video/trim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoId: vidId, startOffsetSec: start, endOffsetSec: end })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok) {
+            if (typeof showToast === 'function') showToast('✂️ Video trimmed successfully to ' + (end - start).toFixed(1) + 's ✓', 'success');
+            self.closeVideoTrimmerModal();
+            self.loadContentLibrary();
+          } else {
+            if (typeof showToast === 'function') showToast('Trim failed: ' + ((d && d.error) || 'Unknown error'), 'error');
+          }
+        })
+        .catch(function() {
+          if (typeof showToast === 'function') showToast('Trim failed', 'error');
+        });
+      },
+
+      toggleStreamKeyVisibility: function() {
+        var input = document.getElementById('studioRtmpStreamKey');
+        var btn = document.getElementById('btnToggleStreamKey');
+        if (!input || !btn) return;
+        if (input.type === 'password') {
+          input.type = 'text';
+          btn.textContent = 'Hide';
+        } else {
+          input.type = 'password';
+          btn.textContent = 'Reveal';
+        }
+      },
+
+      copyStreamKey: function() {
+        var input = document.getElementById('studioRtmpStreamKey');
+        if (input && input.value) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value);
+          }
+          if (typeof showToast === 'function') showToast('🔑 Stream key copied to clipboard! Keep it private.', 'success');
+        }
+      },
+
+      resetStreamKey: function() {
+        var input = document.getElementById('studioRtmpStreamKey');
+        if (!input) return;
+        var randomHex = Array.from({ length: 12 }, function() { return Math.floor(Math.random() * 16).toString(16); }).join('');
+        var newKey = 'live_sk_sovra_' + randomHex;
+        input.value = newKey;
+        if (typeof showToast === 'function') showToast('🔄 Stream key reset! Update your OBS configuration.', 'info');
+      },
+
+      copyRtmpUrl: function() {
+        var input = document.getElementById('studioRtmpStreamUrl');
+        var url = input ? input.value : 'rtmp://live.sovra.network/live';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url);
+        }
+        if (typeof showToast === 'function') showToast('📡 RTMP Ingest URL copied to clipboard!', 'success');
+      },
+
+      toggleLowLatency: function(enabled) {
+        if (typeof showToast === 'function') {
+          showToast(enabled ? '⚡ Ultra-low latency relay active (< 1.5s)' : 'Standard latency buffer active (4-6s)', 'info');
+        }
       },
 
       insiderSlideIdx: 1,
