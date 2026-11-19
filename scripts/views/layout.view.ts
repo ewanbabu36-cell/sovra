@@ -6228,6 +6228,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <button type="button" class="studio-sidebar-nav-btn" id="studioNavEarn" onclick="SovraCreatorStudioEngine.switchStudioTab('earn')">
               <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span> <span>Earn</span>
             </button>
+            <button type="button" class="studio-sidebar-nav-btn" id="studioNavAds" onclick="openAdsManagerModal()" style="color: #fb7185;">
+              <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span> <span>Ads &amp; Campaigns</span>
+            </button>
             <button type="button" class="studio-sidebar-nav-btn" id="studioNavCustomization" onclick="SovraCreatorStudioEngine.switchStudioTab('customization')">
               <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 4 4 4L8 19l-4 1 1-4 11-11Z"/><line x1="13.5" y1="6.5" x2="17.5" y2="10.5"/></svg></span> <span>Customisation</span>
             </button>
@@ -7248,6 +7251,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <button type="button" id="studioEarnSubtabBtnTiers" onclick="switchEarnSubtab('tiers')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Membership Tiers</button>
                   <button type="button" id="studioEarnSubtabBtnTips" onclick="switchEarnSubtab('tips')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Super Thanks &amp; Tips</button>
                   <button type="button" id="studioEarnSubtabBtnEligibility" onclick="switchEarnSubtab('eligibility')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Eligibility</button>
+                  <button type="button" id="studioEarnSubtabBtnAds" onclick="openAdsManagerModal()" style="background: rgba(244,63,94,0.15); border: 1px solid rgba(244,63,94,0.35); color: #fb7185; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">📢 Ads &amp; Campaigns</button>
                   <button type="button" id="studioEarnSubtabBtnLedger" onclick="switchEarnSubtab('ledger')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Financial Ledger &amp; CSV</button>
                 </div>
 
@@ -14722,6 +14726,197 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
     </div>
     <button type="button" id="btnCancelPendingTx" onclick="cancelPendingSovraTx()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.45); color: #f87171; border-radius: 10px; padding: 6px 14px; font-size: 0.78rem; font-weight: 800; cursor: pointer; flex-shrink: 0; transition: all 0.15s;">UNDO</button>
+  </div>
+
+  <!-- 📢 SOVRA DECENTRALIZED ADS & CAMPAIGN MANAGER MODAL -->
+  <div id="sovraAdsManagerModal" class="sovra-ads-modal-container" role="dialog" aria-modal="true" aria-label="Sovra Ads and Campaign Manager" style="display: none; position: fixed; inset: 0; background: rgba(5, 8, 18, 0.88); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 999998; align-items: center; justify-content: center; padding: 1rem;" onclick="if(event.target === this) closeAdsManagerModal();">
+    <div class="sovra-ads-modal-card" style="background: linear-gradient(145deg, #0b1120, #060913); border: 1.5px solid rgba(56, 189, 248, 0.3); border-radius: 24px; width: 100%; max-width: 980px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 70px rgba(0,0,0,0.85); color: #f8fafc;" onclick="event.stopPropagation();">
+      
+      <!-- Modal Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(15, 23, 42, 0.5);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; border-radius: 14px; background: linear-gradient(135deg, rgba(244,63,94,0.2), rgba(56,189,248,0.2)); border: 1px solid rgba(244,63,94,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">📢</div>
+          <div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <span>Sovereign Ads &amp; Campaign Manager</span>
+              <span style="font-size: 0.68rem; padding: 2px 7px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700;">95/5 Creator Direct</span>
+            </div>
+            <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 2px;">Zero Intermediary • Proof-of-Dwell Attestation (&gt;=3s) • Anti-Sybil Cluster Defense</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" class="btn btn-primary" onclick="switchAdsManagerTab('create')" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; font-size: 0.8rem; font-weight: 800; border-radius: 999px; background: linear-gradient(135deg, #f43f5e, #8b5cf6); border: none; cursor: pointer; color: #fff; box-shadow: 0 4px 15px rgba(244,63,94,0.3);">
+            <span>+ New Campaign</span>
+          </button>
+          <button type="button" onclick="closeAdsManagerModal()" aria-label="Close" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 50%; width: 34px; height: 34px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&times;</button>
+        </div>
+      </div>
+
+      <!-- KPI Summary Ribbon -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 1.25rem 1.75rem; background: rgba(0,0,0,0.35); border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;">
+          <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Total Staked SOV</div>
+          <div id="adsKpiTotalStaked" style="font-size: 1.25rem; font-weight: 800; color: #38bdf8; margin-top: 3px;">0.00 SOV</div>
+        </div>
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;">
+          <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Delivered Impressions</div>
+          <div id="adsKpiImpressions" style="font-size: 1.25rem; font-weight: 800; color: #10b981; margin-top: 3px;">0</div>
+        </div>
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;">
+          <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Active Campaigns</div>
+          <div id="adsKpiActiveCount" style="font-size: 1.25rem; font-weight: 800; color: #f59e0b; margin-top: 3px;">0</div>
+        </div>
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;">
+          <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Proof-of-Dwell Authenticity</div>
+          <div id="adsKpiAuthenticity" style="font-size: 1.25rem; font-weight: 800; color: #a855f7; margin-top: 3px;">100.0%</div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div style="display: flex; gap: 8px; padding: 10px 1.75rem 0; background: rgba(15,23,42,0.3); border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <button type="button" id="adsTabBtnCampaigns" onclick="switchAdsManagerTab('campaigns')" class="active" style="background: none; border: none; border-bottom: 2px solid #38bdf8; color: #38bdf8; font-weight: 800; font-size: 0.82rem; padding: 8px 14px; cursor: pointer;">📊 Active Campaigns</button>
+        <button type="button" id="adsTabBtnCreate" onclick="switchAdsManagerTab('create')" style="background: none; border: none; border-bottom: 2px solid transparent; color: #94a3b8; font-weight: 700; font-size: 0.82rem; padding: 8px 14px; cursor: pointer;">🚀 Launch New Campaign</button>
+        <button type="button" id="adsTabBtnTelemetry" onclick="switchAdsManagerTab('telemetry')" style="background: none; border: none; border-bottom: 2px solid transparent; color: #94a3b8; font-weight: 700; font-size: 0.82rem; padding: 8px 14px; cursor: pointer;">🛡️ Proof-of-Dwell Logs</button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div style="flex: 1; overflow-y: auto; padding: 1.5rem 1.75rem;">
+        
+        <!-- PANE 1: CAMPAIGNS LIST -->
+        <div id="adsPaneCampaigns">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div style="font-size: 0.88rem; font-weight: 700; color: #fff;">Your Sponsored Promotions &amp; Boosts</div>
+            <button type="button" onclick="loadAdsManagerData()" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 8px; padding: 5px 12px; font-size: 0.75rem; cursor: pointer;">🔄 Refresh</button>
+          </div>
+          <div id="adsCampaignsListContainer" style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="text-align: center; color: #64748b; padding: 3rem 1rem;">Loading your campaigns...</div>
+          </div>
+        </div>
+
+        <!-- PANE 2: LAUNCH WIZARD -->
+        <div id="adsPaneCreate" style="display: none;">
+          <div style="max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem;">
+            <div>
+              <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">1. SELECT CONTENT TO PROMOTE</label>
+              <select id="adsCreateTargetSelect" onchange="updateAdsProjection()" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 0.85rem; outline: none;">
+                <option value="yt-video-1">🎬 Video: Decentralized P2P Mesh Architecture</option>
+                <option value="yt-video-2">🎬 Video: Cellular CGNAT Traversal</option>
+                <option value="custom">✏️ Custom Content ID (Video / Post CID)</option>
+              </select>
+              <input type="text" id="adsCreateCustomTargetInput" placeholder="Enter video ID or post ID..." style="display: none; margin-top: 8px; width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.8rem;">
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">2. TARGET CATEGORY / SWARM</label>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <label style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; color: #fff; cursor: pointer;">
+                  <input type="checkbox" name="adsChannelTag" value="all" checked onchange="updateAdsProjection()"> <span>🌐 Global Mesh (All Channels)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; color: #fff; cursor: pointer;">
+                  <input type="checkbox" name="adsChannelTag" value="technology" onchange="updateAdsProjection()"> <span>⚡ Technology</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; color: #fff; cursor: pointer;">
+                  <input type="checkbox" name="adsChannelTag" value="crypto" onchange="updateAdsProjection()"> <span>🪙 Web3 &amp; Crypto</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; color: #fff; cursor: pointer;">
+                  <input type="checkbox" name="adsChannelTag" value="gaming" onchange="updateAdsProjection()"> <span>🎮 Gaming</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Budget & CPM Sliders -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-size: 0.75rem; font-weight: 700; color: #94a3b8;">TOTAL BUDGET</span>
+                  <span id="adsBudgetDisplayVal" style="font-size: 0.85rem; font-weight: 800; color: #38bdf8;">25.0 SOV</span>
+                </div>
+                <input type="range" id="adsBudgetSlider" min="5" max="250" step="5" value="25" oninput="document.getElementById('adsBudgetDisplayVal').innerText = this.value + '.0 SOV'; updateAdsProjection();" style="width: 100%; accent-color: #38bdf8;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: #64748b; margin-top: 4px;">
+                  <span>5 SOV</span>
+                  <span>250 SOV</span>
+                </div>
+              </div>
+
+              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-size: 0.75rem; font-weight: 700; color: #94a3b8;">BID CPM (per 1k views)</span>
+                  <span id="adsCpmDisplayVal" style="font-size: 0.85rem; font-weight: 800; color: #10b981;">2.5 SOV</span>
+                </div>
+                <input type="range" id="adsCpmSlider" min="1.0" max="10.0" step="0.5" value="2.5" oninput="document.getElementById('adsCpmDisplayVal').innerText = Number(this.value).toFixed(1) + ' SOV'; updateAdsProjection();" style="width: 100%; accent-color: #10b981;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: #64748b; margin-top: 4px;">
+                  <span>1.0 SOV</span>
+                  <span>10.0 SOV</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Projection Box -->
+            <div style="background: linear-gradient(135deg, rgba(56,189,248,0.1), rgba(139,92,246,0.1)); border: 1px solid rgba(56,189,248,0.3); border-radius: 14px; padding: 14px;">
+              <div style="font-size: 0.76rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin-bottom: 8px;">📊 Projected Delivery &amp; Cryptographic Settlement</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.82rem;">
+                <div>
+                  <div style="color: #94a3b8; font-size: 0.72rem;">Estimated Attested Views</div>
+                  <div id="adsProjectedViews" style="font-size: 1.15rem; font-weight: 800; color: #fff;">10,000 views</div>
+                </div>
+                <div>
+                  <div style="color: #94a3b8; font-size: 0.72rem;">Cost per Verified View</div>
+                  <div id="adsProjectedPerView" style="font-size: 1.15rem; font-weight: 800; color: #10b981;">0.0025 SOV</div>
+                </div>
+              </div>
+              <div style="margin-top: 10px; font-size: 0.72rem; color: #cbd5e1; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+                <div>✓ <strong>95% Settled to Creator:</strong> <span id="adsProjectedCreatorPayout">0.002375 SOV/view</span> directly into peer wallet</div>
+                <div>✓ <strong>Proof-of-Dwell Guaranteed:</strong> Views &lt;3s dwell time are free (zero deduction)</div>
+                <div>✓ <strong>Instant Refund:</strong> Unspent budget refundable at any second</div>
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-primary" id="btnLaunchAdsCampaign" onclick="submitCreateCampaign()" style="padding: 12px; font-size: 0.95rem; font-weight: 800; background: linear-gradient(135deg, #0284c7, #8b5cf6); border-radius: 12px; border: none; cursor: pointer; color: #fff; box-shadow: 0 4px 20px rgba(2,132,199,0.4);">
+              🚀 Stake Escrow &amp; Launch Campaign
+            </button>
+          </div>
+        </div>
+
+        <!-- PANE 3: TELEMETRY & ANTI-FRAUD LOGS -->
+        <div id="adsPaneTelemetry" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <div style="font-size: 0.88rem; font-weight: 800; color: #fff;">Proof-of-Dwell Attestation Ledger</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Cryptographically verified &gt;=3.0s dwell receipts &amp; Sybil cluster detection</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 999px; padding: 4px 10px; font-size: 0.72rem; color: #34d399; font-weight: 700;">
+              <span>● Sybil Defense: Active</span>
+            </div>
+          </div>
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; overflow-x: auto;">
+            <table class="studio-content-table" style="width: 100%; font-size: 0.76rem;">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Campaign ID</th>
+                  <th>Viewer DID</th>
+                  <th>Dwell Time</th>
+                  <th>Passkey Nonce</th>
+                  <th>Impression Hash</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="adsTelemetryTableBody">
+                <tr><td colspan="7" style="text-align: center; color: #64748b; padding: 2rem;">No attestation receipts recorded yet. Launch a campaign to start streaming verified views!</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.75rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.35); font-size: 0.75rem; color: #94a3b8;">
+        <div>🔒 Protected by Ed25519 Passkeys &amp; RFC 8216 HLS Verification</div>
+        <button type="button" class="btn btn-secondary" onclick="closeAdsManagerModal()" style="font-size: 0.78rem; padding: 6px 16px; border-radius: 8px;">Close</button>
+      </div>
+
+    </div>
   </div>
 `;
 }

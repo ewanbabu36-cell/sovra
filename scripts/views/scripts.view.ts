@@ -3344,6 +3344,14 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       let _syncingHistory = false;
 
       window.handleMobileBackPress = function(e) {
+        // 00. Sovra Ads & Campaign Manager Modal
+        const adsModal = document.getElementById('sovraAdsManagerModal');
+        if (adsModal && (adsModal.style.display === 'flex' || adsModal.style.display === 'block')) {
+          if (typeof closeAdsManagerModal === 'function') closeAdsManagerModal(true);
+          else adsModal.style.display = 'none';
+          return true;
+        }
+
         // 0A. Fullscreen Photo Lightbox
         const photoLightbox = document.getElementById('sovraPhotoLightboxModal');
         if (photoLightbox && (photoLightbox.style.display === 'flex' || photoLightbox.style.display === 'block')) {
@@ -3445,6 +3453,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
         // 3. Modals and overlays
         const openOverlays = [
+          '#sovraAdsManagerModal',
           '#holographicNavOverlay',
           '#webxrTheaterModal',
           '#bitchatRadarModal',
@@ -60210,6 +60219,339 @@ window.SovraCreatorStudioEngine = {
       }
     }
     window.triggerIncomingCallWakeLock = triggerIncomingCallWakeLock;
+
+    // ==========================================================================
+    // 📢 SOVRA DECENTRALIZED ADS & CAMPAIGN MANAGER ENGINE
+    // ==========================================================================
+    window.openAdsManagerModal = function(targetId, targetType) {
+      const modal = document.getElementById('sovraAdsManagerModal');
+      if (!modal) return;
+      modal.style.display = 'flex';
+      if (window.SovraHistoryNavigationManager) {
+        window.SovraHistoryNavigationManager.pushModal('sovraAdsManagerModal');
+      }
+      if (targetId) {
+        window.switchAdsManagerTab('create');
+        const select = document.getElementById('adsCreateTargetSelect');
+        const customInput = document.getElementById('adsCreateCustomTargetInput');
+        if (select) {
+          let found = false;
+          for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].value === targetId) {
+              select.selectedIndex = i;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            select.value = 'custom';
+            if (customInput) {
+              customInput.style.display = 'block';
+              customInput.value = targetId;
+            }
+          } else if (customInput) {
+            customInput.style.display = 'none';
+          }
+        }
+      } else {
+        window.switchAdsManagerTab('campaigns');
+      }
+      window.updateAdsProjection();
+      window.loadAdsManagerData();
+    };
+
+    window.closeAdsManagerModal = function(fromPopstate) {
+      const modal = document.getElementById('sovraAdsManagerModal');
+      if (modal) modal.style.display = 'none';
+      if (!fromPopstate && window.SovraHistoryNavigationManager) {
+        window.SovraHistoryNavigationManager.popModal('sovraAdsManagerModal');
+      }
+    };
+
+    window.switchAdsManagerTab = function(tab) {
+      const tabs = ['campaigns', 'create', 'telemetry'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('adsTabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+        const pane = document.getElementById('adsPane' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (btn) {
+          if (t === tab) {
+            btn.classList.add('active');
+            btn.style.color = '#38bdf8';
+            btn.style.borderBottom = '2px solid #38bdf8';
+            btn.style.fontWeight = '800';
+          } else {
+            btn.classList.remove('active');
+            btn.style.color = '#94a3b8';
+            btn.style.borderBottom = '2px solid transparent';
+            btn.style.fontWeight = '700';
+          }
+        }
+        if (pane) {
+          pane.style.display = t === tab ? 'block' : 'none';
+        }
+      });
+      if (tab === 'create') {
+        window.updateAdsProjection();
+      }
+    };
+
+    window.updateAdsProjection = function() {
+      const budgetSlider = document.getElementById('adsBudgetSlider');
+      const cpmSlider = document.getElementById('adsCpmSlider');
+      const targetSelect = document.getElementById('adsCreateTargetSelect');
+      const customInput = document.getElementById('adsCreateCustomTargetInput');
+
+      if (targetSelect && customInput) {
+        customInput.style.display = targetSelect.value === 'custom' ? 'block' : 'none';
+      }
+
+      const budget = budgetSlider ? Number(budgetSlider.value) : 25;
+      const cpm = cpmSlider ? Number(cpmSlider.value) : 2.5;
+
+      const estimatedViews = Math.round((budget / Math.max(0.1, cpm)) * 1000);
+      const perView = Math.round((cpm / 1000) * 10000) / 10000;
+      const creatorPayout = Math.round((perView * 0.95) * 10000) / 10000;
+
+      const viewsEl = document.getElementById('adsProjectedViews');
+      const perViewEl = document.getElementById('adsProjectedPerView');
+      const payoutEl = document.getElementById('adsProjectedCreatorPayout');
+
+      if (viewsEl) viewsEl.innerText = estimatedViews.toLocaleString() + ' views';
+      if (perViewEl) perViewEl.innerText = perView + ' SOV';
+      if (payoutEl) payoutEl.innerText = creatorPayout + ' SOV/view';
+    };
+
+    window.loadAdsManagerData = async function() {
+      try {
+        const container = document.getElementById('adsCampaignsListContainer');
+        const telemetryTbody = document.getElementById('adsTelemetryTableBody');
+
+        const [analyticsRes, campaignsRes] = await Promise.all([
+          fetch('/api/promotions/analytics').then(r => r.json()).catch(() => ({ ok: false })),
+          fetch('/api/promotions/campaigns').then(r => r.json()).catch(() => ({ ok: false }))
+        ]);
+
+        if (analyticsRes.ok && analyticsRes.summary) {
+          const s = analyticsRes.summary;
+          const stakedEl = document.getElementById('adsKpiTotalStaked');
+          const impEl = document.getElementById('adsKpiImpressions');
+          const activeEl = document.getElementById('adsKpiActiveCount');
+          const authEl = document.getElementById('adsKpiAuthenticity');
+
+          if (stakedEl) stakedEl.innerText = Number(s.totalStakedSov || 0).toFixed(2) + ' SOV';
+          if (impEl) impEl.innerText = Number(s.totalImpressions || 0).toLocaleString();
+          if (activeEl) activeEl.innerText = s.activeCampaigns || 0;
+          if (authEl) authEl.innerText = (s.authenticityRate || 100).toFixed(1) + '%';
+        }
+
+        if (campaignsRes.ok && Array.isArray(campaignsRes.campaigns)) {
+          const campaigns = campaignsRes.campaigns;
+          if (container) {
+            if (campaigns.length === 0) {
+              container.innerHTML = '<div style="text-align: center; color: #64748b; padding: 3rem 1rem; background: rgba(0,0,0,0.25); border-radius: 16px; border: 1px dashed rgba(255,255,255,0.1);">' +
+                '<div style="font-size: 2.2rem; margin-bottom: 8px;">📢</div>' +
+                '<div style="font-size: 0.95rem; font-weight: 700; color: #cbd5e1;">No Active Campaigns</div>' +
+                '<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px; max-width: 360px; margin-left: auto; margin-right: auto;">Launch a high-impact sovereign campaign to boost your videos or posts directly across all connected peer swarms.</div>' +
+                '<button type="button" class="btn btn-primary" onclick="switchAdsManagerTab(&quot;create&quot;)" style="margin-top: 14px; padding: 8px 20px; font-size: 0.82rem; font-weight: 800; border-radius: 999px; background: linear-gradient(135deg, #0284c7, #8b5cf6); border: none; cursor: pointer; color: #fff;">+ Launch First Campaign</button>' +
+                '</div>';
+            } else {
+              let html = '';
+              campaigns.forEach(c => {
+                const totalBudget = Number(c.totalBudgetSov || c.stakedSov || 0);
+                const remaining = Number(c.budgetRemainingSov ?? c.stakedSov ?? 0);
+                const spent = Math.max(0, Math.round((totalBudget - remaining) * 100) / 100);
+                const delivered = Number(c.impressionsDelivered || c.deliveredImpressions || 0);
+                const target = Number(c.targetImpressions || Math.round((totalBudget / (c.cpmSov || 2.5)) * 1000));
+                const pct = Math.min(100, Math.round((delivered / Math.max(1, target)) * 100));
+
+                let statusBadge = '<span style="font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3);">● ACTIVE</span>';
+                if (c.status === 'PAUSED') {
+                  statusBadge = '<span style="font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">⏸ PAUSED</span>';
+                } else if (c.status === 'COMPLETED' || c.status === 'DEPLETED') {
+                  statusBadge = '<span style="font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3);">✓ COMPLETED</span>';
+                } else if (c.status === 'CANCELLED_REFUNDED') {
+                  statusBadge = '<span style="font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3);">🛑 REFUNDED</span>';
+                }
+
+                html += '<div style="background: rgba(15,23,42,0.65); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px;">' +
+                  '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">' +
+                    '<div style="display: flex; align-items: center; gap: 10px;">' +
+                      '<span style="font-size: 1.2rem;">' + (c.targetType === 'video' ? '🎬' : '📝') + '</span>' +
+                      '<div>' +
+                        '<div style="font-size: 0.88rem; font-weight: 800; color: #fff;">' + (c.targetTitle || c.targetId || 'Promoted Item') + '</div>' +
+                        '<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 1px;">Target: ' + (c.targetType || 'video').toUpperCase() + ' • CPM: ' + (c.cpmSov || 2.5) + ' SOV • ID: ' + c.id.slice(0, 16) + '...</div>' +
+                      '</div>' +
+                    '</div>' +
+                    '<div>' + statusBadge + '</div>' +
+                  '</div>' +
+                  '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; font-size: 0.75rem; background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: 10px;">' +
+                    '<div><span style="color: #94a3b8;">Total Staked:</span> <strong style="color: #38bdf8;">' + totalBudget.toFixed(2) + ' SOV</strong></div>' +
+                    '<div><span style="color: #94a3b8;">Remaining:</span> <strong style="color: #10b981;">' + remaining.toFixed(2) + ' SOV</strong></div>' +
+                    '<div><span style="color: #94a3b8;">Spent:</span> <strong style="color: #fb7185;">' + spent.toFixed(2) + ' SOV</strong></div>' +
+                    '<div><span style="color: #94a3b8;">Views Delivered:</span> <strong style="color: #fff;">' + delivered.toLocaleString() + ' / ' + target.toLocaleString() + '</strong></div>' +
+                  '</div>' +
+                  '<div>' +
+                    '<div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: #94a3b8; margin-bottom: 4px;">' +
+                      '<span>Campaign Delivery Progress</span>' +
+                      '<span>' + pct + '%</span>' +
+                    '</div>' +
+                    '<div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 999px; overflow: hidden;">' +
+                      '<div style="width: ' + pct + '%; height: 100%; background: linear-gradient(90deg, #38bdf8, #10b981); border-radius: 999px; transition: width 0.3s ease;"></div>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">' +
+                    ((c.status === 'ACTIVE' || c.status === 'PAUSED')
+                      ? '<button type="button" class="btn btn-secondary" onclick="toggleCampaignPauseAction(&quot;' + c.id + '&quot;)" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px;">' + (c.status === 'ACTIVE' ? '⏸ Pause' : '▶ Resume') + '</button>'
+                      : '') +
+                    (c.status !== 'CANCELLED_REFUNDED' && c.status !== 'COMPLETED'
+                      ? '<button type="button" class="btn btn-secondary" onclick="refundCampaignAction(&quot;' + c.id + '&quot;)" style="padding: 5px 12px; font-size: 0.74rem; border-radius: 8px; color: #f87171; border-color: rgba(239,68,68,0.3);">🛑 Cancel &amp; Refund (' + remaining.toFixed(2) + ' SOV)</button>'
+                      : '') +
+                  '</div>' +
+                '</div>';
+              });
+              container.innerHTML = html;
+            }
+          }
+        }
+
+        if (analyticsRes.ok && Array.isArray(analyticsRes.recentAttestations) && telemetryTbody) {
+          const recs = analyticsRes.recentAttestations;
+          if (recs.length > 0) {
+            let tHtml = '';
+            recs.slice().reverse().forEach(r => {
+              const dt = new Date(r.timestamp || Date.now()).toLocaleTimeString();
+              const maskedDid = (r.viewerDid || 'did:sovra:peer').slice(0, 14) + '...';
+              const nonceHash = (r.passkeyNonce || 'nonce').slice(0, 10) + '...';
+              const impHash = (r.impressionHash || 'hash').slice(0, 12) + '...';
+              tHtml += '<tr>' +
+                '<td>' + dt + '</td>' +
+                '<td><code style="color: #38bdf8; font-size: 0.7rem;">' + (r.campaignId || 'promo_active').slice(0, 12) + '...</code></td>' +
+                '<td>' + maskedDid + '</td>' +
+                '<td><span style="color: #34d399; font-weight: 700;">' + (r.dwellSeconds || 3.0) + 's</span></td>' +
+                '<td><code style="color: #94a3b8; font-size: 0.7rem;">' + nonceHash + '</code></td>' +
+                '<td><code style="color: #c084fc; font-size: 0.7rem;">' + impHash + '</code></td>' +
+                '<td><span style="color: #10b981; font-weight: 700;">Attested ✓</span></td>' +
+              '</tr>';
+            });
+            telemetryTbody.innerHTML = tHtml;
+          }
+        }
+
+      } catch (err) {
+        console.warn('[AdsManager] Load error:', err);
+      }
+    };
+
+    window.submitCreateCampaign = async function() {
+      const btn = document.getElementById('btnLaunchAdsCampaign');
+      const targetSelect = document.getElementById('adsCreateTargetSelect');
+      const customInput = document.getElementById('adsCreateCustomTargetInput');
+      const budgetSlider = document.getElementById('adsBudgetSlider');
+      const cpmSlider = document.getElementById('adsCpmSlider');
+
+      let targetId = targetSelect ? targetSelect.value : 'yt-video-1';
+      if (targetId === 'custom' && customInput && customInput.value.trim()) {
+        targetId = customInput.value.trim();
+      }
+      const targetType = targetId.startsWith('post') ? 'post' : 'video';
+      const stakedSov = budgetSlider ? Number(budgetSlider.value) : 25;
+      const cpmSov = cpmSlider ? Number(cpmSlider.value) : 2.5;
+
+      const checkedChannels = [];
+      document.querySelectorAll('input[name="adsChannelTag"]:checked').forEach(cb => {
+        checkedChannels.push(cb.value);
+      });
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Staking Escrow & Broadcasting...';
+      }
+
+      try {
+        const res = await fetch('/api/promotions/campaign/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetType,
+            targetId,
+            stakedSov,
+            cpmSov,
+            targetChannels: checkedChannels.length > 0 ? checkedChannels : ['all']
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          if (typeof showSovereignToast === 'function') {
+            showSovereignToast('🚀 Campaign successfully staked (' + stakedSov + ' SOV)! Impressions streaming to mesh peers.');
+          }
+          window.switchAdsManagerTab('campaigns');
+          window.loadAdsManagerData();
+          if (typeof updateWalletBalancesUi === 'function') {
+            updateWalletBalancesUi();
+          }
+        } else {
+          if (typeof showSovereignToast === 'function') {
+            showSovereignToast('⚠️ Failed to launch campaign: ' + (data.error || 'Unknown error'));
+          } else {
+            alert('Failed: ' + (data.error || 'Unknown error'));
+          }
+        }
+      } catch (err) {
+        if (typeof showSovereignToast === 'function') {
+          showSovereignToast('⚠️ Network error launching campaign');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = '🚀 Stake Escrow & Launch Campaign';
+        }
+      }
+    };
+
+    window.toggleCampaignPauseAction = async function(campaignId) {
+      try {
+        const res = await fetch('/api/promotions/campaign/toggle-pause', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaignId })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          if (typeof showSovereignToast === 'function') {
+            showSovereignToast('Campaign ' + (data.status === 'ACTIVE' ? 'resumed' : 'paused'));
+          }
+          window.loadAdsManagerData();
+        } else {
+          if (typeof showSovereignToast === 'function') showSovereignToast('⚠️ ' + (data.error || 'Error'));
+        }
+      } catch (_) {}
+    };
+
+    window.refundCampaignAction = async function(campaignId) {
+      if (!confirm('Are you sure you want to cancel this campaign and refund all unspent SOV back to your wallet?')) {
+        return;
+      }
+      try {
+        const res = await fetch('/api/promotions/campaign/refund', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaignId })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          if (typeof showSovereignToast === 'function') {
+            showSovereignToast('💰 Campaign cancelled! ' + Number(data.refundedAmount || 0).toFixed(2) + ' SOV refunded to your wallet.');
+          }
+          window.loadAdsManagerData();
+          if (typeof updateWalletBalancesUi === 'function') {
+            updateWalletBalancesUi();
+          }
+        } else {
+          if (typeof showSovereignToast === 'function') showSovereignToast('⚠️ ' + (data.error || 'Error'));
+        }
+      } catch (_) {}
+    };
+
 </script>
 `;
 }
