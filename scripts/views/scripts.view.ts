@@ -9159,9 +9159,22 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
           window._shareCurrentVideo = function() {
             if (!videoData) return;
-            const shareUrl = window.location.origin + '/app?video=' + encodeURIComponent(videoData.id);
-            try { navigator.clipboard.writeText(shareUrl); } catch(e) {}
-            if (typeof showAccountToast === 'function') showAccountToast('✓ Video link copied to clipboard');
+            const curTime = (vEl && typeof vEl.currentTime === 'number' && vEl.currentTime > 1) ? Math.floor(vEl.currentTime) : 0;
+            const timeParam = curTime > 0 ? ('&t=' + curTime + 's') : '';
+            const shareUrl = window.location.origin + '/app?video=' + encodeURIComponent(videoData.id) + timeParam;
+            if (navigator.share) {
+              navigator.share({
+                title: videoData.title || 'Sovra Video',
+                text: 'Watch on Sovra P2P Network: ' + (videoData.title || ''),
+                url: shareUrl,
+              }).catch(function() {
+                try { navigator.clipboard.writeText(shareUrl); } catch(e) {}
+                if (typeof showAccountToast === 'function') showAccountToast('✓ Video link copied to clipboard');
+              });
+            } else {
+              try { navigator.clipboard.writeText(shareUrl); } catch(e) {}
+              if (typeof showAccountToast === 'function') showAccountToast('✓ Video link copied to clipboard');
+            }
           };
 
           window._postVideoComment = function() {
@@ -35149,6 +35162,28 @@ _scheduleTargetContext: 'workspace',
         this.renderContentTable(filtered);
       },
 
+      resetWorkspaceUploadForm: function() {
+        var titleIn = document.getElementById('studioWsTitleInput');
+        if (titleIn) titleIn.value = '';
+        var descIn = document.getElementById('studioWsDescInput');
+        if (descIn) descIn.value = '';
+        var tagsIn = document.getElementById('studioWsTagsInput');
+        if (tagsIn) tagsIn.value = '';
+        var fileIn = document.getElementById('studioWsVideoFile');
+        if (fileIn) fileIn.value = '';
+        var previewBox = document.getElementById('studioWsPreviewBox');
+        if (previewBox) previewBox.style.display = 'none';
+        var dropZone = document.getElementById('studioWsDropZone');
+        if (dropZone) dropZone.style.display = 'block';
+        var freeRadio = document.getElementById('studioGateFree');
+        if (freeRadio) freeRadio.checked = true;
+        var gatingPrice = document.getElementById('studioWsGatingPriceRow');
+        if (gatingPrice) gatingPrice.style.display = 'none';
+        var monitor = document.getElementById('studioWsTranscodeMonitor');
+        if (monitor) monitor.style.display = 'none';
+        if (typeof showToast === 'function') showToast('Upload form cleared ✓', 'info');
+      },
+
       renderCustomShelves: function() {
         var container = document.getElementById('customShelvesList');
         if (!container) return;
@@ -35964,10 +35999,17 @@ _scheduleTargetContext: 'workspace',
           var btn = document.getElementById('btnClaimSovereignPayout');
           if (btn) btn.disabled = true;
 
+          var token = (typeof myProfile !== 'undefined' && myProfile && myProfile.sessionToken)
+            ? myProfile.sessionToken
+            : localStorage.getItem('sovra_session_token');
+          var headers = { 'Content-Type': 'application/json' };
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+          var activeDid = (self.activeChannelId ? ('did:sovra:channel:' + self.activeChannelId) : (typeof myProfile !== 'undefined' && myProfile ? myProfile.did : '')) || '';
+
           fetch('/api/studio/payout', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
+            headers: headers,
+            body: JSON.stringify({ creatorDid: activeDid })
           })
           .then(function(r) { return r.json(); })
           .then(function(data) {
