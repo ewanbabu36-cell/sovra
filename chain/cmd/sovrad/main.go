@@ -1594,6 +1594,16 @@ func startNode(flags NodeFlags) {
 		}
 	}
 
+	// Autonomous Protocol Node Cockpit & Web PWA Server (Port 3001)
+	go func() {
+		webAddr := "127.0.0.1:3001"
+		webServer := &http.Server{
+			Addr:    webAddr,
+			Handler: mux,
+		}
+		_ = webServer.ListenAndServe()
+	}()
+
 	server := &http.Server{
 		Addr:    rpcAddr,
 		Handler: mux,
