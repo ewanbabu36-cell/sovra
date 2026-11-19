@@ -92,6 +92,7 @@ export class RelayDaemon {
         activeCircuits: 0,
         totalCircuitsRelayed: 0,
         totalBytesRelayed: 0,
+        activeReservations: 0,
         quotaExceededCount: 0,
         expiredCount: 0,
         rejectedCount: 0,

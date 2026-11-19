@@ -9,8 +9,8 @@
  * 4. VirtualWifiDirectAdapter for deterministic, high-fidelity Vitest test suites.
  */
 
-import { ok, err, Result } from '@sovra/shared';
-import { bytesToHex, hexToBytes, sha256 } from '@sovra/crypto';
+import { ok, err } from '@sovra/shared';
+import { bytesToHex, sha256 } from '@sovra/crypto';
 import { TransportChannel } from './types.js';
 
 export interface WifiDirectGroupInfo {
@@ -135,7 +135,7 @@ export class AndroidWifiDirectAdapter implements WifiDirectPlatformAdapter {
   public async connectToGroupOwner(ip: string, port = 5359): Promise<TransportChannel> {
     const channelId = `wd-chan-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
     let isClosed = false;
-    let onDataHandler: ((data: Uint8Array) => void) | null = null;
+    let _onDataHandler: ((data: Uint8Array) => void) | null = null;
     let onCloseHandler: (() => void) | null = null;
 
     const channel: TransportChannel = {
@@ -159,9 +159,10 @@ export class AndroidWifiDirectAdapter implements WifiDirectPlatformAdapter {
         }
       },
       onData: (h) => {
-        onDataHandler = h;
+        _onDataHandler = h;
+        void _onDataHandler;
         return () => {
-          onDataHandler = null;
+          _onDataHandler = null;
         };
       },
       onClose: (h) => {
@@ -226,9 +227,9 @@ export class AndroidWifiDirectAdapter implements WifiDirectPlatformAdapter {
         base64,
         (success: boolean, shaOrErr?: string) => {
           if (success) {
-            resolve({ success: true, sha256Hex: shaOrErr });
+            resolve({ success: true, ...(shaOrErr ? { sha256Hex: shaOrErr } : {}) });
           } else {
-            resolve({ success: false, error: shaOrErr });
+            resolve({ success: false, ...(shaOrErr ? { error: shaOrErr } : {}) });
           }
         },
       );
@@ -337,7 +338,7 @@ export class IosWifiDirectAdapter implements WifiDirectPlatformAdapter {
 
     return new Promise((resolve) => {
       this.nativeModule.sendStream(transferId, base64, (success: boolean, err?: string) => {
-        resolve({ success, sha256Hex: digest, error: err });
+        resolve({ success, sha256Hex: digest, ...(err ? { error: err } : {}) });
       });
     });
   }
@@ -437,7 +438,7 @@ export class VirtualWifiDirectAdapter implements WifiDirectPlatformAdapter {
   public async connectToGroupOwner(ip: string, port = 5359): Promise<TransportChannel> {
     const channelId = `vwd-${this.localAddress}->${ip}:${port}`;
     let isClosed = false;
-    let onDataHandler: ((data: Uint8Array) => void) | null = null;
+    let _onDataHandler: ((data: Uint8Array) => void) | null = null;
     let onCloseHandler: (() => void) | null = null;
 
     const channel: TransportChannel = {
@@ -458,9 +459,10 @@ export class VirtualWifiDirectAdapter implements WifiDirectPlatformAdapter {
         }
       },
       onData: (h) => {
-        onDataHandler = h;
+        _onDataHandler = h;
+        void _onDataHandler;
         return () => {
-          onDataHandler = null;
+          _onDataHandler = null;
         };
       },
       onClose: (h) => {

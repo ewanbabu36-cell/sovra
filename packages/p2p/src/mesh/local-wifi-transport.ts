@@ -290,8 +290,8 @@ export class LocalWifiTransport implements SovraTransport {
       let port = 5359;
       if (peerAddress.includes(':')) {
         const parts = peerAddress.split(':');
-        host = parts[0];
-        port = parseInt(parts[1], 10) || 5359;
+        host = parts[0] || peerAddress;
+        port = parseInt(parts[1] || '5359', 10) || 5359;
       }
       try {
         const channel = await this.adapter.connectToGroupOwner(host, port);

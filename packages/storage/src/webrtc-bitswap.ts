@@ -118,14 +118,12 @@ export class WebRtcDataChannelBitSwapAdapter implements BitSwapNetworkAdapter {
 
         // Unwrap SIP-001 Binary Wire Framing if present
         let payloadBytes = rawBytes;
-        let isWireFrame = false;
         let wireMsgType = BitSwapWireMsgType.SWARM_BITSWAP_BLOCK;
 
         if (rawBytes.length >= SOVRA_MIN_FRAME_LENGTH) {
           const view = new DataView(rawBytes.buffer, rawBytes.byteOffset, rawBytes.byteLength);
           const magic = view.getUint32(0, false);
           if (magic === SOVRA_WIRE_MAGIC) {
-            isWireFrame = true;
             wireMsgType = view.getUint16(5, false);
             const payloadLen = view.getUint32(7, false);
             if (rawBytes.length >= SOVRA_HEADER_LENGTH + payloadLen + SOVRA_SIGNATURE_LENGTH) {
