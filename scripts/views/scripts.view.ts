@@ -32483,393 +32483,7 @@ window.SovraCreatorStudioEngine = {
       pollTimer: null,
       dashboard: null,
 
-      openModal: function() {
-        const modal = document.getElementById("sovraCreatorStudioModal");
-        if (modal) {
-          modal.style.display = "flex";
-        }
-        this.loadDashboard();
-        this.loadScheduledQueue();
-      },
-
-      closeModal: function() {
-        const modal = document.getElementById("sovraCreatorStudioModal");
-        if (modal) {
-          modal.style.display = "none";
-        }
-      },
-
-      loadDashboard: function() {
-        fetch("/api/studio/dashboard")
-          .then(res => res.json())
-          .then(data => {
-            if (data && data.ok && data.dashboard) {
-              this.dashboard = data.dashboard;
-              const viewsEl = document.getElementById("studioTotalViews");
-              const earnedEl = document.getElementById("studioTotalEarnedSov");
-              const schedEl = document.getElementById("studioScheduledCount");
-              if (viewsEl) viewsEl.textContent = String(data.dashboard.totalViews || 0);
-              if (earnedEl) earnedEl.textContent = (data.dashboard.totalEarnedSov || 0).toFixed(2);
-              if (schedEl) schedEl.textContent = String(data.dashboard.scheduledVideos || 0);
-            }
-          })
-          .catch(() => {});
-      },
-
-      getSelectedResolutions: function() {
-        const resolutions = [];
-        const res1080 = document.getElementById("res1080");
-        const res720 = document.getElementById("res720");
-        const res480 = document.getElementById("res480");
-        const res360 = document.getElementById("res360");
-        if (!res1080 || res1080.checked) resolutions.push("1080p");
-        if (!res720 || res720.checked) resolutions.push("720p");
-        if (!res480 || res480.checked) resolutions.push("480p");
-        if (!res360 || res360.checked) resolutions.push("360p");
-        return resolutions.length > 0 ? resolutions : ["1080p", "720p", "480p", "360p"];
-      },
-
-      submitUpload: function(publishImmediately, scheduledPublishAt) {
-        if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('publish video releases')) return;
-        if (typeof publishImmediately !== "boolean") publishImmediately = true;
-        const titleInput = document.getElementById("studioInputTitle");
-        const tagsInput = document.getElementById("studioInputTags");
-        const uploadBtn = document.getElementById("studioUploadBtn");
-        const monitor = document.getElementById("studioTranscodeMonitor");
-        const monitorStatus = document.getElementById("studioMonitorStatus");
-        const monitorProgress = document.getElementById("studioMonitorProgress");
-        const progressBar = document.getElementById("studioProgressBar");
-        const pillsContainer = document.getElementById("studioVariantsPills");
-
-        const title = (titleInput && titleInput.value.trim()) || "Creator Studio Release " + new Date().toLocaleTimeString();
-        const tags = (tagsInput && tagsInput.value.trim()) || "#sovra #creator";
-        const targetResolutions = this.getSelectedResolutions();
-
-        if (monitor) monitor.style.display = "block";
-        if (monitorStatus) monitorStatus.textContent = "Ingesting & Transcoding HLS...";
-        if (monitorProgress) monitorProgress.textContent = "25%";
-        if (progressBar) progressBar.style.width = "25%";
-        if (uploadBtn) uploadBtn.disabled = true;
-        if (pillsContainer) pillsContainer.innerHTML = "";
-        if (typeof showVideoUploadProgressHUD === "function") {
-          showVideoUploadProgressHUD(1, 40, "Ingesting video into creator studio node");
-          setTimeout(function() {
-            showVideoUploadProgressHUD(2, 80, "Transcoding adaptive bitrate HLS");
-          }, 350);
-        }
-
-        const payload = {
-          title: title,
-          tags: tags,
-          targetResolutions: targetResolutions,
-          publishImmediately: publishImmediately,
-          scheduledPublishAt: scheduledPublishAt || undefined,
-        };
-
-        const self = this;
-        fetch("/api/studio/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data && data.ok) {
-              if (typeof showVideoUploadProgressHUD === "function") {
-                showVideoUploadProgressHUD(3, 100, "Published to catalog");
-              }
-              if (monitorStatus) {
-                monitorStatus.textContent = publishImmediately
-                  ? "✅ Transcoded & Published to Catalog!"
-                  : "📅 Transcoded & Scheduled for Release!";
-              }
-              if (monitorProgress) monitorProgress.textContent = "100%";
-              if (progressBar) progressBar.style.width = "100%";
-
-              if (pillsContainer && data.resolutionVariants) {
-                pillsContainer.innerHTML = data.resolutionVariants
-                  .map(function(r) { return '<span style="font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px; background: rgba(52, 211, 153, 0.2); border: 1px solid #34d399; color: #34d399;">' + r + ' HLS</span>'; })
-                  .join(" ");
-              }
-
-              if (titleInput) titleInput.value = "";
-              if (tagsInput) tagsInput.value = "";
-
-              if (typeof showToast === "function") {
-                showToast(publishImmediately ? "Video transcoded & published to Watch catalog!" : "Video scheduled successfully!", "success");
-              }
-
-              self.loadDashboard();
-              self.loadScheduledQueue();
-            } else {
-              if (monitorStatus) monitorStatus.textContent = "❌ Transcode error: " + ((data && data.error) || "Failed");
-              if (typeof showToast === "function") {
-                showToast("Transcode error: " + ((data && data.error) || "Failed"), "error");
-              }
-            }
-          })
-          .catch(function(err) {
-            if (monitorStatus) monitorStatus.textContent = "❌ Network error";
-            if (typeof showToast === "function") {
-              showToast("Network error during studio upload", "error");
-            }
-          })
-          .finally(function() {
-            if (uploadBtn) uploadBtn.disabled = false;
-          });
-      },
-      selectOnboardingEmoji: function(emoji) {
-        var el = document.getElementById('studioNewChanAvatarPreview') || document.getElementById('channelAvatarEmoji') || document.getElementById('onboardingEmojiPreview');
-        if (el) el.textContent = emoji;
-        var inEl = document.getElementById('studioNewChanAvatarInput');
-        if (inEl) inEl.value = emoji;
-        document.querySelectorAll('.btn-emoji-pick').forEach(function(b) {
-          b.style.borderColor = (b.textContent.trim() === emoji) ? '#38bdf8' : 'rgba(255,255,255,0.15)';
-          b.style.background = (b.textContent.trim() === emoji) ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.06)';
-        });
-      },
-
-      cycleInsiderSlide: function(dir) {
-        const slider = document.getElementById('studioInsiderTrack');
-        if (slider) {
-          slider.scrollBy({ left: dir * 280, behavior: 'smooth' });
-        }
-      },
-
-      filterContentByType: function(type) {
-        document.querySelectorAll('.studio-subtab-pill').forEach(function(p) { p.classList.remove('active'); });
-        const activePill = document.getElementById('studioContentTab' + (type.charAt(0).toUpperCase() + type.slice(1)));
-        if (activePill) activePill.classList.add('active');
-        const rows = document.querySelectorAll('.studio-content-row');
-        rows.forEach(function(row) {
-          if (type === 'all' || row.dataset.type === type) {
-            row.style.display = 'flex';
-          } else {
-            row.style.display = 'none';
-          }
-        });
-      },
-
-      loadContentLibrary: function() {
-        const countEl = document.getElementById('studioContentVideosCount');
-        const total = (typeof ytVideosCatalog !== 'undefined' && Array.isArray(ytVideosCatalog)) ? ytVideosCatalog.length : 12;
-        if (countEl) countEl.textContent = '(' + total + ')';
-        if (typeof showAccountToast === 'function') showAccountToast('🎬 Content library synchronized.');
-      },
-
-      switchAnalyticsPillar: function(pillar) {
-        ['overview', 'reach', 'engagement', 'revenue'].forEach(function(p) {
-          const el = document.getElementById('analyticsTab' + p.charAt(0).toUpperCase() + p.slice(1));
-          if (el) {
-            if (p === pillar) el.classList.add('active');
-            else el.classList.remove('active');
-          }
-        });
-        if (typeof showAccountToast === 'function') showAccountToast('📊 Switched to ' + pillar.toUpperCase() + ' analytics view.');
-      },
-
-      toggleYieldWindow: function(days) {
-        ['7d', '28d', '90d', '365d'].forEach(function(id) {
-          const btn = document.getElementById('btnYield' + id);
-          if (btn) {
-            if (id === (days + 'd')) {
-              btn.classList.add('active');
-              btn.style.background = 'rgba(56, 189, 248, 0.2)';
-              btn.style.borderColor = '#38bdf8';
-            } else {
-              btn.classList.remove('active');
-              btn.style.background = 'transparent';
-              btn.style.borderColor = 'rgba(255,255,255,0.12)';
-            }
-          }
-        });
-        const yieldVal = document.getElementById('studioYieldProjectedValue');
-        if (yieldVal) {
-          const mult = days === 7 ? 1 : (days === 28 ? 3.8 : (days === 90 ? 11.5 : 44));
-          yieldVal.textContent = (420.50 * mult).toFixed(2) + ' SOV';
-        }
-      },
-
-      exportAnalytics: function(format) {
-        const rows = [
-          'Date,Views,WatchHours,Subscribers,RevenueSOV',
-          '2026-11-01,1420,84.5,12,38.50',
-          '2026-11-02,2840,169.2,28,77.00',
-          '2026-11-03,3910,210.4,45,105.80',
-          '2026-11-04,5120,312.0,62,142.20',
-          '2026-11-05,6890,418.5,88,189.50'
-        ];
-        const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(rows.join(String.fromCharCode(10)));
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
-        link.setAttribute('download', 'sovra_creator_analytics_' + Date.now() + '.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        if (typeof showAccountToast === 'function') showAccountToast('📥 Analytics report exported as CSV.');
-      },
-
-      switchCommentsTab: function(tab) {
-        ['published', 'held', 'mentions'].forEach(function(t) {
-          const el = document.getElementById('commentsSubtab' + (t === 'published' ? 'Published' : (t === 'held' ? 'Held' : 'Mentions')));
-          if (el) {
-            if (t === tab) el.classList.add('active');
-            else el.classList.remove('active');
-          }
-        });
-        if (typeof showAccountToast === 'function') showAccountToast('💬 Showing ' + tab + ' creator comments.');
-      },
-
-      filterComments: function(filter) {
-        ['all', 'unresponded', 'subscribers', 'superfans'].forEach(function(f) {
-          const el = document.getElementById('commentsFilter' + f.charAt(0).toUpperCase() + f.slice(1));
-          if (el) {
-            if (f === filter) el.classList.add('active');
-            else el.classList.remove('active');
-          }
-        });
-      },
-
-
-
-      filterAudioByGenre: function(genre) {
-        document.querySelectorAll('.studio-comments-filter-pill').forEach(function(p) { p.classList.remove('active'); });
-        if (event && event.target) event.target.classList.add('active');
-        if (typeof showAccountToast === 'function') showAccountToast('🎵 Filtered tracks by ' + genre);
-      },
-
-      toggleDescPreview: function() {
-        const raw = document.getElementById('studioInputDesc');
-        const prev = document.getElementById('studioDescPreviewBox');
-        if (raw && prev) {
-          if (prev.style.display === 'none') {
-            prev.innerHTML = (raw.value || 'No description').split(String.fromCharCode(10)).join('<br/>');
-            prev.style.display = 'block';
-            raw.style.display = 'none';
-          } else {
-            prev.style.display = 'none';
-            raw.style.display = 'block';
-          }
-        }
-      },
-
-      addChapter: function() {
-        const list = document.getElementById('studioChaptersList');
-        const timeInput = document.getElementById('studioNewChapterTime');
-        const titleInput = document.getElementById('studioNewChapterTitle');
-        if (list && timeInput && titleInput && timeInput.value.trim() && titleInput.value.trim()) {
-          const item = document.createElement('div');
-          item.style.cssText = 'display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,0.03); padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 0.78rem;';
-          item.innerHTML = '<span style="color: #38bdf8; font-weight: 700;">' + timeInput.value.trim() + '</span>' +
-            '<span style="flex: 1; color: #cbd5e1;">' + titleInput.value.trim() + '</span>' +
-            '<button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #f87171; cursor: pointer;">✕</button>';
-          list.appendChild(item);
-          timeInput.value = '';
-          titleInput.value = '';
-        }
-      },
-
-
-
-      exportChannelDidKey: function() {
-        var activeDid = (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did) || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || (window.SovraCreatorStudioEngine && window.SovraCreatorStudioEngine.activeChannelId ? ('did:sovra:channel:' + window.SovraCreatorStudioEngine.activeChannelId) : 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD');
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(activeDid).then(function() {
-            if (typeof showAccountToast === 'function') showAccountToast('🔑 Channel DID Root Key exported & copied to clipboard: ' + activeDid.slice(0, 20) + '...');
-          });
-        }
-      },
-
-      submitStudioFeedback: function() {
-        var topicEl = document.getElementById('studioFeedbackTopic');
-        var textEl = document.getElementById('studioFeedbackText');
-        var topic = topicEl ? topicEl.value : 'general';
-        var text = textEl ? textEl.value.trim() : '';
-        if (!text) {
-          if (typeof showToast === 'function') showToast('Please enter your feedback text.', 'warning');
-          else showAccountToast('Please enter your feedback text.');
-          return;
-        }
-
-        var activeDid = (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.did) || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || '';
-        fetch('/api/feedback/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            topic: topic,
-            feedback: text,
-            channelId: window.SovraCreatorStudioEngine && window.SovraCreatorStudioEngine.activeChannelId,
-            userDid: activeDid
-          })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-          if (res && res.ok) {
-            if (textEl) textEl.value = '';
-            if (typeof showAccountToast === 'function') {
-              showAccountToast('📨 Feedback submitted encrypted over mesh gossip. Receipt: ' + (res.feedbackId || 'OK'));
-            } else if (typeof showToast === 'function') {
-              showToast('Feedback submitted successfully!', 'success');
-            }
-          } else {
-            if (typeof showToast === 'function') showToast('Feedback failed: ' + (res.error || 'Unknown error'), 'error');
-          }
-        })
-        .catch(function(err) {
-          if (typeof showToast === 'function') showToast('Network error submitting feedback: ' + err.message, 'error');
-        });
-      },
-
-      closeVideoDetailsModal: function() {
-        const modal = document.getElementById('studioVideoDetailsModal');
-        if (modal) modal.style.display = 'none';
-      },
-
-      toggleEditDescPreview: function() {
-        const raw = document.getElementById('editVideoDescInput');
-        const prev = document.getElementById('editVideoDescPreview');
-        if (raw && prev) {
-          if (prev.style.display === 'none') {
-            prev.innerHTML = (raw.value || '').split(String.fromCharCode(10)).join('<br/>');
-            prev.style.display = 'block';
-            raw.style.display = 'none';
-          } else {
-            prev.style.display = 'none';
-            raw.style.display = 'block';
-          }
-        }
-      },
-
-      addEditChapter: function() {
-        const timeInput = document.getElementById('editChapterTime');
-        const titleInput = document.getElementById('editChapterTitle');
-        const list = document.getElementById('editChaptersList');
-        if (timeInput && titleInput && list && timeInput.value && titleInput.value) {
-          const item = document.createElement('div');
-          item.style.cssText = 'display: flex; gap: 8px; align-items: center; font-size: 0.78rem; padding: 4px;';
-          item.innerHTML = '<span style="color: #38bdf8; font-weight: 700;">' + timeInput.value + '</span> ' +
-            '<span style="flex: 1;">' + titleInput.value + '</span> ' +
-            '<button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #f87171; cursor: pointer;">✕</button>';
-          list.appendChild(item);
-          timeInput.value = '';
-          titleInput.value = '';
-        }
-      },
-
-      copyHlsUrl: function(cid) {
-        const url = window.location.origin + '/hls/' + (cid || 'sample') + '/master.m3u8';
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(url).then(function() {
-            if (typeof showAccountToast === 'function') showAccountToast('📋 HLS Stream Master Playlist URL copied.');
-          });
-        }
-      },
-
-
-,
-
-      _scheduleTargetContext: 'workspace',
+_scheduleTargetContext: 'workspace',
       _selectedScheduledEpochMs: null,
 
       openStudioScheduleModal: function(targetContext) {
@@ -33016,6 +32630,10 @@ window.SovraCreatorStudioEngine = {
       chapters: [{ time: '00:00', title: 'Intro' }],
       contentLibrary: [],
       cachedAnalytics: null,
+      playlistsList: [],
+      communityPostsList: [],
+      customShelves: [],
+      selectedContentIds: [],
 
       init: function() {
         this.populateChannelsAndProfile();
@@ -33413,7 +33031,7 @@ window.SovraCreatorStudioEngine = {
 
       switchStudioTab: function(tab) {
         this.activeStudioTab = tab;
-        var subtabs = ['dashboard', 'content', 'analytics', 'comments', 'subtitles', 'copyright', 'earn', 'customization', 'audio', 'ingest', 'schedule', 'settings', 'feedback'];
+        var subtabs = ['dashboard', 'content', 'playlists', 'analytics', 'comments', 'community', 'subtitles', 'copyright', 'earn', 'customization', 'audio', 'ingest', 'schedule', 'settings', 'feedback'];
         subtabs.forEach(function(s) {
           var cap = s.charAt(0).toUpperCase() + s.slice(1);
           var sec = document.getElementById('studioSection' + cap);
@@ -33431,6 +33049,10 @@ window.SovraCreatorStudioEngine = {
           this.renderRealtimeBars(this.cachedAnalytics ? this.cachedAnalytics.realtimeVelocity : null);
         } else if (tab === 'content') {
           this.loadContentLibrary();
+        } else if (tab === 'playlists') {
+          this.loadStudioPlaylists();
+        } else if (tab === 'community') {
+          this.loadCommunityPosts();
         } else if (tab === 'analytics') {
           this.loadAnalytics();
         } else if (tab === 'comments') {
@@ -33850,6 +33472,17 @@ window.SovraCreatorStudioEngine = {
                   return '<span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px;">' + (ch.timecode || ch.time) + ' ' + ch.title + '</span>';
                 }).join('');
               }
+
+              // Milestone 6: Populate Tags, Visibility, and License
+              var tagsIn = document.getElementById('editVideoTags');
+              if (tagsIn) {
+                var rawTags = v.tags;
+                tagsIn.value = Array.isArray(rawTags) ? rawTags.join(', ') : (rawTags || '');
+              }
+              var visIn = document.getElementById('editVideoVisibility');
+              if (visIn && v.visibility) visIn.value = v.visibility;
+              var licIn = document.getElementById('editVideoLicense');
+              if (licIn && v.license) licIn.value = v.license;
             }
           })
           .catch(function() {});
@@ -33923,6 +33556,11 @@ window.SovraCreatorStudioEngine = {
         var checkedGating = document.querySelector('input[name="editGatingTier"]:checked');
         var gatingTier = checkedGating ? checkedGating.value : 'free';
 
+        var tagsVal = document.getElementById('editVideoTags')?.value;
+        var tags = tagsVal ? tagsVal.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : undefined;
+        var visibility = document.getElementById('editVideoVisibility')?.value;
+        var license = document.getElementById('editVideoLicense')?.value;
+
         var chList = document.getElementById('editVideoChaptersList');
         var chapters = [];
         if (chList) {
@@ -33955,6 +33593,9 @@ window.SovraCreatorStudioEngine = {
             chapters: chapters.length ? chapters : undefined,
             endScreenVideoId: endScreenVideoId,
             endScreenType: endScreenVideoId && endScreenVideoId !== 'none' ? 'video' : 'none',
+            tags: tags,
+            visibility: visibility,
+            license: license,
           })
         })
         .then(function(r) { return r.json(); })
@@ -34339,6 +33980,30 @@ window.SovraCreatorStudioEngine = {
             }
           })
           .catch(function() {});
+
+        // Milestone 4: Fetch channel homepage shelves
+        fetch('/api/studio/customization/shelves')
+          .then(function(r) { return r.json(); })
+          .then(function(sd) {
+            if (sd && sd.ok && Array.isArray(sd.shelves)) {
+              self.customShelves = sd.shelves;
+            } else if (!self.customShelves || !self.customShelves.length) {
+              self.customShelves = [
+                { id: 'uploads', title: 'Recent Videos', type: 'uploads', enabled: true },
+                { id: 'popular', title: 'Popular Uploads', type: 'popular', enabled: true }
+              ];
+            }
+            self.renderCustomShelves();
+          })
+          .catch(function() {
+            if (!self.customShelves || !self.customShelves.length) {
+              self.customShelves = [
+                { id: 'uploads', title: 'Recent Videos', type: 'uploads', enabled: true },
+                { id: 'popular', title: 'Popular Uploads', type: 'popular', enabled: true }
+              ];
+            }
+            self.renderCustomShelves();
+          });
       },
 
       handleAvatarUploaded: function(e) {
@@ -34410,6 +34075,14 @@ window.SovraCreatorStudioEngine = {
         }
         if (this._customWatermarkDataUrl) {
           payload.watermark = this._customWatermarkDataUrl;
+        }
+
+        if (self.customShelves) {
+          fetch('/api/studio/customization/shelves', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shelves: self.customShelves })
+          }).catch(function() {});
         }
 
         fetch('/api/studio/customization/save', {
@@ -35267,11 +34940,451 @@ window.SovraCreatorStudioEngine = {
         this.renderContentTable(filtered);
       },
 
+      renderCustomShelves: function() {
+        var container = document.getElementById('customShelvesList');
+        if (!container) return;
+        var shelves = this.customShelves || [];
+        if (!shelves.length) {
+          container.innerHTML = '<div style="font-size: 0.75rem; color: #64748b; padding: 10px; text-align: center;">No homepage shelves configured. Add one from above!</div>';
+          return;
+        }
+        var self = this;
+        container.innerHTML = shelves.map(function(s) {
+          var isEnabled = s.enabled !== false;
+          return '<div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 12px;">' +
+            '<div style="display: flex; align-items: center; gap: 8px;">' +
+              '<span style="color: #64748b; font-size: 0.75rem;">☰</span>' +
+              '<div>' +
+                '<div style="font-size: 0.82rem; font-weight: 700; color: #fff;">' + (s.title || s.type) + '</div>' +
+                '<div style="font-size: 0.68rem; color: #94a3b8;">Type: ' + s.type + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display: flex; align-items: center; gap: 8px;">' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.toggleShelfEnabled(\'' + s.id + '\', ' + str(not True).lower() + ')" style="padding: 3px 8px; font-size: 0.7rem;">' + (isEnabled ? '🟢 Active' : '⚪ Hidden') + '</button>' +
+              '<button type="button" onclick="SovraCreatorStudioEngine.removeCustomShelf(\'' + s.id + '\')" style="background: none; border: none; color: #ef4444; font-size: 0.85rem; cursor: pointer;" title="Remove shelf">🗑️</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      },
+
+      addSelectedShelf: function() {
+        var sel = document.getElementById('customAddShelfSelect');
+        if (!sel) return;
+        var val = sel.value;
+        var titles = {
+          uploads: 'Recent Videos',
+          popular: 'Popular Uploads',
+          shorts: 'Sovra Reels & Shorts',
+          live: 'Live Streams',
+          created_playlists: 'Created Playlists'
+        };
+        if (!this.customShelves) this.customShelves = [];
+        var newId = val + '_' + Date.now();
+        this.customShelves.push({
+          id: newId,
+          title: titles[val] || val,
+          type: val,
+          enabled: true
+        });
+        this.renderCustomShelves();
+        if (typeof showToast === 'function') showToast('Added section: ' + (titles[val] || val), 'success');
+      },
+
+      toggleShelfEnabled: function(id, enabled) {
+        var shelf = (this.customShelves || []).find(function(s) { return s.id === id; });
+        if (shelf) {
+          shelf.enabled = enabled;
+          this.renderCustomShelves();
+        }
+      },
+
+      removeCustomShelf: function(id) {
+        this.customShelves = (this.customShelves || []).filter(function(s) { return s.id !== id; });
+        this.renderCustomShelves();
+        if (typeof showToast === 'function') showToast('Section removed', 'info');
+      },
+
+      // ==========================================
+      // PLAYLISTS MANAGEMENT HUB METHODS
+      // ==========================================
+      loadStudioPlaylists: function() {
+        var self = this;
+        var tbody = document.getElementById('studioPlaylistsTableBody');
+        var badge = document.getElementById('studioPlaylistsCountBadge');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px; color: #64748b;">Loading channel playlists...</td></tr>';
+
+        var url = '/api/studio/playlists' + (this.activeChannelId ? '?channelId=' + encodeURIComponent(this.activeChannelId) : '');
+        fetch(url)
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            var playlists = (d && d.ok && Array.isArray(d.playlists)) ? d.playlists : [];
+            self.playlistsList = playlists;
+            self.renderStudioPlaylists(playlists);
+          })
+          .catch(function() {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px; color: #ef4444;">Failed to load playlists</td></tr>';
+          });
+      },
+
+      renderStudioPlaylists: function(playlists) {
+        var tbody = document.getElementById('studioPlaylistsTableBody');
+        var badge = document.getElementById('studioPlaylistsCountBadge');
+        if (badge) badge.textContent = playlists.length + ' Playlist' + (playlists.length === 1 ? '' : 's');
+        if (!tbody) return;
+
+        if (!playlists.length) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px; color: #64748b;">No playlists found. Create your first curated playlist!</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = playlists.map(function(pl) {
+          var title = (pl.title || 'Untitled Playlist').replace(/"/g, '&quot;');
+          var privacy = pl.privacy || pl.visibility || 'public';
+          var count = (pl.videoIds ? pl.videoIds.length : (pl.videosCount || 0));
+          var updated = pl.updatedAt ? new Date(pl.updatedAt).toLocaleDateString() : (pl.createdAt ? new Date(pl.createdAt).toLocaleDateString() : 'Recent');
+          var privBadge = privacy === 'public'
+            ? '<span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 0.7rem; padding: 2px 7px;">🌐 Public</span>'
+            : (privacy === 'unlisted'
+              ? '<span class="badge" style="background: rgba(245,158,11,0.15); color: #fbbf24; font-size: 0.7rem; padding: 2px 7px;">🔗 Unlisted</span>'
+              : '<span class="badge" style="background: rgba(100,116,139,0.2); color: #94a3b8; font-size: 0.7rem; padding: 2px 7px;">🔒 Private</span>');
+
+          return '<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">' +
+            '<td style="padding: 10px 12px;">' +
+              '<div style="font-weight: 700; color: #fff; font-size: 0.85rem;">' + title + '</div>' +
+              '<div style="font-size: 0.72rem; color: #94a3b8; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + (pl.description || 'No description') + '</div>' +
+            '</td>' +
+            '<td style="padding: 10px 12px;">' + privBadge + '</td>' +
+            '<td style="padding: 10px 12px; color: #fff; font-weight: 700; font-size: 0.82rem;">' + count + ' videos</td>' +
+            '<td style="padding: 10px 12px; color: #94a3b8; font-size: 0.78rem;">' + updated + '</td>' +
+            '<td style="padding: 10px 12px; text-align: right; white-space: nowrap;">' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.sharePlaylist(\'' + pl.id + '\')" style="padding: 3px 8px; font-size: 0.72rem; margin-right: 4px;" title="Share link">🔗 Share</button>' +
+              '<button type="button" class="btn" onclick="SovraCreatorStudioEngine.deletePlaylist(\'' + pl.id + '\')" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #ef4444; cursor: pointer;" title="Delete">🗑️</button>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+      },
+
+      filterPlaylists: function(q) {
+        if (!this.playlistsList) return;
+        var query = (q || '').toLowerCase().trim();
+        var filtered = this.playlistsList.filter(function(pl) {
+          return !query || (pl.title && pl.title.toLowerCase().indexOf(query) !== -1) || (pl.description && pl.description.toLowerCase().indexOf(query) !== -1);
+        });
+        this.renderStudioPlaylists(filtered);
+      },
+
+      openCreatePlaylistModal: function() {
+        var modal = document.getElementById('studioCreatePlaylistModal');
+        if (modal) {
+          modal.style.display = 'flex';
+          var titleIn = document.getElementById('newPlaylistTitle');
+          var descIn = document.getElementById('newPlaylistDesc');
+          if (titleIn) { titleIn.value = ''; titleIn.focus(); }
+          if (descIn) descIn.value = '';
+        }
+      },
+
+      closeCreatePlaylistModal: function() {
+        var modal = document.getElementById('studioCreatePlaylistModal');
+        if (modal) modal.style.display = 'none';
+      },
+
+      submitCreatePlaylist: function() {
+        var titleIn = document.getElementById('newPlaylistTitle');
+        var descIn = document.getElementById('newPlaylistDesc');
+        var privIn = document.getElementById('newPlaylistPrivacy');
+        var title = titleIn ? titleIn.value.trim() : '';
+        var desc = descIn ? descIn.value.trim() : '';
+        var privacy = privIn ? privIn.value : 'public';
+
+        if (!title) {
+          if (typeof showToast === 'function') showToast('Please enter a playlist title', 'warning');
+          return;
+        }
+
+        var self = this;
+        fetch('/api/studio/playlists/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channelId: this.activeChannelId,
+            title: title,
+            description: desc,
+            privacy: privacy
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok) {
+            if (typeof showToast === 'function') showToast('Playlist "' + title + '" created ✓', 'success');
+            self.closeCreatePlaylistModal();
+            self.loadStudioPlaylists();
+          } else {
+            if (typeof showToast === 'function') showToast('Failed to create playlist: ' + (d.error || 'Unknown error'), 'error');
+          }
+        })
+        .catch(function(err) {
+          if (typeof showToast === 'function') showToast('Error creating playlist: ' + err.message, 'error');
+        });
+      },
+
+      sharePlaylist: function(id) {
+        var url = window.location.origin + '/playlist/' + id;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url);
+        }
+        if (typeof showToast === 'function') showToast('Playlist link copied to clipboard!', 'success');
+      },
+
+      deletePlaylist: function(id) {
+        if (!confirm('Are you sure you want to delete this playlist?')) return;
+        var self = this;
+        fetch('/api/studio/playlists/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: id })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (typeof showToast === 'function') showToast('Playlist deleted', 'info');
+          self.playlistsList = (self.playlistsList || []).filter(function(p) { return p.id !== id; });
+          self.renderStudioPlaylists(self.playlistsList);
+        })
+        .catch(function() {
+          self.playlistsList = (self.playlistsList || []).filter(function(p) { return p.id !== id; });
+          self.renderStudioPlaylists(self.playlistsList);
+        });
+      },
+
+      // ==========================================
+      // COMMUNITY POSTS HUB METHODS
+      // ==========================================
+      loadCommunityPosts: function() {
+        var self = this;
+        var listEl = document.getElementById('studioCommunityFeedList');
+        if (listEl) listEl.innerHTML = '<div style="text-align: center; padding: 30px; color: #64748b;">Loading community feed...</div>';
+
+        var url = '/api/channel/community' + (this.activeChannelId ? '?channelId=' + encodeURIComponent(this.activeChannelId) : '');
+        fetch(url)
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            var posts = (d && d.ok && Array.isArray(d.posts)) ? d.posts : [];
+            self.communityPostsList = posts;
+            self.renderCommunityPosts(posts);
+          })
+          .catch(function() {
+            self.renderCommunityPosts(self.communityPostsList || []);
+          });
+      },
+
+      renderCommunityPosts: function(posts) {
+        var listEl = document.getElementById('studioCommunityFeedList');
+        if (!listEl) return;
+        if (!posts || !posts.length) {
+          listEl.innerHTML = '<div style="text-align: center; padding: 30px; color: #64748b;">No community posts yet. Publish an announcement or poll to your subscribers!</div>';
+          return;
+        }
+
+        listEl.innerHTML = posts.map(function(p) {
+          var date = p.createdAt ? new Date(p.createdAt).toLocaleString() : 'Just now';
+          var content = (p.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+          var likes = p.likesCount || p.likes || 0;
+          var pollHtml = '';
+          if (p.poll && Array.isArray(p.poll.options) && p.poll.options.length) {
+            pollHtml = '<div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px;">' +
+              p.poll.options.map(function(opt) {
+                var votes = opt.votes || 0;
+                return '<div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;">' +
+                  '<span style="font-size: 0.8rem; color: #fff;">' + (opt.text || opt) + '</span>' +
+                  '<span style="font-size: 0.72rem; color: #38bdf8; font-weight: 700;">' + votes + ' votes</span>' +
+                '</div>';
+              }).join('') +
+            '</div>';
+          }
+
+          return '<div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1rem;">' +
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">' +
+              '<div style="font-size: 0.75rem; color: #94a3b8;">📅 ' + date + '</div>' +
+              '<span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 0.68rem; padding: 2px 7px;">Subscribers Only</span>' +
+            '</div>' +
+            '<div style="font-size: 0.85rem; color: #e2e8f0; line-height: 1.5;">' + content + '</div>' +
+            pollHtml +
+            '<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 14px; font-size: 0.75rem; color: #94a3b8;">' +
+              '<span>👍 ' + likes + ' likes</span>' +
+              '<span>💬 ' + (p.commentsCount || 0) + ' comments</span>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      },
+
+      submitCommunityPost: function() {
+        var contentEl = document.getElementById('studioCommunityPostContent');
+        var opt1El = document.getElementById('studioCommunityPollOpt1');
+        var opt2El = document.getElementById('studioCommunityPollOpt2');
+        var content = contentEl ? contentEl.value.trim() : '';
+
+        if (!content) {
+          if (typeof showToast === 'function') showToast('Please enter post content', 'warning');
+          return;
+        }
+
+        var opt1 = opt1El ? opt1El.value.trim() : '';
+        var opt2 = opt2El ? opt2El.value.trim() : '';
+        var poll = null;
+        if (opt1 || opt2) {
+          poll = {
+            question: content,
+            options: [
+              { id: '1', text: opt1 || 'Option 1', votes: 0 },
+              { id: '2', text: opt2 || 'Option 2', votes: 0 }
+            ]
+          };
+        }
+
+        var payload = {
+          channelId: this.activeChannelId,
+          content: content,
+          poll: poll
+        };
+
+        var self = this;
+        fetch('/api/channel/community/post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok) {
+            if (typeof showToast === 'function') showToast('Community post published to channel feed ✓', 'success');
+            if (contentEl) contentEl.value = '';
+            if (opt1El) opt1El.value = '';
+            if (opt2El) opt2El.value = '';
+            var newPost = d.post || {
+              id: 'post_' + Date.now(),
+              content: content,
+              poll: poll,
+              createdAt: new Date().toISOString(),
+              likesCount: 0,
+              commentsCount: 0
+            };
+            if (!self.communityPostsList) self.communityPostsList = [];
+            self.communityPostsList.unshift(newPost);
+            self.renderCommunityPosts(self.communityPostsList);
+          } else {
+            if (typeof showToast === 'function') showToast('Failed to post: ' + (d.error || 'Unknown error'), 'error');
+          }
+        })
+        .catch(function(err) {
+          if (typeof showToast === 'function') showToast('Error submitting post: ' + err.message, 'error');
+        });
+      },
+
+      // ==========================================
+      // BULK ACTIONS & CHECKBOX SELECTION METHODS
+      // ==========================================
+      toggleSelectAllVideos: function(checked) {
+        var cbs = document.querySelectorAll('.studio-video-select-cb');
+        var selected = [];
+        cbs.forEach(function(cb) {
+          cb.checked = checked;
+          if (checked) {
+            var id = cb.getAttribute('data-id');
+            if (id) selected.push(id);
+          }
+        });
+        this.selectedContentIds = selected;
+        this.updateBulkActionBar();
+      },
+
+      handleRowCheckboxChange: function() {
+        var cbs = document.querySelectorAll('.studio-video-select-cb');
+        var selected = [];
+        var allChecked = cbs.length > 0;
+        cbs.forEach(function(cb) {
+          if (cb.checked) {
+            var id = cb.getAttribute('data-id');
+            if (id) selected.push(id);
+          } else {
+            allChecked = false;
+          }
+        });
+        this.selectedContentIds = selected;
+        var masterCb = document.getElementById('studioSelectAllVideos');
+        if (masterCb) masterCb.checked = allChecked;
+        this.updateBulkActionBar();
+      },
+
+      updateBulkActionBar: function() {
+        var bar = document.getElementById('studioBulkActionsBar');
+        var countEl = document.getElementById('studioBulkSelectedCount');
+        var count = this.selectedContentIds ? this.selectedContentIds.length : 0;
+        if (countEl) countEl.textContent = count + ' selected';
+        if (bar) {
+          bar.style.display = count > 0 ? 'flex' : 'none';
+        }
+      },
+
+      clearVideoSelection: function() {
+        this.selectedContentIds = [];
+        var cbs = document.querySelectorAll('.studio-video-select-cb');
+        cbs.forEach(function(cb) { cb.checked = false; });
+        var masterCb = document.getElementById('studioSelectAllVideos');
+        if (masterCb) masterCb.checked = false;
+        this.updateBulkActionBar();
+      },
+
+      bulkSetVisibility: function(tier) {
+        if (!this.selectedContentIds || !this.selectedContentIds.length) return;
+        var self = this;
+        var promises = this.selectedContentIds.map(function(id) {
+          return fetch('/api/studio/video/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: id,
+              monetizationGating: tier,
+              monetization: { tier: tier },
+              visibility: (tier === 'supporter_gated' ? 'unlisted' : 'public')
+            })
+          }).then(function(r) { return r.json(); });
+        });
+        Promise.all(promises).then(function() {
+          if (typeof showToast === 'function') showToast('Updated ' + self.selectedContentIds.length + ' videos to ' + tier, 'success');
+          self.clearVideoSelection();
+          self.loadContentLibrary();
+        }).catch(function() {
+          self.loadContentLibrary();
+        });
+      },
+
+      bulkUnpublishVideos: function() {
+        if (!this.selectedContentIds || !this.selectedContentIds.length) return;
+        if (!confirm('Are you sure you want to unpublish ' + this.selectedContentIds.length + ' video(s)?')) return;
+        var self = this;
+        var promises = this.selectedContentIds.map(function(id) {
+          return fetch('/api/studio/video/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, visibility: 'private' })
+          }).then(function(r) { return r.json(); });
+        });
+        Promise.all(promises).then(function() {
+          if (typeof showToast === 'function') showToast('Unpublished ' + self.selectedContentIds.length + ' video(s)', 'info');
+          self.clearVideoSelection();
+          self.loadContentLibrary();
+        }).catch(function() {
+          self.loadContentLibrary();
+        });
+      },
+
+
       renderContentTable: function(items) {
+        var self = this;
         var tbody = document.getElementById('studioContentTableBody');
         if (!tbody) return;
         if (!items || !items.length) {
-          tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px; color: #64748b;">No creator dispatches found. Upload your first video in Ingest!</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px; color: #64748b;">No creator dispatches found. Upload your first video in Ingest!</td></tr>';
           return;
         }
 
@@ -35292,7 +35405,11 @@ window.SovraCreatorStudioEngine = {
           var safeId = item.id;
           var isPinned = Boolean(item.isPinned);
 
+          var isChecked = self.selectedContentIds && self.selectedContentIds.indexOf(safeId) !== -1;
+          var checkboxCell = '<td style="width: 36px; padding: 10px 8px; text-align: center;"><input type="checkbox" class="studio-video-select-cb" data-id="' + safeId + '"' + (isChecked ? ' checked' : '') + ' onchange="SovraCreatorStudioEngine.handleRowCheckboxChange()"></td>';
+
           return '<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">' +
+            checkboxCell +
             '<td style="padding: 10px 8px; display: flex; align-items: center; gap: 10px;">' +
               '<img src="' + thumb + '" style="width: 58px; height: 34px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">' +
               '<div style="min-width: 0;">' +

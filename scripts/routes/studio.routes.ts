@@ -1953,6 +1953,17 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     return true;
   }
 
+  // 18.1 GET /api/channel/community - Get channel community posts
+  if (url.pathname === '/api/channel/community' && req.method === 'GET') {
+    const channelId = url.searchParams.get('channelId') || '';
+    const dbAny = sovraDb as any;
+    const allPosts = dbAny.db?.posts || [];
+    const posts = channelId ? allPosts.filter((p: any) => p.channelId === channelId) : allPosts.slice(0, 50);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, posts }));
+    return true;
+  }
+
   // =========================================================================
   // SOVRA COMMERCIALIZATION, REVENUE & BUSINESS LOGIC ROUTES (CYCLES 1 - 5)
   // =========================================================================

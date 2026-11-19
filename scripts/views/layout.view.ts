@@ -6213,11 +6213,17 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <button type="button" class="studio-sidebar-nav-btn" id="studioNavContent" onclick="SovraCreatorStudioEngine.switchStudioTab('content')">
               <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></span> <span>Content</span>
             </button>
+            <button type="button" class="studio-sidebar-nav-btn" id="studioNavPlaylists" onclick="SovraCreatorStudioEngine.switchStudioTab('playlists')">
+              <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="9" y1="10" x2="15" y2="10"/></svg></span> <span>Playlists</span>
+            </button>
             <button type="button" class="studio-sidebar-nav-btn" id="studioNavAnalytics" onclick="SovraCreatorStudioEngine.switchStudioTab('analytics')">
               <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span> <span>Analytics</span>
             </button>
             <button type="button" class="studio-sidebar-nav-btn" id="studioNavComments" onclick="SovraCreatorStudioEngine.switchStudioTab('comments')">
-              <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span> <span>Community</span>
+              <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span> <span>Comments</span>
+            </button>
+            <button type="button" class="studio-sidebar-nav-btn" id="studioNavCommunity" onclick="SovraCreatorStudioEngine.switchStudioTab('community')">
+              <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> <span>Community Posts</span>
             </button>
             <button type="button" class="studio-sidebar-nav-btn" id="studioNavSubtitles" onclick="SovraCreatorStudioEngine.switchStudioTab('subtitles')">
               <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15h3M7 11h7M7 7h10"/></svg></span> <span>Languages</span>
@@ -6577,11 +6583,23 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
                 </div>
 
+                <!-- Sticky Bulk Actions Bar -->
+                <div id="studioBulkActionsBar" style="display: none; background: rgba(15, 23, 42, 0.98); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 10px 16px; margin-bottom: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <span id="studioBulkSelectedCount" style="font-weight: 800; font-size: 0.82rem; color: #38bdf8;">0 selected</span>
+                    <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.bulkSetVisibility('public')" style="padding: 4px 10px; font-size: 0.72rem;">🌐 Set Public Free</button>
+                    <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.bulkSetVisibility('supporter_gated')" style="padding: 4px 10px; font-size: 0.72rem;">🔒 Set Supporter Gated</button>
+                    <button type="button" class="btn" id="btnBulkUnpublishAction" onclick="SovraCreatorStudioEngine.bulkUnpublishVideos()" style="padding: 4px 12px; font-size: 0.72rem; font-weight: 700; background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #ef4444; border-radius: 6px; cursor: pointer;">🛡️ Bulk Unpublish</button>
+                  </div>
+                  <button type="button" onclick="SovraCreatorStudioEngine.clearVideoSelection()" style="background: none; border: none; color: #94a3b8; font-size: 0.75rem; cursor: pointer;">✕ Deselect all</button>
+                </div>
+
                 <!-- Content Manager Table -->
                 <div style="overflow-x: auto;">
                   <table class="studio-content-table" id="studioContentTable">
                     <thead>
                       <tr>
+                        <th style="width: 36px;"><input type="checkbox" id="studioSelectAllVideos" onchange="SovraCreatorStudioEngine.toggleSelectAllVideos(this.checked)" title="Select All"></th>
                         <th>VIDEO</th>
                         <th>VISIBILITY</th>
                         <th>RESTRICTIONS</th>
@@ -6595,7 +6613,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     </thead>
                     <tbody id="studioContentTableBody">
                       <tr>
-                        <td colspan="9" style="text-align: center; padding: 30px; color: #64748b;">
+                        <td colspan="10" style="text-align: center; padding: 30px; color: #64748b;">
                           Loading creator content library...
                         </td>
                       </tr>
@@ -6603,6 +6621,54 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </table>
                 </div>
 
+              </div>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- TAB 2.1: CHANNEL PLAYLISTS MANAGER             -->
+            <!-- ============================================== -->
+            <div id="studioSectionPlaylists" style="display: none;">
+              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+                  <div>
+                    <h2 style="font-size: 1.3rem; font-weight: 900; color: #fff; margin: 0;">Channel Playlists</h2>
+                    <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Create and organize curated video collections for your channel</div>
+                  </div>
+                  <button type="button" class="btn btn-primary" id="btnOpenCreatePlaylist" onclick="SovraCreatorStudioEngine.openCreatePlaylistModal()" style="padding: 7px 16px; font-size: 0.8rem; font-weight: 700; background: linear-gradient(135deg, #0284c7, #6366f1);">
+                    + New Playlist
+                  </button>
+                </div>
+
+                <!-- Filter Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem;">
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="studioPlaylistSearch" placeholder="Filter playlists..." oninput="SovraCreatorStudioEngine.filterPlaylists(this.value)" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 12px; color: #fff; font-size: 0.78rem; width: 220px;">
+                    <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.loadStudioPlaylists()" style="padding: 6px 10px; font-size: 0.78rem;">Refresh</button>
+                  </div>
+                  <span id="studioPlaylistsCountBadge" style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">0 Playlists</span>
+                </div>
+
+                <!-- Playlists Table -->
+                <div style="overflow-x: auto;">
+                  <table class="studio-content-table" id="studioPlaylistsTable">
+                    <thead>
+                      <tr>
+                        <th>PLAYLIST</th>
+                        <th>VISIBILITY</th>
+                        <th>VIDEOS</th>
+                        <th>LAST UPDATED</th>
+                        <th style="text-align: right;">ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody id="studioPlaylistsTableBody">
+                      <tr>
+                        <td colspan="5" style="text-align: center; padding: 30px; color: #64748b;">
+                          Loading channel playlists...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -6865,6 +6931,47 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
 
             <!-- ============================================== -->
+            <!-- TAB 4.1: COMMUNITY POSTS & POLLS HUB           -->
+            <!-- ============================================== -->
+            <div id="studioSectionCommunity" style="display: none;">
+              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+                  <div>
+                    <h2 style="font-size: 1.3rem; font-weight: 900; color: #fff; margin: 0;">Community Posts &amp; Polls</h2>
+                    <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Share text updates, announcements, and polls directly to your subscriber feed</div>
+                  </div>
+                  <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.loadCommunityPosts()" style="padding: 6px 12px; font-size: 0.78rem;">Refresh Feed</button>
+                </div>
+
+                <!-- Create Post Box -->
+                <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 1rem; margin-bottom: 1.5rem;">
+                  <div style="font-weight: 700; color: #fff; font-size: 0.85rem; margin-bottom: 8px;">Create Community Post</div>
+                  <textarea id="studioCommunityPostContent" rows="3" placeholder="What's on your mind? Share an update or ask your subscribers..." style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px; color: #fff; font-size: 0.82rem; resize: vertical;"></textarea>
+
+                  <!-- Poll Inputs (Optional) -->
+                  <div id="studioCommunityPollFields" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; gap: 8px;">
+                      <input type="text" id="studioCommunityPollOpt1" placeholder="Poll Option 1 (optional)" style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
+                      <input type="text" id="studioCommunityPollOpt2" placeholder="Poll Option 2 (optional)" style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
+                    </div>
+                  </div>
+
+                  <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 10px; gap: 8px;">
+                    <button type="button" class="btn btn-primary" id="btnPublishCommunityPost" onclick="SovraCreatorStudioEngine.submitCommunityPost()" style="padding: 7px 18px; font-size: 0.8rem; font-weight: 700; background: linear-gradient(135deg, #0284c7, #6366f1);">
+                      Publish Post
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Posts List Feed -->
+                <div id="studioCommunityFeedList" style="display: flex; flex-direction: column; gap: 1rem;">
+                  <div style="text-align: center; padding: 30px; color: #64748b;">Loading community feed...</div>
+                </div>
+              </div>
+            </div>
+
+
+            <!-- ============================================== -->
             <!-- TAB 5: DEDICATED SUBTITLES & CC TRACK STUDIO   -->
             <!-- ============================================== -->
             <div id="studioSectionSubtitles" style="display: none;">
@@ -6959,6 +7066,29 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                         <option value="yt-video-2">Cellular CGNAT Traversal Deep Dive</option>
                         <option value="yt-video-1">Decentralized P2P Mesh Architecture (4K HLS)</option>
                       </select>
+                    </div>
+
+                    <!-- Homepage Featured Shelves Section -->
+                    <div id="customShelvesSection" style="background: rgba(0,0,0,0.4); padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                        <div>
+                          <div style="font-weight: 700; color: #fff; font-size: 0.88rem;">Channel Homepage Shelves</div>
+                          <div style="font-size: 0.75rem; color: #94a3b8;">Customize the sections and shelves displayed on your channel's home tab</div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                          <select id="customAddShelfSelect" style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
+                            <option value="uploads">Recent Videos</option>
+                            <option value="popular">Popular Uploads</option>
+                            <option value="shorts">Sovra Reels &amp; Shorts</option>
+                            <option value="live">Live Streams</option>
+                            <option value="created_playlists">Created Playlists</option>
+                          </select>
+                          <button type="button" class="btn btn-secondary" id="btnAddCustomShelf" onclick="SovraCreatorStudioEngine.addSelectedShelf()" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">+ Add Section</button>
+                        </div>
+                      </div>
+                      <div id="customShelvesList" style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+                        <!-- Rendered dynamically -->
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -7156,6 +7286,28 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                           <div style="font-size: 0.7rem; color: #94a3b8;">Sub-1.5s delay via WebRTC mesh relay</div>
                         </div>
                         <input type="checkbox" id="studioRtmpLowLatency" checked onchange="SovraCreatorStudioEngine.toggleLowLatency(this.checked)" style="cursor: pointer; width: 18px; height: 18px; accent-color: #38bdf8;">
+                      </div>
+
+                      <!-- OBS Broadcast Live Health & Status Card -->
+                      <div id="studioLiveStreamHealthSection" style="margin-top: 6px; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                          <div style="font-size: 0.75rem; font-weight: 700; color: #fff;">Stream Health &amp; Telemetry</div>
+                          <span id="studioLiveStreamStatusBadge" class="badge" style="background: rgba(100, 116, 139, 0.2); color: #94a3b8; font-size: 0.68rem; padding: 2px 8px; border-radius: 6px;">Offline / Inactive</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center;">
+                          <div style="background: rgba(255,255,255,0.03); padding: 6px 4px; border-radius: 6px;">
+                            <div style="font-size: 0.65rem; color: #64748b;">Bitrate</div>
+                            <div id="studioLiveBitrateVal" style="font-size: 0.78rem; font-weight: 800; color: #38bdf8;">4,500 kbps</div>
+                          </div>
+                          <div style="background: rgba(255,255,255,0.03); padding: 6px 4px; border-radius: 6px;">
+                            <div style="font-size: 0.65rem; color: #64748b;">Resolution</div>
+                            <div id="studioLiveResVal" style="font-size: 0.78rem; font-weight: 800; color: #10b981;">1080p60</div>
+                          </div>
+                          <div style="background: rgba(255,255,255,0.03); padding: 6px 4px; border-radius: 6px;">
+                            <div style="font-size: 0.65rem; color: #64748b;">Health</div>
+                            <div id="studioLiveHealthVal" style="font-size: 0.78rem; font-weight: 800; color: #34d399;">🟢 Excellent</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -7698,6 +7850,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div id="editVideoChaptersList" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
             </div>
+
+            <!-- Tags Input -->
+            <div>
+              <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">TAGS (COMMA SEPARATED)</label>
+              <input type="text" id="editVideoTags" placeholder="e.g. sovra, mesh, web3, tutorial" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem;">
+            </div>
           </div>
 
           <!-- Right Column: Player Preview, Visibility & Gating, CID -->
@@ -7741,6 +7899,22 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <option value="none">No end screen</option>
                 <option value="yt-video-1">Promote: Decentralized P2P Mesh Architecture</option>
                 <option value="yt-video-2">Promote: Cellular CGNAT Traversal</option>
+              </select>
+            </div>
+
+            <!-- Visibility & Sovereign License Options -->
+            <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+              <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 6px;">CATALOG VISIBILITY</div>
+              <select id="editVideoVisibility" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem; margin-bottom: 10px;">
+                <option value="public">Public (Everyone can search &amp; watch)</option>
+                <option value="unlisted">Unlisted (Anyone with link can watch)</option>
+                <option value="private">Private (Only you can watch)</option>
+              </select>
+
+              <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 6px;">SOVEREIGN LICENSE &amp; RIGHTS</div>
+              <select id="editVideoLicense" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
+                <option value="sovra_standard">Standard Sovra Sovereign License</option>
+                <option value="creative_commons">Creative Commons - Attribution (CC-BY)</option>
               </select>
             </div>
           </div>
@@ -7808,6 +7982,53 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
           <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.closeVideoTrimmerModal()" style="font-size: 0.8rem; padding: 8px 16px;">Cancel</button>
           <button type="button" class="btn btn-primary" id="btnApplyVideoTrim" onclick="SovraCreatorStudioEngine.applyVideoTrim()" style="font-size: 0.8rem; padding: 8px 20px; font-weight: 800; background: linear-gradient(135deg, #f43f5e, #8b5cf6);">Apply Trim</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- 3.2 MODAL: CREATE NEW CHANNEL PLAYLIST                     -->
+    <!-- ========================================================== -->
+    <div class="studio-modal-backdrop" id="studioCreatePlaylistModal" style="display: none;">
+      <div class="studio-modal-card" style="max-width: 520px;">
+        <!-- Modal Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3rem;">📑</span>
+            <div>
+              <div style="font-weight: 800; font-size: 1.1rem; color: #fff;">Create New Playlist</div>
+              <div style="font-size: 0.75rem; color: #94a3b8;">Group videos into a curated collection</div>
+            </div>
+          </div>
+          <button type="button" onclick="SovraCreatorStudioEngine.closeCreatePlaylistModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+
+        <!-- Modal Body -->
+        <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+          <div>
+            <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">PLAYLIST TITLE (REQUIRED)</label>
+            <input type="text" id="newPlaylistTitle" placeholder="e.g. Sovereign Peer-to-Peer Series" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem;">
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">DESCRIPTION</label>
+            <textarea id="newPlaylistDesc" rows="3" placeholder="Tell viewers what this playlist is about..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem; resize: vertical;"></textarea>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">VISIBILITY</label>
+            <select id="newPlaylistPrivacy" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem;">
+              <option value="public">Public (Anyone can search and view)</option>
+              <option value="unlisted">Unlisted (Anyone with link can view)</option>
+              <option value="private">Private (Only you can view)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
+          <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.closeCreatePlaylistModal()" style="font-size: 0.8rem; padding: 8px 16px;">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btnSubmitCreatePlaylist" onclick="SovraCreatorStudioEngine.submitCreatePlaylist()" style="font-size: 0.8rem; padding: 8px 20px; font-weight: 800; background: linear-gradient(135deg, #0284c7, #6366f1);">Create Playlist</button>
         </div>
       </div>
     </div>
