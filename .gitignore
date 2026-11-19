@@ -93,3 +93,4 @@ chain/*-node/**/priv_validator_state.json
 *.sst
 test_tmp_*
 scratch/
+scripts/ngrok-url.txt

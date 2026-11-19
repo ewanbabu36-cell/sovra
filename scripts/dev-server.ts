@@ -54,6 +54,9 @@ import {
   deriveKeyFromWebAuthnPrf,
   verifyProofOfWork,
   computeProofOfWork,
+  computeAddressFromPubKey,
+  verifyTransactionSignature,
+  type SignedTransaction,
 } from '../packages/crypto/dist/index.js';
 import {
   SovraIdentityKey,
@@ -2541,10 +2544,21 @@ async function startDevServer() {
 
       const user = sovraDb.findUserBySessionToken(cleanToken);
       if (user) {
+        const validRoles: AdminRole[] = [
+          'SUPER_ADMIN',
+          'ADMIN',
+          'SECURITY_ADMIN',
+          'MODERATOR',
+          'INFRA_OPERATOR',
+          'ANALYST',
+          'SUPPORT',
+          'USER',
+        ];
+        const assignedRole: AdminRole = validRoles.includes(user.role as AdminRole) ? (user.role as AdminRole) : 'USER';
         return createAuthenticatedPrincipal({
           did: user.did,
           sessionId: cleanToken,
-          role: user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' ? user.role : 'USER',
+          role: assignedRole,
           authenticationMethod: 'BEARER_TOKEN',
         });
       }
@@ -2728,7 +2742,6 @@ async function startDevServer() {
   // --- Sovra Layer-1 (Testnet-0) CometBFT Local RPC Integration ---
   // =========================================================================
   const L1_RPC_URL = process.env.SOVRA_L1_RPC || 'http://127.0.0.1:26657';
-  const L1_KEY_PATH = path.resolve(process.cwd(), 'chain/mytestnet/node0/validator-0.key.json');
 
   interface L1ChainStatus {
     connected: boolean;
@@ -2797,70 +2810,24 @@ async function startDevServer() {
     }
   }
 
-  function getSovraL1Key(): { name: string; address: string; pub_key: string; priv_key: string } | null {
+  async function relayL1SignedTx(signedTx: SignedTransaction): Promise<{ ok: boolean; error?: string; txHash?: string; height?: number; appHash?: string }> {
     try {
-      if (fs.existsSync(L1_KEY_PATH)) {
-        return JSON.parse(fs.readFileSync(L1_KEY_PATH, 'utf8'));
-      }
-    } catch {}
-    return null;
-  }
-
-  async function broadcastL1Tx(opts: {
-    type: 'send' | 'burn';
-    recipient?: string;
-    amountUsov: string;
-    feeUsov?: string;
-  }): Promise<{ ok: boolean; error?: string; txHash?: string; height?: number; appHash?: string }> {
-    const key = getSovraL1Key();
-    if (!key) {
-      return { ok: false, error: 'L1 Validator key not found at ' + L1_KEY_PATH };
-    }
-
-    try {
-      const privBytes = Buffer.from(key.priv_key, 'hex').subarray(0, 32);
-      const nonce = await getSovraL1Nonce(key.address);
-
-      // Match Go SignedTransaction struct serialization order
-      const txPayload: any = opts.type === 'send'
-        ? {
-            type: 'send',
-            sender: key.address,
-            recipient: opts.recipient || '',
-            amount: opts.amountUsov,
-            nonce: nonce,
-            fee: opts.feeUsov || '100',
-          }
-        : {
-            type: 'burn',
-            sender: key.address,
-            amount: opts.amountUsov,
-            nonce: nonce,
-            fee: opts.feeUsov || '0',
-          };
-
-      const signBytes = Buffer.from(JSON.stringify(txPayload));
-      const sig = bytesToHex(signEd25519(privBytes, signBytes));
-
-      const fullTx = {
-        ...txPayload,
-        pub_key: key.pub_key,
-        sig: sig,
-      };
-
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
       const res = await fetch(`${L1_RPC_URL}/broadcast_tx`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fullTx),
+        body: JSON.stringify(signedTx),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       const data: any = await res.json();
       if (!res.ok || data.error) {
         return { ok: false, error: data.error || 'Broadcast failed' };
       }
 
-      const txHash = crypto.createHash('sha256').update(JSON.stringify(fullTx)).digest('hex');
-
+      const txHash = crypto.createHash('sha256').update(JSON.stringify(signedTx)).digest('hex');
       return {
         ok: true,
         txHash: data.tx_hash || txHash,
@@ -2870,7 +2837,7 @@ async function startDevServer() {
     } catch (err: any) {
       return { ok: false, error: err?.message || 'L1 Broadcast exception' };
     }
-  };
+  }
 
   const cspReportRateLimits = new Map<string, { count: number; resetAt: number }>();
   function isCspReportRateLimited(ip: string): boolean {
@@ -3661,26 +3628,26 @@ async function startDevServer() {
 
       // Layer-1 CometBFT Live Chain Status & Balance Query
       const l1Status = await getSovraL1Status();
-      let onChainInfo: any = { connected: false, rpcUrl: L1_RPC_URL };
-      const l1Key = getSovraL1Key();
-      if (l1Status.connected && l1Key) {
-        const bal = await getSovraL1Balance(l1Key.address);
-        onChainInfo = {
-          connected: true,
-          rpcUrl: l1Status.rpcUrl,
-          chainId: l1Status.chainId,
-          height: l1Status.height,
-          moniker: l1Status.moniker,
-          genesisTime: l1Status.genesisTime,
-          address: l1Key.address,
-          balanceUsov: bal.balanceUsov,
-          balanceSov: bal.balanceSov,
-          totalSupply: l1Status.totalSupply,
-          lifetimeMint: l1Status.lifetimeMint,
-          lifetimeBurn: l1Status.lifetimeBurn,
-          supplyCorrect: l1Status.supplyCorrect,
-          appHash: l1Status.appHash,
-        };
+      const queriedAddress = url.searchParams.get('address') || url.searchParams.get('addr');
+      let onChainInfo: any = {
+        connected: l1Status.connected,
+        rpcUrl: l1Status.rpcUrl || L1_RPC_URL,
+        chainId: l1Status.chainId,
+        height: l1Status.height,
+        moniker: l1Status.moniker,
+        genesisTime: l1Status.genesisTime,
+        totalSupply: l1Status.totalSupply,
+        lifetimeMint: l1Status.lifetimeMint,
+        lifetimeBurn: l1Status.lifetimeBurn,
+        supplyCorrect: l1Status.supplyCorrect,
+        appHash: l1Status.appHash,
+      };
+
+      if (l1Status.connected && queriedAddress) {
+        const bal = await getSovraL1Balance(queriedAddress);
+        onChainInfo.address = queriedAddress;
+        onChainInfo.balanceUsov = bal.balanceUsov;
+        onChainInfo.balanceSov = bal.balanceSov;
       }
 
       res.writeHead(200, {
@@ -4164,66 +4131,39 @@ async function startDevServer() {
       return;
     }
 
-    // API: Layer-1 Native Blockchain Transfer (CometBFT Consensus)
+    // API: Layer-1 Non-Custodial Native Blockchain Transfer (CometBFT Consensus)
     if (url.pathname === '/api/wallet/chain-send' && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
       try {
-        const parsed = JSON.parse(body);
-        const principal = resolvePrincipal(req);
-        const targetDid = parsed.did || (principal ? principal.did : masterKey.did);
-        const recipient = String(parsed.recipient || parsed.recipientAddress || '').trim();
-        const amountSov = Number(parsed.amount || parsed.amountSov);
-        const memo = String(parsed.memo || 'L1 Sovra Transfer').trim();
-
-        if (!recipient || !recipient.startsWith('sovra1')) {
+        const parsed = JSON.parse(body || '{}');
+        if (!parsed.signedTx) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Recipient must be a valid Sovra address (e.g. sovra1...)' }));
+          res.end(JSON.stringify({ ok: false, error: 'Custodial signing disabled: payload must include client-signed signedTx object' }));
           return;
         }
 
-        if (isNaN(amountSov) || amountSov <= 0) {
+        const signedTx = parsed.signedTx as SignedTransaction;
+        const sigResult = verifyTransactionSignature(signedTx);
+        if (!sigResult.valid) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Amount must be greater than 0 SOV' }));
+          res.end(JSON.stringify({ ok: false, error: 'Invalid transaction signature: ' + (sigResult.error || 'verification failed') }));
           return;
         }
 
-        const amountUsov = String(BigInt(Math.floor(amountSov * 1_000_000)));
-        const broadcastRes = await broadcastL1Tx({
-          type: 'send',
-          recipient,
-          amountUsov,
-          feeUsov: '100',
-        });
+        const derivedAddress = computeAddressFromPubKey(signedTx.pub_key);
+        if (derivedAddress !== signedTx.sender) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Public key does not match sender address: ${signedTx.sender} vs ${derivedAddress}` }));
+          return;
+        }
 
+        const broadcastRes = await relayL1SignedTx(signedTx);
         if (!broadcastRes.ok) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: broadcastRes.error || 'L1 Broadcast failed' }));
           return;
         }
-
-        const l1Key = getSovraL1Key();
-        const newBal = l1Key ? await getSovraL1Balance(l1Key.address) : { balanceUsov: '0', balanceSov: 0 };
-
-        const voucher = {
-          voucherId: 'l1_send_' + (broadcastRes.txHash ? broadcastRes.txHash.slice(0, 16) : Date.now()),
-          type: 'l1_transfer',
-          senderDid: targetDid,
-          senderAddress: l1Key?.address,
-          recipientAddress: recipient,
-          toDid: recipient,
-          totalAmount: amountSov.toString(),
-          timestamp: Date.now(),
-          senderComment: memo,
-          txHash: broadcastRes.txHash,
-          blockHeight: broadcastRes.height,
-          status: 'settled_on_chain',
-        };
-
-        const state = sovraDb.getState();
-        if (!state.tip_vouchers) state.tip_vouchers = [];
-        state.tip_vouchers.push(voucher);
-        sovraDb.save();
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -4231,10 +4171,6 @@ async function startDevServer() {
           txHash: broadcastRes.txHash,
           height: broadcastRes.height,
           appHash: broadcastRes.appHash,
-          amountSov,
-          recipient,
-          newBalanceSov: newBal.balanceSov,
-          voucher,
         }));
       } catch (err: any) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -4243,56 +4179,39 @@ async function startDevServer() {
       return;
     }
 
-    // API: Layer-1 Native Blockchain Burn (Protocol Deflation & Invariant Verification)
+    // API: Layer-1 Non-Custodial Native Blockchain Burn (Protocol Deflation & Invariant Verification)
     if (url.pathname === '/api/wallet/chain-burn' && req.method === 'POST') {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
       try {
-        const parsed = JSON.parse(body);
-        const principal = resolvePrincipal(req);
-        const targetDid = parsed.did || (principal ? principal.did : masterKey.did);
-        const amountSov = Number(parsed.amount || parsed.amountSov);
-
-        if (isNaN(amountSov) || amountSov <= 0) {
+        const parsed = JSON.parse(body || '{}');
+        if (!parsed.signedTx) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Burn amount must be greater than 0 SOV' }));
+          res.end(JSON.stringify({ ok: false, error: 'Custodial signing disabled: payload must include client-signed signedTx object' }));
           return;
         }
 
-        const amountUsov = String(BigInt(Math.floor(amountSov * 1_000_000)));
-        const broadcastRes = await broadcastL1Tx({
-          type: 'burn',
-          amountUsov,
-          feeUsov: '100',
-        });
+        const signedTx = parsed.signedTx as SignedTransaction;
+        const sigResult = verifyTransactionSignature(signedTx);
+        if (!sigResult.valid) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid transaction signature: ' + (sigResult.error || 'verification failed') }));
+          return;
+        }
 
+        const derivedAddress = computeAddressFromPubKey(signedTx.pub_key);
+        if (derivedAddress !== signedTx.sender) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Public key does not match sender address: ${signedTx.sender} vs ${derivedAddress}` }));
+          return;
+        }
+
+        const broadcastRes = await relayL1SignedTx(signedTx);
         if (!broadcastRes.ok) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: broadcastRes.error || 'L1 Burn broadcast failed' }));
           return;
         }
-
-        const l1Key = getSovraL1Key();
-        const newBal = l1Key ? await getSovraL1Balance(l1Key.address) : { balanceUsov: '0', balanceSov: 0 };
-        const l1Status = await getSovraL1Status();
-
-        const voucher = {
-          voucherId: 'l1_burn_' + (broadcastRes.txHash ? broadcastRes.txHash.slice(0, 16) : Date.now()),
-          type: 'l1_burn',
-          senderDid: targetDid,
-          senderAddress: l1Key?.address,
-          totalAmount: amountSov.toString(),
-          timestamp: Date.now(),
-          senderComment: 'Layer-1 Protocol Burn',
-          txHash: broadcastRes.txHash,
-          blockHeight: broadcastRes.height,
-          status: 'burned_on_chain',
-        };
-
-        const state = sovraDb.getState();
-        if (!state.tip_vouchers) state.tip_vouchers = [];
-        state.tip_vouchers.push(voucher);
-        sovraDb.save();
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -4300,12 +4219,68 @@ async function startDevServer() {
           txHash: broadcastRes.txHash,
           height: broadcastRes.height,
           appHash: broadcastRes.appHash,
-          amountSov,
-          newBalanceSov: newBal.balanceSov,
-          totalSupply: l1Status.totalSupply,
-          lifetimeBurn: l1Status.lifetimeBurn,
-          supplyCorrect: l1Status.supplyCorrect,
-          voucher,
+        }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Server error' }));
+      }
+      return;
+    }
+
+    // API: Non-Custodial Relay Endpoint (/api/wallet/broadcast-tx)
+    if (url.pathname === '/api/wallet/broadcast-tx' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        if (!parsed || !parsed.signedTx || typeof parsed.signedTx !== 'object') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Missing or malformed signedTx in request body' }));
+          return;
+        }
+
+        const signedTx = parsed.signedTx as SignedTransaction;
+        if (!signedTx.sig || !signedTx.pub_key) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unsigned transaction: missing signature or public key' }));
+          return;
+        }
+
+        const sigResult = verifyTransactionSignature(signedTx);
+        if (!sigResult.valid) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid transaction signature: ' + (sigResult.error || 'verification failed') }));
+          return;
+        }
+
+        const derivedAddress = computeAddressFromPubKey(signedTx.pub_key);
+        if (derivedAddress !== signedTx.sender) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Public key does not match sender address: ${signedTx.sender} vs ${derivedAddress}` }));
+          return;
+        }
+
+        // Nonce check against L1 node
+        const currentNonce = await getSovraL1Nonce(signedTx.sender);
+        if (signedTx.nonce < currentNonce) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Account sequence mismatch: expected nonce >= ${currentNonce}, got ${signedTx.nonce}` }));
+          return;
+        }
+
+        const broadcastRes = await relayL1SignedTx(signedTx);
+        if (!broadcastRes.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: broadcastRes.error || 'L1 Broadcast failed' }));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          txHash: broadcastRes.txHash,
+          height: broadcastRes.height,
+          appHash: broadcastRes.appHash,
         }));
       } catch (err: any) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -9531,7 +9506,7 @@ async function startDevServer() {
         }
         res.writeHead(200, {
           'Content-Type': 'text/css; charset=utf-8',
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
           'ETag': etag,
         });
         res.end(fs.readFileSync(cssPath));
@@ -9884,17 +9859,14 @@ server.listen(HTTP_PORT, '0.0.0.0', () => {
         }
 
         for (const voucher of pending) {
-          const res = await broadcastL1Tx({
-            type: 'send',
-            recipient: voucher.recipientAddress || voucher.toDid,
-            amountUsov: String(BigInt(Math.floor(Number(voucher.totalAmount || '1') * 1_000_000))),
-            feeUsov: '100',
-          });
-          if (res.ok) {
-            voucher.status = 'settled_on_chain';
-            voucher.txHash = res.txHash;
-            voucher.blockHeight = res.height;
-            console.log(`[L1-MULE] Successfully settled voucher ${voucher.voucherId} on CometBFT block #${res.height}`);
+          if (voucher.signedTx) {
+            const res = await relayL1SignedTx(voucher.signedTx);
+            if (res.ok) {
+              voucher.status = 'settled_on_chain';
+              voucher.txHash = res.txHash;
+              voucher.blockHeight = res.height;
+              console.log(`[L1-MULE] Successfully settled voucher ${voucher.voucherId} on CometBFT block #${res.height}`);
+            }
           }
         }
         sovraDb.save();

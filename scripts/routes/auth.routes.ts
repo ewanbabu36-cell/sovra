@@ -260,6 +260,11 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body);
+      if (parsed.isEnclaveBypass === true || parsed.enclaveBypass === true || parsed.bypassEnclave === true) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Hardware enclave bypass flags are strictly prohibited in production mode' }));
+        return true;
+      }
       let identifier = String(parsed.identifier || parsed.handle || parsed.did || '').trim();
       if (!identifier) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -280,7 +285,8 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
       });
 
       if (!loginRes.ok || !loginRes.user) {
-        res.writeHead(loginRes.code || 401, { 'Content-Type': 'application/json' });
+        const statusCode = loginRes.code || (loginRes.isLocked || loginRes.isThrottled ? 429 : 401);
+        res.writeHead(statusCode, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           ok: false,
           error: loginRes.error,

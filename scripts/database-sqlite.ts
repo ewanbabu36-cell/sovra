@@ -1541,52 +1541,6 @@ export class SqliteSocialDatabaseEngine {
 
       this.db.exec('BEGIN TRANSACTION;');
 
-      // 0. USERS (DURABLE RELATIONAL REPOSITORY)
-      if (Array.isArray(state.users)) {
-        const stmtUser = this.db.prepare(`
-          INSERT OR REPLACE INTO users (
-            did, handle, display_name, name, avatar, avatar_data_url, avatar_bg,
-            bio, website, website_url, cover_data_url, device_type, public_key,
-            session_token, balance_sov, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        for (const u of state.users) {
-          if (!u || !u.did) continue;
-          stmtUser.run(
-            u.did, u.handle || `@user_${u.did.slice(-6)}`, u.displayName || u.name || 'Peer',
-            u.name || u.displayName || 'Peer', u.avatar || 'S', u.avatarDataUrl || null,
-            u.avatarBg || '#6366f1', u.bio || '', u.website || '', u.websiteUrl || '',
-            u.coverDataUrl || null, u.deviceType || 'Desktop', u.publicKey || null,
-            u.sessionToken || null, typeof u.balanceSov === 'number' ? u.balanceSov : 500.0,
-            u.createdAt || Date.now(), u.updatedAt || Date.now()
-          );
-        }
-      }
-
-      // 0B. POSTS (DURABLE RELATIONAL REPOSITORY)
-      if (Array.isArray(state.posts)) {
-        const stmtPost = this.db.prepare(`
-          INSERT OR REPLACE INTO posts (
-            id, author_did, handle, author_name, author_avatar, author_avatar_bg, caption,
-            post_type, media_image, media_video, tags_json, likes_count, comments_count,
-            shares_count, reposts_count, visibility, timestamp
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        for (const p of state.posts) {
-          if (!p || !p.id) continue;
-          stmtPost.run(
-            p.id, p.authorDid || 'did:key:anonymous', p.authorHandle || '',
-            p.authorName || 'Peer', p.authorAvatar || 'S', p.authorAvatarBg || '#6366f1',
-            p.caption || '', p.postType || 'text', p.mediaImage || null, p.mediaVideo || null,
-            JSON.stringify(Array.isArray(p.tags) ? p.tags : (p.tags ? [p.tags] : [])),
-            p.likesCount || 0, Array.isArray(p.comments) ? p.comments.length : (p.commentsCount || 0),
-            p.sharesCount || 0, p.repostsCount || 0, p.visibility || 'public',
-            p.timestamp || Date.now()
-          );
-        }
-      }
-
-
       // Migrate Users
       if (Array.isArray(data.users)) {
         const stmt = this.db.prepare(`
@@ -6143,17 +6097,18 @@ this.db.exec('COMMIT;');
           'SELECT attempts, first_attempt_at, last_attempt_at, locked_until FROM durable_ip_throttles WHERE ip_address = ?'
         ).get(ipAddress) as any;
 
+        const maxIpAttempts = (ipAddress === '127.0.0.1' || ipAddress === '::1') ? 100 : 50;
         if (existingIp && (now - Number(existingIp.last_attempt_at) <= 10 * 60 * 1000)) {
           ipAttempts = Number(existingIp.attempts) + 1;
           ipFirstAttemptAt = Number(existingIp.first_attempt_at);
-          if (ipAttempts >= 10) {
+          if (ipAttempts >= maxIpAttempts) {
             ipLockedUntilVal = now + 15 * 60 * 1000;
           } else {
             ipLockedUntilVal = Number(existingIp.locked_until) || 0;
           }
         }
 
-        if (ipAttempts >= 10) {
+        if (ipAttempts >= maxIpAttempts) {
           isIpLocked = true;
           ipLockedUntil = now + 15 * 60 * 1000;
           ipLockedUntilVal = ipLockedUntil;

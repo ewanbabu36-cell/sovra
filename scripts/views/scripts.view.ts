@@ -17738,6 +17738,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
       // ❄️ Freeze Previous Tab (Scroll & Media Playback)
       const prevTab = document.body.dataset.activeTab || window._currentActiveTab || 'feed';
+      window._prevSovraTab = prevTab;
       if (prevTab && prevTab !== tab) {
         if (prevTab === 'feed' || prevTab === 'friends') {
           tabFreezeState[prevTab] = { scrollY: window.scrollY };
@@ -17989,21 +17990,37 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
       // Dynamic layout adjustments for wide views (Watch, Chat, Admin, Studio, Hub, Calls, Live, Communities, Search, Notifications, Settings)
       const rightRail = document.querySelector('.app-right-rail');
+      const leftRail = document.querySelector('.app-left-rail');
       const centerStage = document.querySelector('.app-center-stage');
       const isWideModule = ['youtube', 'chat', 'admin', 'studio', 'hub', 'calls', 'live', 'communities', 'search', 'notifications', 'settings'].includes(tab);
+      const isDedicatedFullWorkspace = (tab === 'studio' || tab === 'admin');
+
+      if (leftRail) {
+        leftRail.style.display = isDedicatedFullWorkspace ? 'none' : '';
+      }
+
       if (isWideModule) {
         if (rightRail) rightRail.style.display = 'none';
         if (centerStage) {
-          centerStage.style.maxWidth = (tab === 'youtube' || tab === 'studio' || tab === 'live' || tab === 'calls') ? '1400px' : (tab === 'hub' ? '1200px' : (tab === 'chat' || tab === 'communities' ? '1300px' : '1080px'));
+          centerStage.style.maxWidth = isDedicatedFullWorkspace ? '100%' : ((tab === 'youtube' || tab === 'live' || tab === 'calls') ? '1400px' : (tab === 'hub' ? '1200px' : (tab === 'chat' || tab === 'communities' ? '1300px' : '1080px')));
           centerStage.style.width = '100%';
+          if (isDedicatedFullWorkspace) {
+            centerStage.style.margin = '0';
+            centerStage.style.padding = '0';
+          } else {
+            centerStage.style.margin = '';
+            centerStage.style.padding = '';
+          }
         }
       } else {
         if (rightRail) {
-          rightRail.style.display = window.innerWidth > 1250 ? 'flex' : 'none';
+          rightRail.style.display = (tab === 'feed' && window.innerWidth > 1250) ? 'flex' : 'none';
         }
         if (centerStage) {
           centerStage.style.maxWidth = (tab === 'me' || tab === 'peer-profile') ? '920px' : '820px';
           centerStage.style.width = '';
+          centerStage.style.margin = '';
+          centerStage.style.padding = '';
         }
       }
 
@@ -33207,6 +33224,14 @@ _scheduleTargetContext: 'workspace',
             hdEl.style.textDecoration = 'none';
             hdEl.style.color = '#94a3b8';
           }
+          // Dynamic Studio Top Header Sync (Subscribers, Avatar)
+          var topAvEl = document.getElementById('studioTopChannelAvatar');
+          var topSubEl = document.getElementById('studioHeaderSubCount');
+          if (topAvEl) topAvEl.textContent = activeChan.avatar || '🎬';
+          if (topSubEl) {
+            var subNum = activeChan.subscriberCount || activeChan.subscribers || activeChan.subscribersCount || 0;
+            topSubEl.textContent = (typeof formatMetricCount === 'function' ? formatMetricCount(subNum) : subNum) + ' subs';
+          }
           if (typeof window.updateStudioHeaderChanSwitcher === 'function') {
             window.updateStudioHeaderChanSwitcher(activeChan, this.channelsList);
           }
@@ -34252,18 +34277,25 @@ _scheduleTargetContext: 'workspace',
         var tbody = document.getElementById('subtitlesCuesTableBody');
         if (!tbody) return;
         if (!cues || !cues.length) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 25px; color: #64748b;">No subtitle cues found. Add your first caption cue above!</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 48px 20px;">' +
+            '<div style="max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 32px 24px;">' +
+              '<div style="width: 56px; height: 56px; border-radius: 16px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">💬</div>' +
+              '<div style="font-weight: 800; font-size: 1.1rem; color: #ffffff;">No Subtitle Cues Found</div>' +
+              '<div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45;">Enter start/end timestamps and caption text above, or import a .VTT / .SRT file to synchronize subtitles with video streams.</div>' +
+              '<button type="button" class="btn btn-primary" onclick="document.getElementById(&quot;newCueText&quot;).focus()" style="margin-top: 6px; padding: 8px 18px; font-weight: 700; background: linear-gradient(135deg, #0284c7, #6366f1); border: none; border-radius: 10px; color: #fff; cursor: pointer;">+ Add First Cue</button>' +
+            '</div>' +
+          '</td></tr>';
           return;
         }
 
         tbody.innerHTML = cues.map(function(c, idx) {
           var sStr = typeof c.start === 'number' ? '00:0' + Math.floor(c.start / 60) + ':' + (c.start % 60 < 10 ? '0' : '') + (c.start % 60) : c.start;
           var eStr = typeof c.end === 'number' ? '00:0' + Math.floor(c.end / 60) + ':' + (c.end % 60 < 10 ? '0' : '') + (c.end % 60) : c.end;
-          return '<tr>' +
-            '<td style="color: #38bdf8; font-family: monospace;">' + sStr + '</td>' +
-            '<td style="color: #94a3b8; font-family: monospace;">' + eStr + '</td>' +
-            '<td style="color: #f1f5f9;">' + c.text + '</td>' +
-            '<td style="text-align: right;"><button type="button" onclick="SovraCreatorStudioEngine.removeSubtitleCue(' + idx + ')" style="background: none; border: none; color: #ef4444; cursor: pointer; font-weight: 800;">&times;</button></td>' +
+          return '<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">' +
+            '<td style="padding: 10px 12px; color: #38bdf8; font-family: monospace; font-weight: 700; width: 110px;">' + sStr + '</td>' +
+            '<td style="padding: 10px 12px; color: #cbd5e1; font-family: monospace; width: 110px;">' + eStr + '</td>' +
+            '<td style="padding: 10px 12px; color: #ffffff; font-weight: 600;">' + c.text + '</td>' +
+            '<td style="padding: 10px 12px; text-align: right; width: 80px;"><button type="button" onclick="SovraCreatorStudioEngine.removeSubtitleCue(' + idx + ')" style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-weight: 800;" title="Delete cue">&times;</button></td>' +
           '</tr>';
         }).join('');
       },
@@ -34606,17 +34638,17 @@ _scheduleTargetContext: 'workspace',
             return '<span class="studio-audio-waveform-bar" style="height: ' + (val * 0.22) + 'px;"></span>';
           }).join('');
 
-          return '<tr>' +
-            '<td><button type="button" id="audioPlayBtn-' + safeId + '" onclick="SovraCreatorStudioEngine.togglePlayAudioTrack(&quot;' + safeId + '&quot;)" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 1.1rem;">▶</button></td>' +
-            '<td><div style="font-weight: 700; color: #f1f5f9;">' + t.title + '</div><div style="margin-top: 2px;" id="audioWaveformContainer-' + safeId + '">' + waveformBars + '</div></td>' +
-            '<td style="color: #94a3b8;">' + t.artist + '</td>' +
-            '<td><span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 0.7rem;">' + t.genre + '</span></td>' +
-            '<td style="color: #cbd5e1;">' + t.mood + '</td>' +
-            '<td style="color: #94a3b8; font-family: monospace;">' + t.duration + '</td>' +
-            '<td><span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 0.65rem;">' + t.license + '</span></td>' +
-            '<td style="text-align: right;">' +
-              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.attachAudioToProject(&quot;' + t.title + '&quot;)" style="padding: 4px 8px; font-size: 0.72rem; margin-right: 4px;">Attach</button>' +
-              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.downloadAudioTrack(&quot;' + t.title + '&quot;)" style="padding: 4px 8px; font-size: 0.72rem;">⬇️</button>' +
+          return '<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">' +
+            '<td style="padding: 10px 12px; width: 44px;"><button type="button" id="audioPlayBtn-' + safeId + '" onclick="SovraCreatorStudioEngine.togglePlayAudioTrack(&quot;' + safeId + '&quot;)" style="background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center;">▶</button></td>' +
+            '<td style="padding: 10px 12px;"><div style="font-weight: 800; color: #ffffff; font-size: 0.86rem;">' + t.title + '</div><div style="margin-top: 3px;" id="audioWaveformContainer-' + safeId + '">' + waveformBars + '</div></td>' +
+            '<td style="padding: 10px 12px; color: #cbd5e1; font-weight: 600;">' + t.artist + '</td>' +
+            '<td style="padding: 10px 12px;"><span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px;">' + t.genre + '</span></td>' +
+            '<td style="padding: 10px 12px; color: #94a3b8;">' + t.mood + '</td>' +
+            '<td style="padding: 10px 12px; color: #f1f5f9; font-family: monospace; font-weight: 700;">' + t.duration + '</td>' +
+            '<td style="padding: 10px 12px;"><span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 6px;">' + t.license + '</span></td>' +
+            '<td style="padding: 10px 12px; text-align: right; white-space: nowrap;">' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.attachAudioToProject(&quot;' + t.title + '&quot;)" style="padding: 4px 10px; font-size: 0.72rem; border-radius: 6px; margin-right: 4px;">Attach</button>' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.downloadAudioTrack(&quot;' + t.title + '&quot;)" style="padding: 4px 8px; font-size: 0.72rem; border-radius: 6px;">⬇️</button>' +
             '</td>' +
           '</tr>';
         }).join('');
@@ -35426,17 +35458,17 @@ _scheduleTargetContext: 'workspace',
         var self = this;
         container.innerHTML = shelves.map(function(s) {
           var isEnabled = s.enabled !== false;
-          return '<div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 12px;">' +
-            '<div style="display: flex; align-items: center; gap: 8px;">' +
-              '<span style="color: #64748b; font-size: 0.75rem;">☰</span>' +
+          return '<div style="display: flex; justify-content: space-between; align-items: center; background: #090d16; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 10px 14px;">' +
+            '<div style="display: flex; align-items: center; gap: 10px;">' +
+              '<span style="color: #94a3b8; font-size: 0.9rem; cursor: grab;">☰</span>' +
               '<div>' +
-                '<div style="font-size: 0.82rem; font-weight: 700; color: #fff;">' + (s.title || s.type) + '</div>' +
-                '<div style="font-size: 0.68rem; color: #94a3b8;">Type: ' + s.type + '</div>' +
+                '<div style="font-size: 0.88rem; font-weight: 800; color: #ffffff;">' + (s.title || s.type) + '</div>' +
+                '<div style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Channel Section &bull; ' + s.type + '</div>' +
               '</div>' +
             '</div>' +
             '<div style="display: flex; align-items: center; gap: 8px;">' +
-              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.toggleShelfEnabled(&quot;' + s.id + '&quot;, ' + (!isEnabled) + ')" style="padding: 3px 8px; font-size: 0.7rem;">' + (isEnabled ? '🟢 Active' : '⚪ Hidden') + '</button>' +
-              '<button type="button" onclick="SovraCreatorStudioEngine.removeCustomShelf(&quot;' + s.id + '&quot;)" style="background: none; border: none; color: #ef4444; font-size: 0.85rem; cursor: pointer;" title="Remove shelf">🗑️</button>' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.toggleShelfEnabled(&quot;' + s.id + '&quot;, ' + (!isEnabled) + ')" style="padding: 4px 10px; font-size: 0.72rem; border-radius: 6px;">' + (isEnabled ? '🟢 Active' : '⚪ Hidden') + '</button>' +
+              '<button type="button" onclick="SovraCreatorStudioEngine.removeCustomShelf(&quot;' + s.id + '&quot;)" style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; font-size: 0.85rem; cursor: pointer; padding: 4px 8px; border-radius: 6px;" title="Remove section">🗑️</button>' +
             '</div>' +
           '</div>';
         }).join('');
@@ -35508,7 +35540,14 @@ _scheduleTargetContext: 'workspace',
         if (!tbody) return;
 
         if (!playlists.length) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px; color: #64748b;">No playlists found. Create your first curated playlist!</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 48px 20px;">' +
+            '<div style="max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 32px 24px;">' +
+              '<div style="width: 56px; height: 56px; border-radius: 16px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">📁</div>' +
+              '<div style="font-weight: 800; font-size: 1.1rem; color: #ffffff;">No playlists created yet</div>' +
+              '<div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45;">Create curated video playlists to organize and showcase your channel content for your subscribers.</div>' +
+              '<button type="button" class="btn btn-primary" onclick="SovraCreatorStudioEngine.openCreatePlaylistModal()" style="margin-top: 6px; padding: 8px 18px; font-weight: 700; background: linear-gradient(135deg, #0284c7, #6366f1); border: none; border-radius: 10px; color: #fff; cursor: pointer;">+ Create First Playlist</button>' +
+            '</div>' +
+          '</td></tr>';
           return;
         }
 
@@ -35859,7 +35898,14 @@ _scheduleTargetContext: 'workspace',
         var tbody = document.getElementById('studioContentTableBody');
         if (!tbody) return;
         if (!items || !items.length) {
-          tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px; color: #64748b;">No creator dispatches found. Upload your first video in Ingest!</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 48px 20px;">' +
+            '<div style="max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 32px 24px;">' +
+              '<div style="width: 56px; height: 56px; border-radius: 16px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">🎬</div>' +
+              '<div style="font-weight: 800; font-size: 1.1rem; color: #ffffff;">No creator dispatches found</div>' +
+              '<div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45;">Upload your first video to start broadcasting 4K multi-bitrate HLS streams across the decentralized mesh.</div>' +
+              '<button type="button" class="btn btn-primary" onclick="SovraCreatorStudioEngine.switchStudioTab(&quot;ingest&quot;)" style="margin-top: 6px; padding: 8px 18px; font-weight: 700; background: linear-gradient(135deg, #f43f5e, #8b5cf6); border: none; border-radius: 10px; color: #fff; cursor: pointer;">+ Ingest First Video</button>' +
+            '</div>' +
+          '</td></tr>';
           return;
         }
 
@@ -35883,16 +35929,18 @@ _scheduleTargetContext: 'workspace',
           var isChecked = self.selectedContentIds && self.selectedContentIds.indexOf(safeId) !== -1;
           var checkboxCell = '<td style="width: 36px; padding: 10px 8px; text-align: center;"><input type="checkbox" class="studio-video-select-cb" data-id="' + safeId + '"' + (isChecked ? ' checked' : '') + ' onchange="SovraCreatorStudioEngine.handleRowCheckboxChange()"></td>';
 
-          return '<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">' +
+          return '<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">' +
             checkboxCell +
-            '<td style="padding: 10px 8px; display: flex; align-items: center; gap: 10px;">' +
-              '<img src="' + thumb + '" style="width: 58px; height: 34px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">' +
-              '<div style="min-width: 0;">' +
-                '<div style="font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; display: flex; align-items: center; gap: 5px;" title="' + title + '">' +
-                  (isPinned ? '<span style="color:#f59e0b; font-size:0.75rem;">📌</span> ' : '') +
-                  '<span>' + title + '</span>' +
+            '<td style="padding: 10px 8px;">' +
+              '<div style="display: flex; align-items: center; gap: 10px;">' +
+                '<img src="' + thumb + '" style="width: 58px; height: 34px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">' +
+                '<div style="min-width: 0;">' +
+                  '<div style="font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; display: flex; align-items: center; gap: 5px;" title="' + title + '">' +
+                    (isPinned ? '<span style="color:#f59e0b; font-size:0.75rem;">📌</span> ' : '') +
+                    '<span>' + title + '</span>' +
+                  '</div>' +
+                  '<div style="font-size: 0.7rem; color: #94a3b8;">' + (item.duration || '2:00') + ' &bull; 4K HLS &bull; <span style="color:#34d399; font-weight:700;">🟢 ' + seeders + ' seeders</span></div>' +
                 '</div>' +
-                '<div style="font-size: 0.7rem; color: #94a3b8;">' + (item.duration || '2:00') + ' &bull; 4K HLS &bull; <span style="color:#34d399; font-weight:700;">🟢 ' + seeders + ' seeders</span></div>' +
               '</div>' +
             '</td>' +
             '<td style="padding: 10px 8px;">' + gatingBadge + '</td>' +
