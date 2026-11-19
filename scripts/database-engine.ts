@@ -2732,7 +2732,13 @@ export class SovraDatabaseEngine {
     }
     if (!Array.isArray(this.db.video_likes)) this.db.video_likes = [];
     if (!Array.isArray(this.db.user_sessions)) this.db.user_sessions = [];
-    if (!Array.isArray(this.db.friend_relationships)) this.db.friend_relationships = [];
+    if (!Array.isArray(this.db.friend_relationships)) {
+      this.db.friend_relationships = [];
+    } else {
+      this.db.friend_relationships = this.db.friend_relationships.filter(
+        r => r && r.fromDid && r.toDid && r.fromDid !== r.toDid
+      );
+    }
     if (!Array.isArray(this.db.notifications)) this.db.notifications = [];
     if (!Array.isArray(this.db.channel_membership_tiers)) this.db.channel_membership_tiers = [];
     if (!Array.isArray(this.db.channel_paid_subscriptions)) this.db.channel_paid_subscriptions = [];
@@ -5957,6 +5963,9 @@ export class SovraDatabaseEngine {
 
   public sendFriendRequest(fromDid: string, toDid: string): FriendRelationshipRecord {
     this.load();
+    if (!fromDid || !toDid || fromDid === toDid) {
+      throw new Error('Cannot send friend request to yourself or invalid DID');
+    }
     const existing = this.db.friend_relationships.find(
       r => (r.fromDid === fromDid && r.toDid === toDid) || (r.fromDid === toDid && r.toDid === fromDid)
     );
@@ -6018,29 +6027,14 @@ export class SovraDatabaseEngine {
     return rel;
   }
 
-  public acceptDirectChatRequest(userDid: string, contactDid: string): FriendRelationshipRecord {
+  public acceptDirectChatRequest(userDid: string, contactDid: string): { ok: boolean } {
     this.load();
-    let rel = this.db.friend_relationships.find(
-      r => (r.fromDid === userDid && r.toDid === contactDid) || (r.fromDid === contactDid && r.toDid === userDid)
-    );
-    const now = Date.now();
-    if (!rel) {
-      rel = {
-        id: 'rel-' + now,
-        fromDid: contactDid,
-        toDid: userDid,
-        status: 'accepted',
-        createdAt: now,
-        updatedAt: now,
-      };
-      this.db.friend_relationships.push(rel);
-    } else {
-      rel.status = 'accepted';
-      rel.updatedAt = now;
+    if (!userDid || !contactDid || userDid === contactDid) {
+      return { ok: false };
     }
-    this.logActivity('FRIEND_ACCEPTED', userDid, userDid.slice(-8), `Accepted direct chat request from ${contactDid.slice(-8)}`);
+    this.logActivity('CHAT_REQUEST_ACCEPTED', userDid, userDid.slice(-8), `Accepted direct chat request from ${contactDid.slice(-8)}`);
     this.save();
-    return rel;
+    return { ok: true };
   }
 
   public removeFriendship(userDidA: string, userDidB: string): boolean {
