@@ -9229,6 +9229,7 @@ export class SovraDatabaseEngine {
         if (updates.category) vid.category = String(updates.category).trim();
         if (updates.chapters) vid.chapters = updates.chapters;
         if (updates.monetization) vid.monetization = updates.monetization;
+        if (updates.monetizationGating !== undefined) (vid as any).monetizationGating = updates.monetizationGating;
         if (updates.thumbnailUrl) vid.thumbnailUrl = updates.thumbnailUrl;
         if (updates.subtitleTracks) (vid as any).subtitleTracks = updates.subtitleTracks;
         if (updates.endScreenVideoId !== undefined) (vid as any).endScreenVideoId = updates.endScreenVideoId;
@@ -9247,6 +9248,7 @@ export class SovraDatabaseEngine {
         if (updates.category) job.category = String(updates.category).trim();
         if (updates.chapters) job.chapters = updates.chapters;
         if (updates.monetization) job.monetization = updates.monetization;
+        if (updates.monetizationGating !== undefined) (job as any).monetizationGating = updates.monetizationGating;
         if (updates.thumbnailUrl) job.thumbnailUrl = updates.thumbnailUrl;
         if (updates.subtitleTracks) (job as any).subtitleTracks = updates.subtitleTracks;
         if (updates.endScreenVideoId !== undefined) (job as any).endScreenVideoId = updates.endScreenVideoId;
@@ -9390,7 +9392,10 @@ export class SovraDatabaseEngine {
       if (chan) {
         if (data.channelName) chan.name = data.channelName;
         if (data.channelBio) chan.desc = data.channelBio;
-        if (data.channelAvatar) chan.avatar = data.channelAvatar;
+        if (data.channelAvatar || data.avatar) chan.avatar = data.channelAvatar || data.avatar;
+        if (data.channelBanner || data.bannerUrl) (chan as any).bannerUrl = data.channelBanner || data.bannerUrl;
+        if (data.watermark) (chan as any).watermark = data.watermark;
+        if (data.socialLinks !== undefined) (chan as any).socialLinks = data.socialLinks;
         if (cleanHandle) chan.handle = cleanHandle;
         if (data.trailerVideoId) chan.trailerVideoId = data.trailerVideoId;
         if (data.featuredVideoId) chan.featuredVideoId = data.featuredVideoId;
@@ -9770,7 +9775,7 @@ export class SovraDatabaseEngine {
   public moderateComment(
     videoId: string,
     commentId: string,
-    action: 'approve' | 'reject' | 'delete' | 'hide_user' | 'report_spam'
+    action: 'approve' | 'reject' | 'delete' | 'hide_user' | 'report_spam' | 'heart' | 'pin'
   ): { ok: boolean; comment?: YoutubeCommentRecord } {
     this.load();
     const comments = (this.db.video_comments && this.db.video_comments[videoId]) || [];
@@ -9792,6 +9797,14 @@ export class SovraDatabaseEngine {
       comm.moderationState = 'SPAM';
     } else if (action === 'hide_user') {
       comm.moderationState = 'HIDDEN';
+    } else if (action === 'heart') {
+      comm.isHearted = !comm.isHearted;
+    } else if (action === 'pin') {
+      const targetPinState = !comm.isPinned;
+      if (targetPinState) {
+        comments.forEach(c => { (c as any).isPinned = false; });
+      }
+      comm.isPinned = targetPinState;
     }
     this.save();
     return { ok: true, comment: comm };

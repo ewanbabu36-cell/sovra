@@ -6975,7 +6975,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                         <label for="customAvatarInput" class="btn btn-secondary" style="font-size: 0.75rem; padding: 6px 14px; cursor: pointer; display: inline-block;">
                           Upload Avatar
                         </label>
-                        <input type="file" id="customAvatarInput" accept="image/*" style="display: none;">
+                        <input type="file" id="customAvatarInput" accept="image/*" style="display: none;" onchange="SovraCreatorStudioEngine.handleAvatarUploaded(event)">
                       </div>
                     </div>
 
@@ -6997,7 +6997,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       <label for="customWatermarkInput" class="btn btn-secondary" style="font-size: 0.75rem; padding: 6px 14px; cursor: pointer; display: inline-block;">
                         Upload Watermark
                       </label>
-                      <input type="file" id="customWatermarkInput" accept="image/*" style="display: none;">
+                      <input type="file" id="customWatermarkInput" accept="image/*" style="display: none;" onchange="SovraCreatorStudioEngine.handleWatermarkUploaded(event)">
                     </div>
                   </div>
                 </div>
@@ -7112,6 +7112,51 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       <label for="studioWsCustomThumbInput" class="btn btn-secondary" style="flex: 1; font-size: 0.75rem; text-align: center; cursor: pointer; padding: 0.5rem;">🖼️ Upload Custom Image</label>
                       <input type="file" id="studioWsCustomThumbInput" accept="image/*" style="display: none;" onchange="SovraCreatorStudioEngine.handleCustomThumbSelected(event)">
                       <div id="studioWsSelectedThumbBadge" style="font-size: 0.72rem; color: #34d399; font-weight: 700;">● Default Active</div>
+                    </div>
+                  </div>
+
+                  <!-- Live Streaming & RTMP Ingest Keys Card -->
+                  <div class="card" id="studioLiveIngestCard" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.1rem;">📡</span>
+                        <div>
+                          <div style="font-weight: 800; font-size: 0.95rem; color: #fff;">Live Streaming &amp; RTMP Ingest</div>
+                          <div style="font-size: 0.72rem; color: #94a3b8;">Stream via OBS Studio, Streamlabs, or vMix directly into the peer mesh</div>
+                        </div>
+                      </div>
+                      <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.68rem; padding: 2px 8px; border-radius: 6px;">● Ready</span>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                      <div>
+                        <label style="display: block; font-size: 0.72rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">STREAM URL (RTMP SERVER)</label>
+                        <div style="display: flex; gap: 6px;">
+                          <input type="text" id="studioRtmpStreamUrl" readonly value="rtmp://live.sovra.network/live" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #38bdf8; font-size: 0.78rem; font-family: monospace;">
+                          <button type="button" class="btn btn-secondary" id="btnCopyRtmpUrl" onclick="SovraCreatorStudioEngine.copyRtmpUrl()" style="padding: 6px 10px; font-size: 0.75rem;">Copy</button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                          <label style="font-size: 0.72rem; color: #94a3b8; font-weight: 700;">STREAM KEY (PASTE IN OBS)</label>
+                          <span style="font-size: 0.68rem; color: #eab308;">⚠️ Keep private</span>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                          <input type="password" id="studioRtmpStreamKey" value="live_sk_sovra_98a72f0b4d1c" readonly style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem; font-family: monospace;">
+                          <button type="button" class="btn btn-secondary" id="btnToggleStreamKey" onclick="SovraCreatorStudioEngine.toggleStreamKeyVisibility()" style="padding: 6px 10px; font-size: 0.75rem;">Reveal</button>
+                          <button type="button" class="btn btn-secondary" id="btnCopyStreamKey" onclick="SovraCreatorStudioEngine.copyStreamKey()" style="padding: 6px 10px; font-size: 0.75rem;">Copy</button>
+                          <button type="button" class="btn btn-secondary" id="btnResetStreamKey" onclick="SovraCreatorStudioEngine.resetStreamKey()" style="padding: 6px 10px; font-size: 0.75rem; color: #ef4444;" title="Reset Stream Key">Reset</button>
+                        </div>
+                      </div>
+
+                      <div style="padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                          <div style="font-size: 0.78rem; font-weight: 700; color: #fff;">Ultra-Low Latency Mode</div>
+                          <div style="font-size: 0.7rem; color: #94a3b8;">Sub-1.5s delay via WebRTC mesh relay</div>
+                        </div>
+                        <input type="checkbox" id="studioRtmpLowLatency" checked onchange="SovraCreatorStudioEngine.toggleLowLatency(this.checked)" style="cursor: pointer; width: 18px; height: 18px; accent-color: #38bdf8;">
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -7705,6 +7750,64 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
           <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.closeVideoDetailsModal()" style="font-size: 0.8rem; padding: 8px 16px;">Cancel</button>
           <button type="button" class="btn btn-primary" id="btnSaveVideoDetails" onclick="SovraCreatorStudioEngine.saveVideoDetails()" style="font-size: 0.8rem; padding: 8px 20px; font-weight: 800; background: linear-gradient(135deg, #0284c7, #6366f1);">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- 3.1 MODAL: LOSSLESS VIDEO TRIMMER & TIMELINE SCRUBBER       -->
+    <!-- ========================================================== -->
+    <div class="studio-modal-backdrop" id="studioVideoTrimmerModal" style="display: none;">
+      <div class="studio-modal-card" style="max-width: 640px;">
+        <!-- Modal Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3rem;">✂️</span>
+            <div>
+              <div style="font-weight: 800; font-size: 1.1rem; color: #fff;">Lossless Video Trimmer</div>
+              <div style="font-size: 0.75rem; color: #94a3b8;" id="trimModalSubtitle">Set lossless start and end boundaries without quality loss</div>
+            </div>
+          </div>
+          <button type="button" id="closeVideoTrimmerModalBtn" onclick="SovraCreatorStudioEngine.closeVideoTrimmerModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+
+        <!-- Modal Body -->
+        <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+          <input type="hidden" id="studioTrimVideoId">
+          
+          <!-- Video Player Preview -->
+          <div style="background: #000; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); position: relative;">
+            <video id="studioTrimVideoPlayer" controls style="width: 100%; max-height: 280px; display: block; object-fit: contain;"></video>
+          </div>
+
+          <!-- Timeline Scrubber & Trim Sliders -->
+          <div style="background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #94a3b8; font-weight: 700;">
+              <span>TIMELINE BOUNDARIES</span>
+              <span id="studioTrimDurationLabel" style="color: #38bdf8;">Duration: 0.0s</span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="display: block; font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">START OFFSET (SEC)</label>
+                <input type="number" id="studioTrimStartSec" value="0" min="0" step="0.5" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.85rem;" oninput="SovraCreatorStudioEngine.onTrimInputChange()">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">END OFFSET (SEC)</label>
+                <input type="number" id="studioTrimEndSec" value="60" min="0.5" step="0.5" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.85rem;" oninput="SovraCreatorStudioEngine.onTrimInputChange()">
+              </div>
+            </div>
+
+            <div>
+              <input type="range" id="studioTrimRangeSlider" min="0" max="100" value="0" style="width: 100%; cursor: pointer;" oninput="SovraCreatorStudioEngine.onTrimSliderChange(this.value)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
+          <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.closeVideoTrimmerModal()" style="font-size: 0.8rem; padding: 8px 16px;">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btnApplyVideoTrim" onclick="SovraCreatorStudioEngine.applyVideoTrim()" style="font-size: 0.8rem; padding: 8px 20px; font-weight: 800; background: linear-gradient(135deg, #f43f5e, #8b5cf6);">Apply Trim</button>
         </div>
       </div>
     </div>

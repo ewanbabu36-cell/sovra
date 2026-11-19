@@ -1450,7 +1450,7 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
 
   // 18. POST /api/studio/customization/save - Save Channel Customization & Branding
   if (url.pathname === '/api/studio/customization/save' && req.method === 'POST') {
-    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    const { body, ok } = await readBoundedBody(req, res, 2 * 1024 * 1024);
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body);
@@ -1467,6 +1467,10 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
         if (match) {
           if (parsed.channelName) match.name = parsed.channelName;
           if (parsed.channelBio) match.desc = parsed.channelBio;
+          if (parsed.channelAvatar || parsed.avatar) match.avatar = parsed.channelAvatar || parsed.avatar;
+          if (parsed.channelBanner || parsed.bannerUrl) match.bannerUrl = parsed.channelBanner || parsed.bannerUrl;
+          if (parsed.watermark) match.watermark = parsed.watermark;
+          if (parsed.socialLinks !== undefined) match.socialLinks = parsed.socialLinks;
           if (cleanHandle) match.handle = cleanHandle;
           if (parsed.trailerVideoId) match.trailerVideoId = parsed.trailerVideoId;
           if (parsed.featuredVideoId) match.featuredVideoId = parsed.featuredVideoId;
