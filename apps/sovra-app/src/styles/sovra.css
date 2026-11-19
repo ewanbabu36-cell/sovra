@@ -2542,18 +2542,40 @@
     #studioChannelSummaryCard,
     #studioRecentCommentsCard,
     #studioNewsCard,
-    #studioCreatorInsiderCard {
+    #studioCreatorInsiderCard,
+    #studioSectionContent .card,
+    #studioSectionPlaylists .card,
+    #studioSectionAnalytics .card,
+    #studioSectionComments .card,
+    #studioSectionCommunity .card,
+    #studioSectionSubtitles .card,
+    #studioSectionCustomization .card,
+    #studioSectionAudio .card,
+    #studioSectionEarn .card,
+    #studioSectionCopyright .card,
+    #studioSectionSettings .card,
+    #studioSectionFeedback .card {
       background: #0f172a !important;
       background-color: #0f172a !important;
       border: 1px solid rgba(255, 255, 255, 0.14) !important;
       border-radius: 16px !important;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
       opacity: 1 !important;
       visibility: visible !important;
       position: relative !important;
+      color: #f1f5f9 !important;
     }
 
-    /* High-Contrast Studio Typography */
+    /* Complete Studio High-Contrast Typography System (Eliminates All Camouflaged & Invisible Text) */
+    body.tab-active-studio,
+    body.tab-active-studio .app-center-stage,
+    body.tab-active-studio .main-content,
+    #studio-view,
+    .studio-main-viewport,
+    .studio-main-workspace {
+      color: #f1f5f9 !important;
+    }
+
     #studio-view h1,
     #studio-view h2,
     #studio-view h3,
@@ -2567,7 +2589,9 @@
     .studio-main-workspace h3,
     .studio-main-workspace h4,
     .studio-main-workspace .card-title,
-    .studio-main-workspace .studio-card-title {
+    .studio-main-workspace .studio-card-title,
+    .studio-main-workspace strong,
+    .studio-main-workspace b {
       color: #ffffff !important;
       opacity: 1 !important;
       visibility: visible !important;
@@ -2575,67 +2599,118 @@
     }
 
     #studio-view p,
-    #studio-view div:not(.badge):not(.badge-accent),
-    #studio-view span:not(.badge):not(.badge-accent),
     .studio-main-viewport p,
-    .studio-main-viewport div:not(.badge):not(.badge-accent),
-    .studio-main-viewport span:not(.badge):not(.badge-accent),
-    .studio-main-workspace p,
-    .studio-main-workspace div:not(.badge):not(.badge-accent),
-    .studio-main-workspace span:not(.badge):not(.badge-accent),
-    .studio-main-workspace label,
-    .studio-main-workspace td {
+    .studio-main-workspace p {
+      color: #cbd5e1 !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      line-height: 1.45 !important;
+    }
+
+    #studio-view label,
+    .studio-main-workspace label {
+      color: #cbd5e1 !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      font-weight: 700 !important;
+    }
+
+    #studio-view div:not(.badge):not(.badge-accent):not(.studio-audio-waveform-bar),
+    .studio-main-viewport div:not(.badge):not(.badge-accent):not(.studio-audio-waveform-bar),
+    .studio-main-workspace div:not(.badge):not(.badge-accent):not(.studio-audio-waveform-bar),
+    .studio-main-workspace span:not(.badge):not(.badge-accent):not(.studio-audio-waveform-bar) {
       opacity: 1 !important;
       visibility: visible !important;
     }
 
+    /* Override any body.theme-normal text darkening inside Studio */
+    body.theme-normal #studio-view [style*="color: #fff"],
+    body.theme-normal #studio-view [style*="color:#fff"],
+    body.theme-normal #studio-view [style*="color: #ffffff"],
+    body.theme-normal #studio-view [style*="color: #f1f5f9"],
+    body.theme-normal #studio-view [style*="color: #cbd5e1"],
+    body.theme-normal #studio-view [style*="color: #94a3b8"],
+    body.theme-normal #studio-view [style*="color: #64748b"],
+    body.theme-normal #studio-view h1,
+    body.theme-normal #studio-view h2,
+    body.theme-normal #studio-view h3,
+    body.theme-normal #studio-view h4,
+    body.theme-normal #studio-view p,
+    body.theme-normal #studio-view td,
+    body.theme-normal #studio-view th,
+    body.theme-normal #studio-view label {
+      color: #f1f5f9 !important;
+    }
+
+    body.theme-normal #studio-view h1,
+    body.theme-normal #studio-view h2,
+    body.theme-normal #studio-view h3,
+    body.theme-normal #studio-view h4 {
+      color: #ffffff !important;
+    }
+
+    body.theme-normal #studio-view th {
+      color: #94a3b8 !important;
+    }
+
     /* Content & Playlists Table High-Contrast System */
-    .studio-content-table {
+    #studio-view .studio-content-table {
       width: 100% !important;
       border-collapse: separate !important;
       border-spacing: 0 !important;
       color: #f1f5f9 !important;
     }
-    .studio-content-table th {
-      background: rgba(15, 23, 42, 0.98) !important;
+    #studio-view .studio-content-table th {
+      background: #1e293b !important;
       color: #94a3b8 !important;
       font-size: 0.72rem !important;
-      font-weight: 700 !important;
+      font-weight: 800 !important;
       text-transform: uppercase !important;
       letter-spacing: 0.05em !important;
-      padding: 10px 12px !important;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.12) !important;
+      padding: 11px 12px !important;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.16) !important;
       text-align: left !important;
       vertical-align: middle !important;
+      opacity: 1 !important;
+      visibility: visible !important;
     }
-    .studio-content-table td {
+    #studio-view .studio-content-table td {
       padding: 12px !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
       vertical-align: middle !important;
-      color: #e2e8f0 !important;
+      color: #f1f5f9 !important;
+      background: #0f172a !important;
+      opacity: 1 !important;
+      visibility: visible !important;
     }
-    .studio-content-table tr:hover td {
-      background: rgba(255, 255, 255, 0.03) !important;
+    #studio-view .studio-content-table tr:hover td {
+      background: #1e293b !important;
     }
 
     /* Studio Form Controls */
+    #studio-view input[type="text"],
+    #studio-view input[type="search"],
+    #studio-view select,
+    #studio-view textarea,
     .studio-main-workspace input[type="text"],
     .studio-main-workspace input[type="search"],
     .studio-main-workspace select,
     .studio-main-workspace textarea {
-      background: rgba(15, 23, 42, 0.95) !important;
-      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+      background: #090d16 !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
       color: #ffffff !important;
       opacity: 1 !important;
       visibility: visible !important;
+      border-radius: 8px !important;
     }
 
     /* Analytics Metric Cards */
     .studio-metric-card {
       background: #0f172a !important;
-      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
       border-radius: 14px !important;
       padding: 1.1rem 1.25rem !important;
+      color: #f1f5f9 !important;
     }
     .studio-sidebar-footer {
       margin-top: auto;

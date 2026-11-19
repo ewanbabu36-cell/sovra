@@ -21280,12 +21280,18 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     window.addEventListener('resize', function() {
       const curTab = document.body.dataset.activeTab || 'feed';
       const rRail = document.querySelector('.app-right-rail');
-      if (curTab === 'youtube' || curTab === 'chat' || curTab === 'admin') {
+      const lRail = document.querySelector('.app-left-rail');
+      if (curTab === 'studio' || curTab === 'admin') {
         if (rRail) rRail.style.display = 'none';
+        if (lRail) lRail.style.display = 'none';
+      } else if (curTab === 'youtube' || curTab === 'chat' || curTab === 'calls' || curTab === 'live') {
+        if (rRail) rRail.style.display = 'none';
+        if (lRail) lRail.style.display = '';
       } else {
         if (rRail) {
           rRail.style.display = window.innerWidth > 1250 ? 'flex' : 'none';
         }
+        if (lRail) lRail.style.display = '';
       }
     });
 
@@ -34634,7 +34640,12 @@ _scheduleTargetContext: 'workspace',
 
         tbody.innerHTML = tracks.map(function(t) {
           var safeId = t.id;
-          var waveformBars = (t.waveform || [20, 40, 60, 80, 50, 30]).map(function(val) {
+          var wf = Array.isArray(t.waveform)
+            ? t.waveform
+            : (typeof t.waveform === 'string'
+                ? t.waveform.trim().split(/\s+/).map(Number)
+                : [20, 40, 60, 80, 50, 30]);
+          var waveformBars = wf.map(function(val) {
             return '<span class="studio-audio-waveform-bar" style="height: ' + (val * 0.22) + 'px;"></span>';
           }).join('');
 
