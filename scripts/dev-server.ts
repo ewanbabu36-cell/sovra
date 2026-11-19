@@ -852,66 +852,230 @@ async function bootstrapLocalNode() {
   await node.pubsub.subscribe('sovra/feed/main', async msg => {
     try {
       const parsed = JSON.parse(new TextDecoder().decode(msg.data));
-      if (parsed && typeof parsed === 'object') {
-        const pId = parsed.id || ('p2p-' + Date.now());
-        const authorDid = parsed.authorDid || parsed.pubkey || 'did:key:unknown';
-        const content = parsed.content || parsed.caption || '';
-        const topic = parsed.topic || 'sovra/feed/main';
-        const timestamp = parsed.timestamp || parsed.createdAt || Date.now();
-        const signatureHex = parsed.signatureHex || parsed.sig || ('ed25519_sig_' + pId);
+      if (!parsed || typeof parsed !== 'object') return;
 
-        // 🛡️ Sybil Defense: Decentralized Hashcash Proof-of-Work verification
-        if (parsed.powNonce !== undefined) {
-          const reqDiff = Math.min(24, Math.max(8, Number(parsed.powDifficulty || 12)));
-          const isPoWValid = verifyProofOfWork(
-            new TextEncoder().encode(pId),
-            BigInt(parsed.powNonce),
-            reqDiff,
-          );
-          if (!isPoWValid) {
-            console.warn(`[GossipSub] 🛑 Dropping unverified PoW spam envelope ${pId} from ${authorDid}`);
-            return;
+      // 🛡️ Discriminator for State Mutation Types (Comments, Replies, Likes, Reactions, Sync)
+      if (parsed.type === 'FEED_COMMENT_ADDED') {
+        const { postId, comment } = parsed;
+        if (postId && comment && comment.authorDid && comment.text) {
+          const targetPost = sovraDb.getPostById(postId);
+          if (targetPost) {
+            const hasCmt = targetPost.comments?.some((c: any) => c.id === comment.id || (c.text === comment.text && c.authorDid === comment.authorDid && Math.abs((c.timestamp || 0) - (comment.timestamp || 0)) < 10000));
+            if (!hasCmt) {
+              sovraDb.addComment(postId, {
+                author: comment.author || comment.authorName,
+                authorDid: comment.authorDid,
+                authorHandle: comment.authorHandle,
+                text: comment.text,
+                authorAvatar: comment.authorAvatar,
+                authorAvatarDataUrl: comment.authorAvatarDataUrl,
+              });
+              dynamicSocialStore.posts = sovraDb.getAllPosts();
+              broadcastChatEvent('all', { type: 'comment_added', postId, comment }, 'feed_event');
+            }
           }
         }
+        return;
+      }
 
-        const record: PostRecord = {
-          id: pId,
-          authorDid,
-          authorPeerId: parsed.authorPeerId || '',
-          content,
-          topic,
-          isCreatorPost: Boolean(parsed.isCreatorPost),
-          timestamp,
-          signatureHex,
-        };
-        postsStore.unshift(record);
-
-        // Durability: Persist remote gossip post to SQLite if not already stored
-        if (!sovraDb.getPostById(pId)) {
-          const newPost = sovraDb.createPost({
-            id: pId,
-            authorDid,
-            authorName: parsed.authorName || parsed.author || 'P2P Peer',
-            caption: content,
-            postType: parsed.postType || 'text',
-            visibility: parsed.visibility || 'public',
-            timestamp,
+      if (parsed.type === 'FEED_COMMENT_REPLY_ADDED') {
+        const { postId, commentId, reply } = parsed;
+        if (postId && commentId && reply && reply.authorDid && reply.text) {
+          sovraDb.addCommentReply(postId, commentId, {
+            author: reply.author || reply.authorName,
+            authorDid: reply.authorDid,
+            authorHandle: reply.authorHandle,
+            text: reply.text,
+            authorAvatar: reply.authorAvatar,
+            authorAvatarDataUrl: reply.authorAvatarDataUrl,
           });
-          indexPostInSearch(newPost);
+          dynamicSocialStore.posts = sovraDb.getAllPosts();
+          broadcastChatEvent('all', { type: 'comment_reply_added', postId, commentId, reply }, 'feed_event');
+        }
+        return;
+      }
+
+      if (parsed.type === 'FEED_COMMENT_LIKED') {
+        const { postId, commentId, userDid, isLiked } = parsed;
+        if (postId && commentId && userDid) {
+          sovraDb.likeComment(postId, commentId, userDid, isLiked ? 'LIKE' : 'UNLIKE');
+          dynamicSocialStore.posts = sovraDb.getAllPosts();
+          broadcastChatEvent('all', { type: 'comment_liked', postId, commentId, userDid, isLiked }, 'feed_event');
+        }
+        return;
+      }
+
+      if (parsed.type === 'FEED_POST_REACTED') {
+        const { postId, emoji, userDid } = parsed;
+        if (postId && emoji && userDid) {
+          sovraDb.reactToPost(postId, userDid, emoji);
+          dynamicSocialStore.posts = sovraDb.getAllPosts();
+          broadcastChatEvent('all', { type: 'post_reacted', postId, emoji, userDid }, 'feed_event');
+        }
+        return;
+      }
+
+      // 🔄 Anti-Entropy Catch-Up: Initial Feed Sync Handshake
+      if (parsed.type === 'FEED_SYNC_REQUEST') {
+        try {
+          const recentPosts = sovraDb.getAllPosts().slice(0, 50);
+          const syncResp = {
+            type: 'FEED_SYNC_RESPONSE',
+            requesterPeerId: parsed.requesterPeerId,
+            posts: recentPosts,
+            timestamp: Date.now(),
+          };
+          await node.pubsub.publish('sovra/feed/main', new TextEncoder().encode(JSON.stringify(syncResp)));
+        } catch (_) {}
+        return;
+      }
+
+      if (parsed.type === 'FEED_SYNC_RESPONSE') {
+        if (Array.isArray(parsed.posts)) {
+          for (const p of parsed.posts) {
+            if (p && p.id && !sovraDb.getPostById(p.id)) {
+              const newPost = sovraDb.createPost({
+                id: p.id,
+                authorDid: p.authorDid || 'did:key:unknown',
+                authorName: p.authorName || p.author || 'P2P Peer',
+                caption: p.caption || p.content || '',
+                postType: p.postType || 'text',
+                mediaCid: p.mediaCid,
+                visibility: p.visibility || 'public',
+                timestamp: p.timestamp || Date.now(),
+              });
+              indexPostInSearch(newPost);
+            }
+          }
           dynamicSocialStore.posts = sovraDb.getAllPosts();
         }
-
-        localFeed.appendEvent({
-          id: pId,
-          pubkey: authorDid,
-          createdAt: Math.floor(timestamp / 1000),
-          kind: 1,
-          tags: [['topic', topic]],
-          content,
-          sig: signatureHex,
-        });
+        return;
       }
+
+      // Default: Root Post Record
+      const pId = parsed.id || ('p2p-' + Date.now());
+      const authorDid = parsed.authorDid || parsed.pubkey || 'did:key:unknown';
+      const content = parsed.content || parsed.caption || '';
+      const topic = parsed.topic || 'sovra/feed/main';
+      const timestamp = parsed.timestamp || parsed.createdAt || Date.now();
+      const signatureHex = parsed.signatureHex || parsed.sig || ('ed25519_sig_' + pId);
+
+      // 🛡️ Sybil Defense: Decentralized Hashcash Proof-of-Work verification
+      if (parsed.powNonce !== undefined) {
+        const reqDiff = Math.min(24, Math.max(8, Number(parsed.powDifficulty || 12)));
+        const isPoWValid = verifyProofOfWork(
+          new TextEncoder().encode(pId),
+          BigInt(parsed.powNonce),
+          reqDiff,
+        );
+        if (!isPoWValid) {
+          console.warn(`[GossipSub] 🛑 Dropping unverified PoW spam envelope ${pId} from ${authorDid}`);
+          return;
+        }
+      }
+
+      const record: PostRecord = {
+        id: pId,
+        authorDid,
+        authorPeerId: parsed.authorPeerId || '',
+        content,
+        topic,
+        isCreatorPost: Boolean(parsed.isCreatorPost),
+        timestamp,
+        signatureHex,
+      };
+      postsStore.unshift(record);
+
+      // Durability: Persist remote gossip post to SQLite if not already stored
+      if (!sovraDb.getPostById(pId)) {
+        const newPost = sovraDb.createPost({
+          id: pId,
+          authorDid,
+          authorName: parsed.authorName || parsed.author || 'P2P Peer',
+          caption: content,
+          postType: parsed.postType || 'text',
+          visibility: parsed.visibility || 'public',
+          timestamp,
+        });
+        indexPostInSearch(newPost);
+        dynamicSocialStore.posts = sovraDb.getAllPosts();
+      }
+
+      localFeed.appendEvent({
+        id: pId,
+        pubkey: authorDid,
+        createdAt: Math.floor(timestamp / 1000),
+        kind: 1,
+        tags: [['topic', topic]],
+        content,
+        sig: signatureHex,
+      });
     } catch {}
+  });
+
+  // 🤝 Peer-to-Peer Social Friends Mesh (Bilateral Handshake Replication)
+  await node.pubsub.subscribe('sovra/social/friends', async msg => {
+    try {
+      const parsed = JSON.parse(new TextDecoder().decode(msg.data));
+      if (parsed && parsed.rel) {
+        const { type, rel } = parsed;
+        if (rel.fromDid && rel.toDid) {
+          try {
+            if (type === 'friend_request') {
+              sovraDb.sendFriendRequest(rel.fromDid, rel.toDid);
+              sovraDb.addNotification({
+                recipientDid: rel.toDid,
+                senderDid: rel.fromDid,
+                type: 'friend_request',
+                title: 'New Friend Request',
+                body: `${rel.fromName || 'A peer'} sent you a friend request.`,
+                link: '/app#friends',
+                data: rel,
+              });
+            } else if (type === 'friend_respond') {
+              sovraDb.respondFriendRequest(rel.fromDid, rel.toDid, rel.status || 'accepted');
+            }
+          } catch (_) {}
+          broadcastChatEvent(rel.toDid, { type, rel }, 'friend_event');
+        }
+      }
+    } catch (_) {}
+  });
+
+  // 💬 Autonomous Cross-Node P2P Chat Mesh (/sovra/v1/chat/direct)
+  await node.pubsub.subscribe('/sovra/v1/chat/direct', async msg => {
+    try {
+      const payload = JSON.parse(new TextDecoder().decode(msg.data));
+      if (payload && payload.type === 'CHAT_DIRECT_MESSAGE' && payload.record) {
+        const rec = payload.record;
+        const localUser = sovraDb.findUserByDid(rec.recipientDid);
+        if (localUser || rec.recipientDid === masterKey.did) {
+          const existing = sovraDb.getState().chatMessages?.find((m: any) => m.id === rec.id);
+          if (!existing) {
+            sovraDb.appendMessage({
+              id: rec.id,
+              senderDid: rec.senderDid,
+              recipientDid: rec.recipientDid,
+              senderName: rec.senderName,
+              text: rec.rawText || rec.text,
+              ciphertextHex: rec.ciphertextHex,
+              ivHex: rec.ivHex,
+              tagHex: rec.tagHex,
+              isE2EE: rec.isE2EE,
+              attachment: rec.attachment,
+              isAudio: rec.isAudio,
+              audioDurationSec: rec.audioDurationSec,
+              waveformBars: rec.waveformBars,
+              timestamp: rec.timestamp,
+              sentAt: rec.sentAt,
+              disappearingDurationSec: rec.disappearingDurationSec,
+            });
+            broadcastChatEvent(rec.recipientDid, rec);
+            broadcastChatEvent(rec.recipientDid, { type: 'message', messageId: rec.id, senderDid: rec.senderDid }, 'notification');
+          }
+        }
+      }
+    } catch (_) {}
   });
 
   // 🌐 Decentralized CRDT Ops Mesh (/sovra/v1/ops)
@@ -932,15 +1096,37 @@ async function bootstrapLocalNode() {
     } catch (_) {}
   });
 
-  // 📞 Host Sovereign WebRTC Signaling Topic (/sovra/v1/signal/{hostDid})
-  if (masterKey && masterKey.did) {
-    await node.pubsub.subscribe(`/sovra/v1/signal/${masterKey.did}`, async msg => {
-      try {
-        const signal = JSON.parse(new TextDecoder().decode(msg.data));
-        broadcastChatEvent(masterKey.did, signal, 'call_signal');
-      } catch (_) {}
-    });
+  // 📞 Multi-DID Sovereign WebRTC Signaling Topics (/sovra/v1/signal/{did})
+  const allKnownDids = new Set<string>([masterKey.did]);
+  try {
+    for (const u of sovraDb.getAllUsers()) {
+      if (u && u.did) allKnownDids.add(u.did);
+    }
+  } catch (_) {}
+  for (const did of allKnownDids) {
+    if (did) {
+      await node.pubsub.subscribe(`/sovra/v1/signal/${did}`, async msg => {
+        try {
+          const signal = JSON.parse(new TextDecoder().decode(msg.data));
+          broadcastChatEvent(did, signal, 'call_signal');
+        } catch (_) {}
+      }).catch(() => {});
+    }
   }
+
+  // 🔄 Initial Feed Sync Handshake across P2P swarm
+  setTimeout(async () => {
+    try {
+      const syncReq = {
+        type: 'FEED_SYNC_REQUEST',
+        requesterPeerId: binding.peerId,
+        requesterDid: masterKey.did,
+        sinceTimestamp: Math.max(0, Date.now() - 30 * 24 * 3600 * 1000),
+        timestamp: Date.now(),
+      };
+      await node.pubsub.publish('sovra/feed/main', new TextEncoder().encode(JSON.stringify(syncReq))).catch(() => {});
+    } catch (_) {}
+  }, 2500);
 
   await node.pubsub.subscribe('sovra/creator/live');
 
@@ -6102,6 +6288,14 @@ async function startDevServer() {
         }
         const result = sovraDb.reactToPost(postId, principal.did, emoji);
         dynamicSocialStore.posts = sovraDb.getAllPosts();
+        try {
+          await node.pubsub.publish('sovra/feed/main', new TextEncoder().encode(JSON.stringify({
+            type: 'FEED_POST_REACTED',
+            postId,
+            userDid: principal.did,
+            emoji,
+          })));
+        } catch (_) {}
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
       } catch (err: any) {
@@ -7133,6 +7327,7 @@ async function startDevServer() {
       url,
       blindPushRelay,
       storageDaemon,
+      p2pNode: node,
       ATTACHMENTS_DIR,
       broadcastChatEvent,
       validateMediaMagicBytes,

@@ -11199,17 +11199,39 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           ? (myProfile.displayName || myProfile.name).charAt(0).toUpperCase() 
           : ((typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : '👤');
 
+        const renderFallbackCover = function() {
+          coverEl.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ' + fallbackBg + '; font-size: 2.8rem; font-weight: 800; color: #fff;">' + fallbackText + '</div><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+        };
+
         // If an active story exists, show its media preview
         if (activeStoryMedia) {
-          coverEl.innerHTML = '<img src="' + activeStoryMedia + '" alt="Your story" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.onerror=null; this.parentElement.innerHTML=\'<div style=\\\'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ' + fallbackBg + '; font-size: 2.8rem; font-weight: 800; color: #fff;\\\'>' + fallbackText + '</div>\';" /><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+          const img = document.createElement('img');
+          img.src = activeStoryMedia;
+          img.alt = 'Your story';
+          img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block;';
+          img.onerror = renderFallbackCover;
+          coverEl.innerHTML = '';
+          coverEl.appendChild(img);
+          const overlay = document.createElement('div');
+          overlay.style.cssText = 'position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;';
+          coverEl.appendChild(overlay);
           return;
         }
 
         // 2. Otherwise show currently logged-in user\'s profile photo or styled monogram
         if (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) {
-          coverEl.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" alt="Your avatar" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.onerror=null; this.parentElement.innerHTML=\'<div style=\\\'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ' + fallbackBg + '; font-size: 2.8rem; font-weight: 800; color: #fff;\\\'>' + fallbackText + '</div>\';" /><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+          const img = document.createElement('img');
+          img.src = myProfile.avatarDataUrl;
+          img.alt = 'Your avatar';
+          img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block;';
+          img.onerror = renderFallbackCover;
+          coverEl.innerHTML = '';
+          coverEl.appendChild(img);
+          const overlay = document.createElement('div');
+          overlay.style.cssText = 'position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;';
+          coverEl.appendChild(overlay);
         } else {
-          coverEl.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ' + fallbackBg + '; font-size: 2.8rem; font-weight: 800; color: #fff;">' + fallbackText + '</div><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+          renderFallbackCover();
         }
       } catch (e) {
         console.warn('[Stories] updateCreateStoryCoverUI error:', e);
@@ -36101,6 +36123,49 @@ window.SovraCreatorStudioEngine = {
 
       if (typeof showAccountToast === 'function') showAccountToast('🔄 Processing cryptographic transfer...');
 
+      // 🛡️ Zero-Trust Client-Side Signing for Direct CometBFT RPC Execution
+      var clientSig = null;
+      var myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : 'did:sovra:self';
+      if (window.SovraCryptoVault && typeof window.SovraCryptoVault.sign === 'function') {
+        try {
+          var canonicalTx = JSON.stringify({
+            Sender: myDid,
+            Recipient: rec,
+            Amount: String(Math.round(amt * 1000000)),
+            Fee: '0',
+            Timestamp: Date.now()
+          });
+          clientSig = await window.SovraCryptoVault.sign(canonicalTx);
+        } catch (_) {}
+      }
+
+      // Try Direct CometBFT L1 RPC Broadcast first (Zero Server Scaffolding)
+      var directRpcCommitted = false;
+      var directL1TxHash = null;
+      var l1RpcEndpoint = (typeof window.__SOVRA_L1_RPC__ !== 'undefined' && window.__SOVRA_L1_RPC__) ? window.__SOVRA_L1_RPC__ : 'http://127.0.0.1:26657';
+      try {
+        var directPayload = {
+          Sender: myDid,
+          Recipient: rec,
+          Amount: String(Math.round(amt * 1000000)),
+          Fee: '0',
+          PubKeyHex: clientSig ? (clientSig.pubkey || clientSig.did || '') : '',
+          SigHex: clientSig ? clientSig.signatureHex : ''
+        };
+        var rpcDirectRes = await fetch(l1RpcEndpoint + '/broadcast_tx_commit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(directPayload)
+        });
+        if (rpcDirectRes.ok) {
+          var rpcData = await rpcDirectRes.json();
+          if (rpcData && (rpcData.tx_hash || rpcData.hash || (rpcData.check_tx && rpcData.check_tx.code === 0))) {
+            directRpcCommitted = true;
+            directL1TxHash = rpcData.tx_hash || rpcData.hash || 'l1_verified';
+          }
+        }
+      } catch (_) {}
+
       try {
         var res = await fetch('/api/wallet/transfer', {
           method: 'POST',
@@ -36109,7 +36174,9 @@ window.SovraCreatorStudioEngine = {
             recipientDid: rec,
             amount: amt,
             tokenSymbol: 'SOV',
-            memo: 'Spatial CoPilot Transfer'
+            signature: clientSig ? clientSig.signatureHex : undefined,
+            signedTx: directPayload,
+            memo: directRpcCommitted ? ('Direct L1 Tx: ' + directL1TxHash) : 'Spatial CoPilot Transfer'
           })
         });
         var data = await res.json();

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#050810" />
+  <meta name="description" content="Sovra Autonomous Sovereign Protocol Node & PWA Super-App" />
+  <title>SOVRA Protocol • Autonomous Node Cockpit</title>
+  <link rel="stylesheet" href="/static/sovra.css" />
+  <style>
+    :root {
+      --bg-deep: #050810;
+      --bg-card: rgba(15, 23, 42, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #38bdf8;
+      --accent-emerald: #34d399;
+      --accent-purple: #c084fc;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-deep);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+    .protocol-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(5, 8, 16, 0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 1.2rem;
+      color: #fff;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+    }
+    .brand-title {
+      font-weight: 800;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+    .brand-badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(52, 211, 153, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .header-metrics {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .metric-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      padding: 6px 14px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      font-family: monospace;
+    }
+    .metric-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+    }
+    .main-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 16px 80px;
+      width: 100%;
+      flex: 1;
+    }
+    .cockpit-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .cockpit-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .card-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #fff;
+      font-family: monospace;
+    }
+    .card-subtext {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+    .tx-console {
+      background: #020408;
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 24px;
+      font-family: monospace;
+    }
+    .console-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .btn-action {
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-action:hover {
+      opacity: 0.9;
+    }
+    .bottom-dock {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(5, 8, 16, 0.95);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      z-index: 99;
+    }
+    .dock-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 10px;
+    }
+    .dock-tab.active {
+      color: var(--accent-cyan);
+      background: rgba(56, 189, 248, 0.1);
+    }
+    .dock-icon {
+      font-size: 1.25rem;
+    }
+  </style>
+</head>
+<body>
+  <header class="protocol-header">
+    <div class="brand-group">
+      <div class="brand-logo">⚡</div>
+      <div>
+        <div class="brand-title">SOVRA DAEMON</div>
+        <span class="brand-badge">CometBFT L1 Consensus • Autonomous</span>
+      </div>
+    </div>
+    <div class="header-metrics">
+      <div class="metric-pill">
+        <span class="metric-dot"></span>
+        <span>HEIGHT: <b id="headerHeight" style="color:#34d399;">...</b></span>
+      </div>
+      <div class="metric-pill" style="display: none;" id="peerPill">
+        <span>PEERS: <b id="headerPeers" style="color:#38bdf8;">0</b></span>
+      </div>
+      <a href="/query/supply" class="btn-action" style="padding: 6px 12px; font-size: 0.75rem;">Supply Check</a>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <div class="cockpit-grid">
+      <div class="cockpit-card">
+        <div class="card-title">Consensus Block Height</div>
+        <div class="card-value" id="cardHeight">...</div>
+        <div class="card-subtext">CometBFT Byzantine Fault Tolerant Tendermint State</div>
+      </div>
+      <div class="cockpit-card">
+        <div class="card-title">Network Chain ID</div>
+        <div class="card-value" id="cardChain" style="font-size: 1.3rem; color: var(--accent-cyan);">sovra-testnet-0</div>
+        <div class="card-subtext">PoS Invariant Verified</div>
+      </div>
+      <div class="cockpit-card">
+        <div class="card-title">P2P Wire Framing</div>
+        <div class="card-value" style="color: var(--accent-emerald);">SIP-001</div>
+        <div class="card-subtext">0x534F5652 Magic Bytes Active on Port 4001</div>
+      </div>
+      <div class="cockpit-card">
+        <div class="card-title">Decentralized Storage</div>
+        <div class="card-value" style="color: var(--accent-purple);">BitSwap UnixFS</div>
+        <div class="card-subtext">256 KiB Merkle DAG Blocks Seeding</div>
+      </div>
+    </div>
+
+    <div class="tx-console">
+      <div class="console-header">
+        <span style="color: var(--accent-cyan); font-weight: 700;">📡 DIRECT COMETBFT RPC BROADCASTER (Zero-Trust)</span>
+        <button class="btn-action" onclick="fetchNodeStatus()">🔄 Refresh Status</button>
+      </div>
+      <pre id="consoleOutput" style="color: #94a3b8; font-size: 0.85rem; line-height: 1.5; max-height: 250px; overflow-y: auto;">Querying local daemon node status on :26657 / :3001...</pre>
+    </div>
+  </main>
+
+  <nav class="bottom-dock">
+    <a href="#" class="dock-tab active">
+      <span class="dock-icon">⚡</span>
+      <span>Cockpit</span>
+    </a>
+    <a href="/status" class="dock-tab">
+      <span class="dock-icon">📊</span>
+      <span>RPC Status</span>
+    </a>
+    <a href="/query/supply" class="dock-tab">
+      <span class="dock-icon">🪙</span>
+      <span>Supply</span>
+    </a>
+  </nav>
+
+  <script src="/static/sovra.bundle.js" onerror="console.warn('sovra.bundle.js loaded as fallback')"></script>
+  <script>
+    async function fetchNodeStatus() {
+      const out = document.getElementById('consoleOutput');
+      try {
+        const res = await fetch('/status');
+        const data = await res.json();
+        out.innerText = JSON.stringify(data, null, 2);
+        if (data && data.sync_info) {
+          const h = data.sync_info.latest_block_height || '0';
+          document.getElementById('headerHeight').innerText = h;
+          document.getElementById('cardHeight').innerText = h;
+        } else if (data && data.height) {
+          document.getElementById('headerHeight').innerText = data.height;
+          document.getElementById('cardHeight').innerText = data.height;
+        }
+      } catch (err) {
+        out.innerText = 'Connecting to sovrad daemon... ' + err.message;
+      }
+    }
+    fetchNodeStatus();
+    setInterval(fetchNodeStatus, 5000);
+  </script>
+</body>
+</html>
