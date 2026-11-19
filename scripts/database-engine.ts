@@ -9234,6 +9234,8 @@ export class SovraDatabaseEngine {
         if (updates.subtitleTracks) (vid as any).subtitleTracks = updates.subtitleTracks;
         if (updates.endScreenVideoId !== undefined) (vid as any).endScreenVideoId = updates.endScreenVideoId;
         if (updates.endScreenType !== undefined) (vid as any).endScreenType = updates.endScreenType;
+        if (updates.visibility !== undefined) (vid as any).visibility = updates.visibility;
+        if (updates.license !== undefined) (vid as any).license = updates.license;
         this.save();
         return { ok: true, item: vid };
       }
@@ -9253,6 +9255,8 @@ export class SovraDatabaseEngine {
         if (updates.subtitleTracks) (job as any).subtitleTracks = updates.subtitleTracks;
         if (updates.endScreenVideoId !== undefined) (job as any).endScreenVideoId = updates.endScreenVideoId;
         if (updates.endScreenType !== undefined) (job as any).endScreenType = updates.endScreenType;
+        if (updates.visibility !== undefined) (job as any).visibility = updates.visibility;
+        if (updates.license !== undefined) (job as any).license = updates.license;
         this.save();
         return { ok: true, item: job };
       }
