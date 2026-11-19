@@ -6983,6 +6983,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Manage multi-language caption cues, sync timestamps, and export WebVTT</div>
                   </div>
                   <div style="display: flex; gap: 8px;">
+                    <input type="file" id="studioVttFileInput" accept=".vtt,.srt" style="display: none;" onchange="SovraCreatorStudioEngine.uploadWebVTT(event)">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('studioVttFileInput').click()" style="font-size: 0.78rem; padding: 6px 12px;">📤 Import .VTT</button>
                     <button type="button" class="btn btn-secondary" id="btnDownloadVtt" onclick="SovraCreatorStudioEngine.downloadWebVTT()" style="font-size: 0.78rem; padding: 6px 12px;">⬇️ Download .VTT</button>
                     <button type="button" class="btn btn-primary" id="btnSaveSubtitles" onclick="SovraCreatorStudioEngine.saveSubtitles()" style="font-size: 0.78rem; padding: 6px 14px; background: #38bdf8; color: #030712; font-weight: 800;">Save Changes</button>
                   </div>
@@ -11035,6 +11037,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div style="display: flex; gap: 4px;">
             <button type="button" onclick="setSendRecipient('@alice')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.68rem; border-radius: 6px; padding: 1px 6px; cursor: pointer;">@alice</button>
             <button type="button" onclick="setSendRecipient('@bob')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.68rem; border-radius: 6px; padding: 1px 6px; cursor: pointer;">@bob</button>
+            <button type="button" onclick="pasteSendRecipient()" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); color: #c084fc; font-size: 0.68rem; border-radius: 6px; padding: 1px 8px; cursor: pointer;">📋 Paste</button>
           </div>
         </div>
         <input type="text" id="sendModalRecipientInput" placeholder="@handle or did:key:z6Mk..." style="width: 100%; padding: 11px 14px; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; font-size: 0.9rem; box-sizing: border-box; outline: none;">

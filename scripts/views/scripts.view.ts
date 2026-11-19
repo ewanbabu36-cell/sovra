@@ -16174,6 +16174,9 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       window.addEventListener('online', function() {
         _realtimeBackoffMs = 1500;
         updateLiveStatus('connected');
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('⚡ Reconnected: Syncing outbox to sovereign mesh peers...', 'success');
+        }
         initRealtimeLiveConnection();
       });
       window.addEventListener('offline', function() {
@@ -16182,6 +16185,9 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           _realtimeReconnectTimer = null;
         }
         updateLiveStatus('offline');
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('📡 Offline Mesh Mode: Actions saved to local cryptographic outbox', 'info');
+        }
       });
     }
 
@@ -19202,6 +19208,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             if (nameEl && s.display_name) nameEl.value = s.display_name;
             const bioEl = document.getElementById('settingsBio');
             if (bioEl && s.bio) bioEl.value = s.bio;
+            if (s.themePreset || s.theme_preset) {
+              const themeSel = document.querySelector('#settingsSection_appearance select');
+              if (themeSel) themeSel.value = s.themePreset || s.theme_preset;
+            }
           }
         }
       } catch (_) {}
@@ -19213,6 +19223,17 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         stored[key] = val;
         localStorage.setItem('sovra_user_settings', JSON.stringify(stored));
       } catch (_) {}
+
+      if (key === 'themePreset') {
+        document.body.classList.remove('theme-black', 'theme-dark', 'theme-cyber', 'theme-matrix');
+        if (val === 'cyber') document.body.classList.add('theme-cyber');
+        else if (val === 'matrix') document.body.classList.add('theme-matrix');
+        else document.body.classList.add('theme-black');
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('Theme preset updated to ' + val);
+        }
+        return;
+      }
 
       const keyMap = {
         meshDiscovery: 'mesh_discovery',
@@ -26821,6 +26842,19 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       if (modal) modal.style.display = 'none';
     }
 
+    async function pasteSendRecipient() {
+      try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          const text = await navigator.clipboard.readText();
+          if (text) {
+            const recInput = document.getElementById('sendModalRecipientInput');
+            if (recInput) recInput.value = text.trim();
+          }
+        }
+      } catch (_) {}
+    }
+    window.pasteSendRecipient = pasteSendRecipient;
+
     async function submitSendTransferForm() {
       const recInput = document.getElementById('sendModalRecipientInput');
       const amtInput = document.getElementById('sendModalAmountInput');
@@ -26867,20 +26901,34 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = 'Bearer ' + token;
 
-        const res = await fetch('/api/watch/tip', {
+        let res = await fetch('/api/wallet/transfer', {
           method: 'POST',
           headers,
           body: JSON.stringify({
             amount: amt,
             recipientDid: recipient,
-            creatorDid: recipient,
-            message: memo || 'P2P Sovereign State Channel Transfer',
+            memo: memo || 'P2P Sovereign State Channel Transfer',
           }),
         });
 
+        if (!res.ok) {
+          res = await fetch('/api/watch/tip', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              amount: amt,
+              recipientDid: recipient,
+              creatorDid: recipient,
+              message: memo || 'P2P Sovereign State Channel Transfer',
+            }),
+          });
+        }
+
         const data = await res.json();
         if (data.ok) {
-          if (typeof data.newBalance === 'number') {
+          if (typeof data.fromBalance === 'number') {
+            walletBalanceSov = data.fromBalance;
+          } else if (typeof data.newBalance === 'number') {
             walletBalanceSov = data.newBalance;
           } else {
             walletBalanceSov -= amt;
@@ -34032,6 +34080,55 @@ _scheduleTargetContext: 'workspace',
         a.click();
         URL.revokeObjectURL(url);
         if (typeof showToast === 'function') showToast('Downloaded subtitles_' + this.activeSubtitleLang + '.vtt ✓', 'info');
+      },
+
+      uploadWebVTT: function(event) {
+        var file = event && event.target && event.target.files && event.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        var self = this;
+        reader.onload = function(e) {
+          try {
+            var text = e.target.result;
+            var lines = String(text).split(/\r?\n/);
+            var cues = [];
+            var curCue = null;
+            for (var i = 0; i < lines.length; i++) {
+              var line = lines[i].trim();
+              if (!line || line.indexOf('WEBVTT') === 0 || /^\d+$/.test(line)) continue;
+              if (line.indexOf('-->') !== -1) {
+                var parts = line.split('-->');
+                curCue = {
+                  start: parts[0].trim(),
+                  end: parts[1].trim().split(' ')[0],
+                  text: ''
+                };
+                cues.push(curCue);
+              } else if (curCue) {
+                curCue.text = curCue.text ? (curCue.text + ' ' + line) : line;
+              }
+            }
+            if (cues.length > 0) {
+              var curTrack = self.currentSubtitlesTracks.find(function(t) { return t.langCode === self.activeSubtitleLang; });
+              if (curTrack) {
+                curTrack.cues = cues;
+              } else {
+                self.currentSubtitlesTracks.push({
+                  langCode: self.activeSubtitleLang,
+                  label: self.activeSubtitleLang === 'en' ? 'English' : self.activeSubtitleLang.toUpperCase(),
+                  cues: cues
+                });
+              }
+              self.renderSubtitlesTable(cues);
+              if (typeof showToast === 'function') showToast('Parsed & loaded ' + cues.length + ' subtitle cues ✓', 'success');
+            } else {
+              if (typeof showToast === 'function') showToast('No cues detected in file', 'warning');
+            }
+          } catch (err) {
+            if (typeof showToast === 'function') showToast('Error parsing subtitle file', 'error');
+          }
+        };
+        reader.readAsText(file);
       },
 
       switchCustomSubtab: function(sub) {
