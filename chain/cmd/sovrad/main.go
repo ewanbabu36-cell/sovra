@@ -1542,6 +1542,50 @@ func startNode(flags NodeFlags) {
 	mux.HandleFunc("/broadcast_tx", handleBroadcastTx)
 	mux.HandleFunc("/broadcast_tx_commit", handleBroadcastTx)
 
+	// Embedded Static UI / Protocol Node Cockpit
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sovra Sovereign Node Daemon (sovrad)</title>
+  <style>
+    body { background: #050810; color: #f1f5f9; font-family: -apple-system, system-ui, sans-serif; padding: 40px; text-align: center; }
+    .card { background: #0d1527; border: 1px solid #1e293b; border-radius: 16px; max-width: 600px; margin: 0 auto; padding: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
+    .badge { background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 0.8rem; display: inline-block; margin-bottom: 16px; }
+    h1 { margin: 0 0 12px; font-size: 1.8rem; color: #fff; }
+    p { color: #94a3b8; line-height: 1.6; margin: 0 0 24px; font-size: 0.95rem; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+    .stat-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; text-align: left; }
+    .stat-lbl { font-size: 0.72rem; color: #64748b; text-transform: uppercase; font-weight: 700; }
+    .stat-val { font-size: 1.1rem; color: #34d399; font-weight: 800; margin-top: 4px; }
+    .btn { background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">Autonomous L1 Protocol Node Active</div>
+    <h1>⚡ SOVRA Autonomous Node</h1>
+    <p>CometBFT Tendermint Consensus • Kademlia DHT • SIP-001 Binary Wire Engine • Zero Central Server Scaffolding</p>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-lbl">Block Height</div><div class="stat-val">%d</div></div>
+      <div class="stat-box"><div class="stat-lbl">Chain ID</div><div class="stat-val" style="color: #38bdf8; font-size: 0.95rem;">%s</div></div>
+      <div class="stat-box"><div class="stat-lbl">Moniker</div><div class="stat-val" style="color: #f1f5f9; font-size: 0.95rem;">%s</div></div>
+      <div class="stat-box"><div class="stat-lbl">P2P Port</div><div class="stat-val">%d</div></div>
+    </div>
+    <a href="/status" class="btn" style="background: rgba(255,255,255,0.08); margin-right: 8px;">Node JSON Status</a>
+    <a href="/query/supply" class="btn">Query Supply Invariants</a>
+  </div>
+</body>
+</html>`, app.GetHeight(), cfg.ChainID, cfg.Moniker, cfg.P2PPort)
+		w.Write([]byte(html))
+	})
+
 	rpcAddr := fmt.Sprintf("127.0.0.1:%d", cfg.RPCPort)
 	if cfg.RPCLAddr != "" {
 		l := strings.TrimPrefix(cfg.RPCLAddr, "tcp://")

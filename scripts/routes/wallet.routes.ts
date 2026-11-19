@@ -707,10 +707,42 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         return true;
       }
 
+      // ⛓️ Layer-1 CometBFT Consensus Broadcast (Bitcoin/Tendermint On-Chain Settlement)
+      let l1Committed = false;
+      let l1TxHash = transferResult.txId;
+      try {
+        if (await isL1RpcAvailable()) {
+          const l1Tx = {
+            Sender: senderDid,
+            Recipient: recipientDid,
+            Amount: String(BigInt(Math.round(amountSov * 1_000_000))),
+            Fee: '0',
+            PubKeyHex: parsed.pubKeyHex || '',
+            SigHex: parsed.signature || transferResult.txId,
+          };
+          const controller = new AbortController();
+          const tId = setTimeout(() => controller.abort(), 1200);
+          const l1Res = await fetch(`${PRIMARY_RPC}/broadcast_tx_commit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(l1Tx),
+            signal: controller.signal,
+          });
+          clearTimeout(tId);
+          if (l1Res.ok) {
+            const l1Data = await l1Res.json();
+            l1Committed = true;
+            if (l1Data.tx_hash || l1Data.hash) {
+              l1TxHash = l1Data.tx_hash || l1Data.hash;
+            }
+          }
+        }
+      } catch (_) {}
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
-        txHash: transferResult.txId,
+        txHash: l1TxHash,
         txId: transferResult.txId,
         senderDid,
         recipientDid,
@@ -719,6 +751,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         toBalance: transferResult.toBalance,
         tokenSymbol,
         status: 'confirmed',
+        l1Committed,
         isReplay: transferResult.isReplay || false,
         timestamp: Date.now(),
       }));
