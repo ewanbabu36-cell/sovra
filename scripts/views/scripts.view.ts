@@ -732,6 +732,31 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       }
     } catch(e) {}
 
+    // Global Cryptographically Secure Pseudo-Random Number Generator (CSPRNG)
+    window.sovraCSPRNG = function(bytesCount) {
+      var len = Math.max(1, Number(bytesCount) || 8);
+      try {
+        var cryptoObj = (typeof window !== 'undefined' && window.crypto) 
+          ? window.crypto 
+          : (typeof globalThis !== 'undefined' && globalThis.crypto ? globalThis.crypto : null);
+        if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+          var arr = new Uint8Array(len);
+          cryptoObj.getRandomValues(arr);
+          var hex = '';
+          for (var i = 0; i < arr.length; i++) {
+            var h = arr[i].toString(16);
+            hex += (h.length === 1 ? '0' : '') + h;
+          }
+          return hex;
+        }
+      } catch (e) {}
+      var fallback = '';
+      for (var j = 0; j < len; j++) {
+        fallback += ((Math.random() * 256) | 0).toString(16).padStart(2, '0');
+      }
+      return fallback;
+    };
+
     // Global XSS Sanitization Shield
     window.escapeHtml = function(str) {
       if (str === null || str === undefined) return '';
@@ -752,7 +777,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       init.headers = init.headers || {};
 
       // Anti-Replay Cryptographic Nonce & Timestamp Header Injection
-      const reqNonce = 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Math.random().toString(36).substring(2, 10));
+      const reqNonce = 'n_' + Date.now() + '_' + window.sovraCSPRNG(8);
       const reqTimestamp = String(Date.now());
       if (init.headers instanceof Headers) {
         init.headers.set('X-Sovra-Nonce', reqNonce);
@@ -829,7 +854,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               }
             } catch(e) {}
             const retryInit = Object.assign({}, init);
-            const freshNonce = 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Math.random().toString(36).substring(2, 10));
+            const freshNonce = 'n_' + Date.now() + '_' + window.sovraCSPRNG(8);
             const freshTs = String(Date.now());
             if (retryInit.headers instanceof Headers) {
               retryInit.headers.set('Authorization', 'Bearer ' + freshTok);
@@ -873,7 +898,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         'Authorization': token ? ('Bearer ' + token) : '',
         'X-Sovra-Session-Token': token,
         'X-Sovra-DID': myDid,
-        'X-Sovra-Nonce': 'n_' + Date.now() + '_' + (window.sovraCSPRNG ? window.sovraCSPRNG(8) : Math.random().toString(36).substring(2, 10)),
+        'X-Sovra-Nonce': 'n_' + Date.now() + '_' + window.sovraCSPRNG(8),
         'X-Sovra-Timestamp': String(Date.now()),
         'X-Sovra-CSRF': '1',
         'X-Requested-With': 'XMLHttpRequest'
