@@ -9,6 +9,7 @@ import { sovraDb } from '../database-engine.ts';
 import { renderGlobalStyles } from './styles.view.ts';
 import { renderAppLayout, type AppLayoutContext } from './layout.view.ts';
 import { renderClientScripts, type AppScriptContext } from './scripts.view.ts';
+import { safeJsonForScript } from './view-helpers.ts';
 import { SOVRA_RTC_CONFIGURATION } from '../webrtc-config.ts';
 
 export interface RenderAppHtmlParams {
@@ -146,12 +147,12 @@ export function renderAppHtml(params: RenderAppHtmlParams): string {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700;800&family=Roboto+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/sovra.css?v=2.1.0">
+  <link rel="stylesheet" href="/assets/sovra.css?v=2.4.0">
   <style>
 ${renderGlobalStyles(isCreatorModeActive)}
   </style>
   <script id="sovra-hydrated-state">
-    window.__SOVRA_HYDRATED_STATE__ = ${JSON.stringify({
+    window.__SOVRA_HYDRATED_STATE__ = ${safeJsonForScript({
       hostSession: {
         did: masterKey.did,
         handle: hostUser ? hostUser.handle : "@laptop_host",

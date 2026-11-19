@@ -51,6 +51,126 @@ export interface AdminConsoleRouteContext {
   broadcastChatEvent?: (threadId: string, eventName: string, payload: any) => void;
   masterKey?: any;
   binding?: any;
+  checkAdminRbac?: (req: http.IncomingMessage, requiredPerm?: string) => { authorized: boolean; adminDid: string; role: string; statusCode: number; error?: string };
+}
+
+export function createCheckAdminRbac(adminSecurity: any) {
+  return function checkAdminRbac(
+    req: http.IncomingMessage,
+    requiredPerm: string = 'admin:access'
+  ): { authorized: boolean; adminDid: string; role: string; statusCode: number; error?: string } {
+    let token = '';
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    } else if (req.headers['x-sovra-session-token']) {
+      token = String(req.headers['x-sovra-session-token']).trim();
+    } else if (req.headers.cookie) {
+      const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
+      if (match) token = decodeURIComponent(match[1]).trim();
+    }
+
+    if (!token) {
+      return {
+        authorized: false,
+        adminDid: '',
+        role: 'ANONYMOUS',
+        statusCode: 401,
+        error: 'UNAUTHORIZED: Admin session token required',
+      };
+    }
+
+    if (sovraDb.isSessionRevoked(token)) {
+      return {
+        authorized: false,
+        adminDid: '',
+        role: 'ANONYMOUS',
+        statusCode: 401,
+        error: 'UNAUTHORIZED: Session token has been revoked',
+      };
+    }
+
+    const adminPrinc = adminSecurity ? adminSecurity.resolveAdminSession(token) : null;
+    let callerDid = '';
+    let callerRole = '';
+
+    if (adminPrinc) {
+      callerDid = adminPrinc.did;
+      callerRole = adminPrinc.role;
+    } else {
+      const user = sovraDb.findUserBySessionToken(token);
+      if (user) {
+        callerDid = user.did;
+        callerRole = user.role || 'USER';
+      }
+    }
+
+    if (!callerDid) {
+      return {
+        authorized: false,
+        adminDid: '',
+        role: 'ANONYMOUS',
+        statusCode: 401,
+        error: 'UNAUTHORIZED: Invalid or expired admin session token',
+      };
+    }
+
+    if (callerRole === 'USER' || callerRole === 'CITIZEN' || !callerRole) {
+      return {
+        authorized: false,
+        adminDid: callerDid,
+        role: callerRole || 'USER',
+        statusCode: 403,
+        error: `RBAC_PERMISSION_DENIED: Role '${callerRole || 'USER'}' lacks required permission '${requiredPerm}'`,
+      };
+    }
+
+    if (callerRole === 'SUPER_ADMIN') {
+      return { authorized: true, adminDid: callerDid, role: callerRole, statusCode: 200 };
+    }
+
+    // Role-based capability verification via AdminSecurityEngine
+    const allowedAdminRoles = [
+      'SUPER_ADMIN',
+      'SECURITY_ADMIN',
+      'MODERATOR',
+      'INFRA_OPERATOR',
+      'ANALYST',
+      'SUPPORT',
+      'TREASURY_OFFICER',
+      'TRUST_SAFETY',
+      'ADMIN',
+    ];
+    if (allowedAdminRoles.includes(callerRole)) {
+      if (requiredPerm === 'admin:access') {
+        // Any recognized admin role passes the general gateway into the admin plane
+        return { authorized: true, adminDid: callerDid, role: callerRole, statusCode: 200 };
+      }
+      if (adminSecurity && typeof adminSecurity.authorize === 'function') {
+        const authRes = adminSecurity.authorize({ did: callerDid, role: callerRole as any }, requiredPerm);
+        if (authRes.authorized) {
+          return { authorized: true, adminDid: callerDid, role: callerRole, statusCode: 200 };
+        }
+      }
+    }
+
+    const sqlite = sovraDb.getSqliteEngine();
+    let hasPerm = false;
+    if (sqlite) {
+      hasPerm = sqlite.hasPermission(callerDid, requiredPerm);
+    }
+    if (!hasPerm) {
+      return {
+        authorized: false,
+        adminDid: callerDid,
+        role: callerRole,
+        statusCode: 403,
+        error: `RBAC_PERMISSION_DENIED: Role '${callerRole}' lacks required permission '${requiredPerm}'`,
+      };
+    }
+
+    return { authorized: true, adminDid: callerDid, role: callerRole, statusCode: 200 };
+  };
 }
 
 export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): Promise<boolean> {
@@ -77,6 +197,8 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
     binding,
   } = ctx;
 
+  const checkAdminRbac = ctx.checkAdminRbac || createCheckAdminRbac(adminSecurity);
+
   const pathname = url.pathname;
   if (
     !pathname.startsWith('/api/admin') &&
@@ -87,6 +209,16 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
     !pathname.startsWith('/api/backup')
   ) {
     return false;
+  }
+
+  // 🛡️ SEC-ADMIN-GATE: All /api/admin/* routes except /api/admin/login require authenticated admin credentials
+  if (pathname.startsWith('/api/admin/') && pathname !== '/api/admin/login') {
+    const baseAuth = checkAdminRbac(req);
+    if (!baseAuth.authorized) {
+      res.writeHead(baseAuth.statusCode || 401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: baseAuth.error || 'UNAUTHORIZED: Admin session token required' }));
+      return true;
+    }
   }
 
     // ==========================================
@@ -217,7 +349,13 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
     if (url.pathname === '/api/admin/treasury/solvency' && req.method === 'GET') {
       const report = sovraDb.getTreasurySolvencyReport();
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(report));
+      res.end(JSON.stringify({ ok: true, ...report }));
+      return true;
+    }
+
+    if (url.pathname === '/api/admin/treasury/withdraw' && req.method === 'POST') {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'CONSTITUTIONAL VIOLATION: Unilateral treasury withdrawals are strictly forbidden by Sovra protocol. Multi-party governance consensus required.' }));
       return true;
     }
 
@@ -725,6 +863,12 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
     }
 
     if (url.pathname === '/api/admin/revenue/take-rate' && req.method === 'POST') {
+      const auth = checkAdminRbac(req, 'revenue:write');
+      if (!auth.authorized) {
+        res.writeHead(auth.statusCode || 403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: auth.error }));
+        return true;
+      }
       const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
       if (!ok) return true;
       try {
@@ -851,25 +995,7 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
       return true;
     }
 
-    function checkAdminRbac(req: http.IncomingMessage, requiredPerm: string): { authorized: boolean; adminDid: string; role: string; error?: string } {
-      const adminDid = (req.headers['x-admin-did'] as string) || (new URL(req.url || '/', 'http://localhost').searchParams.get('adminDid')) || 'did:sov:admin_root';
-      const sqlite = sovraDb.getSqliteEngine();
-      if (!sqlite) return { authorized: true, adminDid, role: 'SUPER_ADMIN' };
 
-      const hasPerm = sqlite.hasPermission(adminDid, requiredPerm);
-      const rbac = sqlite.getRbacRole(adminDid);
-      const role = rbac?.role || (adminDid === 'did:sov:admin_root' ? 'SUPER_ADMIN' : 'UNKNOWN');
-
-      if (!hasPerm) {
-        return {
-          authorized: false,
-          adminDid,
-          role,
-          error: `RBAC_PERMISSION_DENIED: Role '${role}' lacks required permission '${requiredPerm}'`,
-        };
-      }
-      return { authorized: true, adminDid, role };
-    }
 
     if (url.pathname === '/api/admin/nuclear/switches' && req.method === 'GET') {
       const sqlite = sovraDb.getSqliteEngine();
@@ -925,11 +1051,22 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
     }
 
     if (url.pathname === '/api/admin/ghost/impersonate' && req.method === 'POST') {
+      const auth = checkAdminRbac(req, 'admin:ghost_impersonate');
+      if (!auth.authorized) {
+        res.writeHead(auth.statusCode || 403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: auth.error }));
+        return true;
+      }
       const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
       if (!ok) return true;
       try {
         const parsed = JSON.parse(body);
         const targetDid = String(parsed.targetDid || '').trim();
+        if (targetDid === auth.adminDid || targetDid === 'did:sov:admin_root') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Cannot impersonate self' }));
+          return true;
+        }
         const sqlite = sovraDb.getSqliteEngine();
         if (!sqlite || !targetDid) {
           res.writeHead(400, { 'Content-Type': 'application/json' });

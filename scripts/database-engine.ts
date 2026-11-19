@@ -2892,7 +2892,7 @@ export class SovraDatabaseEngine {
 
   public save(immediate = false): void {
     this.isDirty = true;
-    const forceSync = process.env.SOVRA_FORCE_SYNC_WRITE === 'true';
+    const forceSync = immediate || process.env.SOVRA_FORCE_SYNC_WRITE === 'true' || Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
     if (forceSync) {
       if (this.saveDebounceTimer) {
         clearTimeout(this.saveDebounceTimer);
@@ -11691,7 +11691,6 @@ export class SovraDatabaseEngine {
     // 3. Credential Evaluation
     if (user.totpEnabled) {
       if (!factor || !factor.totpCode) {
-        this.recordFailedPinAttempt(user.did);
         const failResult = this.recordFailedPinAttempt(targetThrottleKey, ipAddress);
         if (failResult.attempts >= 5) {
           return {
@@ -11703,7 +11702,6 @@ export class SovraDatabaseEngine {
         return { ok: false, error: 'Invalid credentials' };
       }
       if (!user.totpSecret || !this.verifyTotpCode(user.totpSecret, factor.totpCode)) {
-        this.recordFailedPinAttempt(user.did);
         const failResult = this.recordFailedPinAttempt(targetThrottleKey, ipAddress);
         if (failResult.attempts >= 5) {
           return {
@@ -11718,14 +11716,8 @@ export class SovraDatabaseEngine {
       this.clearFailedPinAttempts(user.did);
       for (const k of this.getAllTargetThrottleKeys(identifier)) this.clearFailedPinAttempts(k);
     } else if (user.securityPinHash) {
-      // Strict factor requirement with fallback to default credential if valid
+      // Strict factor requirement - no implicit pin or enclave bypass allowed
       if (!factor || (!factor.webauthnVerified && !factor.pin && !factor.totpCode)) {
-        if (this.verifySecurityPin('123456', user.securityPinHash)) {
-          factor = { pin: '123456' };
-        }
-      }
-      if (!factor || (!factor.webauthnVerified && !factor.pin && !factor.totpCode)) {
-        this.recordFailedPinAttempt(user.did);
         const failResult = this.recordFailedPinAttempt(targetThrottleKey, ipAddress);
         if (failResult.attempts >= 5) {
           return {
@@ -11770,7 +11762,6 @@ export class SovraDatabaseEngine {
           }
 
           // Failure handling:
-          this.recordFailedPinAttempt(user.did);
           const failResult = this.recordFailedPinAttempt(targetThrottleKey, ipAddress);
           if (failResult.isIpLocked) {
             return {

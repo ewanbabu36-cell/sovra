@@ -2466,7 +2466,17 @@
     .studio-sidebar-nav-btn.active svg {
       color: #fff;
     }
-    body.tab-active-studio .app-top-header {
+    body.tab-active-studio .app-top-header,
+    body.tab-active-studio .app-left-rail,
+    body.tab-active-studio .app-right-rail,
+    body.tab-active-studio #spatialCoPilotDrawer,
+    body.tab-active-studio #appStageFooter {
+      display: none !important;
+    }
+    body.tab-active-admin .app-left-rail,
+    body.tab-active-admin .app-right-rail,
+    body.tab-active-admin #spatialCoPilotDrawer,
+    body.tab-active-admin #appStageFooter {
       display: none !important;
     }
     .studio-channel-select {
@@ -2507,10 +2517,125 @@
       color: #fff !important;
     }
     .studio-dashboard-3col {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 1.25rem;
-      margin-bottom: 1.5rem;
+      display: grid !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      gap: 1.25rem !important;
+      margin-bottom: 1.5rem !important;
+      align-items: stretch !important;
+    }
+    @media (max-width: 1080px) {
+      .studio-dashboard-3col {
+        grid-template-columns: 1fr !important;
+      }
+    }
+
+    /* Solid, High-Contrast Studio Cards (Immune to Wallpaper Blending & Theme Collisions) */
+    #studio-view .card,
+    #studio-view .studio-card,
+    .studio-main-viewport .card,
+    .studio-main-workspace .card,
+    .studio-main-workspace .studio-card,
+    .studio-card,
+    .studio-realtime-card,
+    .studio-metric-card,
+    #studioPublishedVideosCard,
+    #studioChannelSummaryCard,
+    #studioRecentCommentsCard,
+    #studioNewsCard,
+    #studioCreatorInsiderCard {
+      background: #0f172a !important;
+      background-color: #0f172a !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      border-radius: 16px !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      position: relative !important;
+    }
+
+    /* High-Contrast Studio Typography */
+    #studio-view h1,
+    #studio-view h2,
+    #studio-view h3,
+    #studio-view h4,
+    .studio-main-viewport h1,
+    .studio-main-viewport h2,
+    .studio-main-viewport h3,
+    .studio-main-viewport h4,
+    .studio-main-workspace h1,
+    .studio-main-workspace h2,
+    .studio-main-workspace h3,
+    .studio-main-workspace h4,
+    .studio-main-workspace .card-title,
+    .studio-main-workspace .studio-card-title {
+      color: #ffffff !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      font-weight: 800 !important;
+    }
+
+    #studio-view p,
+    #studio-view div:not(.badge):not(.badge-accent),
+    #studio-view span:not(.badge):not(.badge-accent),
+    .studio-main-viewport p,
+    .studio-main-viewport div:not(.badge):not(.badge-accent),
+    .studio-main-viewport span:not(.badge):not(.badge-accent),
+    .studio-main-workspace p,
+    .studio-main-workspace div:not(.badge):not(.badge-accent),
+    .studio-main-workspace span:not(.badge):not(.badge-accent),
+    .studio-main-workspace label,
+    .studio-main-workspace td {
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+
+    /* Content & Playlists Table High-Contrast System */
+    .studio-content-table {
+      width: 100% !important;
+      border-collapse: separate !important;
+      border-spacing: 0 !important;
+      color: #f1f5f9 !important;
+    }
+    .studio-content-table th {
+      background: rgba(15, 23, 42, 0.98) !important;
+      color: #94a3b8 !important;
+      font-size: 0.72rem !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.05em !important;
+      padding: 10px 12px !important;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.12) !important;
+      text-align: left !important;
+      vertical-align: middle !important;
+    }
+    .studio-content-table td {
+      padding: 12px !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+      vertical-align: middle !important;
+      color: #e2e8f0 !important;
+    }
+    .studio-content-table tr:hover td {
+      background: rgba(255, 255, 255, 0.03) !important;
+    }
+
+    /* Studio Form Controls */
+    .studio-main-workspace input[type="text"],
+    .studio-main-workspace input[type="search"],
+    .studio-main-workspace select,
+    .studio-main-workspace textarea {
+      background: rgba(15, 23, 42, 0.95) !important;
+      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+      color: #ffffff !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+
+    /* Analytics Metric Cards */
+    .studio-metric-card {
+      background: #0f172a !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      border-radius: 14px !important;
+      padding: 1.1rem 1.25rem !important;
     }
     .studio-sidebar-footer {
       margin-top: auto;
@@ -6911,11 +7036,26 @@
       max-width: 920px !important;
     }
 
+    body.tab-active-studio .app-left-rail,
+    body.tab-active-admin .app-left-rail,
+    body.tab-active-studio .app-right-rail,
+    body.tab-active-studio #spatialCoPilotDrawer,
     body.tab-active-youtube .app-right-rail,
+    body.tab-active-youtube #spatialCoPilotDrawer,
     body.tab-active-chat .app-right-rail,
+    body.tab-active-chat #spatialCoPilotDrawer,
     body.tab-active-admin .app-right-rail,
+    body.tab-active-admin #spatialCoPilotDrawer,
     body.tab-active-settings .app-right-rail,
-    body.tab-active-hub .app-right-rail {
+    body.tab-active-settings #spatialCoPilotDrawer,
+    body.tab-active-hub .app-right-rail,
+    body.tab-active-hub #spatialCoPilotDrawer,
+    body.tab-active-reels .app-right-rail,
+    body.tab-active-reels #spatialCoPilotDrawer,
+    body.tab-active-calls .app-right-rail,
+    body.tab-active-calls #spatialCoPilotDrawer,
+    body.tab-active-live .app-right-rail,
+    body.tab-active-live #spatialCoPilotDrawer {
       display: none !important;
     }
 
@@ -9005,24 +9145,88 @@
       #chat-view {
         max-width: 100% !important;
       }
-      body.tab-active-studio .main-content,
-      #studio-view {
-        max-width: 1200px !important;
+      /* 🎬 CREATOR STUDIO: Dedicated Full-Screen Workspace (YouTube Studio Standard) */
+      body.tab-active-studio .app-left-rail,
+      body.tab-active-admin .app-left-rail {
+        display: none !important;
       }
-      body.tab-active-hub .main-content,
-      #hub-view {
-        max-width: 1100px !important;
+      body.tab-active-studio .app-right-rail,
+      body.tab-active-studio #spatialCoPilotDrawer,
+      body.tab-active-admin .app-right-rail,
+      body.tab-active-admin #spatialCoPilotDrawer,
+      body.tab-active-chat .app-right-rail,
+      body.tab-active-chat #spatialCoPilotDrawer,
+      body.tab-active-youtube .app-right-rail,
+      body.tab-active-youtube #spatialCoPilotDrawer,
+      body.tab-active-reels .app-right-rail,
+      body.tab-active-reels #spatialCoPilotDrawer,
+      body.tab-active-hub .app-right-rail,
+      body.tab-active-hub #spatialCoPilotDrawer,
+      body.tab-active-settings .app-right-rail,
+      body.tab-active-settings #spatialCoPilotDrawer,
+      body.tab-active-calls .app-right-rail,
+      body.tab-active-calls #spatialCoPilotDrawer,
+      body.tab-active-live .app-right-rail,
+      body.tab-active-live #spatialCoPilotDrawer {
+        display: none !important;
+      }
+      body.tab-active-studio .app-layout {
+        display: block !important;
+        max-width: 100vw !important;
         width: 100% !important;
-        flex-direction: column !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      body.tab-active-studio .app-center-stage {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-right: none !important;
+        border-left: none !important;
+      }
+      body.tab-active-studio .main-content,
+      body.tab-active-studio #studio-view {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      body.tab-active-studio #studio-view > div {
+        max-width: 100% !important;
+        padding: 0.5rem 1.5rem 4rem !important;
         box-sizing: border-box !important;
       }
-      body.tab-active-hub .app-center-stage {
-        max-width: 1200px !important;
+      body.tab-active-studio .studio-layout-shell {
+        display: flex !important;
         width: 100% !important;
+        gap: 1.5rem !important;
+      }
+      body.tab-active-studio .studio-content-canvas {
+        flex: 1 !important;
+        min-width: 0 !important;
+        width: 100% !important;
+      }
+      body.tab-active-admin .app-layout {
+        display: block !important;
+        max-width: 100vw !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      body.tab-active-admin .app-center-stage {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0.5rem 1rem !important;
         border-right: none !important;
       }
-      body.tab-active-hub .app-right-rail {
-        display: none !important;
+      body.tab-active-admin .main-content,
+      body.tab-active-admin #admin-view {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
 
       body.tab-active-settings .main-content,
@@ -18020,3 +18224,55 @@ html, body {
 .holo-exit-pill:active {
   transform: scale(0.95);
 }
+
+
+    /* Opaque Studio Shell Isolation */
+    #studio-view,
+    body.tab-active-studio #studio-view {
+      background: #0b0f19 !important;
+      background-color: #0b0f19 !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+    #studio-view .studio-layout-shell {
+      background: #0b0f19 !important;
+    }
+    #studio-view .studio-sidebar {
+      background: #0f172a !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+    }
+    #studio-view .studio-top-navbar {
+      background: #0f172a !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+    }
+    #studio-view .studio-metric-card {
+      background: #111827 !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+      border-radius: 16px !important;
+    }
+    #studio-view .studio-scorecard,
+    #studio-view .studio-realtime-card,
+    #studio-view .studio-news-card {
+      background: #111827 !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
+      border-radius: 16px !important;
+    }
+    #studio-view .studio-content-table th {
+      background: #1e293b !important;
+      color: #94a3b8 !important;
+      font-weight: 800 !important;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.16) !important;
+    }
+    #studio-view .studio-content-table td {
+      background: transparent !important;
+      color: #f1f5f9 !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+    #studio-view .studio-content-table tr:hover td {
+      background: rgba(255, 255, 255, 0.04) !important;
+    }
+    

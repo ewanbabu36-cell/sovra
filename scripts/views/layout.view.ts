@@ -104,7 +104,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             banner.style.display = 'block';
             banner.innerHTML = '<div style="max-width: 1200px; margin: 0 auto; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #fff; font-family: -apple-system, sans-serif;">' +
               '<div style="display: flex; align-items: center; gap: 10px; min-width: 0;">' +
-                '<span style="padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.3); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.5px;">' + (alert.level || 'INFO') + '</span>' +
+                '<span style="padding: 2px 7px; border-radius: 4px; background: #090d16; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.5px;">' + (alert.level || 'INFO') + '</span>' +
                 '<strong style="font-size: 0.86rem; white-space: nowrap;">' + alert.title + ':</strong>' +
                 '<span style="font-size: 0.82rem; opacity: 0.95; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + alert.message + '</span>' +
               '</div>' +
@@ -718,7 +718,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </button>
       </div>
 
-      <div class="rail-user-profile" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer; transition: all 0.2s ease;">
+      <div class="rail-user-profile" data-action="switch-tab" data-tab="me" onclick="switchTab('me')" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); cursor: pointer; transition: all 0.2s ease;">
         <div id="railUserAvatar" style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; color: #fff; overflow: hidden; flex-shrink: 0;">S</div>
         <div style="flex: 1; min-width: 0;">
           <div id="railUserName" style="font-weight: 700; font-size: 0.86rem; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sovereign Member</div>
@@ -890,7 +890,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <button id="sovraCoPilotToggleBtn" type="button" class="sovra-header-action-btn" onclick="toggleSpatialCoPilotDrawer(); event.stopPropagation();" title="Toggle Co-Pilot Workspace (Ctrl + /)" aria-label="Toggle Co-Pilot Workspace" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 999px; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; color: #a5b4fc; cursor: pointer; font-size: 0.82rem; font-weight: 700; transition: all 0.2s ease;">
             <span>◫</span>
             <span style="display: inline-block;">Co-Pilot</span>
-            <kbd style="font-size: 0.68rem; background: rgba(0,0,0,0.3); border-radius: 4px; padding: 1px 4px; color: #94a3b8; border: 1px solid rgba(255,255,255,0.1);">^/</kbd>
+            <kbd style="font-size: 0.68rem; background: #090d16; border-radius: 4px; padding: 1px 4px; color: #94a3b8; border: 1px solid rgba(255,255,255,0.1);">^/</kbd>
           </button>
 
           <!-- 🔍 Search Icon Button -->
@@ -1330,12 +1330,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <input type="file" id="realFeedFileInput" accept="image/*,video/*" multiple style="display: none;" onchange="handleFeedPhotoSelected(event)">
               <div id="feedPhotoPreviewContainer" style="display: none; position: relative; margin-top: 0.75rem; border-radius: 12px; overflow: hidden; max-height: 320px; background: #000; border: 1px solid var(--glass-border);">
                 <img id="feedPhotoPreviewImg" src="" alt="Selected photo" style="width: 100%; max-height: 320px; object-fit: contain; display: block;" />
-                <span id="feedPhotoCompressBadge" style="position: absolute; bottom: 8px; left: 8px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); color: #38bdf8; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.35);"></span>
+                <span id="feedPhotoCompressBadge" style="position: absolute; bottom: 8px; left: 8px; background: #0f172a; backdrop-filter: blur(6px); color: #38bdf8; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.35);"></span>
                 <button type="button" onclick="clearFeedSelectedPhoto()" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold;">✕</button>
               </div>
 
               <!-- Instagram Parity: Filter Shaders Selection Tray -->
-              <div id="composerFilterTray" style="display: none; margin-top: 8px; padding: 6px 8px; background: rgba(15, 23, 42, 0.7); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); overflow-x: auto; gap: 6px; scrollbar-width: none;">
+              <div id="composerFilterTray" style="display: none; margin-top: 8px; padding: 6px 8px; background: rgba(15, 23, 42, 0.7); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.14); overflow-x: auto; gap: 6px; scrollbar-width: none;">
                 <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; align-self: center; margin-right: 4px; flex-shrink: 0;">🎨 Filter:</span>
                 <button type="button" class="action-pill-btn active" onclick="applyComposerFilterPreset('normal', this)" style="font-size: 0.75rem; padding: 3px 9px;">Normal</button>
                 <button type="button" class="action-pill-btn" onclick="applyComposerFilterPreset('clarendon', this)" style="font-size: 0.75rem; padding: 3px 9px;">Clarendon</button>
@@ -1351,7 +1351,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <input type="file" id="realFeedVideoInput" accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*" style="display: none;" onchange="handleFeedVideoSelected(event)">
               <div id="feedVideoPreviewContainer" style="display: none; position: relative; margin-top: 0.75rem; border-radius: 12px; overflow: hidden; max-height: 320px; background: #000; border: 1px solid var(--glass-border);">
                 <video id="feedVideoPreviewEl" src="" controls playsinline style="width: 100%; max-height: 320px; object-fit: contain; display: block;"></video>
-                <span id="feedVideoBadge" style="position: absolute; bottom: 8px; left: 8px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); color: #a855f7; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(168, 85, 247, 0.35); display: inline-flex; align-items: center; gap: 4px;">
+                <span id="feedVideoBadge" style="position: absolute; bottom: 8px; left: 8px; background: #0f172a; backdrop-filter: blur(6px); color: #a855f7; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(168, 85, 247, 0.35); display: inline-flex; align-items: center; gap: 4px;">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
                   <span>Video Reel</span>
                 </span>
@@ -1564,12 +1564,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- ⚖️ ALGORITHMIC TRANSPARENCY DIAL ("SHADOW-BAN BUSTER") -->
-        <div id="algorithmicTransparencyDial" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; margin-bottom: 1.25rem;">
+        <div id="algorithmicTransparencyDial" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; margin-bottom: 1.25rem;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 1rem;">⚖️</span>
             <span style="font-size: 0.82rem; font-weight: 700; color: #f1f5f9;">Algorithm Dial:</span>
           </div>
-          <div class="algo-dial-group" style="display: inline-flex; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 3px; gap: 3px;">
+          <div class="algo-dial-group" style="display: inline-flex; background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 3px; gap: 3px;">
             <button type="button" class="algo-dial-btn" id="algoBtnFriends" onclick="setAlgorithmicDial('friends', this)" style="background: none; border: none; color: #94a3b8; font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 7px; cursor: pointer; transition: all 0.2s;">👥 Friends Only</button>
             <button type="button" class="algo-dial-btn active" id="algoBtnViral" onclick="setAlgorithmicDial('viral', this)" style="background: #3b82f6; border: none; color: #fff; font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 7px; cursor: pointer; transition: all 0.2s;">⚡ Viral Consensus</button>
             <button type="button" class="algo-dial-btn" id="algoBtnChrono" onclick="setAlgorithmicDial('chrono', this)" style="background: none; border: none; color: #94a3b8; font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 7px; cursor: pointer; transition: all 0.2s;">⏱ Chronological</button>
@@ -2271,7 +2271,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <button type="button" id="reelBgAudioToggleBtn" onclick="event.stopPropagation(); toggleSovraBackgroundAudioMode()" title="Background & Lock-Screen Audio Mode" style="font-size: 0.72rem; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px); padding: 0.22rem 0.65rem; border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.35); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                 <span>🎧</span> <span id="reelBgAudioBtnLabel">BG Audio: ON</span>
               </button>
-              <div style="font-size: 0.75rem; color: #fff; font-weight: 700; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); padding: 0.2rem 0.6rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);" id="reelCounterDisplay">
+              <div style="font-size: 0.75rem; color: #fff; font-weight: 700; background: #090d16; backdrop-filter: blur(6px); padding: 0.2rem 0.6rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);" id="reelCounterDisplay">
                 1 / ${reelsStore.length}
               </div>
             </div>
@@ -2569,7 +2569,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </div>
 
                 <!-- Dual-Channel Mixer: Original Track Gain + Synth Lo-Fi Beat -->
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 8px;">
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 8px;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 0.75rem; color: #cbd5e1; font-weight: 600;">🔊 Track Gain Boost</span>
                     <input type="range" id="reelOriginalGainSlider" min="0" max="150" value="100" oninput="setSovraAudioGain(this.value)" style="width: 140px; accent-color: #38bdf8;">
@@ -2684,7 +2684,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     <!-- 🥽 CYCLE 3: OPEN WEBXR SPATIAL HOLOGRAM THEATER MODAL -->
     <div id="webxrTheaterModal" class="webxr-theater-container" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;" onclick="closeWebxrSpatialTheater()">
       <!-- Floating Top Exit Bar (reveals on hover / tap) -->
-      <div id="webxrTopFloatingBar" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10000; display: flex; align-items: center; gap: 10px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.18); border-radius: 999px; padding: 6px 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); transition: opacity 0.3s ease, transform 0.3s ease; opacity: 1; pointer-events: auto;" onclick="event.stopPropagation()">
+      <div id="webxrTopFloatingBar" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10000; display: flex; align-items: center; gap: 10px; background: #0f172a; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.18); border-radius: 999px; padding: 6px 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); transition: opacity 0.3s ease, transform 0.3s ease; opacity: 1; pointer-events: auto;" onclick="event.stopPropagation()">
         <button type="button" onclick="closeWebxrSpatialTheater()" style="background: none; border: none; color: #fff; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
           <span>← Exit Cinema</span>
           <span style="font-size: 0.68rem; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,0.15); color: #94a3b8;">Esc / Swipe Down</span>
@@ -2713,8 +2713,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
           <!-- Floating Badges Overlay -->
           <div style="position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; pointer-events: none; z-index: 5;">
-            <span id="spatialSeatBadge" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(139, 92, 246, 0.5); color: #c084fc; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">💺 VIP Center (Row 2)</span>
-            <span id="spatialCurveBadge" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">Curved IMAX</span>
+            <span id="spatialSeatBadge" style="background: #0f172a; border: 1px solid rgba(139, 92, 246, 0.5); color: #c084fc; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">💺 VIP Center (Row 2)</span>
+            <span id="spatialCurveBadge" style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">Curved IMAX</span>
           </div>
 
           <div style="position: absolute; top: 10px; right: 10px; pointer-events: none; z-index: 5;">
@@ -2784,7 +2784,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- Creator Profile Card inside Modal -->
-        <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 12px; margin: 1rem 0;">
+        <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px 12px; margin: 1rem 0;">
           <div id="tipModalCreatorAvatar" style="width: 40px; height: 40px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; color: #fff;">
             C
           </div>
@@ -2872,7 +2872,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- Today's Screen-Time Meter -->
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 1.25rem; margin-top: 1.25rem;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 1.25rem; margin-top: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <span style="font-size: 0.82rem; font-weight: 600; color: #94a3b8;">Today's Screen Time</span>
             <span id="wbDailyProgressText" style="font-size: 0.9rem; font-weight: 800; color: #38bdf8;">0m / 60m</span>
@@ -2917,7 +2917,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 8px 12px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 8px 12px; margin-bottom: 14px;">
             <div>
               <div style="font-size: 0.82rem; font-weight: 600; color: #e2e8f0;">Strict Lockout Mode</div>
               <div style="font-size: 0.7rem; color: #94a3b8;">Block feed interaction when daily budget is reached</div>
@@ -2952,15 +2952,15 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
         <!-- Studio Analytics Card -->
         <div id="studioAnalyticsCard" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 1.25rem;">
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px; text-align: center;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 10px; text-align: center;">
             <div style="font-size: 0.7rem; color: #94a3b8;">Total Views</div>
             <div id="studioTotalViews" style="font-size: 1.05rem; font-weight: 800; color: #38bdf8;">0</div>
           </div>
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px; text-align: center;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 10px; text-align: center;">
             <div style="font-size: 0.7rem; color: #94a3b8;">SOV Earned</div>
             <div id="studioTotalEarnedSov" style="font-size: 1.05rem; font-weight: 800; color: #34d399;">0.00</div>
           </div>
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px; text-align: center;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 10px; text-align: center;">
             <div style="font-size: 0.7rem; color: #94a3b8;">Scheduled</div>
             <div id="studioScheduledCount" style="font-size: 1.05rem; font-weight: 800; color: #fbbf24;">0</div>
           </div>
@@ -2993,7 +2993,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- Live Transcode Progress Monitor -->
-        <div id="studioTranscodeMonitor" style="display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 1rem; margin-top: 1.25rem;">
+        <div id="studioTranscodeMonitor" style="display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 1rem; margin-top: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span id="studioMonitorStatus" style="font-size: 0.8rem; font-weight: 700; color: #38bdf8;">Transcoding HLS Master...</span>
             <span id="studioMonitorProgress" style="font-size: 0.8rem; font-weight: 800; color: #fff;">0%</span>
@@ -3048,14 +3048,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <span id="liveWebRtcStatusBadge" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">
               📡 WebRTC Mesh
             </span>
-            <span id="liveViewerCountBadge" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.15); color: #38bdf8; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">
+            <span id="liveViewerCountBadge" style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #38bdf8; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">
               👥 <span id="liveViewerCount">1</span>
             </span>
           </div>
 
           <!-- Live Tips Tally Overlay -->
           <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
-            <span id="liveTipsTallyBadge" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(251, 191, 36, 0.4); color: #fbbf24; font-size: 0.72rem; font-weight: 800; padding: 3px 10px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;">
+            <span id="liveTipsTallyBadge" style="background: #0f172a; border: 1px solid rgba(251, 191, 36, 0.4); color: #fbbf24; font-size: 0.72rem; font-weight: 800; padding: 3px 10px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;">
               ⚡ <span id="liveTipsTotalSov">0.00</span> SOV
             </span>
           </div>
@@ -3299,7 +3299,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <button class="chat-action-btn" id="chatHeaderMenuBtn" onclick="toggleChatHeaderMenu(event)" title="More options" aria-label="More options">⋮</button>
 
               <!-- Clean WhatsApp Style Dropdown Menu -->
-              <div id="chatHeaderDropdownMenu" style="display: none; position: absolute; top: 44px; right: 2px; background: #233138; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.65); padding: 6px 0; z-index: 100; min-width: 210px; border: 1px solid rgba(255,255,255,0.08);">
+              <div id="chatHeaderDropdownMenu" style="display: none; position: absolute; top: 44px; right: 2px; background: #233138; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.65); padding: 6px 0; z-index: 100; min-width: 210px; border: 1px solid rgba(255, 255, 255, 0.14);">
                 <div class="chat-dropdown-item" onclick="closeChatHeaderMenu(); toggleInChatSearch();">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                   <span>Search in chat</span>
@@ -3470,7 +3470,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
             <button class="wa-modal-close" onclick="closeChatAttachmentLightbox()" style="background: none; border: none; font-size: 1.5rem; color: #94a3b8; cursor: pointer;">&times;</button>
           </div>
-          <div id="lightboxFilePreviewContainer" style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 250px; max-height: 60vh; overflow: auto; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 0.85rem; padding: 0.5rem;">
+          <div id="lightboxFilePreviewContainer" style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 250px; max-height: 60vh; overflow: auto; background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; margin-bottom: 0.85rem; padding: 0.5rem;">
             <!-- Dynamic Content -->
           </div>
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
@@ -3760,7 +3760,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
 
             <!-- Bottom-Left Peer Label on Video -->
-            <div style="position: absolute; bottom: 82px; left: 18px; z-index: 15; pointer-events: none; background: rgba(11, 18, 33, 0.75); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px;">
+            <div style="position: absolute; bottom: 82px; left: 18px; z-index: 15; pointer-events: none; background: rgba(11, 18, 33, 0.75); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.14); display: flex; align-items: center; gap: 6px;">
               <span style="font-size: 0.8rem; font-weight: 700; color: #fff;" id="callVideoPeerBadge">ewan</span>
               <span style="font-size: 0.65rem; color: #34d399;">● Online</span>
             </div>
@@ -3772,7 +3772,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <span style="font-size: 1.1rem;">📷</span>
                 <span>Camera Off</span>
               </div>
-              <button type="button" id="pipDirectFlipBtn" onclick="flipCallCamera()" title="Flip Camera (Front / Rear)" style="position: absolute; top: 4px; right: 4px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.3); color: #fff; width: 26px; height: 26px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; z-index: 25;">🔄</button>
+              <button type="button" id="pipDirectFlipBtn" onclick="flipCallCamera()" title="Flip Camera (Front / Rear)" style="position: absolute; top: 4px; right: 4px; background: #0f172a; border: 1px solid rgba(255,255,255,0.3); color: #fff; width: 26px; height: 26px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; z-index: 25;">🔄</button>
               <span style="position: absolute; bottom: 4px; left: 6px; font-size: 0.58rem; font-weight: 800; color: #fff; background: rgba(0,0,0,0.65); padding: 1px 5px; border-radius: 4px; letter-spacing: 0.05em;">YOU</span>
             </div>
           </div>
@@ -3844,7 +3844,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <video id="spatialRemoteVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
             <div id="spatialLocalVideoPiP" style="position: absolute; bottom: 10px; right: 10px; width: 90px; height: 60px; border-radius: 8px; overflow: hidden; border: 1.5px solid #38bdf8; background: #0f172a;">
               <video id="spatialLocalVideo" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
-              <button type="button" id="spatialPipFlipBtn" onclick="flipCallCamera()" title="Flip Camera (Front / Rear)" style="position: absolute; top: 2px; right: 2px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.3); color: #fff; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; z-index: 25;">🔄</button>
+              <button type="button" id="spatialPipFlipBtn" onclick="flipCallCamera()" title="Flip Camera (Front / Rear)" style="position: absolute; top: 2px; right: 2px; background: #0f172a; border: 1px solid rgba(255,255,255,0.3); color: #fff; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; z-index: 25;">🔄</button>
             </div>
           </div>
 
@@ -3977,7 +3977,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <div style="margin-bottom: 0.65rem;">
-            <input type="text" id="groupMemberSearchInput" placeholder="Search contacts..." oninput="filterGroupMemberList(this.value)" style="width: 100%; box-sizing: border-box; background: #111b21; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.45rem 0.75rem; color: #fff; font-size: 0.8rem; outline: none;" />
+            <input type="text" id="groupMemberSearchInput" placeholder="Search contacts..." oninput="filterGroupMemberList(this.value)" style="width: 100%; box-sizing: border-box; background: #111b21; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 6px; padding: 0.45rem 0.75rem; color: #fff; font-size: 0.8rem; outline: none;" />
           </div>
 
           <div id="newGroupMembersList" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-bottom: 1.2rem;">
@@ -4434,7 +4434,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- Collapsible Live Swarm Chat -->
-          <div id="ytLiveSwarmChatCard" class="yt-live-swarm-chat-card" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; overflow: hidden; backdrop-filter: blur(12px); box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+          <div id="ytLiveSwarmChatCard" class="yt-live-swarm-chat-card" style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; overflow: hidden; backdrop-filter: blur(12px); box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer;" onclick="toggleLiveSwarmChat()">
               <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; color: #f8fafc;">
                 <span>💬</span> <span>Live Swarm Chat</span>
@@ -4763,7 +4763,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- Shareable Link Box -->
-        <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 0.85rem;">
+        <div style="background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 0.85rem;">
           <input type="text" id="ytShareUrlInput" readonly style="background: transparent; border: none; color: #38bdf8; font-size: 0.85rem; width: 100%; outline: none;" value="https://sovra.network/watch?v=..." />
           <button class="btn btn-primary" onclick="copyYtShareUrl()" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 700; white-space: nowrap;">Copy Link</button>
         </div>
@@ -4800,7 +4800,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <label style="font-size: 0.82rem; color: #94a3b8; display: block; margin-bottom: 4px;">Clip Title (Required):</label>
           <input type="text" id="ytClipTitleInput" class="chat-text-input" placeholder="Give this clip a catchy title..." style="width: 100%; border-radius: 8px; font-size: 0.85rem;" maxlength="140" />
         </div>
-        <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px; margin-bottom: 1rem;">
+        <div style="background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px; margin-bottom: 1rem;">
           <div style="display: flex; justify-content: space-between; font-size: 0.82rem; color: #cbd5e1; margin-bottom: 8px;">
             <span>Clip Range: <b id="ytClipRangeLabel" style="color: #38bdf8;">00:00 - 00:30</b></span>
             <span>Duration: <b id="ytClipDurationLabel" style="color: #34d399;">30s</b></span>
@@ -5211,7 +5211,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.4;">
                 Enable Creator Studio tools, fan tipping, and high-speed media delivery.
               </div>
-              <div class="toggle-row" style="background: rgba(255,255,255,0.03); padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.75rem;">
+              <div class="toggle-row" style="background: rgba(255,255,255,0.03); padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.12); margin-bottom: 0.75rem;">
                 <span style="font-weight: 700; font-size: 0.88rem; color: #f1f5f9;" id="creatorStatusText">${isCreatorModeActive ? 'Studio Active' : 'Standard Account'}</span>
                 <label class="switch">
                   <input type="checkbox" id="creatorToggle" ${isCreatorModeActive ? 'checked' : ''} onchange="toggleCreatorMode(this.checked)">
@@ -5291,15 +5291,15 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.65rem; font-weight: 700;">🟢 RELAY MINING ACTIVE</span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; font-size: 0.75rem;">
-                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
+                  <div style="background: #090d16; padding: 8px; border-radius: 8px;">
                     <div style="color: #94a3b8; font-size: 0.65rem;">Blocks Relayed</div>
                     <div id="seederBlocksRelayedCount" style="font-weight: 800; color: #fff; font-size: 0.95rem; margin-top: 2px;">1,428</div>
                   </div>
-                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
+                  <div style="background: #090d16; padding: 8px; border-radius: 8px;">
                     <div style="color: #94a3b8; font-size: 0.65rem;">Bandwidth Shared</div>
                     <div id="seederBandwidthSharedText" style="font-weight: 800; color: #38bdf8; font-size: 0.95rem; margin-top: 2px;">14.2 GB</div>
                   </div>
-                  <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px;">
+                  <div style="background: #090d16; padding: 8px; border-radius: 8px;">
                     <div style="color: #94a3b8; font-size: 0.65rem;">Unclaimed Yield</div>
                     <div id="seederUnclaimedYieldText" style="font-weight: 800; color: #10b981; font-size: 0.95rem; margin-top: 2px;">5.25 SOV</div>
                   </div>
@@ -5313,17 +5313,17 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
 
               <!-- Merkle DAG Ingestion & Storage Quotas (Node Operator Diagnostics) -->
-              <div style="margin-top: 0.85rem; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">
+              <div style="margin-top: 0.85rem; background: rgba(0,0,0,0.25); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px 14px;">
                 <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 6px;">
                   <span>📦</span> <span>Offline Media Storage &amp; Quotas</span>
                 </div>
-                <div style="display: flex; gap: 0.75rem; margin-bottom: 0.65rem; background: rgba(0,0,0,0.3); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.75rem; flex-wrap: wrap;">
+                <div style="display: flex; gap: 0.75rem; margin-bottom: 0.65rem; background: #090d16; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.75rem; flex-wrap: wrap;">
                   <div>Capacity: <b id="quotaCapacity">50 GB</b></div>
                   <div>Used: <b id="quotaUsed" style="color: #60a5fa;">0 B</b></div>
                   <div>Pinned: <b id="quotaPinned" style="color: #34d399;">0 B</b></div>
                   <div>Active Pins: <b id="activePinsCount" style="color: #a78bfa;">0</b></div>
                 </div>
-                <textarea id="mediaPayload" style="width: 100%; min-height: 44px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; padding: 0.5rem; font-size: 0.8rem;" placeholder="Paste media payload to chunk, pin into Merkle DAG, and announce to DHT..."></textarea>
+                <textarea id="mediaPayload" style="width: 100%; min-height: 44px; background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; padding: 0.5rem; font-size: 0.8rem;" placeholder="Paste media payload to chunk, pin into Merkle DAG, and announce to DHT..."></textarea>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem; flex-wrap: wrap; gap: 6px;">
                   <div id="mediaPublishResult" style="font-size: 0.74rem; font-family: monospace; color: #a5b4fc;"></div>
                   <div style="display: flex; gap: 0.4rem;">
@@ -5457,7 +5457,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               
               <!-- Quick Toggles -->
               <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem;">
-                <div class="toggle-row" style="background: rgba(255,255,255,0.03); padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+                <div class="toggle-row" style="background: rgba(255,255,255,0.03); padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.12);">
                   <div>
                     <div style="font-weight: 700; font-size: 0.85rem; color: #f1f5f9;">Ghost Mode (Stealth Mesh)</div>
                     <div style="font-size: 0.72rem; color: #94a3b8;" id="privacyGhostStatusText">Hide presence beacon from nearby BLE/Wi-Fi peers</div>
@@ -5468,7 +5468,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </label>
                 </div>
 
-                <div class="toggle-row" style="background: rgba(255,255,255,0.03); padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+                <div class="toggle-row" style="background: rgba(255,255,255,0.03); padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.12);">
                   <div>
                     <div style="font-weight: 700; font-size: 0.85rem; color: #f1f5f9;">Direct E2EE Chat Requests</div>
                     <div style="font-size: 0.72rem; color: #94a3b8;">Accept Double Ratchet message handshakes</div>
@@ -5495,7 +5495,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </span>
                 <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.72rem;">Self-Custody &bull; Zero Fees</span>
               </div>
-              <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 14px; margin-bottom: 0.85rem; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 12px 14px; margin-bottom: 0.85rem; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
                 <div>
                   <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 2px;">Available Balance</div>
                   <div style="display: flex; align-items: baseline; gap: 8px;">
@@ -5550,7 +5550,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- Clean Action Bar (Instagram & Telegram Standard) -->
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 12px 16px; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; padding: 12px 16px; margin-bottom: 1rem;">
             <div>
               <div style="font-weight: 700; color: #f8fafc; font-size: 0.94rem; display: flex; align-items: center; gap: 8px;">
                 <span>Publishing Hub</span>
@@ -5978,7 +5978,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </main>
 
     <!-- Dedicated Full-Width YouTube Studio Command Center -->
-    <main class="main-content" id="studio-view" style="display: none; width: 100%;">
+    <main class="main-content studio-main-viewport" id="studio-view" style="display: none; width: 100%;">
       <div style="max-width: 1380px; margin: 0 auto; padding: 0.5rem 1rem 4rem;">
 
         <!-- ======================================================== -->
@@ -6001,7 +6001,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- Hero Presentation Card -->
-          <div id="studioChannelOnboardingCard" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(0, 240, 255, 0.25); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 240, 255, 0.12); border-radius: 20px; padding: 2rem 2.25rem;">
+          <div id="studioChannelOnboardingCard" style="background: #0f172a; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(0, 240, 255, 0.25); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 240, 255, 0.12); border-radius: 20px; padding: 2rem 2.25rem;">
             <!-- Center Header -->
             <div style="text-align: center; margin-bottom: 2rem;">
               <div style="width: 68px; height: 68px; margin: 0 auto 1rem; border-radius: 20px; background: linear-gradient(135deg, rgba(244,63,94,0.25) 0%, rgba(139,92,246,0.25) 100%); border: 1.5px solid rgba(244, 63, 94, 0.5); display: flex; align-items: center; justify-content: center; font-size: 2rem; box-shadow: 0 0 20px rgba(244, 63, 94, 0.35);">
@@ -6014,7 +6014,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
 
             <!-- Onboarding Form: How you'll appear -->
-            <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem;">
+            <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem;">
               <div style="font-size: 0.78rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 6px;">
                 <span>✨</span> <span>How You'll Appear on Sovra</span>
               </div>
@@ -6044,13 +6044,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                   <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Channel Name <span style="color:#f43f5e;">*</span></label>
-                  <input type="text" id="studioNewChanNameInput" placeholder="e.g. Rajesh Tech 4K" maxlength="50" oninput="SovraCreatorStudioEngine.handleOnboardingNameChange(this.value)" style="width: 100%; box-sizing: border-box; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 0.85rem; outline: none; transition: border-color 0.2s;">
+                  <input type="text" id="studioNewChanNameInput" placeholder="e.g. Rajesh Tech 4K" maxlength="50" oninput="SovraCreatorStudioEngine.handleOnboardingNameChange(this.value)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 0.85rem; outline: none; transition: border-color 0.2s;">
                 </div>
                 <div>
                   <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Channel Handle <span style="color:#f43f5e;">*</span></label>
                   <div style="position: relative;">
                     <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b; font-weight: 700;">@</span>
-                    <input type="text" id="studioNewChanHandleInput" placeholder="tech_stream" maxlength="30" oninput="SovraCreatorStudioEngine.handleOnboardingHandleChange(this.value)" style="width: 100%; box-sizing: border-box; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 9px 12px 9px 28px; color: #38bdf8; font-weight: 700; font-size: 0.85rem; outline: none; transition: border-color 0.2s;">
+                    <input type="text" id="studioNewChanHandleInput" placeholder="tech_stream" maxlength="30" oninput="SovraCreatorStudioEngine.handleOnboardingHandleChange(this.value)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 9px 12px 9px 28px; color: #38bdf8; font-weight: 700; font-size: 0.85rem; outline: none; transition: border-color 0.2s;">
                   </div>
                   <div id="studioNewChanHandleStatus" style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">Choose a unique creator handle</div>
                 </div>
@@ -6060,7 +6060,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                   <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Primary Category / Niche</label>
-                  <select id="studioNewChanCategorySelect" style="width: 100%; box-sizing: border-box; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 0.85rem; outline: none;">
+                  <select id="studioNewChanCategorySelect" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 0.85rem; outline: none;">
                     <option value="tech" selected>💻 Technology &amp; Web3</option>
                     <option value="gaming">🎮 Gaming &amp; Esports</option>
                     <option value="education">📚 Tutorials &amp; Education</option>
@@ -6072,7 +6072,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </div>
                 <div>
                   <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Channel Bio / Summary</label>
-                  <textarea id="studioNewChanBioInput" rows="1" placeholder="Tell viewers what your channel is about..." style="width: 100%; box-sizing: border-box; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 0.82rem; outline: none; resize: none;"></textarea>
+                  <textarea id="studioNewChanBioInput" rows="1" placeholder="Tell viewers what your channel is about..." style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 0.82rem; outline: none; resize: none;"></textarea>
                 </div>
               </div>
             </div>
@@ -6114,7 +6114,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <header class="studio-top-navbar" id="studioTopNavbar">
           <!-- Left: Branding & Studio Logo & Channel Switcher -->
           <div style="display: flex; align-items: center; gap: 10px;">
-            <button type="button" class="studio-back-to-app-btn" id="studioBackToAppBtn" onclick="switchTab('watch')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 8px; padding: 5px 12px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-right: 4px;" title="Exit Studio & Return to App">
+            <button type="button" class="studio-back-to-app-btn" id="studioBackToAppBtn" onclick="switchTab(window._prevSovraTab && window._prevSovraTab !== 'studio' ? window._prevSovraTab : 'feed')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 8px; padding: 5px 12px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-right: 4px;" title="Exit Studio & Return to App">
               <span>← Back to Sovra App</span>
             </button>
             <button type="button" class="studio-btn-icon" onclick="SovraCreatorStudioEngine.toggleSidebarCollapse()" title="Toggle Studio Menu" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px; display: flex; align-items: center;">
@@ -6134,7 +6134,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div id="studioHeaderChannelPill" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.12);">
               <span id="studioTopChannelAvatar" style="font-size: 1.1rem;">🎬</span>
               <span id="studioTopVerifiedBadge" style="color: #38bdf8; font-size: 0.8rem; font-weight: 800;">✓</span>
-              <span id="studioHeaderSubCount" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">142.8K subs</span>
+              <span id="studioHeaderSubCount" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">0 subs</span>
             </div>
           </div>
 
@@ -6143,7 +6143,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b; pointer-events: none; display: flex; align-items: center;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </div>
-            <input type="text" id="studioChannelSearchInput" placeholder="Search across your channel" oninput="SovraCreatorStudioEngine.handleChannelGlobalSearch(this.value)" style="width: 100%; box-sizing: border-box; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 24px; padding: 7px 14px 7px 36px; color: #fff; font-size: 0.84rem; outline: none; transition: border-color 0.2s;">
+            <input type="text" id="studioChannelSearchInput" placeholder="Search across your channel" oninput="SovraCreatorStudioEngine.handleChannelGlobalSearch(this.value)" style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 24px; padding: 7px 14px 7px 36px; color: #fff; font-size: 0.84rem; outline: none; transition: border-color 0.2s;">
           </div>
 
           <!-- Right: Notifications + Quick Action Triad + Create Button + Exit Studio Pill -->
@@ -6160,7 +6160,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </button>
 
             <!-- Quick Action Triad Buttons: Upload (↑), Go Live (((•))), Create Post (📝) -->
-            <div style="display: flex; align-items: center; gap: 4px; background: rgba(255, 255, 255, 0.04); padding: 3px 6px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.08);" id="studioQuickActionTriad">
+            <div style="display: flex; align-items: center; gap: 4px; background: rgba(255, 255, 255, 0.04); padding: 3px 6px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.14);" id="studioQuickActionTriad">
               <!-- Upload Video (↑) -->
               <button type="button" class="studio-btn-icon" id="studioQuickUploadBtn" onclick="SovraCreatorStudioEngine.switchStudioTab('ingest')" title="Upload Video (HLS Transcode)" style="background: none; border: none; color: #cbd5e1; cursor: pointer; padding: 6px 8px; border-radius: 50%; display: flex; align-items: center;">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -6314,7 +6314,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                         Publish 4K HLS videos and shorts directly to your channel on the mesh.
                       </div>
                       <!-- 1-Click Fast Ingest Drag & Drop Zone -->
-                      <div id="studioDashboardDropzone" onclick="document.getElementById('studioDashboardQuickFileInput').click()" style="border: 2px dashed rgba(244,63,94,0.4); border-radius: 14px; padding: 16px 10px; background: rgba(0,0,0,0.3); cursor: pointer; transition: all 0.2s;" ondragover="event.preventDefault(); this.style.borderColor='#f43f5e'; this.style.background='rgba(244,63,94,0.1)';" ondragleave="this.style.borderColor='rgba(244,63,94,0.4)'; this.style.background='rgba(0,0,0,0.3)';" ondrop="event.preventDefault(); this.style.borderColor='rgba(244,63,94,0.4)'; this.style.background='rgba(0,0,0,0.3)'; SovraCreatorStudioEngine.handleDashboardFileDrop(event.dataTransfer.files);">
+                      <div id="studioDashboardDropzone" onclick="document.getElementById('studioDashboardQuickFileInput').click()" style="border: 2px dashed rgba(244,63,94,0.4); border-radius: 14px; padding: 16px 10px; background: #090d16; cursor: pointer; transition: all 0.2s;" ondragover="event.preventDefault(); this.style.borderColor='#f43f5e'; this.style.background='rgba(244,63,94,0.1)';" ondragleave="this.style.borderColor='rgba(244,63,94,0.4)'; this.style.background='rgba(0,0,0,0.3)';" ondrop="event.preventDefault(); this.style.borderColor='rgba(244,63,94,0.4)'; this.style.background='rgba(0,0,0,0.3)'; SovraCreatorStudioEngine.handleDashboardFileDrop(event.dataTransfer.files);">
                         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" style="margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         <div style="font-size: 0.82rem; font-weight: 700; color: #fff;">Click or Drag &amp; Drop Video Here</div>
                         <div style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">MP4, MOV, WebM &bull; Auto 4K Multi-bitrate HLS</div>
@@ -6400,13 +6400,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
 
                   <!-- Published Videos Mini Preview -->
-                  <div class="card" id="studioPublishedVideosCard" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" id="studioPublishedVideosCard" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                       <div style="font-weight: 800; font-size: 0.95rem; color: #fff;">Published videos</div>
                       <button type="button" onclick="SovraCreatorStudioEngine.switchStudioTab('content')" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; cursor: pointer; font-weight: 700;">See all</button>
                     </div>
                     <div id="publishedVideosMiniList" style="display: flex; flex-direction: column; gap: 8px;">
-                      <div style="display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; background: rgba(0,0,0,0.3);">
+                      <div style="display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; background: #090d16;">
                         <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&q=80" style="width: 50px; height: 32px; object-fit: cover; border-radius: 4px;" alt="thumb">
                         <div style="flex: 1; min-width: 0;">
                           <div style="font-size: 0.78rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Cellular CGNAT Traversal Deep Dive</div>
@@ -6420,7 +6420,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <!-- COLUMN 2: Channel Analytics Summary & Comments -->
                 <div class="studio-col-analytics" style="display: flex; flex-direction: column; gap: 1.25rem;">
                   <!-- Card 2: Channel Analytics -->
-                  <div class="card" id="studioChannelSummaryCard" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" id="studioChannelSummaryCard" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12);">
                     <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.5rem;">Channel analytics</div>
                     <div style="font-size: 0.75rem; color: #94a3b8;">Current subscribers</div>
                     <div style="font-size: 2.2rem; font-weight: 900; color: #fff; margin: 4px 0;" id="studioSummarySubsBig">46</div>
@@ -6462,7 +6462,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
 
                   <!-- Comments Card with Mini Video Thumbnail Badges -->
-                  <div class="card" id="studioRecentCommentsCard" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" id="studioRecentCommentsCard" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                       <div style="font-weight: 800; font-size: 0.95rem; color: #fff;">Recent Comments &amp; Mentions</div>
                       <button type="button" onclick="SovraCreatorStudioEngine.switchStudioTab('comments')" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; cursor: pointer; font-weight: 700;">View All</button>
@@ -6478,7 +6478,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <!-- COLUMN 3: News, Creator Insider, and Real-Time Activity -->
                 <div class="studio-col-news" style="display: flex; flex-direction: column; gap: 1.25rem;">
                   <!-- Card 3: News -->
-                  <div class="card" id="studioNewsCard" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" id="studioNewsCard" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12);">
                     <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">News</div>
                     <div style="width: 100%; height: 110px; border-radius: 12px; background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; margin-bottom: 0.75rem;">
                       <div style="font-weight: 900; font-size: 1.15rem; background: linear-gradient(135deg, #f43f5e, #fb923c); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
@@ -6491,7 +6491,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
 
                   <!-- Card 4: Creator Insider Carousel (< 1/5 >) -->
-                  <div class="card" id="studioCreatorInsiderCard" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" id="studioCreatorInsiderCard" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                       <div style="font-weight: 800; font-size: 0.95rem; color: #fff;">Creator Insider</div>
                       <div style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #94a3b8;">
@@ -6550,7 +6550,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- TAB 2: ADVANCED CONTENT MANAGER (VIDEOS/SHORTS)-->
             <!-- ============================================== -->
             <div id="studioSectionContent" style="display: none;">
-              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12);">
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
                   <div>
@@ -6572,14 +6572,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
 
                   <div style="display: flex; gap: 8px; align-items: center;">
-                    <select id="studioVisibilityFilter" onchange="SovraCreatorStudioEngine.filterContentByVisibility(this.value)" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
+                    <select id="studioVisibilityFilter" onchange="SovraCreatorStudioEngine.filterContentByVisibility(this.value)" style="background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
                       <option value="all">Visibility: All</option>
                       <option value="public">Public Free</option>
                       <option value="supporter_gated">Supporter Gated</option>
                       <option value="scheduled">Scheduled</option>
                     </select>
 
-                    <input type="text" id="studioWsContentSearch" placeholder="Filter by title..." oninput="SovraCreatorStudioEngine.filterContentLibrary(this.value)" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 12px; color: #fff; font-size: 0.78rem; width: 180px;">
+                    <input type="text" id="studioWsContentSearch" placeholder="Filter by title..." oninput="SovraCreatorStudioEngine.filterContentLibrary(this.value)" style="background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 12px; color: #fff; font-size: 0.78rem; width: 180px;">
                     <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.loadContentLibrary()" style="padding: 6px 10px; font-size: 0.78rem;">Refresh</button>
                   </div>
                 </div>
@@ -6629,7 +6629,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- TAB 2.1: CHANNEL PLAYLISTS MANAGER             -->
             <!-- ============================================== -->
             <div id="studioSectionPlaylists" style="display: none;">
-              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
                   <div>
                     <h2 style="font-size: 1.3rem; font-weight: 900; color: #fff; margin: 0;">Channel Playlists</h2>
@@ -6643,7 +6643,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <!-- Filter Bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem;">
                   <div style="display: flex; gap: 8px; align-items: center;">
-                    <input type="text" id="studioPlaylistSearch" placeholder="Filter playlists..." oninput="SovraCreatorStudioEngine.filterPlaylists(this.value)" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 12px; color: #fff; font-size: 0.78rem; width: 220px;">
+                    <input type="text" id="studioPlaylistSearch" placeholder="Filter playlists..." oninput="SovraCreatorStudioEngine.filterPlaylists(this.value)" style="background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 12px; color: #fff; font-size: 0.78rem; width: 220px;">
                     <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.loadStudioPlaylists()" style="padding: 6px 10px; font-size: 0.78rem;">Refresh</button>
                   </div>
                   <span id="studioPlaylistsCountBadge" style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">0 Playlists</span>
@@ -6728,18 +6728,18 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
                 <!-- 7-Day Velocity & Cumulative Revenue SVGs -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
-                  <div class="card" style="padding: 1.25rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" style="padding: 1.25rem; border-radius: 16px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                     <div style="font-weight: 800; font-size: 0.92rem; color: #fff; margin-bottom: 0.5rem;">📈 7-Day View Velocity</div>
                     <div id="studioSvgViewVelocity" style="width: 100%; height: 200px;"></div>
                   </div>
-                  <div class="card" style="padding: 1.25rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" style="padding: 1.25rem; border-radius: 16px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                     <div style="font-weight: 800; font-size: 0.92rem; color: #fff; margin-bottom: 0.5rem;">💰 SOV Revenue Trajectory (95/5 Split)</div>
                     <div id="studioSvgRevenue" style="width: 100%; height: 200px;"></div>
                   </div>
                 </div>
 
                 <!-- YouTube Studio-Grade CPM / SOV Token Yield Curve -->
-                <div class="card" style="padding: 1.25rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 1.5rem;">
+                <div class="card studio-card" style="padding: 1.25rem; border-radius: 16px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45); margin-bottom: 1.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                     <div>
                       <div style="font-weight: 800; font-size: 0.95rem; color: #fff;">💎 CPM &amp; SOV Token Yield Curve</div>
@@ -6754,19 +6754,19 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
                   <!-- Mini yield KPIs -->
                   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
-                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px;">
+                    <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 8px 10px;">
                       <div style="font-size: 0.68rem; color: #94a3b8;">Avg CPM</div>
                       <div style="font-size: 1.1rem; font-weight: 800; color: #10b981;" id="kpiYieldCpm">14.25 SOV</div>
                     </div>
-                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px;">
+                    <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 8px 10px;">
                       <div style="font-size: 0.68rem; color: #94a3b8;">SuperChat Share</div>
                       <div style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;" id="kpiYieldSuperChat">95%</div>
                     </div>
-                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px;">
+                    <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 8px 10px;">
                       <div style="font-size: 0.68rem; color: #94a3b8;">NFT/Tip Conversions</div>
                       <div style="font-size: 1.1rem; font-weight: 800; color: #fbbf24;" id="kpiYieldNft">18 Tx</div>
                     </div>
-                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px;">
+                    <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 8px 10px;">
                       <div style="font-size: 0.68rem; color: #94a3b8;">Engagement Velocity</div>
                       <div style="font-size: 1.1rem; font-weight: 800; color: #c084fc;" id="kpiYieldVelocity">42 views/hr</div>
                     </div>
@@ -6775,7 +6775,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </div>
 
                 <!-- Real-Time Post-by-Post Performance Breakdown Table with CSV/JSON Export -->
-                <div class="card" style="padding: 1.25rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 1.5rem;">
+                <div class="card studio-card" style="padding: 1.25rem; border-radius: 16px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45); margin-bottom: 1.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
                     <div>
                       <div style="font-weight: 800; font-size: 0.95rem; color: #fff;">📊 Post-by-Post Performance Breakdown</div>
@@ -6832,7 +6832,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
                 </div>
 
-                <div class="card" style="padding: 1.25rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 1.5rem;">
+                <div class="card studio-card" style="padding: 1.25rem; border-radius: 16px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45); margin-bottom: 1.5rem;">
                   <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">🌐 Traffic Source Types</div>
                   <div id="studioSvgTrafficSources" style="width: 100%; height: 180px;">
                     <!-- Rendered via renderTrafficSourcesChart() -->
@@ -6855,7 +6855,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
                 </div>
 
-                <div class="card" style="padding: 1.25rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 1.5rem;">
+                <div class="card studio-card" style="padding: 1.25rem; border-radius: 16px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45); margin-bottom: 1.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                     <div>
                       <div style="font-weight: 800; font-size: 0.95rem; color: #fff;">⏱️ Key Moments for Audience Retention</div>
@@ -6890,7 +6890,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
                 </div>
 
-                <div class="card" style="padding: 1.25rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                <div class="card studio-card" style="padding: 1.25rem; border-radius: 16px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                   <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.5rem;">👥 Returning vs New Viewers Trajectory</div>
                   <div id="studioSvgAudienceType" style="width: 100%; height: 180px;"></div>
                 </div>
@@ -6902,7 +6902,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- TAB 4: COMMUNITY COMMENTS & MODERATION HUB     -->
             <!-- ============================================== -->
             <div id="studioSectionComments" style="display: none;">
-              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
                   <div>
                     <h2 style="font-size: 1.3rem; font-weight: 900; color: #fff; margin: 0;">Channel Comments &amp; Mentions</h2>
@@ -6935,7 +6935,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- TAB 4.1: COMMUNITY POSTS & POLLS HUB           -->
             <!-- ============================================== -->
             <div id="studioSectionCommunity" style="display: none;">
-              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
                   <div>
                     <h2 style="font-size: 1.3rem; font-weight: 900; color: #fff; margin: 0;">Community Posts &amp; Polls</h2>
@@ -6945,15 +6945,15 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </div>
 
                 <!-- Create Post Box -->
-                <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 1rem; margin-bottom: 1.5rem;">
+                <div style="background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 1rem; margin-bottom: 1.5rem;">
                   <div style="font-weight: 700; color: #fff; font-size: 0.85rem; margin-bottom: 8px;">Create Community Post</div>
                   <textarea id="studioCommunityPostContent" rows="3" placeholder="What's on your mind? Share an update or ask your subscribers..." style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px; color: #fff; font-size: 0.82rem; resize: vertical;"></textarea>
 
                   <!-- Poll Inputs (Optional) -->
                   <div id="studioCommunityPollFields" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
                     <div style="display: flex; gap: 8px;">
-                      <input type="text" id="studioCommunityPollOpt1" placeholder="Poll Option 1 (optional)" style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
-                      <input type="text" id="studioCommunityPollOpt2" placeholder="Poll Option 2 (optional)" style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
+                      <input type="text" id="studioCommunityPollOpt1" placeholder="Poll Option 1 (optional)" style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
+                      <input type="text" id="studioCommunityPollOpt2" placeholder="Poll Option 2 (optional)" style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
                     </div>
                   </div>
 
@@ -6976,7 +6976,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- TAB 5: DEDICATED SUBTITLES & CC TRACK STUDIO   -->
             <!-- ============================================== -->
             <div id="studioSectionSubtitles" style="display: none;">
-              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
                   <div>
                     <h2 style="font-size: 1.3rem; font-weight: 900; color: #fff; margin: 0;">Subtitles &amp; Closed Captions Studio</h2>
@@ -6991,7 +6991,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </div>
 
                 <!-- Video and Language Selector -->
-                <div style="display: flex; gap: 12px; margin-bottom: 1.25rem; align-items: center; background: rgba(0,0,0,0.4); padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; gap: 12px; margin-bottom: 1.25rem; align-items: center; background: #090d16; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.14);">
                   <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">LANGUAGE TRACK:</div>
                   <select id="subtitlesLanguageSelect" onchange="SovraCreatorStudioEngine.changeSubtitleTrack(this.value)" style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 5px 10px; color: #fff; font-size: 0.8rem;">
                     <option value="en">English (Original - Auto-Sync)</option>
@@ -7001,10 +7001,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
                 <!-- Cue Add Form -->
                 <div style="display: flex; gap: 8px; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
-                  <input type="text" id="newCueStart" placeholder="00:00:00" style="width: 90px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px; color: #fff; font-size: 0.78rem; text-align: center;">
+                  <input type="text" id="newCueStart" placeholder="00:00:00" style="width: 90px; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px; color: #fff; font-size: 0.78rem; text-align: center;">
                   <span style="color: #64748b;">&rarr;</span>
-                  <input type="text" id="newCueEnd" placeholder="00:00:05" style="width: 90px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px; color: #fff; font-size: 0.78rem; text-align: center;">
-                  <input type="text" id="newCueText" placeholder="Enter subtitle caption line..." style="flex: 1; min-width: 200px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
+                  <input type="text" id="newCueEnd" placeholder="00:00:05" style="width: 90px; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px; color: #fff; font-size: 0.78rem; text-align: center;">
+                  <input type="text" id="newCueText" placeholder="Enter subtitle caption line..." style="flex: 1; min-width: 200px; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
                   <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.addSubtitleCue()" style="padding: 6px 12px; font-size: 0.78rem;">+ Add Cue</button>
                 </div>
 
@@ -7020,7 +7020,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       </tr>
                     </thead>
                     <tbody id="subtitlesCuesTableBody">
-                      <!-- Rendered dynamically -->
+                      <tr><td colspan="4" style="text-align: center; padding: 48px 20px;">
+                        <div style="max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px; background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 32px 24px;">
+                          <div style="width: 56px; height: 56px; border-radius: 16px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">💬</div>
+                          <div style="font-weight: 800; font-size: 1.1rem; color: #ffffff;">No Subtitle Cues Found</div>
+                          <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45;">Enter start/end timestamps and caption text above, or import a .VTT / .SRT file to synchronize subtitles with video streams.</div>
+                          <button type="button" class="btn btn-primary" onclick="document.getElementById('newCueText').focus()" style="margin-top: 6px; padding: 8px 18px; font-weight: 700; background: linear-gradient(135deg, #0284c7, #6366f1); border: none; border-radius: 10px; color: #fff; cursor: pointer;">+ Add First Cue</button>
+                        </div>
+                      </td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -7032,7 +7039,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- TAB 6: CHANNEL CUSTOMIZATION & BRANDING        -->
             <!-- ============================================== -->
             <div id="studioSectionCustomization" style="display: none;">
-              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
                   <div>
                     <h2 style="font-size: 1.3rem; font-weight: 900; color: #fff; margin: 0;">Channel Customization</h2>
@@ -7053,7 +7060,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <!-- Layout Pane -->
                 <div id="customPaneLayout" style="display: block;">
                   <div style="display: flex; flex-direction: column; gap: 1.25rem;">
-                    <div style="background: rgba(0,0,0,0.4); padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="background: #090d16; padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
                       <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">Channel Trailer for People Who Haven't Subscribed</div>
                       <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Feature a video for peers who visit your channel without subscribing</div>
                       <select id="customTrailerSelect" style="width: 100%; max-width: 420px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 12px; color: #fff; font-size: 0.8rem;">
@@ -7062,7 +7069,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       </select>
                     </div>
 
-                    <div style="background: rgba(0,0,0,0.4); padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="background: #090d16; padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
                       <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">Featured Video for Returning Subscribers</div>
                       <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Highlight a recent release for your dedicated subscriber peers</div>
                       <select id="customFeaturedSelect" style="width: 100%; max-width: 420px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 12px; color: #fff; font-size: 0.8rem;">
@@ -7072,7 +7079,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     </div>
 
                     <!-- Homepage Featured Shelves Section -->
-                    <div id="customShelvesSection" style="background: rgba(0,0,0,0.4); padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div id="customShelvesSection" style="background: #090d16; padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
                       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
                         <div>
                           <div style="font-weight: 700; color: #fff; font-size: 0.88rem;">Channel Homepage Shelves</div>
@@ -7100,7 +7107,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <div id="customPaneBranding" style="display: none;">
                   <div style="display: flex; flex-direction: column; gap: 1.25rem;">
                     <!-- Profile Picture Avatar -->
-                    <div style="background: rgba(0,0,0,0.4); padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="background: #090d16; padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
                       <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">Profile Picture Avatar</div>
                       <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Your profile picture will appear where your channel is presented on Sovra</div>
                       <div style="display: flex; gap: 12px; align-items: center;">
@@ -7113,7 +7120,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     </div>
 
                     <!-- Banner Image -->
-                    <div style="background: rgba(0,0,0,0.4); padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="background: #090d16; padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
                       <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">16:9 Channel Banner Image</div>
                       <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Displays across the top of your channel page</div>
                       <div id="customBannerPreview" style="width: 100%; height: 110px; border-radius: 10px; background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1600&q=80') center/cover no-repeat; border: 1px solid rgba(255,255,255,0.15); margin-bottom: 10px;"></div>
@@ -7124,7 +7131,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     </div>
 
                     <!-- Watermark -->
-                    <div style="background: rgba(0,0,0,0.4); padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="background: #090d16; padding: 1rem 1.25rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
                       <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">Video Watermark Stamp</div>
                       <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">The watermark will appear on your videos in the right-hand corner of the video player</div>
                       <label for="customWatermarkInput" class="btn btn-secondary" style="font-size: 0.75rem; padding: 6px 14px; cursor: pointer; display: inline-block;">
@@ -7140,19 +7147,19 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 600px;">
                     <div>
                       <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">CHANNEL NAME</label>
-                      <input type="text" id="customChannelName" value="Sovereign Creator Studio" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">
+                      <input type="text" id="customChannelName" value="Sovereign Creator Studio" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">
                     </div>
                     <div>
                       <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">HANDLE</label>
-                      <input type="text" id="customChannelHandle" value="creator_primary" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">
+                      <input type="text" id="customChannelHandle" value="creator_primary" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">
                     </div>
                     <div>
                       <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">DESCRIPTION / BIO</label>
-                      <textarea id="customChannelBio" rows="3" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">Decentralized P2P streaming node broadcasting 4K video swarms with 95/5 sovereign economics.</textarea>
+                      <textarea id="customChannelBio" rows="3" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">Decentralized P2P streaming node broadcasting 4K video swarms with 95/5 sovereign economics.</textarea>
                     </div>
                     <div>
                       <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">EXTERNAL LINKS</label>
-                      <input type="text" id="customChannelLinks" placeholder="https://..." value="https://sovra.network" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">
+                      <input type="text" id="customChannelLinks" placeholder="https://..." value="https://sovra.network" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">
                     </div>
                     <div>
                       <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">DID CRYPTOGRAPHIC FINGERPRINT</label>
@@ -7171,13 +7178,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- TAB 7: ROYALTY-FREE AUDIO & SFX LIBRARY        -->
             <!-- ============================================== -->
             <div id="studioSectionAudio" style="display: none;">
-              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
                   <div>
                     <h2 style="font-size: 1.3rem; font-weight: 900; color: #fff; margin: 0;">Audio Library</h2>
                     <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Royalty-free production music and sound effects to use in your video dispatches</div>
                   </div>
-                  <input type="text" id="audioSearchInput" placeholder="Search tracks or sound effects..." oninput="SovraCreatorStudioEngine.filterAudioLibrary(this.value)" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 12px; color: #fff; font-size: 0.78rem; width: 240px;">
+                  <input type="text" id="audioSearchInput" placeholder="Search tracks or sound effects..." oninput="SovraCreatorStudioEngine.filterAudioLibrary(this.value)" style="background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 12px; color: #fff; font-size: 0.78rem; width: 240px;">
                 </div>
 
                 <!-- Genre Filters -->
@@ -7219,7 +7226,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div id="studioSectionIngest" style="display: none;">
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
                 <div style="display: flex; flex-direction: column; gap: 1.25rem;">
-                  <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                     <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">📤 Video Upload & Processing</div>
                     <div id="studioWsDropzone" onclick="document.getElementById('studioWsFileInput').click()" style="border: 2px dashed rgba(56, 189, 248, 0.4); border-radius: 14px; padding: 2rem 1rem; text-align: center; cursor: pointer; background: rgba(15, 23, 42, 0.6); transition: all 0.2s;">
                       <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎬</div>
@@ -7231,15 +7238,15 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     <canvas id="studioWsCanvasElement" style="display: none;" width="640" height="360"></canvas>
                   </div>
 
-                  <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                       <div style="font-weight: 800; font-size: 0.95rem; color: #fff;">📸 Smart Thumbnail Studio</div>
                       <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.68rem; padding: 2px 6px;">Canvas Frame Picker</span>
                     </div>
                     <div id="studioWsThumbCandidates" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem;">
-                      <div style="background: rgba(0,0,0,0.4); border: 1px dashed rgba(255,255,255,0.15); border-radius: 10px; height: 75px; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: #64748b; text-align: center; padding: 4px;">Frame @ 0.5s</div>
-                      <div style="background: rgba(0,0,0,0.4); border: 1px dashed rgba(255,255,255,0.15); border-radius: 10px; height: 75px; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: #64748b; text-align: center; padding: 4px;">Frame @ 5s</div>
-                      <div style="background: rgba(0,0,0,0.4); border: 1px dashed rgba(255,255,255,0.15); border-radius: 10px; height: 75px; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: #64748b; text-align: center; padding: 4px;">Frame @ 10s</div>
+                      <div style="background: #090d16; border: 1px dashed rgba(255,255,255,0.15); border-radius: 10px; height: 75px; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: #64748b; text-align: center; padding: 4px;">Frame @ 0.5s</div>
+                      <div style="background: #090d16; border: 1px dashed rgba(255,255,255,0.15); border-radius: 10px; height: 75px; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: #64748b; text-align: center; padding: 4px;">Frame @ 5s</div>
+                      <div style="background: #090d16; border: 1px dashed rgba(255,255,255,0.15); border-radius: 10px; height: 75px; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: #64748b; text-align: center; padding: 4px;">Frame @ 10s</div>
                     </div>
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
                       <label for="studioWsCustomThumbInput" class="btn btn-secondary" style="flex: 1; font-size: 0.75rem; text-align: center; cursor: pointer; padding: 0.5rem;">🖼️ Upload Custom Image</label>
@@ -7249,7 +7256,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
 
                   <!-- Live Streaming & RTMP Ingest Keys Card -->
-                  <div class="card" id="studioLiveIngestCard" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" id="studioLiveIngestCard" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 1.1rem;">📡</span>
@@ -7265,7 +7272,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       <div>
                         <label style="display: block; font-size: 0.72rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">STREAM URL (RTMP SERVER)</label>
                         <div style="display: flex; gap: 6px;">
-                          <input type="text" id="studioRtmpStreamUrl" readonly value="rtmp://live.sovra.network/live" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #38bdf8; font-size: 0.78rem; font-family: monospace;">
+                          <input type="text" id="studioRtmpStreamUrl" readonly value="rtmp://live.sovra.network/live" style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #38bdf8; font-size: 0.78rem; font-family: monospace;">
                           <button type="button" class="btn btn-secondary" id="btnCopyRtmpUrl" onclick="SovraCreatorStudioEngine.copyRtmpUrl()" style="padding: 6px 10px; font-size: 0.75rem;">Copy</button>
                         </div>
                       </div>
@@ -7276,7 +7283,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                           <span style="font-size: 0.68rem; color: #eab308;">⚠️ Keep private</span>
                         </div>
                         <div style="display: flex; gap: 6px;">
-                          <input type="password" id="studioRtmpStreamKey" value="live_sk_sovra_98a72f0b4d1c" readonly style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem; font-family: monospace;">
+                          <input type="password" id="studioRtmpStreamKey" value="live_sk_sovra_98a72f0b4d1c" readonly style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem; font-family: monospace;">
                           <button type="button" class="btn btn-secondary" id="btnToggleStreamKey" onclick="SovraCreatorStudioEngine.toggleStreamKeyVisibility()" style="padding: 6px 10px; font-size: 0.75rem;">Reveal</button>
                           <button type="button" class="btn btn-secondary" id="btnCopyStreamKey" onclick="SovraCreatorStudioEngine.copyStreamKey()" style="padding: 6px 10px; font-size: 0.75rem;">Copy</button>
                           <button type="button" class="btn btn-secondary" id="btnResetStreamKey" onclick="SovraCreatorStudioEngine.resetStreamKey()" style="padding: 6px 10px; font-size: 0.75rem; color: #ef4444;" title="Reset Stream Key">Reset</button>
@@ -7292,7 +7299,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       </div>
 
                       <!-- OBS Broadcast Live Health & Status Card -->
-                      <div id="studioLiveStreamHealthSection" style="margin-top: 6px; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);">
+                      <div id="studioLiveStreamHealthSection" style="margin-top: 6px; padding: 10px; border-radius: 10px; background: #090d16; border: 1px solid rgba(255, 255, 255, 0.12);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                           <div style="font-size: 0.75rem; font-weight: 700; color: #fff;">Stream Health &amp; Telemetry</div>
                           <span id="studioLiveStreamStatusBadge" class="badge" style="background: rgba(100, 116, 139, 0.2); color: #94a3b8; font-size: 0.68rem; padding: 2px 8px; border-radius: 6px;">Offline / Inactive</span>
@@ -7317,11 +7324,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 1.25rem;">
-                  <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                     <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.85rem;">📝 Video Metadata &amp; Chapters</div>
                     <div style="margin-bottom: 0.85rem;">
                       <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">TITLE</label>
-                      <input type="text" id="studioWsInputTitle" placeholder="e.g. Decentralized P2P Mesh Architecture (4K HLS)" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0.65rem 0.85rem; color: #fff; font-size: 0.88rem;">
+                      <input type="text" id="studioWsInputTitle" placeholder="e.g. Decentralized P2P Mesh Architecture (4K HLS)" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0.65rem 0.85rem; color: #fff; font-size: 0.88rem;">
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.85rem;">
                       <div>
@@ -7336,7 +7343,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       </div>
                       <div>
                         <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">TAGS</label>
-                        <input type="text" id="studioWsInputTags" value="#p2p #mesh #sovereign" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0.65rem 0.85rem; color: #fff; font-size: 0.82rem;">
+                        <input type="text" id="studioWsInputTags" value="#p2p #mesh #sovereign" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0.65rem 0.85rem; color: #fff; font-size: 0.82rem;">
                       </div>
                     </div>
                     <div style="margin-bottom: 0.85rem;">
@@ -7344,32 +7351,32 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                         <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">DESCRIPTION</label>
                         <button type="button" class="btn btn-secondary" id="studioWsToggleDescPreviewBtn" onclick="SovraCreatorStudioEngine.toggleDescPreview()" style="padding: 2px 8px; font-size: 0.7rem;">Toggle Preview</button>
                       </div>
-                      <textarea id="studioWsInputDesc" rows="3" placeholder="Describe your video dispatch..." style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0.65rem 0.85rem; color: #fff; font-size: 0.82rem; resize: vertical;"></textarea>
-                      <div id="studioWsDescPreview" style="display: none; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0.65rem 0.85rem; color: #cbd5e1; font-size: 0.82rem; margin-top: 4px; min-height: 48px;"></div>
+                      <textarea id="studioWsInputDesc" rows="3" placeholder="Describe your video dispatch..." style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0.65rem 0.85rem; color: #fff; font-size: 0.82rem; resize: vertical;"></textarea>
+                      <div id="studioWsDescPreview" style="display: none; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0.65rem 0.85rem; color: #cbd5e1; font-size: 0.82rem; margin-top: 4px; min-height: 48px;"></div>
                     </div>
                     <div style="margin-bottom: 0.85rem;">
                       <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">CLICKABLE CHAPTERS</label>
                       <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-                        <input type="text" id="studioWsChapterTime" placeholder="00:00" style="width: 70px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 0.45rem; color: #fff; font-size: 0.78rem; text-align: center;">
-                        <input type="text" id="studioWsChapterTitle" placeholder="Chapter title" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 0.45rem 0.65rem; color: #fff; font-size: 0.78rem;">
+                        <input type="text" id="studioWsChapterTime" placeholder="00:00" style="width: 70px; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 0.45rem; color: #fff; font-size: 0.78rem; text-align: center;">
+                        <input type="text" id="studioWsChapterTitle" placeholder="Chapter title" style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 0.45rem 0.65rem; color: #fff; font-size: 0.78rem;">
                         <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.addChapter()" style="padding: 0.45rem 0.75rem; font-size: 0.75rem;">+ Add</button>
                       </div>
                       <div id="studioWsChaptersList" style="display: flex; wrap: wrap; gap: 6px;"></div>
                     </div>
                   </div>
 
-                  <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+                  <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                     <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">💰 Monetization &amp; Content Gating Matrix</div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem;">
-                      <label style="background: rgba(0,0,0,0.4); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 10px; padding: 8px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                      <label style="background: #090d16; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 10px; padding: 8px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
                         <input type="radio" name="studioGatingTier" id="studioGateFree" value="free" checked onchange="SovraCreatorStudioEngine.handleGatingChange(this.value)">
                         <span style="font-size: 0.82rem; font-weight: 700; color: #fff;">🌐 Public Free</span>
                       </label>
-                      <label style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                      <label style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; padding: 8px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
                         <input type="radio" name="studioGatingTier" id="studioGateSupporter" value="supporter_gated" onchange="SovraCreatorStudioEngine.handleGatingChange(this.value)">
                         <span style="font-size: 0.82rem; font-weight: 700; color: #fff;">🔒 Supporter Tip</span>
                       </label>
-                      <label style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                      <label style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; padding: 8px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
                         <input type="radio" name="studioGatingTier" id="studioGatePreview" value="timed_preview" onchange="SovraCreatorStudioEngine.handleGatingChange(this.value)">
                         <span style="font-size: 0.82rem; font-weight: 700; color: #fff;">⏱️ Timed Preview</span>
                       </label>
@@ -7378,11 +7385,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     <div id="studioWsGatingPriceRow" style="display: none; margin-bottom: 0.85rem; gap: 8px;">
                       <div style="flex: 1;">
                         <label style="display: block; font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">TIPPING / UNLOCK PRICE (SOV)</label>
-                        <input type="number" id="studioWsGatingPrice" value="5.0" step="0.5" min="0" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.8rem;">
+                        <input type="number" id="studioWsGatingPrice" value="5.0" step="0.5" min="0" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.8rem;">
                       </div>
                       <div style="flex: 1;">
                         <label style="display: block; font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">PREVIEW DURATION (SEC)</label>
-                        <input type="number" id="studioWsPreviewSeconds" value="30" step="5" min="5" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.8rem;">
+                        <input type="number" id="studioWsPreviewSeconds" value="30" step="5" min="5" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.8rem;">
                       </div>
                     </div>
 
@@ -7416,7 +7423,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- TAB 9: SCHEDULED RELEASES QUEUE                -->
             <!-- ============================================== -->
             <div id="studioSectionSchedule" style="display: none;">
-              <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.25rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                   <div>
                     <h2 style="font-size: 1.3rem; font-weight: 900; color: #fff; margin: 0;">⏳ Scheduled Releases</h2>
@@ -7432,7 +7439,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <!-- TAB: SOVEREIGN EARN & MONETIZATION -->
             <div id="studioSectionEarn" style="display: none;">
-              <div class="card" style="padding: 1.5rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.5rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
                   <div>
                     <h2 style="font-size: 1.4rem; font-weight: 900; color: #fff; margin: 0;">Sovereign Earn &amp; Monetization</h2>
@@ -7478,7 +7485,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     </div>
                   </div>
 
-                  <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem;">
+                  <div style="background: #090d16; border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 1.25rem;">
                     <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">Recent Peer Micro-Tips &amp; Payout Receipts</div>
                     <div class="table-responsive" style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;">
                       <table class="studio-content-table">
@@ -7492,6 +7499,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                           </tr>
                         </thead>
                         <tbody id="studioEarnReceiptsTableBody">
+                          <tr><td colspan="5" style="text-align: center; padding: 32px 16px; color: #94a3b8;">
+                            <div style="font-size: 1.5rem; margin-bottom: 6px;">💳</div>
+                            <div style="font-weight: 700; color: #fff; font-size: 0.9rem;">No Payout Receipts Yet</div>
+                            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Peer micro-tips and supporter earnings will appear here with cryptographic settlement hashes.</div>
+                          </td></tr>
                         </tbody>
                       </table>
                     </div>
@@ -7505,21 +7517,21 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     <button type="button" class="btn btn-secondary" onclick="openTierModal()" style="padding: 6px 12px; font-size: 0.78rem;">Configure Tiers</button>
                   </div>
                   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
-                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 14px; padding: 1.25rem;">
+                    <div style="background: #090d16; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 14px; padding: 1.25rem;">
                       <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-weight: 800; color: #10b981;">Tier 1: Sovereign Supporter</span>
                         <span style="font-weight: 900; color: #fff;">5.0 SOV/mo</span>
                       </div>
                       <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">Comments Badge, VIP Chat</div>
                     </div>
-                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; padding: 1.25rem;">
+                    <div style="background: #090d16; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; padding: 1.25rem;">
                       <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-weight: 800; color: #38bdf8;">Tier 2: Mesh Insider</span>
                         <span style="font-weight: 900; color: #fff;">15.0 SOV/mo</span>
                       </div>
                       <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">4K Early Access, Private AMAs</div>
                     </div>
-                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 14px; padding: 1.25rem;">
+                    <div style="background: #090d16; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 14px; padding: 1.25rem;">
                       <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-weight: 800; color: #a855f7;">Tier 3: VIP Patron Council</span>
                         <span style="font-weight: 900; color: #fff;">50.0 SOV/mo</span>
@@ -7532,7 +7544,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <!-- Subtab 3: Tips -->
                 <div id="studioEarnSubtabTips" style="display: none;">
                   <div style="font-size: 0.9rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem;">Super Thanks &amp; Livestream Tips Stream</div>
-                  <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1rem; color: #94a3b8; font-size: 0.85rem;">
+                  <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; padding: 1rem; color: #94a3b8; font-size: 0.85rem;">
                     Real-time peer micro-tipping stream active via P2P relay. 95% is instantly deposited to your sovereign wallet.
                   </div>
                 </div>
@@ -7584,7 +7596,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     </div>
                   </div>
 
-                  <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; overflow-x: auto;">
+                  <div style="background: #090d16; border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; overflow-x: auto;">
                     <table class="studio-content-table" style="width: 100%; font-size: 0.78rem;">
                       <thead>
                         <tr>
@@ -7599,7 +7611,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                         </tr>
                       </thead>
                       <tbody id="studioLedgerEntriesBody">
-                        <tr><td colspan="8" style="text-align: center; color: #64748b; padding: 1.5rem;">Loading financial ledger...</td></tr>
+                        <tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 32px 16px;">
+                          <div style="font-size: 1.5rem; margin-bottom: 6px;">📊</div>
+                          <div style="font-weight: 700; color: #fff; font-size: 0.9rem;">No Accounting Entries Recorded</div>
+                          <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">95/5 autonomous ledger settlements will be logged here with immutable receipt hashes.</div>
+                        </td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -7618,22 +7634,22 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <div>
                     <label style="font-size: 0.75rem; color: #94a3b8;">Tier 1 Name &amp; Price (SOV):</label>
                     <div style="display: flex; gap: 8px;">
-                      <input id="tier1NameInput" value="Sovereign Supporter" style="flex: 2; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
-                      <input id="tier1PriceInput" type="number" value="5.0" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                      <input id="tier1NameInput" value="Sovereign Supporter" style="flex: 2; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                      <input id="tier1PriceInput" type="number" value="5.0" style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
                     </div>
                   </div>
                   <div>
                     <label style="font-size: 0.75rem; color: #94a3b8;">Tier 2 Name &amp; Price (SOV):</label>
                     <div style="display: flex; gap: 8px;">
-                      <input id="tier2NameInput" value="Mesh Insider" style="flex: 2; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
-                      <input id="tier2PriceInput" type="number" value="15.0" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                      <input id="tier2NameInput" value="Mesh Insider" style="flex: 2; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                      <input id="tier2PriceInput" type="number" value="15.0" style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
                     </div>
                   </div>
                   <div>
                     <label style="font-size: 0.75rem; color: #94a3b8;">Tier 3 Name &amp; Price (SOV):</label>
                     <div style="display: flex; gap: 8px;">
-                      <input id="tier3NameInput" value="VIP Patron Council" style="flex: 2; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
-                      <input id="tier3PriceInput" type="number" value="50.0" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                      <input id="tier3NameInput" value="VIP Patron Council" style="flex: 2; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
+                      <input id="tier3PriceInput" type="number" value="50.0" style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff;">
                     </div>
                   </div>
                   <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 0.5rem;">
@@ -7646,7 +7662,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <!-- TAB: CONTENT DETECTION & OWNERSHIP PROOF -->
             <div id="studioSectionCopyright" style="display: none;">
-              <div class="card" style="padding: 1.5rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.5rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
                   <div>
                     <h2 style="font-size: 1.4rem; font-weight: 900; color: #fff; margin: 0;">Content Detection &amp; Provenance</h2>
@@ -7657,7 +7673,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </button>
                 </div>
 
-                <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem;">
+                <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem;">
                   <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.5rem;">Merkle Original Authorship Claims</div>
                   <div style="font-size: 0.76rem; color: #94a3b8; margin-bottom: 1rem;">Every video uploaded receives an immutable cryptographic timestamp and Verified signature registered across all bootstrap nodes.</div>
                   <div class="table-responsive" style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;">
@@ -7684,14 +7700,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <!-- TAB: STUDIO SETTINGS -->
             <div id="studioSectionSettings" style="display: none;">
-              <div class="card" style="padding: 1.5rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="card studio-card" style="padding: 1.5rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);">
                 <div style="margin-bottom: 1.5rem;">
                   <h2 style="font-size: 1.4rem; font-weight: 900; color: #fff; margin: 0;">Channel &amp; Studio Settings</h2>
                   <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">Configure upload defaults, P2P mesh relay bitrate caps, and cryptographic access keys</div>
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 1.25rem; max-width: 650px;">
-                  <div style="background: rgba(0,0,0,0.4); padding: 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                  <div style="background: #090d16; padding: 1.25rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
                     <div style="font-weight: 800; font-size: 0.92rem; color: #fff; margin-bottom: 4px;">Default Upload Category &amp; Tags</div>
                     <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Applied automatically to new video uploads and live streams</div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -7702,11 +7718,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                         <option value="Music">Music &amp; Audio</option>
                         <option value="Creative">Creative &amp; Design</option>
                       </select>
-                      <input type="text" id="studioSettingDefaultTags" value="#sovra #p2p #sovereign" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.8rem;">
+                      <input type="text" id="studioSettingDefaultTags" value="#sovra #p2p #sovereign" style="background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.8rem;">
                     </div>
                   </div>
 
-                  <div style="background: rgba(0,0,0,0.4); padding: 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                  <div style="background: #090d16; padding: 1.25rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
                     <div style="font-weight: 800; font-size: 0.92rem; color: #fff; margin-bottom: 4px;">P2P Swarm Seeding &amp; Bitrate Caps</div>
                     <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Control maximum upload seeding bandwidth when streaming to local peers</div>
                     <select id="studioSettingBitrateCap" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.8rem;">
@@ -7722,7 +7738,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     </button>
                   </div>
 
-                  <div style="background: rgba(0,0,0,0.4); padding: 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                  <div style="background: #090d16; padding: 1.25rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
                     <div style="font-weight: 800; font-size: 0.92rem; color: #fff; margin-bottom: 4px;">Channel Cryptographic DID &amp; Keys</div>
                     <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Export Channel Master Key (Hardware Passkey protected)</div>
                     <button type="button" class="btn btn-secondary" id="btnExportChannelDid" onclick="SovraCreatorStudioEngine.exportChannelDidKey()" style="font-size: 0.78rem; padding: 7px 14px; border-radius: 16px;">
@@ -7735,7 +7751,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <!-- TAB: STUDIO FEEDBACK -->
             <div id="studioSectionFeedback" style="display: none;">
-              <div class="card" style="padding: 1.5rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); max-width: 650px;">
+              <div class="card studio-card" style="padding: 1.5rem; border-radius: 18px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45); max-width: 650px;">
                 <div style="margin-bottom: 1.5rem;">
                   <h2 style="font-size: 1.4rem; font-weight: 900; color: #fff; margin: 0;">Send Creator Feedback</h2>
                   <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">Share your ideas, feature requests, or bug reports with the Sovra core dev team over encrypted mesh gossip</div>
@@ -7753,7 +7769,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
                   <div>
                     <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">YOUR FEEDBACK OR SUGGESTION</label>
-                    <textarea id="studioFeedbackText" rows="4" placeholder="Describe your experience or suggestion..." style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px; color: #fff; font-size: 0.82rem;"></textarea>
+                    <textarea id="studioFeedbackText" rows="4" placeholder="Describe your experience or suggestion..." style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px; color: #fff; font-size: 0.82rem;"></textarea>
                   </div>
                   <div>
                     <button type="button" class="btn btn-primary" onclick="SovraCreatorStudioEngine.submitStudioFeedback()" style="padding: 8px 18px; font-size: 0.82rem; font-weight: 800; border-radius: 20px;">
@@ -7800,7 +7816,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">TITLE (REQUIRED)</label>
                 <span id="editVideoTitleCount" style="font-size: 0.7rem; color: #64748b;">0/100</span>
               </div>
-              <input type="text" id="editVideoTitle" placeholder="Video title..." style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.88rem;" oninput="document.getElementById('editVideoTitleCount').textContent = this.value.length + '/100'">
+              <input type="text" id="editVideoTitle" placeholder="Video title..." style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.88rem;" oninput="document.getElementById('editVideoTitleCount').textContent = this.value.length + '/100'">
             </div>
 
             <div>
@@ -7808,7 +7824,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">DESCRIPTION (MARKDOWN SUPPORTED)</label>
                 <button type="button" id="btnEditVideoDescPreview" onclick="SovraCreatorStudioEngine.toggleEditDescPreview()" style="background: none; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; font-weight: 700;">Preview MD</button>
               </div>
-              <textarea id="editVideoDesc" rows="4" placeholder="Tell viewers about your video with timestamps and links..." style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem; resize: vertical;"></textarea>
+              <textarea id="editVideoDesc" rows="4" placeholder="Tell viewers about your video with timestamps and links..." style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem; resize: vertical;"></textarea>
               <div id="editVideoDescPreview" style="display: none; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; color: #cbd5e1; max-height: 120px; overflow-y: auto;"></div>
             </div>
 
@@ -7850,8 +7866,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div>
               <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">VIDEO CHAPTERS</label>
               <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-                <input type="text" id="editChapterTime" placeholder="00:00" style="width: 70px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 5px; color: #fff; font-size: 0.78rem; text-align: center;">
-                <input type="text" id="editChapterTitle" placeholder="Chapter title..." style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 5px 8px; color: #fff; font-size: 0.78rem;">
+                <input type="text" id="editChapterTime" placeholder="00:00" style="width: 70px; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 5px; color: #fff; font-size: 0.78rem; text-align: center;">
+                <input type="text" id="editChapterTitle" placeholder="Chapter title..." style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 5px 8px; color: #fff; font-size: 0.78rem;">
                 <button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.addEditChapter()" style="padding: 5px 10px; font-size: 0.75rem;">+ Add</button>
               </div>
               <div id="editVideoChaptersList" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
@@ -7860,7 +7876,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- Tags Input -->
             <div>
               <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">TAGS (COMMA SEPARATED)</label>
-              <input type="text" id="editVideoTags" placeholder="e.g. sovra, mesh, web3, tutorial" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem;">
+              <input type="text" id="editVideoTags" placeholder="e.g. sovra, mesh, web3, tutorial" style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem;">
             </div>
           </div>
 
@@ -7880,7 +7896,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
 
             <!-- Visibility & 95/5 Monetization Gating -->
-            <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+            <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
               <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 8px;">VISIBILITY &amp; MONETIZATION</div>
               <div style="display: flex; flex-direction: column; gap: 6px;">
                 <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #fff; cursor: pointer;">
@@ -7899,7 +7915,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
 
             <!-- End Screens & Related Video Selector -->
-            <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+            <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
               <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 6px;">END SCREEN &amp; CARDS</div>
               <select id="editVideoEndScreenSelect" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem;">
                 <option value="none">No end screen</option>
@@ -7909,7 +7925,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
 
             <!-- Visibility & Sovereign License Options -->
-            <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+            <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
               <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 6px;">CATALOG VISIBILITY</div>
               <select id="editVideoVisibility" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 0.78rem; margin-bottom: 10px;">
                 <option value="public">Public (Everyone can search &amp; watch)</option>
@@ -7961,7 +7977,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- Timeline Scrubber & Trim Sliders -->
-          <div style="background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="background: #090d16; padding: 1rem; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.14); display: flex; flex-direction: column; gap: 0.75rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #94a3b8; font-weight: 700;">
               <span>TIMELINE BOUNDARIES</span>
               <span id="studioTrimDurationLabel" style="color: #38bdf8;">Duration: 0.0s</span>
@@ -8013,12 +8029,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
           <div>
             <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">PLAYLIST TITLE (REQUIRED)</label>
-            <input type="text" id="newPlaylistTitle" placeholder="e.g. Sovereign Peer-to-Peer Series" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem;">
+            <input type="text" id="newPlaylistTitle" placeholder="e.g. Sovereign Peer-to-Peer Series" style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem;">
           </div>
 
           <div>
             <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">DESCRIPTION</label>
-            <textarea id="newPlaylistDesc" rows="3" placeholder="Tell viewers what this playlist is about..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem; resize: vertical;"></textarea>
+            <textarea id="newPlaylistDesc" rows="3" placeholder="Tell viewers what this playlist is about..." style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem; resize: vertical;"></textarea>
           </div>
 
           <div>
@@ -8072,7 +8088,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <!-- Date & Time Picker -->
           <div>
             <label for="studioScheduleDatetimeInput" style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 6px;">SELECT PUBLISH DATE &amp; TIME</label>
-            <input type="datetime-local" id="studioScheduleDatetimeInput" onchange="SovraCreatorStudioEngine.handleScheduleCustomTimeChange()" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px 12px; color: #fff; font-size: 0.88rem; outline: none;">
+            <input type="datetime-local" id="studioScheduleDatetimeInput" onchange="SovraCreatorStudioEngine.handleScheduleCustomTimeChange()" style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px 12px; color: #fff; font-size: 0.88rem; outline: none;">
           </div>
 
           <!-- Timezone & Countdown Preview -->
@@ -8106,7 +8122,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <!-- 📱 Idle Dashboard: Contact Search & Real Call History (Shown When No Active Call) -->
         <div id="callsIdleDashboard" style="display: flex; flex-direction: column; gap: 18px;">
           <!-- Card 1: Start Encrypted Call & Contact Quick Dial -->
-          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px; padding: 18px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 18px; padding: 18px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
               <div style="display: flex; align-items: center; gap: 10px;">
                 <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: #fff;">📞</div>
@@ -8131,7 +8147,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- Card 2: Call History Log (Incoming, Outgoing, Missed) -->
-          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px; padding: 18px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 18px; padding: 18px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
               <div style="font-weight: 800; font-size: 1rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
                 <span>📜 Call History Log</span>
@@ -8154,7 +8170,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <!-- 🔴 Active Call Session Canvas (Shown ONLY When Real Call Is In Progress) -->
         <div id="callsActiveSession" style="display: none; flex-direction: column;">
           <!-- Calls Top Bar -->
-          <div class="calls-top-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: rgba(15, 23, 42, 0.7); border-radius: 16px; margin-bottom: 14px; border: 1px solid rgba(255, 255, 255, 0.08);">
+          <div class="calls-top-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: rgba(15, 23, 42, 0.7); border-radius: 16px; margin-bottom: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
             <div style="display: flex; align-items: center; gap: 12px;">
               <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #38bdf8, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #fff;">📞</div>
               <div>
@@ -8169,7 +8185,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
-              <span class="calls-timer-pill" id="callsTimerPill" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); padding: 6px 14px; border-radius: 100px; font-family: monospace; font-size: 0.88rem; font-weight: 700; color: #38bdf8;">00:00</span>
+              <span class="calls-timer-pill" id="callsTimerPill" style="background: #090d16; border: 1px solid rgba(255,255,255,0.12); padding: 6px 14px; border-radius: 100px; font-family: monospace; font-size: 0.88rem; font-weight: 700; color: #38bdf8;">00:00</span>
               <button type="button" class="btn btn-secondary" onclick="terminateActiveCall()" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 10px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;">✕ End Call</button>
             </div>
           </div>
@@ -8181,7 +8197,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(2,6,23,0.3) 0%, rgba(2,6,23,0.7) 100%);"></div>
               
               <div style="position: absolute; bottom: 100px; left: 24px; z-index: 10; display: flex; align-items: center; gap: 10px;">
-                <div style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); padding: 8px 14px; border-radius: 12px; display: flex; align-items: center; gap: 8px;">
+                <div style="background: #0f172a; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); padding: 8px 14px; border-radius: 12px; display: flex; align-items: center; gap: 8px;">
                   <span id="remoteCallPeerLabel" style="font-weight: 700; font-size: 0.85rem; color: #fff;">Peer</span>
                   <span style="font-size: 0.72rem; color: #34d399;">📶 42ms (Loss 0%)</span>
                 </div>
@@ -8218,7 +8234,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- Recent Call History & Contacts Strip -->
-        <div style="margin-top: 20px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px 20px;">
+        <div style="margin-top: 20px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 16px 20px;">
           <div style="font-weight: 800; font-size: 0.92rem; color: #f8fafc; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <span>Recent Peers &amp; Quick Dial</span>
             <span style="font-size: 0.75rem; color: #94a3b8;">Direct WebRTC Mesh</span>
@@ -8296,7 +8312,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
 
             <!-- Gift Tipping & Super-Chat Bar -->
-            <div class="live-tipping-bar" style="display: flex; gap: 6px; padding: 8px 12px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.06); align-items: center; overflow-x: auto; scrollbar-width: none;">
+            <div class="live-tipping-bar" style="display: flex; gap: 6px; padding: 8px 12px; background: #090d16; border-top: 1px solid rgba(255,255,255,0.06); align-items: center; overflow-x: auto; scrollbar-width: none;">
               <button type="button" class="live-gift-pill" onclick="openLiveSuperChatModal()" style="background: linear-gradient(135deg, #f59e0b, #ec4899); color: #fff; font-weight: 800; border: none; padding: 5px 12px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 8px rgba(245,158,11,0.4);">
                 <span>⚡</span> <span>Super-Chat</span>
               </button>
@@ -8364,7 +8380,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div style="flex: 1;">
                 <label style="display: block; font-size: 0.76rem; font-weight: 700; color: #cbd5e1; margin-bottom: 4px;">Community Name <span style="color:#f43f5e;">*</span></label>
-                <input type="text" id="newCommNameInput" placeholder="e.g. Sovereign AI Engineers" maxlength="60" required style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.88rem; outline: none;">
+                <input type="text" id="newCommNameInput" placeholder="e.g. Sovereign AI Engineers" maxlength="60" required style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.88rem; outline: none;">
               </div>
             </div>
 
@@ -8386,13 +8402,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- Description -->
             <div>
               <label style="display: block; font-size: 0.76rem; font-weight: 700; color: #cbd5e1; margin-bottom: 4px;">Description</label>
-              <textarea id="newCommDescInput" placeholder="What is the purpose of this community? Guidelines and goals..." rows="3" maxlength="280" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.85rem; outline: none; resize: none; font-family: inherit;"></textarea>
+              <textarea id="newCommDescInput" placeholder="What is the purpose of this community? Guidelines and goals..." rows="3" maxlength="280" style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.85rem; outline: none; resize: none; font-family: inherit;"></textarea>
             </div>
 
             <!-- Category / Tags -->
             <div>
               <label style="display: block; font-size: 0.76rem; font-weight: 700; color: #cbd5e1; margin-bottom: 4px;">Topic Tags (space separated)</label>
-              <input type="text" id="newCommTagsInput" placeholder="e.g. tech ai web3 algorithms" maxlength="100" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 12px; color: #38bdf8; font-weight: 600; font-size: 0.85rem; outline: none;">
+              <input type="text" id="newCommTagsInput" placeholder="e.g. tech ai web3 algorithms" maxlength="100" style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 12px; color: #38bdf8; font-weight: 600; font-size: 0.85rem; outline: none;">
             </div>
 
             <!-- Privacy & Banner Color -->
@@ -8620,7 +8636,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <h3 style="font-size: 1.15rem; font-weight: 800; color: #fff; margin-top: 0;">Cryptographic Keys &amp; Security</h3>
               <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 20px;">Manage your master identity key and end-to-end encryption sessions.</p>
               
-              <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+              <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
                 <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">PUBLIC IDENTITY KEY (ED25519)</div>
                 <code style="display: block; margin-top: 6px; font-size: 0.72rem; color: #38bdf8; word-break: break-all;">sovra1ed25519_node_identity_7f8a9b2c3d4e5f6a7b8c9d0e1f2a3b4c</code>
               </div>
@@ -8718,10 +8734,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
           <div style="display: flex; gap: 8px; margin-top: 1.25rem; overflow-x: auto; padding-bottom: 4px;" id="dappsCategoryBar">
             <button type="button" class="dapp-cat-pill active" onclick="filterDAppsCategory('all', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.15); color: #fff; font-size: 0.78rem; font-weight: 700; cursor: pointer;">All DApps</button>
-            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('games', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">🎮 Games</button>
-            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('defi', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">⚡ DeFi &amp; Swaps</button>
-            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('tools', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">🛠️ Tools &amp; ZK</button>
-            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('social', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">🔮 Social &amp; Circles</button>
+            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('games', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">🎮 Games</button>
+            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('defi', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">⚡ DeFi &amp; Swaps</button>
+            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('tools', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">🛠️ Tools &amp; ZK</button>
+            <button type="button" class="dapp-cat-pill" onclick="filterDAppsCategory('social', this)" style="padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.78rem; font-weight: 700; cursor: pointer;">🔮 Social &amp; Circles</button>
           </div>
         </div>
         <div id="dappsGridContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
@@ -8894,7 +8910,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
 
             <!-- Middle Group: Volume & Mute -->
-            <div style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+            <div style="display: flex; align-items: center; gap: 8px; background: #090d16; padding: 5px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.12);">
               <button type="button" id="sovraMuteToggleBtn" onclick="toggleSovraMediaMute()" style="background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #cbd5e1; padding: 0;">🔊</button>
               <input type="range" id="sovraVolumeSlider" min="0" max="1" step="0.05" value="1" oninput="setSovraMediaVolume(this.value)" style="width: 75px; accent-color: #38bdf8; cursor: pointer;">
             </div>
@@ -8926,7 +8942,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Equalizer & Audio Enhancement Console -->
-      <div style="background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div style="background: rgba(15,23,42,0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 1rem;">🎛️</span>
           <span style="font-size: 0.85rem; font-weight: 700; color: #fff;">Audio Equalizer Preset:</span>
@@ -8941,7 +8957,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Recent Streams & History Playlist -->
-      <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 1.25rem;">
+      <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 18px; padding: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <span style="font-size: 0.9rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
             <span>📜</span> <span>Recently Played External Streams</span>
@@ -9160,7 +9176,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 <!-- Column 3: Spatial Co-Pilot Drawer (#spatialCoPilotDrawer, 340px) -->
 <aside class="app-right-rail" id="spatialCoPilotDrawer">
   <!-- Co-Pilot Header -->
-  <div class="copilot-drawer-header" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 0.5rem;">
+  <div class="copilot-drawer-header" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14); margin-bottom: 0.5rem;">
     <div style="display: flex; align-items: center; gap: 8px;">
       <span style="font-size: 1.1rem; color: #818cf8;">◫</span>
       <span style="font-weight: 800; font-size: 0.92rem; color: #f8fafc; letter-spacing: -0.01em;">Co-Pilot Workspace</span>
@@ -9173,7 +9189,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   </div>
 
   <!-- Co-Pilot 3-Tab Bar -->
-  <div class="copilot-tabs-bar" style="display: flex; gap: 4px; background: rgba(15, 23, 42, 0.6); padding: 4px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.65rem;">
+  <div class="copilot-tabs-bar" style="display: flex; gap: 4px; background: rgba(15, 23, 42, 0.6); padding: 4px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.12); margin-bottom: 0.65rem;">
     <button type="button" id="copilotTabBtn_messages" class="copilot-nav-tab active" onclick="switchCoPilotTab('messages')" style="flex: 1; padding: 6px 8px; border-radius: 8px; border: none; background: #6366f1; color: #fff; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.2s;">
       <span>💬</span> <span>Messages</span>
     </button>
@@ -9188,7 +9204,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <!-- Tab 1: Messages Pane -->
   <div id="copilotPane_messages" class="copilot-pane" style="display: flex; flex-direction: column; gap: 0.75rem;">
     <!-- Active Docked Thread Card -->
-    <div id="copilotActiveThreadCard" class="card" style="padding: 0.85rem; border-radius: 14px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+    <div id="copilotActiveThreadCard" class="card" style="padding: 0.85rem; border-radius: 14px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255, 255, 255, 0.14);">
       <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 8px; margin-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
           <div id="copilotPeerAvatar" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.82rem; color: #fff; flex-shrink: 0;">A</div>
@@ -9211,7 +9227,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div style="align-self: center; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 999px; padding: 2px 10px; font-size: 0.65rem; color: #38bdf8;">
           🔒 Double Ratchet Ratchet Step #1 Active
         </div>
-        <div style="align-self: flex-start; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px 12px 12px 2px; padding: 6px 10px; color: #f1f5f9; max-width: 82%;">
+        <div style="align-self: flex-start; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px 12px 12px 2px; padding: 6px 10px; color: #f1f5f9; max-width: 82%;">
           <div>Hey! Just checked your post on the sovereign mesh. Ready for the live demo?</div>
           <div style="font-size: 0.62rem; color: #94a3b8; text-align: right; margin-top: 2px;">12:04 PM</div>
         </div>
@@ -9229,7 +9245,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
 
     <!-- Facebook Parity: Contacts Sidebar -->
-    <div class="card fb-contacts-card" style="padding: 0.75rem 0.5rem; border-radius: 14px; background: rgba(17, 24, 39, 0.65); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.5rem;">
+    <div class="card fb-contacts-card" style="padding: 0.75rem 0.5rem; border-radius: 14px; background: rgba(17, 24, 39, 0.65); border: 1px solid rgba(255, 255, 255, 0.12); margin-bottom: 0.5rem;">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; padding: 4px 8px;">
         <span style="font-weight: 600; font-size: 0.88rem; color: #b0b3b8;">Direct Contacts</span>
         <div style="display: flex; gap: 8px; color: #b0b3b8;">
@@ -9246,7 +9262,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <!-- Tab 2: Quick Wallet Pane (display: none by default) -->
   <div id="copilotPane_wallet" class="copilot-pane" style="display: none; flex-direction: column; gap: 0.75rem;">
     <!-- Column 3 Contextual Rail Card 1: Sovereign Wallet & Economics -->
-    <div class="card" id="railSovWalletCard" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+    <div class="card" id="railSovWalletCard" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255, 255, 255, 0.14);">
       <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
         <span style="display: flex; align-items: center; gap: 6px;">
           <span>💳</span>
@@ -9283,7 +9299,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <!-- Tab 3: Mesh Radar Pane (display: none by default) -->
   <div id="copilotPane_radar" class="copilot-pane" style="display: none; flex-direction: column; gap: 0.75rem;">
     <!-- Column 3 Contextual Rail Card 2: BLE Offline Mesh Radar -->
-    <div class="card" id="railBleRadarCard" style="display: block; padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+    <div class="card" id="railBleRadarCard" style="display: block; padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255, 255, 255, 0.14);">
       <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
         <span style="display: flex; align-items: center; gap: 6px;">
           <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 8px #38bdf8;"></span>
@@ -9300,7 +9316,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
 
     <!-- People You May Know / Suggested Connections -->
-    <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+    <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255, 255, 255, 0.14);">
       <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
         <span>👥 Suggested For You</span>
         <span style="font-size: 0.75rem; color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="switchTab('friends')">See All</span>
@@ -9311,7 +9327,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
 
     <!-- Trending on Mesh -->
-    <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+    <div class="card" style="padding: 1.15rem; border-radius: 16px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255, 255, 255, 0.14);">
       <div style="font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
         <span>🔥 Trending on Mesh</span>
         <span style="font-size: 0.72rem; color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="renderTrendingHashtags()">Refresh</span>
@@ -9323,7 +9339,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   </div>
 
   <!-- Shared Footer Telemetry & Diagnostics -->
-  <div class="card" id="railLiveStreamsCard" style="display: none; padding: 1rem; border-radius: 14px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
+  <div class="card" id="railLiveStreamsCard" style="display: none; padding: 1rem; border-radius: 14px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255, 255, 255, 0.14);">
     <div style="font-weight: 800; font-size: 0.85rem; color: #fff; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
       <span style="display: flex; align-items: center; gap: 6px;">
         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444;"></span>
@@ -9350,7 +9366,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
   </div>
 
-  <div class="card" style="padding: 1rem; border-radius: 14px; background: rgba(17, 24, 39, 0.7); border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem;">
+  <div class="card" style="padding: 1rem; border-radius: 14px; background: rgba(17, 24, 39, 0.7); border: 1px solid rgba(255, 255, 255, 0.12); font-size: 0.78rem;">
     <div style="font-weight: 800; color: #fff; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
       <span style="display: flex; align-items: center; gap: 6px;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -9570,6 +9586,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <button id="sovraPipCloseBtn"></button>
       <video id="sovraPipVideoElement"></video>
       <button id="sovraPipPlayBtn"></button>
+      <span id="sovraPipStatusBadge"></span>
     </div>
   </div>
 
@@ -9733,15 +9750,15 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     <div class="story-card-modal story-creator-studio-card" id="storyCreatorCard" onclick="event.stopPropagation()">
       <!-- Top Studio Toolbar -->
       <div class="story-creator-top-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; z-index: 50; position: relative;">
-        <button type="button" class="story-creator-tool-btn" onclick="closeStoryCreatorModal()" title="Discard Story" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #fff; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem;">✕</button>
+        <button type="button" class="story-creator-tool-btn" onclick="closeStoryCreatorModal()" title="Discard Story" style="background: #090d16; border: 1px solid rgba(255,255,255,0.2); color: #fff; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem;">✕</button>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <button type="button" class="story-creator-tool-btn" id="storyToolStickersBtn" onclick="toggleStoryStickersTray()" title="Stickers & Overlays" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 16px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+          <button type="button" class="story-creator-tool-btn" id="storyToolStickersBtn" onclick="toggleStoryStickersTray()" title="Stickers & Overlays" style="background: #090d16; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 16px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 4px;">
             <span>🏷️</span> <span>Stickers</span>
           </button>
-          <button type="button" class="story-creator-tool-btn" id="storyToolTextBtn" onclick="focusStoryTextOverlay()" title="Add Text" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 16px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 800; display: flex; align-items: center; gap: 4px;">
+          <button type="button" class="story-creator-tool-btn" id="storyToolTextBtn" onclick="focusStoryTextOverlay()" title="Add Text" style="background: #090d16; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 16px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 800; display: flex; align-items: center; gap: 4px;">
             <span>Aa</span>
           </button>
-          <button type="button" class="story-creator-tool-btn" id="storyToolFiltersBtn" onclick="toggleStoryFiltersTray()" title="Filter Presets" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 16px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+          <button type="button" class="story-creator-tool-btn" id="storyToolFiltersBtn" onclick="toggleStoryFiltersTray()" title="Filter Presets" style="background: #090d16; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 16px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 4px;">
             <span>✨</span>
           </button>
         </div>
@@ -9887,7 +9904,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </span>
         <button type="button" onclick="closeFeedQaAnswerModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">✕</button>
       </div>
-      <div id="feedQaModalQuestionTitle" style="font-size: 0.82rem; color: #cbd5e1; font-weight: 600; margin-bottom: 0.75rem; padding: 8px 10px; background: rgba(15,23,42,0.6); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+      <div id="feedQaModalQuestionTitle" style="font-size: 0.82rem; color: #cbd5e1; font-weight: 600; margin-bottom: 0.75rem; padding: 8px 10px; background: rgba(15,23,42,0.6); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.14);">
         Question text
       </div>
       <textarea id="feedQaAnswerInput" rows="3" placeholder="Write your sovereign answer..." style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.85); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.85rem; outline: none; resize: none; margin-bottom: 1rem; font-family: inherit;"></textarea>
@@ -9978,7 +9995,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <div style="display: flex; flex-direction: column; gap: 1rem;">
         <!-- PHOTO UPLOAD & PREVIEW ROW -->
-        <div style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: #1e293b; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: #1e293b; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
           <div id="editProfileAvatarPreview" style="width: 58px; height: 58px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800; overflow: hidden; border: 2px solid #38bdf8; flex-shrink: 0;">
             <span id="editProfileAvatarLetter">S</span>
           </div>
@@ -10000,7 +10017,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- COVER BANNER UPLOAD ROW -->
-        <div style="padding: 0.75rem; background: #1e293b; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+        <div style="padding: 0.75rem; background: #1e293b; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <div style="font-size: 0.85rem; font-weight: 700; color: #f8fafc;">Cover Banner</div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -10102,7 +10119,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <!-- VIEW 1: Main Dashboard -->
       <div id="almViewMain">
-        <div style="background: #1e293b; padding: 0.9rem 1.1rem; border-radius: 14px; margin-bottom: 1.25rem; border: 1px solid rgba(255,255,255,0.06);">
+        <div style="background: #1e293b; padding: 0.9rem 1.1rem; border-radius: 14px; margin-bottom: 1.25rem; border: 1px solid rgba(255, 255, 255, 0.12);">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <span style="font-weight: 800; color: #f8fafc; font-size: 1.05rem;" id="almProfileName">Sovereign Peer</span>
@@ -10335,7 +10352,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div id="mfaModalNotice" style="display: none; padding: 0.65rem 1rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: center;"></div>
 
       <!-- Tab Switcher -->
-      <div style="display: flex; gap: 0.4rem; margin-bottom: 1.25rem; background: #1e293b; padding: 4px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="display: flex; gap: 0.4rem; margin-bottom: 1.25rem; background: #1e293b; padding: 4px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.12);">
         <button id="mfaTabTotpBtn" onclick="switchMfaTab('totp')" style="flex: 1; padding: 0.5rem 0.6rem; background: #3b82f6; color: #fff; border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
           Authenticator
         </button>
@@ -10350,7 +10367,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <!-- SECTION 1: TOTP AUTHENTICATOR -->
       <div id="mfaSectionTotp">
         <!-- Status indicator badge -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 0.75rem 1rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.06);">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 0.75rem 1rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid rgba(255, 255, 255, 0.12);">
           <div>
             <div style="font-weight: 700; font-size: 0.88rem;">2-Factor Authentication (TOTP)</div>
             <div style="font-size: 0.75rem; color: #94a3b8;">Google / Microsoft / Apple Authenticator</div>
@@ -10462,7 +10479,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div id="vaultModalNotice" style="display: none; padding: 0.65rem 1rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: center;"></div>
 
       <!-- Tab Switcher -->
-      <div style="display: flex; gap: 0.4rem; margin-bottom: 1.25rem; background: #1e293b; padding: 4px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="display: flex; gap: 0.4rem; margin-bottom: 1.25rem; background: #1e293b; padding: 4px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.12);">
         <button id="vaultTabExportBtn" onclick="switchVaultTab('export')" style="flex: 1; padding: 0.5rem 0.6rem; background: #a855f7; color: #fff; border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
           Export Vault
         </button>
@@ -10572,7 +10589,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div id="deviceLinkNoticeToast" style="display: none; padding: 0.65rem 1rem; border-radius: 10px; font-size: 0.8rem; margin-bottom: 1rem; text-align: center;"></div>
 
       <!-- Tab Switcher -->
-      <div style="display: flex; gap: 0.4rem; margin-bottom: 1.25rem; background: #1e293b; padding: 4px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="display: flex; gap: 0.4rem; margin-bottom: 1.25rem; background: #1e293b; padding: 4px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.12);">
         <button id="deviceLinkTabQrBtn" onclick="switchDeviceLinkTab('qr')" style="flex: 1; padding: 0.5rem 0.6rem; background: #22c55e; color: #000; border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 800; cursor: pointer;">
           Show Linking QR
         </button>
@@ -10831,7 +10848,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
         </div>
 
-        <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 0.85rem 1rem;">
+        <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 0.85rem 1rem;">
           <div style="font-weight: 700; font-size: 0.88rem; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
             <span>🤖 Android (Chrome / Brave / Edge)</span>
           </div>
@@ -10840,7 +10857,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
         </div>
 
-        <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 0.85rem 1rem;">
+        <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 0.85rem 1rem;">
           <div style="font-weight: 700; font-size: 0.88rem; color: #a78bfa; display: flex; align-items: center; gap: 6px;">
             <span>🍎 iPhone &amp; iPad (Safari)</span>
           </div>
@@ -10849,7 +10866,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
         </div>
 
-        <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 0.85rem 1rem;">
+        <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 0.85rem 1rem;">
           <div style="font-weight: 700; font-size: 0.88rem; color: #34d399; display: flex; align-items: center; gap: 6px;">
             <span>💻 Desktop (Chrome / Brave / Edge)</span>
           </div>
@@ -10860,7 +10877,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Live Diagnostics -->
-      <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 0.65rem 0.5rem; font-size: 0.72rem; color: #94a3b8; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; margin-bottom: 1.25rem;">
+      <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 0.65rem 0.5rem; font-size: 0.72rem; color: #94a3b8; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; margin-bottom: 1.25rem;">
         <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
           <span style="color: #64748b; font-size: 0.68rem;">SW Engine</span>
           <b style="color: #34d399;">Active ✓</b>
@@ -10930,7 +10947,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <button onclick="closeWithdrawModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; padding: 4px;" title="Close modal" aria-label="Close modal">✕</button>
       </div>
 
-        <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1rem; margin-bottom: 1rem;">
+        <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; padding: 1rem; margin-bottom: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
           <span style="font-size: 0.78rem; color: #94a3b8; font-weight: 600;">Available Balance</span>
           <div style="display: flex; gap: 4px;">
@@ -10991,7 +11008,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Public Key / DID String -->
-      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 0.85rem; margin-bottom: 1rem;">
+      <div style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 0.85rem; margin-bottom: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
           <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">Sovereign Deposit DID</span>
           <button type="button" onclick="copyDepositDid()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; font-size: 0.72rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; cursor: pointer;">COPY</button>
@@ -11121,7 +11138,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <div style="margin-bottom: 1.25rem;">
         <label style="display: block; font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Consensus Fee &amp; Finality</label>
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
           <span style="color: #94a3b8;">Consensus Gas Fee:</span>
           <span style="color: #cbd5e1; font-weight: 700; font-family: monospace;">0.0001 SOV (100 uSOV)</span>
         </div>
@@ -11183,7 +11200,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Amount Highlight Card -->
-      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 1.25rem; text-align: center; margin-bottom: 1.25rem;">
+      <div style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 1.25rem; text-align: center; margin-bottom: 1.25rem;">
         <div id="receiptModalDirectionBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; margin-bottom: 8px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
           <span>● INCOMING SETTLEMENT</span>
         </div>
@@ -11192,7 +11209,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Ledger Specifications Grid -->
-      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 10px; font-size: 0.82rem;">
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 1rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 10px; font-size: 0.82rem;">
         
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span style="color: #94a3b8; font-weight: 600;">Transaction Type</span>
@@ -11218,22 +11235,22 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
         <div>
           <div style="color: #94a3b8; font-weight: 600; margin-bottom: 3px;">From (Sender DID / Address)</div>
-          <div id="receiptModalFromDid" style="font-family: monospace; font-size: 0.74rem; color: #cbd5e1; word-break: break-all; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 8px;">—</div>
+          <div id="receiptModalFromDid" style="font-family: monospace; font-size: 0.74rem; color: #cbd5e1; word-break: break-all; background: #090d16; padding: 6px 8px; border-radius: 8px;">—</div>
         </div>
 
         <div>
           <div style="color: #94a3b8; font-weight: 600; margin-bottom: 3px;">To (Recipient DID / Address)</div>
-          <div id="receiptModalToDid" style="font-family: monospace; font-size: 0.74rem; color: #cbd5e1; word-break: break-all; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 8px;">—</div>
+          <div id="receiptModalToDid" style="font-family: monospace; font-size: 0.74rem; color: #cbd5e1; word-break: break-all; background: #090d16; padding: 6px 8px; border-radius: 8px;">—</div>
         </div>
 
         <div>
           <div style="color: #94a3b8; font-weight: 600; margin-bottom: 3px;">Voucher ID / Leaf Hash</div>
-          <div id="receiptModalTxId" style="font-family: monospace; font-size: 0.74rem; color: #38bdf8; word-break: break-all; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 8px;">—</div>
+          <div id="receiptModalTxId" style="font-family: monospace; font-size: 0.74rem; color: #38bdf8; word-break: break-all; background: #090d16; padding: 6px 8px; border-radius: 8px;">—</div>
         </div>
 
         <div>
           <div style="color: #94a3b8; font-weight: 600; margin-bottom: 3px;">Merkle State Channel Root / Signature</div>
-          <div id="receiptModalMerkleRoot" style="font-family: monospace; font-size: 0.74rem; color: #a78bfa; word-break: break-all; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 8px;">—</div>
+          <div id="receiptModalMerkleRoot" style="font-family: monospace; font-size: 0.74rem; color: #a78bfa; word-break: break-all; background: #090d16; padding: 6px 8px; border-radius: 8px;">—</div>
         </div>
       </div>
 
@@ -11268,7 +11285,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <!-- Chain Selector Row -->
       <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-bottom: 1rem;">
-        <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px;">
+        <div style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px;">
           <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">From Chain</div>
           <select id="bridgeSourceChainSelect" style="width: 100%; margin-top: 4px; background: transparent; border: none; color: #f8fafc; font-weight: 700; font-size: 0.88rem; outline: none; cursor: pointer;">
             <option value="sovra-mesh" style="background:#0f172a;">Sovra Pure Mesh (L1)</option>
@@ -11280,7 +11297,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; color: #c7d2fe; font-size: 0.9rem;">
           ⇄
         </div>
-        <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px;">
+        <div style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px;">
           <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">To Chain</div>
           <select id="bridgeTargetChainSelect" onchange="updateBridgeFeeAndEstimate()" style="width: 100%; margin-top: 4px; background: transparent; border: none; color: #f8fafc; font-weight: 700; font-size: 0.88rem; outline: none; cursor: pointer;">
             <option value="osmosis" style="background:#0f172a;">Osmosis DEX (channel-0)</option>
@@ -11292,7 +11309,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Asset & Amount Row -->
-      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px; margin-bottom: 1rem;">
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; padding: 12px; margin-bottom: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <label style="font-size: 0.74rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Transfer Amount &amp; Asset</label>
           <span style="font-size: 0.74rem; color: #38bdf8; cursor: pointer;" onclick="document.getElementById('bridgeAmountInput').value = '25.00'; updateBridgeFeeAndEstimate();">MAX (25.00)</span>
@@ -11307,13 +11324,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Destination Target Address -->
-      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px; margin-bottom: 1rem;">
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; padding: 12px; margin-bottom: 1rem;">
         <label style="font-size: 0.74rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Counterparty Cosmos/IBC Address</label>
         <input type="text" id="bridgeTargetAddressInput" placeholder="osmo1... / cosmos1... / did:sovra:..." value="osmo12a806ca82d506a025d580d40600abc77a69e10e7" style="width: 100%; margin-top: 6px; padding: 10px 12px; background: rgba(30,41,59,0.8); border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font-size: 0.85rem; font-family: monospace; outline: none;" />
       </div>
 
       <!-- Relayer Specs Breakdown -->
-      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px; font-size: 0.78rem; display: flex; flex-direction: column; gap: 4px; margin-bottom: 1.25rem;">
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 10px 14px; font-size: 0.78rem; display: flex; flex-direction: column; gap: 4px; margin-bottom: 1.25rem;">
         <div style="display: flex; justify-content: space-between; color: #94a3b8;">
           <span>IBC Protocol Route:</span>
           <span id="bridgeChannelRouteDisplay" style="color: #c7d2fe; font-family: monospace;">ICS-20 • channel-0</span>
@@ -11350,7 +11367,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
         </div>
 
-        <div id="bridgeTxHashBox" style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.4); border-radius: 8px; font-family: monospace; font-size: 0.72rem; color: #38bdf8; word-break: break-all; display: none;">
+        <div id="bridgeTxHashBox" style="margin-top: 10px; padding: 8px; background: #090d16; border-radius: 8px; font-family: monospace; font-size: 0.72rem; color: #38bdf8; word-break: break-all; display: none;">
           TxHash: <span id="bridgeTxHashDisplay">—</span>
         </div>
       </div>
@@ -11437,9 +11454,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div style="display: grid; grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.4fr); gap: 1rem; align-items: start;">
         
         <!-- Left: Order Form -->
-        <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 1.25rem; display: flex; flex-direction: column; gap: 12px;">
+        <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 18px; padding: 1.25rem; display: flex; flex-direction: column; gap: 12px;">
           <!-- Side Selection: BUY / SELL -->
-          <div style="display: flex; gap: 8px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 12px;">
+          <div style="display: flex; gap: 8px; background: #090d16; padding: 4px; border-radius: 12px;">
             <button type="button" id="tradingSideBuyBtn" onclick="setTradingSide('BUY')" style="flex: 1; padding: 9px; border-radius: 8px; font-weight: 800; font-size: 0.9rem; cursor: pointer; border: none; background: #10b981; color: #080d14; transition: all 0.2s;">
               BUY SOVRA
             </button>
@@ -11460,9 +11477,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <!-- Quantity / Budget Input with Mode Switcher -->
           <div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <div style="display: inline-flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 2px; border-radius: 8px;">
+              <div style="display: inline-flex; gap: 4px; background: #090d16; padding: 2px; border-radius: 8px;">
                 <button type="button" id="tradingInputModeQtyBtn" onclick="setTradingInputMode('QTY')" style="padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; cursor: pointer; border: 1px solid rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.15); color: #38bdf8;">Quantity (SOV)</button>
-                <button type="button" id="tradingInputModeBudgetBtn" onclick="setTradingInputMode('BUDGET')" style="padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.08); background: transparent; color: #94a3b8;">Fiat Budget (₹)</button>
+                <button type="button" id="tradingInputModeBudgetBtn" onclick="setTradingInputMode('BUDGET')" style="padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.14); background: transparent; color: #94a3b8;">Fiat Budget (₹)</button>
               </div>
               <span id="tradingMaxQuantityLabel" style="font-size: 0.72rem; color: #38bdf8; cursor: pointer;" onclick="applyTradingQuickFraction(1.0)">Avail: 0.00 SOV</span>
             </div>
@@ -11475,10 +11492,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
             <!-- Fractional Quick Selectors -->
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px;">
-              <button type="button" onclick="applyTradingQuickFraction(0.25)" style="padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #cbd5e1; font-size: 0.72rem; font-weight: 700; cursor: pointer;">25%</button>
-              <button type="button" onclick="applyTradingQuickFraction(0.50)" style="padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #cbd5e1; font-size: 0.72rem; font-weight: 700; cursor: pointer;">50%</button>
-              <button type="button" onclick="applyTradingQuickFraction(0.75)" style="padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #cbd5e1; font-size: 0.72rem; font-weight: 700; cursor: pointer;">75%</button>
-              <button type="button" onclick="applyTradingQuickFraction(1.00)" style="padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #cbd5e1; font-size: 0.72rem; font-weight: 700; cursor: pointer;">100%</button>
+              <button type="button" onclick="applyTradingQuickFraction(0.25)" style="padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255, 255, 255, 0.14); color: #cbd5e1; font-size: 0.72rem; font-weight: 700; cursor: pointer;">25%</button>
+              <button type="button" onclick="applyTradingQuickFraction(0.50)" style="padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255, 255, 255, 0.14); color: #cbd5e1; font-size: 0.72rem; font-weight: 700; cursor: pointer;">50%</button>
+              <button type="button" onclick="applyTradingQuickFraction(0.75)" style="padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255, 255, 255, 0.14); color: #cbd5e1; font-size: 0.72rem; font-weight: 700; cursor: pointer;">75%</button>
+              <button type="button" onclick="applyTradingQuickFraction(1.00)" style="padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255, 255, 255, 0.14); color: #cbd5e1; font-size: 0.72rem; font-weight: 700; cursor: pointer;">100%</button>
             </div>
           </div>
 
@@ -11495,7 +11512,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- Real-Time Indicative Quote & Breakdown Card -->
-          <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem;">
+          <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem;">
             <div style="display: flex; justify-content: space-between; color: #94a3b8;">
               <span>Execution Price:</span>
               <span id="quoteExecutionPriceDisplay" style="color: #f8fafc; font-weight: 700;">₹0.0000</span>
@@ -11532,7 +11549,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- Right: Live Order Book & Sub-tabs (Open Orders / Ledger) -->
-        <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 1.25rem; display: flex; flex-direction: column; gap: 12px;">
+        <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 18px; padding: 1.25rem; display: flex; flex-direction: column; gap: 12px;">
           
           <!-- Order Book Title & Refresh -->
           <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -11558,7 +11575,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- Mid-Market Spread & Last Price Bar -->
-          <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem;">
+          <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem;">
             <div>
               <span style="color: #94a3b8;">Last:</span>
               <strong id="tradingLastTradePriceDisplay" style="color: #f8fafc; margin-left: 4px;">₹---</strong>
@@ -11578,8 +11595,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; margin-top: 4px;">
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
               <button type="button" id="tabBtnOpenOrders" onclick="switchTradingActivityTab('orders')" style="padding: 4px 10px; border-radius: 8px; font-size: 0.74rem; font-weight: 700; cursor: pointer; border: 1px solid rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.15); color: #38bdf8;">My Orders (<span id="tradingOpenOrdersCount">0</span>)</button>
-              <button type="button" id="tabBtnAuditLedger" onclick="switchTradingActivityTab('ledger')" style="padding: 4px 10px; border-radius: 8px; font-size: 0.74rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.08); background: transparent; color: #94a3b8;">Audit Ledger</button>
-              <button type="button" id="tabBtnRecentTrades" onclick="switchTradingActivityTab('trades')" style="padding: 4px 10px; border-radius: 8px; font-size: 0.74rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.08); background: transparent; color: #94a3b8;">Market Trades</button>
+              <button type="button" id="tabBtnAuditLedger" onclick="switchTradingActivityTab('ledger')" style="padding: 4px 10px; border-radius: 8px; font-size: 0.74rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.14); background: transparent; color: #94a3b8;">Audit Ledger</button>
+              <button type="button" id="tabBtnRecentTrades" onclick="switchTradingActivityTab('trades')" style="padding: 4px 10px; border-radius: 8px; font-size: 0.74rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.14); background: transparent; color: #94a3b8;">Market Trades</button>
             </div>
 
             <!-- Tab Content: Active Orders -->
@@ -11625,12 +11642,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 10px; padding: 10px; display: flex; gap: 10px; align-items: flex-start;">
         <span style="font-size: 1rem; line-height: 1;">⚖️</span>
         <div style="font-size: 0.73rem; color: #fbbf24; line-height: 1.45;">
-          <strong>Sandbox Internal Ledger Asset:</strong> Real-money payment gateway is strictly disabled (<code style="background: rgba(0,0,0,0.3); padding: 1px 4px; border-radius: 4px;">REAL_FIAT_GATEWAY_ENABLED = false</code>). This order executes atomically on Sovra's internal ledger with integer micro-unit precision.
+          <strong>Sandbox Internal Ledger Asset:</strong> Real-money payment gateway is strictly disabled (<code style="background: #090d16; padding: 1px 4px; border-radius: 4px;">REAL_FIAT_GATEWAY_ENABLED = false</code>). This order executes atomically on Sovra's internal ledger with integer micro-unit precision.
         </div>
       </div>
 
       <!-- Order Summary Card -->
-      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem;">
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span style="color: #94a3b8;">Action &amp; Type:</span>
           <span id="confirmOrderSideTypeBadge" style="font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4);">BUY LIMIT</span>
@@ -11776,7 +11793,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- Segmented Tab Switcher: Sign In vs Create Account -->
-          <div style="display: flex; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 4px; margin-bottom: 1.25rem; gap: 4px;">
+          <div style="display: flex; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 4px; margin-bottom: 1.25rem; gap: 4px;">
             <button type="button" id="womTabLoginBtn" onclick="switchWomAuthTab('login')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 9px; font-size: 0.86rem; font-weight: 700; cursor: pointer; background: #3b82f6; color: #fff; transition: all 0.2s ease;">
               🔑 Sign In
             </button>
@@ -11931,7 +11948,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <button type="button" id="womToggleAdvancedBtn" onclick="toggleWomAdvancedOps(event)" style="background: none; border: none; color: #64748b; font-size: 0.74rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
                 <span>⚙️</span> <span>Advanced Node Ops (SSL & Localhost)</span>
               </button>
-              <div id="womAdvancedOpsTray" style="display: none; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 0.65rem; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+              <div id="womAdvancedOpsTray" style="display: none; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 0.65rem; padding: 8px; background: #090d16; border-radius: 8px;">
                 <button type="button" onclick="autoFindForgotUserIdDemo()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.74rem; padding: 0;">Auto-Find Passkey</button>
                 <span style="color: rgba(255,255,255,0.2);">•</span>
                 <button type="button" onclick="openMobileDeviceSetupModal()" style="background: none; border: none; color: #38bdf8; cursor: pointer; font-size: 0.74rem; padding: 0;">Connect Phone (SSL)</button>
@@ -12009,7 +12026,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="display: flex; flex-direction: column; gap: 6px; max-height: 190px; overflow-y: auto; padding-right: 4px;">
               
               <!-- Channel 1: ch-alpha -->
-              <label class="onb-follow-row" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; cursor: pointer;">
+              <label class="onb-follow-row" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; cursor: pointer;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <div style="width: 32px; height: 32px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 800; color: #fff;">🛰️</div>
                   <div>
@@ -12021,7 +12038,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </label>
 
               <!-- Channel 2: ch-news -->
-              <label class="onb-follow-row" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; cursor: pointer;">
+              <label class="onb-follow-row" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; cursor: pointer;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <div style="width: 32px; height: 32px; border-radius: 50%; background: #e11d48; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 800; color: #fff;">📰</div>
                   <div>
@@ -12033,7 +12050,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </label>
 
               <!-- Creator 1: Rahul -->
-              <label class="onb-follow-row" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; cursor: pointer;">
+              <label class="onb-follow-row" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; cursor: pointer;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <div style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; color: #fff;">R</div>
                   <div>
@@ -12045,7 +12062,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </label>
 
               <!-- Creator 2: Priya -->
-              <label class="onb-follow-row" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; cursor: pointer;">
+              <label class="onb-follow-row" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; cursor: pointer;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <div style="width: 32px; height: 32px; border-radius: 50%; background: #ec4899; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; color: #fff;">P</div>
                   <div>
@@ -12293,7 +12310,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- Inline Mnemonic Restore Drawer -->
-        <div id="mnemonicImportDrawer" style="display: none; margin-top: 0.85rem; padding: 12px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; text-align: left;">
+        <div id="mnemonicImportDrawer" style="display: none; margin-top: 0.85rem; padding: 12px; background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; text-align: left;">
           <label style="font-size: 0.78rem; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 5px;">Enter Your 12-Word BIP-39 Seed Phrase</label>
           <textarea id="importMnemonicInput" placeholder="word1 word2 word3 ... word12" rows="3" style="width: 100%; box-sizing: border-box; background: #0b1120; border: 1px solid #334155; border-radius: 8px; color: #f8fafc; font-family: monospace; font-size: 0.82rem; padding: 8px; resize: none; outline: none;"></textarea>
           <div style="display: flex; gap: 8px; margin-top: 8px;">
@@ -12327,7 +12344,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <!-- Recommended Carousel/List -->
         <div style="display: flex; flex-direction: column; gap: 7px; max-height: 220px; overflow-y: auto; padding-right: 4px; margin-bottom: 1.25rem;">
           <!-- Channel: Alpha -->
-          <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; cursor: pointer;">
+          <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; cursor: pointer;">
             <div style="display: flex; align-items: center; gap: 10px;">
               <div style="width: 32px; height: 32px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 0.95rem;">🛰️</div>
               <div style="text-align: left;">
@@ -12338,7 +12355,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <input type="checkbox" class="sov-wizard-follow-cb" checked onchange="updateSovWizardFollowCount()" style="width: 18px; height: 18px; accent-color: #38bdf8; cursor: pointer;">
           </label>
           <!-- Channel: News -->
-          <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; cursor: pointer;">
+          <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; cursor: pointer;">
             <div style="display: flex; align-items: center; gap: 10px;">
               <div style="width: 32px; height: 32px; border-radius: 50%; background: #e11d48; display: flex; align-items: center; justify-content: center; font-size: 0.95rem;">📰</div>
               <div style="text-align: left;">
@@ -12349,7 +12366,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <input type="checkbox" class="sov-wizard-follow-cb" checked onchange="updateSovWizardFollowCount()" style="width: 18px; height: 18px; accent-color: #38bdf8; cursor: pointer;">
           </label>
           <!-- Creator: Rahul -->
-          <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; cursor: pointer;">
+          <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; cursor: pointer;">
             <div style="display: flex; align-items: center; gap: 10px;">
               <div style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; color: #fff;">R</div>
               <div style="text-align: left;">
@@ -12360,7 +12377,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <input type="checkbox" class="sov-wizard-follow-cb" checked onchange="updateSovWizardFollowCount()" style="width: 18px; height: 18px; accent-color: #38bdf8; cursor: pointer;">
           </label>
           <!-- Creator: Priya -->
-          <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; cursor: pointer;">
+          <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; cursor: pointer;">
             <div style="display: flex; align-items: center; gap: 10px;">
               <div style="width: 32px; height: 32px; border-radius: 50%; background: #ec4899; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; color: #fff;">P</div>
               <div style="text-align: left;">
@@ -12392,7 +12409,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- 12-Word Seed Display Grid -->
-        <div id="sovWizardSeedWordsDisplay" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 14px; padding: 12px; margin-bottom: 0.85rem;">
+        <div id="sovWizardSeedWordsDisplay" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: #0f172a; border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 14px; padding: 12px; margin-bottom: 0.85rem;">
           <!-- Populated dynamically via JS -->
         </div>
 
@@ -12700,7 +12717,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <label style="font-size: 0.76rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Pinned Message</label>
-        <textarea id="scMessageInput" rows="2" placeholder="Your highlighted message pinned at the top of stream chat..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px; color: #fff; margin-top: 6px; font-family: inherit; font-size: 0.88rem;"></textarea>
+        <textarea id="scMessageInput" rows="2" placeholder="Your highlighted message pinned at the top of stream chat..." style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px; color: #fff; margin-top: 6px; font-family: inherit; font-size: 0.88rem;"></textarea>
 
         <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 1.25rem;">
           <button type="button" onclick="closeLiveSuperChatModal()" class="btn btn-secondary" style="border-radius: 999px; padding: 8px 16px;">Cancel</button>
@@ -12722,7 +12739,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div style="padding: 1.5rem;">
         <div id="storeCheckoutProductTitle" style="font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 6px;">Asset Title</div>
         <div id="storeCheckoutProductDesc" style="font-size: 0.84rem; color: #94a3b8; margin-bottom: 1rem;">Asset Description</div>
-        <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
           <span style="font-size: 0.88rem; color: #cbd5e1;">Price (Instant P2P Settlement):</span>
           <span id="storeCheckoutProductPrice" style="font-size: 1.4rem; font-weight: 900; color: #10b981;">15 SOV</span>
         </div>
@@ -12772,7 +12789,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
 <!-- Search Input -->
       <div style="margin-bottom: 0.65rem;">
-        <input type="text" id="masterDrawerSearchInput" oninput="window.SovraModularGlassOS.filterDrawer(this.value)" placeholder="Search features, channels & tools..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 9px 14px; color: #fff; font-size: 0.84rem; outline: none;" />
+        <input type="text" id="masterDrawerSearchInput" oninput="window.SovraModularGlassOS.filterDrawer(this.value)" placeholder="Search features, channels & tools..." style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 9px 14px; color: #fff; font-size: 0.84rem; outline: none;" />
       </div>
 
       <!-- Category Filter Pills -->
@@ -12953,11 +12970,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
       <div id="appInfoDesc" style="font-size: 0.88rem; color: #cbd5e1; margin-bottom: 1.2rem; line-height: 1.4;">App description goes here...</div>
       <div class="app-info-metrics-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.2rem;">
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px;">
           <div style="font-size: 0.72rem; color: #94a3b8;">Local Cache / Storage</div>
           <div id="appInfoStorage" style="font-size: 0.95rem; font-weight: 700; color: #38bdf8;">1.4 MB (SQLite WAL)</div>
         </div>
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px;">
           <div style="font-size: 0.72rem; color: #94a3b8;">Encryption &amp; Swarm</div>
           <div id="appInfoSecurity" style="font-size: 0.95rem; font-weight: 700; color: #34d399;">Noise_XX E2EE</div>
         </div>
@@ -13081,7 +13098,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Item Title & Total Amount -->
-      <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-bottom: 1rem;">
+      <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 14px; margin-bottom: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
           <div id="checkoutItemTitle" style="font-weight: 700; font-size: 0.95rem; color: #fff;">Premium Content Unlock</div>
           <div id="checkoutGrossPrice" style="font-size: 1.4rem; font-weight: 900; color: #10b981;">25.00 SOV</div>
@@ -13104,7 +13121,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div id="checkoutPinDurationMeter" style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.25); border-radius: 8px; padding: 6px 12px; margin-bottom: 6px;">
           ⏱️ Pin Duration: 5 Minutes (Silver Tier)
         </div>
-        <input type="text" id="checkoutSuperChatMessage" placeholder="Your highlighted message pinned at stream top..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem;" />
+        <input type="text" id="checkoutSuperChatMessage" placeholder="Your highlighted message pinned at stream top..." style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem;" />
       </div>
 
       <!-- Transparent 95/5 Economic Breakdown -->
@@ -13294,10 +13311,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <span style="font-size: 0.76rem; font-weight: 700; color: #c084fc;">📊 Community Poll Creator</span>
               <button type="button" onclick="toggleChannelPollCreator()" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">✕</button>
             </div>
-            <input type="text" id="channelPollQuestionInput" placeholder="Poll question (e.g. Which feature should we build next?)..." style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 0.8rem;">
+            <input type="text" id="channelPollQuestionInput" placeholder="Poll question (e.g. Which feature should we build next?)..." style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 0.8rem;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-              <input type="text" id="channelPollOpt1" placeholder="Option 1 (e.g. P2P Voice Notes)" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 0.76rem;">
-              <input type="text" id="channelPollOpt2" placeholder="Option 2 (e.g. Instant Tipping)" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 0.76rem;">
+              <input type="text" id="channelPollOpt1" placeholder="Option 1 (e.g. P2P Voice Notes)" style="background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 0.76rem;">
+              <input type="text" id="channelPollOpt2" placeholder="Option 2 (e.g. Instant Tipping)" style="background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 0.76rem;">
             </div>
           </div>
 
@@ -13463,7 +13480,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
           <!-- Sub-Metric 4-Column Grid -->
           <div class="wallet-metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.25rem;">
-            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
               <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #fbbf24;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 <span>Network Rewards</span>
@@ -13471,7 +13488,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div class="wallet-metric-value" id="walletBandwidthEarned" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">+0.00 SOV</div>
               <div class="wallet-metric-subtext" id="walletBandwidthSubtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Community incentives</div>
             </div>
-            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
               <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f472b6;"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
                 <span>Tips &amp; Gifts</span>
@@ -13479,7 +13496,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div class="wallet-metric-value" id="walletTipsEarned" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">+0.00 SOV</div>
               <div class="wallet-metric-subtext" id="walletTipsSubtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Creator earnings</div>
             </div>
-            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
               <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 <span>Security Deposit</span>
@@ -13487,7 +13504,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div class="wallet-metric-value" id="walletStakedBond" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">50.00 SOV</div>
               <div class="wallet-metric-subtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Refundable reserve</div>
             </div>
-            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
               <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a78bfa;"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
                 <span>Network Credits</span>
@@ -13547,7 +13564,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- 🪙 Vault Assets & Creator Tokens (AMM Pool Integrations) -->
-          <div class="wallet-assets-section" style="margin-bottom: 1.5rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 1.25rem;">
+          <div class="wallet-assets-section" style="margin-bottom: 1.5rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 1.25rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
               <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #f8fafc; font-size: 0.95rem;">
                 <span>🪙</span>
@@ -13664,7 +13681,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div id="walletReceiveQrSvg" style="width: 180px; height: 180px; display: flex; align-items: center; justify-content: center;"></div>
       </div>
 
-      <div style="margin-bottom: 1.25rem; text-align: left; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 12px;">
+      <div style="margin-bottom: 1.25rem; text-align: left; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px 12px;">
         <div style="font-size: 0.74rem; color: #94a3b8; font-weight: 600; margin-bottom: 4px;">Sovereign Address / DID:</div>
         <code id="walletReceiveDidText" style="font-family: monospace; font-size: 0.8rem; color: #38bdf8; word-break: break-all; display: block;">did:sovra:...</code>
       </div>
@@ -13688,7 +13705,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Direction Badge & Toggle Button -->
-      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 14px; margin-bottom: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px 14px; margin-bottom: 1rem;">
         <span id="swapDirectionBadge" style="font-size: 0.8rem; font-weight: 700; color: #38bdf8;">Pay Native SOV ➔ Receive Creator Tokens</span>
         <button type="button" onclick="toggleSwapDirection()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer;" title="Flip Swap Direction">⇅ Flip</button>
         <input type="hidden" id="swapDirection" value="buy" />
@@ -13756,7 +13773,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <!-- 4 Universal Action Cards Grid -->
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0.5rem;">
         <!-- Card 1: Upload Video -->
-        <button type="button" class="universal-action-tile" id="btnUniversalUploadVideo" onclick="triggerUniversalVideoPick()" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #fff; outline: none;">
+        <button type="button" class="universal-action-tile" id="btnUniversalUploadVideo" onclick="triggerUniversalVideoPick()" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #fff; outline: none;">
           <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #0284c7, #38bdf8); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(56,189,248,0.3);">
             🎬
           </div>
@@ -13765,7 +13782,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </button>
 
         <!-- Card 2: Share Photo -->
-        <button type="button" class="universal-action-tile" id="btnUniversalSharePhoto" onclick="triggerUniversalPhotoPick()" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #fff; outline: none;">
+        <button type="button" class="universal-action-tile" id="btnUniversalSharePhoto" onclick="triggerUniversalPhotoPick()" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #fff; outline: none;">
           <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #db2777, #f472b6); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(236,72,153,0.3);">
             📸
           </div>
@@ -13774,7 +13791,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </button>
 
         <!-- Card 3: Write Post -->
-        <button type="button" class="universal-action-tile" id="btnUniversalWritePost" onclick="triggerUniversalWritePost()" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #fff; outline: none;">
+        <button type="button" class="universal-action-tile" id="btnUniversalWritePost" onclick="triggerUniversalWritePost()" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #fff; outline: none;">
           <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #059669, #34d399); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(52,211,153,0.3);">
             ✍️
           </div>
@@ -13783,7 +13800,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </button>
 
         <!-- Card 4: Go Live -->
-        <button type="button" class="universal-action-tile" id="btnUniversalGoLive" onclick="triggerUniversalGoLive()" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #fff; outline: none;">
+        <button type="button" class="universal-action-tile" id="btnUniversalGoLive" onclick="triggerUniversalGoLive()" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #fff; outline: none;">
           <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #dc2626, #f87171); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(239,68,68,0.3);">
             🔴
           </div>
@@ -13976,7 +13993,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
 
           <!-- Sovereign Monetization & Access Controls -->
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
                 <div style="font-weight: 700; font-size: 0.82rem; color: #fbbf24; display: flex; align-items: center; gap: 4px;">
@@ -14008,7 +14025,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <div style="font-weight: 700; font-size: 0.82rem; color: #f1f5f9;">Content Visibility</div>
                 <div style="font-size: 0.7rem; color: #94a3b8;">Public network search vs Private invitation</div>
               </div>
-              <select id="videoUploadVisibilitySelect" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.75rem; border-radius: 6px; padding: 4px 8px;">
+              <select id="videoUploadVisibilitySelect" style="background: #090d16; border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.75rem; border-radius: 6px; padding: 4px 8px;">
                 <option value="public">🌐 Public (Mesh)</option>
                 <option value="unlisted">🔗 Unlisted</option>
                 <option value="members">🔒 Members Only</option>
@@ -14186,19 +14203,19 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <!-- Utility Actions Grid: Your Story, Copy Link, Share via System, QR Code -->
       <div style="padding: 0.85rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0, 0, 0, 0.2); display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
-        <button type="button" onclick="sharePostToMyStory()" class="share-utility-btn" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 8px 4px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+        <button type="button" onclick="sharePostToMyStory()" class="share-utility-btn" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 8px 4px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
           <span style="font-size: 1.2rem;">⭕</span>
           <span style="font-size: 0.68rem; font-weight: 600;">Your Story</span>
         </button>
-        <button type="button" onclick="copyFeedPostShareLink()" class="share-utility-btn" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 8px 4px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+        <button type="button" onclick="copyFeedPostShareLink()" class="share-utility-btn" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 8px 4px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
           <span style="font-size: 1.2rem;">🔗</span>
           <span style="font-size: 0.68rem; font-weight: 600;">Copy Link</span>
         </button>
-        <button type="button" onclick="shareFeedPostViaSystem()" class="share-utility-btn" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 8px 4px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+        <button type="button" onclick="shareFeedPostViaSystem()" class="share-utility-btn" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 8px 4px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
           <span style="font-size: 1.2rem;">📱</span>
           <span style="font-size: 0.68rem; font-weight: 600;">Share via...</span>
         </button>
-        <button type="button" onclick="openSharePostQrModal()" class="share-utility-btn" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 8px 4px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+        <button type="button" onclick="openSharePostQrModal()" class="share-utility-btn" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 8px 4px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;">
           <span style="font-size: 1.2rem;">🏁</span>
           <span style="font-size: 0.68rem; font-weight: 600;">QR Code</span>
         </button>
@@ -14258,7 +14275,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div style="padding: 0.65rem 1.25rem 0.95rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(15, 23, 42, 0.95); display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
         <div id="drawerMyAvatar" style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; flex-shrink: 0;">S</div>
         <div style="flex: 1; position: relative;">
-          <input type="text" id="drawerCommentInput" placeholder="Add a comment..." onkeydown="if(event.key==='Enter')submitDrawerComment()" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 7px 56px 7px 14px; color: #fff; font-size: 0.84rem; outline: none; transition: border-color 0.2s ease;">
+          <input type="text" id="drawerCommentInput" placeholder="Add a comment..." onkeydown="if(event.key==='Enter')submitDrawerComment()" style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 7px 56px 7px 14px; color: #fff; font-size: 0.84rem; outline: none; transition: border-color 0.2s ease;">
           <button type="button" id="drawerCommentSubmitBtn" onclick="submitDrawerComment()" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #38bdf8; font-weight: 700; font-size: 0.82rem; cursor: pointer; padding: 2px 6px;">Post</button>
         </div>
       </div>
@@ -14376,18 +14393,18 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
         <!-- 2-Step Guide -->
         <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 1.5rem;">
-          <div style="display: flex; gap: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+          <div style="display: flex; gap: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
             <div style="width: 28px; height: 28px; border-radius: 50%; background: #38bdf8; color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem;">1</div>
             <div style="flex: 1; min-width: 0;">
               <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">Open Secure URL on Your Phone</div>
               <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 6px;">Connect your phone to the same Wi-Fi and open:</div>
-              <div id="mobileSetupHttpsUrl" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 6px 10px; font-family: monospace; font-size: 0.85rem; color: #38bdf8; word-break: break-all;">
+              <div id="mobileSetupHttpsUrl" style="background: #090d16; border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 6px 10px; font-family: monospace; font-size: 0.85rem; color: #38bdf8; word-break: break-all;">
                 https://localhost:3443
               </div>
             </div>
           </div>
 
-          <div style="display: flex; gap: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+          <div style="display: flex; gap: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
             <div style="width: 28px; height: 28px; border-radius: 50%; background: #10b981; color: #000; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem;">2</div>
             <div>
               <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">Accept Local Certificate (2 Taps)</div>
@@ -14425,7 +14442,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- 24h Community Jury Court Access -->
-        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;">
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;">
           <div style="font-weight: 700; color: #f87171; font-size: 0.85rem; margin-bottom: 4px;">🗳️ 24h Democratic Community Jury</div>
           <div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin-bottom: 10px;">
             Content moderation is decided by decentralized community jurors, requiring a 66.67% supermajority to take down harmful posts.
@@ -14485,7 +14502,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
 
         <!-- 24h Countdown Clock -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;">
           <span style="font-size: 0.78rem; color: #94a3b8; font-weight: 600;">⏳ 24h Epoch Timer</span>
           <span id="juryTimerCountdown" style="font-size: 0.82rem; color: #f59e0b; font-weight: 800; font-family: monospace;">23h 59m 50s Remaining</span>
         </div>
@@ -15192,7 +15209,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <div style="padding: 1.25rem 1.4rem; display: flex; flex-direction: column; gap: 1rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 12px 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; padding: 12px 16px;">
           <div>
             <div style="font-weight: 700; color: #f8fafc; font-size: 0.92rem;">Your Sovereign Spaces</div>
             <div style="font-size: 0.75rem; color: #94a3b8;">Audience reaches across p2p mesh subscribers</div>
@@ -15234,15 +15251,15 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div style="padding: 1.25rem 1.4rem; display: flex; flex-direction: column; gap: 1rem;">
         <div style="background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">
           <div style="font-size: 0.72rem; color: #a7f3d0; font-weight: 700; text-transform: uppercase;">Content Hash (SHA-256)</div>
-          <div id="merkleProofContentHash" style="font-family: monospace; font-size: 0.8rem; color: #34d399; word-break: break-all; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 6px;"></div>
+          <div id="merkleProofContentHash" style="font-family: monospace; font-size: 0.8rem; color: #34d399; word-break: break-all; background: #090d16; padding: 6px 8px; border-radius: 6px;"></div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px;">
             <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Merkle State Root</div>
             <div id="merkleProofStateRoot" style="font-family: monospace; font-size: 0.75rem; color: #f1f5f9; margin-top: 4px; word-break: break-all;"></div>
           </div>
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px;">
             <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Sovereign Signature</div>
             <div style="font-size: 0.75rem; color: #34d399; font-weight: 700; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
               <span>✓ Verified Valid</span>
@@ -15277,7 +15294,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <button type="button" id="btnHoldPanicWipe" class="panic-hold-shred-btn" style="position: relative; overflow: hidden; width: 100%; height: 46px; border-radius: 12px; background: linear-gradient(135deg, #dc2626, #b91c1c); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4); user-select: none;">
-          <div id="panicHoldProgressBar" style="position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: rgba(0, 0, 0, 0.4); transition: width 0.05s linear; pointer-events: none;"></div>
+          <div id="panicHoldProgressBar" style="position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: #090d16; transition: width 0.05s linear; pointer-events: none;"></div>
           <span style="position: relative; z-index: 2;" id="panicHoldBtnText">Hold 3s to Shred 💥</span>
         </button>
         <button type="button" onclick="closeBitChatPanicModal()" style="width: 100%; height: 40px; border-radius: 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #cbd5e1; font-weight: 700; font-size: 0.85rem; cursor: pointer;">Cancel (Keep Data Safe)</button>
@@ -15328,19 +15345,19 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <!-- KPI Summary Ribbon -->
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 1.25rem 1.75rem; background: rgba(0,0,0,0.35); border-bottom: 1px solid rgba(255,255,255,0.06);">
-        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;">
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 10px 14px;">
           <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Total Staked SOV</div>
           <div id="adsKpiTotalStaked" style="font-size: 1.25rem; font-weight: 800; color: #38bdf8; margin-top: 3px;">0.00 SOV</div>
         </div>
-        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;">
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 10px 14px;">
           <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Delivered Impressions</div>
           <div id="adsKpiImpressions" style="font-size: 1.25rem; font-weight: 800; color: #10b981; margin-top: 3px;">0</div>
         </div>
-        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;">
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 10px 14px;">
           <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Active Campaigns</div>
           <div id="adsKpiActiveCount" style="font-size: 1.25rem; font-weight: 800; color: #f59e0b; margin-top: 3px;">0</div>
         </div>
-        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;">
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 10px 14px;">
           <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Proof-of-Dwell Authenticity</div>
           <div id="adsKpiAuthenticity" style="font-size: 1.25rem; font-weight: 800; color: #a855f7; margin-top: 3px;">100.0%</div>
         </div>
@@ -15400,7 +15417,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <!-- Budget & CPM Sliders -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+              <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                   <span style="font-size: 0.75rem; font-weight: 700; color: #94a3b8;">TOTAL BUDGET</span>
                   <span id="adsBudgetDisplayVal" style="font-size: 0.85rem; font-weight: 800; color: #38bdf8;">25.0 SOV</span>
@@ -15412,7 +15429,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </div>
               </div>
 
-              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+              <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                   <span style="font-size: 0.75rem; font-weight: 700; color: #94a3b8;">BID CPM (per 1k views)</span>
                   <span id="adsCpmDisplayVal" style="font-size: 0.85rem; font-weight: 800; color: #10b981;">2.5 SOV</span>
@@ -15462,7 +15479,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <span>● Sybil Defense: Active</span>
             </div>
           </div>
-          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; overflow-x: auto;">
+          <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; overflow-x: auto;">
             <table class="studio-content-table" style="width: 100%; font-size: 0.76rem;">
               <thead>
                 <tr>
