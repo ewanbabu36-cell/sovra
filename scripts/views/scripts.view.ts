@@ -892,7 +892,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     // --- PILLAR 3 CORE STORE (IndexedDB for Personal Sovereign Data) ---
     window.SovraClientStore = (function() {
       const DB_NAME = 'sovra_sovereign_db';
-      const DB_VERSION = 3;
+      const DB_VERSION = 4;
 
       function openDb() {
         return new Promise(function(resolve, reject) {
@@ -912,6 +912,14 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               const msgStore = db.createObjectStore('messages_vault', { keyPath: 'id' });
               msgStore.createIndex('partnerDid', 'recipientDid', { unique: false });
               msgStore.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('feed_posts_cache')) {
+              const feedStore = db.createObjectStore('feed_posts_cache', { keyPath: 'id' });
+              feedStore.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('crdt_operations')) {
+              const crdtStore = db.createObjectStore('crdt_operations', { keyPath: 'id' });
+              crdtStore.createIndex('lamport', 'lamport', { unique: false });
             }
           };
           req.onsuccess = function(e) { resolve(e.target.result); };
@@ -1000,6 +1008,31 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         getMessagesForContact: getMessagesForContact
       };
     })();
+
+    // 🛡️ Client-Side Hashcash Proof-of-Work Solver (Zero-Cost Sybil Resistance)
+    window.solveHashcashPoW = async function(payloadStr, difficultyBits) {
+      if (!difficultyBits || difficultyBits <= 0) return { nonce: '0', difficulty: 0 };
+      const diff = Math.min(20, Math.max(4, difficultyBits || 12));
+      const targetPrefix = '0'.repeat(Math.floor(diff / 4));
+      let nonce = 0;
+      const encoder = new TextEncoder();
+      while (nonce < 1000000) {
+        const text = payloadStr + ':' + nonce;
+        const msgUint8 = encoder.encode(text);
+        if (window.crypto && window.crypto.subtle) {
+          const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const hashHex = hashArray.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+          if (hashHex.startsWith(targetPrefix)) {
+            return { nonce: String(nonce), difficulty: diff, hashHex: hashHex };
+          }
+        } else {
+          break;
+        }
+        nonce++;
+      }
+      return { nonce: String(nonce), difficulty: diff };
+    };
 
     // --- PILLAR 3 OFFLINE OUTBOX ENGINE ---
     window.SovraOfflineOutbox = (function() {
@@ -22007,6 +22040,22 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       renderDynamicPostCard(optimisticPost, true);
       updateProfileDynamicStats();
       if (typeof handleTweetComposerInput === 'function') handleTweetComposerInput();
+
+      // 💾 Persist optimistic post directly into Browser Local-First IndexedDB
+      if (window.SovraClientStore) {
+        window.SovraClientStore.put('feed_posts_cache', optimisticPost).catch(function() {});
+      }
+
+      // 🛡️ Solve Client Hashcash Proof-of-Work Nonce
+      if (window.solveHashcashPoW) {
+        window.solveHashcashPoW(optPostId, 12).then(function(pow) {
+          if (pow && pow.nonce) {
+            payload.powNonce = pow.nonce;
+            payload.powDifficulty = pow.difficulty || 12;
+          }
+        }).catch(function() {});
+      }
+
       try {
         localStorage.setItem('sovra_has_posted', 'true');
       } catch (_) {}
@@ -22026,6 +22075,9 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           // Replace optimistic post with server confirmed post in feedPostsData
           const optIdx = feedPostsData.findIndex(function(p) { return p.id === optPostId; });
           if (optIdx >= 0) feedPostsData[optIdx] = data.post;
+          if (window.SovraClientStore) {
+            window.SovraClientStore.put('feed_posts_cache', data.post).catch(function() {});
+          }
 
           // Smooth DOM update from temporary ID to confirmed server ID
           const oldCard = document.getElementById('card-' + optPostId);
@@ -22542,6 +22594,21 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     };
 
     function syncFeedPosts() {
+      // 💾 Browser Local-First CRDT Hydration: Load instantly from IndexedDB before network fetch
+      if (window.SovraClientStore && (!feedPostsData || feedPostsData.length === 0)) {
+        window.SovraClientStore.getAll('feed_posts_cache').then(function(cachedPosts) {
+          if (Array.isArray(cachedPosts) && cachedPosts.length > 0 && (!feedPostsData || feedPostsData.length === 0)) {
+            cachedPosts.sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
+            cachedPosts.forEach(function(cp) {
+              if (!feedPostsData.find(function(ex) { return ex.id === cp.id; })) {
+                feedPostsData.push(cp);
+                renderDynamicPostCard(cp, false);
+              }
+            });
+          }
+        }).catch(function() {});
+      }
+
       const sessionToken = (myProfile && myProfile.sessionToken) ? myProfile.sessionToken : (localStorage.getItem('sovra_session_token') || '');
       const reqHeaders = {};
       if (sessionToken) reqHeaders['Authorization'] = 'Bearer ' + sessionToken;
@@ -22555,6 +22622,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
             for (let i = data.posts.length - 1; i >= 0; i--) {
               const p = data.posts[i];
+              // 💾 Persist to local-first IndexedDB
+              if (window.SovraClientStore) {
+                window.SovraClientStore.put('feed_posts_cache', p).catch(function() {});
+              }
               const existing = feedPostsData.find(function(ex) { return ex.id === p.id; });
               if (!existing) {
                 feedPostsData.unshift(p);
@@ -43998,6 +44069,10 @@ window.SovraCreatorStudioEngine = {
       if (window._activeCallId && document.getElementById('e2eeCallModal') && document.getElementById('e2eeCallModal').style.display === 'flex') {
         syncActiveCallSession();
       }
+      // 🌐 Zero-Server P2P Optimization: If Realtime GossipSub SSE stream is active, skip redundant polling
+      if (_realtimeEventSource && _realtimeEventSource.readyState === 1 && !window._activeCallId) {
+        return;
+      }
       callFetch('/api/call/incoming')
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -44286,7 +44361,7 @@ window.SovraCreatorStudioEngine = {
     window.renderInCallMessages = renderInCallMessages;
     window.sendInCallMessage = sendInCallMessage;
     window.minimizeCallToFullChat = minimizeCallToFullChat;
-    setInterval(pollIncomingCalls, 1500);
+    setInterval(pollIncomingCalls, 5000);
 
     // Auto-answer call from lockscreen notification click
     if ('serviceWorker' in navigator) {

@@ -23,6 +23,7 @@ export interface CallRouteContext {
   resolvePrincipal: (req: http.IncomingMessage, parsedBody?: Record<string, any>) => AuthenticatedPrincipal | null;
   enforceAuth: (req: http.IncomingMessage, res: http.ServerResponse, parsedBody?: Record<string, any>) => AuthenticatedPrincipal | null;
   broadcastChatEvent?: (recipientDid: string, payload: any, eventType?: string) => void;
+  p2pNode?: any;
 }
 
 interface RelayedAudioChunk {
@@ -108,7 +109,7 @@ export function checkAndPruneCallHeartbeats(): void {
 }
 
 export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<boolean> {
-  const { req, res, url, blindPushRelay, getIceServers, readBoundedBody, resolvePrincipal, enforceAuth, broadcastChatEvent } = ctx;
+  const { req, res, url, blindPushRelay, getIceServers, readBoundedBody, resolvePrincipal, enforceAuth, broadcastChatEvent, p2pNode } = ctx;
 
   // 1. ICE Servers configuration with Privacy Relay Mode (IP Leakage Shielding)
   if ((url.pathname === '/api/call/ice-servers' || url.pathname === '/api/webrtc/ice-servers' || url.pathname === '/api/rtc/ice-servers') && req.method === 'GET') {
@@ -189,6 +190,28 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
               callType,
               sdpOffer: session.sdpOffer,
             }, 'call_signal');
+          } catch (_) {}
+        }
+
+        // 🌐 P2P Libp2p GossipSub Signaling (Decoupled E2EE Mesh)
+        if (p2pNode?.pubsub) {
+          try {
+            const signalPayload = {
+              version: 1,
+              type: 'offer',
+              signalType: 'call_invite',
+              callId: session.callId,
+              callerDid: principal.did,
+              callerName: senderUser?.displayName || senderUser?.handle || 'Peer',
+              callerAvatar: senderUser?.avatar || '📞',
+              callerAvatarBg: (senderUser as any)?.avatarBg || '#10b981',
+              recipientDid,
+              callType,
+              sdpOffer: session.sdpOffer,
+              timestamp: Date.now(),
+            };
+            const topic = `/sovra/v1/signal/${recipientDid}`;
+            p2pNode.pubsub.publish(topic, new TextEncoder().encode(JSON.stringify(signalPayload))).catch(() => {});
           } catch (_) {}
         }
 
@@ -463,6 +486,24 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
             }, 'call_signal');
           } catch (_) {}
         }
+        // 🌐 P2P Libp2p GossipSub Signaling (Decoupled E2EE Mesh)
+        if (p2pNode?.pubsub) {
+          try {
+            const signalPayload = {
+              version: 1,
+              type: 'answer',
+              signalType: 'call_accept',
+              callId,
+              callerDid: existingCall.callerDid,
+              recipientDid: principal.did,
+              answerSdp,
+              status: 'answered',
+              timestamp: Date.now(),
+            };
+            const topic = `/sovra/v1/signal/${existingCall.callerDid}`;
+            p2pNode.pubsub.publish(topic, new TextEncoder().encode(JSON.stringify(signalPayload))).catch(() => {});
+          } catch (_) {}
+        }
         recordCallHeartbeat(callId, principal.did, 'callee');
         broadcastCallSse(callId, 'call_answer', {
           callId,
@@ -549,6 +590,24 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
               senderDid: principal.did,
               candidate,
             }, 'call_signal');
+          } catch (_) {}
+        }
+        // 🌐 P2P Libp2p GossipSub Signaling (Decoupled E2EE Mesh)
+        if (p2pNode?.pubsub && existingCall) {
+          try {
+            const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
+            const signalPayload = {
+              version: 1,
+              type: 'candidate',
+              signalType: 'ice_candidate',
+              callId,
+              senderDid: principal.did,
+              targetDid,
+              candidate,
+              timestamp: Date.now(),
+            };
+            const topic = `/sovra/v1/signal/${targetDid}`;
+            p2pNode.pubsub.publish(topic, new TextEncoder().encode(JSON.stringify(signalPayload))).catch(() => {});
           } catch (_) {}
         }
         recordCallHeartbeat(callId, principal.did, existingCall?.callerDid === principal.did ? 'caller' : 'callee');
@@ -655,6 +714,23 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
             callId,
             reason: reason || 'peer_hung_up',
           }, 'call_signal');
+        } catch (_) {}
+      }
+      // 🌐 P2P Libp2p GossipSub Signaling (Decoupled E2EE Mesh)
+      if (p2pNode?.pubsub) {
+        try {
+          const targetDid = existingCall.callerDid === principal.did ? existingCall.recipientDid : existingCall.callerDid;
+          const signalPayload = {
+            version: 1,
+            type: 'end',
+            signalType: sigType,
+            callId,
+            targetDid,
+            reason: reason || 'peer_hung_up',
+            timestamp: Date.now(),
+          };
+          const topic = `/sovra/v1/signal/${targetDid}`;
+          p2pNode.pubsub.publish(topic, new TextEncoder().encode(JSON.stringify(signalPayload))).catch(() => {});
         } catch (_) {}
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });

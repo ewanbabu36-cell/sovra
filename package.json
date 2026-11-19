@@ -15,6 +15,8 @@
     "build:client": "node --experimental-strip-types scripts/build-client-bundle.ts",
     "test:prod-build": "node --check scripts/dev-server.ts && node --check scripts/database-engine.ts && node --experimental-strip-types scripts/build-client-bundle.ts",
     "dev": "node --experimental-strip-types scripts/dev-server.ts",
+    "tunnel:ngrok": "node scripts/run-ngrok.js",
+    "tunnel:cf": "node scripts/run-cloudflare-tunnel.js",
     "test": "vitest run",
     "test:fast": "vitest run --fileParallelism false tests/unit/client-script-integrity.test.ts tests/e2e/holographic-navigation.test.ts tests/e2e/pwa-manifest.test.ts tests/e2e/ftux-activation.test.ts tests/e2e/webrtc-stories-pwa.test.ts",
     "validate:integrity": "vitest run --fileParallelism false --teardownTimeout 15000 tests/unit/client-script-integrity.test.ts tests/e2e/pwa-manifest.test.ts tests/e2e/ftux-activation.test.ts tests/e2e/webrtc-stories-pwa.test.ts",
