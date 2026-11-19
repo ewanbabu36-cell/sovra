@@ -1016,8 +1016,13 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
   // 15. POST /api/wallet/claim-seeder-yield - Calculate and claim bandwidth earnings from seeder receipts
   if (url.pathname === '/api/wallet/claim-seeder-yield' && req.method === 'POST') {
-    const body = await parseJsonBody(req);
-    const targetDid = body?.did || principal?.did || 'did:sovra:laptop_host';
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    let bodyObj: any = {};
+    try {
+      bodyObj = body ? JSON.parse(body) : {};
+    } catch {}
+    const targetDid = bodyObj?.did || principal?.did || 'did:sovra:laptop_host';
     const dbAny = sovraDb as any;
 
     if (!dbAny.db.seeder_receipts) {
@@ -1045,6 +1050,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
     claimableSov = Math.round(claimableSov * 100) / 100;
 
+    const sqlite = (sovraDb as any).getSqliteEngine?.()?.getRawDb?.() || (sovraDb as any).getSqliteEngine?.()?.db;
     let currentBal = 0;
     let user = sqlite?.prepare('SELECT balance_sov FROM users WHERE did = ?').get(targetDid) as any;
     if (user) {
