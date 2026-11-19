@@ -609,7 +609,7 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
     return true;
   }
 
-  if ((url.pathname === '/api/social/channels' || url.pathname === '/api/channel/create') && req.method === 'POST') {
+  if ((url.pathname === '/api/social/channels' || url.pathname === '/api/channel/create' || url.pathname === '/api/channels/create') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
@@ -677,6 +677,13 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
         if (saveDynamicSocialState) saveDynamicSocialState(dynamicSocialStore);
       }
       sovraDb.upsertChannel(newChan);
+      try {
+        const creatorUser = sovraDb.getUserByDid(principal.did);
+        if (creatorUser) {
+          (creatorUser as any).isCreator = true;
+          sovraDb.save();
+        }
+      } catch (_) {}
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, channel: newChan, message: 'Channel created successfully' }));
     } catch (err: any) {

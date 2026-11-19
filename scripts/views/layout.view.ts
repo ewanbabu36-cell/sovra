@@ -7492,22 +7492,31 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     <div style="font-weight: 800; font-size: 0.92rem; color: #fff; margin-bottom: 4px;">Default Upload Category &amp; Tags</div>
                     <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Applied automatically to new video uploads and live streams</div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                      <select style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.8rem;">
+                      <select id="studioSettingDefaultCategory" style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.8rem;">
                         <option value="Tech">Tech &amp; Code</option>
                         <option value="Mesh">Decentralized Mesh</option>
+                        <option value="Gaming">Gaming &amp; Esports</option>
+                        <option value="Music">Music &amp; Audio</option>
+                        <option value="Creative">Creative &amp; Design</option>
                       </select>
-                      <input type="text" value="#sovra #p2p #sovereign" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.8rem;">
+                      <input type="text" id="studioSettingDefaultTags" value="#sovra #p2p #sovereign" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.8rem;">
                     </div>
                   </div>
 
                   <div style="background: rgba(0,0,0,0.4); padding: 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
                     <div style="font-weight: 800; font-size: 0.92rem; color: #fff; margin-bottom: 4px;">P2P Swarm Seeding &amp; Bitrate Caps</div>
                     <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Control maximum upload seeding bandwidth when streaming to local peers</div>
-                    <select style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.8rem;">
+                    <select id="studioSettingBitrateCap" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.8rem;">
                       <option value="unlimited">Unlimited (Recommended for Gigabit / 4K)</option>
                       <option value="50mbps">50 Mbps (Balanced)</option>
                       <option value="20mbps">20 Mbps (Cellular Hotspot Friendly)</option>
                     </select>
+                  </div>
+
+                  <div style="display: flex; justify-content: flex-end; margin-top: 0.25rem;">
+                    <button type="button" class="btn btn-primary" id="btnSaveStudioSettings" onclick="SovraCreatorStudioEngine.saveStudioSettings()" style="font-size: 0.82rem; font-weight: 800; padding: 8px 18px; border-radius: 10px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border: none; cursor: pointer; color: #fff; display: flex; align-items: center; gap: 6px;">
+                      💾 Save Settings
+                    </button>
                   </div>
 
                   <div style="background: rgba(0,0,0,0.4); padding: 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
