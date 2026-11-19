@@ -1000,7 +1000,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <!-- Middle Row: Video Cache Quota linear progress meter -->
           <div class="hero-cache-row">
             <div class="hero-cache-header">
-              <span id="heroCacheProgressLabel" class="hero-cache-progress-label">420 MB of 500 MB SQLite Cache Used</span>
+              <span id="heroCacheProgressLabel" class="hero-cache-progress-label">420 MB of 500 MB Offline Storage Used</span>
               <button type="button" id="heroCachePruneBtn" class="hero-cache-prune-btn" onclick="pruneCacheFromHero()" title="Prune Media Cache">Prune</button>
             </div>
             <div class="hero-cache-track">
@@ -1070,7 +1070,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div class="meter-circle">
               <svg class="meter-svg" viewBox="0 0 68 68"><circle class="meter-bg" cx="34" cy="34" r="28"></circle><circle id="meterSqliteProgress" class="meter-progress" cx="34" cy="34" r="28" stroke="#818cf8" stroke-dasharray="175.9" stroke-dashoffset="102"></circle></svg>
               <div id="meterSqliteText" class="meter-text">42%</div>
-              <div class="meter-label">SQLITE</div>
+              <div class="meter-label">STORAGE</div>
             </div>
             <div class="meter-circle">
               <svg class="meter-svg" viewBox="0 0 68 68"><circle class="meter-bg" cx="34" cy="34" r="28"></circle><circle id="meterCipherProgress" class="meter-progress" cx="34" cy="34" r="28" stroke="#34d399" stroke-dasharray="175.9" stroke-dashoffset="21"></circle></svg>
@@ -1082,7 +1082,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <!-- Real-Time Packet Log Terminal (Ref Image 2) -->
           <div id="devPacketTerminalLogs" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 8px; padding: 8px 12px; font-family: monospace; font-size: 0.72rem; color: #a5f3fc; line-height: 1.5; margin-top: 8px; max-height: 90px; overflow-y: auto;">
             <div style="color: #34d399;">[LIVE] Noise_XX Key Rotation Monotonic Pass • Verified</div>
-            <div style="color: #38bdf8;">[LIVE] SQLite WAL Mode Active • 10 Core Tables Synced</div>
+            <div style="color: #38bdf8;">[LIVE] Offline Vault Synced • Ready for Playback</div>
             <div style="color: #818cf8;">[LIVE] P2P Noise_XX TCP Port 4001 • Mesh Router Ready</div>
           </div>
 
@@ -2089,7 +2089,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid rgba(56, 189, 248, 0.18); padding-bottom: 0.75rem; margin-bottom: 0.85rem;">
             <div>
               <div style="font-size: 1rem; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 6px; letter-spacing: 0.02em;">
-                <span>📡</span> <span>Offline BLE Mesh Radar &amp; DTN Relay</span>
+                <span>📡</span> <span>Offline Mesh Radar &amp; Message Relay</span>
                 <span id="bleRadarTransportBadge" style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 1px 7px; border-radius: 999px; font-weight: 800;">GATT 5.3 Active</span>
               </div>
               <div id="bleRadarStatusText" style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">
@@ -2146,7 +2146,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="display: flex; flex-direction: column; gap: 8px;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-size: 0.75rem; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.05em;">Proximity Peers Identified</span>
-                <span id="bleMeshOutboxBadge" style="font-size: 0.7rem; color: #a855f7; font-weight: 700;">DTN Outbox: 0 packets</span>
+                <span id="bleMeshOutboxBadge" style="font-size: 0.7rem; color: #a855f7; font-weight: 700;">Offline Outbox: 0 messages</span>
               </div>
               <div id="bleDiscoveredPeersList" style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto;">
                 <!-- Populated dynamically -->
@@ -2235,7 +2235,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
               <div class="sovra-skeleton-bar sovra-skeleton-shimmer" style="width: 80px; height: 16px;"></div>
               <div class="sovra-skeleton-telemetry-badge" style="font-size: 0.65rem;">
-                <span>⚡</span> <span id="reelSkeletonStatusText">BitSwap 60 FPS Loop</span>
+                <span>⚡</span> <span id="reelSkeletonStatusText">Smooth 60 FPS Offline Loop</span>
               </div>
             </div>
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; margin: auto;">
@@ -2354,7 +2354,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </button>
 
             <!-- ⚡ Phase 4: Creator SOV Tipping Button (95% Creator / 5% Seeders) -->
-            <button class="reel-action-btn" id="reelSovTipBtn" onclick="event.stopPropagation(); openCreatorSovTipModal({ targetType: 'reel' })" title="Send SOV Micro-tip (95% Creator, 5% BitSwap Seeders)">
+            <button class="reel-action-btn" id="reelSovTipBtn" onclick="event.stopPropagation(); openCreatorSovTipModal({ targetType: 'reel' })" title="Send SOV Micro-tip (95% Creator, 5% Community Seeders)">
               <div class="reel-action-icon" style="color: #fbbf24; text-shadow: 0 0 12px rgba(251, 191, 36, 0.7);">⚡</div>
               <span class="reel-action-label" id="reelTipSovCount" style="color: #fbbf24; font-weight: 800;">Tip SOV</span>
             </button>
@@ -2819,14 +2819,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <input type="text" id="tipSupporterMessageInput" maxlength="140" style="width: 100%; box-sizing: border-box; background: rgba(2, 6, 23, 0.7); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 9px 12px; font-size: 0.8rem; color: #f8fafc; outline: none;" placeholder="Add a public supporter note (optional)...">
         </div>
 
-        <!-- Real-Time 95% Creator / 5% BitSwap Seeder Split Preview -->
+        <!-- Real-Time 95% Creator / 5% Network Seeder Split Preview -->
         <div style="background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.25); border-radius: 10px; padding: 9px 12px; margin-bottom: 16px;">
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
             <span style="color: #cbd5e1;">Split Breakdown:</span>
             <span id="tipSplitPlatformNotice" style="color: #38bdf8; font-weight: 700;">0% Platform Fee</span>
           </div>
           <div id="tipSplitPreviewText" style="font-size: 0.78rem; font-weight: 700; color: #f1f5f9; margin-top: 4px;">
-            ⚡ <b>4.75 SOV (95%)</b> to Creator &bull; <b>0.25 SOV (5%)</b> to BitSwap Seeders
+            ⚡ <b>4.75 SOV (95%)</b> to Creator &bull; <b>0.25 SOV (5%)</b> to Community Seeders
           </div>
         </div>
 
@@ -4025,7 +4025,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <div id="ytSkeletonTitle" class="sovra-skeleton-bar sovra-skeleton-shimmer" style="width: 220px; height: 18px;"></div>
                   <div class="sovra-skeleton-telemetry-badge">
                     <span>⚡</span>
-                    <span id="ytSkeletonStatusText">BitSwap P2P: Pre-Warming 4K Stream...</span>
+                    <span id="ytSkeletonStatusText">Network Mesh: Buffering 4K Stream...</span>
                   </div>
                 </div>
                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; margin: auto;">
@@ -4124,7 +4124,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <span style="color: #94a3b8;">Viewport:</span> <span id="nerdsViewport">1280x720*1.50</span>
                   <span style="color: #94a3b8;">Buffer Health:</span> <span id="nerdsBuffer" style="color: #34d399;">14.8 s</span>
                   <span style="color: #94a3b8;">Network Speed:</span> <span id="nerdsSpeed" style="color: #38bdf8;">18.4 MB/s</span>
-                  <span style="color: #94a3b8;">BitSwap Swarm:</span> <span id="nerdsSeeders" style="color: #a855f7;">14 Connected Seeders</span>
+                  <span style="color: #94a3b8;">Network Seeders:</span> <span id="nerdsSeeders" style="color: #a855f7;">14 Connected Seeders</span>
                   <span style="color: #94a3b8;">Dropped Frames:</span> <span id="nerdsDropped">0 / 4820 (0.0%)</span>
                 </div>
               </div>
@@ -4297,7 +4297,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
 
               <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                <!-- BitSwap Seeder Health Capsule -->
+                <!-- Community Seeder Health Capsule -->
                 <span id="ytSeederHealthCapsule" class="yt-seeder-health-capsule" style="display: inline-flex; align-items: center; gap: 5px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; padding: 4px 10px; font-size: 0.74rem; color: #34d399; font-weight: 700;">
                   <span>🟢</span> <span id="ytSeederCountText">⚡ 4K 60fps • High Bitrate Swarm</span>
                 </span>
@@ -4359,7 +4359,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
 
               <div style="font-size: 0.8rem; color: #cbd5e1; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem;">
-                <span>Send direct micro-tokens to <b id="tipRecipientName">${longFormVideosCatalog[0]!.channelName}</b>. Zero gas fees, instant Ed25519 off-chain voucher settlement.</span>
+                <span>Send direct micro-tokens to <b id="tipRecipientName">${longFormVideosCatalog[0]!.channelName}</b>. Zero gas fees, instant Verified off-chain voucher settlement.</span>
                 <span style="font-size: 0.72rem; color: #94a3b8;">YouTube takes 45% &bull; Sovra takes 0%</span>
               </div>
 
@@ -4944,7 +4944,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <span id="meProfileName">—</span>
                   <button id="meVerifiedBadgeBtn" onclick="openSovereignIdCardModal()" class="authoritative-verified-badge" aria-label="Cryptographically Verified Sovereign DID — Click to inspect identity proof" title="Cryptographically Verified Sovereign DID — Click to inspect identity proof">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-                    <span id="meEd25519Badge">Verified</span>
+                    <span id="meVerifiedBadge">Verified</span>
                     <span id="meVerifiedCheckmark" style="color: #38bdf8; font-weight: 700; margin-left: 1px;">✓</span>
                   </button>
                   <span id="meRoleBadge" style="display: none;">Sovereign Peer</span>
@@ -5256,7 +5256,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div class="key-val">
                 <span class="key-label">Storage Architecture</span>
-                <span class="key-data" style="color: #e2e8f0; font-size: 0.82rem;">SQLite WAL &amp; Merkle DAG</span>
+                <span class="key-data" style="color: #e2e8f0; font-size: 0.82rem;">Encrypted Local Storage</span>
               </div>
               <div class="key-val">
                 <span class="key-label">Local Data Footprint</span>
@@ -5267,7 +5267,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <span class="key-data" style="color: #34d399; font-weight: 700;" id="meSeededBytes">—</span>
               </div>
               <div class="key-val">
-                <span class="key-label">Pinned UnixFS Blocks</span>
+                <span class="key-label">Saved Offline Media</span>
                 <span class="key-data" style="color: #38bdf8;" id="meBlocksCount">—</span>
               </div>
               <div class="key-val">
@@ -5282,7 +5282,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </div>
               </div>
 
-              <!-- P2P BitSwap Seeder Node Mining HUD Tile (Relocated to Developer / Node Diagnostics) -->
+              <!-- P2P Community Seeder Node Mining HUD Tile (Relocated to Developer / Node Diagnostics) -->
               <div id="walletSeederMiningTile" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; margin-top: 0.85rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                   <span style="font-weight: 700; color: #38bdf8; font-size: 0.82rem; display: flex; align-items: center; gap: 6px;">
@@ -5315,7 +5315,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <!-- Merkle DAG Ingestion & Storage Quotas (Node Operator Diagnostics) -->
               <div style="margin-top: 0.85rem; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">
                 <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 6px;">
-                  <span>📦</span> <span>Merkle DAG Ingestion &amp; Quotas</span>
+                  <span>📦</span> <span>Offline Media Storage &amp; Quotas</span>
                 </div>
                 <div style="display: flex; gap: 0.75rem; margin-bottom: 0.65rem; background: rgba(0,0,0,0.3); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.75rem; flex-wrap: wrap;">
                   <div>Capacity: <b id="quotaCapacity">50 GB</b></div>
@@ -5381,7 +5381,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div class="key-val">
                 <span class="key-label">Discovery Protocol</span>
-                <span class="key-data" style="color: #38bdf8; font-size: 0.82rem;">mDNS LAN + Kademlia DHT</span>
+                <span class="key-data" style="color: #38bdf8; font-size: 0.82rem;">Nearby Wi-Fi + Mesh Discovery</span>
               </div>
             </div>
             <div class="card-footer-actions">
@@ -6723,7 +6723,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     <div style="font-weight: 800; font-size: 0.88rem; color: #34d399;">Sovereign 95/5 Revenue Split Active:</div>
                     <div style="font-size: 0.75rem; color: #a7f3d0; margin-top: 2px;">You keep <strong>95%</strong> of all micro-tips, supporter subscriptions, and timed unlocks. 5% distributes autonomously to P2P relay nodes.</div>
                   </div>
-                  <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: 800; font-size: 0.75rem;">Self-Custody Ed25519</span>
+                  <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: 800; font-size: 0.75rem;">Self-Custody Verified</span>
                 </div>
 
                 <!-- 7-Day Velocity & Cumulative Revenue SVGs -->
@@ -7659,13 +7659,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
                 <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem;">
                   <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.5rem;">Merkle Original Authorship Claims</div>
-                  <div style="font-size: 0.76rem; color: #94a3b8; margin-bottom: 1rem;">Every video uploaded receives an immutable cryptographic timestamp and Ed25519 signature registered across all bootstrap nodes.</div>
+                  <div style="font-size: 0.76rem; color: #94a3b8; margin-bottom: 1rem;">Every video uploaded receives an immutable cryptographic timestamp and Verified signature registered across all bootstrap nodes.</div>
                   <div class="table-responsive" style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;">
                     <table class="studio-content-table">
                       <thead>
                         <tr>
                           <th>VIDEO</th>
-                          <th>IPFS CIDv1 HASH</th>
+                          <th>CONTENT ID (CID)</th>
                           <th>SIGNATURE TIMESTAMP</th>
                           <th>MATCH STATUS</th>
                           <th style="text-align: right;">ACTION</th>
@@ -7724,7 +7724,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
                   <div style="background: rgba(0,0,0,0.4); padding: 1.25rem; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
                     <div style="font-weight: 800; font-size: 0.92rem; color: #fff; margin-bottom: 4px;">Channel Cryptographic DID &amp; Keys</div>
-                    <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Export channel Ed25519 root identity key (Hardware Passkey protected)</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">Export Channel Master Key (Hardware Passkey protected)</div>
                     <button type="button" class="btn btn-secondary" id="btnExportChannelDid" onclick="SovraCreatorStudioEngine.exportChannelDidKey()" style="font-size: 0.78rem; padding: 7px 14px; border-radius: 16px;">
                       🔑 Export Channel DID (Biometric Gate)
                     </button>
@@ -7870,7 +7870,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="background: rgba(0,0,0,0.6); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden;">
               <img id="editVideoPreviewThumb" src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=480&q=80" style="width: 100%; height: 140px; object-fit: cover;" alt="Video Preview">
               <div style="padding: 10px;">
-                <div style="font-size: 0.75rem; color: #94a3b8;">Multihash CIDv1:</div>
+                <div style="font-size: 0.75rem; color: #94a3b8;">Content ID (CID):</div>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
                   <code id="editVideoCid" style="font-size: 0.7rem; color: #38bdf8; word-break: break-all;">bafybeicreator_video_cid</code>
                   <button type="button" onclick="SovraCreatorStudioEngine.copyHlsUrl(document.getElementById('editVideoCid').innerText)" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.8rem;" title="Copy CID">📋</button>
@@ -8618,7 +8618,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- Security Section -->
             <div class="settings-pane" id="settingsSection_security" style="display: none;">
               <h3 style="font-size: 1.15rem; font-weight: 800; color: #fff; margin-top: 0;">Cryptographic Keys &amp; Security</h3>
-              <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 20px;">Manage your Ed25519 root identity key and end-to-end encryption sessions.</p>
+              <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 20px;">Manage your master identity key and end-to-end encryption sessions.</p>
               
               <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
                 <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">PUBLIC IDENTITY KEY (ED25519)</div>
@@ -9045,11 +9045,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div class="card-title">Distributed Storage & BitSwap</div>
             <div class="key-val">
               <span class="key-label">Storage Topology</span>
-              <span class="key-data">UnixFS Merkle DAG</span>
+              <span class="key-data">Local Storage Vault</span>
             </div>
             <div class="key-val">
               <span class="key-label">Block Addressing</span>
-              <span class="key-data">Deterministic CIDv1</span>
+              <span class="key-data">Content ID (CID)</span>
             </div>
             <div class="key-val">
               <span class="key-label">Wire Protocol</span>
@@ -9119,7 +9119,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div class="stat-card">
               <div class="card-title">Connected Peers</div>
               <div class="stat-val">1 Local Direct</div>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">Autonomous Kademlia DHT routing table</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">Automatic Smart Peer Routing table</div>
             </div>
             <div class="stat-card">
               <div class="card-title">P2P PubSub Topics</div>
@@ -9144,7 +9144,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div>[INFO] Decentralized P2P node bound to OS TCP port :${tcpPort}</div>
               <div>[INFO] Cryptographic identity generated: ${masterKey.did}</div>
               <div>[INFO] Noise_XX mutual authentication cipher state initialized</div>
-              <div>[INFO] Kademlia DHT bucket routing engine active (alpha=3)</div>
+              <div>[INFO] Smart mesh peer routing active</div>
               <div>[INFO] GossipSub v1.2 heartbeat loop healthy (D=6, 4<=D<=12)</div>
             </div>
           </div>
@@ -9344,8 +9344,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
     <div style="display: flex; flex-direction: column; gap: 4px; font-family: monospace; color: #cbd5e1; font-size: 0.72rem;">
       <div>Peer Wire: Noise_XX ChaCha20</div>
-      <div>DHT Buckets: Kademlia Alpha=3</div>
-      <div>Storage: Merkle DAG UnixFS (CIDv1)</div>
+      <div>Peer Discovery: Active</div>
+      <div>Storage: Verified Local Media</div>
       <div>Gossip: GossipSub v1.2 (D=6)</div>
     </div>
   </div>
@@ -10114,7 +10114,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             🔒 Protected Identity &bull; Hidden from public network
           </div>
           <div id="almSecurityTier" style="font-size: 0.72rem; color: #34d399; margin-top: 6px; font-weight: 600;">
-            ✓ Ed25519 Hardware-Bound Key • RAM Protected
+            ✓ Verified Hardware-Bound Key • RAM Protected
           </div>
         </div>
 
@@ -10477,7 +10477,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <!-- TAB 1: EXPORT ENCRYPTED VAULT -->
       <div id="vaultExportPane">
         <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 1rem 0;">
-          Export your cryptographic Ed25519 &amp; X25519 keys into an encrypted JSON bundle. The bundle is secured with <b>AES-256-GCM</b> and <b>PBKDF2-SHA256 (100,000 iterations)</b> using your sovereign passphrase.
+          Export your cryptographic Verified &amp; X25519 keys into an encrypted JSON bundle. The bundle is secured with <b>AES-256-GCM</b> and <b>PBKDF2-SHA256 (100,000 iterations)</b> using your sovereign passphrase.
         </p>
 
         <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem;">
@@ -10719,7 +10719,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div class="holo-card-content">
           <!-- Header row: Sovra Hologram Microchip & Network Badge -->
           <div class="holo-card-top-row">
-            <div class="holo-emv-chip" title="Hardware Security Enclave (Curve25519 / Ed25519)">
+            <div class="holo-emv-chip" title="Hardware Security Enclave (Curve25519 / Verified)">
               <div class="holo-chip-core"></div>
             </div>
             <div class="holo-network-badge">
@@ -10776,7 +10776,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
             <div class="holo-crypto-footer">
               <div id="idCardSigStatus" class="holo-sig-verified">
-                <span>✓ Valid RFC 8032 Ed25519 Signature</span>
+                <span>✓ Valid RFC 8032 Verified Signature</span>
               </div>
               <div class="holo-tilt-hint" id="holoTiltAngleDisplay">
                 <span>📐 3D Tilt: 0.0° / 0.0° &bull; Live Gyro/Mouse</span>
@@ -11301,7 +11301,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <input type="number" id="bridgeAmountInput" oninput="updateBridgeFeeAndEstimate()" placeholder="0.00" style="flex: 1; padding: 10px 12px; background: rgba(30,41,59,0.8); border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font-size: 1.1rem; font-weight: 800; outline: none;" />
           <select id="bridgeAssetSelect" onchange="updateBridgeFeeAndEstimate()" style="width: 120px; padding: 10px; background: rgba(30,41,59,0.8); border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font-size: 0.9rem; font-weight: 700; outline: none;">
             <option value="SOV" selected>SOV Native</option>
-            <option value="CW20_CREATOR">CW20 Creator</option>
+            <option value="CW20_CREATOR">Creator Token</option>
           </select>
         </div>
       </div>
@@ -11724,7 +11724,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div style="display: flex; align-items: flex-start; gap: 12px;">
             <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">🛡️</div>
             <div>
-              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">Self-Sovereign Identity (Ed25519 DID)</div>
+              <div style="font-size: 0.92rem; font-weight: 700; color: #f1f5f9;">Self-Sovereign Identity (Verified DID)</div>
               <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">Your private keys stay strictly in your device hardware enclave, backed by 12-word mnemonic.</div>
             </div>
           </div>
@@ -12077,7 +12077,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
           <div style="background: #1e293b; padding: 0.85rem 1rem; border-radius: 12px; font-size: 0.78rem; text-align: left; color: #94a3b8; margin-bottom: 1.25rem; border: 1px solid #334155;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-              <span>Enclave Security:</span> <span style="color: #10b981; font-weight: 700;">Ed25519 Hardware Resident ✓</span>
+              <span>Enclave Security:</span> <span style="color: #10b981; font-weight: 700;">Verified Hardware Resident ✓</span>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
               <span>Starter Subscriptions:</span> <span id="onbFollowsAppliedLabel" style="color: #38bdf8; font-weight: 700;">4 Applied ✓</span>
@@ -12217,7 +12217,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div style="margin-bottom: 1.2rem; text-align: left;">
           <span style="font-size: 0.72rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(56, 189, 248, 0.12); padding: 3px 8px; border-radius: 8px;">Step 1 of 3 &bull; Sovereign Identity</span>
           <h2 style="font-size: 1.35rem; font-weight: 800; margin: 0.4rem 0 0.2rem 0;">Claim Your Handle &amp; Avatar</h2>
-          <p style="font-size: 0.8rem; color: #94a3b8; margin: 0;">Your cryptographic Ed25519 identity resides exclusively in your hardware enclave.</p>
+          <p style="font-size: 0.8rem; color: #94a3b8; margin: 0;">Your cryptographic Verified identity resides exclusively in your hardware enclave.</p>
         </div>
 
         <!-- Display Name -->
@@ -12273,10 +12273,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
         </div>
 
-        <!-- Visual Ed25519 DID Keypair Generation Preview -->
+        <!-- Visual Verified DID Keypair Generation Preview -->
         <div style="background: rgba(15, 23, 42, 0.7); border: 1px dashed rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 10px 12px; margin-bottom: 1.25rem; text-align: left;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <span style="font-size: 0.72rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Ed25519 DID Keypair Preview</span>
+            <span style="font-size: 0.72rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Verified DID Keypair Preview</span>
             <span style="font-size: 0.68rem; color: #10b981; font-weight: 600;">Hardware Enclave Ready ✓</span>
           </div>
           <code id="sovWizardDidPreview" style="font-family: monospace; font-size: 0.74rem; color: #e2e8f0; word-break: break-all; display: block;">did:sovra:e25519_8f92a10b4c</code>
@@ -12442,7 +12442,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <span>Genesis Allowance:</span> <span style="color: #10b981; font-weight: 700;">+50.00 SOV ✓</span>
           </div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-            <span>Decentralized Wallet:</span> <span style="color: #38bdf8; font-weight: 700;">Ed25519 Enclave ✓</span>
+            <span>Decentralized Wallet:</span> <span style="color: #38bdf8; font-weight: 700;">Verified Enclave ✓</span>
           </div>
           <div style="display: flex; justify-content: space-between;">
             <span>Gas Fees:</span> <span style="color: #fff; font-weight: 700;">0.00 SOV (Free Initial Mesh Block)</span>
@@ -13524,9 +13524,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               <span>L1 Send</span>
             </button>
-            <button class="wallet-action-btn wallet-btn-secondary" onclick="openWalletBridgeModal()" title="Cross-chain IBC Bridge &amp; Creator Settlement" aria-label="IBC Bridge" style="flex: 1; min-width: 125px; padding: 10px 14px; border-radius: 12px; background: rgba(99, 102, 241, 0.16); border: 1px solid rgba(99, 102, 241, 0.4); color: #c7d2fe; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <button class="wallet-action-btn wallet-btn-secondary" onclick="openWalletBridgeModal()" title="Cross-chain Bridge &amp; Creator Settlement" aria-label="Cross-Chain Bridge" style="flex: 1; min-width: 125px; padding: 10px 14px; border-radius: 12px; background: rgba(99, 102, 241, 0.16); border: 1px solid rgba(99, 102, 241, 0.4); color: #c7d2fe; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
-              <span>IBC Bridge</span>
+              <span>Cross-Chain Bridge</span>
             </button>
             <button class="wallet-action-btn wallet-btn-trading" onclick="openTradingExchangeModal()" title="Buy, sell &amp; trade fractional SOVRA on the sovereign matching engine" aria-label="Trade Exchange" style="flex: 1; min-width: 130px; padding: 10px 14px; border-radius: 12px; background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.45); color: #fde68a; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10h14l-4-4"/><path d="M17 14H3l4 4"/><circle cx="12" cy="12" r="2"/></svg>
@@ -13698,7 +13698,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div style="margin-bottom: 1rem; text-align: left;">
         <label style="font-size: 0.76rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 6px;">Select Creator Token</label>
         <select id="swapTokenSelect" style="width: 100%; padding: 10px 12px; border-radius: 12px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.12); color: #f8fafc; font-size: 0.88rem; font-weight: 600; outline: none;">
-          <option value="">No CW20 creator tokens found</option>
+          <option value="">No creator tokens found</option>
         </select>
       </div>
 
@@ -14006,7 +14006,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
               <div>
                 <div style="font-weight: 700; font-size: 0.82rem; color: #f1f5f9;">Content Visibility</div>
-                <div style="font-size: 0.7rem; color: #94a3b8;">Global Kademlia DHT announce vs Encrypted pass</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">Public network search vs Private invitation</div>
               </div>
               <select id="videoUploadVisibilitySelect" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.75rem; border-radius: 6px; padding: 4px 8px;">
                 <option value="public">🌐 Public (Mesh)</option>
@@ -14319,7 +14319,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div style="width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, #6366f1, #38bdf8); display: flex; align-items: center; justify-content: center; font-size: 1.15rem;">🔑</div>
           <div>
             <div style="font-weight: 800; font-size: 1.05rem; color: #f8fafc; letter-spacing: -0.01em;">Sovereign Identity Backup</div>
-            <div style="font-size: 0.74rem; color: #94a3b8;">12-Word BIP-39 Disaster Recovery Seed</div>
+            <div style="font-size: 0.74rem; color: #94a3b8;">12-Word Master Recovery Phrase</div>
           </div>
         </div>
         <button onclick="closeSovereignBackupModal()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;">✕</button>
@@ -14329,7 +14329,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 1.25rem; font-size: 0.78rem; color: #fca5a5; line-height: 1.45; display: flex; gap: 10px; align-items: flex-start;">
           <span style="font-size: 1.1rem; line-height: 1;">⚠️</span>
           <div>
-            <strong style="color: #fff;">Do NOT share these words with anyone.</strong> Anyone with this 12-word recovery phrase can recreate your Ed25519 keys, decrypt your confidential messages, and control your wallet.
+            <strong style="color: #fff;">Do NOT share these words with anyone.</strong> Anyone with this 12-word recovery phrase can recreate your Verified keys, decrypt your confidential messages, and control your wallet.
           </div>
         </div>
 
@@ -14450,7 +14450,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <div style="background: rgba(34, 197, 94, 0.05); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
           <div style="font-weight: 700; color: #4ade80; font-size: 0.85rem; margin-bottom: 4px;">🔐 Zero-Knowledge Privacy &amp; Encryption</div>
           <div style="font-size: 0.78rem; color: #cbd5e1; line-height: 1.4;">
-            Your chats and identity are secured with Ed25519 &amp; Noise_XX cryptography. No central authority can snoop on your private communications.
+            Your chats and identity are secured with Verified &amp; Noise_XX cryptography. No central authority can snoop on your private communications.
           </div>
         </div>
 
@@ -15245,7 +15245,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px;">
             <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Sovereign Signature</div>
             <div style="font-size: 0.75rem; color: #34d399; font-weight: 700; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
-              <span>✓ Ed25519 Valid</span>
+              <span>✓ Verified Valid</span>
             </div>
           </div>
         </div>
@@ -15486,7 +15486,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <!-- Modal Footer -->
       <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.75rem; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.35); font-size: 0.75rem; color: #94a3b8;">
-        <div>🔒 Protected by Ed25519 Passkeys &amp; RFC 8216 HLS Verification</div>
+        <div>🔒 Protected by Verified Passkeys &amp; RFC 8216 HLS Verification</div>
         <button type="button" class="btn btn-secondary" onclick="closeAdsManagerModal()" style="font-size: 0.78rem; padding: 6px 16px; border-radius: 8px;">Close</button>
       </div>
 

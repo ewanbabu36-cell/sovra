@@ -1320,7 +1320,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
     window.SovraCryptoVault = (function() {
       let _keyPair = null;
-      let _algorithm = 'Ed25519'; // 'Ed25519' or 'ECDSA-P256'
+      let _algorithm = 'Verified'; // 'Verified' or 'ECDSA-P256'
       let _pubKeyHex = '';
       let _rawPubKeyBytes = null;
       let _did = '';
@@ -1414,8 +1414,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       }
 
       // --- 3. Canonical W3C did:key:z6Mk... Derivation ---
-      // Multicodec Ed25519-pub varint prefix: 0xed, 0x01
-      function deriveEd25519DidKey(raw32Bytes) {
+      // Multicodec Verified-pub varint prefix: 0xed, 0x01
+      function deriveVerifiedDidKey(raw32Bytes) {
         const prefixed = new Uint8Array(34);
         prefixed[0] = 0xed;
         prefixed[1] = 0x01;
@@ -1441,14 +1441,14 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             if (existing && existing.did && existing.privJwk && existing.pubJwk) {
               _did = existing.did;
               _pubKeyHex = existing.pubKeyHex || '';
-              _algorithm = existing.algorithm || 'Ed25519';
+              _algorithm = existing.algorithm || 'Verified';
               if (existing.rawPubKeyBytes) _rawPubKeyBytes = new Uint8Array(existing.rawPubKeyBytes);
 
               try {
-                if (_algorithm === 'Ed25519') {
+                if (_algorithm === 'Verified') {
                   _keyPair = {
-                    privateKey: await crypto.subtle.importKey('jwk', existing.privJwk, { name: 'Ed25519' }, false, ['sign']),
-                    publicKey: await crypto.subtle.importKey('jwk', existing.pubJwk, { name: 'Ed25519' }, true, ['verify'])
+                    privateKey: await crypto.subtle.importKey('jwk', existing.privJwk, { name: 'Verified' }, false, ['sign']),
+                    publicKey: await crypto.subtle.importKey('jwk', existing.pubJwk, { name: 'Verified' }, true, ['verify'])
                   };
                 } else {
                   _keyPair = {
@@ -1466,25 +1466,25 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               let privJwk = null;
               let pubJwk = null;
               try {
-                // Primary: Native W3C Ed25519 WebCrypto
-                _keyPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
-                _algorithm = 'Ed25519';
+                // Primary: Native W3C Verified WebCrypto
+                _keyPair = await crypto.subtle.generateKey({ name: 'Verified' }, true, ['sign', 'verify']);
+                _algorithm = 'Verified';
                 const rawPub = await crypto.subtle.exportKey('raw', _keyPair.publicKey);
                 _rawPubKeyBytes = new Uint8Array(rawPub);
                 _pubKeyHex = bufToHex(rawPub);
-                _did = deriveEd25519DidKey(_rawPubKeyBytes);
+                _did = deriveVerifiedDidKey(_rawPubKeyBytes);
                 privJwk = await crypto.subtle.exportKey('jwk', _keyPair.privateKey);
                 pubJwk = await crypto.subtle.exportKey('jwk', _keyPair.publicKey);
               } catch (edErr) {
-                // Secondary Fallback: ECDSA P-256 with deterministic Ed25519 multicodec mapping
-                console.log('🛡️ [SovraCryptoVault] Native Ed25519 WebCrypto not supported in this runtime, using ECDSA-P256:', edErr);
+                // Secondary Fallback: ECDSA P-256 with deterministic Verified multicodec mapping
+                console.log('🛡️ [SovraCryptoVault] Native Verified WebCrypto not supported in this runtime, using ECDSA-P256:', edErr);
                 _keyPair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
                 _algorithm = 'ECDSA-P256';
                 const pubSpki = await crypto.subtle.exportKey('spki', _keyPair.publicKey);
                 _pubKeyHex = bufToHex(pubSpki);
                 const digest = await crypto.subtle.digest('SHA-256', pubSpki);
                 _rawPubKeyBytes = new Uint8Array(digest);
-                _did = deriveEd25519DidKey(_rawPubKeyBytes);
+                _did = deriveVerifiedDidKey(_rawPubKeyBytes);
                 privJwk = await crypto.subtle.exportKey('jwk', _keyPair.privateKey);
                 pubJwk = await crypto.subtle.exportKey('jwk', _keyPair.publicKey);
               }
@@ -1569,8 +1569,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         if (_keyPair && _keyPair.privateKey) {
           try {
             let sigBuf;
-            if (_algorithm === 'Ed25519') {
-              sigBuf = await crypto.subtle.sign({ name: 'Ed25519' }, _keyPair.privateKey, bytes);
+            if (_algorithm === 'Verified') {
+              sigBuf = await crypto.subtle.sign({ name: 'Verified' }, _keyPair.privateKey, bytes);
             } else {
               sigBuf = await crypto.subtle.sign({ name: 'ECDSA', hash: { name: 'SHA-256' } }, _keyPair.privateKey, bytes);
             }
@@ -1616,8 +1616,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           const sigBuf = hexToBuf(cleanSig);
 
           if (_keyPair && _keyPair.publicKey && (!targetSpkiHex || targetSpkiHex === _pubKeyHex)) {
-            if (_algorithm === 'Ed25519') {
-              return await crypto.subtle.verify({ name: 'Ed25519' }, _keyPair.publicKey, sigBuf, bytes);
+            if (_algorithm === 'Verified') {
+              return await crypto.subtle.verify({ name: 'Verified' }, _keyPair.publicKey, sigBuf, bytes);
             } else {
               return await crypto.subtle.verify({ name: 'ECDSA', hash: { name: 'SHA-256' } }, _keyPair.publicKey, sigBuf, bytes);
             }
@@ -1865,7 +1865,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         tx.objectStore(STORE_KEYS).put({
           id: 'primary_identity',
           did: payload.did,
-          algorithm: payload.algorithm || 'Ed25519',
+          algorithm: payload.algorithm || 'Verified',
           pubKeyHex: payload.pubKeyHex || '',
           rawPubKeyBytes: payload.rawPubKeyBytes || [],
           privJwk: payload.privJwk,
@@ -1876,14 +1876,14 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
         _did = payload.did;
         _pubKeyHex = payload.pubKeyHex || '';
-        _algorithm = payload.algorithm || 'Ed25519';
+        _algorithm = payload.algorithm || 'Verified';
         if (payload.rawPubKeyBytes) _rawPubKeyBytes = new Uint8Array(payload.rawPubKeyBytes);
 
         try {
-          if (_algorithm === 'Ed25519') {
+          if (_algorithm === 'Verified') {
             _keyPair = {
-              privateKey: await crypto.subtle.importKey('jwk', payload.privJwk, { name: 'Ed25519' }, false, ['sign']),
-              publicKey: await crypto.subtle.importKey('jwk', payload.pubJwk, { name: 'Ed25519' }, true, ['verify'])
+              privateKey: await crypto.subtle.importKey('jwk', payload.privJwk, { name: 'Verified' }, false, ['sign']),
+              publicKey: await crypto.subtle.importKey('jwk', payload.pubJwk, { name: 'Verified' }, true, ['verify'])
             };
           } else {
             _keyPair = {
@@ -4815,7 +4815,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         render: function(bodyEl, ctx) {
           bodyEl.innerHTML = '<div style="display: flex; flex-direction: column; gap: 8px;">' +
             '<div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 10px; font-size: 0.8rem; color: #cbd5e1;">' +
-              '<span style="color: #38bdf8; font-weight: 600;">[IDENTITY]</span> Ed25519 node keypair verified' +
+              '<span style="color: #38bdf8; font-weight: 600;">[IDENTITY]</span> Verified node keypair verified' +
             '</div>' +
             '<div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 10px; font-size: 0.8rem; color: #cbd5e1;">' +
               '<span style="color: #10b981; font-weight: 600;">[MESH]</span> Connected to local swarm peer group' +
@@ -4919,7 +4919,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               '<div class="spatial-option-icon">🔐</div>' +
               '<div class="spatial-option-details">' +
                 '<div class="spatial-option-title">Security</div>' +
-                '<div class="spatial-option-desc">Ed25519 identity keys, authenticator PIN, and emergency panic wipe</div>' +
+                '<div class="spatial-option-desc">Verified identity keys, authenticator PIN, and emergency panic wipe</div>' +
               '</div>' +
             '</div>' +
             '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
@@ -5123,7 +5123,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               '<div class="spatial-option-icon">🔑</div>' +
               '<div class="spatial-option-details">' +
                 '<div class="spatial-option-title">Account Security</div>' +
-                '<div class="spatial-option-desc">Ed25519 identity key, authenticator passkeys, and connected devices</div>' +
+                '<div class="spatial-option-desc">Verified identity key, authenticator passkeys, and connected devices</div>' +
               '</div>' +
             '</div>' +
             '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
@@ -5594,7 +5594,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               '<div class="spatial-option-icon">👤</div>' +
               '<div class="spatial-option-details">' +
                 '<div class="spatial-option-title">Sovereign DID Card</div>' +
-                '<div class="spatial-option-desc">Inspect your decentralized identity credential and Ed25519 public key</div>' +
+                '<div class="spatial-option-desc">Inspect your decentralized identity credential and Verified public key</div>' +
               '</div>' +
             '</div>' +
             '<div style="color: #64748b; font-size: 1.1rem;">›</div>' +
@@ -5655,7 +5655,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         id: 'security',
         type: 'security',
         title: 'Security & Cryptography',
-        subtitle: 'Ed25519 identity keys, PIN lock, and anti-tamper controls',
+        subtitle: 'Verified identity keys, PIN lock, and anti-tamper controls',
         originEl: originEl,
         render: function(bodyEl, ctx) {
           let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
@@ -5664,7 +5664,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             '<div class="spatial-option-card-left">' +
               '<div class="spatial-option-icon">🔑</div>' +
               '<div class="spatial-option-details">' +
-                '<div class="spatial-option-title">Ed25519 Keys &amp; DID</div>' +
+                '<div class="spatial-option-title">Identity Keys &amp; DID</div>' +
                 '<div class="spatial-option-desc">Inspect cryptographic public key, fingerprint, and DID resolution</div>' +
               '</div>' +
             '</div>' +
@@ -6253,7 +6253,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         id: 'msg-crypto-' + msgId,
         type: 'msg-crypto',
         title: 'Cryptographic Proof',
-        subtitle: 'Ed25519 signature & zero-trust delivery sequence',
+        subtitle: 'Verified signature & zero-trust delivery sequence',
         render: function(bodyEl, ctx) {
           let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
           html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">' +
@@ -7164,7 +7164,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           html += '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">' +
             '<button type="button" class="action-pill-btn action-pill-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="document.getElementById(&quot;spatialPostFileInput&quot;).click()">📷 Attach Photo</button>' +
             '<div style="display: flex; align-items: center; gap: 10px;">' +
-              '<span style="font-size: 0.74rem; color: #94a3b8;">🔒 Signed with Ed25519</span>' +
+              '<span style="font-size: 0.74rem; color: #94a3b8;">🔒 Signed with Verified</span>' +
               '<button class="action-pill-btn action-pill-primary" style="padding: 8px 18px;" onclick="window._submitSpatialPost()">Publish Post 🚀</button>' +
             '</div>' +
           '</div>';
@@ -7653,7 +7653,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               listEl.innerHTML = '<div style="text-align: center; color: #64748b; font-size: 0.8rem; padding: 32px 12px;">' +
                 '<div style="font-size: 1.8rem; margin-bottom: 6px;">🔒</div>' +
                 '<div>End-to-End Encrypted Session Established</div>' +
-                '<div style="font-size: 0.72rem; color: #475569; margin-top: 4px;">Messages are encrypted with Double Ratchet &amp; signed with Ed25519 keys.</div>' +
+                '<div style="font-size: 0.72rem; color: #475569; margin-top: 4px;">Messages are encrypted with Double Ratchet &amp; signed with Verified keys.</div>' +
               '</div>';
               return;
             }
@@ -10484,7 +10484,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                 '<span style="font-size: 0.72rem; color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 2px 8px; border-radius: 4px; font-weight: 600;">Hardware Secured</span>' +
               '</div>' +
               '<div style="font-size: 0.76rem; color: #94a3b8; font-family: monospace; word-break: break-all; margin-bottom: 4px;">DID: ' + (user.did || 'did:sovra:self') + '</div>' +
-              '<div style="font-size: 0.74rem; color: #64748b;">Protocol: Ed25519 (RFC 8032) • Self-Custodied</div>' +
+              '<div style="font-size: 0.74rem; color: #64748b;">Protocol: Verified (RFC 8032) • Self-Custodied</div>' +
               '<div style="font-size: 0.7rem; color: #a855f7; margin-top: 6px; font-style: italic;">🛡️ Private keys and recovery seeds remain isolated in local secure hardware.</div>' +
             '</div>';
 
@@ -11180,11 +11180,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     }
 
     async function verifyCurrentIdentityCrypto(profile) {
-      const badge = document.getElementById('meEd25519Badge');
+      const badge = document.getElementById('meVerifiedBadge');
       const checkmark = document.getElementById('meVerifiedCheckmark');
       const badgeBtn = document.getElementById('meVerifiedBadgeBtn');
       const cardBadge = document.getElementById('meCardCryptoBadge');
-      if (badge) badge.innerText = 'Testing WebCrypto Enclave...';
+      if (badge) badge.innerText = 'Verifying device security...';
       if (cardBadge) {
         cardBadge.innerText = 'Testing Enclave...';
         cardBadge.style.color = '#fbbf24';
@@ -11262,9 +11262,9 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
         })
         .catch(function(err) {
-          if (badge) badge.innerText = 'Ed25519 (Offline)';
+          if (badge) badge.innerText = 'Verified (Offline)';
           if (cardBadge) {
-            cardBadge.innerText = 'Ed25519 (Offline)';
+            cardBadge.innerText = 'Verified (Offline)';
             cardBadge.style.color = '#94a3b8';
             cardBadge.style.borderColor = 'rgba(148, 163, 184, 0.3)';
           }
@@ -11410,7 +11410,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
         const websiteRow = document.getElementById('meProfileWebsiteRow');
         if (websiteRow) websiteRow.style.display = 'none';
-        const badge = document.getElementById('meEd25519Badge');
+        const badge = document.getElementById('meVerifiedBadge');
         if (badge) badge.innerText = 'Guest';
 
         const drawerName = document.getElementById('drawerProfileName');
@@ -12687,7 +12687,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       var btn = document.getElementById('forgotPinSubmitBtn');
       if (btn) {
         btn.disabled = true;
-        btn.innerText = 'Verifying Phrase & Cryptographic Enclave...';
+        btn.innerText = 'Verifying recovery phrase securely...';
       }
 
       try {
@@ -13117,7 +13117,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
         updateUserDisplayInUI();
         closeEditProfileModal();
-        showAccountToast('Profile saved to database and announced to peer mesh!');
+        showAccountToast('✓ Profile saved successfully!');
       } catch (err) {
         showAccountToast('Network error while updating profile: ' + err);
       }
@@ -20078,7 +20078,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             '<span>' + displayName + '</span>' +
             '<div class="authoritative-verified-badge" title="Cryptographically Verified Sovereign DID">' +
               '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>' +
-              '<span>Ed25519 Verified</span>' +
+              '<span>Verified Verified</span>' +
               '<span style="color: #38bdf8; font-weight: 700; margin-left: 1px;">✓</span>' +
             '</div>' +
           '</div>' +
@@ -23885,7 +23885,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             '<div style="display: flex; justify-content: space-between; align-items: center;">' +
               '<span id="opt-status-text-' + post.id + '" style="display: flex; align-items: center; gap: 6px;">' +
                 '<span class="pulse-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #38bdf8;"></span>' +
-                '<span>Broadcasting to Sovereign Relay...</span>' +
+                '<span>Publishing post...</span>' +
               '</span>' +
               '<span style="font-size: 0.72rem; color: #94a3b8; font-weight: 400;">Optimistic UI 0ms</span>' +
             '</div>' +
@@ -23910,7 +23910,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
               '<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">' +
                 '<span style="font-weight: 700; font-size: 0.95rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">' + post.authorName + '</span>' +
                 '<span style="color: #38bdf8; font-size: 0.85rem;" title="Verified Sovereign Identity">✓</span>' +
-                (post.signatureHex || post.signature ? '<span class="dev-verified-sig-badge" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 3px;" title="Cryptographically Verified Ed25519 Signature">🛡️ Verified</span>' : '') +
+                (post.signatureHex || post.signature ? '<span class="dev-verified-sig-badge" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 3px;" title="Cryptographically Verified Verified Signature">🛡️ Verified</span>' : '') +
                 (post.feeling ? '<span style="color: #f472b6; font-size: 0.82rem; font-weight: 500;">is ' + post.feeling.emoji + ' feeling ' + post.feeling.text + '</span>' : '') +
                 (post.location ? '<span style="color: #38bdf8; font-size: 0.82rem; font-weight: 500;">at 📍 ' + post.location + '</span>' : '') +
                 (post.authorType === 'page' ? '<span class="badge badge-page" style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399;">📄 Page</span>' : (post.authorType === 'channel' ? '<span class="badge badge-channel" style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24;">📢 Channel</span>' : '')) +
@@ -26434,8 +26434,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         pubKeyEl.innerText = rawPubKey || myDid;
       }
       if (sigEl) {
-        const algo = (window.SovraCryptoVault ? window.SovraCryptoVault.getAlgorithm() : 'Ed25519');
-        sigEl.innerHTML = '<span style="color: #34d399;">✓ WebCrypto Enclave Active &bull; W3C ' + algo + ' (RFC 8032)</span>';
+        const algo = (window.SovraCryptoVault ? window.SovraCryptoVault.getAlgorithm() : 'Verified');
+        sigEl.innerHTML = '<span style="color: #34d399;">✓ Secure Enclave Active &bull; W3C ' + algo + ' (RFC 8032)</span>';
       }
 
       if (avEl) {
@@ -26482,7 +26482,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         label = 'Sovereign DID';
       } else if (field === 'pubkey') {
         val = (myProfile && (myProfile.devicePublicKeyHex || myProfile.publicKey)) || ((myProfile && myProfile.did) ? myProfile.did.replace('did:key:', '') : '${masterKey.did}');
-        label = 'Ed25519 Public Key';
+        label = 'Verified Public Key';
       } else if (field === 'peerid') {
         val = window.sovraPeerId || '${binding.peerId}';
         label = 'libp2p Peer ID';
@@ -26500,11 +26500,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       const sigStatus = document.getElementById('idCardSigStatus');
       if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<span>⚡ Verifying Curve25519 & Ed25519...</span>';
+        btn.innerHTML = '<span>⚡ Verifying Curve25519 & Verified...</span>';
       }
       setTimeout(function() {
         if (sigStatus) {
-          sigStatus.innerHTML = '<span style="color: #34d399; font-weight: 700;">✓ VALIDATED: 100% Ed25519 Proof Confirmed</span><div style="font-size: 0.68rem; color: #94a3b8; margin-top: 2px;">RFC 8032 curve point verified against DID document. Latency: 1.1ms</div>';
+          sigStatus.innerHTML = '<span style="color: #34d399; font-weight: 700;">✓ VALIDATED: 100% Verified Proof Confirmed</span><div style="font-size: 0.68rem; color: #94a3b8; margin-top: 2px;">RFC 8032 curve point verified against DID document. Latency: 1.1ms</div>';
         }
         if (btn) {
           btn.disabled = false;
@@ -26513,7 +26513,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           btn.style.borderColor = 'rgba(52, 211, 153, 0.5)';
           btn.style.color = '#34d399';
         }
-        showAccountToast('🛡️ Live Cryptographic Verification: Ed25519 signature valid!', 'success');
+        showAccountToast('🛡️ Live Cryptographic Verification: Verified signature valid!', 'success');
       }, 400);
     }
 
@@ -26532,7 +26532,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         "verificationMethod": [
           {
             "id": did + "#key-1",
-            "type": "Ed25519VerificationKey2020",
+            "type": "VerifiedVerificationKey2020",
             "controller": did,
             "publicKeyMultibase": pubKey
           }
@@ -27998,7 +27998,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             txBox.style.display = 'block';
           }
 
-          showAccountToast('✅ IBC Bridge transfer settled on ' + targetChain.toUpperCase() + '!');
+          showAccountToast('✅ Cross-chain transfer settled on ' + targetChain.toUpperCase() + '!');
           if (typeof refreshWalletBalanceLive === 'function') {
             refreshWalletBalanceLive();
           }
@@ -28043,7 +28043,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             '</div>';
           }).join('');
         } else {
-          list.innerHTML = '<div style="text-align:center; color:#64748b; padding:10px;">No IBC bridge transactions yet.</div>';
+          list.innerHTML = '<div style="text-align:center; color:#64748b; padding:10px;">No cross-chain bridge transactions yet.</div>';
         }
       } catch (err) {
         list.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:10px;">Unable to load bridge records.</div>';
@@ -30877,7 +30877,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             recipient = 'channel:local_mesh';
           }
         }
-        const text = prompt('Enter offline encrypted DTN message to queue for Store-and-Forward mesh relay:', 'Offline emergency relay: Power grid ok, sync mesh at rendezvous point 🏕️');
+        const text = prompt('Enter offline message to send via mesh network:', 'Offline emergency relay: Power grid ok, sync mesh at rendezvous point 🏕️');
         if (!text || !text.trim()) return;
 
         const myDid = (window.SovraCryptoVault ? window.SovraCryptoVault.getDid() : null) || (myProfile ? myProfile.did : 'self');
@@ -30919,7 +30919,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
         self.renderRadarHud();
         if (typeof showAccountToast === 'function') {
-          showAccountToast('✉️ DTN Packet queued in offline outbox (Store-and-Forward Epidemic Relay)', 'success');
+          showAccountToast('✉️ Message saved to offline outbox. Will deliver automatically when peers are nearby.', 'success');
         }
       },
 
@@ -31024,7 +31024,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         const outboxBadge = document.getElementById('bleMeshOutboxBadge');
         if (outboxBadge) {
           const qCount = self.outboxPackets.length;
-          outboxBadge.innerText = 'DTN Outbox: ' + qCount + ' packet' + (qCount === 1 ? '' : 's');
+          outboxBadge.innerText = 'Offline Outbox: ' + qCount + ' packet' + (qCount === 1 ? '' : 's');
         }
 
         const blipsContainer = document.getElementById('bleRadarBlipsContainer');
@@ -31213,7 +31213,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
         const preview = document.getElementById('tipSplitPreviewText');
         if (preview) {
-          preview.innerHTML = '⚡ <b>' + creatorCut + ' SOV (95%)</b> to Creator &bull; <b>' + seederCut + ' SOV (5%)</b> to BitSwap Seeders';
+          preview.innerHTML = '⚡ <b>' + creatorCut + ' SOV (95%)</b> to Creator &bull; <b>' + seederCut + ' SOV (5%)</b> to Community Seeders';
         }
 
         const submitBtn = document.getElementById('submitSovTipBtn');
@@ -31301,7 +31301,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             self.closeModal();
             if (typeof spawnConfetti === 'function') spawnConfetti();
             if (typeof showAccountToast === 'function') {
-              showAccountToast('⚡ ' + amount.toFixed(2) + ' SOV Tip Sent! 95% credited directly to ' + self.activeCreatorName + ', 5% to BitSwap Seeders.');
+              showAccountToast('⚡ ' + amount.toFixed(2) + ' SOV Tip Sent! 95% credited directly to ' + self.activeCreatorName + ', 5% to Community Seeders.');
             }
           } else {
             showAccountToast('Failed to send tip: ' + (data.error || 'Unknown error'));
@@ -36157,7 +36157,7 @@ _scheduleTargetContext: 'workspace',
         },
         {
           graphic: 'Sovereign 95/5 Instant Settlement',
-          title: 'Zero Platform Intermediaries & Instant Ed25519 Payouts',
+          title: 'Zero Platform Intermediaries & Instant Verified Payouts',
           desc: 'Your fans pay you directly via WebAuthn hardware passkeys. 95% goes directly to your wallet.',
           color: 'linear-gradient(135deg, #10b981, #06b6d4)'
         },
@@ -36252,7 +36252,7 @@ _scheduleTargetContext: 'workspace',
                 if (ytWallet) ytWallet.textContent = Number(walletBalanceSov).toFixed(2) + ' SOV';
               }
               if (typeof showAccountToast === 'function') {
-                showAccountToast('🛡️ Merkle Verified: Claimed ' + Number(data.claimedAmount || 0).toFixed(2) + ' SOV directly to your Ed25519 wallet!');
+                showAccountToast('🛡️ Merkle Verified: Claimed ' + Number(data.claimedAmount || 0).toFixed(2) + ' SOV directly to your Verified wallet!');
               } else if (typeof showToast === 'function') {
                 showToast('Claimed ' + Number(data.claimedAmount || 0).toFixed(2) + ' SOV with 95% creator split!', 'success');
               }
@@ -36298,7 +36298,7 @@ _scheduleTargetContext: 'workspace',
           triggerBiometricShield(
             doExport,
             'Channel Root Key Export Shield',
-            'WebAuthn authentication required to access private Ed25519 channel signing credentials.'
+            'WebAuthn authentication required to access private Verified channel signing credentials.'
           );
         } else {
           doExport();
@@ -37084,7 +37084,7 @@ _scheduleTargetContext: 'workspace',
         }
         var fallbackReply = document.createElement('div');
         fallbackReply.style.cssText = 'align-self: flex-start; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px 12px 12px 2px; padding: 6px 10px; color: #fca5a5; max-width: 82%;';
-        fallbackReply.innerHTML = '<div>⚠️ Offline mesh fallback: message queued in DTN store.</div>';
+        fallbackReply.innerHTML = '<div>⚠️ Offline: message queued in outbox.</div>';
         stream.appendChild(fallbackReply);
         stream.scrollTop = stream.scrollHeight;
       }
@@ -39488,7 +39488,7 @@ _scheduleTargetContext: 'workspace',
           protoBadge.style.background = 'rgba(34, 197, 94, 0.15)';
         }
         activeContactDid = contactsData[0]?.did || (bitchatPeersData[0]?.did || 'channel:local_mesh');
-        showAccountToast('🌐 Global P2P Mode: Connected via DHT & GossipSub internet relays.');
+        showAccountToast('🌐 Connected to Global Sovereign Network.');
       }
 
       renderChatContactsList();
@@ -46538,7 +46538,7 @@ _scheduleTargetContext: 'workspace',
       if (vpEl && box) vpEl.innerText = box.clientWidth + 'x' + box.clientHeight + '*1.50';
       if (bufEl) bufEl.innerText = (14.2 + Math.sin(ytCurrentTimeSec) * 2.1).toFixed(1) + ' s';
       if (spdEl) spdEl.innerText = (18.4 + Math.cos(ytCurrentTimeSec) * 3.2).toFixed(1) + ' MB/s';
-      if (swmEl) swmEl.innerText = '14 BitSwap Seeders';
+      if (swmEl) swmEl.innerText = '14 Community Seeders';
       if (drpEl) drpEl.innerText = '0 / ' + Math.floor(ytCurrentTimeSec * 60) + ' (0.0%)';
     }
 
@@ -47883,7 +47883,7 @@ _scheduleTargetContext: 'workspace',
       if (!v) return;
       const btn = document.getElementById('btnDownloadYt');
       if (btn) {
-        btn.innerHTML = '<span>⏳</span> <span>Pinning UnixFS DAG...</span>';
+        btn.innerHTML = '<span>⏳</span> <span>Saving Media File...</span>';
         setTimeout(() => {
           btn.innerHTML = '<span>✓</span> <span>Pinned to BitSwap</span>';
           btn.style.borderColor = '#10b981';
@@ -48205,7 +48205,7 @@ _scheduleTargetContext: 'workspace',
       closeYtModal('membershipModal');
       spawnConfetti();
       const v = ytVideosCatalog[activeYtVideoIndex];
-      showAccountToast('Channel Membership Activated: Joined ' + (v ? v.channelName : 'Channel') + ' as ' + selectedMembershipTier.name + ' (₹' + selectedMembershipTier.price + '/mo)! Signed with Ed25519 identity key.');
+      showAccountToast('Channel Membership Activated: Joined ' + (v ? v.channelName : 'Channel') + ' as ' + selectedMembershipTier.name + ' (₹' + selectedMembershipTier.price + '/mo)! Signed with Verified identity key.');
     }
 
     function openSuperThanksModal() {
@@ -48269,7 +48269,7 @@ _scheduleTargetContext: 'workspace',
       const notice = document.getElementById('tipStatusNotice');
       if (notice) {
         const rootHashStr = signedVoucher ? (' Root: <code>' + signedVoucher.rootHash + '…</code>') : '';
-        notice.innerHTML = '⚡ <b>P2P State Channel Voucher Signed' + rootHashStr + '</b>: <b style="color:#fbbf24;">₹' + creatorAmt + ' (95%)</b> to ' + v.channelName + ', <b style="color:#34d399;">₹' + seederAmt + ' (5%)</b> to BitSwap Seeders, <b style="color:#38bdf8;">0% Gas Fees</b> (Instant Netting).';
+        notice.innerHTML = '⚡ <b>P2P State Channel Voucher Signed' + rootHashStr + '</b>: <b style="color:#fbbf24;">₹' + creatorAmt + ' (95%)</b> to ' + v.channelName + ', <b style="color:#34d399;">₹' + seederAmt + ' (5%)</b> to Community Seeders, <b style="color:#38bdf8;">0% Gas Fees</b> (Instant Netting).';
       }
 
       spawnConfetti();
@@ -48919,7 +48919,7 @@ _scheduleTargetContext: 'workspace',
       if (!text) return;
 
       const resBox = document.getElementById('mediaPublishResult');
-      if (resBox) resBox.innerText = 'Chunking UnixFS DAG & Computing CIDv1...';
+      if (resBox) resBox.innerText = 'Optimizing video for instant playback...';
 
       let clientCid = null;
       if (window.SovraDirectSeeder) {
@@ -48941,7 +48941,7 @@ _scheduleTargetContext: 'workspace',
       const data = await res.json();
       if (data.ok) {
         const finalCid = data.asset.cid.multihash ? data.asset.cid.multihash.slice(0, 18) + '...' : (data.asset.cid || clientCid);
-        if (resBox) resBox.innerHTML = '✓ Pinned CIDv1 to BitSwap Pool: <b style="color:#34d399;">' + finalCid + '</b> (' + data.asset.byteLength + ' B)';
+        if (resBox) resBox.innerHTML = '✓ Saved to Local Vault: <b style="color:#34d399;">' + finalCid + '</b> (' + data.asset.byteLength + ' B)';
         if (input) input.value = '';
         updateStorageStats();
       } else {
@@ -48972,7 +48972,7 @@ _scheduleTargetContext: 'workspace',
 
     async function triggerVerifyReplicas() {
       const resBox = document.getElementById('mediaPublishResult');
-      resBox.innerText = 'Verifying network replicas across DHT...';
+      resBox.innerText = 'Verifying network availability...';
       try {
         const res = await fetch('/api/storage/verify', { method: 'POST' });
         const report = await res.json();
@@ -53944,7 +53944,7 @@ _scheduleTargetContext: 'workspace',
           '<div style="display: flex; justify-content: space-between; align-items: center;">' +
             '<div style="display: flex; align-items: center; gap: 6px;">' +
               (isPinned ? '<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 0.68rem; font-weight: 700;">📌 PINNED</span>' : '<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.68rem; font-weight: 700;">📢 BROADCAST</span>') +
-              '<span style="font-size: 0.74rem; color: #94a3b8; font-family: monospace;">' + (p.mediaCid ? p.mediaCid.slice(0, 12) + '...' : 'Ed25519 Signed') + '</span>' +
+              '<span style="font-size: 0.74rem; color: #94a3b8; font-family: monospace;">' + (p.mediaCid ? p.mediaCid.slice(0, 12) + '...' : 'Verified Signed') + '</span>' +
             '</div>' +
             '<div style="display: flex; align-items: center; gap: 8px;">' +
               '<button type="button" data-post-id="' + p.id + '" data-post-caption="' + (p.caption || '').replace(/"/g, '&quot;') + '" onclick="pinChannelAnnouncement(this.dataset.postId, this.dataset.postCaption)" style="background: none; border: none; color: #94a3b8; font-size: 0.75rem; cursor: pointer; padding: 0;" title="Pin to channel top">📌 Pin</button>' +
@@ -55325,9 +55325,9 @@ _scheduleTargetContext: 'workspace',
         pill.style.display = 'flex';
         pill.style.background = 'linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(168, 85, 247, 0.95))';
         pill.style.border = '1px solid rgba(168, 85, 247, 0.6)';
-        pill.innerHTML = '<span>📡</span> <span>Offline Mesh Active — Bluetooth GATT &amp; DTN Outbox Ready</span>';
+        pill.innerHTML = '<span>📡</span> <span>Offline Mesh Active — Bluetooth &amp; Offline Outbox Ready</span>';
         if (typeof showAccountToast === 'function') {
-          showAccountToast('📡 Operating in Offline Mesh Mode (Bluetooth GATT & DTN Store-and-Forward Active)', 'info');
+          showAccountToast('📡 Operating in Offline Mesh Mode (Messages will sync automatically)', 'info');
         }
         if (window.SovraBleMeshRadar && typeof window.SovraBleMeshRadar.refreshScan === 'function') {
           window.SovraBleMeshRadar.refreshScan();
@@ -55534,7 +55534,7 @@ _scheduleTargetContext: 'workspace',
         const iconBorder = isNative ? 'rgba(245, 158, 11, 0.35)' : 'rgba(168, 85, 247, 0.35)';
         const iconColor = isNative ? '#f59e0b' : '#c084fc';
         const iconSymbol = isNative ? '⚡' : '🪙';
-        const subText = isNative ? 'L1 Base Currency' : (a.contractAddress ? a.contractAddress.slice(0, 14) + '...' + a.contractAddress.slice(-6) : 'CW20 Token');
+        const subText = isNative ? 'Native Currency' : (a.contractAddress ? a.contractAddress.slice(0, 14) + '...' + a.contractAddress.slice(-6) : 'CW20 Token');
         const swapBtn = !isNative ? ('<button onclick="openWalletSwapModal(&quot;' + a.contractAddress + '&quot;, &quot;buy&quot;)" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 8px; padding: 5px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer;" title="Instant AMM Swap">Swap</button>') : '';
 
         return '<div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">' +
@@ -55562,7 +55562,7 @@ _scheduleTargetContext: 'workspace',
 
       const cw20Tokens = assets.filter(function(a) { return a.type === 'cw20'; });
       if (cw20Tokens.length === 0) {
-        select.innerHTML = '<option value="">No CW20 creator tokens found</option>';
+        select.innerHTML = '<option value="">No creator tokens found</option>';
         return;
       }
 
@@ -55659,11 +55659,11 @@ _scheduleTargetContext: 'workspace',
 
       if (btn) {
         btn.disabled = true;
-        btn.innerText = 'Broadcasting AMM Swap to L1...';
+        btn.innerText = 'Processing instant swap...';
       }
       if (status) {
         status.style.color = '#38bdf8';
-        status.innerText = 'Broadcasting to CometBFT mempool...';
+        status.innerText = 'Confirming transaction on network...';
       }
 
       try {
@@ -59899,7 +59899,7 @@ _scheduleTargetContext: 'workspace',
           storageEl.textContent = (sizes[targetApp] || '1.8 MB') + ' (SQLite WAL)';
         }
         if (secEl) {
-          secEl.textContent = targetApp === 'chat' || targetApp === 'wallet' ? 'Noise_XX E2EE' : 'Ed25519 Signed';
+          secEl.textContent = targetApp === 'chat' || targetApp === 'wallet' ? 'Noise_XX E2EE' : 'Verified Signed';
         }
 
         modal.style.display = 'flex';
