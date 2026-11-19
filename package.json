@@ -21,7 +21,7 @@
     "test:fast": "vitest run --fileParallelism false tests/unit/client-script-integrity.test.ts tests/e2e/holographic-navigation.test.ts tests/e2e/pwa-manifest.test.ts tests/e2e/ftux-activation.test.ts tests/e2e/webrtc-stories-pwa.test.ts",
     "validate:integrity": "vitest run --fileParallelism false --teardownTimeout 15000 tests/unit/client-script-integrity.test.ts tests/e2e/pwa-manifest.test.ts tests/e2e/ftux-activation.test.ts tests/e2e/webrtc-stories-pwa.test.ts",
     "test:watch": "vitest",
-    "audit:prelaunch": "vitest run tests/audit/pre_launch_master_control_audit.test.ts tests/audit/pre_launch_adversarial_audit.test.ts",
+    "audit:prelaunch": "vitest run tests/audit/pre_launch_master_control_audit.test.ts tests/audit/pre_launch_adversarial_audit.test.ts tests/audit/world_standard_flagship_audit.test.ts",
     "test:architecture": "vitest run tests/security/dependency-boundaries.test.ts",
     "lint": "eslint .",
     "typecheck": "pnpm -r run typecheck",
