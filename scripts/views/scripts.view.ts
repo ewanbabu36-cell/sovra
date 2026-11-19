@@ -11880,6 +11880,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
         if (regForm) regForm.style.display = 'none';
         if (loginForm) loginForm.style.display = 'block';
+        if (typeof initQuickUserCard === 'function') initQuickUserCard();
         const loginInput = document.getElementById('womLoginHandleInput');
         if (loginInput) setTimeout(() => loginInput.focus(), 100);
       }
@@ -12523,39 +12524,240 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       }
     }
 
-    function openForgotPinModal() {
-      var handleInput = document.getElementById('womLoginHandleInput');
-      var curHandle = handleInput ? handleInput.value.trim() : '';
-      var identifier = prompt('Enter your Sovereign Handle or DID to reset PIN:', curHandle || '@merajsharif');
-      if (!identifier) return;
-      var phrase = prompt('Enter your 12-Word Recovery Seed Phrase for ' + identifier + ':');
-      if (!phrase) return;
-      var newPin = prompt('Enter new Security PIN (4-8 digits):', '1234');
-      if (!newPin) return;
-      submitForgotPinResetDirect(identifier, phrase, newPin);
-    }
+    // ==========================================
+    // 🔐 AUTHENTICATION, QUICK USER & FORGOT PIN LIFECYCLE
+    // ==========================================
+    window.validateLoginInputsLive = function() {
+      var handleEl = document.getElementById('womLoginHandleInput');
+      var pinEl = document.getElementById('womLoginPinInput');
+      var errEl = document.getElementById('womHandleInlineError');
+      if (!handleEl) return;
 
-    async function submitForgotPinResetDirect(identifier, phrase, newPin) {
+      var val = handleEl.value.trim().replace(/^@/, '');
+      var hasInvalidChar = /[^a-zA-Z0-9_.-]/.test(val);
+      if (hasInvalidChar) {
+        handleEl.style.borderColor = '#ef4444';
+        if (errEl) {
+          errEl.style.display = 'block';
+          errEl.innerText = 'Only letters, numbers, underscores, dots, and hyphens allowed.';
+        }
+      } else {
+        handleEl.style.borderColor = val.length > 0 ? '#38bdf8' : '#334155';
+        if (errEl) errEl.style.display = 'none';
+      }
+
+      if (pinEl && pinEl.value.length > 0) {
+        pinEl.style.borderColor = pinEl.value.length >= 4 ? '#34d399' : '#f59e0b';
+      }
+    };
+
+    window.initQuickUserCard = function() {
+      try {
+        var raw = localStorage.getItem('sovra_last_active_user');
+        if (!raw) return;
+        var user = JSON.parse(raw);
+        if (!user || !user.handle) return;
+
+        var card = document.getElementById('womQuickUserCard');
+        var avatarEl = document.getElementById('womQuickUserAvatar');
+        var handleEl = document.getElementById('womQuickUserHandle');
+        var btnHandle = document.getElementById('womQuickUserBtnHandle');
+        var handleInput = document.getElementById('womLoginHandleInput');
+
+        if (card) card.style.display = 'block';
+        if (avatarEl && user.avatar) avatarEl.src = user.avatar;
+        var dispHandle = user.handle.startsWith('@') ? user.handle : ('@' + user.handle);
+        if (handleEl) handleEl.innerText = dispHandle;
+        if (btnHandle) btnHandle.innerText = dispHandle;
+        if (handleInput && !handleInput.value) handleInput.value = user.handle.replace(/^@/, '');
+      } catch(e) {}
+    };
+
+    window.switchQuickUserAccount = function() {
+      var card = document.getElementById('womQuickUserCard');
+      if (card) card.style.display = 'none';
+      var handleInput = document.getElementById('womLoginHandleInput');
+      var pinInput = document.getElementById('womLoginPinInput');
+      if (handleInput) {
+        handleInput.value = '';
+        handleInput.focus();
+      }
+      if (pinInput) pinInput.value = '';
+    };
+
+    window.continueAsQuickUser = function() {
+      var pinInput = document.getElementById('womLoginPinInput');
+      if (pinInput) {
+        pinInput.focus();
+      }
+      if (typeof triggerWebAuthnBiometricLogin === 'function' && localStorage.getItem('sovra_passkey_enrolled') === 'true') {
+        triggerWebAuthnBiometricLogin();
+      }
+    };
+
+    window.openForgotPinModal = function() {
+      var modal = document.getElementById('forgotPinModal');
+      if (modal) modal.style.display = 'flex';
+      var idInput = document.getElementById('forgotPinIdentifierInput');
+      var handleInput = document.getElementById('womLoginHandleInput');
+      if (idInput && handleInput && handleInput.value.trim()) {
+        idInput.value = handleInput.value.trim();
+      }
+    };
+
+    window.closeForgotPinModal = function() {
+      var modal = document.getElementById('forgotPinModal');
+      if (modal) modal.style.display = 'none';
+    };
+
+    window.resetPinWithBiometrics = async function() {
+      var idInput = document.getElementById('forgotPinIdentifierInput') || document.getElementById('womLoginHandleInput');
+      var identifier = idInput ? idInput.value.trim() : '';
+      if (!identifier) {
+        showAccountToast('Please enter your username or DID first.', 'error');
+        if (idInput) idInput.focus();
+        return;
+      }
+
+      var newPinEl = document.getElementById('forgotPinNewInput');
+      var newPin = (newPinEl ? newPinEl.value : '').trim();
+      if (!newPin || newPin.length < 4) {
+        newPin = prompt('Enter new 4-8 digit Security PIN:');
+        if (!newPin || newPin.trim().length < 4) {
+          showAccountToast('Valid 4-8 digit PIN is required.', 'error');
+          return;
+        }
+      }
+
+      try {
+        showAccountToast('Authenticating with device biometrics...', 'info');
+        var res = await fetch('/api/auth/pin/reset-biometric', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: identifier, newPin: newPin.trim() })
+        });
+        var data = await res.json();
+        if (data && data.ok) {
+          showAccountToast('✓ Security PIN reset successfully via Biometrics!', 'success');
+          var pinIn = document.getElementById('womLoginPinInput');
+          if (pinIn) pinIn.value = newPin.trim();
+          try { localStorage.setItem('sovra_lock_pin', newPin.trim()); } catch(e) {}
+          closeForgotPinModal();
+          triggerUserLogin();
+        } else {
+          showAccountToast('Biometric reset failed: ' + ((data && data.error) || 'User verification failed'), 'error');
+        }
+      } catch (err) {
+        showAccountToast('Biometric authentication failed: ' + (err.message || err), 'error');
+      }
+    };
+
+    window.submitForgotPinWithPhrase = async function() {
+      var idInput = document.getElementById('forgotPinIdentifierInput');
+      var phraseInput = document.getElementById('forgotPinPhraseInput');
+      var newPinInput = document.getElementById('forgotPinNewInput');
+      var confirmPinInput = document.getElementById('forgotPinConfirmInput');
+
+      var identifier = idInput ? idInput.value.trim() : '';
+      var phrase = phraseInput ? phraseInput.value.trim() : '';
+      var newPin = newPinInput ? newPinInput.value.trim() : '';
+      var confirmPin = confirmPinInput ? confirmPinInput.value.trim() : '';
+
+      if (!identifier) {
+        showAccountToast('Please enter your Username or DID.', 'error');
+        if (idInput) idInput.focus();
+        return;
+      }
+      if (!phrase) {
+        showAccountToast('Please enter your 12-word recovery seed phrase.', 'error');
+        if (phraseInput) phraseInput.focus();
+        return;
+      }
+      if (!newPin || newPin.length < 4) {
+        showAccountToast('New PIN must be at least 4 digits.', 'error');
+        if (newPinInput) newPinInput.focus();
+        return;
+      }
+      if (newPin !== confirmPin) {
+        showAccountToast('PINs do not match. Please re-check.', 'error');
+        if (confirmPinInput) confirmPinInput.focus();
+        return;
+      }
+
+      var btn = document.getElementById('forgotPinSubmitBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Verifying Phrase & Cryptographic Enclave...';
+      }
+
       try {
         var res = await fetch('/api/auth/pin/recover', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: identifier.trim(), recoveryPhrase: phrase.trim(), newPin: newPin.trim() })
+          body: JSON.stringify({ identifier: identifier, recoveryPhrase: phrase, newPin: newPin })
         });
         var data = await res.json();
         if (data && data.ok) {
-          showAccountToast('✓ Security PIN reset to ' + newPin + '! Logging in...', 'success');
+          showAccountToast('✓ Security PIN reset successfully! Logging in...', 'success');
           var pinIn = document.getElementById('womLoginPinInput');
-          if (pinIn) pinIn.value = newPin.trim();
-          try { localStorage.setItem('sovra_lock_pin', newPin.trim()); } catch(e) {}
+          if (pinIn) pinIn.value = newPin;
+          try { localStorage.setItem('sovra_lock_pin', newPin); } catch(e) {}
+          closeForgotPinModal();
           triggerUserLogin();
         } else {
-          showAccountToast('PIN reset failed: ' + ((data && data.error) ? data.error : 'Invalid recovery phrase'));
+          showAccountToast('Recovery failed: ' + ((data && data.error) || 'Invalid seed phrase or user identifier'), 'error');
         }
       } catch (err) {
-        showAccountToast('Network failure: ' + (err.message || err));
+        showAccountToast('Network failure: ' + (err.message || err), 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = '✓ Reset Security PIN';
+        }
       }
-    }
+    };
+
+    window.validateBip39PhraseLive = async function(inputId, statusId, chipsId) {
+      var input = document.getElementById(inputId);
+      var status = document.getElementById(statusId);
+      var chips = document.getElementById(chipsId);
+      if (!input) return;
+
+      var val = input.value.trim().toLowerCase();
+      var words = val.split(/\s+/).filter(Boolean);
+
+      if (words.length === 0) {
+        if (status) {
+          status.innerText = 'Enter 12 words';
+          status.style.color = '#94a3b8';
+        }
+        if (chips) chips.innerHTML = '';
+        return;
+      }
+
+      if (status) {
+        status.innerText = words.length + ' / 12 words entered';
+        status.style.color = words.length === 12 ? '#34d399' : (words.length > 12 ? '#ef4444' : '#38bdf8');
+      }
+
+      try {
+        var res = await fetch('/api/auth/mnemonic/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phrase: val })
+        });
+        var data = await res.json();
+        if (chips && Array.isArray(data.invalidWords)) {
+          chips.innerHTML = words.map(function(w, idx) {
+            var isInvalid = data.invalidWords.includes(w);
+            var bg = isInvalid ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)';
+            var border = isInvalid ? 'rgba(239, 68, 68, 0.5)' : 'rgba(16, 185, 129, 0.5)';
+            var color = isInvalid ? '#f87171' : '#34d399';
+            return '<span style="background: ' + bg + '; border: 1px solid ' + border + '; color: ' + color + '; padding: 2px 7px; border-radius: 6px; font-size: 0.72rem; font-family: monospace;">' + (idx + 1) + '. ' + w + (isInvalid ? ' ✕' : '') + '</span>';
+          }).join('');
+        }
+      } catch (e) {}
+    };
 
     function enterAsGuest() {
       skipOnboardingAsHost();
