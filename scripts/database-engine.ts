@@ -17102,6 +17102,47 @@ export class SovraDatabaseEngine {
     };
   }
 
+  public getPromotionCampaigns(creatorDid?: string): any[] {
+    this.load();
+    let campaigns = this.db.promotion_campaigns || [];
+    if (creatorDid) {
+      campaigns = campaigns.filter(c => c.creatorDid === creatorDid);
+    }
+    return campaigns.map(c => {
+      let targetTitle = c.targetId;
+      if (c.targetType === 'video') {
+        const vid = (this.db.videos || []).find(v => v.id === c.targetId);
+        if (vid) targetTitle = vid.title || targetTitle;
+      } else if (c.targetType === 'post') {
+        const post = (this.db.posts || []).find(p => p.id === c.targetId);
+        if (post) targetTitle = (post.content || '').slice(0, 40) + '...';
+      }
+      return {
+        ...c,
+        targetTitle,
+        totalBudgetSov: c.stakedSov || (c as any).totalBudgetSov || 0,
+        budgetRemainingSov: typeof c.budgetRemainingSov === 'number' ? c.budgetRemainingSov : (c.stakedSov || 0),
+        impressionsDelivered: c.impressionsDelivered || (c as any).deliveredImpressions || 0,
+        targetImpressions: (c as any).targetImpressions || Math.round(((c.stakedSov || 10) / (c.cpmSov || 2.0)) * 1000),
+      };
+    });
+  }
+
+  public togglePausePromotionCampaign(campaignId: string, callerDid?: string): any {
+    this.load();
+    const camp = (this.db.promotion_campaigns || []).find(c => c.id === campaignId);
+    if (!camp) return { ok: false, error: 'Campaign not found' };
+    if (callerDid && camp.creatorDid !== callerDid && callerDid !== 'did:sovra:admin') {
+      return { ok: false, error: 'Unauthorized to modify this campaign' };
+    }
+    if (camp.status === 'CANCELLED_REFUNDED' || camp.status === 'COMPLETED' || (camp as any).status === 'DEPLETED') {
+      return { ok: false, error: `Cannot toggle pause for campaign in ${camp.status} state` };
+    }
+    camp.status = camp.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+    this.save();
+    return { ok: true, campaignId: camp.id, status: camp.status };
+  }
+
   // -------------------------------------------------------------------------
   // CYCLE 5: AUTOMATED CREATOR PAYOUT LEDGER, FEE REVIEWS & REFERRAL LOOPS
   // -------------------------------------------------------------------------
@@ -17425,13 +17466,18 @@ export class SovraDatabaseEngine {
 
     // Disburse 1 impression from CPM escrow
     // CPM = cost per 1,000 views. Each view = cpmRate / 1000
-    const cpmRate = Number(campaign.cpmBidSov || 2.5);
+    const cpmRate = Number(campaign.cpmBidSov || (campaign as any).cpmSov || 2.5);
     const perImpressionSov = Math.round((cpmRate / 1000) * 10000) / 10000;
     
     campaign.impressionsDelivered = (campaign.impressionsDelivered || 0) + 1;
+    (campaign as any).deliveredImpressions = campaign.impressionsDelivered;
     campaign.spentSov = Math.round(((campaign.spentSov || 0) + perImpressionSov) * 10000) / 10000;
+    if (typeof campaign.budgetRemainingSov === 'number') {
+      campaign.budgetRemainingSov = Math.max(0, Math.round((campaign.budgetRemainingSov - perImpressionSov) * 10000) / 10000);
+    }
     
-    if (campaign.spentSov >= campaign.budgetSov) {
+    const budgetLimit = Number(campaign.budgetRemainingSov !== undefined ? (campaign.stakedSov || (campaign as any).budgetSov || 0) : ((campaign as any).budgetSov || 0));
+    if (campaign.spentSov >= budgetLimit || campaign.budgetRemainingSov === 0) {
       campaign.status = 'COMPLETED';
     }
 
