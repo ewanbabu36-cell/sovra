@@ -4862,25 +4862,24 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <input type="file" id="directAvatarFileInput" accept="image/*" style="display: none;" onchange="handleDirectAvatarChange(event)">
             </div>
             <div class="profile-actions-wrap">
-              <button class="profile-btn profile-btn-primary" onclick="openEditProfileModal()" aria-label="Edit Profile">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                <span>Edit Profile</span>
-              </button>
-              <div class="profile-secondary-actions">
-                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileOpenWalletBtn" onclick="openFullPageWallet()" aria-label="Open Sovereign Wallet" title="Wallet" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #34d399;">
+              <div class="profile-actions-dock" id="profileActionsDock">
+                <button class="profile-btn profile-btn-primary profile-btn-icon-only" id="profileEditBtn" onclick="openEditProfileModal()" aria-label="Edit Profile" title="Edit Profile" style="background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.38); color: #38bdf8;">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                </button>
+                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileOpenWalletBtn" onclick="openFullPageWallet()" aria-label="Open Sovereign Wallet" title="Sovereign Wallet" style="background: rgba(16, 185, 129, 0.16); border: 1px solid rgba(16, 185, 129, 0.38); color: #34d399;">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                 </button>
-                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileShareBtn" onclick="openShareProfileModal(event)" aria-label="Share Profile" title="Share Profile" style="color: #38bdf8;">
+                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileShareBtn" onclick="openShareProfileModal(event)" aria-label="Share Profile" title="Share Profile" style="background: rgba(168, 85, 247, 0.16); border: 1px solid rgba(168, 85, 247, 0.38); color: #c084fc;">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                 </button>
-                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="btnBackupSovereignIdentity" onclick="openSovereignBackupModal()" aria-label="Backup Sovereign Identity" title="Backup Sovereign Identity (Mnemonic)" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.35); color: #a5b4fc;">
+                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="btnBackupSovereignIdentity" onclick="openSovereignBackupModal()" aria-label="Backup Sovereign Identity" title="Backup Sovereign Identity (Mnemonic)" style="background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.38); color: #fbbf24;">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
                 </button>
-                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileSettingsBtn" onclick="openSpatialSettingsSurface(this)" aria-label="Settings" title="Settings & Security" style="color: #94a3b8;">
+                <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileSettingsBtn" onclick="openSpatialSettingsSurface(this)" aria-label="Settings" title="Settings & Security" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); color: #94a3b8;">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 </button>
                 <div class="profile-overflow-wrap">
-                  <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileOverflowMenuBtn" onclick="toggleProfileOverflowMenu(event)" aria-label="More account and sovereign options" aria-haspopup="menu" aria-expanded="false" title="More Options (•••)">
+                  <button class="profile-btn profile-btn-secondary profile-btn-icon-only" id="profileOverflowMenuBtn" onclick="toggleProfileOverflowMenu(event)" aria-label="More account and sovereign options" aria-haspopup="menu" aria-expanded="false" title="More Options (•••)" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); color: #cbd5e1;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                   </button>
                   <div id="profileOverflowDropdown" class="profile-overflow-dropdown" role="menu" style="display: none;">
@@ -4964,7 +4963,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     <div class="stat-subtext">Published</div>
                   </div>
 
-                  <div class="profile-stat-box stat-box-friends" onclick="viewMyProfileFriends()" title="Click to view friends" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')viewMyProfileFriends()" aria-label="View Friends">
+                  <div class="profile-stat-box stat-box-friends" onclick="openSocialConnectionsModal('friends')" title="Click to view friends" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openSocialConnectionsModal('friends')" aria-label="View Friends">
                     <div class="stat-top-row">
                       <span class="stat-category-title" id="meFriendsStatTitle">Friends</span>
                       <span class="stat-icon-wrap" style="color: #38bdf8;">
@@ -10311,11 +10310,17 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <button onclick="closeSocialConnectionsModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; padding: 4px;" aria-label="Close modal">✕</button>
       </div>
 
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
-        <button id="scmTabFollowers" onclick="switchSocialModalTab('followers')" style="padding: 0.5rem 1rem; background: #334155; border: none; border-radius: 8px; color: #fff; font-size: 0.85rem; font-weight: 700; cursor: pointer;">
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; overflow-x: auto;">
+        <button id="scmTabFriends" onclick="switchSocialModalTab('friends')" style="padding: 0.5rem 0.95rem; background: #38bdf8; border: none; border-radius: 8px; color: #0f172a; font-size: 0.82rem; font-weight: 800; cursor: pointer; white-space: nowrap;">
+          Friends (<span id="scmCountFriends">0</span>)
+        </button>
+        <button id="scmTabRequests" onclick="switchSocialModalTab('requests')" style="display: none; padding: 0.5rem 0.95rem; background: transparent; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; color: #fbbf24; font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
+          Requests (<span id="scmCountRequests">0</span>)
+        </button>
+        <button id="scmTabFollowers" onclick="switchSocialModalTab('followers')" style="padding: 0.5rem 0.95rem; background: transparent; border: 1px solid #334155; border-radius: 8px; color: #94a3b8; font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
           Followers (<span id="scmCountFollowers">0</span>)
         </button>
-        <button id="scmTabFollowing" onclick="switchSocialModalTab('following')" style="padding: 0.5rem 1rem; background: transparent; border: 1px solid #334155; border-radius: 8px; color: #94a3b8; font-size: 0.85rem; font-weight: 700; cursor: pointer;">
+        <button id="scmTabFollowing" onclick="switchSocialModalTab('following')" style="padding: 0.5rem 0.95rem; background: transparent; border: 1px solid #334155; border-radius: 8px; color: #94a3b8; font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
           Following (<span id="scmCountFollowing">0</span>)
         </button>
       </div>

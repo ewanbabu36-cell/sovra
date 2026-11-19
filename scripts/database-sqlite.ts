@@ -1890,11 +1890,14 @@ this.db.exec('COMMIT;');
           ) VALUES (?, ?, ?, ?, ?, ?)
         `);
         for (const fr of state.friend_relationships) {
+          const fromDid = fr.fromDid || fr.userDid;
+          const toDid = fr.toDid || fr.targetDid;
+          if (!fromDid || !toDid || fromDid === toDid) continue;
           stmt.run(
-            fr.id || `${fr.userDid || fr.fromDid}:${fr.targetDid || fr.toDid}`,
-            fr.fromDid || fr.userDid || 'did:sovra:from',
-            fr.toDid || fr.targetDid || 'did:sovra:to',
-            fr.status || 'ACCEPTED', fr.createdAt || Date.now(), fr.updatedAt || Date.now()
+            fr.id || `${fromDid}:${toDid}`,
+            fromDid,
+            toDid,
+            fr.status || 'pending', fr.createdAt || Date.now(), fr.updatedAt || Date.now()
           );
         }
       }
