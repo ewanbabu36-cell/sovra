@@ -34334,12 +34334,12 @@ _scheduleTargetContext: 'workspace',
         reader.onload = function(e) {
           try {
             var text = e.target.result;
-            var lines = String(text).split(/\r?\n/);
+            var lines = String(text).split(/\\r?\\n/);
             var cues = [];
             var curCue = null;
             for (var i = 0; i < lines.length; i++) {
               var line = lines[i].trim();
-              if (!line || line.indexOf('WEBVTT') === 0 || /^\d+$/.test(line)) continue;
+              if (!line || line.indexOf('WEBVTT') === 0 || /^\\d+$/.test(line)) continue;
               if (line.indexOf('-->') !== -1) {
                 var parts = line.split('-->');
                 curCue = {
@@ -35435,8 +35435,8 @@ _scheduleTargetContext: 'workspace',
               '</div>' +
             '</div>' +
             '<div style="display: flex; align-items: center; gap: 8px;">' +
-              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.toggleShelfEnabled(\'' + s.id + '\', ' + str(not True).lower() + ')" style="padding: 3px 8px; font-size: 0.7rem;">' + (isEnabled ? '🟢 Active' : '⚪ Hidden') + '</button>' +
-              '<button type="button" onclick="SovraCreatorStudioEngine.removeCustomShelf(\'' + s.id + '\')" style="background: none; border: none; color: #ef4444; font-size: 0.85rem; cursor: pointer;" title="Remove shelf">🗑️</button>' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.toggleShelfEnabled(&quot;' + s.id + '&quot;, ' + (!isEnabled) + ')" style="padding: 3px 8px; font-size: 0.7rem;">' + (isEnabled ? '🟢 Active' : '⚪ Hidden') + '</button>' +
+              '<button type="button" onclick="SovraCreatorStudioEngine.removeCustomShelf(&quot;' + s.id + '&quot;)" style="background: none; border: none; color: #ef4444; font-size: 0.85rem; cursor: pointer;" title="Remove shelf">🗑️</button>' +
             '</div>' +
           '</div>';
         }).join('');
@@ -35532,8 +35532,8 @@ _scheduleTargetContext: 'workspace',
             '<td style="padding: 10px 12px; color: #fff; font-weight: 700; font-size: 0.82rem;">' + count + ' videos</td>' +
             '<td style="padding: 10px 12px; color: #94a3b8; font-size: 0.78rem;">' + updated + '</td>' +
             '<td style="padding: 10px 12px; text-align: right; white-space: nowrap;">' +
-              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.sharePlaylist(\'' + pl.id + '\')" style="padding: 3px 8px; font-size: 0.72rem; margin-right: 4px;" title="Share link">🔗 Share</button>' +
-              '<button type="button" class="btn" onclick="SovraCreatorStudioEngine.deletePlaylist(\'' + pl.id + '\')" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #ef4444; cursor: pointer;" title="Delete">🗑️</button>' +
+              '<button type="button" class="btn btn-secondary" onclick="SovraCreatorStudioEngine.sharePlaylist(&quot;' + pl.id + '&quot;)" style="padding: 3px 8px; font-size: 0.72rem; margin-right: 4px;" title="Share link">🔗 Share</button>' +
+              '<button type="button" class="btn" onclick="SovraCreatorStudioEngine.deletePlaylist(&quot;' + pl.id + '&quot;)" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #ef4444; cursor: pointer;" title="Delete">🗑️</button>' +
             '</td>' +
           '</tr>';
         }).join('');
@@ -35662,7 +35662,7 @@ _scheduleTargetContext: 'workspace',
 
         listEl.innerHTML = posts.map(function(p) {
           var date = p.createdAt ? new Date(p.createdAt).toLocaleString() : 'Just now';
-          var content = (p.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+          var content = (p.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\\n/g, '<br>');
           var likes = p.likesCount || p.likes || 0;
           var pollHtml = '';
           if (p.poll && Array.isArray(p.poll.options) && p.poll.options.length) {
