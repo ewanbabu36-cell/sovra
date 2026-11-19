@@ -1101,9 +1101,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             
             <!-- 1. Create Story Card -->
             <div class="story-item create-story-card" onclick="handleStoryTrayUserClick()" title="Create Story (+ Add Story)">
-              <div class="create-story-cover">
-                ${hostUser && hostUser.avatarDataUrl ? `<img src="${hostUser.avatarDataUrl}" alt="Your avatar" />` : `<div style="font-size: 2.8rem; font-weight: 800; color: #fff;">${hostUser ? hostUser.avatar || 'S' : 'S'}</div>`}
-                <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%);"></div>
+              <div class="create-story-cover" id="createStoryCover">
+                <div id="createStoryCoverContent" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1e293b, #0f172a);">
+                  <div style="font-size: 2.8rem; font-weight: 800; color: #94a3b8;" id="createStoryCoverFallback">👤</div>
+                </div>
+                <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>
               </div>
               <div class="create-story-footer">
                 <div class="story-ring" id="myStoryRing" style="display: none;">

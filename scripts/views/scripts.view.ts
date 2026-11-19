@@ -10959,6 +10959,48 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         });
     }
 
+    function updateCreateStoryCoverUI() {
+      try {
+        const coverEl = document.getElementById('createStoryCover');
+        if (!coverEl) return;
+        const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
+        const myHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle.replace('@', '').toLowerCase() : '';
+
+        // 1. Check if user has an active story published
+        let activeStoryMedia = '';
+        if (typeof storiesData !== 'undefined' && Array.isArray(storiesData)) {
+          const myStory = storiesData.find(function(s) {
+            return (myDid && s.creatorDid === myDid) ||
+                   (myHandle && s.creatorHandle && s.creatorHandle.replace('@', '').toLowerCase() === myHandle) ||
+                   s.creatorHandle === 'you';
+          });
+          if (myStory && Array.isArray(myStory.segments) && myStory.segments.length > 0) {
+            activeStoryMedia = myStory.segments[0].imageUrl || myStory.mediaUrl || '';
+          }
+        }
+
+        // If an active story exists, show its media preview
+        if (activeStoryMedia) {
+          coverEl.innerHTML = '<img src="' + activeStoryMedia + '" alt="Your story" style="width: 100%; height: 100%; object-fit: cover; display: block;" /><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+          return;
+        }
+
+        // 2. Otherwise show currently logged-in user\'s profile photo
+        if (typeof myProfile !== 'undefined' && myProfile && myProfile.avatarDataUrl) {
+          coverEl.innerHTML = '<img src="' + myProfile.avatarDataUrl + '" alt="Your avatar" style="width: 100%; height: 100%; object-fit: cover; display: block;" /><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+        } else if (typeof myProfile !== 'undefined' && myProfile && (myProfile.name || myProfile.displayName || myProfile.avatar)) {
+          const bg = myProfile.avatarBg || 'linear-gradient(135deg, #4f46e5, #06b6d4)';
+          const text = (myProfile.displayName || myProfile.name) ? (myProfile.displayName || myProfile.name).charAt(0).toUpperCase() : (myProfile.avatar || 'S');
+          coverEl.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ' + bg + '; font-size: 2.8rem; font-weight: 800; color: #fff;">' + text + '</div><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+        } else {
+          coverEl.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1e293b, #0f172a); font-size: 2.8rem; font-weight: 800; color: #94a3b8;">👤</div><div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.5) 100%); pointer-events: none;"></div>';
+        }
+      } catch (e) {
+        console.warn('[Stories] updateCreateStoryCoverUI error:', e);
+      }
+    }
+    window.updateCreateStoryCoverUI = updateCreateStoryCoverUI;
+
     function updateUserDisplayInUI() {
       if (!myProfile) {
         currentUserHandle = '@guest';
@@ -11018,6 +11060,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
         const myStoryAvatar = document.getElementById('myStoryAvatar');
         if (myStoryAvatar) { myStoryAvatar.innerText = '?'; myStoryAvatar.style.background = '#475569'; }
+        if (typeof updateCreateStoryCoverUI === 'function') updateCreateStoryCoverUI();
         const coverEl = document.getElementById('meProfileCover');
         const directCoverRemoveBtn = document.getElementById('directCoverRemoveBtn');
         if (coverEl) {
@@ -11279,6 +11322,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           if (myProfile.avatarBg) myStoryAvatar.style.background = myProfile.avatarBg;
         }
       }
+      if (typeof updateCreateStoryCoverUI === 'function') updateCreateStoryCoverUI();
       if (typeof myProfile.balanceSov === 'number') {
         walletBalanceSov = myProfile.balanceSov;
         const sovEl = document.getElementById('walletBalanceSovDisplay');
@@ -37013,6 +37057,7 @@ window.SovraCreatorStudioEngine = {
           if (ring) ring.style.display = 'none';
           if (cardLabel) cardLabel.textContent = 'Create story';
         }
+        if (typeof updateCreateStoryCoverUI === 'function') updateCreateStoryCoverUI();
 
         if (container) {
           let peerHtml = '';

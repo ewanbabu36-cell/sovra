@@ -11,3 +11,4 @@ export * from './flash-preservation.js';
 export * from './ssim.js';
 export * from './incubator.js';
 export * from './reels.js';
+export * from './webrtc-bitswap.js';

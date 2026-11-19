@@ -21,5 +21,6 @@ export * from './chameleon.js';
 export * from './delay-skew.js';
 export * from './bootstrap-seeds.js';
 export * from './signaling.js';
+export * from './wire.js';
 export * from './mesh/index.js';
 
