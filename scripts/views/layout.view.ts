@@ -13546,6 +13546,24 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </button>
           </div>
 
+          <!-- 🪙 Vault Assets & Creator Tokens (AMM Pool Integrations) -->
+          <div class="wallet-assets-section" style="margin-bottom: 1.5rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #f8fafc; font-size: 0.95rem;">
+                <span>🪙</span>
+                <span>Vault Assets &amp; Creator Tokens</span>
+                <span id="walletAssetCount" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 700;">1 Asset</span>
+              </div>
+              <button type="button" onclick="openWalletSwapModal()" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; font-size: 0.76rem; font-weight: 700; padding: 5px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                <span>🔄 AMM Swap</span>
+              </button>
+            </div>
+            <div id="walletAssetsList" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Dynamically populated by renderWalletAssets() -->
+              <div class="wallet-empty-state" style="font-size: 0.82rem; color: #64748b; text-align: center; padding: 12px;">Loading vault assets...</div>
+            </div>
+          </div>
+
           <!-- Visual Vouchers & Recent Activity -->
           <div class="wallet-vouchers-section" id="walletVouchersSection">
             <div class="wallet-vouchers-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
@@ -13656,6 +13674,62 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <span>📋 Copy sovra:&lt;did&gt; Deep Link</span>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- 🔄 WALLET SWAP (AMM) MODAL -->
+  <div id="walletSwapModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; background: rgba(5, 8, 16, 0.88); backdrop-filter: blur(20px); z-index: 1000020; align-items: center; justify-content: center; padding: 1.25rem;">
+    <div style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 24px; max-width: 440px; width: 100%; padding: 1.75rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.85); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div style="font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; color: #38bdf8;">
+          <span>🔄</span> <span>Instant AMM Swap</span>
+        </div>
+        <button onclick="closeWalletSwapModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; padding: 4px;" aria-label="Close modal">✕</button>
+      </div>
+
+      <!-- Direction Badge & Toggle Button -->
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 14px; margin-bottom: 1rem;">
+        <span id="swapDirectionBadge" style="font-size: 0.8rem; font-weight: 700; color: #38bdf8;">Pay Native SOV ➔ Receive Creator Tokens</span>
+        <button type="button" onclick="toggleSwapDirection()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer;" title="Flip Swap Direction">⇅ Flip</button>
+        <input type="hidden" id="swapDirection" value="buy" />
+      </div>
+
+      <!-- Select Token Dropdown -->
+      <div style="margin-bottom: 1rem; text-align: left;">
+        <label style="font-size: 0.76rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 6px;">Select Creator Token</label>
+        <select id="swapTokenSelect" style="width: 100%; padding: 10px 12px; border-radius: 12px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.12); color: #f8fafc; font-size: 0.88rem; font-weight: 600; outline: none;">
+          <option value="">No CW20 creator tokens found</option>
+        </select>
+      </div>
+
+      <!-- Swap Amount Input -->
+      <div style="margin-bottom: 1.25rem; text-align: left;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label style="font-size: 0.76rem; color: #94a3b8; font-weight: 600;">Amount to Swap</label>
+          <span style="font-size: 0.72rem; color: #34d399; cursor: pointer;" onclick="document.getElementById('swapAmountInput').value='10'; updateSwapEstimate();">Max (10)</span>
+        </div>
+        <input type="number" id="swapAmountInput" step="0.01" min="0.01" placeholder="0.00" oninput="updateSwapEstimate()" style="width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.12); color: #f8fafc; font-size: 1.1rem; font-weight: 700; outline: none;" />
+      </div>
+
+      <!-- Output & Royalty Breakdown -->
+      <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 12px; margin-bottom: 1.25rem; font-size: 0.82rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #94a3b8;">
+          <span>Estimated Output:</span>
+          <span id="swapEstimatedOutput" style="font-weight: 700; color: #34d399;">0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; color: #94a3b8;">
+          <span>Creator Royalty Fee (1%):</span>
+          <span id="swapRoyaltyFee" style="font-weight: 600; color: #f8fafc;">0.00</span>
+        </div>
+      </div>
+
+      <!-- Status Message -->
+      <div id="swapStatusMsg" style="min-height: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; text-align: center;"></div>
+
+      <!-- Action Button -->
+      <button type="button" id="executeSwapBtn" onclick="executeWalletSwap()" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #0284c7, #38bdf8); border: none; border-radius: 12px; color: #fff; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);">
+        <span>Execute Instant AMM Swap</span>
+      </button>
     </div>
   </div>
 

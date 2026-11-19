@@ -252,7 +252,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
       // Execute on Layer-1 if pre-signed client transaction is provided
       // Non-custodial: only relay client-signed transactions (never sign with validator private key)
-      const clientSignedTx = req.body?.signedTx;
+      const clientSignedTx = parsed.signedTx || (req as any).body?.signedTx;
       if (clientSignedTx && typeof clientSignedTx === 'object') {
         try {
           const rpcRes = await fetch(`${PRIMARY_RPC}/broadcast_tx_commit`, {
@@ -267,21 +267,55 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
           console.warn('[WALLET] L1 swap broadcast warning:', rpcErr);
         }
       }
+
       // Calculate Constant Product (x * y = k) locally for pool state
-      const rSov = BigInt(pool.reserveSov);
-      const rTok = BigInt(pool.reserveToken);
+      const rSov = BigInt(pool.reserveSov || '0');
+      const rTok = BigInt(pool.reserveToken || '0');
       const inputAmt = BigInt(amount);
+
+      if (inputAmt <= 0n) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Amount must be greater than zero' }));
+        return true;
+      }
+      if (rSov <= 0n || rTok <= 0n) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Liquidity pool reserves are depleted' }));
+        return true;
+      }
 
       if (direction === 'buy') {
         const fee = (inputAmt * 1n) / 100n;
         royaltyFee = fee.toString();
         const netSov = inputAmt - fee;
-        const tokensOut = (rTok * netSov) / (rSov + netSov);
+        const denominator = rSov + netSov;
+        if (denominator <= 0n) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid pool state' }));
+          return true;
+        }
+        const tokensOut = (rTok * netSov) / denominator;
+        if (tokensOut >= rTok) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Insufficient token liquidity in pool' }));
+          return true;
+        }
         calculatedOutput = tokensOut.toString();
         pool.reserveSov = (rSov + netSov).toString();
         pool.reserveToken = (rTok - tokensOut).toString();
       } else {
-        const grossSov = (rSov * inputAmt) / (rTok + inputAmt);
+        const denominator = rTok + inputAmt;
+        if (denominator <= 0n) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid pool state' }));
+          return true;
+        }
+        const grossSov = (rSov * inputAmt) / denominator;
+        if (grossSov >= rSov) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Insufficient SOV liquidity in pool' }));
+          return true;
+        }
         const fee = (grossSov * 1n) / 100n;
         royaltyFee = fee.toString();
         const netSov = grossSov - fee;

@@ -6209,7 +6209,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       window.SovraSurfaceManager.closeAll();
       const allMsgs = (typeof chatMessages !== 'undefined' && Array.isArray(chatMessages)) ? chatMessages : [];
       const msg = allMsgs.find(function(m) { return m.id === msgId; });
-      const input = document.getElementById('chatMessageInput');
+      const input = document.getElementById('chatInputText') || document.getElementById('chatMessageInput');
       if (input && msg) {
         input.value = '> ' + (msg.text || 'Attachment') + '\\n';
         input.focus();
@@ -10664,7 +10664,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         if (womChip) {
           womChip.style.display = isStandalone ? 'none' : 'block';
         }
-        const pwaMeBtn = document.getElementById('pwaMeInstallBtn');
+        const pwaMeBtn = document.getElementById('pwaMeInstallBtn') || document.getElementById('pwaInstallBtn') || document.getElementById('pwaDirectTriggerBtn');
         if (pwaMeBtn && isStandalone) {
           pwaMeBtn.style.display = 'none';
         }
@@ -16785,7 +16785,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         if (typeof openDirectChatWithUser === 'function') {
           openDirectChatWithUser(targetDid, targetName, '');
         }
-        var input = document.getElementById('chatInput');
+        var input = document.getElementById('chatInputText') || document.getElementById('chatInput');
         if (input) {
           setTimeout(function() { input.focus(); }, 120);
         }
@@ -17351,8 +17351,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       // Optimistic balance deduction
       if (typeof walletBalanceSov === 'number' && walletBalanceSov >= amount) {
         walletBalanceSov -= amount;
-        const wVal = document.getElementById('walletBalanceValue');
-        if (wVal) wVal.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+        ['walletBalanceSovDisplay', 'sovraHeaderWalletBalance', 'heroActiveSovBalance', 'heroActiveSovBalanceProfile', 'railWalletSovBalance', 'walletBalanceValue'].forEach(function(bid) {
+          var el = document.getElementById(bid);
+          if (el) el.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+        });
       }
 
       // Visual SoundWave & Confetti Burst
@@ -17379,8 +17381,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         const data = await res.json();
         if (data && data.ok && typeof data.newBalanceSov === 'number') {
           walletBalanceSov = data.newBalanceSov;
-          const wVal = document.getElementById('walletBalanceValue');
-          if (wVal) wVal.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+          ['walletBalanceSovDisplay', 'sovraHeaderWalletBalance', 'heroActiveSovBalance', 'heroActiveSovBalanceProfile', 'railWalletSovBalance', 'walletBalanceValue'].forEach(function(bid) {
+            var el = document.getElementById(bid);
+            if (el) el.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+          });
         }
       } catch (err) {
         console.warn('Micro-tip background dispatch:', err);
@@ -31077,10 +31081,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           if (data && data.ok) {
             if (typeof data.newBalanceSov === 'number') {
               walletBalanceSov = data.newBalanceSov;
-              const wVal = document.getElementById('walletBalanceValue');
-              if (wVal) wVal.innerText = walletBalanceSov.toFixed(2) + ' SOV';
-              const yVal = document.getElementById('ytWalletBalanceDisplay');
-              if (yVal) yVal.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+              ['walletBalanceSovDisplay', 'sovraHeaderWalletBalance', 'heroActiveSovBalance', 'heroActiveSovBalanceProfile', 'railWalletSovBalance', 'ytWalletBalanceDisplay', 'walletBalanceValue'].forEach(function(bid) {
+                var el = document.getElementById(bid);
+                if (el) el.innerText = walletBalanceSov.toFixed(2) + ' SOV';
+              });
             }
 
             if (self.activeTargetType === 'reel') {
@@ -32657,7 +32661,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     function cancelChatEdit() {
       const editBar = document.getElementById('chatEditBar') || document.querySelector('.chat-edit-preview');
       if (editBar) editBar.style.display = 'none';
-      const input = document.getElementById('chatMessageInput');
+      const input = document.getElementById('chatInputText') || document.getElementById('chatMessageInput');
       if (input) input.value = '';
       window._activeEditMessageId = null;
     }
@@ -55012,7 +55016,7 @@ _scheduleTargetContext: 'workspace',
       if (banner && !sessionStorage.getItem('pwa_dismissed')) {
         banner.style.display = 'flex';
       }
-      const pwaMeBtn = document.getElementById('pwaMeInstallBtn');
+      const pwaMeBtn = document.getElementById('pwaMeInstallBtn') || document.getElementById('pwaInstallBtn') || document.getElementById('pwaDirectTriggerBtn');
       if (pwaMeBtn) pwaMeBtn.style.display = 'inline-flex';
     });
 
@@ -55023,8 +55027,8 @@ _scheduleTargetContext: 'workspace',
         localStorage.setItem('pwa_installed', 'true');
       } catch (e) {}
       syncPwaInstallState();
-      const pwaMeBtn = document.getElementById('pwaMeInstallBtn');
-      const pwaMeLabel = document.getElementById('pwaMeInstallLabel');
+      const pwaMeBtn = document.getElementById('pwaMeInstallBtn') || document.getElementById('pwaInstallBtn') || document.getElementById('pwaDirectTriggerBtn');
+      const pwaMeLabel = document.getElementById('pwaMeInstallLabel') || document.getElementById('pwaDirectTriggerLabel');
       if (pwaMeLabel) pwaMeLabel.innerText = '✓ App Installed';
       if (pwaMeBtn) {
         pwaMeBtn.disabled = true;
