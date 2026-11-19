@@ -18003,3 +18003,20 @@ html, body {
     z-index: 9999 !important;
   }
 }
+
+
+/* 🚨 Panic Hold Shred Button & Undo Toast Styles */
+.panic-hold-shred-btn {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease;
+}
+.panic-hold-shred-btn:active {
+  transform: scale(0.98);
+}
+.holo-exit-pill:hover {
+  background: rgba(30, 41, 59, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  transform: translateY(-2px);
+}
+.holo-exit-pill:active {
+  transform: scale(0.95);
+}
