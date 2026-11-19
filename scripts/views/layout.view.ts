@@ -251,7 +251,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   <div id="insecureContextNotice" style="display: none; background: linear-gradient(90deg, #1e1b4b, #312e81); color: #e0e7ff; padding: 10px 16px; font-size: 0.8rem; border-bottom: 1px solid #4f46e5; align-items: center; justify-content: space-between; z-index: 999999; position: sticky; top: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
     <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
       <span style="font-size: 1rem;">🔒</span>
-      <span><strong>Mobile WebRTC Notice:</strong> Camera & Microphone calling requires HTTPS on LAN.</span>
+      <span><strong>Calling Notice:</strong> Camera & microphone calling requires a secure connection (HTTPS).</span>
     </div>
     <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-top: 4px;">
       <a id="insecureContextNoticeLink" href="#" style="background: #38bdf8; color: #020617; font-weight: 700; padding: 5px 12px; border-radius: 6px; text-decoration: none; font-size: 0.74rem;">Switch to HTTPS (Port 3443)</a>
@@ -1050,7 +1050,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 1.1rem; color: #00f0ff; animation: radarPulse 2s infinite ease;">💠</span>
-              <span style="font-size: 0.85rem; font-weight: 800; color: #00f0ff; letter-spacing: 0.5px;">SOVRA // ADVANCE HOLOGRAPHIC TELEMETRY HUD</span>
+              <span style="font-size: 0.85rem; font-weight: 800; color: #00f0ff; letter-spacing: 0.5px;">SOVRA // NETWORK HEALTH MONITOR HUD</span>
             </div>
             <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: rgba(0, 240, 255, 0.15); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); font-weight: 700;">ONLINE 3.2GHz</span>
           </div>
@@ -2100,7 +2100,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
             </div>
             <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-              <button type="button" id="bleHardwareScanBtn" onclick="window.SovraBleMeshRadar && window.SovraBleMeshRadar.scanBleDevices()" title="Trigger Web Bluetooth GATT Hardware Discovery" style="background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 5px 11px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              <button type="button" id="bleHardwareScanBtn" onclick="window.SovraBleMeshRadar && window.SovraBleMeshRadar.scanBleDevices()" title="Trigger Web Direct Bluetooth Hardware Discovery" style="background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 5px 11px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                 <span>🔍</span> <span>Scan BLE</span>
               </button>
               <button type="button" id="bleBeaconBroadcastBtn" onclick="window.SovraBleMeshRadar && window.SovraBleMeshRadar.toggleBleBeaconBroadcast()" title="Broadcast signed cryptographic proximity beacon" style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #34d399; font-size: 0.72rem; font-weight: 700; padding: 5px 11px; border-radius: 8px; cursor: pointer;">
@@ -2539,7 +2539,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <div style="flex: 1;">
                     <div style="font-weight: 700; color: #fff; font-size: 0.98rem;" id="audioSheetTitle">Original Audio</div>
                     <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;" id="audioSheetArtist">By Alice Creator</div>
-                    <div style="font-size: 0.72rem; color: #34d399; margin-top: 0.2rem;">● W3C MediaSession Lock-Screen Ready</div>
+                    <div style="font-size: 0.72rem; color: #34d399; margin-top: 0.2rem;">● Lock-Screen Media Controls Active</div>
                   </div>
                 </div>
 
@@ -3141,7 +3141,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
               <div style="font-size: 0.68rem; color: #64748b;">Direct cryptographic forwarding active</div>
             </div>
-            <button id="webBluetoothPairBtn" type="button" onclick="connectWebBluetoothRadar()" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; color: #38bdf8; font-size: 0.68rem; font-weight: 700; cursor: pointer;" title="Pair nearby mobile device over Web Bluetooth GATT">
+            <button id="webBluetoothPairBtn" type="button" onclick="connectWebBluetoothRadar()" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; color: #38bdf8; font-size: 0.68rem; font-weight: 700; cursor: pointer;" title="Pair nearby mobile device over Web Direct Bluetooth">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg>
               <span>Pair BLE</span>
             </button>
@@ -3658,7 +3658,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="color: #34d399; font-weight: 700; margin-bottom: 0.35rem;">🔐 Cryptographic Verification</div>
             <div style="color: #8696a0;">Ratchet Sequence: <span style="color: #e9edef;" id="modalInfoSeq">#3</span></div>
             <div style="color: #8696a0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span style="color: #38bdf8;">🔒 End-to-End Encrypted</span> &bull; <span style="color: #34d399; font-weight: 700;">Verified Signature</span></div>
-            <div style="color: #8696a0;">Cipher: <span style="color: #e9edef;">ChaCha20-Poly1305 / AES-256-GCM</span></div>
+            <div style="color: #8696a0;">Security: <span style="color: #e9edef;">Bank-Grade End-to-End Encrypted</span></div>
             <div style="color: #8696a0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Sealed Sender: <span style="color: #38bdf8;" id="modalInfoSealedSender">Blinded Metadata Shielded</span></div>
             <div style="color: #8696a0;">View-Once: <span style="color: #e9edef;" id="modalInfoViewOnce">Standard Persistent</span></div>
             <div style="color: #8696a0;">Safety Number: <span style="color: #10b981;" id="modalInfoSafetyVerified">Verified Identity 🛡️</span></div>
@@ -5125,7 +5125,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <span>⚡</span> <span>P2P Diagnostics</span>
             </button>
             <button type="button" class="sovereign-hub-tab-btn" id="hubBtnMeshTelemetry" style="display: none;" onclick="switchSovereignHubTab('meshTelemetryCard', this)">
-              <span>🌐</span> <span>libp2p Swarm</span>
+              <span>🌐</span> <span>Peer Network</span>
             </button>
           </div>
 
@@ -5346,15 +5346,15 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
           </div>
 
-          <!-- Card 4: libp2p Swarm & PubSub Mesh Telemetry (Admin / Operator Only) -->
+          <!-- Card 4: Connected Peer Network Telemetry (Admin / Operator Only) -->
           <div class="card profile-telemetry-card" id="meshTelemetryCard" style="display: none;">
             <div>
               <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                 <span style="display: flex; align-items: center; gap: 7px; font-weight: 700;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-                  <span>libp2p Swarm &amp; PubSub Mesh</span>
+                  <span>Peer Network &amp; PubSub Mesh</span>
                 </span>
-                <span class="badge" id="meSwarmStatusBadge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); font-size: 0.72rem;">● libp2p Swarm</span>
+                <span class="badge" id="meSwarmStatusBadge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); font-size: 0.72rem;">● Peer Network</span>
               </div>
               <div class="key-val">
                 <span class="key-label">PubSub Topics</span>
@@ -7214,13 +7214,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
 
             <!-- ================================================== -->
-            <!-- TAB 8: VIDEO INGESTION & SMART THUMBNAIL STUDIO   -->
+            <!-- TAB 8: VIDEO UPLOAD & STUDIO   -->
             <!-- ================================================== -->
             <div id="studioSectionIngest" style="display: none;">
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
                 <div style="display: flex; flex-direction: column; gap: 1.25rem;">
                   <div class="card" style="padding: 1.25rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
-                    <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">📤 Video File Ingestion</div>
+                    <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 0.75rem;">📤 Video Upload & Processing</div>
                     <div id="studioWsDropzone" onclick="document.getElementById('studioWsFileInput').click()" style="border: 2px dashed rgba(56, 189, 248, 0.4); border-radius: 14px; padding: 2rem 1rem; text-align: center; cursor: pointer; background: rgba(15, 23, 42, 0.6); transition: all 0.2s;">
                       <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎬</div>
                       <div style="font-weight: 700; color: #fff; font-size: 0.95rem;" id="studioWsDropzonePrompt">Drop MP4 / WebM / MOV here or click to browse</div>
@@ -7644,7 +7644,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
             </div>
 
-            <!-- TAB: CONTENT DETECTION & MERKLE PROVENANCE -->
+            <!-- TAB: CONTENT DETECTION & OWNERSHIP PROOF -->
             <div id="studioSectionCopyright" style="display: none;">
               <div class="card" style="padding: 1.5rem; border-radius: 18px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
@@ -9124,7 +9124,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div class="stat-card">
               <div class="card-title">P2P PubSub Topics</div>
               <div class="stat-val">2 Active</div>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">GossipSub v1.2 mesh active</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">Live peer mesh active</div>
             </div>
             <div class="stat-card">
               <div class="card-title">Security & Crypto</div>
@@ -9145,7 +9145,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <div>[INFO] Cryptographic identity generated: ${masterKey.did}</div>
               <div>[INFO] Noise_XX mutual authentication cipher state initialized</div>
               <div>[INFO] Smart mesh peer routing active</div>
-              <div>[INFO] GossipSub v1.2 heartbeat loop healthy (D=6, 4<=D<=12)</div>
+              <div>[INFO] Peer network connection healthy</div>
             </div>
           </div>
         </div>
@@ -9346,7 +9346,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <div>Peer Wire: Noise_XX ChaCha20</div>
       <div>Peer Discovery: Active</div>
       <div>Storage: Verified Local Media</div>
-      <div>Gossip: GossipSub v1.2 (D=6)</div>
+      <div>Network Mesh: Connected</div>
     </div>
   </div>
 
@@ -9451,12 +9451,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           </div>
         </section>
 
-        <!-- Section 3: SQLite WAL Telemetry -->
+        <!-- Section 3: Local Storage Health -->
         <section class="dev-hud-section" id="devHudSqliteSection">
           <div class="dev-hud-sec-header">
             <div class="dev-hud-sec-title-wrap">
               <span style="font-size: 0.95rem;">🗄️</span>
-              <span class="dev-hud-sec-title">SQLite WAL Telemetry</span>
+              <span class="dev-hud-sec-title">Local Storage Health</span>
             </div>
             <span class="dev-hud-pill" id="devHudWalStatusPill">WAL Mode &bull; Active</span>
           </div>
@@ -10159,7 +10159,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="flex: 1;">
               <div style="font-weight: 700; font-size: 0.9rem; color: #c084fc; display: flex; align-items: center; gap: 6px;">
                 <span>🔐 Sovereign Key Vault &amp; Recovery</span>
-                <span style="font-size: 0.68rem; background: rgba(168, 85, 247, 0.2); color: #e9d5ff; padding: 2px 6px; border-radius: 4px; font-weight: 700;">AES-256-GCM</span>
+                <span style="font-size: 0.68rem; background: rgba(168, 85, 247, 0.2); color: #e9d5ff; padding: 2px 6px; border-radius: 4px; font-weight: 700;">End-to-End Encrypted</span>
               </div>
               <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Export encrypted backup, 12-word seed, or restore from .json</div>
             </div>
@@ -10477,7 +10477,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <!-- TAB 1: EXPORT ENCRYPTED VAULT -->
       <div id="vaultExportPane">
         <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 1rem 0;">
-          Export your cryptographic Verified &amp; X25519 keys into an encrypted JSON bundle. The bundle is secured with <b>AES-256-GCM</b> and <b>PBKDF2-SHA256 (100,000 iterations)</b> using your sovereign passphrase.
+          Export your cryptographic Verified &amp; X25519 keys into an encrypted JSON bundle. The bundle is secured with <b>End-to-End Encrypted</b> and <b>PBKDF2-SHA256 (100,000 iterations)</b> using your sovereign passphrase.
         </p>
 
         <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem;">
@@ -10513,7 +10513,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <!-- TAB 2: RESTORE ENCRYPTED VAULT -->
       <div id="vaultImportPane" style="display: none;">
         <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 1rem 0;">
-          Restore your sovereign keys into this browser's IndexedDB hardware enclave. Select your <code>.sovra-vault.json</code> file or paste its JSON payload, then enter your passphrase to decrypt.
+          Restore your sovereign keys into this browser's secure browser storage. Select your <code>.sovra-vault.json</code> file or paste its JSON payload, then enter your passphrase to decrypt.
         </p>
 
         <div style="margin-bottom: 0.75rem;">
@@ -10523,7 +10523,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
         <div style="margin-bottom: 0.75rem;">
           <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">OR PASTE JSON CONTENTS</label>
-          <textarea id="vaultImportJsonInput" rows="3" placeholder='{"version": 1, "algorithm": "AES-256-GCM", ...}' style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 0.65rem; border-radius: 10px; font-family: monospace; font-size: 0.75rem; resize: vertical;"></textarea>
+          <textarea id="vaultImportJsonInput" rows="3" placeholder='{"version": 1, "algorithm": "End-to-End Encrypted", ...}' style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 0.65rem; border-radius: 10px; font-family: monospace; font-size: 0.75rem; resize: vertical;"></textarea>
         </div>
 
         <div style="margin-bottom: 1rem;">
@@ -10736,7 +10736,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div class="holo-id-details">
               <div class="holo-name-row">
                 <span id="idCardName" class="holo-user-name">Sovereign Node</span>
-                <div class="holo-verified-seal" title="Cryptographically Anchored W3C DID">
+                <div class="holo-verified-seal" title="Verified Sovereign Identity">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   <span>ED25519 VERIFIED</span>
                 </div>
@@ -10760,7 +10760,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <!-- Cryptographic Proof Data Panel -->
           <div class="holo-crypto-panel">
             <div class="holo-crypto-row">
-              <span class="holo-k">W3C DID:</span>
+              <span class="holo-k">Account ID:</span>
               <span class="holo-v" id="idCardDid"></span>
               <button class="holo-copy-btn" onclick="copyIdCardField('did')" title="Copy DID">Copy</button>
             </div>
@@ -10776,7 +10776,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
             <div class="holo-crypto-footer">
               <div id="idCardSigStatus" class="holo-sig-verified">
-                <span>✓ Valid RFC 8032 Verified Signature</span>
+                <span>✓ Verified Cryptographic Signature</span>
               </div>
               <div class="holo-tilt-hint" id="holoTiltAngleDisplay">
                 <span>📐 3D Tilt: 0.0° / 0.0° &bull; Live Gyro/Mouse</span>
@@ -11088,7 +11088,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 10px 12px; margin-bottom: 1rem; font-size: 0.76rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
-        <span>CometBFT Mesh Node:</span>
+        <span>Network Validator Node:</span>
         <span style="color: #34d399; font-weight: 700; font-family: monospace;">127.0.0.1:26657 (Live)</span>
       </div>
 
@@ -14946,7 +14946,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <!-- Manual Input & Upload Fallback -->
       <div style="display: flex; gap: 8px; margin-bottom: 0.75rem;">
-        <input type="text" id="sovraManualDidInput" placeholder="Paste did:sovra or payment payload..." style="flex: 1; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.82rem; outline: none;" />
+        <input type="text" id="sovraManualDidInput" placeholder="Paste Sovereign ID or payment link..." style="flex: 1; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.82rem; outline: none;" />
         <button type="button" onclick="submitManualDidScan()" style="padding: 8px 14px; background: linear-gradient(135deg, #0284c7, #6366f1); border: none; border-radius: 10px; color: #fff; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
           Process
         </button>
@@ -15224,7 +15224,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="font-weight: 800; font-size: 1.02rem; color: #f8fafc; letter-spacing: -0.01em;">Cryptographic Merkle Receipt</div>
             <div style="font-size: 0.74rem; color: #34d399; display: flex; align-items: center; gap: 5px;">
               <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px #34d399;"></span>
-              <span>Web Crypto SHA-256 State Channel Proof</span>
+              <span>Verified Network Settlement Proof</span>
             </div>
           </div>
         </div>
