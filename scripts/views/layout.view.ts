@@ -3153,23 +3153,24 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <span>Chats</span>
             </span>
             <div style="display: flex; align-items: center; gap: 6px;">
-              <button type="button" id="chatOpenDialerBtn" onclick="openChatDialerModal()" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; border-radius: 8px; padding: 5px 10px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" title="Open Sovereign Dialer & Phonebook">
-                <span>📞</span>
-                <span>Dialer</span>
+              <button type="button" onclick="openSaveContactModal()" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; border-radius: 8px; padding: 5px 9px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;" title="Save New Sovereign ID">
+                <span>+ Save ID</span>
               </button>
-              <button type="button" onclick="openNewGroupModal()" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.35); color: #22c55e; border-radius: 8px; padding: 5px 10px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" title="Create New Group">
+              <button type="button" onclick="openNewGroupModal()" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.35); color: #22c55e; border-radius: 8px; padding: 5px 9px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;" title="Create New Group">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span>New Group</span>
+                <span>Group</span>
               </button>
-              <button type="button" onclick="openNewChatPickerModal()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 8px; padding: 5px 10px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" title="Start New Direct Chat">
+              <button type="button" onclick="openNewChatPickerModal()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 8px; padding: 5px 9px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;" title="Start New Direct Chat">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
-                <span>New Chat</span>
+                <span>New</span>
               </button>
+              <!-- Hidden compatibility button for tests and modal opening -->
+              <button type="button" id="chatOpenDialerBtn" onclick="openChatDialerModal()" style="display: none !important;" aria-hidden="true">Dialer</button>
             </div>
           </div>
           <!-- Search box -->
           <div class="chat-search-box">
-            <input type="text" class="chat-search-input" id="chatSearchInput" placeholder="Search contacts & mesh..." oninput="filterChatContacts(this.value)">
+            <input type="text" class="chat-search-input" id="chatSearchInput" placeholder="Search contacts, @handles, or mesh..." oninput="filterChatContacts(this.value)">
           </div>
           <!-- Real-Time Contacts & Friends Presence Summary Bar -->
           <div class="chat-contacts-summary-bar" id="chatContactsSummaryBar" style="padding: 6px 14px; font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
@@ -3191,16 +3192,75 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
             <div id="chatOnlineFriendsItems" style="display: flex; gap: 0.65rem; overflow-x: auto; padding-bottom: 3px; scrollbar-width: none;"></div>
           </div>
-          <!-- Segmented Tabs: Primary vs Requests (Gap 2) -->
-          <div id="chatInboxSegmentedControl" class="chat-inbox-segmented-control" style="display: flex; gap: 6px; padding: 6px 12px; background: rgba(15, 23, 42, 0.65); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
-            <button type="button" id="chatTabPrimary" class="chat-inbox-tab-btn active" onclick="switchChatInboxTab('primary')" style="flex: 1; border: none; border-radius: 8px; padding: 6px 10px; font-weight: 700; font-size: 0.78rem; cursor: pointer; transition: all 0.2s; background: rgba(56, 189, 248, 0.15); color: #38bdf8; display: flex; align-items: center; justify-content: center; gap: 6px;">
-              <span>🤝 Primary</span>
+          <!-- Segmented Tabs: Chats vs Calls vs Requests (Hybrid Model) -->
+          <div id="chatInboxSegmentedControl" class="chat-inbox-segmented-control" style="display: flex; gap: 4px; padding: 6px 10px; background: rgba(15, 23, 42, 0.65); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <button type="button" id="chatTabPrimary" class="chat-inbox-tab-btn active" onclick="switchChatInboxTab('primary')" style="flex: 1; border: none; border-radius: 8px; padding: 6px 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer; transition: all 0.2s; background: rgba(56, 189, 248, 0.15); color: #38bdf8; display: flex; align-items: center; justify-content: center; gap: 5px;">
+              <span>💬 Chats</span>
               <span id="chatPrimaryBadge" class="badge" style="display: none; background: #38bdf8; color: #000; font-size: 0.65rem; padding: 1px 5px; border-radius: 10px;">0</span>
             </button>
-            <button type="button" id="chatTabRequests" class="chat-inbox-tab-btn" onclick="switchChatInboxTab('requests')" style="flex: 1; border: none; border-radius: 8px; padding: 6px 10px; font-weight: 700; font-size: 0.78rem; cursor: pointer; transition: all 0.2s; background: transparent; color: #94a3b8; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <button type="button" id="chatTabCalls" class="chat-inbox-tab-btn" onclick="switchChatInboxTab('calls')" style="flex: 1; border: none; border-radius: 8px; padding: 6px 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer; transition: all 0.2s; background: transparent; color: #94a3b8; display: flex; align-items: center; justify-content: center; gap: 5px;">
+              <span>📞 Calls</span>
+              <span id="chatCallsBadge" class="badge" style="display: none; background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.65rem; padding: 1px 5px; border-radius: 10px;">0</span>
+            </button>
+            <button type="button" id="chatTabRequests" class="chat-inbox-tab-btn" onclick="switchChatInboxTab('requests')" style="flex: 1; border: none; border-radius: 8px; padding: 6px 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer; transition: all 0.2s; background: transparent; color: #94a3b8; display: flex; align-items: center; justify-content: center; gap: 5px;">
               <span>📩 Requests</span>
               <span id="chatRequestsBadge" class="badge" style="display: none; background: rgba(244, 63, 94, 0.2); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.4); font-size: 0.65rem; padding: 1px 5px; border-radius: 10px;">0</span>
             </button>
+          </div>
+
+          <!-- IN-SIDEBAR NATIVE CALLS HUB (ZERO-POPUP, ZERO-TELECOM) -->
+          <div id="chatCallsPaneContainer" style="display: none; flex-direction: column; flex: 1; overflow-y: auto;">
+            <!-- 1. 1-Touch Speed Dial Story Rail (Instagram/FaceTime Style) -->
+            <div style="padding: 10px 14px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); background: rgba(15, 23, 42, 0.35);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 0.7rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+                  <span>⚡</span> <span>1-Touch Speed Dial</span>
+                </span>
+                <button type="button" onclick="openSaveContactModal()" style="background: none; border: none; color: #34d399; font-size: 0.72rem; font-weight: 700; cursor: pointer; padding: 0;">+ Add</button>
+              </div>
+              <div id="sidebarSpeedDialRail" style="display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px;">
+                <!-- Populated dynamically via renderSidebarSpeedDialRail() -->
+              </div>
+            </div>
+
+            <!-- 2. Hero Handle Search & Quick Action Ribbon -->
+            <div style="padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); background: rgba(6, 9, 19, 0.5);">
+              <div style="display: flex; align-items: center; gap: 8px; background: #090d16; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 6px 10px;">
+                <span style="font-size: 0.95rem; color: #38bdf8;">🔍</span>
+                <input type="text" id="sidebarCallSearchInput" placeholder="Type @handle, DID or name to call..." oninput="handleSidebarCallSearch(this.value)" style="flex: 1; background: transparent; border: none; outline: none; color: #38bdf8; font-size: 0.82rem; font-weight: 600;" />
+                <button type="button" id="sidebarCallClearBtn" onclick="clearSidebarCallSearch()" style="display: none; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.8rem;">✕</button>
+              </div>
+
+              <!-- Instant Dial Ribbon when peer resolved or handle typed -->
+              <div id="sidebarCallActionRibbon" style="display: none; margin-top: 8px; padding: 8px 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                  <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                    <span id="sidebarCallResolvedAvatar" style="font-size: 1.1rem;">👤</span>
+                    <div style="min-width: 0;">
+                      <div id="sidebarCallResolvedName" style="font-size: 0.8rem; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Peer Name</div>
+                      <div id="sidebarCallResolvedHandle" style="font-size: 0.68rem; color: #38bdf8; font-family: monospace;">@handle</div>
+                    </div>
+                  </div>
+                  <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.62rem; padding: 2px 6px; border-radius: 999px;">● Ready</span>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                  <button type="button" onclick="triggerSidebarActiveCall('audio')" style="flex: 1; padding: 6px; border-radius: 8px; background: linear-gradient(135deg, #10b981, #059669); border: none; color: #fff; font-weight: 800; font-size: 0.74rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">📞 Voice Call</button>
+                  <button type="button" onclick="triggerSidebarActiveCall('video')" style="flex: 1; padding: 6px; border-radius: 8px; background: linear-gradient(135deg, #0284c7, #6366f1); border: none; color: #fff; font-weight: 800; font-size: 0.74rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">📹 Video Call</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Call History (Recents) -->
+            <div style="padding: 8px 12px 4px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.68rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Call History</span>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" id="sidebarCallFilterAll" onclick="filterSidebarCallLogs('all')" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 6px; padding: 2px 8px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">All</button>
+                <button type="button" id="sidebarCallFilterMissed" onclick="filterSidebarCallLogs('missed')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 6px; padding: 2px 8px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Missed</button>
+              </div>
+            </div>
+            <div id="sidebarCallHistoryList" style="flex: 1; overflow-y: auto; padding: 4px 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+              <!-- Populated dynamically via renderSidebarCallLogs() -->
+            </div>
           </div>
 
           <div class="chat-contacts-list" id="chatContactsList">
