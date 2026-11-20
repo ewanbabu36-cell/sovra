@@ -46474,6 +46474,409 @@ _scheduleTargetContext: 'workspace',
       showAccountToast('👥 Group "' + groupName + '" created successfully!');
     }
 
+    // ========================================================
+    // 📞 SOVRA SOVEREIGN DIALER & FAMILY/FRIENDS ADDRESS BOOK
+    // ========================================================
+    var _cachedAddressBook = [];
+    var _currentDialerTab = 'keypad';
+    var _dialerResolveTimer = null;
+
+    function openChatDialerModal(initialTab) {
+      var modal = document.getElementById('sovraChatDialerModal');
+      if (modal) modal.style.display = 'flex';
+      loadDialerAddressBook();
+      switchDialerTab(initialTab || 'keypad');
+      var input = document.getElementById('dialerSovraIdInput');
+      if (input && !input.value) {
+        input.value = '';
+      }
+    }
+    window.openChatDialerModal = openChatDialerModal;
+
+    function closeChatDialerModal() {
+      var modal = document.getElementById('sovraChatDialerModal');
+      if (modal) modal.style.display = 'none';
+    }
+    window.closeChatDialerModal = closeChatDialerModal;
+
+    function switchDialerTab(tab) {
+      _currentDialerTab = tab;
+      var tabs = ['keypad', 'favorites', 'family', 'friends', 'all'];
+      tabs.forEach(function(t) {
+        var btn = document.getElementById('dialerNavTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (btn) {
+          if (t === tab) {
+            btn.style.background = 'rgba(56, 189, 248, 0.2)';
+            btn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+            btn.style.color = '#38bdf8';
+          } else {
+            btn.style.background = 'rgba(255, 255, 255, 0.05)';
+            btn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+            btn.style.color = '#94a3b8';
+          }
+        }
+      });
+
+      var paneKeypad = document.getElementById('dialerPaneKeypad');
+      var paneContacts = document.getElementById('dialerPaneContacts');
+
+      if (tab === 'keypad') {
+        if (paneKeypad) paneKeypad.style.display = 'block';
+        if (paneContacts) paneContacts.style.display = 'none';
+      } else {
+        if (paneKeypad) paneKeypad.style.display = 'none';
+        if (paneContacts) paneContacts.style.display = 'block';
+        var catFilter = (tab === 'all') ? '' : tab.toUpperCase();
+        loadDialerAddressBook(catFilter);
+      }
+    }
+    window.switchDialerTab = switchDialerTab;
+
+    function dialerAppendKey(k) {
+      var inEl = document.getElementById('dialerSovraIdInput');
+      if (!inEl) return;
+      inEl.value = (inEl.value || '') + k;
+      handleDialerInputChange(inEl.value);
+    }
+    window.dialerAppendKey = dialerAppendKey;
+
+    function dialerAppendSpecial(prefix) {
+      var inEl = document.getElementById('dialerSovraIdInput');
+      if (!inEl) return;
+      var cur = (inEl.value || '').trim();
+      if (prefix === 'did:') {
+        if (!cur.startsWith('did:sovra:')) {
+          inEl.value = 'did:sovra:' + cur.replace(/^@/, '');
+        }
+      } else if (prefix === '@') {
+        if (!cur.startsWith('@')) {
+          inEl.value = '@' + cur.replace(/^did:sovra:/, '');
+        }
+      } else {
+        inEl.value = cur + prefix;
+      }
+      handleDialerInputChange(inEl.value);
+    }
+    window.dialerAppendSpecial = dialerAppendSpecial;
+
+    function dialerBackspace() {
+      var inEl = document.getElementById('dialerSovraIdInput');
+      if (!inEl) return;
+      var cur = inEl.value || '';
+      inEl.value = cur.slice(0, -1);
+      handleDialerInputChange(inEl.value);
+    }
+    window.dialerBackspace = dialerBackspace;
+
+    function handleDialerInputChange(val) {
+      var clean = (val || '').trim();
+      var avEl = document.getElementById('dialerResolvedAvatar');
+      var nameEl = document.getElementById('dialerResolvedName');
+      var tagEl = document.getElementById('dialerResolvedTag');
+      var badgeEl = document.getElementById('dialerResolvedOnlineBadge');
+
+      if (!clean) {
+        if (nameEl) nameEl.innerText = 'Dial by Sovereign ID';
+        if (tagEl) tagEl.innerText = '• Type handle or tap contact';
+        if (avEl) { avEl.innerText = '👤'; avEl.style.background = '#0284c7'; }
+        if (badgeEl) { badgeEl.innerText = '🟢 Mesh Ready'; badgeEl.style.color = '#34d399'; }
+        return;
+      }
+
+      // Check in cached address book first
+      var matched = _cachedAddressBook.find(function(c) {
+        return (c.handle && c.handle.toLowerCase() === clean.toLowerCase()) ||
+               (c.contactDid && c.contactDid.toLowerCase() === clean.toLowerCase()) ||
+               (c.displayName && c.displayName.toLowerCase().includes(clean.toLowerCase())) ||
+               (c.nickname && c.nickname.toLowerCase().includes(clean.toLowerCase()));
+      });
+
+      if (matched) {
+        if (nameEl) nameEl.innerText = matched.displayName + (matched.nickname ? (' (' + matched.nickname + ')') : '');
+        if (tagEl) tagEl.innerText = '• ' + (matched.category || 'Contact') + (matched.relationship ? (' · ' + matched.relationship) : '');
+        if (avEl) { avEl.innerText = matched.avatar || '👤'; avEl.style.background = matched.avatarBg || '#0284c7'; }
+        if (badgeEl) { badgeEl.innerText = '🟢 Verified Contact'; badgeEl.style.color = '#34d399'; }
+        return;
+      }
+
+      // Query live resolver
+      clearTimeout(_dialerResolveTimer);
+      _dialerResolveTimer = setTimeout(function() {
+        fetch('/api/identity/resolve?q=' + encodeURIComponent(clean))
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d && d.ok && d.peer) {
+              var p = d.peer;
+              if (nameEl) nameEl.innerText = p.displayName || p.handle || 'Peer';
+              if (tagEl) tagEl.innerText = '• ' + (p.did ? p.did.slice(0, 18) + '...' : 'Sovereign Peer');
+              if (avEl) { avEl.innerText = p.avatar || '👤'; avEl.style.background = p.avatarBg || '#0284c7'; }
+              if (badgeEl) { badgeEl.innerText = p.isOnline ? '🟢 Online Mesh' : '⚪ Standby'; badgeEl.style.color = p.isOnline ? '#34d399' : '#94a3b8'; }
+            }
+          })
+          .catch(function() {});
+      }, 200);
+    }
+    window.handleDialerInputChange = handleDialerInputChange;
+
+    function loadDialerAddressBook(category) {
+      var q = category ? ('?category=' + encodeURIComponent(category)) : '';
+      fetch('/api/addressbook' + q)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok && Array.isArray(d.contacts)) {
+            _cachedAddressBook = d.contacts;
+            renderDialerSpeedDial(d.contacts);
+            renderDialerContactsList(d.contacts);
+          }
+        })
+        .catch(function(err) {
+          console.warn('[AddressBook] Failed to fetch:', err);
+        });
+    }
+    window.loadDialerAddressBook = loadDialerAddressBook;
+
+    function renderDialerSpeedDial(contacts) {
+      var container = document.getElementById('dialerSpeedDialList');
+      if (!container) return;
+      var speedDials = (contacts || []).filter(function(c) {
+        return c.isFavorite || (c.speedDialIndex != null && c.speedDialIndex > 0) || c.category === 'FAMILY';
+      });
+
+      if (speedDials.length === 0) {
+        container.innerHTML = '<div style="font-size: 0.72rem; color: #64748b; padding: 4px 8px;">No speed dial contacts pinned yet. Tap + Add New to save family and close friends!</div>';
+        return;
+      }
+
+      container.innerHTML = speedDials.map(function(c) {
+        var label = c.nickname || c.displayName || c.handle;
+        var tag = c.relationship || (c.category === 'FAMILY' ? 'Family' : 'Friend');
+        var safeDid = encodeURIComponent(c.contactDid || c.handle);
+        var safeName = encodeURIComponent(label);
+        return '<div class="dialer-speed-dial-chip" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="selectDialerContact(this.dataset.did, this.dataset.name)">' +
+          '<div style="width: 38px; height: 38px; border-radius: 50%; background: ' + (c.avatarBg || '#0284c7') + '; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">' + (c.avatar || '👤') + '</div>' +
+          '<div style="font-size: 0.72rem; font-weight: 700; color: #fff; white-space: nowrap; max-width: 65px; overflow: hidden; text-overflow: ellipsis; text-align: center;">' + label + '</div>' +
+          '<div style="font-size: 0.62rem; color: #38bdf8; white-space: nowrap;">' + tag + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function selectDialerContact(encodedDid, encodedName) {
+      var did = decodeURIComponent(encodedDid);
+      var name = decodeURIComponent(encodedName);
+      var inEl = document.getElementById('dialerSovraIdInput');
+      if (inEl) inEl.value = did;
+      handleDialerInputChange(did);
+      switchDialerTab('keypad');
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('Selected ' + name + ' for call. Tap 📞 or 📹 to connect.');
+      }
+    }
+    window.selectDialerContact = selectDialerContact;
+
+    function renderDialerContactsList(contacts) {
+      var container = document.getElementById('dialerAddressBookList');
+      if (!container) return;
+      if (!contacts || contacts.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px 12px; font-size: 0.8rem;"><div style="font-size: 1.5rem; margin-bottom: 6px;">👥</div><div>No contacts in this category yet.</div><button type="button" onclick="openSaveContactModal()" style="margin-top: 8px; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.35); color: #38bdf8; border-radius: 8px; padding: 6px 14px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">+ Add Contact</button></div>';
+        return;
+      }
+
+      container.innerHTML = contacts.map(function(c) {
+        var categoryColor = c.category === 'FAMILY' ? '#f43f5e' : (c.category === 'WORK' ? '#6366f1' : '#10b981');
+        var categoryLabel = c.category === 'FAMILY' ? '👨‍👩‍👧‍👦 Family' : (c.category === 'WORK' ? '💼 Work' : '👥 Friend');
+        var safeDid = encodeURIComponent(c.contactDid || c.handle);
+        var safeName = encodeURIComponent(c.displayName);
+        var safeId = encodeURIComponent(c.id);
+
+        return '<div class="dialer-contact-card">' +
+          '<div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">' +
+            '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + (c.avatarBg || '#0284c7') + '; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #fff; flex-shrink: 0;">' + (c.avatar || '👤') + '</div>' +
+            '<div style="min-width: 0; flex: 1;">' +
+              '<div style="display: flex; align-items: center; gap: 6px;">' +
+                '<span style="font-weight: 700; font-size: 0.86rem; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + (c.displayName || 'Peer') + '</span>' +
+                (c.nickname ? ('<span style="font-size: 0.72rem; color: #38bdf8;">(' + c.nickname + ')</span>') : '') +
+              '</div>' +
+              '<div style="display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: #94a3b8; margin-top: 2px;">' +
+                '<span style="font-family: monospace; color: #38bdf8;">' + (c.handle || c.contactDid.slice(0, 16) + '...') + '</span>' +
+                '<span>•</span>' +
+                '<span style="color: ' + categoryColor + '; font-weight: 700;">' + categoryLabel + '</span>' +
+                (c.relationship ? ('<span>· ' + c.relationship + '</span>') : '') +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">' +
+            '<button type="button" data-call-type="audio" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="Voice Call" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(16, 185, 129, 0.18); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">📞</button>' +
+            '<button type="button" data-call-type="video" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="Video Call" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">📹</button>' +
+            '<button type="button" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="openChatWithContact(this.dataset.did, this.dataset.name)" title="Open Chat" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.14); color: #cbd5e1; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">💬</button>' +
+            '<button type="button" data-id="' + safeId + '" data-name="' + safeName + '" onclick="deleteAddressBookContact(this.dataset.id, this.dataset.name)" title="Remove Contact" style="width: 28px; height: 28px; border-radius: 50%; background: transparent; border: none; color: #f87171; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function openChatWithContact(encodedDid, encodedName) {
+      var did = decodeURIComponent(encodedDid);
+      var name = decodeURIComponent(encodedName);
+      closeChatDialerModal();
+      if (typeof selectContact === 'function') {
+        selectContact(did, { did: did, name: name, displayName: name, handle: did.startsWith('@') ? did : '' });
+      }
+    }
+    window.openChatWithContact = openChatWithContact;
+
+    function filterDialerContactsList(q) {
+      var query = (q || '').toLowerCase().trim();
+      if (!query) {
+        renderDialerContactsList(_cachedAddressBook);
+        return;
+      }
+      var filtered = _cachedAddressBook.filter(function(c) {
+        return (c.displayName && c.displayName.toLowerCase().includes(query)) ||
+               (c.nickname && c.nickname.toLowerCase().includes(query)) ||
+               (c.handle && c.handle.toLowerCase().includes(query)) ||
+               (c.relationship && c.relationship.toLowerCase().includes(query)) ||
+               (c.category && c.category.toLowerCase().includes(query));
+      });
+      renderDialerContactsList(filtered);
+    }
+    window.filterDialerContactsList = filterDialerContactsList;
+
+    function openSaveContactModal(prefillDid, prefillName) {
+      var modal = document.getElementById('sovraSaveContactModal');
+      if (modal) modal.style.display = 'flex';
+      var didInput = document.getElementById('saveContactDidInput');
+      var nameInput = document.getElementById('saveContactNameInput');
+      var relInput = document.getElementById('saveContactRelationshipInput');
+      var notesInput = document.getElementById('saveContactNotesInput');
+      if (didInput) didInput.value = prefillDid || (document.getElementById('dialerSovraIdInput') ? document.getElementById('dialerSovraIdInput').value : '');
+      if (nameInput) nameInput.value = prefillName || '';
+      if (relInput) relInput.value = '';
+      if (notesInput) notesInput.value = '';
+      setTimeout(function() {
+        if (nameInput) nameInput.focus();
+      }, 50);
+    }
+    window.openSaveContactModal = openSaveContactModal;
+
+    function closeSaveContactModal() {
+      var modal = document.getElementById('sovraSaveContactModal');
+      if (modal) modal.style.display = 'none';
+    }
+    window.closeSaveContactModal = closeSaveContactModal;
+
+    function submitSaveAddressBookContact() {
+      var nameEl = document.getElementById('saveContactNameInput');
+      var didEl = document.getElementById('saveContactDidInput');
+      var catEl = document.getElementById('saveContactCategorySelect');
+      var relEl = document.getElementById('saveContactRelationshipInput');
+      var speedEl = document.getElementById('saveContactSpeedDialCheck');
+      var notesEl = document.getElementById('saveContactNotesInput');
+
+      var displayName = (nameEl ? nameEl.value : '').trim();
+      var rawDid = (didEl ? didEl.value : '').trim();
+      var category = (catEl ? catEl.value : 'FRIENDS') || 'FRIENDS';
+      var relationship = (relEl ? relEl.value : '').trim();
+      var isFavorite = Boolean(speedEl && speedEl.checked);
+      var notes = (notesEl ? notesEl.value : '').trim();
+
+      if (!displayName) {
+        if (typeof showAccountToast === 'function') showAccountToast('Please enter a display name for the contact.', 'warning');
+        return;
+      }
+      if (!rawDid) {
+        if (typeof showAccountToast === 'function') showAccountToast('Please enter a Sovra handle or DID.', 'warning');
+        return;
+      }
+
+      var handle = rawDid.startsWith('@') ? rawDid : (rawDid.startsWith('did:') ? '' : ('@' + rawDid));
+      var contactDid = rawDid.startsWith('did:') ? rawDid : ('did:sovra:' + rawDid.replace(/^@/, ''));
+      var avatar = category === 'FAMILY' ? '👨‍👩‍👧‍👦' : (category === 'WORK' ? '💼' : '👤');
+      var avatarBg = category === 'FAMILY' ? 'linear-gradient(135deg, #f43f5e, #ec4899)' : (category === 'WORK' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : '#0284c7');
+
+      fetch('/api/addressbook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: displayName,
+          contactDid: contactDid,
+          handle: handle,
+          nickname: displayName,
+          category: category,
+          relationship: relationship,
+          isFavorite: isFavorite,
+          speedDialIndex: isFavorite ? 1 : null,
+          avatar: avatar,
+          avatarBg: avatarBg,
+          notes: notes
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          closeSaveContactModal();
+          loadDialerAddressBook();
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('✓ Contact "' + displayName + '" saved to Sovereign Phonebook!');
+          }
+        } else {
+          if (typeof showAccountToast === 'function') showAccountToast('Failed to save contact: ' + (d.error || 'Unknown error'), 'error');
+        }
+      })
+      .catch(function(err) {
+        if (typeof showAccountToast === 'function') showAccountToast('Network error saving contact: ' + err.message, 'error');
+      });
+    }
+    window.submitSaveAddressBookContact = submitSaveAddressBookContact;
+
+    function deleteAddressBookContact(encodedId, encodedName) {
+      var id = decodeURIComponent(encodedId);
+      var name = decodeURIComponent(encodedName);
+      if (!confirm('Remove "' + name + '" from saved address book?')) return;
+
+      fetch('/api/addressbook', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.ok) {
+          loadDialerAddressBook();
+          if (typeof showAccountToast === 'function') {
+            showAccountToast('Contact removed from address book.');
+          }
+        }
+      })
+      .catch(function() {});
+    }
+    window.deleteAddressBookContact = deleteAddressBookContact;
+
+    function initiateDialerCall(type, optDid, optName) {
+      var inEl = document.getElementById('dialerSovraIdInput');
+      var rawTarget = optDid ? decodeURIComponent(optDid) : (inEl ? inEl.value.trim() : '');
+      var rawName = optName ? decodeURIComponent(optName) : '';
+
+      if (!rawTarget) {
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('Please enter or select a Sovra ID / handle to call.', 'warning');
+        }
+        if (inEl) inEl.focus();
+        return;
+      }
+
+      var finalDid = rawTarget.startsWith('did:') ? rawTarget : ('did:sovra:' + rawTarget.replace(/^@/, ''));
+      var finalName = rawName || (document.getElementById('dialerResolvedName') ? document.getElementById('dialerResolvedName').innerText : rawTarget);
+
+      closeChatDialerModal();
+
+      if (typeof startE2eeCall === 'function') {
+        startE2eeCall(type || 'audio', finalDid, finalName);
+      } else {
+        if (typeof showAccountToast === 'function') showAccountToast('WebRTC Call Engine initializing...', 'info');
+      }
+    }
+    window.initiateDialerCall = initiateDialerCall;
+
     // Start ticker
     startDisappearingTicker();
 
