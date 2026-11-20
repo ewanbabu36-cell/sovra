@@ -16691,19 +16691,22 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     });
 
     // ========================================================
-    // 🎨 STRICT 2-THEME ENGINE: NORMAL (LIGHT) & BLACK (DARK)
+    // 🎨 3-THEME ENGINE: AURORA (BRAND), NORMAL (LIGHT), BLACK (DARK)
     // ========================================================
-    var _currentMobileOsTheme = 'normal';
+    var _currentMobileOsTheme = 'aurora';
     var currentSovraTheme = (function() {
       try {
-        localStorage.setItem('sovra_theme_mode', 'black');
-        return 'black';
+        var saved = localStorage.getItem('sovra_theme_mode');
+        if (saved === 'black' || saved === 'normal' || saved === 'aurora') return saved;
+        return 'aurora';
       } catch (_) {}
-      return 'black';
+      return 'aurora';
     })();
 
     function setSovraTheme(theme, showToast) {
-      if (theme !== 'black') theme = 'normal';
+      if (theme !== 'black' && theme !== 'normal' && theme !== 'aurora') {
+        theme = 'aurora';
+      }
       currentSovraTheme = theme;
       try {
         localStorage.setItem('sovra_theme_mode', theme);
@@ -16713,7 +16716,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
     function toggleSovraTheme(e) {
       if (e && e.stopPropagation) e.stopPropagation();
-      var next = (currentSovraTheme === 'black') ? 'normal' : 'black';
+      var next = (currentSovraTheme === 'aurora') ? 'normal' : ((currentSovraTheme === 'normal') ? 'black' : 'aurora');
       setSovraTheme(next, true);
     }
 
@@ -16724,29 +16727,35 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       var body = document.body;
       if (docEl) docEl.setAttribute('data-theme', theme);
       if (body) {
-        body.classList.remove('theme-normal', 'theme-black', 'theme-cyber', 'theme-ios', 'theme-android', 'mode-advance');
+        body.classList.remove('theme-normal', 'theme-black', 'theme-aurora', 'theme-cyber', 'theme-ios', 'theme-android', 'mode-advance');
         body.classList.add('theme-' + theme);
       }
 
       var headerIcon = document.getElementById('headerThemeIcon');
       var headerBtn = document.getElementById('headerThemeToggleBtn');
       if (headerIcon) {
-        headerIcon.innerText = theme === 'black' ? '☀️' : '🌙';
+        headerIcon.innerText = theme === 'aurora' ? '✨' : (theme === 'normal' ? '☀️' : '🌙');
       }
       if (headerBtn) {
-        headerBtn.title = theme === 'black' ? 'Switch to Normal (Light) Mode' : 'Switch to Black (Dark) Mode';
+        headerBtn.title = theme === 'aurora' ? 'Current Theme: Sovra Aurora (Brand) • Tap for Light Mode' : (theme === 'normal' ? 'Current Theme: Clean Light • Tap for Dark Mode' : 'Current Theme: Pure Dark • Tap for Aurora Mode');
         headerBtn.setAttribute('aria-label', headerBtn.title);
       }
 
       var badge = document.getElementById('currentThemeBadge');
       if (badge) {
-        badge.innerText = theme === 'black' ? '🌙 Black' : '☀️ Normal';
-        badge.style.background = theme === 'black' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(24, 119, 242, 0.15)';
-        badge.style.color = theme === 'black' ? '#38bdf8' : '#1877f2';
+        badge.innerText = theme === 'aurora' ? '✨ Aurora' : (theme === 'normal' ? '☀️ Light' : '🌙 Dark');
+        badge.style.background = theme === 'aurora' ? 'rgba(99, 102, 241, 0.15)' : (theme === 'normal' ? 'rgba(24, 119, 242, 0.15)' : 'rgba(56, 189, 248, 0.15)');
+        badge.style.color = theme === 'aurora' ? '#818cf8' : (theme === 'normal' ? '#1877f2' : '#38bdf8');
       }
 
+      var btnAurora = document.getElementById('btnThemeAurora');
       var btnNormal = document.getElementById('btnThemeNormal');
       var btnBlack = document.getElementById('btnThemeBlack');
+      if (btnAurora) {
+        btnAurora.style.borderColor = theme === 'aurora' ? '#818cf8' : 'var(--surface-border)';
+        btnAurora.style.background = theme === 'aurora' ? 'rgba(99, 102, 241, 0.15)' : 'transparent';
+        btnAurora.style.color = theme === 'aurora' ? '#818cf8' : 'var(--text)';
+      }
       if (btnNormal) {
         btnNormal.style.borderColor = theme === 'normal' ? '#1877f2' : 'var(--surface-border)';
         btnNormal.style.background = theme === 'normal' ? 'rgba(24, 119, 242, 0.12)' : 'transparent';
@@ -16758,18 +16767,23 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         btnBlack.style.color = theme === 'black' ? '#38bdf8' : 'var(--text)';
       }
 
+      var drawerLabel = document.getElementById('drawerThemeLabel');
+      if (drawerLabel) {
+        drawerLabel.innerText = 'Theme: ' + (theme === 'aurora' ? 'Aurora (Brand)' : (theme === 'normal' ? 'Light' : 'Dark'));
+      }
+
       var mobileBadge = document.getElementById('currentMobileOsBadge');
       if (mobileBadge) {
-        mobileBadge.innerText = theme === 'black' ? '🌙 Black' : '☀️ Normal';
+        mobileBadge.innerText = theme === 'aurora' ? '✨ Aurora' : (theme === 'normal' ? '☀️ Light' : '🌙 Dark');
       }
 
       var metaTheme = document.querySelector('meta[name="theme-color"]');
       if (metaTheme) {
-        metaTheme.setAttribute('content', theme === 'black' ? '#000000' : '#ffffff');
+        metaTheme.setAttribute('content', theme === 'aurora' ? '#070913' : (theme === 'normal' ? '#ffffff' : '#000000'));
       }
 
       if (showToast && typeof showAccountToast === 'function') {
-        showAccountToast(theme === 'black' ? '🌙 Black Theme applied' : '☀️ Normal Theme applied');
+        showAccountToast(theme === 'aurora' ? '✨ Sovra Aurora Brand Theme applied' : (theme === 'normal' ? '☀️ Clean Light Theme applied' : '🌙 Pure Dark Theme applied'));
       }
     }
 
@@ -33058,7 +33072,13 @@ _scheduleTargetContext: 'workspace',
 
       init: function() {
         this.populateChannelsAndProfile();
-        this.switchStudioTab(this.activeStudioTab || 'dashboard');
+        var hashTab = null;
+        try {
+          var m = window.location.hash.match(/[#&?]tab=([a-z0-9_-]+)/i);
+          if (m && m[1]) hashTab = m[1];
+        } catch(_) {}
+        var initialTab = hashTab || this.activeStudioTab || 'dashboard';
+        this.switchStudioTab(initialTab);
         this.renderChaptersList();
         this.restoreDraftIfPresent();
         this.bindDraftAutoSave();
@@ -52292,6 +52312,17 @@ _scheduleTargetContext: 'workspace',
               window.openChannelHub(target, true);
             }
           }, 180);
+        }
+      } else {
+        var pathSegments = (window.location.pathname || '').split('/').filter(Boolean);
+        var pathPart = (pathSegments[0] || '').toLowerCase();
+        var knownTabs = ['studio', 'watch', 'reels', 'feed', 'chat', 'me', 'admin', 'hub', 'calls', 'live', 'communities', 'settings', 'dapps', 'player', 'notifications', 'search'];
+        if (knownTabs.includes(pathPart)) {
+          setTimeout(function() {
+            if (typeof switchTab === 'function') {
+              switchTab(pathPart === 'watch' ? 'youtube' : pathPart);
+            }
+          }, 150);
         }
       }
     });
