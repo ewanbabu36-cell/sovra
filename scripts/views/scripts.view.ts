@@ -46479,18 +46479,18 @@ _scheduleTargetContext: 'workspace',
     // ========================================================
     var _cachedAddressBook = [];
     var _cachedCallLogs = [];
-    var _currentDialerTab = 'keypad';
+    var _currentDialerTab = 'contacts';
     var _dialerResolveTimer = null;
 
     function openChatDialerModal(initialTab) {
       var modal = document.getElementById('sovraChatDialerModal');
       if (modal) modal.style.display = 'flex';
-      loadDialerAddressBook();
-      switchDialerTab(initialTab || 'keypad');
       var input = document.getElementById('dialerSovraIdInput');
       if (input && !input.value) {
         input.value = '';
       }
+      loadDialerAddressBook();
+      switchDialerTab(initialTab || 'contacts');
     }
     window.openChatDialerModal = openChatDialerModal;
 
@@ -46501,45 +46501,94 @@ _scheduleTargetContext: 'workspace',
     window.closeChatDialerModal = closeChatDialerModal;
 
     function switchDialerTab(tab) {
+      if (tab === 'keypad' || tab === 'all' || tab === 'family' || tab === 'friends') {
+        tab = 'contacts';
+      }
       _currentDialerTab = tab;
-      var tabs = ['recents', 'keypad', 'favorites', 'family', 'friends', 'all'];
+      var tabs = ['contacts', 'favorites', 'recents'];
       tabs.forEach(function(t) {
         var btn = document.getElementById('dialerNavTab' + t.charAt(0).toUpperCase() + t.slice(1));
         if (btn) {
           if (t === tab) {
-            btn.style.background = 'rgba(56, 189, 248, 0.2)';
-            btn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
-            btn.style.color = '#38bdf8';
+            btn.style.background = 'linear-gradient(135deg, #0284c7, #38bdf8)';
+            btn.style.color = '#fff';
+            btn.style.boxShadow = '0 2px 8px rgba(56, 189, 248, 0.3)';
+            btn.classList.add('active');
           } else {
-            btn.style.background = 'rgba(255, 255, 255, 0.05)';
-            btn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+            btn.style.background = 'transparent';
             btn.style.color = '#94a3b8';
+            btn.style.boxShadow = 'none';
+            btn.classList.remove('active');
           }
         }
       });
 
-      var paneRecents = document.getElementById('dialerPaneRecents');
-      var paneKeypad = document.getElementById('dialerPaneKeypad');
       var paneContacts = document.getElementById('dialerPaneContacts');
+      var paneFavorites = document.getElementById('dialerPaneFavorites');
+      var paneRecents = document.getElementById('dialerPaneRecents');
 
-      if (tab === 'recents') {
-        if (paneRecents) paneRecents.style.display = 'block';
-        if (paneKeypad) paneKeypad.style.display = 'none';
-        if (paneContacts) paneContacts.style.display = 'none';
-        loadDialerCallLogs('all');
-      } else if (tab === 'keypad') {
-        if (paneRecents) paneRecents.style.display = 'none';
-        if (paneKeypad) paneKeypad.style.display = 'block';
-        if (paneContacts) paneContacts.style.display = 'none';
-      } else {
-        if (paneRecents) paneRecents.style.display = 'none';
-        if (paneKeypad) paneKeypad.style.display = 'none';
+      if (tab === 'contacts') {
         if (paneContacts) paneContacts.style.display = 'block';
-        var catFilter = (tab === 'all') ? '' : tab.toUpperCase();
-        loadDialerAddressBook(catFilter);
+        if (paneFavorites) paneFavorites.style.display = 'none';
+        if (paneRecents) paneRecents.style.display = 'none';
+        renderDialerContactsList(_cachedAddressBook);
+      } else if (tab === 'favorites') {
+        if (paneContacts) paneContacts.style.display = 'none';
+        if (paneFavorites) paneFavorites.style.display = 'block';
+        if (paneRecents) paneRecents.style.display = 'none';
+        renderDialerSpeedDialGrid(_cachedAddressBook);
+      } else if (tab === 'recents') {
+        if (paneContacts) paneContacts.style.display = 'none';
+        if (paneFavorites) paneFavorites.style.display = 'none';
+        if (paneRecents) paneRecents.style.display = 'block';
+        loadDialerCallLogs('all');
       }
     }
     window.switchDialerTab = switchDialerTab;
+
+    function filterContactsCategory(category) {
+      var pills = [
+        { id: 'filterPillAll', cat: 'all' },
+        { id: 'filterPillFamily', cat: 'family' },
+        { id: 'filterPillFriends', cat: 'friends' },
+        { id: 'filterPillWork', cat: 'work' }
+      ];
+      pills.forEach(function(p) {
+        var el = document.getElementById(p.id);
+        if (!el) return;
+        if (p.cat === category) {
+          el.style.background = 'rgba(56, 189, 248, 0.2)';
+          el.style.border = '1px solid rgba(56, 189, 248, 0.4)';
+          el.style.color = '#38bdf8';
+        } else {
+          el.style.background = 'rgba(255, 255, 255, 0.05)';
+          el.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+          el.style.color = '#94a3b8';
+        }
+      });
+
+      if (category === 'all') {
+        renderDialerContactsList(_cachedAddressBook);
+      } else {
+        var filtered = _cachedAddressBook.filter(function(c) {
+          return (c.category || '').toUpperCase() === category.toUpperCase();
+        });
+        renderDialerContactsList(filtered);
+      }
+    }
+    window.filterContactsCategory = filterContactsCategory;
+
+    function selectDialerSuggestion(handle, name) {
+      var inEl = document.getElementById('dialerSovraIdInput');
+      if (inEl) {
+        inEl.value = handle;
+        handleDialerInputChange(handle);
+      }
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('Selected ' + (name || handle) + ' to call.');
+      }
+    }
+    window.selectDialerSuggestion = selectDialerSuggestion;
 
     function dialerClearAll() {
       var inEl = document.getElementById('dialerSovraIdInput');
@@ -46759,18 +46808,30 @@ _scheduleTargetContext: 'workspace',
 
     function handleDialerInputChange(val) {
       var clean = (val || '').trim();
+      var heroBox = document.getElementById('dialerHeroCallBox');
+      var quickChips = document.getElementById('dialerQuickChips');
+      var clearBtn = document.getElementById('dialerClearBtn');
       var avEl = document.getElementById('dialerResolvedAvatar');
       var nameEl = document.getElementById('dialerResolvedName');
       var tagEl = document.getElementById('dialerResolvedTag');
       var badgeEl = document.getElementById('dialerResolvedOnlineBadge');
 
       if (!clean) {
-        if (nameEl) nameEl.innerText = 'Dial by Sovereign ID';
-        if (tagEl) tagEl.innerText = '• Type handle or tap contact';
-        if (avEl) { avEl.innerText = '👤'; avEl.style.background = '#0284c7'; }
-        if (badgeEl) { badgeEl.innerText = '🟢 Mesh Ready'; badgeEl.style.color = '#34d399'; }
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (heroBox) heroBox.style.display = 'none';
+        if (quickChips) quickChips.style.display = 'flex';
         return;
       }
+
+      if (clearBtn) clearBtn.style.display = 'flex';
+      if (heroBox) heroBox.style.display = 'block';
+      if (quickChips) quickChips.style.display = 'none';
+
+      // Default display while resolving
+      if (nameEl) nameEl.innerText = clean;
+      if (tagEl) tagEl.innerText = clean.startsWith('did:') ? 'Sovereign DID' : (clean.startsWith('@') ? clean : ('@' + clean));
+      if (avEl) { avEl.innerText = '👤'; avEl.style.background = '#0284c7'; }
+      if (badgeEl) { badgeEl.innerText = '🟢 Ready'; badgeEl.style.color = '#34d399'; }
 
       // Check in cached address book first
       var matched = _cachedAddressBook.find(function(c) {
@@ -46782,9 +46843,9 @@ _scheduleTargetContext: 'workspace',
 
       if (matched) {
         if (nameEl) nameEl.innerText = matched.displayName + (matched.nickname ? (' (' + matched.nickname + ')') : '');
-        if (tagEl) tagEl.innerText = '• ' + (matched.category || 'Contact') + (matched.relationship ? (' · ' + matched.relationship) : '');
+        if (tagEl) tagEl.innerText = (matched.handle || (matched.contactDid ? matched.contactDid.slice(0, 16) : '')) + (matched.relationship ? (' · ' + matched.relationship) : '');
         if (avEl) { avEl.innerText = matched.avatar || '👤'; avEl.style.background = matched.avatarBg || '#0284c7'; }
-        if (badgeEl) { badgeEl.innerText = '🟢 Verified Contact'; badgeEl.style.color = '#34d399'; }
+        if (badgeEl) { badgeEl.innerText = '🟢 Saved Contact'; badgeEl.style.color = '#34d399'; }
         return;
       }
 
@@ -46797,7 +46858,7 @@ _scheduleTargetContext: 'workspace',
             if (d && d.ok && d.peer) {
               var p = d.peer;
               if (nameEl) nameEl.innerText = p.displayName || p.handle || 'Peer';
-              if (tagEl) tagEl.innerText = '• ' + (p.did ? p.did.slice(0, 18) + '...' : 'Sovereign Peer');
+              if (tagEl) tagEl.innerText = p.handle || (p.did ? p.did.slice(0, 18) + '...' : 'Sovereign Peer');
               if (avEl) { avEl.innerText = p.avatar || '👤'; avEl.style.background = p.avatarBg || '#0284c7'; }
               if (badgeEl) { badgeEl.innerText = p.isOnline ? '🟢 Online Mesh' : '⚪ Standby'; badgeEl.style.color = p.isOnline ? '#34d399' : '#94a3b8'; }
             }
@@ -46814,8 +46875,8 @@ _scheduleTargetContext: 'workspace',
         .then(function(d) {
           if (d && d.ok && Array.isArray(d.contacts)) {
             _cachedAddressBook = d.contacts;
-            renderDialerSpeedDial(d.contacts);
             renderDialerContactsList(d.contacts);
+            renderDialerSpeedDialGrid(d.contacts);
           }
         })
         .catch(function(err) {
@@ -46824,15 +46885,15 @@ _scheduleTargetContext: 'workspace',
     }
     window.loadDialerAddressBook = loadDialerAddressBook;
 
-    function renderDialerSpeedDial(contacts) {
-      var container = document.getElementById('dialerSpeedDialList');
+    function renderDialerSpeedDialGrid(contacts) {
+      var container = document.getElementById('dialerSpeedDialGrid') || document.getElementById('dialerSpeedDialList');
       if (!container) return;
       var speedDials = (contacts || []).filter(function(c) {
         return c.isFavorite || (c.speedDialIndex != null && c.speedDialIndex > 0) || c.category === 'FAMILY';
       });
 
       if (speedDials.length === 0) {
-        container.innerHTML = '<div style="font-size: 0.72rem; color: #64748b; padding: 4px 8px;">No speed dial contacts pinned yet. Tap + Add New to save family and close friends!</div>';
+        container.innerHTML = '<div style="grid-column: span 2; text-align: center; color: #94a3b8; padding: 30px 10px; font-size: 0.8rem;"><div style="font-size: 1.6rem; margin-bottom: 6px;">⭐</div><div>No speed dial contacts pinned yet.</div><button type="button" onclick="openSaveContactModal()" style="margin-top: 10px; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.35); color: #38bdf8; border-radius: 8px; padding: 6px 14px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">+ Add Family &amp; Friends</button></div>';
         return;
       }
 
@@ -46841,13 +46902,24 @@ _scheduleTargetContext: 'workspace',
         var tag = c.relationship || (c.category === 'FAMILY' ? 'Family' : 'Friend');
         var safeDid = encodeURIComponent(c.contactDid || c.handle);
         var safeName = encodeURIComponent(label);
-        return '<div class="dialer-speed-dial-chip" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="selectDialerContact(this.dataset.did, this.dataset.name)">' +
-          '<div style="width: 38px; height: 38px; border-radius: 50%; background: ' + (c.avatarBg || '#0284c7') + '; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">' + (c.avatar || '👤') + '</div>' +
-          '<div style="font-size: 0.72rem; font-weight: 700; color: #fff; white-space: nowrap; max-width: 65px; overflow: hidden; text-overflow: ellipsis; text-align: center;">' + label + '</div>' +
-          '<div style="font-size: 0.62rem; color: #38bdf8; white-space: nowrap;">' + tag + '</div>' +
+        var bg = c.avatarBg || 'linear-gradient(135deg, #0284c7, #38bdf8)';
+
+        return '<div class="dialer-speed-card">' +
+          '<div style="width: 44px; height: 44px; border-radius: 50%; background: ' + bg + '; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.35);">' + (c.avatar || '👤') + '</div>' +
+          '<div style="width: 100%; min-width: 0; text-align: center;">' +
+            '<div style="font-size: 0.84rem; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + label + '</div>' +
+            '<div style="font-size: 0.68rem; color: #38bdf8; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (c.handle || '') + '</div>' +
+            '<div style="font-size: 0.64rem; color: #94a3b8; margin-top: 2px;">' + tag + '</div>' +
+          '</div>' +
+          '<div style="display: flex; gap: 6px; width: 100%; margin-top: 4px;">' +
+            '<button type="button" data-call-type="audio" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="Voice Call" style="flex: 1; padding: 6px 0; border-radius: 8px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">📞 Call</button>' +
+            '<button type="button" data-call-type="video" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="Video Call" style="flex: 1; padding: 6px 0; border-radius: 8px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">📹 Video</button>' +
+          '</div>' +
         '</div>';
       }).join('');
     }
+    window.renderDialerSpeedDialGrid = renderDialerSpeedDialGrid;
+    window.renderDialerSpeedDial = renderDialerSpeedDialGrid;
 
     function selectDialerContact(encodedDid, encodedName) {
       var did = decodeURIComponent(encodedDid);
@@ -46855,7 +46927,6 @@ _scheduleTargetContext: 'workspace',
       var inEl = document.getElementById('dialerSovraIdInput');
       if (inEl) inEl.value = did;
       handleDialerInputChange(did);
-      switchDialerTab('keypad');
       if (typeof showAccountToast === 'function') {
         showAccountToast('Selected ' + name + ' for call. Tap 📞 or 📹 to connect.');
       }
