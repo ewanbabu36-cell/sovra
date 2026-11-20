@@ -3997,7 +3997,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
       <!-- 8. SOVRA SOVEREIGN DIALER & FAMILY/FRIENDS PHONEBOOK HUD -->
       <div class="wa-modal-overlay" id="sovraChatDialerModal" style="display: none; z-index: 10500; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(10px); align-items: center; justify-content: center;" onclick="closeChatDialerModal()">
-        <div class="wa-modal-card" style="max-width: 480px; width: 94vw; max-height: 90vh; overflow-y: auto; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 22px; padding: 1.25rem 1.4rem; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7); color: #f8fafc;" onclick="event.stopPropagation()">
+        <div class="wa-modal-card" style="max-width: 490px; width: 94vw; max-height: 92vh; overflow-y: auto; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 22px; padding: 1.25rem 1.4rem; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7); color: #f8fafc;" onclick="event.stopPropagation()">
           
           <!-- Header -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem;">
@@ -4005,46 +4005,76 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <span style="font-size: 1.25rem;">📞</span>
               <div>
                 <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Sovereign Dialer</div>
-                <div style="font-size: 0.7rem; color: #94a3b8;">Direct P2P E2EE Voice &amp; Video Calling</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">Direct P2P E2EE Voice &amp; Video (Zero Telecom)</div>
               </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.68rem; padding: 2px 8px; border-radius: 999px;">● Mesh Online</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.68rem; padding: 3px 8px; border-radius: 999px;">● MESH ONLINE • 14ms</span>
+              <button type="button" onclick="openMyQrModal()" title="My Sovereign QR Card" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; font-size: 0.74rem; font-weight: 700; padding: 4px 8px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;">🪪 My QR</button>
+              <button type="button" onclick="openScanQrModal()" title="Scan Sovereign QR" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); color: #c084fc; font-size: 0.74rem; font-weight: 700; padding: 4px 8px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;">📷 Scan</button>
               <button type="button" onclick="closeChatDialerModal()" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; font-size: 1.1rem; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
             </div>
           </div>
 
           <!-- Subtab Navigation -->
-          <div style="display: flex; gap: 6px; margin-bottom: 1rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px;">
-            <button type="button" id="dialerNavTabKeypad" onclick="switchDialerTab('keypad')" class="active" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">🎛️ Keypad</button>
-            <button type="button" id="dialerNavTabFavorites" onclick="switchDialerTab('favorites')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">⭐ Speed Dial</button>
-            <button type="button" id="dialerNavTabFamily" onclick="switchDialerTab('family')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👨‍👩‍👧‍👦 Family</button>
-            <button type="button" id="dialerNavTabFriends" onclick="switchDialerTab('friends')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👥 Friends</button>
-            <button type="button" id="dialerNavTabAll" onclick="switchDialerTab('all')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">📖 All Contacts</button>
+          <div style="display: flex; gap: 6px; margin-bottom: 0.85rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px;">
+            <button type="button" id="dialerNavTabRecents" onclick="switchDialerTab('recents')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">🕒 Recents</button>
+            <button type="button" id="dialerNavTabKeypad" onclick="switchDialerTab('keypad')" class="active" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">🎛️ Sovereign Dial</button>
+            <button type="button" id="dialerNavTabFavorites" onclick="switchDialerTab('favorites')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">⭐ Speed Dial</button>
+            <button type="button" id="dialerNavTabFamily" onclick="switchDialerTab('family')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👨‍👩‍👧‍👦 Family</button>
+            <button type="button" id="dialerNavTabFriends" onclick="switchDialerTab('friends')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👥 Friends</button>
+            <button type="button" id="dialerNavTabAll" onclick="switchDialerTab('all')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">📖 All Contacts</button>
           </div>
 
-          <!-- VIEW A: TACTILE DIALPAD & LIVE PEER RESOLUTION -->
+          <!-- VIEW 0: RECENTS / CALL LOGS -->
+          <div id="dialerPaneRecents" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+              <span style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Recent Sovereign Calls</span>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" id="recentsFilterAll" onclick="filterRecentsList('all')" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 8px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer;">All</button>
+                <button type="button" id="recentsFilterMissed" onclick="filterRecentsList('missed')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 8px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer;">Missed</button>
+              </div>
+            </div>
+            <div id="dialerRecentsList" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+              <!-- Populated dynamically via loadDialerCallLogs() -->
+            </div>
+          </div>
+
+          <!-- VIEW A: SOVEREIGN DIALPAD & LIVE PEER RESOLUTION -->
           <div id="dialerPaneKeypad">
             <!-- Screen Display Box -->
-            <div style="background: #090d16; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; padding: 12px 14px; margin-bottom: 0.85rem; box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);">
+            <div style="background: #090d16; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; padding: 12px 14px; margin-bottom: 0.75rem; box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);">
               <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
                 <input type="text" id="dialerSovraIdInput" placeholder="Enter @handle or did:sovra:..." oninput="handleDialerInputChange(this.value)" style="width: 100%; background: transparent; border: none; color: #38bdf8; font-size: 1.25rem; font-weight: 800; outline: none; font-family: monospace; letter-spacing: 0.5px;" />
-                <button type="button" onclick="dialerBackspace()" title="Backspace" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">⌫</button>
+                <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                  <button type="button" onclick="dialerClearAll()" title="Clear All" style="background: rgba(255,255,255,0.06); border: none; color: #94a3b8; font-size: 0.72rem; font-weight: 800; padding: 4px 8px; border-radius: 6px; cursor: pointer;">AC</button>
+                  <button type="button" onclick="dialerBackspace()" title="Backspace" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;">⌫</button>
+                </div>
               </div>
 
               <!-- Live Resolved Peer Preview Ribbon -->
               <div id="dialerResolvedRibbon" style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.74rem;">
-                <div id="dialerResolvedAvatar" style="width: 24px; height: 24px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #fff;">👤</div>
+                <div id="dialerResolvedAvatar" style="width: 26px; height: 26px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: #fff; flex-shrink: 0;">👤</div>
                 <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                   <span id="dialerResolvedName" style="font-weight: 700; color: #fff;">Dial by Sovereign ID</span>
                   <span id="dialerResolvedTag" style="color: #94a3b8; margin-left: 4px;">• Type handle or tap contact</span>
                 </div>
-                <span id="dialerResolvedOnlineBadge" class="badge" style="background: rgba(34, 197, 94, 0.2); color: #34d399; font-size: 0.65rem; padding: 1px 6px;">🟢 Mesh Ready</span>
+                <span id="dialerResolvedOnlineBadge" class="badge" style="background: rgba(34, 197, 94, 0.2); color: #34d399; font-size: 0.65rem; padding: 2px 7px;">🟢 Mesh Ready</span>
               </div>
             </div>
 
-            <!-- Speed Dial Top Rail (Maa, Papa, Bhai, Best Friend) -->
-            <div style="margin-bottom: 0.85rem;">
+            <!-- Sovereign Quick Handle Macros Bar -->
+            <div style="display: flex; gap: 6px; margin-bottom: 0.75rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;">
+              <button type="button" onclick="dialerAppendSpecial('@')" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">@</button>
+              <button type="button" onclick="dialerAppendSpecial('did:sovra:')" style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">did:sovra:</button>
+              <button type="button" onclick="dialerAppendSpecial('.sovra')" style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); color: #34d399; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">.sovra</button>
+              <button type="button" onclick="dialerAppendSpecial('_')" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">_</button>
+              <button type="button" onclick="dialerAppendSpecial('fam/')" style="background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">fam/</button>
+              <button type="button" onclick="dialerAppendSpecial('mesh/')" style="background: rgba(234, 179, 8, 0.12); border: 1px solid rgba(234, 179, 8, 0.3); color: #facc15; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">mesh/</button>
+            </div>
+
+            <!-- Speed Dial Top Rail (Maa, Bhai, Alice, Bob) -->
+            <div style="margin-bottom: 0.75rem;">
               <div style="font-size: 0.7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between;">
                 <span>⭐ Speed Dial (Family &amp; Close Friends)</span>
                 <span style="color: #38bdf8; cursor: pointer;" onclick="openSaveContactModal()">+ Add New</span>
@@ -4101,11 +4131,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </button>
               <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('0')">
                 <span class="key-digit">0</span>
-                <span class="key-sub">+ / Space</span>
+                <span class="key-sub">_ / Space</span>
               </button>
-              <button type="button" class="sovra-keypad-btn sovra-keypad-mod" onclick="dialerAppendSpecial('@')">
-                <span class="key-digit">@</span>
-                <span class="key-sub">Handle</span>
+              <button type="button" class="sovra-keypad-btn sovra-keypad-mod" onclick="dialerAppendSpecial('.sovra')">
+                <span class="key-digit" style="font-size: 0.85rem;">.sovra</span>
+                <span class="key-sub">Domain</span>
               </button>
             </div>
 
@@ -4123,10 +4153,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
               <button type="button" onclick="openSaveContactModal(document.getElementById('dialerSovraIdInput').value)" style="background: transparent; border: 1px dashed rgba(255,255,255,0.2); border-radius: 10px; padding: 6px 12px; color: #cbd5e1; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                <span>💾 Save to Family &amp; Friends</span>
+                <span>💾 Save to Sovereign Contacts</span>
               </button>
               <button type="button" onclick="document.getElementById('dialerSovraIdInput').focus()" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; font-weight: 700; cursor: pointer;">
-                ⌨️ Use Physical Keyboard
+                ⌨️ Direct Keyboard Input
               </button>
             </div>
           </div>
@@ -4142,6 +4172,94 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <!-- Populated dynamically via loadDialerAddressBook() -->
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 8b. MY SOVEREIGN QR CARD MODAL -->
+      <div class="wa-modal-overlay" id="sovraMyQrModal" style="display: none; z-index: 10550; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(12px); align-items: center; justify-content: center;" onclick="closeMyQrModal()">
+        <div class="wa-modal-card" style="max-width: 400px; width: 90vw; background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 22px; padding: 1.4rem; box-shadow: 0 25px 60px rgba(0,0,0,0.85); color: #fff; text-align: center;" onclick="event.stopPropagation()">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <span style="font-weight: 800; font-size: 1rem; color: #38bdf8;">🪪 My Sovereign ID Card</span>
+            <button type="button" onclick="closeMyQrModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">&times;</button>
+          </div>
+
+          <div style="background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; padding: 1.2rem; margin-bottom: 1rem;">
+            <div id="myQrAvatar" style="width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #38bdf8); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 4px 16px rgba(56, 189, 248, 0.4);">👤</div>
+            <div id="myQrDisplayName" style="font-weight: 800; font-size: 1.15rem; color: #fff;">Sovra Root Peer</div>
+            <div id="myQrHandle" style="font-family: monospace; font-size: 0.85rem; color: #38bdf8; margin: 2px 0 10px;">@sovra_master</div>
+            
+            <!-- Graphic QR matrix canvas/box -->
+            <div style="background: #fff; border-radius: 12px; padding: 12px; display: inline-block; box-shadow: 0 4px 14px rgba(0,0,0,0.5); margin: 6px auto 12px;">
+              <svg width="140" height="140" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="140" height="140" fill="white"/>
+                <!-- Corner 1 -->
+                <rect x="10" y="10" width="35" height="35" rx="4" fill="#0f172a"/>
+                <rect x="15" y="15" width="25" height="25" rx="2" fill="white"/>
+                <rect x="20" y="20" width="15" height="15" fill="#0284c7"/>
+                <!-- Corner 2 -->
+                <rect x="95" y="10" width="35" height="35" rx="4" fill="#0f172a"/>
+                <rect x="100" y="15" width="25" height="25" rx="2" fill="white"/>
+                <rect x="105" y="20" width="15" height="15" fill="#0284c7"/>
+                <!-- Corner 3 -->
+                <rect x="10" y="95" width="35" height="35" rx="4" fill="#0f172a"/>
+                <rect x="15" y="100" width="25" height="25" rx="2" fill="white"/>
+                <rect x="20" y="105" width="15" height="15" fill="#0284c7"/>
+                <!-- Data dots pattern -->
+                <rect x="55" y="15" width="8" height="8" fill="#0f172a"/>
+                <rect x="70" y="25" width="8" height="8" fill="#0f172a"/>
+                <rect x="55" y="35" width="8" height="8" fill="#0f172a"/>
+                <rect x="25" y="55" width="8" height="8" fill="#0f172a"/>
+                <rect x="40" y="60" width="12" height="12" rx="2" fill="#0284c7"/>
+                <rect x="65" y="55" width="10" height="10" fill="#0f172a"/>
+                <rect x="85" y="60" width="12" height="12" rx="2" fill="#0284c7"/>
+                <rect x="110" y="55" width="8" height="8" fill="#0f172a"/>
+                <rect x="55" y="80" width="8" height="8" fill="#0f172a"/>
+                <rect x="75" y="85" width="8" height="8" fill="#0f172a"/>
+                <rect x="60" y="105" width="8" height="8" fill="#0f172a"/>
+                <rect x="80" y="100" width="8" height="8" fill="#0f172a"/>
+                <rect x="105" y="105" width="8" height="8" fill="#0f172a"/>
+                <rect x="115" y="115" width="8" height="8" fill="#0f172a"/>
+              </svg>
+            </div>
+
+            <div style="font-size: 0.7rem; color: #94a3b8; word-break: break-all; font-family: monospace; background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 8px;" id="myQrDidText">
+              did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button type="button" onclick="copyMySovereignId()" style="flex: 1; padding: 10px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 12px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">📋 Copy ID</button>
+            <button type="button" onclick="closeMyQrModal()" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: #cbd5e1; border-radius: 12px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8c. SCAN SOVEREIGN QR MODAL -->
+      <div class="wa-modal-overlay" id="sovraScanQrModal" style="display: none; z-index: 10550; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(12px); align-items: center; justify-content: center;" onclick="closeScanQrModal()">
+        <div class="wa-modal-card" style="max-width: 400px; width: 90vw; background: #0f172a; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 22px; padding: 1.4rem; box-shadow: 0 25px 60px rgba(0,0,0,0.85); color: #fff; text-align: center;" onclick="event.stopPropagation()">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <span style="font-weight: 800; font-size: 1rem; color: #c084fc;">📷 Scan Sovereign QR Code</span>
+            <button type="button" onclick="closeScanQrModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">&times;</button>
+          </div>
+
+          <div style="position: relative; width: 220px; height: 220px; margin: 0 auto 1rem; background: #000; border: 2px dashed rgba(168, 85, 247, 0.6); border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+            <div style="position: absolute; width: 100%; height: 2px; background: #c084fc; box-shadow: 0 0 12px #c084fc; animation: scanLaser 2s infinite ease-in-out;"></div>
+            <div style="color: #94a3b8; font-size: 0.78rem; padding: 20px;">
+              <div style="font-size: 2rem; margin-bottom: 6px;">📷</div>
+              <span>Point camera at any Sovereign QR or paste ID below</span>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <input type="text" id="scanQrPasteInput" placeholder="Or paste Sovra @handle or DID here..." style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 0.82rem;" />
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button type="button" onclick="applyScannedSovraId()" style="flex: 2; padding: 10px; background: linear-gradient(135deg, #9333ea, #c084fc); border: none; color: #fff; border-radius: 12px; font-weight: 800; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4);">⚡ Connect &amp; Dial</button>
+            <button type="button" onclick="closeScanQrModal()" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: #cbd5e1; border-radius: 12px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">Cancel</button>
+          </div>
+        </div>
+      </div>
         </div>
       </div>
 
