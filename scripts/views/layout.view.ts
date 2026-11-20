@@ -4820,8 +4820,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     <!-- Tab 5: Profile & Sovereign Identity (Instagram Profile + Wallet + Creator Tools) -->
     <main class="main-content" id="profile-view" style="display: none;">
       <div class="profile-container">
-        <!-- Airtel-Inspired Top Sovereign Node & Wallet Hero Anchor Card in Profile -->
-        <div id="sovraHeroAnchorCardProfile" class="sovra-hero-anchor-card" style="margin-bottom: 1rem;">
+        <!-- Airtel-Inspired Top Sovereign Node & Wallet Hero Anchor Card in Profile (Suppressed for Clean Industry-Standard Profile Layout) -->
+        <div id="sovraHeroAnchorCardProfile" class="sovra-hero-anchor-card" style="display: none !important;">
           <div class="hero-top-row">
             <div class="hero-balance-wrap">
               <span class="hero-balance-label">Active Sovereign Balance</span>
