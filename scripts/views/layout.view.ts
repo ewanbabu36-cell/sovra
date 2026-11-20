@@ -3995,183 +3995,128 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         </div>
       </div>
 
-      <!-- 8. SOVRA SOVEREIGN DIALER & FAMILY/FRIENDS PHONEBOOK HUD -->
-      <div class="wa-modal-overlay" id="sovraChatDialerModal" style="display: none; z-index: 10500; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(10px); align-items: center; justify-content: center;" onclick="closeChatDialerModal()">
-        <div class="wa-modal-card" style="max-width: 490px; width: 94vw; max-height: 92vh; overflow-y: auto; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 22px; padding: 1.25rem 1.4rem; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7); color: #f8fafc;" onclick="event.stopPropagation()">
+      <!-- 8. SOVRA SOVEREIGN DIALER & IDENTITY ADDRESS BOOK (CLEAN, ZERO-TELECOM) -->
+      <div class="wa-modal-overlay" id="sovraChatDialerModal" style="display: none; z-index: 10500; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(12px); align-items: center; justify-content: center;" onclick="closeChatDialerModal()">
+        <div class="wa-modal-card" style="max-width: 470px; width: 94vw; max-height: 90vh; overflow-y: auto; background: #0b1120; border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 24px; padding: 1.35rem 1.4rem; box-shadow: 0 25px 65px rgba(0, 0, 0, 0.85); color: #f8fafc;" onclick="event.stopPropagation()">
           
-          <!-- Header -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 1.25rem;">📞</span>
+          <!-- Top Header: Clean, modern & spacious -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.85rem;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 38px; height: 38px; border-radius: 12px; background: rgba(56, 189, 248, 0.14); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">📞</div>
               <div>
-                <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Sovereign Dialer</div>
-                <div style="font-size: 0.7rem; color: #94a3b8;">Direct P2P E2EE Voice &amp; Video (Zero Telecom)</div>
+                <div style="font-weight: 800; font-size: 1.1rem; color: #fff; letter-spacing: -0.2px;">Sovra Identity Call</div>
+                <div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+                  <span>P2P E2EE Calling</span>
+                  <span>•</span>
+                  <span style="color: #34d399; font-weight: 700;">● Mesh Online (14ms)</span>
+                </div>
               </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.68rem; padding: 3px 8px; border-radius: 999px;">● MESH ONLINE • 14ms</span>
-              <button type="button" onclick="openMyQrModal()" title="My Sovereign QR Card" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; font-size: 0.74rem; font-weight: 700; padding: 4px 8px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;">🪪 My QR</button>
-              <button type="button" onclick="openScanQrModal()" title="Scan Sovereign QR" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); color: #c084fc; font-size: 0.74rem; font-weight: 700; padding: 4px 8px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;">📷 Scan</button>
-              <button type="button" onclick="closeChatDialerModal()" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; font-size: 1.1rem; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" onclick="openSaveContactModal()" title="Save New Contact" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 0.75rem; font-weight: 700; padding: 6px 12px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
+                <span>+ Save ID</span>
+              </button>
+              <button type="button" onclick="openMyQrModal()" title="My Sovereign QR Card" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; font-size: 0.8rem; padding: 6px 9px; border-radius: 10px; cursor: pointer;">
+                🪪
+              </button>
+              <button type="button" onclick="closeChatDialerModal()" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; font-size: 1.1rem; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 2px;">&times;</button>
             </div>
           </div>
 
-          <!-- Subtab Navigation -->
-          <div style="display: flex; gap: 6px; margin-bottom: 0.85rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px;">
-            <button type="button" id="dialerNavTabRecents" onclick="switchDialerTab('recents')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">🕒 Recents</button>
-            <button type="button" id="dialerNavTabKeypad" onclick="switchDialerTab('keypad')" class="active" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">🎛️ Sovereign Dial</button>
-            <button type="button" id="dialerNavTabFavorites" onclick="switchDialerTab('favorites')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">⭐ Speed Dial</button>
-            <button type="button" id="dialerNavTabFamily" onclick="switchDialerTab('family')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👨‍👩‍👧‍👦 Family</button>
-            <button type="button" id="dialerNavTabFriends" onclick="switchDialerTab('friends')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👥 Friends</button>
-            <button type="button" id="dialerNavTabAll" onclick="switchDialerTab('all')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;">📖 All Contacts</button>
+          <!-- Hero Search & Instant Call Box -->
+          <div style="background: #060913; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 18px; padding: 12px 14px; margin-bottom: 1rem; box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.15rem; color: #38bdf8;">🔍</span>
+              <input type="text" id="dialerSovraIdInput" placeholder="Type Sovra ID (@handle or did:sovra:)..." oninput="handleDialerInputChange(this.value)" style="width: 100%; background: transparent; border: none; color: #38bdf8; font-size: 1.05rem; font-weight: 700; outline: none; font-family: monospace; letter-spacing: 0.3px;" />
+              <button type="button" id="dialerClearBtn" onclick="dialerClearAll()" title="Clear" style="display: none; background: rgba(255,255,255,0.08); border: none; color: #94a3b8; font-size: 0.85rem; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0;">✕</button>
+            </div>
+
+            <!-- Instant Call Preview Ribbon (Shows up whenever an ID is typed or peer resolved) -->
+            <div id="dialerHeroCallBox" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                  <div id="dialerResolvedAvatar" style="width: 32px; height: 32px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #fff; flex-shrink: 0;">👤</div>
+                  <div style="min-width: 0;">
+                    <div id="dialerResolvedName" style="font-weight: 700; font-size: 0.88rem; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Peer Name</div>
+                    <div id="dialerResolvedTag" style="font-size: 0.72rem; color: #38bdf8; font-family: monospace;">@handle</div>
+                  </div>
+                </div>
+                <span id="dialerResolvedOnlineBadge" class="badge" style="background: rgba(34, 197, 94, 0.2); color: #34d399; font-size: 0.65rem; padding: 2px 7px; border-radius: 999px;">🟢 Ready</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button type="button" onclick="initiateDialerCall('audio')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 12px; padding: 10px; color: #fff; font-weight: 800; font-size: 0.86rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
+                  <span>📞</span> <span>Voice Call</span>
+                </button>
+                <button type="button" onclick="initiateDialerCall('video')" style="background: linear-gradient(135deg, #0284c7, #6366f1); border: none; border-radius: 12px; padding: 10px; color: #fff; font-weight: 800; font-size: 0.86rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);">
+                  <span>📹</span> <span>Video Call</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Suggestions (Maa, Bhai, Alice, Bob) when input is empty -->
+            <div id="dialerQuickChips" style="display: flex; align-items: center; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); overflow-x: auto; scrollbar-width: none;">
+              <span style="font-size: 0.68rem; color: #64748b; font-weight: 700; text-transform: uppercase; white-space: nowrap;">Suggestions:</span>
+              <button type="button" onclick="selectDialerSuggestion('@maa_family', 'Maa ❤️ (Mom)')" style="background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👵 @maa</button>
+              <button type="button" onclick="selectDialerSuggestion('@bhai_family', 'Bhai (Brother)')" style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👦 @bhai</button>
+              <button type="button" onclick="selectDialerSuggestion('@alice_creator', 'Alice Creator')" style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👩‍🎤 @alice</button>
+              <button type="button" onclick="selectDialerSuggestion('@bob_mesh', 'Bob Mesh Seeder')" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">🚀 @bob</button>
+            </div>
           </div>
 
-          <!-- VIEW 0: RECENTS / CALL LOGS -->
+          <!-- Clean 3-Segment Switcher: Spacious & Never Cut Off! -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 3px; gap: 3px; margin-bottom: 1rem;">
+            <button type="button" id="dialerNavTabContacts" onclick="switchDialerTab('contacts')" class="active" style="border: none; border-radius: 11px; padding: 8px 6px; font-weight: 800; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; box-shadow: 0 2px 8px rgba(56, 189, 248, 0.3);">
+              👥 Contacts
+            </button>
+            <button type="button" id="dialerNavTabFavorites" onclick="switchDialerTab('favorites')" style="border: none; border-radius: 11px; padding: 8px 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; background: transparent; color: #94a3b8;">
+              ⭐ Speed Dial
+            </button>
+            <button type="button" id="dialerNavTabRecents" onclick="switchDialerTab('recents')" style="border: none; border-radius: 11px; padding: 8px 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; background: transparent; color: #94a3b8;">
+              🕒 Recents
+            </button>
+          </div>
+
+          <!-- TAB 1: CONTACTS (FAMILY & FRIENDS) -->
+          <div id="dialerPaneContacts">
+            <!-- Filter Pills (All / Family / Friends / Work) -->
+            <div style="display: flex; gap: 6px; margin-bottom: 0.75rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;">
+              <button type="button" id="filterPillAll" onclick="filterContactsCategory('all')" class="active" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 999px; padding: 4px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">All</button>
+              <button type="button" id="filterPillFamily" onclick="filterContactsCategory('family')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 999px; padding: 4px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👨‍👩‍👧‍👦 Family</button>
+              <button type="button" id="filterPillFriends" onclick="filterContactsCategory('friends')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 999px; padding: 4px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👥 Friends</button>
+              <button type="button" id="filterPillWork" onclick="filterContactsCategory('work')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 999px; padding: 4px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">💼 Work</button>
+            </div>
+
+            <!-- Contacts List -->
+            <div id="dialerAddressBookList" style="max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 2px;">
+              <!-- Populated dynamically via loadDialerAddressBook() -->
+            </div>
+          </div>
+
+          <!-- TAB 2: SPEED DIAL (1-TOUCH CALLING) -->
+          <div id="dialerPaneFavorites" style="display: none;">
+            <div style="font-size: 0.74rem; color: #94a3b8; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+              <span>⭐ 1-Touch Speed Dial for Family &amp; Close Friends</span>
+              <span style="color: #38bdf8; cursor: pointer; font-weight: 700;" onclick="openSaveContactModal()">+ Add</span>
+            </div>
+            <div id="dialerSpeedDialGrid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 340px; overflow-y: auto;">
+              <!-- Populated dynamically via renderDialerSpeedDialGrid() -->
+            </div>
+          </div>
+
+          <!-- TAB 3: RECENTS (CALL HISTORY) -->
           <div id="dialerPaneRecents" style="display: none;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
-              <span style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Recent Sovereign Calls</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <span style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Call History</span>
               <div style="display: flex; gap: 4px;">
-                <button type="button" id="recentsFilterAll" onclick="filterRecentsList('all')" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 8px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer;">All</button>
-                <button type="button" id="recentsFilterMissed" onclick="filterRecentsList('missed')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 8px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer;">Missed</button>
+                <button type="button" id="recentsFilterAll" onclick="filterRecentsList('all')" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 8px; padding: 3px 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer;">All</button>
+                <button type="button" id="recentsFilterMissed" onclick="filterRecentsList('missed')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 8px; padding: 3px 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer;">Missed</button>
               </div>
             </div>
-            <div id="dialerRecentsList" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+            <div id="dialerRecentsList" style="max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
               <!-- Populated dynamically via loadDialerCallLogs() -->
             </div>
           </div>
 
-          <!-- VIEW A: SOVEREIGN DIALPAD & LIVE PEER RESOLUTION -->
-          <div id="dialerPaneKeypad">
-            <!-- Screen Display Box -->
-            <div style="background: #090d16; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; padding: 12px 14px; margin-bottom: 0.75rem; box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);">
-              <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-                <input type="text" id="dialerSovraIdInput" placeholder="Enter @handle or did:sovra:..." oninput="handleDialerInputChange(this.value)" style="width: 100%; background: transparent; border: none; color: #38bdf8; font-size: 1.25rem; font-weight: 800; outline: none; font-family: monospace; letter-spacing: 0.5px;" />
-                <div style="display: flex; gap: 4px; flex-shrink: 0;">
-                  <button type="button" onclick="dialerClearAll()" title="Clear All" style="background: rgba(255,255,255,0.06); border: none; color: #94a3b8; font-size: 0.72rem; font-weight: 800; padding: 4px 8px; border-radius: 6px; cursor: pointer;">AC</button>
-                  <button type="button" onclick="dialerBackspace()" title="Backspace" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;">⌫</button>
-                </div>
-              </div>
-
-              <!-- Live Resolved Peer Preview Ribbon -->
-              <div id="dialerResolvedRibbon" style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.74rem;">
-                <div id="dialerResolvedAvatar" style="width: 26px; height: 26px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: #fff; flex-shrink: 0;">👤</div>
-                <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  <span id="dialerResolvedName" style="font-weight: 700; color: #fff;">Dial by Sovereign ID</span>
-                  <span id="dialerResolvedTag" style="color: #94a3b8; margin-left: 4px;">• Type handle or tap contact</span>
-                </div>
-                <span id="dialerResolvedOnlineBadge" class="badge" style="background: rgba(34, 197, 94, 0.2); color: #34d399; font-size: 0.65rem; padding: 2px 7px;">🟢 Mesh Ready</span>
-              </div>
-            </div>
-
-            <!-- Sovereign Quick Handle Macros Bar -->
-            <div style="display: flex; gap: 6px; margin-bottom: 0.75rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;">
-              <button type="button" onclick="dialerAppendSpecial('@')" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">@</button>
-              <button type="button" onclick="dialerAppendSpecial('did:sovra:')" style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">did:sovra:</button>
-              <button type="button" onclick="dialerAppendSpecial('.sovra')" style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); color: #34d399; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">.sovra</button>
-              <button type="button" onclick="dialerAppendSpecial('_')" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">_</button>
-              <button type="button" onclick="dialerAppendSpecial('fam/')" style="background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">fam/</button>
-              <button type="button" onclick="dialerAppendSpecial('mesh/')" style="background: rgba(234, 179, 8, 0.12); border: 1px solid rgba(234, 179, 8, 0.3); color: #facc15; border-radius: 8px; padding: 4px 10px; font-family: monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">mesh/</button>
-            </div>
-
-            <!-- Speed Dial Top Rail (Maa, Bhai, Alice, Bob) -->
-            <div style="margin-bottom: 0.75rem;">
-              <div style="font-size: 0.7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between;">
-                <span>⭐ Speed Dial (Family &amp; Close Friends)</span>
-                <span style="color: #38bdf8; cursor: pointer;" onclick="openSaveContactModal()">+ Add New</span>
-              </div>
-              <div id="dialerSpeedDialList" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;">
-                <!-- Populated dynamically -->
-              </div>
-            </div>
-
-            <!-- Tactile Sovereign Keypad Grid (Alphanumeric with Quick Sovereign Modifiers) -->
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem;">
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('1')">
-                <span class="key-digit">1</span>
-                <span class="key-sub">@</span>
-              </button>
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('2')">
-                <span class="key-digit">2</span>
-                <span class="key-sub">ABC</span>
-              </button>
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('3')">
-                <span class="key-digit">3</span>
-                <span class="key-sub">DEF</span>
-              </button>
-
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('4')">
-                <span class="key-digit">4</span>
-                <span class="key-sub">GHI</span>
-              </button>
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('5')">
-                <span class="key-digit">5</span>
-                <span class="key-sub">JKL</span>
-              </button>
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('6')">
-                <span class="key-digit">6</span>
-                <span class="key-sub">MNO</span>
-              </button>
-
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('7')">
-                <span class="key-digit">7</span>
-                <span class="key-sub">PQRS</span>
-              </button>
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('8')">
-                <span class="key-digit">8</span>
-                <span class="key-sub">TUV</span>
-              </button>
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('9')">
-                <span class="key-digit">9</span>
-                <span class="key-sub">WXYZ</span>
-              </button>
-
-              <button type="button" class="sovra-keypad-btn sovra-keypad-mod" onclick="dialerAppendSpecial('did:')">
-                <span class="key-digit" style="font-size: 0.95rem;">did:</span>
-                <span class="key-sub">DID Prefix</span>
-              </button>
-              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('0')">
-                <span class="key-digit">0</span>
-                <span class="key-sub">_ / Space</span>
-              </button>
-              <button type="button" class="sovra-keypad-btn sovra-keypad-mod" onclick="dialerAppendSpecial('.sovra')">
-                <span class="key-digit" style="font-size: 0.85rem;">.sovra</span>
-                <span class="key-sub">Domain</span>
-              </button>
-            </div>
-
-            <!-- Big Call Action Buttons -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 0.65rem;">
-              <button type="button" onclick="initiateDialerCall('audio')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 14px; padding: 12px 14px; color: #fff; font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);">
-                <span style="font-size: 1.15rem;">📞</span>
-                <span>Audio Call</span>
-              </button>
-              <button type="button" onclick="initiateDialerCall('video')" style="background: linear-gradient(135deg, #0284c7, #6366f1); border: none; border-radius: 14px; padding: 12px 14px; color: #fff; font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 16px rgba(56, 189, 248, 0.35);">
-                <span style="font-size: 1.15rem;">📹</span>
-                <span>Video Call</span>
-              </button>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
-              <button type="button" onclick="openSaveContactModal(document.getElementById('dialerSovraIdInput').value)" style="background: transparent; border: 1px dashed rgba(255,255,255,0.2); border-radius: 10px; padding: 6px 12px; color: #cbd5e1; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                <span>💾 Save to Sovereign Contacts</span>
-              </button>
-              <button type="button" onclick="document.getElementById('dialerSovraIdInput').focus()" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; font-weight: 700; cursor: pointer;">
-                ⌨️ Direct Keyboard Input
-              </button>
-            </div>
-          </div>
-
-          <!-- VIEW B: SAVED ADDRESS BOOK & CONTACTS LIST -->
-          <div id="dialerPaneContacts" style="display: none;">
-            <div style="display: flex; gap: 8px; margin-bottom: 0.75rem;">
-              <input type="text" id="dialerContactSearchInput" placeholder="Search saved family, friends..." oninput="filterDialerContactsList(this.value)" style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.8rem; outline: none;" />
-              <button type="button" onclick="openSaveContactModal()" style="background: rgba(16, 185, 129, 0.18); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; border-radius: 10px; padding: 0 12px; font-weight: 800; font-size: 0.78rem; cursor: pointer;">+ Add</button>
-            </div>
-
-            <div id="dialerAddressBookList" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
-              <!-- Populated dynamically via loadDialerAddressBook() -->
-            </div>
-          </div>
         </div>
       </div>
 
@@ -4258,8 +4203,6 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <button type="button" onclick="applyScannedSovraId()" style="flex: 2; padding: 10px; background: linear-gradient(135deg, #9333ea, #c084fc); border: none; color: #fff; border-radius: 12px; font-weight: 800; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4);">⚡ Connect &amp; Dial</button>
             <button type="button" onclick="closeScanQrModal()" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: #cbd5e1; border-radius: 12px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">Cancel</button>
           </div>
-        </div>
-      </div>
         </div>
       </div>
 
