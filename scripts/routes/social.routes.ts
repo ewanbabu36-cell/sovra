@@ -786,6 +786,7 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
         createdAt: new Date().toISOString(),
       };
       if (dynamicSocialStore) {
+        if (!Array.isArray(dynamicSocialStore.pages)) dynamicSocialStore.pages = [];
         dynamicSocialStore.pages.unshift(newPage);
         if (saveDynamicSocialState) saveDynamicSocialState(dynamicSocialStore);
       }

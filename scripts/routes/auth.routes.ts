@@ -111,7 +111,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body);
-      const regIp = clientIp;
+      const regIp = clientIp ? clientIp.replace(/^::ffff:/, '') : '127.0.0.1';
       const isLoopback = regIp === '127.0.0.1' || regIp === '::1' || regIp === 'localhost';
       const isTestEnv = process.env.NODE_ENV === 'test' ||
         req.headers['x-sovra-test-bypass'] === 'true' ||
@@ -300,8 +300,8 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'Set-Cookie': [
-          `sovra_session=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
           `sovra_session_token=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
+          `sovra_session=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
         ],
       });
       res.end(JSON.stringify({
@@ -1569,8 +1569,14 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
   // 34. User Settings
   if (url.pathname === '/api/user/settings' && req.method === 'GET') {
     try {
-      const principal = resolvePrincipal(req);
-      const targetDid = url.searchParams.get('did') || (principal ? principal.did : ctx.masterKey?.did);
+      const principal = enforceAuth(req, res);
+      if (!principal) return true;
+      const targetDid = url.searchParams.get('did') || principal.did;
+      if (targetDid !== principal.did && principal.role !== 'SUPER_ADMIN') {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access settings for another user' }));
+        return true;
+      }
       const settings = sovraDb.getUserSettings(targetDid);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, settings }));
@@ -1585,8 +1591,14 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
     if (!ok) return true;
     try {
-      const principal = resolvePrincipal(req);
-      const targetDid = url.searchParams.get('did') || (principal ? principal.did : ctx.masterKey?.did);
+      const principal = enforceAuth(req, res);
+      if (!principal) return true;
+      const targetDid = url.searchParams.get('did') || principal.did;
+      if (targetDid !== principal.did && principal.role !== 'SUPER_ADMIN') {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot update settings for another user' }));
+        return true;
+      }
       const parsed = JSON.parse(body || '{}');
       const updated = sovraDb.setUserSettings(targetDid, parsed);
       res.writeHead(200, { 'Content-Type': 'application/json' });

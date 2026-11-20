@@ -60,22 +60,24 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('sovra_logged_out') === 'true') {
         return '';
       }
-      if (typeof myProfile !== 'undefined' && myProfile && myProfile.sessionToken) {
-        return myProfile.sessionToken;
+      if (typeof myProfile !== 'undefined' && myProfile && (myProfile.sessionToken || myProfile.token)) {
+        return myProfile.sessionToken || myProfile.token;
       }
       if (typeof localStorage !== 'undefined') {
         var token = localStorage.getItem('sovra_session_token');
-        if (token) return token;
+        if (token && token !== 'undefined' && token !== 'null') return token;
         try {
           var saved = localStorage.getItem('sovra_user_profile');
           if (saved) {
             var parsed = JSON.parse(saved);
-            if (parsed && parsed.sessionToken) return parsed.sessionToken;
+            if (parsed && (parsed.sessionToken || parsed.token)) return parsed.sessionToken || parsed.token;
           }
         } catch(e) {}
       }
       if (typeof window !== 'undefined' && window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) {
-        return window.SOVRA_HOST_SESSION.token;
+        if (!myProfile || !myProfile.did || myProfile.did === window.SOVRA_HOST_SESSION.did) {
+          return window.SOVRA_HOST_SESSION.token;
+        }
       }
       return '';
     };
@@ -7421,7 +7423,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           '</div>';
 
           function loadContacts() {
-            const token = (typeof authToken !== 'undefined' && authToken) ? authToken : (localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? myProfile.token : ''));
+            const token = (typeof authToken !== 'undefined' && authToken) ? authToken : ((typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? (myProfile.sessionToken || myProfile.token || '') : '')));
             fetch('/api/chat/contacts', {
               headers: token ? { 'Authorization': 'Bearer ' + token } : {}
             })
@@ -7604,7 +7606,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             };
             window._clearSpatialAttachment();
 
-            const token = (typeof authToken !== 'undefined' && authToken) ? authToken : (localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? myProfile.token : ''));
+            const token = (typeof authToken !== 'undefined' && authToken) ? authToken : ((typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? (myProfile.sessionToken || myProfile.token || '') : '')));
             fetch('/api/chat/send', {
               method: 'POST',
               headers: {
@@ -7623,7 +7625,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           };
 
           function loadMessages() {
-            const token = (typeof authToken !== 'undefined' && authToken) ? authToken : (localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? myProfile.token : ''));
+            const token = (typeof authToken !== 'undefined' && authToken) ? authToken : ((typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || (typeof myProfile !== 'undefined' && myProfile ? (myProfile.sessionToken || myProfile.token || '') : '')));
             fetch('/api/chat/messages?contactDid=' + encodeURIComponent(contactDid), {
               headers: token ? { 'Authorization': 'Bearer ' + token } : {}
             })
@@ -11968,7 +11970,6 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         localStorage.removeItem('sovra_is_guest');
         localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
         if (data.sessionToken) {
-          localStorage.setItem('sovra_session_token', data.sessionToken);
           localStorage.setItem('sovra_auth_active', 'true');
           try {
             document.cookie = 'sovra_session_token=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
@@ -12895,7 +12896,13 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         const regData = await regRes.json();
         if (regRes.ok && regData.ok && regData.user) {
           myProfile = regData.user;
-          if (regData.sessionToken) myProfile.sessionToken = regData.sessionToken;
+          if (regData.sessionToken) {
+            myProfile.sessionToken = regData.sessionToken;
+            try {
+              document.cookie = 'sovra_session_token=' + encodeURIComponent(regData.sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+              document.cookie = 'sovra_session=' + encodeURIComponent(regData.sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+            } catch (_) {}
+          }
           window.myProfile = myProfile;
           currentUserHandle = myProfile.handle;
           localStorage.removeItem('sovra_logged_out');
@@ -14430,6 +14437,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
         if (data.sessionToken) {
           localStorage.setItem('sovra_auth_active', 'true');
+          try {
+            document.cookie = 'sovra_session_token=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+            document.cookie = 'sovra_session=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+          } catch (_) {}
         }
         if (data.user) {
           localStorage.setItem('sovra_user_profile', JSON.stringify(data.user));
@@ -15155,6 +15166,13 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
         if (errorBox) errorBox.style.display = 'none';
         myProfile = data.user;
+        if (data.sessionToken) {
+          myProfile.sessionToken = data.sessionToken;
+          try {
+            document.cookie = 'sovra_session_token=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+            document.cookie = 'sovra_session=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+          } catch (_) {}
+        }
         currentUserHandle = myProfile.handle;
 
         localStorage.removeItem('sovra_logged_out');
@@ -15211,7 +15229,14 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           if (data.ok && data.user) {
             localStorage.removeItem('sovra_logged_out');
             myProfile = data.user;
-            if (data.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
+            if (data.sessionToken) {
+              myProfile.sessionToken = data.sessionToken;
+              try {
+                document.cookie = 'sovra_session_token=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+                document.cookie = 'sovra_session=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; max-age=2592000';
+              } catch (_) {}
+              localStorage.setItem('sovra_auth_active', 'true');
+            }
             localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
           }
         }).catch(() => {});
@@ -46542,30 +46567,23 @@ _scheduleTargetContext: 'workspace',
         return c.isFavorite || (c.speedDialIndex != null && c.speedDialIndex > 0) || c.category === 'FAMILY';
       });
 
-      // Default high-profile family & close friends seeds if none saved yet
-      if (speedContacts.length === 0) {
-        speedContacts = [
-          { displayName: 'Maa', handle: '@maa_family', contactDid: 'did:sovra:maa_family', avatar: '👵', avatarBg: 'linear-gradient(135deg, #f43f5e, #ec4899)' },
-          { displayName: 'Bhai', handle: '@bhai_family', contactDid: 'did:sovra:bhai_family', avatar: '👦', avatarBg: 'linear-gradient(135deg, #3b82f6, #0284c7)' },
-          { displayName: 'Alice', handle: '@alice_creator', contactDid: 'did:sovra:alice_creator', avatar: '👩‍🎤', avatarBg: 'linear-gradient(135deg, #a855f7, #6366f1)' },
-          { displayName: 'Bob', handle: '@bob_mesh', contactDid: 'did:sovra:bob_mesh', avatar: '🚀', avatarBg: 'linear-gradient(135deg, #10b981, #059669)' }
-        ];
+      var html = '';
+      if (speedContacts.length > 0) {
+        html += speedContacts.map(function(c) {
+          var label = c.nickname || c.displayName || c.handle;
+          var safeDid = encodeURIComponent(c.contactDid || c.handle);
+          var safeName = encodeURIComponent(label);
+          var bg = c.avatarBg || 'linear-gradient(135deg, #0284c7, #38bdf8)';
+
+          return '<div class="call-story-avatar" data-call-type="audio" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="1-Touch Call to ' + label + ' (Studio Opus HD)">' +
+            '<div class="story-ring">' +
+              '<div class="story-inner" style="background: ' + bg + ';">' + (c.avatar || '👤') + '</div>' +
+              '<div class="story-online-dot"></div>' +
+            '</div>' +
+            '<div class="story-label">' + label + '</div>' +
+          '</div>';
+        }).join('');
       }
-
-      var html = speedContacts.map(function(c) {
-        var label = c.nickname || c.displayName || c.handle;
-        var safeDid = encodeURIComponent(c.contactDid || c.handle);
-        var safeName = encodeURIComponent(label);
-        var bg = c.avatarBg || 'linear-gradient(135deg, #0284c7, #38bdf8)';
-
-        return '<div class="call-story-avatar" data-call-type="audio" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="1-Touch Call to ' + label + ' (Studio Opus HD)">' +
-          '<div class="story-ring">' +
-            '<div class="story-inner" style="background: ' + bg + ';">' + (c.avatar || '👤') + '</div>' +
-            '<div class="story-online-dot"></div>' +
-          '</div>' +
-          '<div class="story-label">' + label + '</div>' +
-        '</div>';
-      }).join('');
 
       html += '<div class="call-story-avatar" onclick="openSaveContactModal()" title="Save New Sovereign Contact">' +
         '<div class="story-ring" style="background: rgba(255,255,255,0.15); border: 1px dashed rgba(255,255,255,0.3);">' +
@@ -47167,6 +47185,21 @@ _scheduleTargetContext: 'workspace',
             _cachedAddressBook = d.contacts;
             renderDialerContactsList(d.contacts);
             renderDialerSpeedDialGrid(d.contacts);
+            var quickChips = document.getElementById('dialerQuickChips');
+            var quickChipsList = document.getElementById('dialerQuickChipsList');
+            if (quickChips && quickChipsList) {
+              if (d.contacts.length > 0) {
+                quickChipsList.innerHTML = d.contacts.slice(0, 4).map(function(c) {
+                  var handleOrDid = c.handle || c.contactDid;
+                  var name = c.nickname || c.displayName;
+                  return '<button type="button" data-handle="' + encodeURIComponent(handleOrDid) + '" data-name="' + encodeURIComponent(name) + '" onclick="selectDialerSuggestion(decodeURIComponent(this.dataset.handle), decodeURIComponent(this.dataset.name))" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">' + (c.avatar || '👤') + ' ' + (c.handle || name) + '</button>';
+                }).join('');
+                quickChips.style.display = 'flex';
+              } else {
+                quickChips.style.display = 'none';
+                quickChipsList.innerHTML = '';
+              }
+            }
           }
         })
         .catch(function(err) {

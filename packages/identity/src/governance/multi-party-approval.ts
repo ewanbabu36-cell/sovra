@@ -129,8 +129,8 @@ export class MultiPartyApprovalEngine {
     this.defaultChainId = options?.chainId ?? 'sovra-testnet';
     this.strictRegistry = options?.strictRegistry ?? false;
 
-    // Bind 5 Genesis Security Council members (3-of-5 threshold) unless explicitly disabled
-    if (options?.bindGenesisCouncil !== false) {
+    // Bind 5 Genesis Security Council members (3-of-5 threshold) when explicitly enabled
+    if (options?.bindGenesisCouncil === true) {
       for (const member of GENESIS_SECURITY_COUNCIL) {
         this.registerSigner({
           did: member.did,

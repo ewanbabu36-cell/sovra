@@ -1479,15 +1479,14 @@ export class SqliteSocialDatabaseEngine {
           insertRole.run(did, role, JSON.stringify(perms), by, Date.now());
         }
       } else {
-        // Ensure did:sov:admin_moderator in existing DB has updated moderation permissions
+        // Ensure did:sov:admin_moderator in existing DB has canonical moderation permissions
         try {
-          const modRow = this.db.prepare('SELECT permissions_json FROM admin_rbac_roles WHERE admin_did = ?').get('did:sov:admin_moderator') as any;
-          if (modRow) {
-            const currentPerms = JSON.parse(modRow.permissions_json || '[]');
-            const modPerms = ['admin:moderate', 'god_dial:write', 'shadowbans:write', 'shadowban:manage', 'flags:write', 'forensics:read', 'user:read', 'user:moderate', 'user:suspend', 'creator:read', 'creator:moderate', 'creator:suspend', 'content:read', 'content:remove', 'appeal:review', 'audit:read'];
-            const merged = Array.from(new Set([...currentPerms, ...modPerms]));
-            this.db.prepare('UPDATE admin_rbac_roles SET permissions_json = ? WHERE admin_did = ?').run(JSON.stringify(merged), 'did:sov:admin_moderator');
-          }
+          const modPerms = ['admin:moderate', 'god_dial:write', 'shadowbans:write', 'shadowban:manage', 'flags:write', 'forensics:read', 'user:read', 'user:moderate', 'user:suspend', 'creator:read', 'creator:moderate', 'creator:suspend', 'content:read', 'content:remove', 'appeal:review', 'audit:read'];
+          this.db.prepare('UPDATE admin_rbac_roles SET role = ?, permissions_json = ? WHERE admin_did = ?').run(
+            'CONTENT_MODERATOR',
+            JSON.stringify(modPerms),
+            'did:sov:admin_moderator'
+          );
         } catch (_) {}
       }
 
@@ -2717,7 +2716,6 @@ this.db.exec('COMMIT;');
 
   public getAddressBook(ownerDid: string, category?: string): any[] {
     try {
-      this.seedDefaultAddressBookIfEmpty(ownerDid);
       let sql = 'SELECT * FROM address_book WHERE owner_did = ?';
       const params: any[] = [ownerDid];
       if (category && category !== 'ALL') {
@@ -2818,90 +2816,9 @@ this.db.exec('COMMIT;');
   }
 
   public seedDefaultAddressBookIfEmpty(ownerDid: string): void {
-    try {
-      if (!ownerDid) return;
-      const countRow = this.prepareCached('SELECT COUNT(*) as cnt FROM address_book WHERE owner_did = ?').get(ownerDid) as any;
-      if (countRow && countRow.cnt > 0) return;
-
-      const defaults = [
-        {
-          contactDid: 'did:sovra:family_mom',
-          handle: '@maa_family',
-          displayName: 'Maa ❤️ (Mom)',
-          nickname: 'Maa',
-          category: 'FAMILY',
-          relationship: 'Mother',
-          isFavorite: true,
-          speedDialIndex: 1,
-          avatar: '👵',
-          avatarBg: 'linear-gradient(135deg, #f43f5e, #ec4899)'
-        },
-        {
-          contactDid: 'did:sovra:family_brother',
-          handle: '@bhai_family',
-          displayName: 'Bhai (Brother)',
-          nickname: 'Bhai',
-          category: 'FAMILY',
-          relationship: 'Brother',
-          isFavorite: true,
-          speedDialIndex: 2,
-          avatar: '👦',
-          avatarBg: 'linear-gradient(135deg, #3b82f6, #06b6d4)'
-        },
-        {
-          contactDid: 'did:sovra:alice_creator',
-          handle: '@alice_creator',
-          displayName: 'Alice Creator',
-          nickname: 'Alice',
-          category: 'FRIENDS',
-          relationship: 'Best Friend',
-          isFavorite: true,
-          speedDialIndex: 3,
-          avatar: '👩‍🎤',
-          avatarBg: 'linear-gradient(135deg, #8b5cf6, #d946ef)'
-        },
-        {
-          contactDid: 'did:sovra:bob_mesh',
-          handle: '@bob_mesh',
-          displayName: 'Bob Mesh Seeder',
-          nickname: 'Bob',
-          category: 'FRIENDS',
-          relationship: 'College Friend',
-          isFavorite: true,
-          speedDialIndex: 4,
-          avatar: '🚀',
-          avatarBg: 'linear-gradient(135deg, #10b981, #059669)'
-        },
-        {
-          contactDid: 'did:sovra:laptop_host',
-          handle: '@laptop_host',
-          displayName: 'Host Root Node',
-          nickname: 'Host Node',
-          category: 'WORK',
-          relationship: 'Mesh Relay Operator',
-          isFavorite: false,
-          speedDialIndex: null,
-          avatar: '💻',
-          avatarBg: 'linear-gradient(135deg, #6366f1, #4f46e5)'
-        }
-      ];
-
-      for (const d of defaults) {
-        this.upsertAddressBookContact({
-          ownerDid,
-          contactDid: d.contactDid,
-          handle: d.handle,
-          displayName: d.displayName,
-          nickname: d.nickname,
-          category: d.category,
-          relationship: d.relationship,
-          isFavorite: d.isFavorite,
-          speedDialIndex: d.speedDialIndex,
-          avatar: d.avatar,
-          avatarBg: d.avatarBg
-        });
-      }
-    } catch (_) {}
+    // Zero-mock policy: never seed dummy or mock contacts automatically.
+    // Address book remains strictly dynamic and reflects only user-added contacts.
+    return;
   }
 
   public upsertPage(pg: any): void {
@@ -3244,6 +3161,9 @@ this.db.exec('COMMIT;');
       ideaData,
       hiddenByDids,
       savedByDids,
+      isRemoved: Boolean(r.is_removed),
+      moderationState: r.moderation_state || 'ACTIVE',
+      moderationReason: r.moderation_reason || null,
     };
   }
 
@@ -5782,7 +5702,6 @@ this.db.exec('COMMIT;');
     try {
       const targetDid = typeof filter === 'string' ? filter : (filter?.did || filter?.ownerDid);
       if (targetDid) {
-        this.seedDefaultCallLogsIfEmpty(targetDid);
         const rows = this.db.prepare(`
           SELECT * FROM call_logs 
           WHERE owner_did = ? OR caller_did = ? OR callee_did = ? 
@@ -5824,62 +5743,9 @@ this.db.exec('COMMIT;');
   }
 
   public seedDefaultCallLogsIfEmpty(ownerDid: string): void {
-    try {
-      if (!ownerDid) return;
-      const countRow = this.db.prepare('SELECT COUNT(*) as cnt FROM call_logs WHERE owner_did = ? OR caller_did = ?').get(ownerDid, ownerDid) as any;
-      if (countRow && countRow.cnt > 0) return;
-
-      const now = Date.now();
-      const defaults = [
-        {
-          peerDid: 'did:sovra:family_mom',
-          peerHandle: '@maa_family',
-          peerName: 'Maa ❤️ (Mom)',
-          direction: 'incoming',
-          callType: 'audio',
-          status: 'completed',
-          durationSeconds: 420,
-          createdAt: now - 18 * 60 * 1000
-        },
-        {
-          peerDid: 'did:sovra:alice_creator',
-          peerHandle: '@alice_creator',
-          peerName: 'Alice Creator',
-          direction: 'outgoing',
-          callType: 'video',
-          status: 'completed',
-          durationSeconds: 980,
-          createdAt: now - 3 * 3600 * 1000
-        },
-        {
-          peerDid: 'did:sovra:family_brother',
-          peerHandle: '@bhai_family',
-          peerName: 'Bhai (Brother)',
-          direction: 'missed',
-          callType: 'audio',
-          status: 'missed',
-          durationSeconds: 0,
-          createdAt: now - 6 * 3600 * 1000
-        },
-        {
-          peerDid: 'did:sovra:bob_mesh',
-          peerHandle: '@bob_mesh',
-          peerName: 'Bob Mesh Seeder',
-          direction: 'outgoing',
-          callType: 'video',
-          status: 'completed',
-          durationSeconds: 310,
-          createdAt: now - 24 * 3600 * 1000
-        }
-      ];
-
-      for (const d of defaults) {
-        this.recordCallLog({
-          ownerDid,
-          ...d
-        });
-      }
-    } catch (_) {}
+    // Zero-mock policy: never seed dummy or mock call logs automatically.
+    // Call logs remain strictly dynamic and reflect only real calls.
+    return;
   }
 
   // --- Video Views & Telemetry ---

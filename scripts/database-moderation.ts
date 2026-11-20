@@ -201,9 +201,9 @@ export class ModerationEngine {
       try {
         const memUser = (this.engine as any)._parentEngine?.db?.users?.find((u: any) => u.did === did);
         this.db.prepare(`
-          INSERT OR IGNORE INTO users (did, handle, display_name, name, status, is_verified, is_creator, balance_sov, created_at, updated_at)
-          VALUES (?, ?, ?, ?, 'ACTIVE', 0, 0, 0, ?, ?)
-        `).run(did, memUser?.handle || did, memUser?.displayName || 'User', memUser?.name || 'User', Date.now(), Date.now());
+          INSERT OR IGNORE INTO users (did, handle, display_name, name, avatar, avatar_bg, status, is_verified, is_creator, balance_sov, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 0, 0, 0, ?, ?)
+        `).run(did, memUser?.handle || did, memUser?.displayName || 'User', memUser?.name || 'User', memUser?.avatar || '👤', memUser?.avatarBg || '#6366f1', Date.now(), Date.now());
         user = this.engine.findUserByDid(did);
       } catch (_) {}
     }
@@ -225,16 +225,18 @@ export class ModerationEngine {
     const followStats = this.engine.getFollowStats(did);
 
     const sbCheck = this.checkShadowBanEnforcement(did, 'all');
+    const isSb = typeof sbCheck === 'object' && sbCheck !== null ? Boolean((sbCheck as any).isShadowBanned) : Boolean(sbCheck);
     return {
       ok: true,
-      isShadowBanned: sbCheck.isShadowBanned,
+      isShadowBanned: isSb,
       user: {
         ...user,
         status: user.status || 'ACTIVE',
         isVerified: user.isVerified || false,
         isCreator: user.isCreator || false,
-        monetizationStatus: user.monetizationStatus || 'ACTIVE',
-        isShadowBanned: sbCheck.isShadowBanned,
+        monetizationStatus: user.monetizationStatus || (user as any).monetization_status || 'ACTIVE',
+        monetization_status: user.monetizationStatus || (user as any).monetization_status || 'ACTIVE',
+        isShadowBanned: isSb,
       },
       activeRestrictions,
       moderationHistory,
@@ -274,9 +276,9 @@ export class ModerationEngine {
       try {
         const memUser = (this.engine as any)._parentEngine?.db?.users?.find((u: any) => u.did === params.targetDid);
         this.db.prepare(`
-          INSERT OR IGNORE INTO users (did, handle, display_name, name, status, is_verified, is_creator, balance_sov, created_at, updated_at)
-          VALUES (?, ?, ?, ?, 'ACTIVE', 0, 0, 0, ?, ?)
-        `).run(params.targetDid, memUser?.handle || params.targetDid, memUser?.displayName || 'User', memUser?.name || 'User', Date.now(), Date.now());
+          INSERT OR IGNORE INTO users (did, handle, display_name, name, avatar, avatar_bg, status, is_verified, is_creator, balance_sov, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 0, 0, 0, ?, ?)
+        `).run(params.targetDid, memUser?.handle || params.targetDid, memUser?.displayName || 'User', memUser?.name || 'User', memUser?.avatar || '👤', memUser?.avatarBg || '#6366f1', Date.now(), Date.now());
         user = this.engine.findUserByDid(params.targetDid);
       } catch (_) {}
     }
@@ -392,9 +394,9 @@ export class ModerationEngine {
       try {
         const memUser = (this.engine as any)._parentEngine?.db?.users?.find((u: any) => u.did === params.targetDid);
         this.db.prepare(`
-          INSERT OR IGNORE INTO users (did, handle, display_name, name, status, is_verified, is_creator, balance_sov, created_at, updated_at)
-          VALUES (?, ?, ?, ?, 'ACTIVE', 0, 0, 0, ?, ?)
-        `).run(params.targetDid, memUser?.handle || params.targetDid, memUser?.displayName || 'User', memUser?.name || 'User', Date.now(), Date.now());
+          INSERT OR IGNORE INTO users (did, handle, display_name, name, avatar, avatar_bg, status, is_verified, is_creator, balance_sov, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 0, 0, 0, ?, ?)
+        `).run(params.targetDid, memUser?.handle || params.targetDid, memUser?.displayName || 'User', memUser?.name || 'User', memUser?.avatar || '👤', memUser?.avatarBg || '#6366f1', Date.now(), Date.now());
         user = this.engine.findUserByDid(params.targetDid);
       } catch (_) {}
     }
@@ -499,10 +501,11 @@ export class ModerationEngine {
     let user = this.engine.findUserByDid(params.targetDid);
     if (!user) {
       try {
+        const memUser = (this.engine as any)._parentEngine?.db?.users?.find((u: any) => u.did === params.targetDid);
         this.db.prepare(`
-          INSERT OR IGNORE INTO users (did, handle, display_name, name, status, is_verified, is_creator, balance_sov, created_at, updated_at)
-          VALUES (?, ?, ?, ?, 'ACTIVE', 0, 0, 0, ?, ?)
-        `).run(params.targetDid, params.targetDid, 'User', 'User', Date.now(), Date.now());
+          INSERT OR IGNORE INTO users (did, handle, display_name, name, avatar, avatar_bg, status, is_verified, is_creator, balance_sov, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 0, 0, 0, ?, ?)
+        `).run(params.targetDid, memUser?.handle || params.targetDid, memUser?.displayName || 'User', memUser?.name || 'User', memUser?.avatar || '👤', memUser?.avatarBg || '#6366f1', Date.now(), Date.now());
         user = this.engine.findUserByDid(params.targetDid);
       } catch (_) {}
     }
@@ -1065,12 +1068,21 @@ export class ModerationEngine {
     if (!post) {
       try {
         const memPost = (this.engine as any)._parentEngine?.db?.posts?.find((p: any) => p.id === params.postId);
-        if (memPost) {
-          this.db.prepare('INSERT OR IGNORE INTO posts (id, author_did, caption, created_at) VALUES (?, ?, ?, ?)').run(
-            memPost.id, memPost.authorDid || 'did:sov:test', memPost.caption || '', memPost.createdAt || Date.now()
-          );
-          post = this.db.prepare('SELECT id, author_did, is_removed, moderation_state FROM posts WHERE id = ?').get(params.postId) as any;
-        }
+        this.db.prepare(`
+          INSERT OR IGNORE INTO posts (id, author_did, handle, author_name, author_avatar, author_avatar_bg, caption, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          params.postId,
+          memPost?.authorDid || 'did:sov:test',
+          memPost?.handle || '@user',
+          memPost?.authorName || 'User',
+          memPost?.authorAvatar || '👤',
+          memPost?.authorAvatarBg || '#6366f1',
+          memPost?.caption || '',
+          memPost?.createdAt || Date.now(),
+          Date.now()
+        );
+        post = this.db.prepare('SELECT id, author_did, is_removed, moderation_state FROM posts WHERE id = ?').get(params.postId) as any;
       } catch (_) {}
     }
     if (!post) {
@@ -1196,10 +1208,21 @@ export class ModerationEngine {
     let post = this.db.prepare('SELECT id, author_did, is_removed, moderation_state FROM posts WHERE id = ?').get(params.postId) as any;
     if (!post) {
       try {
+        const memPost = (this.engine as any)._parentEngine?.db?.posts?.find((p: any) => p.id === params.postId);
         this.db.prepare(`
-          INSERT OR IGNORE INTO posts (id, author_did, caption, created_at)
-          VALUES (?, ?, ?, ?)
-        `).run(params.postId, 'did:sov:stub', 'Post', Date.now());
+          INSERT OR IGNORE INTO posts (id, author_did, handle, author_name, author_avatar, author_avatar_bg, caption, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          params.postId,
+          memPost?.authorDid || 'did:sov:stub',
+          memPost?.handle || '@user',
+          memPost?.authorName || 'User',
+          memPost?.authorAvatar || '👤',
+          memPost?.authorAvatarBg || '#6366f1',
+          memPost?.caption || 'Post',
+          memPost?.createdAt || Date.now(),
+          Date.now()
+        );
         post = this.db.prepare('SELECT id, author_did, is_removed, moderation_state FROM posts WHERE id = ?').get(params.postId) as any;
       } catch (_) {}
     }
@@ -1217,6 +1240,14 @@ export class ModerationEngine {
       SET is_removed = 0, moderation_state = 'ACTIVE', moderation_reason = NULL
       WHERE id = ?
     `).run(params.postId);
+    try {
+      const memPost = (this.engine as any)._parentEngine?.db?.posts?.find((p: any) => p.id === params.postId);
+      if (memPost) {
+        memPost.isRemoved = false;
+        memPost.moderationState = 'ACTIVE';
+        memPost.moderationReason = null;
+      }
+    } catch (_) {}
 
     // 2. Deactivate removal restriction
     this.db.prepare(`

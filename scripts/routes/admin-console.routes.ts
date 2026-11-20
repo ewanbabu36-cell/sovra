@@ -49,6 +49,8 @@ export interface AdminConsoleRouteContext {
   HTTPS_PORT: number;
   injectCspNonce: (html: string, nonce: string) => string;
   broadcastChatEvent?: (threadId: string, eventName: string, payload: any) => void;
+  broadcastControlPlaneEvent?: (eventType: string, payload: any) => void;
+  dynamicSocialStore?: any;
   masterKey?: any;
   binding?: any;
   checkAdminRbac?: (req: http.IncomingMessage, requiredPerm?: string) => { authorized: boolean; adminDid: string; role: string; statusCode: number; error?: string };
@@ -76,7 +78,7 @@ export function createCheckAdminRbac(adminSecurity: any) {
         adminDid: '',
         role: 'ANONYMOUS',
         statusCode: 401,
-        error: 'UNAUTHORIZED: Admin session token required',
+        error: 'UNAUTHORIZED: Admin authorization required',
       };
     }
 
@@ -126,6 +128,51 @@ export function createCheckAdminRbac(adminSecurity: any) {
     }
 
     if (callerRole === 'SUPER_ADMIN') {
+      return { authorized: true, adminDid: callerDid, role: callerRole, statusCode: 200 };
+    }
+
+    if (callerRole === 'CONTENT_MODERATOR') {
+      const moderatorPerms = [
+        'admin:access',
+        'admin:moderate',
+        'god_dial:write',
+        'shadowbans:write',
+        'shadowban:manage',
+        'flags:write',
+        'forensics:read',
+        'user:read',
+        'user:moderate',
+        'user:suspend',
+        'creator:read',
+        'creator:moderate',
+        'creator:suspend',
+        'content:read',
+        'content:remove',
+        'appeal:review',
+        'audit:read',
+      ];
+      if (!moderatorPerms.includes(requiredPerm)) {
+        return {
+          authorized: false,
+          adminDid: callerDid,
+          role: callerRole,
+          statusCode: 403,
+          error: `RBAC_PERMISSION_DENIED: Role '${callerRole}' lacks required permission '${requiredPerm}'`,
+        };
+      }
+      return { authorized: true, adminDid: callerDid, role: callerRole, statusCode: 200 };
+    }
+
+    if (callerRole === 'SYSTEM_OBSERVER') {
+      if (requiredPerm !== 'admin:access' && !requiredPerm.endsWith(':read')) {
+        return {
+          authorized: false,
+          adminDid: callerDid,
+          role: callerRole,
+          statusCode: 403,
+          error: `RBAC_PERMISSION_DENIED: Role '${callerRole}' lacks required permission '${requiredPerm}'`,
+        };
+      }
       return { authorized: true, adminDid: callerDid, role: callerRole, statusCode: 200 };
     }
 
@@ -193,8 +240,10 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
     HTTPS_PORT,
     injectCspNonce,
     broadcastChatEvent,
+    broadcastControlPlaneEvent,
     masterKey,
     binding,
+    dynamicSocialStore,
   } = ctx;
 
   const checkAdminRbac = ctx.checkAdminRbac || createCheckAdminRbac(adminSecurity);
@@ -355,7 +404,7 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
 
     if (url.pathname === '/api/admin/treasury/withdraw' && req.method === 'POST') {
       res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: 'CONSTITUTIONAL VIOLATION: Unilateral treasury withdrawals are strictly forbidden by Sovra protocol. Multi-party governance consensus required.' }));
+      res.end(JSON.stringify({ ok: false, error: 'CRITICAL CONSTITUTIONAL VIOLATION: Unilateral treasury withdrawal is strictly prohibited. Multi-party governance consensus required.' }));
       return true;
     }
 
@@ -685,7 +734,7 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
         let success = false;
         if (sqlite && id) {
           success = sqlite.setFeatureFlag(id, enabled, rolloutPercentage);
-          broadcastControlPlaneEvent('FEATURE_FLAG_MUTATED', { id, enabled, rolloutPercentage });
+          broadcastControlPlaneEvent?.('FEATURE_FLAG_MUTATED', { id, enabled, rolloutPercentage });
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: success, message: `Flag '${id}' updated: ${enabled ? 'ENABLED' : 'DISABLED'} (${rolloutPercentage}%)` }));
@@ -750,7 +799,7 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
         let alertId = '';
         if (sqlite) {
           alertId = sqlite.publishBroadcastAlert({ level, title, message, actionLabel, actionUrl, isSticky });
-          broadcastControlPlaneEvent('BROADCAST_ALERT_PUBLISHED', { alertId, level, title, message, actionLabel, actionUrl, isSticky });
+          broadcastControlPlaneEvent?.('BROADCAST_ALERT_PUBLISHED', { alertId, level, title, message, actionLabel, actionUrl, isSticky });
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, alertId, message: 'Broadcast alert published to active swarm' }));
@@ -1023,7 +1072,7 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
         let success = false;
         if (sqlite && switchId) {
           success = sqlite.setKillSwitch(switchId, active, auth.adminDid);
-          broadcastControlPlaneEvent('KILL_SWITCH_ENGAGED', { switchId, active });
+          broadcastControlPlaneEvent?.('KILL_SWITCH_ENGAGED', { switchId, active });
           sqlite.recordTamperProofAuditEntry({
             adminDid: auth.adminDid,
             role: auth.role,
@@ -1448,7 +1497,7 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
           timestamp: Date.now(),
         }, 'moderation_enforcement');
 
-        if (targetType === 'post') {
+        if (targetType === 'post' && dynamicSocialStore && Array.isArray(dynamicSocialStore.posts)) {
           if (action === 'Remove') {
             dynamicSocialStore.posts = dynamicSocialStore.posts.filter((p: any) => p.id !== targetId);
           } else if (action === 'Tombstone') {
@@ -1800,7 +1849,7 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
         }
 
         const delRes = sovraDb.deleteChannel(channelId, 'did:sovra:system');
-        dynamicSocialStore.channels = sovraDb.getAllChannels();
+        if (dynamicSocialStore) dynamicSocialStore.channels = sovraDb.getAllChannels();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: delRes.ok, channelId }));
       } catch (err: any) {
@@ -1839,7 +1888,7 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
         }
 
         const delRes = sovraDb.deletePage(pageId, 'did:sovra:system');
-        dynamicSocialStore.pages = sovraDb.getAllPages();
+        if (dynamicSocialStore) dynamicSocialStore.pages = sovraDb.getAllPages();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: delRes.ok, pageId }));
       } catch (err: any) {
@@ -1859,8 +1908,10 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
         return true;
       }
       const resPurge = sovraDb.purgeTestEntities();
-      dynamicSocialStore.channels = sovraDb.getAllChannels();
-      dynamicSocialStore.pages = sovraDb.getAllPages();
+      if (dynamicSocialStore) {
+        dynamicSocialStore.channels = sovraDb.getAllChannels();
+        dynamicSocialStore.pages = sovraDb.getAllPages();
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, ...resPurge }));
       return true;

@@ -1153,7 +1153,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     const hasAuthToken = Boolean(
       req.headers.authorization ||
       req.headers['x-sovra-session-token'] ||
-      (req.headers.cookie && req.headers.cookie.includes('sovra_session_token='))
+      (req.headers.cookie && /(?:sovra_session|sovra_session_token)=/.test(req.headers.cookie))
     );
     if (!hasAuthToken) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
