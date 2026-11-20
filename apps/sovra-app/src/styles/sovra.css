@@ -8943,6 +8943,13 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
+      background: 
+        radial-gradient(ellipse 1000px 600px at 50% -10%, rgba(99, 102, 241, 0.35), transparent 75%),
+        radial-gradient(ellipse 800px 500px at 95% 20%, rgba(14, 165, 233, 0.28), transparent 65%),
+        radial-gradient(ellipse 750px 600px at 5% 55%, rgba(168, 85, 247, 0.25), transparent 65%),
+        radial-gradient(ellipse 700px 500px at 85% 85%, rgba(20, 184, 166, 0.22), transparent 60%),
+        radial-gradient(circle 500px at 25% 15%, rgba(244, 63, 94, 0.16), transparent 55%),
+        linear-gradient(180deg, #060814 0%, #090e1e 40%, #080c18 70%, #04060c 100%);
       transition: background 0.4s ease, transform 0.4s ease;
     }
     .sovra-wallpaper-dimmer {
@@ -9096,7 +9103,7 @@
         overflow: visible !important;
         padding: 0 !important;
         margin: 0 !important;
-        background: #070a13 !important;
+        background: transparent !important;
         box-sizing: border-box !important;
       }
 
@@ -9482,15 +9489,25 @@
       }
     }
 
-    /* 🎨 UNIFIED LUXURY OBSIDIAN GLASS ARCHITECTURE */
+    /* 🎨 UNIFIED LUXURY LINEAR OBSIDIAN AURORA ARCHITECTURE */
     body,
     body.theme-black,
     body.theme-normal {
-      background-color: #070a13 !important;
+      background-color: #070913 !important;
+      background: 
+        radial-gradient(ellipse 1000px 600px at 50% -10%, rgba(99, 102, 241, 0.35), transparent 75%),
+        radial-gradient(ellipse 800px 500px at 95% 20%, rgba(14, 165, 233, 0.28), transparent 65%),
+        radial-gradient(ellipse 750px 600px at 5% 55%, rgba(168, 85, 247, 0.25), transparent 65%),
+        radial-gradient(ellipse 700px 500px at 85% 85%, rgba(20, 184, 166, 0.22), transparent 60%),
+        radial-gradient(circle 500px at 25% 15%, rgba(244, 63, 94, 0.16), transparent 55%),
+        linear-gradient(180deg, #060814 0%, #090e1e 40%, #080c18 70%, #04060c 100%) !important;
+      background-attachment: fixed !important;
       color: #f8fafc !important;
+      min-height: 100vh;
     }
     body .app-layout {
-      background-color: #070a13 !important;
+      background: transparent !important;
+      background-color: transparent !important;
     }
     .feed-composer-card,
     .composer-card,

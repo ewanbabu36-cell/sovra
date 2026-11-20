@@ -58789,8 +58789,8 @@ _scheduleTargetContext: 'workspace',
         
         {
           id: 'nebula',
-          name: 'Cosmic Nebula',
-          gradient: 'radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.45) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(56, 189, 248, 0.35) 0%, transparent 50%), linear-gradient(135deg, #090614 0%, #130924 40%, #1e1145 75%, #0a1128 100%)'
+          name: 'Linear Obsidian Aurora',
+          gradient: 'radial-gradient(circle 900px at 50% -15%, rgba(99, 102, 241, 0.22), transparent 70%), radial-gradient(circle 700px at 100% 25%, rgba(14, 165, 233, 0.16), transparent 60%), radial-gradient(circle 750px at 0% 70%, rgba(139, 92, 246, 0.15), transparent 65%), radial-gradient(circle 600px at 85% 85%, rgba(6, 182, 212, 0.12), transparent 60%), radial-gradient(circle 500px at 20% 20%, rgba(236, 72, 153, 0.08), transparent 50%), linear-gradient(180deg, #070913 0%, #090e1c 50%, #05070e 100%)'
         },
         {
           id: 'cyberpunk',
