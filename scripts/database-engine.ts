@@ -19283,6 +19283,27 @@ export class SovraDatabaseEngine {
     return [];
   }
 
+  public getAddressBook(ownerDid: string, category?: string): any[] {
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).getAddressBook === 'function') {
+      return (this.sqliteEngine as any).getAddressBook(ownerDid, category);
+    }
+    return [];
+  }
+
+  public upsertAddressBookContact(contact: any): any {
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).upsertAddressBookContact === 'function') {
+      return (this.sqliteEngine as any).upsertAddressBookContact(contact);
+    }
+    return contact;
+  }
+
+  public deleteAddressBookContact(id: string, ownerDid: string): boolean {
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).deleteAddressBookContact === 'function') {
+      return (this.sqliteEngine as any).deleteAddressBookContact(id, ownerDid);
+    }
+    return false;
+  }
+
 }
 
 // Singleton database instance exported for application-wide use

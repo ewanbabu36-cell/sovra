@@ -1061,6 +1061,29 @@ export class SqliteSocialDatabaseEngine {
       CREATE INDEX IF NOT EXISTS idx_contacts_handle ON contacts(handle);
       CREATE INDEX IF NOT EXISTS idx_contacts_online ON contacts(is_online);
 
+      -- 52b. ADDRESS BOOK (FAMILY, FRIENDS, WORK, SPEED DIAL)
+      CREATE TABLE IF NOT EXISTS address_book (
+        id TEXT PRIMARY KEY,
+        owner_did TEXT NOT NULL,
+        contact_did TEXT NOT NULL,
+        handle TEXT,
+        display_name TEXT NOT NULL,
+        nickname TEXT,
+        category TEXT NOT NULL DEFAULT 'FRIENDS',
+        relationship TEXT,
+        is_favorite INTEGER NOT NULL DEFAULT 0,
+        speed_dial_index INTEGER DEFAULT NULL,
+        avatar TEXT DEFAULT '👤',
+        avatar_bg TEXT DEFAULT '#0284c7',
+        custom_ringtone TEXT DEFAULT 'default',
+        notes TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_address_book_owner ON address_book(owner_did);
+      CREATE INDEX IF NOT EXISTS idx_address_book_category ON address_book(category);
+      CREATE INDEX IF NOT EXISTS idx_address_book_handle ON address_book(handle);
+
       -- 53. PAGES
       CREATE TABLE IF NOT EXISTS pages (
         id TEXT PRIMARY KEY,
@@ -2665,6 +2688,195 @@ this.db.exec('COMMIT;');
         p.disappearingDurationSec || 0, p.safetyNumbers || null,
         p.isVerified ? 1 : 0, p.createdAt || now, p.updatedAt || now
       );
+    } catch (_) {}
+  }
+
+  public getAddressBook(ownerDid: string, category?: string): any[] {
+    try {
+      this.seedDefaultAddressBookIfEmpty(ownerDid);
+      let sql = 'SELECT * FROM address_book WHERE owner_did = ?';
+      const params: any[] = [ownerDid];
+      if (category && category !== 'ALL') {
+        if (category === 'FAVORITES' || category === 'SPEED_DIAL') {
+          sql += ' AND (is_favorite = 1 OR speed_dial_index IS NOT NULL)';
+        } else {
+          sql += ' AND UPPER(category) = ?';
+          params.push(category.toUpperCase());
+        }
+      }
+      sql += ' ORDER BY CASE WHEN speed_dial_index IS NOT NULL THEN speed_dial_index ELSE 999 END, display_name ASC';
+      const rows = this.prepareCached(sql).all(...params) as any[];
+      return rows.map(r => ({
+        id: r.id,
+        ownerDid: r.owner_did,
+        contactDid: r.contact_did,
+        handle: r.handle || '',
+        displayName: r.display_name,
+        nickname: r.nickname || '',
+        category: r.category || 'FRIENDS',
+        relationship: r.relationship || '',
+        isFavorite: Boolean(r.is_favorite),
+        speedDialIndex: r.speed_dial_index,
+        avatar: r.avatar || '👤',
+        avatarBg: r.avatar_bg || '#0284c7',
+        customRingtone: r.custom_ringtone || 'default',
+        notes: r.notes || '',
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      }));
+    } catch (err) {
+      console.warn('[SQLite] getAddressBook warning:', err);
+      return [];
+    }
+  }
+
+  public upsertAddressBookContact(c: {
+    id?: string;
+    ownerDid: string;
+    contactDid: string;
+    handle?: string;
+    displayName: string;
+    nickname?: string;
+    category?: string;
+    relationship?: string;
+    isFavorite?: boolean;
+    speedDialIndex?: number | null;
+    avatar?: string;
+    avatarBg?: string;
+    customRingtone?: string;
+    notes?: string;
+  }): any {
+    const now = Date.now();
+    const id = c.id || ('addr_' + now + '_' + Math.random().toString(36).substring(2, 7));
+    const category = (c.category || 'FRIENDS').toUpperCase();
+    const isFavorite = c.isFavorite ? 1 : 0;
+    const speedDialIndex = c.speedDialIndex ?? (isFavorite ? 1 : null);
+    const stmt = this.prepareCached(`
+      INSERT OR REPLACE INTO address_book (
+        id, owner_did, contact_did, handle, display_name, nickname,
+        category, relationship, is_favorite, speed_dial_index,
+        avatar, avatar_bg, custom_ringtone, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(
+      id, c.ownerDid, c.contactDid, c.handle || null, c.displayName, c.nickname || null,
+      category, c.relationship || null, isFavorite, speedDialIndex,
+      c.avatar || '👤', c.avatarBg || '#0284c7', c.customRingtone || 'default', c.notes || null,
+      now, now
+    );
+    return {
+      id,
+      ownerDid: c.ownerDid,
+      contactDid: c.contactDid,
+      handle: c.handle || '',
+      displayName: c.displayName,
+      nickname: c.nickname || '',
+      category,
+      relationship: c.relationship || '',
+      isFavorite: Boolean(isFavorite),
+      speedDialIndex,
+      avatar: c.avatar || '👤',
+      avatarBg: c.avatarBg || '#0284c7',
+      customRingtone: c.customRingtone || 'default',
+      notes: c.notes || '',
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+
+  public deleteAddressBookContact(id: string, ownerDid: string): boolean {
+    try {
+      const info = this.prepareCached('DELETE FROM address_book WHERE id = ? AND owner_did = ?').run(id, ownerDid);
+      return info.changes > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public seedDefaultAddressBookIfEmpty(ownerDid: string): void {
+    try {
+      if (!ownerDid) return;
+      const countRow = this.prepareCached('SELECT COUNT(*) as cnt FROM address_book WHERE owner_did = ?').get(ownerDid) as any;
+      if (countRow && countRow.cnt > 0) return;
+
+      const defaults = [
+        {
+          contactDid: 'did:sovra:family_mom',
+          handle: '@maa_family',
+          displayName: 'Maa ❤️ (Mom)',
+          nickname: 'Maa',
+          category: 'FAMILY',
+          relationship: 'Mother',
+          isFavorite: true,
+          speedDialIndex: 1,
+          avatar: '👵',
+          avatarBg: 'linear-gradient(135deg, #f43f5e, #ec4899)'
+        },
+        {
+          contactDid: 'did:sovra:family_brother',
+          handle: '@bhai_family',
+          displayName: 'Bhai (Brother)',
+          nickname: 'Bhai',
+          category: 'FAMILY',
+          relationship: 'Brother',
+          isFavorite: true,
+          speedDialIndex: 2,
+          avatar: '👦',
+          avatarBg: 'linear-gradient(135deg, #3b82f6, #06b6d4)'
+        },
+        {
+          contactDid: 'did:sovra:alice_creator',
+          handle: '@alice_creator',
+          displayName: 'Alice Creator',
+          nickname: 'Alice',
+          category: 'FRIENDS',
+          relationship: 'Best Friend',
+          isFavorite: true,
+          speedDialIndex: 3,
+          avatar: '👩‍🎤',
+          avatarBg: 'linear-gradient(135deg, #8b5cf6, #d946ef)'
+        },
+        {
+          contactDid: 'did:sovra:bob_mesh',
+          handle: '@bob_mesh',
+          displayName: 'Bob Mesh Seeder',
+          nickname: 'Bob',
+          category: 'FRIENDS',
+          relationship: 'College Friend',
+          isFavorite: true,
+          speedDialIndex: 4,
+          avatar: '🚀',
+          avatarBg: 'linear-gradient(135deg, #10b981, #059669)'
+        },
+        {
+          contactDid: 'did:sovra:laptop_host',
+          handle: '@laptop_host',
+          displayName: 'Host Root Node',
+          nickname: 'Host Node',
+          category: 'WORK',
+          relationship: 'Mesh Relay Operator',
+          isFavorite: false,
+          speedDialIndex: null,
+          avatar: '💻',
+          avatarBg: 'linear-gradient(135deg, #6366f1, #4f46e5)'
+        }
+      ];
+
+      for (const d of defaults) {
+        this.upsertAddressBookContact({
+          ownerDid,
+          contactDid: d.contactDid,
+          handle: d.handle,
+          displayName: d.displayName,
+          nickname: d.nickname,
+          category: d.category,
+          relationship: d.relationship,
+          isFavorite: d.isFavorite,
+          speedDialIndex: d.speedDialIndex,
+          avatar: d.avatar,
+          avatarBg: d.avatarBg
+        });
+      }
     } catch (_) {}
   }
 

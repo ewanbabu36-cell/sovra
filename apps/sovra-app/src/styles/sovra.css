@@ -18569,4 +18569,91 @@ html, body {
     #studio-view .studio-content-table tr:hover td {
       background: rgba(255, 255, 255, 0.04) !important;
     }
+
+    /* ======================================================== */
+    /* 📞 SOVRA SOVEREIGN DIALER & ADDRESS BOOK STYLES          */
+    /* ======================================================== */
+    .sovra-keypad-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 10px 4px;
+      cursor: pointer;
+      color: #f8fafc;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .sovra-keypad-btn:hover {
+      background: rgba(56, 189, 248, 0.14);
+      border-color: rgba(56, 189, 248, 0.35);
+      transform: translateY(-2px);
+    }
+    .sovra-keypad-btn:active {
+      transform: scale(0.95);
+      background: rgba(56, 189, 248, 0.25);
+    }
+    .sovra-keypad-btn .key-digit {
+      font-size: 1.25rem;
+      font-weight: 800;
+      line-height: 1.1;
+      color: #ffffff;
+    }
+    .sovra-keypad-btn .key-sub {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .sovra-keypad-mod {
+      background: rgba(99, 102, 241, 0.08);
+      border-color: rgba(99, 102, 241, 0.2);
+    }
+    .sovra-keypad-mod:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+    .sovra-keypad-mod .key-digit {
+      color: #818cf8;
+    }
+
+    .dialer-speed-dial-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 8px 10px;
+      min-width: 68px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+    .dialer-speed-dial-chip:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.3);
+      transform: translateY(-2px);
+    }
+    .dialer-contact-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: #090d16;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 10px 12px;
+      transition: all 0.2s;
+    }
+    .dialer-contact-card:hover {
+      border-color: rgba(56, 189, 248, 0.3);
+      background: rgba(15, 23, 42, 0.9);
+    }
     

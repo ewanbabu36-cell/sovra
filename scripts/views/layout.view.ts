@@ -3153,6 +3153,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               <span>Chats</span>
             </span>
             <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" id="chatOpenDialerBtn" onclick="openChatDialerModal()" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; border-radius: 8px; padding: 5px 10px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" title="Open Sovereign Dialer & Phonebook">
+                <span>📞</span>
+                <span>Dialer</span>
+              </button>
               <button type="button" onclick="openNewGroupModal()" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.35); color: #22c55e; border-radius: 8px; padding: 5px 10px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" title="Create New Group">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 <span>New Group</span>
@@ -3987,6 +3991,212 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div style="display: flex; gap: 8px;">
             <button type="button" class="action-pill-btn action-pill-secondary" onclick="closeWaModal('newGroupModal')" style="flex: 1; padding: 0.65rem; justify-content: center;">Cancel</button>
             <button type="button" class="action-pill-btn action-pill-primary" onclick="submitCreateNewGroup()" style="flex: 2; padding: 0.65rem; justify-content: center; background: #00a884; border-color: #00a884;">Create Group 🚀</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. SOVRA SOVEREIGN DIALER & FAMILY/FRIENDS PHONEBOOK HUD -->
+      <div class="wa-modal-overlay" id="sovraChatDialerModal" style="display: none; z-index: 10500; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(10px); align-items: center; justify-content: center;" onclick="closeChatDialerModal()">
+        <div class="wa-modal-card" style="max-width: 480px; width: 94vw; max-height: 90vh; overflow-y: auto; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 22px; padding: 1.25rem 1.4rem; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7); color: #f8fafc;" onclick="event.stopPropagation()">
+          
+          <!-- Header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.25rem;">📞</span>
+              <div>
+                <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Sovereign Dialer</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">Direct P2P E2EE Voice &amp; Video Calling</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.68rem; padding: 2px 8px; border-radius: 999px;">● Mesh Online</span>
+              <button type="button" onclick="closeChatDialerModal()" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; font-size: 1.1rem; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+            </div>
+          </div>
+
+          <!-- Subtab Navigation -->
+          <div style="display: flex; gap: 6px; margin-bottom: 1rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px;">
+            <button type="button" id="dialerNavTabKeypad" onclick="switchDialerTab('keypad')" class="active" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">🎛️ Keypad</button>
+            <button type="button" id="dialerNavTabFavorites" onclick="switchDialerTab('favorites')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">⭐ Speed Dial</button>
+            <button type="button" id="dialerNavTabFamily" onclick="switchDialerTab('family')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👨‍👩‍👧‍👦 Family</button>
+            <button type="button" id="dialerNavTabFriends" onclick="switchDialerTab('friends')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👥 Friends</button>
+            <button type="button" id="dialerNavTabAll" onclick="switchDialerTab('all')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; border-radius: 14px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">📖 All Contacts</button>
+          </div>
+
+          <!-- VIEW A: TACTILE DIALPAD & LIVE PEER RESOLUTION -->
+          <div id="dialerPaneKeypad">
+            <!-- Screen Display Box -->
+            <div style="background: #090d16; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; padding: 12px 14px; margin-bottom: 0.85rem; box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <input type="text" id="dialerSovraIdInput" placeholder="Enter @handle or did:sovra:..." oninput="handleDialerInputChange(this.value)" style="width: 100%; background: transparent; border: none; color: #38bdf8; font-size: 1.25rem; font-weight: 800; outline: none; font-family: monospace; letter-spacing: 0.5px;" />
+                <button type="button" onclick="dialerBackspace()" title="Backspace" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">⌫</button>
+              </div>
+
+              <!-- Live Resolved Peer Preview Ribbon -->
+              <div id="dialerResolvedRibbon" style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.74rem;">
+                <div id="dialerResolvedAvatar" style="width: 24px; height: 24px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #fff;">👤</div>
+                <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <span id="dialerResolvedName" style="font-weight: 700; color: #fff;">Dial by Sovereign ID</span>
+                  <span id="dialerResolvedTag" style="color: #94a3b8; margin-left: 4px;">• Type handle or tap contact</span>
+                </div>
+                <span id="dialerResolvedOnlineBadge" class="badge" style="background: rgba(34, 197, 94, 0.2); color: #34d399; font-size: 0.65rem; padding: 1px 6px;">🟢 Mesh Ready</span>
+              </div>
+            </div>
+
+            <!-- Speed Dial Top Rail (Maa, Papa, Bhai, Best Friend) -->
+            <div style="margin-bottom: 0.85rem;">
+              <div style="font-size: 0.7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between;">
+                <span>⭐ Speed Dial (Family &amp; Close Friends)</span>
+                <span style="color: #38bdf8; cursor: pointer;" onclick="openSaveContactModal()">+ Add New</span>
+              </div>
+              <div id="dialerSpeedDialList" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Tactile Sovereign Keypad Grid (Alphanumeric with Quick Sovereign Modifiers) -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem;">
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('1')">
+                <span class="key-digit">1</span>
+                <span class="key-sub">@</span>
+              </button>
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('2')">
+                <span class="key-digit">2</span>
+                <span class="key-sub">ABC</span>
+              </button>
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('3')">
+                <span class="key-digit">3</span>
+                <span class="key-sub">DEF</span>
+              </button>
+
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('4')">
+                <span class="key-digit">4</span>
+                <span class="key-sub">GHI</span>
+              </button>
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('5')">
+                <span class="key-digit">5</span>
+                <span class="key-sub">JKL</span>
+              </button>
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('6')">
+                <span class="key-digit">6</span>
+                <span class="key-sub">MNO</span>
+              </button>
+
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('7')">
+                <span class="key-digit">7</span>
+                <span class="key-sub">PQRS</span>
+              </button>
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('8')">
+                <span class="key-digit">8</span>
+                <span class="key-sub">TUV</span>
+              </button>
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('9')">
+                <span class="key-digit">9</span>
+                <span class="key-sub">WXYZ</span>
+              </button>
+
+              <button type="button" class="sovra-keypad-btn sovra-keypad-mod" onclick="dialerAppendSpecial('did:')">
+                <span class="key-digit" style="font-size: 0.95rem;">did:</span>
+                <span class="key-sub">DID Prefix</span>
+              </button>
+              <button type="button" class="sovra-keypad-btn" onclick="dialerAppendKey('0')">
+                <span class="key-digit">0</span>
+                <span class="key-sub">+ / Space</span>
+              </button>
+              <button type="button" class="sovra-keypad-btn sovra-keypad-mod" onclick="dialerAppendSpecial('@')">
+                <span class="key-digit">@</span>
+                <span class="key-sub">Handle</span>
+              </button>
+            </div>
+
+            <!-- Big Call Action Buttons -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 0.65rem;">
+              <button type="button" onclick="initiateDialerCall('audio')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 14px; padding: 12px 14px; color: #fff; font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);">
+                <span style="font-size: 1.15rem;">📞</span>
+                <span>Audio Call</span>
+              </button>
+              <button type="button" onclick="initiateDialerCall('video')" style="background: linear-gradient(135deg, #0284c7, #6366f1); border: none; border-radius: 14px; padding: 12px 14px; color: #fff; font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 16px rgba(56, 189, 248, 0.35);">
+                <span style="font-size: 1.15rem;">📹</span>
+                <span>Video Call</span>
+              </button>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
+              <button type="button" onclick="openSaveContactModal(document.getElementById('dialerSovraIdInput').value)" style="background: transparent; border: 1px dashed rgba(255,255,255,0.2); border-radius: 10px; padding: 6px 12px; color: #cbd5e1; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                <span>💾 Save to Family &amp; Friends</span>
+              </button>
+              <button type="button" onclick="document.getElementById('dialerSovraIdInput').focus()" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; font-weight: 700; cursor: pointer;">
+                ⌨️ Use Physical Keyboard
+              </button>
+            </div>
+          </div>
+
+          <!-- VIEW B: SAVED ADDRESS BOOK & CONTACTS LIST -->
+          <div id="dialerPaneContacts" style="display: none;">
+            <div style="display: flex; gap: 8px; margin-bottom: 0.75rem;">
+              <input type="text" id="dialerContactSearchInput" placeholder="Search saved family, friends..." oninput="filterDialerContactsList(this.value)" style="flex: 1; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.8rem; outline: none;" />
+              <button type="button" onclick="openSaveContactModal()" style="background: rgba(16, 185, 129, 0.18); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; border-radius: 10px; padding: 0 12px; font-weight: 800; font-size: 0.78rem; cursor: pointer;">+ Add</button>
+            </div>
+
+            <div id="dialerAddressBookList" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+              <!-- Populated dynamically via loadDialerAddressBook() -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 9. SAVE CONTACT TO FAMILY & FRIENDS MODAL -->
+      <div class="wa-modal-overlay" id="sovraSaveContactModal" style="display: none; z-index: 10600; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(12px); align-items: center; justify-content: center;" onclick="closeSaveContactModal()">
+        <div class="wa-modal-card" style="max-width: 440px; width: 92vw; background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 20px; padding: 1.25rem 1.4rem; box-shadow: 0 25px 60px rgba(0,0,0,0.8); color: #fff;" onclick="event.stopPropagation()">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem;">
+            <div style="font-weight: 800; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;">
+              <span>💾</span>
+              <span>Save Sovereign Contact</span>
+            </div>
+            <button type="button" onclick="closeSaveContactModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">&times;</button>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div>
+              <label style="display: block; font-size: 0.72rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">DISPLAY NAME / FULL NAME *</label>
+              <input type="text" id="saveContactNameInput" placeholder="e.g. Maa, Rahul Bhai, Priya" style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem;" />
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.72rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">SOVRA ID / HANDLE / DID *</label>
+              <input type="text" id="saveContactDidInput" placeholder="@username or did:sovra:..." style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #38bdf8; font-family: monospace; font-size: 0.85rem;" />
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div>
+                <label style="display: block; font-size: 0.72rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">CATEGORY</label>
+                <select id="saveContactCategorySelect" style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 10px; color: #fff; font-size: 0.82rem;">
+                  <option value="FAMILY">👨‍👩‍👧‍👦 Family (परिवार)</option>
+                  <option value="FRIENDS" selected>👥 Friends (दोस्त)</option>
+                  <option value="WORK">💼 Work / Node</option>
+                  <option value="FAVORITES">⭐ Speed Dial Only</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.72rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">RELATIONSHIP / ROLE</label>
+                <input type="text" id="saveContactRelationshipInput" placeholder="Mother, Brother, Friend..." style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 10px; color: #fff; font-size: 0.82rem;" />
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
+              <input type="checkbox" id="saveContactSpeedDialCheck" checked style="width: 16px; height: 16px; cursor: pointer; accent-color: #38bdf8;" />
+              <label for="saveContactSpeedDialCheck" style="font-size: 0.8rem; color: #cbd5e1; cursor: pointer; font-weight: 600;">⭐ Pin to Top Speed Dial for 1-Touch Calling</label>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.72rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">NOTES (PRIVATE ENCRYPTED)</label>
+              <input type="text" id="saveContactNotesInput" placeholder="Optional personal notes..." style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.82rem;" />
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 0.75rem;">
+              <button type="button" onclick="closeSaveContactModal()" style="flex: 1; padding: 9px; border-radius: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: #cbd5e1; font-weight: 700; font-size: 0.82rem; cursor: pointer;">Cancel</button>
+              <button type="button" onclick="submitSaveAddressBookContact()" style="flex: 2; padding: 9px; border-radius: 12px; background: linear-gradient(135deg, #0284c7, #38bdf8); border: none; color: #fff; font-weight: 800; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3);">Save Contact 💾</button>
+            </div>
           </div>
         </div>
       </div>

@@ -6666,6 +6666,151 @@ async function startDevServer() {
     }
 
     // ==========================================
+    // 📖 SOVEREIGN ADDRESS BOOK & DIALER RESOLVER ENDPOINTS
+    // ==========================================
+    if (url.pathname === '/api/addressbook' && req.method === 'GET') {
+      try {
+        const principal = resolvePrincipal(req);
+        const ownerDid = url.searchParams.get('ownerDid') || principal?.did || masterKey.did;
+        const category = url.searchParams.get('category') || undefined;
+        const contacts = sovraDb.getAddressBook(ownerDid, category);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, contacts, count: contacts.length }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to fetch address book' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/addressbook' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = resolvePrincipal(req, parsed);
+        const ownerDid = principal?.did || parsed.ownerDid || masterKey.did;
+        const contactDid = parsed.contactDid || parsed.did || ('did:sovra:' + (parsed.handle ? parsed.handle.replace(/^@/, '') : ('peer_' + Date.now())));
+        const displayName = parsed.displayName || parsed.name || parsed.nickname || parsed.handle || 'Peer';
+
+        const saved = sovraDb.upsertAddressBookContact({
+          id: parsed.id,
+          ownerDid,
+          contactDid,
+          handle: parsed.handle ? (parsed.handle.startsWith('@') ? parsed.handle : ('@' + parsed.handle)) : undefined,
+          displayName,
+          nickname: parsed.nickname,
+          category: parsed.category || 'FRIENDS',
+          relationship: parsed.relationship,
+          isFavorite: Boolean(parsed.isFavorite || parsed.is_favorite),
+          speedDialIndex: parsed.speedDialIndex != null ? Number(parsed.speedDialIndex) : undefined,
+          avatar: parsed.avatar || '👤',
+          avatarBg: parsed.avatarBg || '#0284c7',
+          customRingtone: parsed.customRingtone,
+          notes: parsed.notes
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, contact: saved }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid contact payload' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/addressbook' && req.method === 'DELETE') {
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        const principal = resolvePrincipal(req, parsed);
+        const ownerDid = principal?.did || parsed.ownerDid || masterKey.did;
+        const id = parsed.id || url.searchParams.get('id');
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Contact ID required' }));
+          return;
+        }
+        const deleted = sovraDb.deleteAddressBookContact(id, ownerDid);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: deleted }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to delete contact' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/identity/resolve' && req.method === 'GET') {
+      try {
+        const query = (url.searchParams.get('q') || '').trim();
+        if (!query) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, peer: null }));
+          return;
+        }
+        const cleanQuery = query.toLowerCase();
+        const cleanHandle = cleanQuery.startsWith('@') ? cleanQuery : ('@' + cleanQuery);
+
+        // 1. Check in registered users
+        const allUsers = sovraDb.getAllUsers ? sovraDb.getAllUsers() : [];
+        let matched: any = allUsers.find((u: any) =>
+          u.did?.toLowerCase() === cleanQuery ||
+          u.handle?.toLowerCase() === cleanHandle ||
+          u.displayName?.toLowerCase() === cleanQuery
+        );
+
+        // 2. Check in address book
+        if (!matched) {
+          const abContacts = sovraDb.getAddressBook(masterKey.did);
+          const foundAb = abContacts.find((c: any) =>
+            c.contactDid?.toLowerCase() === cleanQuery ||
+            c.handle?.toLowerCase() === cleanHandle ||
+            c.displayName?.toLowerCase() === cleanQuery ||
+            c.nickname?.toLowerCase() === cleanQuery
+          );
+          if (foundAb) {
+            matched = {
+              did: foundAb.contactDid,
+              handle: foundAb.handle,
+              displayName: foundAb.displayName,
+              nickname: foundAb.nickname,
+              category: foundAb.category,
+              relationship: foundAb.relationship,
+              avatar: foundAb.avatar,
+              avatarBg: foundAb.avatarBg,
+              isOnline: true
+            };
+          }
+        }
+
+        // 3. Fallback: synthetic deterministic resolution if DID format or valid handle
+        if (!matched) {
+          const isDid = cleanQuery.startsWith('did:');
+          const finalDid = isDid ? cleanQuery : ('did:sovra:' + cleanQuery.replace(/^@/, ''));
+          const finalHandle = cleanQuery.startsWith('@') ? cleanQuery : ('@' + cleanQuery);
+          matched = {
+            did: finalDid,
+            handle: finalHandle,
+            displayName: cleanQuery.replace(/^@/, '').replace(/^did:sovra:/, '').toUpperCase(),
+            avatar: '👤',
+            avatarBg: '#0284c7',
+            isOnline: true,
+            isDiscovered: true
+          };
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, peer: matched }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Resolution error' }));
+      }
+      return;
+    }
+
+    // ==========================================
     // 💎 TESTNET CRYPTOGRAPHIC FAUCET CLAIM
     // ==========================================
     if (url.pathname === '/api/wallet/faucet/claim' && req.method === 'POST') {
