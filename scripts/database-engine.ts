@@ -19304,6 +19304,20 @@ export class SovraDatabaseEngine {
     return false;
   }
 
+  public getCallLogs(ownerDid: string, limit?: number): any[] {
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).getCallLogs === 'function') {
+      return (this.sqliteEngine as any).getCallLogs(ownerDid, limit);
+    }
+    return [];
+  }
+
+  public recordCallLog(log: any): any {
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).recordCallLog === 'function') {
+      return (this.sqliteEngine as any).recordCallLog(log);
+    }
+    return log;
+  }
+
 }
 
 // Singleton database instance exported for application-wide use

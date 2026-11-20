@@ -46478,6 +46478,7 @@ _scheduleTargetContext: 'workspace',
     // 📞 SOVRA SOVEREIGN DIALER & FAMILY/FRIENDS ADDRESS BOOK
     // ========================================================
     var _cachedAddressBook = [];
+    var _cachedCallLogs = [];
     var _currentDialerTab = 'keypad';
     var _dialerResolveTimer = null;
 
@@ -46501,7 +46502,7 @@ _scheduleTargetContext: 'workspace',
 
     function switchDialerTab(tab) {
       _currentDialerTab = tab;
-      var tabs = ['keypad', 'favorites', 'family', 'friends', 'all'];
+      var tabs = ['recents', 'keypad', 'favorites', 'family', 'friends', 'all'];
       tabs.forEach(function(t) {
         var btn = document.getElementById('dialerNavTab' + t.charAt(0).toUpperCase() + t.slice(1));
         if (btn) {
@@ -46517,13 +46518,21 @@ _scheduleTargetContext: 'workspace',
         }
       });
 
+      var paneRecents = document.getElementById('dialerPaneRecents');
       var paneKeypad = document.getElementById('dialerPaneKeypad');
       var paneContacts = document.getElementById('dialerPaneContacts');
 
-      if (tab === 'keypad') {
+      if (tab === 'recents') {
+        if (paneRecents) paneRecents.style.display = 'block';
+        if (paneKeypad) paneKeypad.style.display = 'none';
+        if (paneContacts) paneContacts.style.display = 'none';
+        loadDialerCallLogs('all');
+      } else if (tab === 'keypad') {
+        if (paneRecents) paneRecents.style.display = 'none';
         if (paneKeypad) paneKeypad.style.display = 'block';
         if (paneContacts) paneContacts.style.display = 'none';
       } else {
+        if (paneRecents) paneRecents.style.display = 'none';
         if (paneKeypad) paneKeypad.style.display = 'none';
         if (paneContacts) paneContacts.style.display = 'block';
         var catFilter = (tab === 'all') ? '' : tab.toUpperCase();
@@ -46531,6 +46540,186 @@ _scheduleTargetContext: 'workspace',
       }
     }
     window.switchDialerTab = switchDialerTab;
+
+    function dialerClearAll() {
+      var inEl = document.getElementById('dialerSovraIdInput');
+      if (inEl) inEl.value = '';
+      handleDialerInputChange('');
+    }
+    window.dialerClearAll = dialerClearAll;
+
+    function loadDialerCallLogs(filter) {
+      var listEl = document.getElementById('dialerRecentsList');
+      if (listEl) {
+        listEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px; font-size: 0.8rem;">Loading recent sovereign calls...</div>';
+      }
+      fetch('/api/call-logs')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok && Array.isArray(d.logs)) {
+            _cachedCallLogs = d.logs;
+            renderDialerCallLogs(d.logs, filter);
+          }
+        })
+        .catch(function() {
+          if (listEl) listEl.innerHTML = '<div style="text-align: center; color: #f87171; padding: 20px; font-size: 0.8rem;">Failed to load call logs.</div>';
+        });
+    }
+    window.loadDialerCallLogs = loadDialerCallLogs;
+
+    function filterRecentsList(type) {
+      var btnAll = document.getElementById('recentsFilterAll');
+      var btnMissed = document.getElementById('recentsFilterMissed');
+      if (type === 'missed') {
+        if (btnMissed) {
+          btnMissed.style.background = 'rgba(239, 68, 68, 0.2)';
+          btnMissed.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+          btnMissed.style.color = '#f87171';
+        }
+        if (btnAll) {
+          btnAll.style.background = 'rgba(255, 255, 255, 0.05)';
+          btnAll.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          btnAll.style.color = '#94a3b8';
+        }
+      } else {
+        if (btnAll) {
+          btnAll.style.background = 'rgba(56, 189, 248, 0.2)';
+          btnAll.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+          btnAll.style.color = '#38bdf8';
+        }
+        if (btnMissed) {
+          btnMissed.style.background = 'rgba(255, 255, 255, 0.05)';
+          btnMissed.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          btnMissed.style.color = '#94a3b8';
+        }
+      }
+      renderDialerCallLogs(_cachedCallLogs, type);
+    }
+    window.filterRecentsList = filterRecentsList;
+
+    function renderDialerCallLogs(logs, filter) {
+      var listEl = document.getElementById('dialerRecentsList');
+      if (!listEl) return;
+      var filtered = (logs || []).filter(function(l) {
+        if (filter === 'missed') return l.direction === 'missed' || l.status === 'missed';
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 30px 10px; font-size: 0.8rem;"><div style="font-size: 1.6rem; margin-bottom: 6px;">🕒</div><div>No recent calls recorded.</div><div style="font-size: 0.72rem; color: #64748b; margin-top: 4px;">Direct P2P E2EE calls with family and friends will appear here.</div></div>';
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(function(l) {
+        var isMissed = l.direction === 'missed' || l.status === 'missed';
+        var isOutgoing = l.direction === 'outgoing';
+        var isVideo = l.callType === 'video';
+        var dirIcon = isMissed ? '🔴 ↙️' : (isOutgoing ? '↗️' : '↙️');
+        var typeIcon = isVideo ? '📹' : '📞';
+        var dirColor = isMissed ? '#f87171' : (isOutgoing ? '#34d399' : '#38bdf8');
+        var safeDid = encodeURIComponent(l.peerDid || l.peerHandle);
+        var safeName = encodeURIComponent(l.peerName);
+
+        var durStr = isMissed ? 'Missed Call' : (l.durationSeconds ? (Math.floor(l.durationSeconds / 60) + 'm ' + (l.durationSeconds % 60) + 's') : 'Ended');
+        var dateStr = 'Recently';
+        if (l.createdAt) {
+          var diffMin = Math.floor((Date.now() - l.createdAt) / 60000);
+          if (diffMin < 1) dateStr = 'Just now';
+          else if (diffMin < 60) dateStr = diffMin + 'm ago';
+          else if (diffMin < 1440) dateStr = Math.floor(diffMin / 60) + 'h ago';
+          else dateStr = Math.floor(diffMin / 1440) + 'd ago';
+        }
+
+        return '<div class="dialer-contact-card" style="padding: 10px 12px;">' +
+          '<div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">' +
+            '<div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #38bdf8; flex-shrink: 0;">' + typeIcon + '</div>' +
+            '<div style="min-width: 0; flex: 1;">' +
+              '<div style="display: flex; align-items: center; gap: 6px;">' +
+                '<span style="font-weight: 700; font-size: 0.86rem; color: ' + (isMissed ? '#f87171' : '#fff') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + (l.peerName || 'Peer') + '</span>' +
+                '<span style="font-size: 0.65rem; color: ' + dirColor + '; font-weight: 700;">' + dirIcon + '</span>' +
+              '</div>' +
+              '<div style="display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: #94a3b8; margin-top: 2px;">' +
+                '<span style="font-family: monospace; color: #38bdf8;">' + (l.peerHandle || (l.peerDid ? l.peerDid.slice(0, 14) + '...' : '')) + '</span>' +
+                '<span>•</span>' +
+                '<span>' + durStr + '</span>' +
+                '<span>•</span>' +
+                '<span style="color: #64748b;">' + dateStr + '</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">' +
+            '<button type="button" data-call-type="audio" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="Call Back (Voice)" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(16, 185, 129, 0.18); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">📞</button>' +
+            '<button type="button" data-call-type="video" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="Call Back (Video)" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">📹</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+    window.renderDialerCallLogs = renderDialerCallLogs;
+
+    function openMyQrModal() {
+      var m = document.getElementById('sovraMyQrModal');
+      if (m) m.style.display = 'flex';
+      fetch('/api/status')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok) {
+            var dtEl = document.getElementById('myQrDidText');
+            if (dtEl && d.did) dtEl.innerText = d.did;
+          }
+        })
+        .catch(function() {});
+    }
+    window.openMyQrModal = openMyQrModal;
+
+    function closeMyQrModal() {
+      var m = document.getElementById('sovraMyQrModal');
+      if (m) m.style.display = 'none';
+    }
+    window.closeMyQrModal = closeMyQrModal;
+
+    function copyMySovereignId() {
+      var dtEl = document.getElementById('myQrDidText');
+      var did = dtEl ? dtEl.innerText : '';
+      if (navigator.clipboard && did) {
+        navigator.clipboard.writeText(did);
+      }
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('Sovereign DID copied to clipboard!');
+      }
+    }
+    window.copyMySovereignId = copyMySovereignId;
+
+    function openScanQrModal() {
+      var m = document.getElementById('sovraScanQrModal');
+      if (m) m.style.display = 'flex';
+      var inEl = document.getElementById('scanQrPasteInput');
+      if (inEl) inEl.focus();
+    }
+    window.openScanQrModal = openScanQrModal;
+
+    function closeScanQrModal() {
+      var m = document.getElementById('sovraScanQrModal');
+      if (m) m.style.display = 'none';
+    }
+    window.closeScanQrModal = closeScanQrModal;
+
+    function applyScannedSovraId() {
+      var inEl = document.getElementById('scanQrPasteInput');
+      var val = (inEl ? inEl.value : '').trim();
+      if (!val) {
+        if (typeof showAccountToast === 'function') showAccountToast('Please paste a Sovra ID, handle, or DID.', 'warning');
+        return;
+      }
+      closeScanQrModal();
+      var dIn = document.getElementById('dialerSovraIdInput');
+      if (dIn) dIn.value = val;
+      switchDialerTab('keypad');
+      handleDialerInputChange(val);
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('Sovereign peer imported! Ready to dial.');
+      }
+    }
+    window.applyScannedSovraId = applyScannedSovraId;
 
     function dialerAppendKey(k) {
       var inEl = document.getElementById('dialerSovraIdInput');
@@ -46866,6 +47055,22 @@ _scheduleTargetContext: 'workspace',
 
       var finalDid = rawTarget.startsWith('did:') ? rawTarget : ('did:sovra:' + rawTarget.replace(/^@/, ''));
       var finalName = rawName || (document.getElementById('dialerResolvedName') ? document.getElementById('dialerResolvedName').innerText : rawTarget);
+      var finalHandle = rawTarget.startsWith('@') ? rawTarget : ('@' + rawTarget.replace(/^did:sovra:/, ''));
+
+      // Asynchronously log outgoing call
+      fetch('/api/call-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          peerDid: finalDid,
+          peerHandle: finalHandle,
+          peerName: finalName,
+          direction: 'outgoing',
+          callType: type || 'audio',
+          status: 'completed',
+          durationSeconds: 1
+        })
+      }).catch(function() {});
 
       closeChatDialerModal();
 

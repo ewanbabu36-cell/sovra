@@ -6810,6 +6810,41 @@ async function startDevServer() {
       return;
     }
 
+    if (url.pathname === '/api/call-logs' && req.method === 'GET') {
+      try {
+        const principal = resolvePrincipal(req);
+        const ownerDid = url.searchParams.get('ownerDid') || principal?.did || masterKey.did;
+        const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+        const logs = sovraDb.getCallLogs(ownerDid, limit);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, logs, count: logs.length }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to fetch call logs' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/call-logs' && req.method === 'POST') {
+      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+      if (!ok) return;
+      try {
+        const parsed = JSON.parse(body);
+        const principal = resolvePrincipal(req, parsed);
+        const ownerDid = parsed.ownerDid || principal?.did || masterKey.did;
+        const saved = sovraDb.recordCallLog({
+          ...parsed,
+          ownerDid
+        });
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, log: saved }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to save call log' }));
+      }
+      return;
+    }
+
     // ==========================================
     // 💎 TESTNET CRYPTOGRAPHIC FAUCET CLAIM
     // ==========================================

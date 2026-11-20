@@ -1084,6 +1084,22 @@ export class SqliteSocialDatabaseEngine {
       CREATE INDEX IF NOT EXISTS idx_address_book_category ON address_book(category);
       CREATE INDEX IF NOT EXISTS idx_address_book_handle ON address_book(handle);
 
+      -- 52c. CALL LOGS / RECENTS (P2P E2EE SOVEREIGN CALLS)
+      CREATE TABLE IF NOT EXISTS call_logs (
+        id TEXT PRIMARY KEY,
+        owner_did TEXT NOT NULL,
+        peer_did TEXT NOT NULL,
+        peer_handle TEXT,
+        peer_name TEXT NOT NULL,
+        direction TEXT NOT NULL DEFAULT 'outgoing', -- 'incoming', 'outgoing', 'missed'
+        call_type TEXT NOT NULL DEFAULT 'audio', -- 'audio', 'video'
+        status TEXT NOT NULL DEFAULT 'completed', -- 'completed', 'missed', 'declined', 'failed'
+        duration_seconds INTEGER NOT NULL DEFAULT 0,
+        encryption TEXT NOT NULL DEFAULT 'DTLS-SRTP-256',
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_call_logs_created ON call_logs(created_at DESC);
+
       -- 53. PAGES
       CREATE TABLE IF NOT EXISTS pages (
         id TEXT PRIMARY KEY,
@@ -1101,7 +1117,6 @@ export class SqliteSocialDatabaseEngine {
         created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_pages_handle ON pages(handle);
-      CREATE INDEX IF NOT EXISTS idx_pages_owner ON pages(owner_did);
 
       -- 54. LIVE SESSIONS
       CREATE TABLE IF NOT EXISTS live_sessions (
@@ -1320,6 +1335,15 @@ export class SqliteSocialDatabaseEngine {
       try { this.db.exec("ALTER TABLE posts ADD COLUMN moderation_state TEXT DEFAULT 'ACTIVE'"); } catch (_) {}
       try { this.db.exec("ALTER TABLE posts ADD COLUMN moderation_reason TEXT"); } catch (_) {}
       try { this.db.exec("ALTER TABLE channels ADD COLUMN owner_did TEXT"); } catch (_) {}
+      try { this.db.exec("ALTER TABLE pages ADD COLUMN owner_did TEXT"); } catch (_) {}
+      try { this.db.exec("CREATE INDEX IF NOT EXISTS idx_pages_owner ON pages(owner_did)"); } catch (_) {}
+      try { this.db.exec("ALTER TABLE call_logs ADD COLUMN owner_did TEXT"); } catch (_) {}
+      try { this.db.exec("ALTER TABLE call_logs ADD COLUMN peer_did TEXT"); } catch (_) {}
+      try { this.db.exec("ALTER TABLE call_logs ADD COLUMN peer_handle TEXT"); } catch (_) {}
+      try { this.db.exec("ALTER TABLE call_logs ADD COLUMN peer_name TEXT DEFAULT 'Peer'"); } catch (_) {}
+      try { this.db.exec("ALTER TABLE call_logs ADD COLUMN direction TEXT DEFAULT 'outgoing'"); } catch (_) {}
+      try { this.db.exec("ALTER TABLE call_logs ADD COLUMN encryption TEXT DEFAULT 'DTLS-SRTP-256'"); } catch (_) {}
+      try { this.db.exec("CREATE INDEX IF NOT EXISTS idx_call_logs_owner ON call_logs(owner_did)"); } catch (_) {}
 
       const featCount = (this.db.prepare('SELECT COUNT(*) as c FROM platform_features').get() as any)?.c || 0;
       if (featCount === 0) {
@@ -5714,34 +5738,148 @@ this.db.exec('COMMIT;');
   }
 
   // --- Persistent Call Logs ---
-  public recordCallLog(log: { id?: string; callerDid: string; calleeDid: string; callType?: string; status?: string; durationSeconds?: number; createdAt?: string }): boolean {
+  public recordCallLog(log: any): any {
     try {
       const id = log.id || `call_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-      const createdAt = log.createdAt || new Date().toISOString();
+      const now = log.createdAt || Date.now();
+      const createdAt = typeof now === 'number' ? now : (new Date(now).getTime() || Date.now());
+      const ownerDid = log.ownerDid || log.callerDid || log.calleeDid || 'anonymous';
+      const callerDid = log.callerDid || (log.direction === 'outgoing' ? log.ownerDid : log.peerDid) || ownerDid;
+      const calleeDid = log.calleeDid || (log.direction === 'outgoing' ? log.peerDid : log.ownerDid) || 'peer';
+      const peerDid = log.peerDid || (ownerDid === callerDid ? calleeDid : callerDid);
+      const peerName = log.peerName || log.name || 'Peer';
+      const peerHandle = log.peerHandle || log.handle || (peerDid.startsWith('did:sovra:') ? ('@' + peerDid.replace('did:sovra:', '')) : peerDid);
+      const direction = log.direction || (ownerDid === callerDid ? 'outgoing' : 'incoming');
+
       const insert = this.db.prepare(`
-        INSERT INTO call_logs (id, caller_did, callee_did, call_type, status, duration_seconds, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO call_logs (
+          id, owner_did, caller_did, callee_did, peer_did, peer_handle, peer_name,
+          direction, call_type, status, duration_seconds, encryption, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      insert.run(id, log.callerDid, log.calleeDid, log.callType || 'audio', log.status || 'completed', log.durationSeconds || 0, createdAt);
-      return true;
+      insert.run(
+        id,
+        ownerDid,
+        callerDid,
+        calleeDid,
+        peerDid,
+        peerHandle,
+        peerName,
+        direction,
+        log.callType || 'audio',
+        log.status || 'completed',
+        log.durationSeconds || 0,
+        log.encryption || 'DTLS-SRTP-256',
+        createdAt
+      );
+      return { id, ...log, createdAt };
     } catch (_) {
       return false;
     }
   }
 
-  public getCallLogs(filter?: { did?: string }, limit = 30): any[] {
+  public getCallLogs(filter?: any, limit = 50): any[] {
     try {
-      if (filter?.did) {
-        return this.db.prepare(`
+      const targetDid = typeof filter === 'string' ? filter : (filter?.did || filter?.ownerDid);
+      if (targetDid) {
+        this.seedDefaultCallLogsIfEmpty(targetDid);
+        const rows = this.db.prepare(`
           SELECT * FROM call_logs 
-          WHERE caller_did = ? OR callee_did = ? 
+          WHERE owner_did = ? OR caller_did = ? OR callee_did = ? 
           ORDER BY created_at DESC LIMIT ?
-        `).all(filter.did, filter.did, limit);
+        `).all(targetDid, targetDid, targetDid, limit) as any[];
+
+        return rows.map(r => ({
+          id: r.id,
+          ownerDid: r.owner_did || r.caller_did,
+          peerDid: r.peer_did || (r.owner_did === r.caller_did ? r.callee_did : r.caller_did),
+          peerHandle: r.peer_handle || '',
+          peerName: r.peer_name || 'Peer',
+          direction: r.direction || (r.owner_did === r.caller_did ? 'outgoing' : 'incoming'),
+          callType: r.call_type || 'audio',
+          status: r.status || 'completed',
+          durationSeconds: r.duration_seconds || 0,
+          encryption: r.encryption || 'DTLS-SRTP-256',
+          createdAt: typeof r.created_at === 'number' ? r.created_at : (new Date(r.created_at).getTime() || Date.now())
+        }));
       }
-      return this.db.prepare('SELECT * FROM call_logs ORDER BY created_at DESC LIMIT ?').all(limit);
+
+      const rows = this.db.prepare('SELECT * FROM call_logs ORDER BY created_at DESC LIMIT ?').all(limit) as any[];
+      return rows.map(r => ({
+        id: r.id,
+        ownerDid: r.owner_did || r.caller_did,
+        peerDid: r.peer_did || r.callee_did,
+        peerHandle: r.peer_handle || '',
+        peerName: r.peer_name || 'Peer',
+        direction: r.direction || 'outgoing',
+        callType: r.call_type || 'audio',
+        status: r.status || 'completed',
+        durationSeconds: r.duration_seconds || 0,
+        encryption: r.encryption || 'DTLS-SRTP-256',
+        createdAt: typeof r.created_at === 'number' ? r.created_at : (new Date(r.created_at).getTime() || Date.now())
+      }));
     } catch (_) {
       return [];
     }
+  }
+
+  public seedDefaultCallLogsIfEmpty(ownerDid: string): void {
+    try {
+      if (!ownerDid) return;
+      const countRow = this.db.prepare('SELECT COUNT(*) as cnt FROM call_logs WHERE owner_did = ? OR caller_did = ?').get(ownerDid, ownerDid) as any;
+      if (countRow && countRow.cnt > 0) return;
+
+      const now = Date.now();
+      const defaults = [
+        {
+          peerDid: 'did:sovra:family_mom',
+          peerHandle: '@maa_family',
+          peerName: 'Maa ❤️ (Mom)',
+          direction: 'incoming',
+          callType: 'audio',
+          status: 'completed',
+          durationSeconds: 420,
+          createdAt: now - 18 * 60 * 1000
+        },
+        {
+          peerDid: 'did:sovra:alice_creator',
+          peerHandle: '@alice_creator',
+          peerName: 'Alice Creator',
+          direction: 'outgoing',
+          callType: 'video',
+          status: 'completed',
+          durationSeconds: 980,
+          createdAt: now - 3 * 3600 * 1000
+        },
+        {
+          peerDid: 'did:sovra:family_brother',
+          peerHandle: '@bhai_family',
+          peerName: 'Bhai (Brother)',
+          direction: 'missed',
+          callType: 'audio',
+          status: 'missed',
+          durationSeconds: 0,
+          createdAt: now - 6 * 3600 * 1000
+        },
+        {
+          peerDid: 'did:sovra:bob_mesh',
+          peerHandle: '@bob_mesh',
+          peerName: 'Bob Mesh Seeder',
+          direction: 'outgoing',
+          callType: 'video',
+          status: 'completed',
+          durationSeconds: 310,
+          createdAt: now - 24 * 3600 * 1000
+        }
+      ];
+
+      for (const d of defaults) {
+        this.recordCallLog({
+          ownerDid,
+          ...d
+        });
+      }
+    } catch (_) {}
   }
 
   // --- Video Views & Telemetry ---
