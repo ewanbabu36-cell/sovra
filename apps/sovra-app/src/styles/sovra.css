@@ -9022,6 +9022,35 @@
     #feed-view #sovraHeroAnchorCard {
       display: none !important;
     }
+
+    #headerThemeToggleBtn {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 38px !important;
+      height: 38px !important;
+      border-radius: 50% !important;
+      background: rgba(255, 255, 255, 0.08) !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      color: #f1f5f9 !important;
+      cursor: pointer !important;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+      flex-shrink: 0 !important;
+    }
+    #headerThemeToggleBtn:hover {
+      background: rgba(255, 255, 255, 0.16) !important;
+      border-color: rgba(255, 255, 255, 0.28) !important;
+      transform: scale(1.05);
+    }
+    body.theme-normal #headerThemeToggleBtn {
+      background: #f0f2f5 !important;
+      border: 1px solid #ced0d4 !important;
+      color: #050505 !important;
+    }
+    body.theme-normal #headerThemeToggleBtn:hover {
+      background: #e4e6eb !important;
+    }
     .feed-container {
       max-width: 680px !important;
       margin: 0 auto !important;
@@ -9053,7 +9082,6 @@
       #headerMobileSearchBtn,
       #headerIdentitySwitcherPill,
       #headerLogoutBtn,
-      #headerThemeToggleBtn,
       .node-status-pill {
         display: none !important;
       }
@@ -9349,12 +9377,40 @@
     #headerWallpaperBtn,
     #headerIdentitySwitcherPill,
     #headerLogoutBtn,
-    #headerThemeToggleBtn,
     .node-status-pill,
     .sovra-floating-glass-dock,
     #sovraFloatingGlassDock,
     #feed-view #sovraHeroAnchorCard {
       display: none !important;
+    }
+
+    #headerThemeToggleBtn {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 38px !important;
+      height: 38px !important;
+      border-radius: 50% !important;
+      background: rgba(255, 255, 255, 0.08) !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      color: #f1f5f9 !important;
+      cursor: pointer !important;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+      flex-shrink: 0 !important;
+    }
+    #headerThemeToggleBtn:hover {
+      background: rgba(255, 255, 255, 0.16) !important;
+      border-color: rgba(255, 255, 255, 0.28) !important;
+      transform: scale(1.05);
+    }
+    body.theme-normal #headerThemeToggleBtn {
+      background: #f0f2f5 !important;
+      border: 1px solid #ced0d4 !important;
+      color: #050505 !important;
+    }
+    body.theme-normal #headerThemeToggleBtn:hover {
+      background: #e4e6eb !important;
     }
 
     /* 📱 MOBILE COMPACT HEADER (<= 860px): CLEAN BRAND + 3 ICONS ONLY */
@@ -9489,11 +9545,13 @@
       }
     }
 
-    /* 🎨 UNIFIED LUXURY LINEAR OBSIDIAN AURORA ARCHITECTURE */
+    /* 🎨 STRICT 3-THEME ARCHITECTURE: AURORA (BRAND), NORMAL (LIGHT), BLACK (DARK) */
+
+    /* 🌌 1. SOVRA AURORA BRAND THEME (Signature Luminous Ambient Obsidian Mesh) */
     body,
-    body.theme-black,
-    body.theme-normal {
-      background-color: #070913 !important;
+    body.theme-aurora,
+    body:not(.theme-normal):not(.theme-black) {
+      background-color: #060814 !important;
       background: 
         radial-gradient(ellipse 1000px 600px at 50% -10%, rgba(99, 102, 241, 0.35), transparent 75%),
         radial-gradient(ellipse 800px 500px at 95% 20%, rgba(14, 165, 233, 0.28), transparent 65%),
@@ -9505,27 +9563,168 @@
       color: #f8fafc !important;
       min-height: 100vh;
     }
-    body .app-layout {
+    body.theme-aurora .app-layout,
+    body:not(.theme-normal):not(.theme-black) .app-layout,
+    body.theme-aurora .app-center-stage,
+    body:not(.theme-normal):not(.theme-black) .app-center-stage,
+    body.theme-aurora .feed-container,
+    body:not(.theme-normal):not(.theme-black) .feed-container,
+    body.theme-aurora .main-content:not(#studio-view):not(.studio-main-viewport),
+    body:not(.theme-normal):not(.theme-black) .main-content:not(#studio-view):not(.studio-main-viewport) {
       background: transparent !important;
       background-color: transparent !important;
     }
-    .feed-composer-card,
-    .composer-card,
-    .create-story-card,
-    .insta-post-card {
+    #studio-view,
+    .studio-main-viewport {
+      background: #0b0f19 !important;
+      background-color: #0b0f19 !important;
+    }
+    body.theme-aurora #sovraWallpaperCanvas,
+    body.theme-aurora .sovra-wallpaper-canvas {
+      display: block !important;
+    }
+    body.theme-aurora .app-top-header,
+    body:not(.theme-normal):not(.theme-black) .app-top-header {
+      background: rgba(11, 15, 25, 0.88) !important;
+      backdrop-filter: blur(24px) !important;
+      -webkit-backdrop-filter: blur(24px) !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+      color: #f8fafc !important;
+    }
+    body.theme-aurora .app-left-rail,
+    body:not(.theme-normal):not(.theme-black) .app-left-rail {
+      background: rgba(11, 15, 25, 0.8) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+    body.theme-aurora .app-right-rail,
+    body:not(.theme-normal):not(.theme-black) .app-right-rail {
+      background: rgba(11, 15, 25, 0.8) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+    body.theme-aurora .feed-composer-card,
+    body.theme-aurora .composer-card,
+    body.theme-aurora .create-story-card,
+    body.theme-aurora .insta-post-card,
+    body:not(.theme-normal):not(.theme-black) .feed-composer-card,
+    body:not(.theme-normal):not(.theme-black) .composer-card,
+    body:not(.theme-normal):not(.theme-black) .create-story-card,
+    body:not(.theme-normal):not(.theme-black) .insta-post-card {
       background: rgba(15, 23, 42, 0.75) !important;
       backdrop-filter: blur(20px) !important;
       border: 1px solid rgba(255, 255, 255, 0.08) !important;
       border-radius: 18px !important;
       color: #f8fafc !important;
     }
-    .composer-textarea {
-      background: rgba(0, 0, 0, 0.25) !important;
-      color: #f8fafc !important;
-      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+
+    /* ☀️ 2. CLEAN LIGHT THEME (Pure White Background, Crisp Black Text) */
+    body.theme-normal {
+      background: #f0f2f5 !important;
+      background-color: #f0f2f5 !important;
+      color: #050505 !important;
+      min-height: 100vh;
     }
-    .composer-textarea::placeholder {
-      color: #94a3b8 !important;
+    body.theme-normal #sovraWallpaperCanvas,
+    body.theme-normal .sovra-wallpaper-canvas {
+      display: none !important;
+    }
+    body.theme-normal .app-layout,
+    body.theme-normal .app-center-stage,
+    body.theme-normal .feed-container,
+    body.theme-normal .main-content {
+      background: #f0f2f5 !important;
+      background-color: #f0f2f5 !important;
+    }
+    body.theme-normal .app-top-header {
+      background: #ffffff !important;
+      border-bottom: 1px solid #ced0d4 !important;
+      color: #050505 !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+    }
+    body.theme-normal .app-left-rail {
+      background: #ffffff !important;
+      border-right: 1px solid #ced0d4 !important;
+      color: #050505 !important;
+    }
+    body.theme-normal .app-right-rail {
+      background: #ffffff !important;
+      border-left: 1px solid #ced0d4 !important;
+      color: #050505 !important;
+    }
+    body.theme-normal .card,
+    body.theme-normal .feed-composer-card,
+    body.theme-normal .composer-card,
+    body.theme-normal .create-story-card,
+    body.theme-normal .insta-post-card {
+      background: #ffffff !important;
+      border: 1px solid #e4e6eb !important;
+      color: #050505 !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+      border-radius: 18px !important;
+    }
+    body.theme-normal .composer-textarea {
+      background: #f0f2f5 !important;
+      color: #050505 !important;
+      border: 1px solid #ced0d4 !important;
+    }
+    body.theme-normal .composer-textarea::placeholder {
+      color: #65676b !important;
+    }
+
+    /* 🌙 3. PURE DARK THEME (OLED Pitch Black Background, Crisp White Text) */
+    body.theme-black {
+      background: #000000 !important;
+      background-color: #000000 !important;
+      color: #ffffff !important;
+      min-height: 100vh;
+    }
+    body.theme-black #sovraWallpaperCanvas,
+    body.theme-black .sovra-wallpaper-canvas {
+      display: none !important;
+    }
+    body.theme-black .app-layout,
+    body.theme-black .app-center-stage,
+    body.theme-black .feed-container,
+    body.theme-black .main-content {
+      background: #000000 !important;
+      background-color: #000000 !important;
+    }
+    body.theme-black .app-top-header {
+      background: #121212 !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+      color: #ffffff !important;
+    }
+    body.theme-black .app-left-rail {
+      background: #09090b !important;
+      border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+      color: #ffffff !important;
+    }
+    body.theme-black .app-right-rail {
+      background: #09090b !important;
+      border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+      color: #ffffff !important;
+    }
+    body.theme-black .card,
+    body.theme-black .feed-composer-card,
+    body.theme-black .composer-card,
+    body.theme-black .create-story-card,
+    body.theme-black .insta-post-card {
+      background: #141416 !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
+      border-radius: 18px !important;
+    }
+    body.theme-black .composer-textarea {
+      background: #202024 !important;
+      color: #ffffff !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    }
+    body.theme-black .composer-textarea::placeholder {
+      color: #a1a1aa !important;
     }
 
     /* 🎨 HIGH-CONTRAST THEME INTEGRITY (ELIMINATE WHITE-ON-WHITE TEXT) */

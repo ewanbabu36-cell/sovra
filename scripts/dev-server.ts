@@ -1569,8 +1569,8 @@ const SOVRA_PWA_MANIFEST = {
   ],
 };
 
-const SOVRA_SERVICE_WORKER_SCRIPT = `// Supported cache versions: sovra-pwa-v6, sovra-pwa-v7, sovra-pwa-v8
-const CACHE_NAME = 'sovra-pwa-v8';
+const SOVRA_SERVICE_WORKER_SCRIPT = `// Supported cache versions: sovra-pwa-v6, sovra-pwa-v7, sovra-pwa-v8, sovra-pwa-v9
+const CACHE_NAME = 'sovra-pwa-v9';
 const STATIC_ASSETS = [
   '/',
   '/dist/bundle.js',
@@ -9620,7 +9620,26 @@ async function startDevServer() {
       url.pathname.startsWith('/join') ||
       url.pathname.startsWith('/@') ||
       url.pathname.startsWith('/channel/') ||
-      url.pathname.startsWith('/c/')
+      url.pathname.startsWith('/c/') ||
+      url.pathname === '/studio' ||
+      url.pathname.startsWith('/studio/') ||
+      url.pathname === '/feed' ||
+      url.pathname === '/watch' ||
+      url.pathname.startsWith('/watch/') ||
+      url.pathname === '/reels' ||
+      url.pathname === '/chat' ||
+      url.pathname === '/me' ||
+      url.pathname === '/profile' ||
+      url.pathname === '/admin' ||
+      url.pathname === '/hub' ||
+      url.pathname === '/calls' ||
+      url.pathname === '/live' ||
+      url.pathname === '/communities' ||
+      url.pathname === '/settings' ||
+      url.pathname === '/notifications' ||
+      url.pathname === '/dapps' ||
+      url.pathname === '/player' ||
+      url.pathname === '/search'
     ) {
       const now = Date.now();
       if (!_cachedHtmlResponse || (now - _cachedHtmlResponse.createdAt > HTML_CACHE_TTL_MS)) {

@@ -5404,21 +5404,26 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <span style="font-size: 1.1rem;">🎨</span>
                   <span>Theme &amp; Display Appearance</span>
                 </span>
-                <span class="badge" id="currentThemeBadge" style="background: rgba(24, 119, 242, 0.15); color: #1877f2; border: 1px solid rgba(24, 119, 242, 0.35); font-size: 0.72rem; padding: 2px 8px; border-radius: 8px; font-weight: 700;">☀️ Normal</span>
+                <span class="badge" id="currentThemeBadge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); font-size: 0.72rem; padding: 2px 8px; border-radius: 8px; font-weight: 700;">✨ Aurora</span>
               </div>
               <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">
-                Select your display theme. Strictly two clean modes: Normal (Light) and Black (Dark).
+                Select your display theme: Clean White Light Mode, Pure OLED Dark Mode, or Sovra's signature ambient Aurora Brand Theme.
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0.85rem;">
-                <div id="btnThemeNormal" onclick="setSovraTheme('normal', true)" style="cursor: pointer; padding: 14px 12px; border-radius: 12px; border: 2px solid #1877f2; background: rgba(24, 119, 242, 0.12); color: #1877f2; transition: all 0.2s ease; text-align: center;">
-                  <div style="font-size: 1.6rem; margin-bottom: 4px;">☀️</div>
-                  <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 2px;">Normal</div>
-                  <div style="font-size: 0.72rem; opacity: 0.85; line-height: 1.3;">Clean Light Mode</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 0.85rem;">
+                <div id="btnThemeAurora" onclick="setSovraTheme('aurora', true)" style="cursor: pointer; padding: 12px 8px; border-radius: 12px; border: 2px solid #818cf8; background: rgba(99, 102, 241, 0.15); color: #818cf8; transition: all 0.2s ease; text-align: center;">
+                  <div style="font-size: 1.5rem; margin-bottom: 4px;">✨</div>
+                  <div style="font-weight: 800; font-size: 0.88rem; margin-bottom: 2px;">Aurora</div>
+                  <div style="font-size: 0.68rem; opacity: 0.85; line-height: 1.3;">Brand Signature</div>
                 </div>
-                <div id="btnThemeBlack" onclick="setSovraTheme('black', true)" style="cursor: pointer; padding: 14px 12px; border-radius: 12px; border: 1px solid var(--surface-border); background: transparent; color: var(--text); transition: all 0.2s ease; text-align: center;">
-                  <div style="font-size: 1.6rem; margin-bottom: 4px;">🌙</div>
-                  <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 2px;">Black</div>
-                  <div style="font-size: 0.72rem; opacity: 0.85; line-height: 1.3;">Pure Dark Mode</div>
+                <div id="btnThemeNormal" onclick="setSovraTheme('normal', true)" style="cursor: pointer; padding: 12px 8px; border-radius: 12px; border: 1px solid var(--surface-border); background: transparent; color: var(--text); transition: all 0.2s ease; text-align: center;">
+                  <div style="font-size: 1.5rem; margin-bottom: 4px;">☀️</div>
+                  <div style="font-weight: 800; font-size: 0.88rem; margin-bottom: 2px;">Light</div>
+                  <div style="font-size: 0.68rem; opacity: 0.85; line-height: 1.3;">Clean White</div>
+                </div>
+                <div id="btnThemeBlack" onclick="setSovraTheme('black', true)" style="cursor: pointer; padding: 12px 8px; border-radius: 12px; border: 1px solid var(--surface-border); background: transparent; color: var(--text); transition: all 0.2s ease; text-align: center;">
+                  <div style="font-size: 1.5rem; margin-bottom: 4px;">🌙</div>
+                  <div style="font-weight: 800; font-size: 0.88rem; margin-bottom: 2px;">Dark</div>
+                  <div style="font-size: 0.68rem; opacity: 0.85; line-height: 1.3;">Pure OLED Dark</div>
                 </div>
               </div>
 
@@ -5435,8 +5440,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
             </div>
             <div class="card-footer-actions">
-              <button type="button" class="btn-card-action" onclick="toggleSovraTheme(event)" style="background: rgba(24, 119, 242, 0.15); border-color: rgba(24, 119, 242, 0.35); color: #1877f2;">
-                <span>🌓 Switch Theme (Normal / Black)</span>
+              <button type="button" class="btn-card-action" onclick="toggleSovraTheme(event)" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.35); color: #818cf8;">
+                <span>✨ Cycle Theme (Aurora / Light / Dark)</span>
               </button>
             </div>
           </div>
@@ -7461,7 +7466,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <button type="button" id="studioEarnSubtabBtnTiers" onclick="switchEarnSubtab('tiers')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Membership Tiers</button>
                   <button type="button" id="studioEarnSubtabBtnTips" onclick="switchEarnSubtab('tips')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Super Thanks &amp; Tips</button>
                   <button type="button" id="studioEarnSubtabBtnEligibility" onclick="switchEarnSubtab('eligibility')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Eligibility</button>
-                  <button type="button" id="studioEarnSubtabBtnAds" onclick="openAdsManagerModal()" style="background: rgba(244,63,94,0.15); border: 1px solid rgba(244,63,94,0.35); color: #fb7185; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">📢 Ads &amp; Campaigns</button>
+                  <button type="button" id="studioEarnSubtabBtnAds" onclick="openAdsManagerModal()" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">📢 Ads &amp; Campaigns</button>
                   <button type="button" id="studioEarnSubtabBtnLedger" onclick="switchEarnSubtab('ledger')" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Financial Ledger &amp; CSV</button>
                 </div>
 
