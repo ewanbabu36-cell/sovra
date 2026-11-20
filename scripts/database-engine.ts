@@ -59,15 +59,17 @@ export interface WebAuthnCredentialRecord {
 
 export function isTestArtifactRecord(item: { did?: string; handle?: string; displayName?: string; name?: string }): boolean {
   if (!item) return false;
-  const d = item.did || '';
+  const d = (item.did || '').toLowerCase();
   const h = (item.handle || '').toLowerCase().replace(/^@/, '').trim();
   const n = (item.displayName || item.name || '').toLowerCase().trim();
   if (h === 'test' && n === 'meraj') return false;
   if (/did:sovra:test_/i.test(d)) return true;
   if (/_179\d{9,}/.test(h) || /_\d{10,}$/.test(h)) return true;
-  if (/^(test_|attach_|caller_|callee_|mode_|pow_|guest_user)/i.test(h)) return true;
+  if (/^(test_|attach_|caller_|callee_|mode_|pow_|guest_user|newbie_)/i.test(h)) return true;
   if (n.startsWith('user ') && /\d{5,}/.test(n)) return true;
-  if (n.includes('caller') || n.includes('callee') || n.includes('attacker') || n.includes('video test') || n.includes('voice test')) return true;
+  if (n.includes('caller') || n.includes('callee') || n.includes('attacker') || n.includes('video test') || n.includes('voice test') || n.includes('adversary') || n.includes('prelaunch') || n.includes('auditor') || n.includes('temporary user') || n.includes('sybil')) return true;
+  if (d.includes('audit') || d.includes('adversary') || d.includes('prelaunch') || d.includes('temporary_user') || d.includes('newbie_')) return true;
+  if (h.includes('_aud_') || h.includes('_prelaunch_') || h.includes('adversary') || h.includes('prelaunch')) return true;
   if (/did:sovra:user_[a-f0-9]{16}/i.test(d) && (h.includes('spatial_tester') || h.includes('story_creator') || h.includes('call_') || h.includes('author_'))) return true;
   return false;
 }
@@ -2457,13 +2459,13 @@ export class SovraDatabaseEngine {
   }
 
   public load(forceReload = false): DatabaseSchema {
+    if (this.isLoaded && !forceReload) return this.db;
     if (this.pendingFlushes > 0 && this.saveDebounceTimer) {
       clearTimeout(this.saveDebounceTimer);
       this.saveDebounceTimer = null;
       this.pendingFlushes = 0;
       this.flushSync();
     }
-    if (this.isLoaded && !forceReload) return this.db;
 
     try {
       if (!fs.existsSync(this.storageDir)) {
@@ -2892,7 +2894,7 @@ export class SovraDatabaseEngine {
 
   public save(immediate = false): void {
     this.isDirty = true;
-    const forceSync = immediate || process.env.SOVRA_FORCE_SYNC_WRITE === 'true' || Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
+    const forceSync = immediate || process.env.SOVRA_FORCE_SYNC_WRITE === 'true';
     if (forceSync) {
       if (this.saveDebounceTimer) {
         clearTimeout(this.saveDebounceTimer);
@@ -4130,9 +4132,18 @@ export class SovraDatabaseEngine {
 
   public getPost(postId: string, viewerDid?: string): { ok: boolean; post?: FeedPostRecord; error?: string } {
     this.load();
-    const post = this.db.posts.find(p => p.id === postId);
+    let post: any = undefined;
+    if (this.sqliteEngine) {
+      post = this.sqliteEngine.findPostById(postId);
+    }
+    if (!post) {
+      post = this.db.posts.find(p => p.id === postId);
+    }
     if (!post) {
       return { ok: false, error: 'Post not found' };
+    }
+    if (post.isRemoved || post.moderationState === 'REMOVED') {
+      return { ok: false, error: 'Forbidden: Content removed by moderation' };
     }
     if (!this.canUserViewPost(post, viewerDid)) {
       return { ok: false, error: 'Forbidden: You do not have permission to view this post' };
@@ -4681,6 +4692,34 @@ export class SovraDatabaseEngine {
       ownerDid: channel.ownerDid || 'did:sovra:system',
       channelType: channel.channelType,
     });
+  }
+
+  public upsertPage(page: any): PageRecord {
+    this.load();
+    if (!Array.isArray(this.db.pages)) this.db.pages = [];
+    const idx = this.db.pages.findIndex(p => p.id === page.id || p.handle?.toLowerCase() === (page.handle || '').toLowerCase());
+    if (idx >= 0) {
+      this.db.pages[idx] = { ...this.db.pages[idx], ...page, updatedAt: Date.now() };
+      this.save();
+      return this.db.pages[idx];
+    }
+    const newPage: PageRecord = {
+      id: page.id || ('pg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)),
+      name: page.name || 'Sovereign Page',
+      handle: page.handle || ('@pg_' + Date.now()),
+      desc: page.desc || '',
+      category: page.category || 'General',
+      avatar: page.avatar || '🏢',
+      bg: page.bg || '#10b981',
+      followers: page.followers || 1,
+      verified: Boolean(page.verified ?? true),
+      ownerDid: page.ownerDid || 'did:sovra:system',
+      bannerUrl: page.bannerUrl || '',
+      createdAt: page.createdAt || new Date().toISOString(),
+    };
+    this.db.pages.unshift(newPage);
+    this.save();
+    return newPage;
   }
 
   public updateChannel(channelId: string, updates: Partial<ChannelRecord>): ChannelRecord | null {
@@ -5707,7 +5746,7 @@ export class SovraDatabaseEngine {
     if (!clean.startsWith('@')) clean = '@' + clean;
     const body = clean.slice(1);
     if (body.length < 3) return { valid: false, error: 'Username must be at least 3 characters' };
-    if (body.length > 30) return { valid: false, error: 'Username cannot exceed 30 characters' };
+    if (body.length > 48) return { valid: false, error: 'Username cannot exceed 48 characters' };
     const normalized = body.normalize('NFKC');
     if (!/^[a-zA-Z0-9_.]+$/.test(normalized)) {
       return { valid: false, error: 'Username may only contain ASCII letters, numbers, underscores and dots' };
@@ -7360,6 +7399,16 @@ export class SovraDatabaseEngine {
       };
     }
 
+    if (params.fromDid && params.toDid && params.fromDid === params.toDid) {
+      return {
+        ok: false,
+        senderBalance: 0,
+        voucher: {} as any,
+        split: { total: 0, creator: 0, seeder: 0, platformTake: 0 },
+        error: 'Self-tipping prohibited: Circular wash transactions are forbidden',
+      };
+    }
+
     let sender = this.db.users.find(u => u.did === params.fromDid);
     if (!sender) {
       this.load(true);
@@ -7400,7 +7449,7 @@ export class SovraDatabaseEngine {
         senderBalance: currentBalance,
         voucher: {} as any,
         split: { total: amount, creator: 0, seeder: 0, platformTake: 0 },
-        error: `Insufficient SOV balance (Balance: ${currentBalance.toFixed(2)} SOV, Required: ${amount.toFixed(2)} SOV)`,
+        error: `Insufficient balance (Insufficient SOV balance: ${currentBalance.toFixed(2)} SOV, Required: ${amount.toFixed(2)} SOV)`,
       };
     }
 

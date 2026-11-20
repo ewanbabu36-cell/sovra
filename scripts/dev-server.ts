@@ -109,7 +109,7 @@ import { renderAdminHtml, renderAdminLoginHtml } from './admin-console.ts';
 import { sovereignAdminSecurity } from './admin-security.ts';
 import { selfHealingDaemon } from './self-healing-daemon.ts';
 import { handleOperatorRoutes } from './routes/operator.routes.ts';
-import { handleAdminConsoleRoutes } from './routes/admin-console.routes.ts';
+import { handleAdminConsoleRoutes, createCheckAdminRbac } from './routes/admin-console.routes.ts';
 import { handleJuryModerationRoutes } from './routes/jury-moderation.routes.ts';
 import { handleSecurityCanaryRoutes } from './routes/security-canary.routes.ts';
 import { handlePushRoutes } from './routes/push.routes.ts';
@@ -1569,8 +1569,8 @@ const SOVRA_PWA_MANIFEST = {
   ],
 };
 
-const SOVRA_SERVICE_WORKER_SCRIPT = `// Supported cache versions: sovra-pwa-v6, sovra-pwa-v7, sovra-pwa-v8, sovra-pwa-v9
-const CACHE_NAME = 'sovra-pwa-v9';
+const SOVRA_SERVICE_WORKER_SCRIPT = `// Supported cache versions: sovra-pwa-v6, sovra-pwa-v7, sovra-pwa-v8, sovra-pwa-v9, sovra-pwa-v10
+const CACHE_NAME = 'sovra-pwa-v10';
 const STATIC_ASSETS = [
   '/',
   '/dist/bundle.js',
@@ -1686,34 +1686,27 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navigation Requests: Instant Cache Return with Background Revalidation (Stale-While-Revalidate)
+  // 2. Navigation Requests: Network-First with Offline Cache Fallback
   if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html') || url.pathname === '/' || url.pathname === '/app') {
     event.respondWith(
-      caches.open(CACHE_NAME).then(async (cache) => {
+      fetch(req).then((networkRes) => {
+        if (networkRes && networkRes.status === 200) {
+          const clone = networkRes.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            try {
+              cache.put(req, clone);
+              cache.put('/', clone.clone());
+            } catch (_) {}
+          });
+        }
+        return networkRes;
+      }).catch(async () => {
+        const cache = await caches.open(CACHE_NAME);
         let cached = await cache.match(req).catch(() => null);
-        if (!cached) {
-          cached = await cache.match('/', { ignoreSearch: true }).catch(() => null);
-        }
-        if (!cached) {
-          cached = await cache.match('/index.html', { ignoreSearch: true }).catch(() => null);
-        }
-
-        const fetchPromise = fetch(req).then((networkRes) => {
-          if (networkRes && networkRes.status === 200) {
-            cache.put(req, networkRes.clone());
-            cache.put('/', networkRes.clone());
-          }
-          return networkRes;
-        }).catch(() => null);
-
-        if (cached) {
-          return cached;
-        }
-
-        const networkRes = await fetchPromise;
-        if (networkRes) return networkRes;
-
-        return new Response('<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Sovra Mesh Offline</title><style>body{background:#090d16;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:40px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:85vh;margin:0;}:root{color-scheme:dark;}</style></head><body><div style=\"width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#00f0ff,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:2rem;margin-bottom:16px;box-shadow:0 0 25px rgba(99,102,241,0.5);\">⚡</div><h1 style=\"font-size:1.6rem;font-weight:800;margin:0 0 8px 0;\">Sovra Mesh Offline</h1><p style=\"color:#94a3b8;max-width:440px;font-size:0.95rem;line-height:1.5;margin:0 0 24px 0;\">Operating in disconnected local mode. Your offline outbox and local media are ready.</p><div style=\"display:flex;gap:12px;flex-wrap:wrap;justify-content:center;\"><button onclick=\"window.location.href=\\\'/\'\" style=\"background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;font-size:0.95rem;cursor:pointer;\">🚀 Open Sovra App</button><button onclick=\"window.location.reload()\" style=\"background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.2);padding:12px 20px;border-radius:12px;font-weight:600;font-size:0.95rem;cursor:pointer;\">🔄 Reconnect</button></div></body></html>', {
+        if (!cached) cached = await cache.match('/', { ignoreSearch: true }).catch(() => null);
+        if (!cached) cached = await cache.match('/index.html', { ignoreSearch: true }).catch(() => null);
+        if (cached) return cached;
+        return new Response('<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Sovra Mesh Offline</title></head><body><h1>Sovra Offline</h1><p>Operating in disconnected local mode</p></body></html>', {
           headers: { 'Content-Type': 'text/html; charset=utf-8' }
         });
       })
@@ -2512,7 +2505,10 @@ async function startDevServer() {
       });
 
       req.on('end', () => {
-        if (!aborted) resolve({ body, ok: true });
+        if (!aborted) {
+          (req as any).rawBody = body;
+          resolve({ body, ok: true });
+        }
       });
 
       req.on('error', (err) => {
@@ -2525,15 +2521,97 @@ async function startDevServer() {
     });
   }
 
+  // Anti-replay cache for signed requests: key = `${did}:${nonce}`, value = expiresAt (timestamp)
+  const devServerReplayNonceCache = new Map<string, number>();
+  const DEV_SERVER_MAX_REPLAY_CACHE = 10000;
+  const DEV_SERVER_MAX_SKEW_MS = 300_000; // 5 minutes
+
+  function checkDevServerReplayNonce(did: string, nonce: string, timestamp: number): boolean {
+    if (!did || !nonce || isNaN(timestamp)) return false;
+    const now = Date.now();
+    if (timestamp < now - DEV_SERVER_MAX_SKEW_MS || timestamp > now + 60_000) {
+      return false;
+    }
+    if (devServerReplayNonceCache.size > DEV_SERVER_MAX_REPLAY_CACHE) {
+      for (const [k, exp] of devServerReplayNonceCache) {
+        if (exp < now) devServerReplayNonceCache.delete(k);
+      }
+    }
+    const scopedKey = `${did}:${nonce}`;
+    if (devServerReplayNonceCache.has(scopedKey)) {
+      return false; // Replay detected!
+    }
+    return true;
+  }
+
+  function recordDevServerReplayNonce(did: string, nonce: string, timestamp: number): void {
+    const scopedKey = `${did}:${nonce}`;
+    devServerReplayNonceCache.set(scopedKey, timestamp + 360_000);
+  }
+
+  const B58_CHARS = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  function decodeBase58Btc(str: string): Uint8Array {
+    const bytes = [0];
+    for (let i = 0; i < str.length; i++) {
+      const c = str[i];
+      const val = B58_CHARS.indexOf(c);
+      if (val === -1) throw new Error('Invalid Base58');
+      for (let j = 0; j < bytes.length; j++) bytes[j] = bytes[j] * 58;
+      bytes[0] += val;
+      let carry = 0;
+      for (let j = 0; j < bytes.length; j++) {
+        const sum = bytes[j] + carry;
+        bytes[j] = sum % 256;
+        carry = Math.floor(sum / 256);
+      }
+      while (carry > 0) {
+        bytes.push(carry % 256);
+        carry = Math.floor(carry / 256);
+      }
+    }
+    for (let i = 0; i < str.length && str[i] === '1'; i++) bytes.push(0);
+    return new Uint8Array(bytes.reverse());
+  }
+
+  function extractEd25519PubKey(did: string): Buffer | null {
+    try {
+      if (did.startsWith('did:key:z')) {
+        const b58 = did.slice('did:key:z'.length);
+        const decoded = decodeBase58Btc(b58);
+        if (decoded.length === 34 && decoded[0] === 0xed && decoded[1] === 0x01) {
+          return Buffer.from(decoded.slice(2));
+        }
+        if (decoded.length === 32) {
+          return Buffer.from(decoded);
+        }
+      }
+      const clean = did.replace(/^did:sovra:/, '');
+      if (/^[0-9a-fA-F]{64}$/.test(clean)) {
+        return Buffer.from(clean, 'hex');
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
   function resolvePrincipal(
     req: http.IncomingMessage,
     _parsedBody?: Record<string, any>,
   ): AuthenticatedPrincipal | null {
+    if ((req as any)._resolvedPrincipal !== undefined) {
+      if ((req as any)._resolvedPrincipal !== null) {
+        return (req as any)._resolvedPrincipal;
+      }
+      if (!_parsedBody) {
+        return null;
+      }
+    }
     // Helper to validate and convert a session token to an AuthenticatedPrincipal
     const tryResolveToken = (t: string): AuthenticatedPrincipal | null => {
       if (!t || typeof t !== 'string') return null;
       const cleanToken = t.trim();
-      if (!cleanToken) return null;
+      if (!cleanToken || cleanToken === 'undefined' || cleanToken === 'null') return null;
 
       const adminPrinc = adminSecurity.resolveAdminSession(cleanToken);
       if (adminPrinc) return adminPrinc;
@@ -2580,10 +2658,10 @@ async function startDevServer() {
       if (princ) return princ;
     }
 
-    // Candidate 3: Request body sessionToken
+    // Candidate 3: Request body sessionToken, token, or authToken
     if (_parsedBody && typeof _parsedBody === 'object') {
-      const bodyCandidate = String(_parsedBody.sessionToken || _parsedBody.peer?.sessionToken || '').trim();
-      if (bodyCandidate) {
+      const bodyCandidate = String(_parsedBody.sessionToken || _parsedBody.token || _parsedBody.authToken || _parsedBody.peer?.sessionToken || '').trim();
+      if (bodyCandidate && bodyCandidate !== 'undefined' && bodyCandidate !== 'null') {
         const princ = tryResolveToken(bodyCandidate);
         if (princ) return princ;
       }
@@ -2635,42 +2713,100 @@ async function startDevServer() {
       }
     }
 
+    const rawProvidedToken = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.substring(7).trim() :
+      (req.headers['x-sovra-session-token'] ? String(req.headers['x-sovra-session-token']).trim() :
+      (_parsedBody && typeof _parsedBody === 'object' ? String(_parsedBody.sessionToken || _parsedBody.token || _parsedBody.authToken || _parsedBody.peer?.sessionToken || '').trim() : ''));
+    const isMalformedFalsyToken = rawProvidedToken === 'undefined' || rawProvidedToken === 'null' || rawProvidedToken === '';
+
     // If explicit or cookie authentication tokens were provided but all failed to resolve
-    const hasAnyTokenProvided = Boolean(
+    const hasAnyTokenProvided = !isMalformedFalsyToken && Boolean(
       (authHeader && authHeader.startsWith('Bearer ')) ||
       req.headers['x-sovra-session-token'] ||
-      (_parsedBody && typeof _parsedBody === 'object' && (_parsedBody.sessionToken || _parsedBody.peer?.sessionToken)) ||
-      (req.headers.cookie && /(?:^|;\s*)(?:sovra_session|sovra_session_token)=/.test(req.headers.cookie))
+      (_parsedBody && typeof _parsedBody === 'object' && (_parsedBody.sessionToken || _parsedBody.token || _parsedBody.authToken || _parsedBody.peer?.sessionToken)) ||
+      (req.headers.cookie && /(?:^|;\s*)(?:sovra_session|sovra_session_token)=(?!undefined|null)[^;]+/.test(req.headers.cookie))
     );
     if (hasAnyTokenProvided) {
       // Invalid or expired token was presented
       return null;
     }
 
-    // Sovereign direct node authorization via explicit X-Sovra-DID header or verified actor DID
-    const claimedDid = String(
-      req.headers['x-sovra-did'] ||
-      _parsedBody?.actorDid ||
-      _parsedBody?.authorDid ||
-      _parsedBody?.senderDid ||
-      _parsedBody?.fromDid ||
-      ''
-    ).trim();
-    const sovereignDidHeader = req.headers['x-sovra-did'] ? String(req.headers['x-sovra-did']).trim() : '';
-    const actorDid = sovereignDidHeader || claimedDid;
-    if (actorDid) {
-      const user = sovraDb.findUserByDid(actorDid);
-      if (user) {
-        const activeToken = user.sessionToken || ('stk_' + crypto.randomBytes(24).toString('hex'));
-        return createAuthenticatedPrincipal({
-          did: user.did,
-          sessionId: activeToken,
-          role: user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' ? user.role : 'USER',
-          authenticationMethod: 'BEARER_TOKEN',
+    // Candidate 5: Cryptographically verified Ed25519 Request Signature (Zero-trust, anti-replay, anti-spoofing)
+    const sigHeader = (req.headers['x-sovra-signature'] ? String(req.headers['x-sovra-signature']).trim() : '');
+    if (sigHeader) {
+      const sigDid = String(req.headers['x-sovra-did'] || '').trim();
+      const tsHeader = String(req.headers['x-sovra-timestamp'] || '').trim();
+      const nonceHeader = String(req.headers['x-sovra-nonce'] || '').trim();
+
+      if (!sigDid || !tsHeader || !nonceHeader) {
+        return null;
+      }
+      const timestamp = Number(tsHeader);
+      if (isNaN(timestamp)) {
+        return null;
+      }
+
+      if (!checkDevServerReplayNonce(sigDid, nonceHeader, timestamp)) {
+        return null;
+      }
+
+      const rawPubKey = extractEd25519PubKey(sigDid);
+      if (!rawPubKey || rawPubKey.length !== 32) {
+        return null;
+      }
+
+      const derPrefix = Buffer.from('302a300506032b6570032100', 'hex');
+      const derKey = Buffer.concat([derPrefix, rawPubKey]);
+
+      try {
+        const pubKeyObj = crypto.createPublicKey({
+          key: derKey,
+          format: 'der',
+          type: 'spki',
         });
+        const sigBytes = Buffer.from(sigHeader, 'hex');
+
+        // Check canonical V1: `${method}:${pathname}:${nonce}:${timestamp}`
+        const method = (req.method || 'GET').toUpperCase();
+        const parsedUrl = new URL(req.url || '/', 'http://localhost');
+        const pathname = parsedUrl.pathname;
+        const canonicalV1 = `${method}:${pathname}:${nonceHeader}:${tsHeader}`;
+        let isValid = false;
+        try {
+          isValid = crypto.verify(null, Buffer.from(canonicalV1, 'utf8'), pubKeyObj, sigBytes);
+        } catch (_) {}
+
+        // If not V1, check canonical V2: `SOVRA-REQ-V2\n${method}\n${pathname}\n${canonicalQuery}\n${bodyHash}\n${did}\n${keyId}\n${nonce}\n${timestamp}`
+        if (!isValid) {
+          const rawBody = (req as any).rawBody || (_parsedBody ? (typeof _parsedBody === 'string' ? _parsedBody : JSON.stringify(_parsedBody)) : '');
+          const bodyHash = crypto.createHash('sha256').update(Buffer.from(rawBody, 'utf8')).digest('hex');
+          const queryEntries = Array.from(parsedUrl.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b));
+          const query = queryEntries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+          const keyId = String(req.headers['x-sovra-key-id'] || sigDid).trim();
+          const canonicalV2 = `SOVRA-REQ-V2\n${method}\n${pathname}\n${query}\n${bodyHash}\n${sigDid}\n${keyId}\n${nonceHeader}\n${tsHeader}`;
+          try {
+            isValid = crypto.verify(null, Buffer.from(canonicalV2, 'utf8'), pubKeyObj, sigBytes);
+          } catch (_) {}
+        }
+
+        if (!isValid) return null;
+
+        recordDevServerReplayNonce(sigDid, nonceHeader, timestamp);
+        const u = sovraDb.findUserByDid(sigDid);
+        const principal = createAuthenticatedPrincipal({
+          did: sigDid,
+          sessionId: `sig_${nonceHeader}`,
+          role: u && (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN') ? u.role : 'USER',
+          authenticationMethod: 'ED25519_SIGNATURE',
+        });
+        (req as any)._resolvedPrincipal = principal;
+        return principal;
+      } catch {
+        return null;
       }
     }
 
+    // Explicit unauthenticated DID fallback strictly forbidden (TSK-P0-01)
+    (req as any)._resolvedPrincipal = null;
     return null;
   }
 
@@ -3102,7 +3238,7 @@ async function startDevServer() {
     // Hardened Security Headers (OWASP Production Defense-in-Depth)
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
@@ -3152,6 +3288,7 @@ async function startDevServer() {
       userCreatorModes,
       readBoundedBody,
       enforceAuth,
+      resolvePrincipal,
       getRealSystemTelemetry,
       lastOperatorTelemetrySampleTime,
       setLastOperatorTelemetrySampleTime: (t) => { lastOperatorTelemetrySampleTime = t; },
@@ -3859,8 +3996,14 @@ async function startDevServer() {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       if (!ok) return;
       try {
-        const principal = resolvePrincipal(req);
-        const targetDid = url.searchParams.get('did') || (principal ? principal.did : masterKey.did);
+        const principal = enforceAuth(req, res);
+        if (!principal) return;
+        const targetDid = url.searchParams.get('did') || principal.did;
+        if (targetDid !== principal.did && principal.role !== 'SUPER_ADMIN') {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot update profile of another user' }));
+          return;
+        }
         const parsed = JSON.parse(body || '{}');
         const result = sovraDb.updateUserProfile(targetDid, {
           name: parsed.name,
@@ -4009,81 +4152,6 @@ async function startDevServer() {
       return;
     }
 
-    // API: Genesis Faucet Claim (0-to-1 Activation Grant)
-    if (url.pathname === '/api/wallet/faucet/claim' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = JSON.parse(body || '{}');
-        const principal = resolvePrincipal(req, parsed);
-        const targetDid = parsed.did || (principal ? principal.did : masterKey.did);
-        const amount = Number(parsed.amount || 50);
-
-        // Cryptographic 24-hour rate limiting
-        const sqlite = sovraDb.getSqliteEngine()?.getRawDb();
-        if (sqlite) {
-          try {
-            const lastClaim = sqlite.prepare(`
-              SELECT created_at FROM analytics_events 
-              WHERE event_type = 'FAUCET_CLAIM' AND user_did = ? 
-              ORDER BY created_at DESC LIMIT 1
-            `).get(targetDid);
-
-            if (lastClaim) {
-              const lastTime = new Date(lastClaim.created_at).getTime();
-              if (Date.now() - lastTime < 24 * 60 * 60 * 1000) {
-                const waitHours = Math.ceil((24 * 60 * 60 * 1000 - (Date.now() - lastTime)) / 3600000);
-                res.writeHead(429, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: false, error: 'Faucet rate limit reached. Please wait ' + waitHours + ' hours before claiming again.' }));
-                return;
-              }
-            }
-          } catch (_) {}
-        }
-
-        const result = sovraDb.depositFunds({
-          did: targetDid,
-          amount,
-          sourceTx: 'faucet_claim_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'),
-        });
-
-        if (result.ok) {
-          try {
-            sovraDb.recordAnalyticsEvent({
-              eventType: 'FAUCET_CLAIM',
-              userDid: targetDid,
-              metadataJson: JSON.stringify({ amount, txType: 'GENESIS_TESTNET_FAUCET' })
-            });
-          } catch (_) {}
-          sovraDb.logAudit({
-            type: 'WALLET_FAUCET_CLAIM',
-            action: 'GENESIS_GRANT',
-            actorDid: targetDid,
-            actorHandle: parsed.handle || (principal?.handle || 'user'),
-            details: `Claimed ${amount} SOV starter grant via 0-to-1 activation wizard`,
-          });
-
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
-            ok: true,
-            claimed: amount,
-            amount,
-            newBalance: result.newBalance,
-            newBalanceFiat: Number((result.newBalance * 3.0).toFixed(2)),
-            currency: 'SOV',
-            txHash: '0x' + crypto.randomBytes(16).toString('hex'),
-            message: `🎁 ${amount.toFixed(2)} SOV Genesis Starter Grant claimed successfully!`,
-          }));
-        } else {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: result.error || 'Faucet claim failed' }));
-        }
-      } catch (err: any) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Server error' }));
-      }
-      return;
-    }
 
     // API: BitSwap P2P Seeder Mining Yield Claim
     if (url.pathname === '/api/wallet/claim-seeder-rewards' && req.method === 'POST') {
@@ -6845,64 +6913,6 @@ async function startDevServer() {
       return;
     }
 
-    // ==========================================
-    // 💎 TESTNET CRYPTOGRAPHIC FAUCET CLAIM
-    // ==========================================
-    if (url.pathname === '/api/wallet/faucet/claim' && req.method === 'POST') {
-      const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-      if (!ok) return;
-      try {
-        const parsed = body ? JSON.parse(body) : {};
-        const principal = resolvePrincipal(req, parsed);
-        const userDid = principal?.did || parsed.did || (typeof currentUserHandle !== 'undefined' ? currentUserHandle : 'did:sovra:guest');
-        
-        const sqlite = sovraDb.getSqliteEngine()?.getRawDb();
-        const now = Date.now();
-        const FAUCET_AMOUNT = 50.0;
-        
-        if (sqlite) {
-          const lastClaim = sqlite.prepare(`
-            SELECT created_at FROM analytics_events 
-            WHERE event_type = 'FAUCET_CLAIM' AND user_did = ? 
-            ORDER BY created_at DESC LIMIT 1
-          `).get(userDid);
-
-          if (lastClaim) {
-            const lastTime = new Date(lastClaim.created_at).getTime();
-            if (now - lastTime < 24 * 60 * 60 * 1000) {
-              const waitHours = Math.ceil((24 * 60 * 60 * 1000 - (now - lastTime)) / 3600000);
-              res.writeHead(429, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ ok: false, error: 'Faucet rate limit reached. Please wait ' + waitHours + ' hours before claiming again.' }));
-              return;
-            }
-          }
-
-          const existing = sqlite.prepare('SELECT did FROM users WHERE did = ?').get(userDid);
-          if (!existing) {
-            const handle = userDid.replace('did:sovra:', '@');
-            sqlite.prepare(`
-              INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, created_at, updated_at)
-              VALUES (?, ?, ?, '👤', '#6366f1', ?, ?, ?)
-            `).run(userDid, handle, handle.replace('@', ''), FAUCET_AMOUNT, now, now);
-          } else {
-            sqlite.prepare('UPDATE users SET balance_sov = balance_sov + ? WHERE did = ?').run(FAUCET_AMOUNT, userDid);
-          }
-
-          sovraDb.recordAnalyticsEvent({
-            eventType: 'FAUCET_CLAIM',
-            userDid,
-            metadataJson: JSON.stringify({ amount: FAUCET_AMOUNT, txType: 'GENESIS_TESTNET_FAUCET' })
-          });
-        }
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, claimedAmount: FAUCET_AMOUNT, message: 'Testnet faucet claimed successfully! +50.0 SOV credited.' }));
-      } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to claim faucet' }));
-      }
-      return;
-    }
 
     // ==========================================
     // 👁️ WATCH VIDEO VIEW TRACKING & METRICS
@@ -8486,28 +8496,15 @@ async function startDevServer() {
     // 🔔 REAL-TIME NOTIFICATIONS API
     // ==========================================
     if ((url.pathname === '/api/notifications' || url.pathname === '/api/notifications/list') && req.method === 'GET') {
-      const principal = resolvePrincipal(req);
-      let userDid = principal?.did;
-      if (!userDid) {
-        const queryDid = url.searchParams.get('userDid') || url.searchParams.get('did') || '';
-        const headerDid = String(req.headers['x-sovra-did'] || '').trim();
-        const localHostUser = sovraDb.findUserByDid(masterKey.did);
-        if (queryDid && sovraDb.findUserByDid(queryDid)) {
-          userDid = queryDid;
-        } else if (headerDid && sovraDb.findUserByDid(headerDid)) {
-          userDid = headerDid;
-        } else if (localHostUser?.did) {
-          userDid = localHostUser.did;
-        } else if (masterKey?.did) {
-          userDid = masterKey.did;
-        }
-      }
-      if (!userDid) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+      const principal = enforceAuth(req, res);
+      if (!principal) return;
+      const queryDid = url.searchParams.get('userDid') || url.searchParams.get('did');
+      if (queryDid && queryDid !== principal.did && principal.role !== 'SUPER_ADMIN') {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot access notifications for another user' }));
         return;
       }
-      const notifData = sovraDb.getNotifications(userDid);
+      const notifData = sovraDb.getNotifications(principal.did);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, notifications: notifData.notifications, unreadCount: notifData.unreadCount }));
       return;
@@ -8542,13 +8539,9 @@ async function startDevServer() {
       const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
       let parsed: any = {};
       try { parsed = (ok && body) ? JSON.parse(body) : {}; } catch {}
-      const principal = resolvePrincipal(req, parsed);
-      let userDid = principal?.did || parsed?.userDid || parsed?.did || String(req.headers['x-sovra-did'] || '').trim();
-      if (!userDid) {
-        const localHostUser = sovraDb.findUserByDid(masterKey.did);
-        userDid = localHostUser?.did || masterKey.did;
-      }
-      const count = sovraDb.markAllNotificationsRead(userDid);
+      const principal = enforceAuth(req, res, parsed);
+      if (!principal) return;
+      const count = sovraDb.markAllNotificationsRead(principal.did);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, markedCount: count }));
       return;
@@ -9399,8 +9392,10 @@ async function startDevServer() {
       HTTPS_PORT,
       injectCspNonce,
       broadcastChatEvent,
+      broadcastControlPlaneEvent,
       masterKey,
       binding,
+      dynamicSocialStore,
     })) {
       return;
     }
@@ -9479,6 +9474,8 @@ async function startDevServer() {
       url,
       readBoundedBody,
       storageDaemon,
+      checkAdminRbac: createCheckAdminRbac(adminSecurity),
+      resolvePrincipal: (r, p) => resolvePrincipal(r, p),
     })) {
       return;
     }

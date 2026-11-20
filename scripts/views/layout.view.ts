@@ -3265,32 +3265,6 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
           <div class="chat-contacts-list" id="chatContactsList">
             <div id="contactsList" style="display: contents;"></div>
-            ${contactsStore
-              .map(
-                c => `
-              <div class="contact-item" onclick="selectContact('${c.did}')" id="contact-${c.did.replace(/[^a-zA-Z0-9]/g, '_')}">
-                <div class="contact-avatar" style="background: ${c.avatarBg};">
-                  ${c.avatar}
-                  ${c.isOnline ? '<div class="online-dot"></div>' : ''}
-                  ${c.disappearingDurationSec > 0 ? '<div class="contact-clock-badge" title="Disappearing Messages Active">⏱️</div>' : ''}
-                </div>
-                <div class="contact-info">
-                  <div class="contact-top-row">
-                    <span class="contact-name">
-                      ${c.name}
-                      ${c.isVerified ? '<span class="verified-shield-icon" title="Safety Numbers Verified">🛡️</span>' : ''}
-                    </span>
-                    <span class="contact-time">${c.isOnline ? 'Online' : c.lastSeen}</span>
-                  </div>
-                  <div class="contact-preview-row">
-                    <span style="color: #53bdeb; font-weight: bold;">✓✓</span>
-                    <span id="preview-${c.did.replace(/[^a-zA-Z0-9]/g, '_')}">${c.role}</span>
-                  </div>
-                </div>
-              </div>
-            `,
-              )
-              .join('')}
           </div>
         </aside>
 
@@ -4113,13 +4087,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
             </div>
 
-            <!-- Quick Suggestions (Maa, Bhai, Alice, Bob) when input is empty -->
-            <div id="dialerQuickChips" style="display: flex; align-items: center; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); overflow-x: auto; scrollbar-width: none;">
+            <!-- Dynamic Quick Suggestions populated from user's address book / speed dial -->
+            <div id="dialerQuickChips" style="display: none; align-items: center; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); overflow-x: auto; scrollbar-width: none;">
               <span style="font-size: 0.68rem; color: #64748b; font-weight: 700; text-transform: uppercase; white-space: nowrap;">Suggestions:</span>
-              <button type="button" onclick="selectDialerSuggestion('@maa_family', 'Maa ❤️ (Mom)')" style="background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👵 @maa</button>
-              <button type="button" onclick="selectDialerSuggestion('@bhai_family', 'Bhai (Brother)')" style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👦 @bhai</button>
-              <button type="button" onclick="selectDialerSuggestion('@alice_creator', 'Alice Creator')" style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">👩‍🎤 @alice</button>
-              <button type="button" onclick="selectDialerSuggestion('@bob_mesh', 'Bob Mesh Seeder')" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;">🚀 @bob</button>
+              <div id="dialerQuickChipsList" style="display: flex; align-items: center; gap: 6px;"></div>
             </div>
           </div>
 

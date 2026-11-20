@@ -9,7 +9,7 @@
  * 6. Reels (ABR Chunking, 95/5 Tipping Split)
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it, beforeAll as before } from 'vitest';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { sovraDb } from '../../scripts/database-engine.ts';
@@ -361,8 +361,9 @@ describe('Master Forensic Remediation Test Suite — Six Core Modules', () => {
 
     it('2.6 Should allow authenticated creator upload and bind to authenticated principal DID', async () => {
       const res = await makeSignedRequest('POST', '/api/studio/upload', alice, {
-        title: 'Alice Sovereign Tutorial',
-        description: 'How to build on Sovra',
+        title: `Alice Sovereign Tutorial ${Date.now()}`,
+        description: `How to build on Sovra ${Date.now()}`,
+        sourceCid: `bafybei_alice_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         tags: '#sovra #crypto',
       });
       assert.equal(res.status, 200);

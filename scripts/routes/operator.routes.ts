@@ -33,6 +33,7 @@ export interface OperatorRouteContext {
   userCreatorModes: Map<string, boolean>;
   readBoundedBody: (req: http.IncomingMessage, res: http.ServerResponse, limit?: number) => Promise<{ body: string; ok: boolean }>;
   enforceAuth: (req: http.IncomingMessage, res: http.ServerResponse, parsed?: Record<string, any>) => AuthenticatedPrincipal | null;
+  resolvePrincipal?: (req: http.IncomingMessage, parsed?: Record<string, any>) => AuthenticatedPrincipal | null;
   getRealSystemTelemetry: (connectedPeersCount: number) => any;
   lastOperatorTelemetrySampleTime: number;
   setLastOperatorTelemetrySampleTime: (t: number) => void;
@@ -62,6 +63,7 @@ export async function handleOperatorRoutes(ctx: OperatorRouteContext): Promise<b
     userCreatorModes,
     readBoundedBody,
     enforceAuth,
+    resolvePrincipal,
     getRealSystemTelemetry,
     lastOperatorTelemetrySampleTime,
     setLastOperatorTelemetrySampleTime,
@@ -162,6 +164,14 @@ export async function handleOperatorRoutes(ctx: OperatorRouteContext): Promise<b
 
   // 6. GET /api/status
   if (url.pathname === '/api/status' && req.method === 'GET') {
+    if (req.headers['x-sovra-signature'] && resolvePrincipal) {
+      const princ = resolvePrincipal(req);
+      if (!princ) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Anti-replay protection violation or invalid signature' }));
+        return true;
+      }
+    }
     const currentLanIp = getLanIpAddress();
     let cloudflareUrl = '';
     try {

@@ -903,21 +903,25 @@ export async function handleAdminFeatureRoute(ctx: AdminFeatureContext): Promise
 
   // 21. POST /api/moderation/appeals/submit (User / Creator Due Process Appeal)
   if (url.pathname === '/api/moderation/appeals/submit' && req.method === 'POST') {
+    const mod = getSqliteMod();
+    if (!mod) return true;
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(body || '{}');
+    } catch (_) {}
     let principal: any = null;
     if (ctx.resolvePrincipal) {
-      principal = ctx.resolvePrincipal(req);
+      principal = ctx.resolvePrincipal(req, parsed);
     }
     if (!principal) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'UNAUTHORIZED: Authentication required to submit moderation appeal.' }));
       return true;
     }
-    const mod = getSqliteMod();
-    if (!mod) return true;
-    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
-    if (!ok) return true;
     try {
-      const p = JSON.parse(body || '{}');
+      const p = parsed;
       const actionId = String(p.actionId || '').trim();
       const targetId = p.targetId ? String(p.targetId).trim() : undefined;
       const targetType = p.targetType ? String(p.targetType).toUpperCase() : undefined;
