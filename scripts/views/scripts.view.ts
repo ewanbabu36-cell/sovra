@@ -39577,27 +39577,47 @@ _scheduleTargetContext: 'workspace',
     let activeChatInboxTab = 'primary';
 
     function switchChatInboxTab(tab) {
+      if (tab === 'chats') tab = 'primary';
       activeChatInboxTab = tab;
       const primaryBtn = document.getElementById('chatTabPrimary');
+      const callsBtn = document.getElementById('chatTabCalls');
       const reqBtn = document.getElementById('chatTabRequests');
-      if (primaryBtn && reqBtn) {
-        if (tab === 'primary') {
-          primaryBtn.classList.add('active');
-          primaryBtn.style.background = 'rgba(56, 189, 248, 0.15)';
-          primaryBtn.style.color = '#38bdf8';
-          reqBtn.classList.remove('active');
-          reqBtn.style.background = 'transparent';
-          reqBtn.style.color = '#94a3b8';
+      const contactsList = document.getElementById('chatContactsList');
+      const callsPane = document.getElementById('chatCallsPaneContainer');
+      const presenceBar = document.getElementById('chatContactsSummaryBar');
+
+      var tabItems = [
+        { el: primaryBtn, id: 'primary', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' },
+        { el: callsBtn, id: 'calls', color: '#34d399', bg: 'rgba(16, 185, 129, 0.15)' },
+        { el: reqBtn, id: 'requests', color: '#f43f5e', bg: 'rgba(244, 63, 94, 0.15)' }
+      ];
+
+      tabItems.forEach(function(item) {
+        if (!item.el) return;
+        if (item.id === tab) {
+          item.el.classList.add('active');
+          item.el.style.background = item.bg;
+          item.el.style.color = item.color;
         } else {
-          reqBtn.classList.add('active');
-          reqBtn.style.background = 'rgba(244, 63, 94, 0.15)';
-          reqBtn.style.color = '#f43f5e';
-          primaryBtn.classList.remove('active');
-          primaryBtn.style.background = 'transparent';
-          primaryBtn.style.color = '#94a3b8';
+          item.el.classList.remove('active');
+          item.el.style.background = 'transparent';
+          item.el.style.color = '#94a3b8';
         }
+      });
+
+      if (tab === 'calls') {
+        if (contactsList) contactsList.style.display = 'none';
+        if (callsPane) callsPane.style.display = 'flex';
+        if (presenceBar) presenceBar.style.display = 'none';
+        if (typeof loadSidebarCallsView === 'function') {
+          loadSidebarCallsView();
+        }
+      } else {
+        if (contactsList) contactsList.style.display = 'block';
+        if (callsPane) callsPane.style.display = 'none';
+        if (presenceBar) presenceBar.style.display = 'flex';
+        renderChatContactsList();
       }
-      renderChatContactsList();
     }
     window.switchChatInboxTab = switchChatInboxTab;
 
@@ -46473,6 +46493,276 @@ _scheduleTargetContext: 'workspace',
       selectContact(groupDid);
       showAccountToast('👥 Group "' + groupName + '" created successfully!');
     }
+
+    // ========================================================
+    // 📞 SOVRA HYBRID CALLING (IN-SIDEBAR NATIVE CALLS HUB)
+    // ========================================================
+    var _sidebarCallFilter = 'all';
+    var _sidebarResolveTimer = null;
+    var _sidebarResolvedPeer = null;
+
+    function loadSidebarCallsView() {
+      // 1. Load Address book if empty
+      if (!_cachedAddressBook || _cachedAddressBook.length === 0) {
+        fetch('/api/addressbook')
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d && d.ok && Array.isArray(d.contacts)) {
+              _cachedAddressBook = d.contacts;
+              renderSidebarSpeedDialRail(_cachedAddressBook);
+            }
+          })
+          .catch(function() {
+            renderSidebarSpeedDialRail(_cachedAddressBook);
+          });
+      } else {
+        renderSidebarSpeedDialRail(_cachedAddressBook);
+      }
+
+      // 2. Load Call logs
+      fetch('/api/call-logs')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ok && Array.isArray(d.logs)) {
+            _cachedCallLogs = d.logs;
+            renderSidebarCallLogs(d.logs, _sidebarCallFilter);
+          }
+        })
+        .catch(function() {
+          renderSidebarCallLogs(_cachedCallLogs, _sidebarCallFilter);
+        });
+    }
+    window.loadSidebarCallsView = loadSidebarCallsView;
+
+    function renderSidebarSpeedDialRail(contacts) {
+      var rail = document.getElementById('sidebarSpeedDialRail');
+      if (!rail) return;
+
+      var speedContacts = (contacts || []).filter(function(c) {
+        return c.isFavorite || (c.speedDialIndex != null && c.speedDialIndex > 0) || c.category === 'FAMILY';
+      });
+
+      // Default high-profile family & close friends seeds if none saved yet
+      if (speedContacts.length === 0) {
+        speedContacts = [
+          { displayName: 'Maa', handle: '@maa_family', contactDid: 'did:sovra:maa_family', avatar: '👵', avatarBg: 'linear-gradient(135deg, #f43f5e, #ec4899)' },
+          { displayName: 'Bhai', handle: '@bhai_family', contactDid: 'did:sovra:bhai_family', avatar: '👦', avatarBg: 'linear-gradient(135deg, #3b82f6, #0284c7)' },
+          { displayName: 'Alice', handle: '@alice_creator', contactDid: 'did:sovra:alice_creator', avatar: '👩‍🎤', avatarBg: 'linear-gradient(135deg, #a855f7, #6366f1)' },
+          { displayName: 'Bob', handle: '@bob_mesh', contactDid: 'did:sovra:bob_mesh', avatar: '🚀', avatarBg: 'linear-gradient(135deg, #10b981, #059669)' }
+        ];
+      }
+
+      var html = speedContacts.map(function(c) {
+        var label = c.nickname || c.displayName || c.handle;
+        var safeDid = encodeURIComponent(c.contactDid || c.handle);
+        var safeName = encodeURIComponent(label);
+        var bg = c.avatarBg || 'linear-gradient(135deg, #0284c7, #38bdf8)';
+
+        return '<div class="call-story-avatar" data-call-type="audio" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="1-Touch Call to ' + label + ' (Studio Opus HD)">' +
+          '<div class="story-ring">' +
+            '<div class="story-inner" style="background: ' + bg + ';">' + (c.avatar || '👤') + '</div>' +
+            '<div class="story-online-dot"></div>' +
+          '</div>' +
+          '<div class="story-label">' + label + '</div>' +
+        '</div>';
+      }).join('');
+
+      html += '<div class="call-story-avatar" onclick="openSaveContactModal()" title="Save New Sovereign Contact">' +
+        '<div class="story-ring" style="background: rgba(255,255,255,0.15); border: 1px dashed rgba(255,255,255,0.3);">' +
+          '<div class="story-inner" style="background: rgba(15,23,42,0.8); color: #34d399; font-size: 1.2rem; font-weight: 800;">+</div>' +
+        '</div>' +
+        '<div class="story-label" style="color: #34d399;">+ Add</div>' +
+      '</div>';
+
+      rail.innerHTML = html;
+    }
+    window.renderSidebarSpeedDialRail = renderSidebarSpeedDialRail;
+
+    function handleSidebarCallSearch(val) {
+      var clean = (val || '').trim();
+      var clearBtn = document.getElementById('sidebarCallClearBtn');
+      var ribbon = document.getElementById('sidebarCallActionRibbon');
+      var avEl = document.getElementById('sidebarCallResolvedAvatar');
+      var nameEl = document.getElementById('sidebarCallResolvedName');
+      var handleEl = document.getElementById('sidebarCallResolvedHandle');
+
+      if (!clean) {
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (ribbon) ribbon.style.display = 'none';
+        _sidebarResolvedPeer = null;
+        return;
+      }
+
+      if (clearBtn) clearBtn.style.display = 'block';
+      if (ribbon) ribbon.style.display = 'block';
+
+      // Default temporary display
+      _sidebarResolvedPeer = {
+        did: clean.startsWith('did:') ? clean : ('did:sovra:' + clean.replace(/^@/, '')),
+        name: clean,
+        handle: clean.startsWith('@') ? clean : ('@' + clean.replace(/^did:sovra:/, ''))
+      };
+
+      if (nameEl) nameEl.innerText = clean;
+      if (handleEl) handleEl.innerText = _sidebarResolvedPeer.handle;
+      if (avEl) avEl.innerText = '👤';
+
+      // Check cache first
+      var matched = _cachedAddressBook.find(function(c) {
+        return (c.handle && c.handle.toLowerCase() === clean.toLowerCase()) ||
+               (c.contactDid && c.contactDid.toLowerCase() === clean.toLowerCase()) ||
+               (c.displayName && c.displayName.toLowerCase().includes(clean.toLowerCase()));
+      });
+
+      if (matched) {
+        _sidebarResolvedPeer = {
+          did: matched.contactDid || matched.handle,
+          name: matched.displayName,
+          handle: matched.handle || matched.contactDid
+        };
+        if (nameEl) nameEl.innerText = matched.displayName;
+        if (handleEl) handleEl.innerText = (matched.handle || (matched.contactDid ? matched.contactDid.slice(0, 16) : '')) + (matched.relationship ? (' · ' + matched.relationship) : '');
+        if (avEl) avEl.innerText = matched.avatar || '👤';
+        return;
+      }
+
+      // Live resolve
+      clearTimeout(_sidebarResolveTimer);
+      _sidebarResolveTimer = setTimeout(function() {
+        fetch('/api/identity/resolve?q=' + encodeURIComponent(clean))
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d && d.ok && d.peer) {
+              _sidebarResolvedPeer = {
+                did: d.peer.did,
+                name: d.peer.displayName || d.peer.handle,
+                handle: d.peer.handle || d.peer.did
+              };
+              if (nameEl) nameEl.innerText = _sidebarResolvedPeer.name;
+              if (handleEl) handleEl.innerText = _sidebarResolvedPeer.handle;
+              if (avEl) avEl.innerText = d.peer.avatar || '👤';
+            }
+          })
+          .catch(function() {});
+      }, 200);
+    }
+    window.handleSidebarCallSearch = handleSidebarCallSearch;
+
+    function clearSidebarCallSearch() {
+      var inEl = document.getElementById('sidebarCallSearchInput');
+      if (inEl) inEl.value = '';
+      handleSidebarCallSearch('');
+    }
+    window.clearSidebarCallSearch = clearSidebarCallSearch;
+
+    function triggerSidebarActiveCall(type) {
+      if (!_sidebarResolvedPeer || !_sidebarResolvedPeer.did) {
+        var inEl = document.getElementById('sidebarCallSearchInput');
+        var val = inEl ? inEl.value.trim() : '';
+        if (!val) {
+          if (typeof showAccountToast === 'function') showAccountToast('Please enter an ID or handle to call.', 'warning');
+          return;
+        }
+        _sidebarResolvedPeer = { did: val, name: val, handle: val };
+      }
+      initiateDialerCall(type || 'audio', _sidebarResolvedPeer.did, _sidebarResolvedPeer.name);
+    }
+    window.triggerSidebarActiveCall = triggerSidebarActiveCall;
+
+    function filterSidebarCallLogs(filterType) {
+      _sidebarCallFilter = filterType;
+      var btnAll = document.getElementById('sidebarCallFilterAll');
+      var btnMissed = document.getElementById('sidebarCallFilterMissed');
+      if (filterType === 'missed') {
+        if (btnMissed) {
+          btnMissed.style.background = 'rgba(239, 68, 68, 0.2)';
+          btnMissed.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+          btnMissed.style.color = '#f87171';
+        }
+        if (btnAll) {
+          btnAll.style.background = 'rgba(255, 255, 255, 0.05)';
+          btnAll.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          btnAll.style.color = '#94a3b8';
+        }
+      } else {
+        if (btnAll) {
+          btnAll.style.background = 'rgba(56, 189, 248, 0.2)';
+          btnAll.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+          btnAll.style.color = '#38bdf8';
+        }
+        if (btnMissed) {
+          btnMissed.style.background = 'rgba(255, 255, 255, 0.05)';
+          btnMissed.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          btnMissed.style.color = '#94a3b8';
+        }
+      }
+      renderSidebarCallLogs(_cachedCallLogs, filterType);
+    }
+    window.filterSidebarCallLogs = filterSidebarCallLogs;
+
+    function renderSidebarCallLogs(logs, filter) {
+      var container = document.getElementById('sidebarCallHistoryList');
+      if (!container) return;
+
+      var filtered = (logs || []).filter(function(l) {
+        if (filter === 'missed') return l.direction === 'missed' || l.status === 'missed';
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 28px 10px; font-size: 0.78rem;">' +
+          '<div style="font-size: 1.5rem; margin-bottom: 6px;">📞</div>' +
+          '<div style="font-weight: 700; color: #e2e8f0;">No recent calls</div>' +
+          '<div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">Tap any speed dial avatar or type @handle to call.</div>' +
+        '</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(function(l) {
+        var isMissed = l.direction === 'missed' || l.status === 'missed';
+        var isOutgoing = l.direction === 'outgoing';
+        var isVideo = l.callType === 'video';
+        var dirIcon = isMissed ? '🔴 ↙️' : (isOutgoing ? '↗️' : '↙️');
+        var typeIcon = isVideo ? '📹' : '📞';
+        var dirColor = isMissed ? '#f87171' : (isOutgoing ? '#34d399' : '#38bdf8');
+        var safeDid = encodeURIComponent(l.peerDid || l.peerHandle);
+        var safeName = encodeURIComponent(l.peerName);
+
+        var durStr = isMissed ? 'Missed' : (l.durationSeconds ? (Math.floor(l.durationSeconds / 60) + 'm ' + (l.durationSeconds % 60) + 's') : 'Ended');
+        var dateStr = 'Recently';
+        if (l.createdAt) {
+          var diffMin = Math.floor((Date.now() - l.createdAt) / 60000);
+          if (diffMin < 1) dateStr = 'Just now';
+          else if (diffMin < 60) dateStr = diffMin + 'm ago';
+          else if (diffMin < 1440) dateStr = Math.floor(diffMin / 60) + 'h ago';
+          else dateStr = Math.floor(diffMin / 1440) + 'd ago';
+        }
+
+        return '<div class="sidebar-call-log-card">' +
+          '<div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">' +
+            '<div style="width: 34px; height: 34px; border-radius: 50%; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #38bdf8; flex-shrink: 0;">' + typeIcon + '</div>' +
+            '<div style="min-width: 0; flex: 1;">' +
+              '<div style="display: flex; align-items: center; gap: 5px;">' +
+                '<span style="font-weight: 700; font-size: 0.82rem; color: ' + (isMissed ? '#f87171' : '#fff') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + (l.peerName || 'Peer') + '</span>' +
+                '<span style="font-size: 0.62rem; color: ' + dirColor + '; font-weight: 700;">' + dirIcon + '</span>' +
+              '</div>' +
+              '<div style="display: flex; align-items: center; gap: 4px; font-size: 0.68rem; color: #94a3b8; margin-top: 1px;">' +
+                '<span style="font-family: monospace; color: #38bdf8;">' + (l.peerHandle || (l.peerDid ? l.peerDid.slice(0, 12) + '...' : '')) + '</span>' +
+                '<span>•</span>' +
+                '<span>' + durStr + '</span>' +
+                '<span>•</span>' +
+                '<span style="color: #64748b;">' + dateStr + '</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">' +
+            '<button type="button" data-call-type="audio" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="Voice Call Back (Studio HD)" style="width: 28px; height: 28px; border-radius: 50%; background: rgba(16, 185, 129, 0.18); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">📞</button>' +
+            '<button type="button" data-call-type="video" data-did="' + safeDid + '" data-name="' + safeName + '" onclick="initiateDialerCall(this.dataset.callType, this.dataset.did, this.dataset.name)" title="Video Call Back (4K)" style="width: 28px; height: 28px; border-radius: 50%; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">📹</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+    window.renderSidebarCallLogs = renderSidebarCallLogs;
 
     // ========================================================
     // 📞 SOVRA SOVEREIGN DIALER & FAMILY/FRIENDS ADDRESS BOOK
