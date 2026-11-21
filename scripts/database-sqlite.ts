@@ -2883,23 +2883,22 @@ this.db.exec('COMMIT;');
     const user = this.findUserByDid(userDid);
     if (!user) return { ok: false, error: 'User not found' };
 
-    const deleteTx = this.db.transaction(() => {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
       this.db.prepare('DELETE FROM users WHERE did = ?').run(userDid);
       this.db.prepare('DELETE FROM user_sessions WHERE user_did = ?').run(userDid);
       this.db.prepare('DELETE FROM follows WHERE follower_did = ? OR target_did = ?').run(userDid, userDid);
+      this.db.prepare('DELETE FROM friend_relationships WHERE from_did = ? OR to_did = ?').run(userDid, userDid);
       this.db.prepare('DELETE FROM posts WHERE author_did = ?').run(userDid);
       this.db.prepare('DELETE FROM comments WHERE author_did = ?').run(userDid);
-      this.db.prepare('DELETE FROM likes WHERE user_did = ?').run(userDid);
-      this.db.prepare('DELETE FROM chat_messages WHERE sender_did = ? OR recipient_did = ?').run(userDid, userDid);
+      this.db.prepare('DELETE FROM direct_messages WHERE sender_did = ? OR recipient_did = ?').run(userDid, userDid);
       this.db.prepare('DELETE FROM notifications WHERE recipient_did = ? OR sender_did = ?').run(userDid, userDid);
       this.db.prepare('DELETE FROM channels WHERE owner_did = ?').run(userDid);
       this.db.prepare('DELETE FROM pages WHERE owner_did = ?').run(userDid);
-    });
-
-    try {
-      deleteTx();
+      this.db.exec('COMMIT');
       return { ok: true };
     } catch (err: any) {
+      try { this.db.exec('ROLLBACK'); } catch (_) {}
       return { ok: false, error: err?.message || 'Database error during account deletion' };
     }
   }

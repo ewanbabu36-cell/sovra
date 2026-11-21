@@ -51,9 +51,6 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
   if ((url.pathname === '/api/chat/contacts' || url.pathname === '/api/chat/conversations') && req.method === 'GET') {
     let principal = resolvePrincipal(req);
     const queryDid = url.searchParams.get('userDid') || url.searchParams.get('did');
-    if (!principal && queryDid && (queryDid.startsWith('did:sovra:') || queryDid.startsWith('did:key:'))) {
-      principal = { did: queryDid, handle: '@' + queryDid.split(':').pop(), role: 'USER', authenticationMethod: 'BEARER_TOKEN' } as any;
-    }
     if (!principal) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));

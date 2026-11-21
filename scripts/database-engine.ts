@@ -2195,6 +2195,8 @@ export class SovraDatabaseEngine {
   private sqliteEngine?: SqliteSocialDatabaseEngine;
   private saveDebounceTimer: NodeJS.Timeout | null = null;
   private pendingFlushes = 0;
+  private lastDiskLoadTime = 0;
+  private unknownDids = new Set<string>();
 
   constructor(customStorageDir?: string) {
     this.storageDir = customStorageDir || process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev';
@@ -2483,6 +2485,10 @@ export class SovraDatabaseEngine {
 
   public load(forceReload = false): DatabaseSchema {
     if (this.isLoaded && !forceReload) return this.db;
+    if (this.isLoaded && forceReload && (Date.now() - this.lastDiskLoadTime < 2000)) {
+      return this.db;
+    }
+    this.lastDiskLoadTime = Date.now();
     if (this.pendingFlushes > 0 && this.saveDebounceTimer) {
       clearTimeout(this.saveDebounceTimer);
       this.saveDebounceTimer = null;
@@ -3068,11 +3074,24 @@ export class SovraDatabaseEngine {
   // ==========================================
 
   public findUserByDid(did: string): UserRecord | undefined {
+    if (!did || this.unknownDids.has(did)) return undefined;
     this.load();
     let u = this.db.users.find(u => u.did === did || u.id === did);
     if (!u) {
+      if (this.sqliteEngine) {
+        try {
+          const sqUser = this.sqliteEngine.getUserByDid(did);
+          if (sqUser) {
+            this.db.users.push(sqUser);
+            return sqUser;
+          }
+        } catch (_) {}
+      }
       this.load(true);
       u = this.db.users.find(u => u.did === did || u.id === did);
+    }
+    if (!u) {
+      this.unknownDids.add(did);
     }
     return u;
   }
@@ -3248,6 +3267,7 @@ export class SovraDatabaseEngine {
     };
 
     this.db.users.push(record);
+    this.unknownDids.delete(record.did);
     this.logActivity('USER_REGISTERED', record.did, record.handle, `New sovereign user registered (${record.displayName}) on ${record.deviceType}`);
 
     this.upsertPeer({
@@ -3369,6 +3389,7 @@ export class SovraDatabaseEngine {
       this.logActivity('PROFILE_UPDATED', record.did, record.handle, `Updated sovereign profile (${record.displayName}) on ${record.deviceType}`);
     } else {
       this.db.users.push(record);
+    this.unknownDids.delete(record.did);
       this.logActivity('USER_REGISTERED', record.did, record.handle, `New sovereign user registered (${record.displayName}) on ${record.deviceType}`);
     }
 
@@ -4093,12 +4114,13 @@ export class SovraDatabaseEngine {
 
   public canUserViewPost(post: FeedPostRecord, viewerDid?: string): boolean {
     if (post.moderationState === 'HIDDEN' || post.moderationState === 'REMOVED') return false;
-    if (viewerDid && this.isBlocked(post.authorDid, viewerDid)) return false;
     const visibility = post.visibility || 'public';
-    if (visibility === 'public') return true;
-    if (!viewerDid) return false;
+    if (!viewerDid) {
+      return visibility === 'public';
+    }
     if (post.authorDid === viewerDid) return true;
     if (visibility === 'only_me') return false;
+    if (this.isBlocked(post.authorDid, viewerDid)) return false;
     if (visibility === 'friends') {
       return this.areFriends(post.authorDid, viewerDid);
     }
@@ -5476,10 +5498,10 @@ export class SovraDatabaseEngine {
   public isBlocked(didA?: string, didB?: string): boolean {
     if (!didA || !didB || didA === didB) return false;
     this.load();
-    const userA = this.findUserByDid(didA);
     const userB = this.findUserByDid(didB);
-    if (userA?.privacySettings?.blockedDids?.includes(didB)) return true;
     if (userB?.privacySettings?.blockedDids?.includes(didA)) return true;
+    const userA = this.findUserByDid(didA);
+    if (userA?.privacySettings?.blockedDids?.includes(didB)) return true;
     return false;
   }
 
@@ -6478,6 +6500,15 @@ export class SovraDatabaseEngine {
       return { ok: false, error: 'User not found' };
     }
 
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).deleteUserAccount === 'function') {
+      try {
+        (this.sqliteEngine as any).deleteUserAccount(userDid);
+      } catch (err: any) {
+        console.warn(`[DB] SQLite deleteUserAccount warning: ${err?.message}`);
+      }
+    }
+    this.unknownDids.add(userDid);
+
     // 1. Remove from users
     this.db.users = this.db.users.filter(u => u.did !== userDid);
 
@@ -6867,6 +6898,7 @@ export class SovraDatabaseEngine {
       entityType: params.entityType || 'personal',
       entityId: params.entityId,
       videoUrl: params.videoUrl || (params.cid ? `/api/watch/video/${params.cid}` : undefined),
+      url: params.videoUrl || (params.cid ? `/api/watch/video/${params.cid}` : undefined),
       videoPath: params.videoPath,
       videoMimeType: params.videoMimeType || 'video/mp4',
       createdAt: Date.now(),
@@ -7434,13 +7466,23 @@ export class SovraDatabaseEngine {
     signatureHex?: string;
     signature?: string;
     rootHash?: string;
+    idempotencyKey?: string;
   }): {
     ok: boolean;
+    txId?: string;
     senderBalance: number;
+    newBalance?: number;
+    newBalanceSov?: number;
     recipientBalance?: number;
     voucher: TipVoucherRecord;
     split: { total: number; creator: number; seeder: number; platformTake: number; creatorAmount?: number; seederAmount?: number };
     error?: string;
+    statusCode?: number;
+    status?: string;
+    isReplay?: boolean;
+    creatorCut?: number;
+    seederCut?: number;
+    targetTotalTipsSov?: number;
   } {
     this.load();
     const amount = Number(params.amount);
@@ -7464,14 +7506,94 @@ export class SovraDatabaseEngine {
       };
     }
 
-    if (params.fromDid && params.toDid && params.fromDid === params.toDid) {
+    let resolvedCreatorDid = params.toDid || (params as any).creatorDid || '';
+    const resolvedTargetType: 'video' | 'reel' | 'post' | 'profile' =
+      params.targetType ||
+      (params.reelId ? 'reel' : params.postId ? 'post' : params.videoId ? 'video' : 'profile');
+    const resolvedTargetId =
+      params.targetId || params.reelId || params.postId || params.videoId || 'yt-video-1';
+
+    if (!resolvedCreatorDid) {
+      if (resolvedTargetType === 'reel' || params.reelId) {
+        const reel = this.db.reels.find(r => r.id === (params.reelId || resolvedTargetId));
+        if (reel) resolvedCreatorDid = reel.creatorDid || reel.creatorHandle;
+      } else if (resolvedTargetType === 'post' || params.postId) {
+        const post = this.db.posts.find(p => p.id === (params.postId || resolvedTargetId));
+        if (post) resolvedCreatorDid = post.authorDid || post.authorHandle;
+      }
+    }
+
+    if (params.fromDid && resolvedCreatorDid && params.fromDid === resolvedCreatorDid) {
       return {
         ok: false,
+        status: 'CONFLICT',
+        statusCode: 400,
         senderBalance: 0,
         voucher: {} as any,
         split: { total: 0, creator: 0, seeder: 0, platformTake: 0 },
         error: 'Self-tipping prohibited: Circular wash transactions are forbidden',
       };
+    }
+
+    let atomicTransferRes: any = null;
+    if (this.sqliteEngine && params.idempotencyKey) {
+      atomicTransferRes = this.sqliteEngine.executeAtomicIdempotentTransfer({
+        idempotencyKey: params.idempotencyKey,
+        fromDid: params.fromDid,
+        toDid: resolvedCreatorDid || 'did:sovra:creator_studio_broadcast',
+        amountSov: amount,
+        txType: 'MICRO_TIP',
+        memo: params.message,
+      });
+
+      if (atomicTransferRes.status === 'IN_FLIGHT') {
+        return {
+          ok: false,
+          status: 'IN_FLIGHT',
+          statusCode: 409,
+          error: 'Transaction already in-flight. Duplicate request rejected.',
+          senderBalance: 0,
+          voucher: {} as any,
+          split: { total: 0, creator: 0, seeder: 0, platformTake: 0 },
+        };
+      }
+
+      if (atomicTransferRes.status === 'REPLAY') {
+        const creatorSplit = Math.round(amount * 0.95 * 100) / 100;
+        const seederSplit = Math.round(amount * 0.05 * 100) / 100;
+        return {
+          ok: true,
+          txId: atomicTransferRes.txId,
+          senderBalance: atomicTransferRes.fromBalanceAfter ?? 0,
+          newBalance: atomicTransferRes.fromBalanceAfter ?? 0,
+          newBalanceSov: atomicTransferRes.fromBalanceAfter ?? 0,
+          recipientBalance: atomicTransferRes.toBalanceAfter,
+          creatorCut: creatorSplit,
+          seederCut: seederSplit,
+          isReplay: true,
+          voucher: (this.db.tip_vouchers || []).find(v => v.voucherId === atomicTransferRes.txId || ('tx_' + v.voucherId) === atomicTransferRes.txId) || ({} as any),
+          split: {
+            total: amount,
+            creator: creatorSplit,
+            seeder: seederSplit,
+            creatorAmount: creatorSplit,
+            seederAmount: seederSplit,
+            platformTake: 0,
+          },
+        };
+      }
+
+      if (atomicTransferRes.status !== 'EXECUTED' && atomicTransferRes.status !== 'REPLAY') {
+        return {
+          ok: false,
+          status: atomicTransferRes.status || 'CONFLICT',
+          statusCode: atomicTransferRes.statusCode || 400,
+          error: atomicTransferRes.error || 'Failed to process tip transfer',
+          senderBalance: 0,
+          voucher: {} as any,
+          split: { total: 0, creator: 0, seeder: 0, platformTake: 0 },
+        };
+      }
     }
 
     let sender = this.db.users.find(u => u.did === params.fromDid);
@@ -7512,45 +7634,44 @@ export class SovraDatabaseEngine {
       }
     }
 
-    if (typeof sender.balanceSov !== 'number') {
-      sender.balanceSov = 500.0;
-    }
-    if (this.sqliteEngine && (this.sqliteEngine as any).db) {
-      try {
-        const row = (this.sqliteEngine as any).db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(sender.did);
-        if (row && typeof row.balance_sov === 'number') {
-          sender.balanceSov = Number(row.balance_sov);
-        }
-      } catch (_) {}
+    if (atomicTransferRes && typeof atomicTransferRes.fromBalanceAfter === 'number') {
+      sender.balanceSov = atomicTransferRes.fromBalanceAfter;
+    } else {
+      if (typeof sender.balanceSov !== 'number') {
+        sender.balanceSov = 500.0;
+      }
+      if (this.sqliteEngine && (this.sqliteEngine as any).db) {
+        try {
+          const row = (this.sqliteEngine as any).db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(sender.did);
+          if (row && typeof row.balance_sov === 'number') {
+            sender.balanceSov = Number(row.balance_sov);
+          }
+        } catch (_) {}
+      }
     }
 
     const currentBalance = sender.balanceSov;
-    if (currentBalance < amount) {
-      return {
-        ok: false,
-        senderBalance: currentBalance,
-        voucher: {} as any,
-        split: { total: amount, creator: 0, seeder: 0, platformTake: 0 },
-        error: `Insufficient balance (Insufficient SOV balance: ${currentBalance.toFixed(2)} SOV, Required: ${amount.toFixed(2)} SOV)`,
-      };
+    let newBalance = currentBalance;
+    if (atomicTransferRes && typeof atomicTransferRes.fromBalanceAfter === 'number') {
+      newBalance = atomicTransferRes.fromBalanceAfter;
+    } else {
+      if (currentBalance < amount) {
+        return {
+          ok: false,
+          senderBalance: currentBalance,
+          voucher: {} as any,
+          split: { total: amount, creator: 0, seeder: 0, platformTake: 0 },
+          error: `Insufficient balance (Insufficient SOV balance: ${currentBalance.toFixed(2)} SOV, Required: ${amount.toFixed(2)} SOV)`,
+        };
+      }
+      newBalance = Math.round((currentBalance - amount) * 100) / 100;
+      sender.balanceSov = newBalance;
     }
-
-    const newBalance = Math.round((currentBalance - amount) * 100) / 100;
-    sender.balanceSov = newBalance;
 
     const creatorSplit = Math.round(amount * 0.95 * 100) / 100;
     const seederSplit = Math.round(amount * 0.05 * 100) / 100;
 
-    let resolvedCreatorDid = params.creatorDid || params.toDid || '';
     let recipientBalance: number | undefined;
-
-    // Resolve target entity (Reel, Post, Video) to infer creator if needed and increment tip counters
-    const resolvedTargetType: 'video' | 'reel' | 'post' | 'profile' =
-      params.targetType ||
-      (params.reelId ? 'reel' : params.postId ? 'post' : params.videoId ? 'video' : 'profile');
-    const resolvedTargetId =
-      params.targetId || params.reelId || params.postId || params.videoId || 'yt-video-1';
-
     let targetTotalTipsSov: number | undefined;
 
     if (resolvedTargetType === 'reel' || params.reelId) {
@@ -7604,8 +7725,12 @@ export class SovraDatabaseEngine {
         } catch (_) {}
       }
       if (recipient) {
-        const recBal = typeof recipient.balanceSov === 'number' ? recipient.balanceSov : 500.0;
-        recipient.balanceSov = Math.round((recBal + creatorSplit) * 100) / 100;
+        if (atomicTransferRes && typeof atomicTransferRes.toBalanceAfter === 'number') {
+          recipient.balanceSov = atomicTransferRes.toBalanceAfter;
+        } else {
+          const recBal = typeof recipient.balanceSov === 'number' ? recipient.balanceSov : 500.0;
+          recipient.balanceSov = Math.round((recBal + creatorSplit) * 100) / 100;
+        }
         recipientBalance = recipient.balanceSov;
         resolvedCreatorDid = recipient.did;
       }
@@ -7691,9 +7816,11 @@ export class SovraDatabaseEngine {
         const sq = this.sqliteEngine as any;
         sq.executeWithRetry(() => {
           const sqDb = sq.db;
-          sqDb.prepare('UPDATE users SET balance_sov = ? WHERE did = ?').run(newBalance, sender.did);
-          if (resolvedCreatorDid && recipientBalance !== undefined) {
-            sqDb.prepare('UPDATE users SET balance_sov = ? WHERE did = ?').run(recipientBalance, resolvedCreatorDid);
+          if (!atomicTransferRes) {
+            sqDb.prepare('UPDATE users SET balance_sov = ? WHERE did = ?').run(newBalance, sender.did);
+            if (resolvedCreatorDid && recipientBalance !== undefined) {
+              sqDb.prepare('UPDATE users SET balance_sov = ? WHERE did = ?').run(recipientBalance, resolvedCreatorDid);
+            }
           }
           sqDb.prepare(`
             INSERT OR REPLACE INTO offline_payment_vouchers (
@@ -7711,18 +7838,20 @@ export class SovraDatabaseEngine {
             nowTs,
             nowTs
           );
-          sqDb.prepare(`
-            INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            'tx_' + voucher.voucherId,
-            sender.did,
-            finalCreatorDid,
-            amount,
-            0,
-            'MICRO_TIP',
-            nowTs
-          );
+          if (!atomicTransferRes) {
+            sqDb.prepare(`
+              INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              'tx_' + voucher.voucherId,
+              sender.did,
+              finalCreatorDid,
+              amount,
+              0,
+              'MICRO_TIP',
+              nowTs
+            );
+          }
         });
       } catch (sqlErr) {
         console.warn('[processTip] SQLite atomic insert notice:', sqlErr);
@@ -7733,6 +7862,7 @@ export class SovraDatabaseEngine {
 
     return {
       ok: true,
+      txId: atomicTransferRes?.txId || ('tx_' + voucher.voucherId),
       senderBalance: newBalance,
       newBalanceSov: newBalance,
       recipientBalance,
@@ -11678,9 +11808,6 @@ export class SovraDatabaseEngine {
 
   public loadThrottleSecrets(explicitSecret?: string): void {
     let raw = explicitSecret || process.env.SOVRA_THROTTLE_SECRET;
-    if (!raw && (process.env.NODE_ENV !== 'production' || Boolean(process.env.VITEST))) {
-      raw = 'd8f1e2c3b4a5968778695a4b3c2d1e0fa1b2c3d4e5f60718293a4b5c6d7e8f90';
-    }
     const rotationRaw = process.env.SOVRA_THROTTLE_SECRET_ROTATION;
 
     const secrets: string[] = [];

@@ -6716,8 +6716,6 @@ export function renderAdminLoginHtml(): string {
         const data = await res.json();
         if (data.ok && data.sessionToken) {
           try {
-            localStorage.setItem('sovra_admin_token', data.sessionToken);
-            localStorage.setItem('sovra_session_token', data.sessionToken);
             sessionStorage.setItem('sovra_ops_session', data.sessionToken);
             sessionStorage.setItem('sovra_admin_token', data.sessionToken);
           } catch(e) {}

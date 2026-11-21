@@ -2698,37 +2698,6 @@ async function startDevServer() {
         const princ = tryResolveToken(bodyCandidate);
         if (princ) return princ;
       }
-      if (
-        req.url &&
-        (req.url.includes('/api/creator/tip') ||
-          req.url.includes('/api/youtube/tip') ||
-          req.url.includes('/api/watch/tip') ||
-          req.url.includes('/api/reels/tip') ||
-          req.url.includes('/api/feed/tip')) &&
-        _parsedBody.fromDid
-      ) {
-        const senderDid = String(_parsedBody.fromDid).trim();
-        let user = sovraDb.findUserByDid(senderDid);
-        if (!user) {
-          sovraDb.load(true);
-          user = sovraDb.findUserByDid(senderDid);
-        }
-        if (!user) {
-          user = sovraDb.registerUser({
-            did: senderDid,
-            handle: _parsedBody.senderHandle || '@' + senderDid.split(':').pop(),
-            displayName: _parsedBody.senderName || 'Tip Sender',
-          });
-        }
-        if (user) {
-          return createAuthenticatedPrincipal({
-            did: user.did,
-            sessionId: 'tip-session-' + user.did,
-            role: (user.role as any) || 'USER',
-            authenticationMethod: 'BEARER_TOKEN',
-          });
-        }
-      }
     }
 
     // Candidate 4: Browser Cookie (sovra_admin_token, sovra_session_token, sovra_session)
@@ -8983,13 +8952,15 @@ async function startDevServer() {
         // Fallback gracefully
       }
 
-      // 1. Users (People) - strictly filter out blocked users and private profiles!
+      // 1. Users (People) - strictly filter out blocked users, private profiles, and shadowbanned users!
       let users: PublicUserDTO[] = [];
+      const sqlite = sovraDb.getSqliteEngine();
       if (scope === 'all' || scope === 'people') {
         const allowTestUsers = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test' || isTestMode);
         users = sovraDb.getAllUsers(allowTestUsers)
           .filter(u => {
             if ((u as any).isBanned || (u as any).moderationState === 'HIDDEN' || (u as any).moderationState === 'REMOVED') return false;
+            if (sqlite && (sqlite as any).moderation && (sqlite as any).moderation.checkShadowBanEnforcement(u.did, 'search')) return false;
             if (viewerDid && sovraDb.isBlocked(u.did, viewerDid)) return false;
             if (!sovraDb.canUserViewProfile(u, viewerDid)) return false;
             if (indexedDocIds.has(`user:${u.did}`)) return true;
@@ -9006,6 +8977,7 @@ async function startDevServer() {
       if (scope === 'all' || scope === 'posts') {
         posts = sovraDb.getAllPosts()
           .filter(p => {
+            if (sqlite && (sqlite as any).moderation && (sqlite as any).moderation.checkShadowBanEnforcement(p.authorDid, 'search')) return false;
             if (!sovraDb.canUserViewPost(p, viewerDid)) return false;
             if (indexedDocIds.has(`post:${p.id}`)) return true;
             const matchCaption = Boolean(p.caption && typeof p.caption === 'string' && p.caption.toLowerCase().includes(q));
@@ -10327,7 +10299,7 @@ const disappearingPurgeInterval = setInterval(() => {
   }, 15000);
   if (disappearingPurgeInterval.unref) disappearingPurgeInterval.unref();
 
-server.listen(HTTP_PORT, '0.0.0.0', () => {
+server.listen(HTTP_PORT, () => {
     console.log('[2/2] HTTP Server Bound!');
     const lanIp = getLanIpAddress();
 
@@ -10335,7 +10307,7 @@ server.listen(HTTP_PORT, '0.0.0.0', () => {
       httpsServer.on('error', (err: any) => {
         console.warn(`[HTTPS] Warning: Could not bind HTTPS port ${HTTPS_PORT} (${err.code}). HTTP server remains active.`);
       });
-      httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
+      httpsServer.listen(HTTPS_PORT, () => {
         console.log(`[HTTPS] Secure Dev Server Bound on https://0.0.0.0:${HTTPS_PORT}`);
       });
     }
