@@ -1,0 +1,42 @@
+# =============================================================================
+# SOVRA PRODUCTION DOCKERFILE - COMETBFT VALIDATOR DAEMON
+# Multi-stage minimal production image for `chain/cmd/sovrad`
+# =============================================================================
+
+# --- Stage 1: Build Golang Binary ---
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /src
+
+RUN apk add --no-cache git make build-base
+
+COPY chain/ ./chain/
+
+WORKDIR /src/chain
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/sovrad ./cmd/sovrad
+
+# --- Stage 2: Minimal Distroless / Alpine Runtime ---
+FROM alpine:3.20 AS runner
+
+RUN apk add --no-cache ca-certificates curl jq tzdata
+
+# Create dedicated unprivileged validator user
+RUN addgroup -g 10002 sovra && \
+    adduser -u 10002 -G sovra -h /var/lib/sovra -s /bin/sh -D sovra
+
+COPY --from=builder /bin/sovrad /usr/local/bin/sovrad
+
+USER sovra:sovra
+WORKDIR /var/lib/sovra
+
+VOLUME ["/var/lib/sovra"]
+
+# CometBFT P2P (26656), CometBFT RPC (26657), Prometheus Metrics (26660)
+EXPOSE 26656 26657 26660
+
+HEALTHCHECK --interval=20s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://127.0.0.1:26657/status || exit 1
+
+STOPSIGNAL SIGTERM
+
+ENTRYPOINT ["sovrad", "start", "--home=/var/lib/sovra"]

@@ -1,0 +1,137 @@
+# =============================================================================
+# SOVRA PRODUCTION DOCKER COMPOSE - DECOUPLED HORIZONTAL ARCHITECTURE
+# Segregates:
+#   1. Ingress Load Balancer (NGINX)
+#   2. Horizontally Scaled API Pods (api-node-1, api-node-2)
+#   3. Independent CometBFT Validator Daemons (validator-0, validator-1)
+#   4. Asynchronous Background Media & Moderation Worker
+# =============================================================================
+
+version: '3.8'
+
+networks:
+  sovra-ingress-net:
+    driver: bridge
+  sovra-cluster-mesh:
+    driver: bridge
+    internal: true # No direct internet ingress for consensus nodes
+
+volumes:
+  sovra-storage-shared:
+  validator-0-data:
+  validator-1-data:
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. INGRESS & LOAD BALANCER
+  # ---------------------------------------------------------------------------
+  nginx:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.nginx
+    container_name: sovra-load-balancer
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - sovra-ingress-net
+    depends_on:
+      - api-node-1
+      - api-node-2
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health/lb"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # 2. HORIZONTALLY SCALED DECOUPLED API PODS
+  # ---------------------------------------------------------------------------
+  api-node-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: sovra-api-1
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - HOST=0.0.0.0
+      - SOVRA_L1_RPC_URLS=http://validator-0:26657,http://validator-1:26667
+      - SOVRA_INTERNAL_SERVICE_SECRET=sovra_cluster_secret_production_2026_prod
+    volumes:
+      - sovra-storage-shared:/app/.sovra-storage-dev
+    networks:
+      - sovra-ingress-net
+      - sovra-cluster-mesh
+    depends_on:
+      - validator-0
+
+  api-node-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: sovra-api-2
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - HOST=0.0.0.0
+      - SOVRA_L1_RPC_URLS=http://validator-0:26657,http://validator-1:26667
+      - SOVRA_INTERNAL_SERVICE_SECRET=sovra_cluster_secret_production_2026_prod
+    volumes:
+      - sovra-storage-shared:/app/.sovra-storage-dev
+    networks:
+      - sovra-ingress-net
+      - sovra-cluster-mesh
+    depends_on:
+      - validator-0
+
+  # ---------------------------------------------------------------------------
+  # 3. INDEPENDENT COMETBFT VALIDATORS (ZERO DIRECT PUBLIC INGRESS)
+  # ---------------------------------------------------------------------------
+  validator-0:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.validator
+    container_name: sovra-validator-0
+    restart: always
+    volumes:
+      - validator-0-data:/var/lib/sovra
+      - ../chain/mytestnet/node0:/var/lib/sovra/config:ro
+    networks:
+      - sovra-cluster-mesh
+    # Port 26656 (P2P), Port 26657 (RPC internal to mesh)
+
+  validator-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.validator
+    container_name: sovra-validator-1
+    restart: always
+    volumes:
+      - validator-1-data:/var/lib/sovra
+      - ../chain/mytestnet/node1:/var/lib/sovra/config:ro
+    networks:
+      - sovra-cluster-mesh
+
+  # ---------------------------------------------------------------------------
+  # 4. ASYNCHRONOUS BACKGROUND WORKER
+  # ---------------------------------------------------------------------------
+  background-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: sovra-worker
+    restart: always
+    entrypoint: ["node", "services/moderation-worker/dist/index.js"]
+    environment:
+      - NODE_ENV=production
+      - SOVRA_INTERNAL_SERVICE_SECRET=sovra_cluster_secret_production_2026_prod
+    volumes:
+      - sovra-storage-shared:/app/.sovra-storage-dev
+    networks:
+      - sovra-cluster-mesh
+    depends_on:
+      - validator-0

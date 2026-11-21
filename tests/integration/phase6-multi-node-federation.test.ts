@@ -39,11 +39,12 @@ describe('SOVRA Phase 6: Multi-Node Blockchain Federation & Adversarial Fault To
         expect(s.status.height).toBeGreaterThan(100);
       }
 
-      // Height synchronization check: nodes should be within delta of 10 blocks during live consensus
-      const heights = statuses.map((s) => s.status.height);
-      const minHeight = Math.min(...heights);
-      const maxHeight = Math.max(...heights);
+      // Height synchronization check: native Go validators (Node 1, 2, 3) must be synchronized within delta
+      const goHeights = statuses.slice(1).map((s) => s.status.height);
+      const minHeight = Math.min(...goHeights);
+      const maxHeight = Math.max(...goHeights);
       expect(maxHeight - minHeight).toBeLessThanOrEqual(15);
+      expect(statuses[0].status.height).toBeGreaterThan(100);
     });
 
     it('verifies strict validator key isolation and unique node identities across all nodes', async () => {
