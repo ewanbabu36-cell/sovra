@@ -90,7 +90,7 @@ export function checkAndPruneCallHeartbeats(): void {
       const callerAge = hb ? now - hb.callerLastSeen : now - session.createdAt;
       const calleeAge = hb ? now - hb.calleeLastSeen : now - session.createdAt;
       const isConnected = session.status === 'connected' || session.status === 'answered';
-      const timeoutThreshold = isConnected ? 15000 : 45000;
+      const timeoutThreshold = isConnected ? 15000 : 20000;
 
       if (callerAge > timeoutThreshold && calleeAge > timeoutThreshold) {
         try {

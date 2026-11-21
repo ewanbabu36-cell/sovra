@@ -655,13 +655,17 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
         return true;
       }
 
+      const isVideo = parsed.channelType === 'video' || parsed.channelType === 'VIDEO';
+      const defaultAvatar = isVideo ? '🎬' : '📺';
+      const defaultBg = isVideo ? '#f43f5e' : '#6366f1';
+
       const newChan = {
         id: 'chan_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         name: reqName,
         handle,
         desc: String(parsed.desc || `Official channel for ${reqName}`),
-        avatar: String(parsed.avatar || '📺'),
-        bg: String(parsed.bg || '#6366f1'),
+        avatar: String(parsed.avatar || defaultAvatar),
+        bg: String(parsed.bg || parsed.avatarBg || defaultBg),
         subscribers: 1,
         subscriberCount: 1,
         verified: true,
@@ -703,13 +707,17 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
       const channelsList = dynamicSocialStore?.channels || sovraDb.getAllChannels();
       const ch = channelsList.find((c: any) => c.id === parsed.channelId);
       if (ch) {
-        const isSubscribed = Boolean(parsed.isSubscribed);
+        const isSubscribed = parsed.isSubscribed !== undefined
+          ? Boolean(parsed.isSubscribed)
+          : (parsed.subscribe !== undefined
+            ? Boolean(parsed.subscribe)
+            : (parsed.isSubbed !== undefined ? Boolean(parsed.isSubbed) : true));
         ch.subscribers = Math.max(0, (ch.subscribers || 0) + (isSubscribed ? 1 : -1));
         ch.subscriberCount = ch.subscribers;
         if (saveDynamicSocialState && dynamicSocialStore) saveDynamicSocialState(dynamicSocialStore);
         sovraDb.upsertChannel(ch);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, subscribers: ch.subscribers, isSubscribed }));
+        res.end(JSON.stringify({ ok: true, subscribers: ch.subscribers, isSubscribed, isSubbed: isSubscribed }));
       } else {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Channel not found' }));

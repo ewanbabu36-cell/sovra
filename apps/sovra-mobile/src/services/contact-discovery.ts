@@ -58,7 +58,6 @@ export async function hashContactIdentifier(raw: string): Promise<string> {
 
   // Node.js fallback
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const nodeCrypto = await import('node:crypto');
     return nodeCrypto.createHash('sha256').update(data).digest('hex');
   } catch {

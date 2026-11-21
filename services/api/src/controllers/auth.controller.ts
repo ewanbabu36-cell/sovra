@@ -110,6 +110,7 @@ export class AuthController {
           role: session.role,
         },
         token: sessionToken,
+        sessionToken: sessionToken,
       });
     } catch (err: any) {
       this.sendJson(res, 500, { ok: false, error: err.message || 'Registration failed.' });
@@ -157,6 +158,7 @@ export class AuthController {
           role: session.role,
         },
         token: sessionToken,
+        sessionToken: sessionToken,
       });
     } catch (err: any) {
       this.sendJson(res, 500, { ok: false, error: err.message || 'Login failed.' });

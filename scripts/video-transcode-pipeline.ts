@@ -460,25 +460,24 @@ export class VideoTranscodePipeline {
     ].filter(Boolean) as string[];
 
     for (const bin of candidates) {
+      if (path.isAbsolute(bin) && !fs.existsSync(bin)) continue;
       try {
-        execSync(`"${bin}" -version`, { stdio: 'ignore', timeout: 1500 });
+        execSync(`"${bin}" -version`, { stdio: 'ignore', timeout: 500 });
         this.ffmpegBinaryPath = bin;
+        this.ffmpegAvailable = true;
+        this.ffmpegChecked = true;
         return bin;
       } catch (_) {}
     }
+    this.ffmpegAvailable = false;
+    this.ffmpegChecked = true;
     return 'ffmpeg';
   }
 
   public static isFFmpegAvailable(): boolean {
-    if (this.ffmpegChecked) return this.ffmpegAvailable;
-    try {
-      const bin = this.getFFmpegPath();
-      execSync(`"${bin}" -version`, { stdio: 'ignore', timeout: 1500 });
-      this.ffmpegAvailable = true;
-    } catch {
-      this.ffmpegAvailable = false;
+    if (!this.ffmpegChecked) {
+      this.getFFmpegPath();
     }
-    this.ffmpegChecked = true;
     return this.ffmpegAvailable;
   }
 

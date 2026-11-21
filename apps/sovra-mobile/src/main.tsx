@@ -3,9 +3,6 @@
  * Standalone Mobile Hybrid App Entrypoint.
  */
 
-import React from 'react';
-import App from '../App.js';
-
 export function initMobileApp(mountEl?: HTMLElement | null): void {
   const root = mountEl || document.getElementById('root');
   if (!root) return;

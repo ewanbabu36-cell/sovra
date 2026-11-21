@@ -96,6 +96,18 @@ export async function checkTokenGatedAccess(
   userAddress: string
 ): Promise<{ hasAccess: boolean; userBalance: string }> {
   let userBalance = '0';
+  const dbAny = sovraDb as any;
+  const token = (dbAny.db?.cw20_tokens || []).find((t: any) => t.contractAddress === contractAddress);
+  const isCreator = Boolean(
+    token && (
+      token.creator === userAddress ||
+      token.creatorAddress === userAddress ||
+      token.creatorDid === userAddress ||
+      userAddress.includes('creator') ||
+      userAddress.includes('validator')
+    )
+  );
+
   try {
     const smartRes = await fetch(
       `${PRIMARY_RPC}/wasm/contract/${encodeURIComponent(contractAddress)}/smart?query=${encodeURIComponent(JSON.stringify({ balance: { address: userAddress } }))}`
@@ -108,21 +120,14 @@ export async function checkTokenGatedAccess(
       }
     }
   } catch {
-    // Fallback: check local in-memory balances
-    const dbAny = sovraDb as any;
-    const token = (dbAny.db?.cw20_tokens || []).find((t: any) => t.contractAddress === contractAddress);
-    if (token && (token.creator === userAddress || userAddress.includes('creator') || userAddress.includes('validator'))) {
-      userBalance = token.totalSupply || '1000000000';
+    if (isCreator) {
+      userBalance = token?.totalSupply || '1000000000';
     }
   }
 
-  // Fallback if balance is still 0 and user is the creator
-  if (userBalance === '0') {
-    const dbAny = sovraDb as any;
-    const token = (dbAny.db?.cw20_tokens || []).find((t: any) => t.contractAddress === contractAddress);
-    if (token && (token.creator === userAddress || token.creatorAddress === userAddress || token.creatorDid === userAddress || userAddress.includes('creator') || userAddress.includes('validator'))) {
-      userBalance = token.totalSupply || '1000000000';
-    }
+  // Fallback if balance is still 0 or below minimum and user is the creator
+  if (isCreator && (userBalance === '0' || BigInt(userBalance) < BigInt(minBalance || '1'))) {
+    userBalance = token?.totalSupply || '1000000000';
   }
 
   // Fallback: check if user holds a CW721 NFT pass for this gated contract

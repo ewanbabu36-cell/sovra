@@ -72,7 +72,7 @@ export async function handleSecurityCanaryRoutes(ctx: SecurityCanaryRouteContext
   const nonceHeader = req.headers['x-sovra-nonce'];
   if (nonceHeader && typeof nonceHeader === 'string') {
     const isMutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes((req.method || 'GET').toUpperCase());
-    const isStrictAntiReplayEndpoint = isMutating && Boolean(
+    const isStrictAntiReplayEndpoint = (isMutating && Boolean(
       url.pathname.startsWith('/api/transfer') ||
       url.pathname.startsWith('/api/wallet') ||
       url.pathname.startsWith('/api/voucher') ||
@@ -82,7 +82,7 @@ export async function handleSecurityCanaryRoutes(ctx: SecurityCanaryRouteContext
       url.pathname.startsWith('/api/security') ||
       url.pathname.startsWith('/api/auth/webauthn') ||
       url.pathname.startsWith('/api/keys/revoke')
-    );
+    )) || url.pathname === '/api/feed/personalized';
     const isValidNonce = checkAndRecordReplayNonce(nonceHeader, req.headers['x-sovra-timestamp']);
     if (!isValidNonce && isStrictAntiReplayEndpoint) {
       res.writeHead(403, { 'Content-Type': 'application/json' });

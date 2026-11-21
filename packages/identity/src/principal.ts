@@ -114,7 +114,10 @@ export function hasCapability(
   if (principal.role === 'SUPER_ADMIN') {
     return true;
   }
-  return principal.capabilities.includes(capability);
+  const caps = Array.isArray(principal.capabilities)
+    ? principal.capabilities
+    : getRoleCapabilities(principal.role);
+  return caps.includes(capability);
 }
 
 /**

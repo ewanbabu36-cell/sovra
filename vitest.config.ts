@@ -22,6 +22,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    setupFiles: [path.resolve(__dirname, 'tests/setup-vitest.ts')],
     fileParallelism: false,
     include: [
       'packages/**/*.test.ts',
