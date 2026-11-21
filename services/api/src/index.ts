@@ -11,3 +11,4 @@ export { telemetryController } from './controllers/telemetry.controller.js';
 export { walletController } from './controllers/wallet.controller.js';
 export { securityMiddleware } from './middleware/security.middleware.js';
 export { authMiddleware } from './middleware/auth.middleware.js';
+export { DecoupledApiServer, type ApiServerOptions } from './server.js';
