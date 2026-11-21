@@ -7,15 +7,19 @@
  * Features:
  *  - Native HTTP/REST request routing
  *  - Liveness, Readiness, and Consensus Health Checks
- *  - Secure Service-to-Service Authentication (X-Sovra-Internal-Auth)
- *  - Multi-Validator RPC Failover Driver
+ *  - Secure Service-to-Service Authentication (X-Sovra-Internal-Auth) with Zero-Downtime Secret Rotation
+ *  - Multi-Validator RPC Failover Driver & Prometheus Telemetry (/metrics)
+ *  - Sliding Window Rate-Limiting Guard
  *  - Graceful Shutdown with in-flight request draining and connection closing
  */
 
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { dispatchApiRequest } from './routes/index.js';
-import { securityMiddleware } from './middleware/security.middleware.js';
+import { SecurityMiddleware } from './middleware/security.middleware.js';
+import { ConsensusMonitor } from './monitoring/consensus-monitor.js';
+import { SecretRotationManager } from './monitoring/secret-rotation.js';
+import { securityEventCollector } from './monitoring/security-events.js';
 
 export interface ApiServerOptions {
   port?: number;
@@ -23,6 +27,8 @@ export interface ApiServerOptions {
   l1RpcUrls?: string[];
   internalSecret?: string;
   drainTimeoutMs?: number;
+  rateLimitMaxRequests?: number;
+  rateLimitWindowMs?: number;
 }
 
 export class DecoupledApiServer {
@@ -30,12 +36,14 @@ export class DecoupledApiServer {
   private port: number;
   private host: string;
   private l1RpcUrls: string[];
-  private internalSecret: string;
   private drainTimeoutMs: number;
   private activeConnections = new Set<any>();
   private activeRequests = 0;
   private isShuttingDown = false;
   private startTime = Date.now();
+  private securityMiddleware: SecurityMiddleware;
+  public readonly secretManager: SecretRotationManager;
+  public readonly consensusMonitor: ConsensusMonitor;
 
   constructor(options: ApiServerOptions = {}) {
     this.port = options.port !== undefined ? options.port : (Number(process.env.PORT) || 3001);
@@ -50,11 +58,17 @@ export class DecoupledApiServer {
             'http://127.0.0.1:26687',
           ]
     );
-    this.internalSecret =
+    const initialSecret =
       options.internalSecret ||
       process.env.SOVRA_INTERNAL_SERVICE_SECRET ||
       'sovra_internal_cluster_secret_default_key_2026';
+    this.secretManager = new SecretRotationManager(initialSecret);
+    this.consensusMonitor = new ConsensusMonitor({ rpcUrls: this.l1RpcUrls });
     this.drainTimeoutMs = options.drainTimeoutMs || 10000;
+    this.securityMiddleware = new SecurityMiddleware({
+      rateLimitMaxRequests: options.rateLimitMaxRequests ?? 120,
+      rateLimitWindowMs: options.rateLimitWindowMs ?? 60000,
+    });
   }
 
   /**
@@ -80,19 +94,26 @@ export class DecoupledApiServer {
   }
 
   /**
-   * Service-to-service authentication validator
+   * Service-to-service authentication validator supporting rotation and replay prevention
    */
   public verifyServiceAuth(req: http.IncomingMessage): boolean {
     const authHeader = req.headers['x-sovra-internal-auth'];
     const timestampHeader = req.headers['x-sovra-timestamp'];
 
     if (!authHeader || typeof authHeader !== 'string') {
+      securityEventCollector.recordEvent(
+        'WARN',
+        'UNAUTHORIZED_ACCESS',
+        'SERVICE_AUTH_MISSING_HEADER',
+        { path: req.url },
+        req.socket?.remoteAddress
+      );
       return false;
     }
 
-    // Direct bearer token match
+    // Direct bearer token match across active secret versions
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (token === this.internalSecret) {
+    if (this.secretManager.isValidSecret(token)) {
       return true;
     }
 
@@ -102,16 +123,34 @@ export class DecoupledApiServer {
       const ts = Number(timestampHeader);
       // Replay prevention: reject timestamps older or ahead by > 5 minutes
       if (isNaN(ts) || Math.abs(now - ts) > 300_000) {
+        securityEventCollector.recordEvent(
+          'WARN',
+          'AUTH_FAILURE',
+          'SERVICE_AUTH_EXPIRED_TIMESTAMP',
+          { ts, delta: Math.abs(now - ts) },
+          req.socket?.remoteAddress
+        );
         return false;
       }
+
+      const activeSecret = this.secretManager.getCurrentSecret();
       const expectedHmac = crypto
-        .createHmac('sha256', this.internalSecret)
+        .createHmac('sha256', activeSecret)
         .update(`${req.method}:${req.url}:${timestampHeader}`)
         .digest('hex');
 
-      return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expectedHmac));
+      if (token.length === expectedHmac.length && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expectedHmac))) {
+        return true;
+      }
     }
 
+    securityEventCollector.recordEvent(
+      'WARN',
+      'AUTH_FAILURE',
+      'SERVICE_AUTH_INVALID_TOKEN',
+      { path: req.url },
+      req.socket?.remoteAddress
+    );
     return false;
   }
 
@@ -132,13 +171,30 @@ export class DecoupledApiServer {
           return;
         }
 
+        // Apply enterprise OWASP security headers across all API responses
+        this.securityMiddleware.applySecurityHeaders(req, res);
+
+        // Rate limiting check
+        if (!this.securityMiddleware.checkRateLimit(req)) {
+          securityEventCollector.recordEvent(
+            'WARN',
+            'RATE_LIMIT_TRIPPED',
+            'HTTP_RATE_LIMIT_EXCEEDED',
+            { url: req.url },
+            req.socket?.remoteAddress
+          );
+          res.writeHead(429, {
+            'Content-Type': 'application/json',
+            'Retry-After': '60',
+          });
+          res.end(JSON.stringify({ ok: false, error: 'Too Many Requests', message: 'Rate limit exceeded' }));
+          return;
+        }
+
         this.activeRequests++;
         res.on('finish', () => {
           this.activeRequests--;
         });
-
-        // Apply enterprise OWASP security headers across all API responses
-        securityMiddleware.applySecurityHeaders(req, res);
 
         try {
           const parsedUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
@@ -212,6 +268,21 @@ export class DecoupledApiServer {
             return;
           }
 
+          if (pathname === '/health/monitoring' && req.method === 'GET') {
+            const summary = await this.consensusMonitor.evaluateHealth();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(summary));
+            return;
+          }
+
+          if (pathname === '/metrics' && req.method === 'GET') {
+            const summary = await this.consensusMonitor.evaluateHealth();
+            const metricsText = this.consensusMonitor.generatePrometheusMetrics(summary);
+            res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
+            res.end(metricsText);
+            return;
+          }
+
           // -----------------------------------------------------------------
           // 2. SECURE SERVICE-TO-SERVICE INTERNAL ROUTING
           // -----------------------------------------------------------------
@@ -231,6 +302,20 @@ export class DecoupledApiServer {
             if (pathname === '/internal/cluster/ping' && req.method === 'POST') {
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ ok: true, pong: true, timestamp: Date.now() }));
+              return;
+            }
+
+            if (pathname === '/internal/security/events' && req.method === 'GET') {
+              const events = securityEventCollector.queryEvents();
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, count: events.length, events }));
+              return;
+            }
+
+            if (pathname === '/internal/secret/rotate' && req.method === 'POST') {
+              const rotated = this.secretManager.rotateSecret();
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, version: rotated.version, createdAt: rotated.createdAt }));
               return;
             }
           }
