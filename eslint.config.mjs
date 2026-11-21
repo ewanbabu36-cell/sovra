@@ -9,6 +9,8 @@ export default [
       '**/.turbo/**',
       '**/coverage/**',
       '**/*.d.ts',
+      '**/.sovra-storage*/**',
+      '**/chain/data/**',
     ],
   },
   {

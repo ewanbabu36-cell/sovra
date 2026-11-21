@@ -77,6 +77,13 @@ export async function handleOfflinePayRoutes(
         return true;
       }
 
+      const sender = (sovraDb as any).getUserByDid ? (sovraDb as any).getUserByDid(senderDid) : (sovraDb.db.users || []).find((u: any) => u.did === senderDid);
+      const currentBal = Number(sender?.balance_sov ?? (sender as any)?.balanceSov ?? 0);
+      if (sender && currentBal < amountSov) {
+        sendJson(res, 400, { ok: false, error: 'Insufficient SOV balance for offline voucher' });
+        return true;
+      }
+
       if (!signature) {
         sendJson(res, 400, { ok: false, error: 'Cryptographic Ed25519 signature is strictly required to generate an offline voucher' });
         return true;

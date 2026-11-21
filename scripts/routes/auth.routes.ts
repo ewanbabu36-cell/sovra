@@ -174,7 +174,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
 
       const valRes = sovraDb.validateHandle(handle);
       if (!valRes.valid) {
-        const status = valRes.error?.includes('reserved') ? 403 : (valRes.error?.includes('already in use') ? 409 : 400);
+        const status = valRes.error?.includes('reserved') ? 403 : (valRes.error?.includes('already') ? 409 : 400);
         res.writeHead(status, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: valRes.error }));
         return true;
@@ -203,7 +203,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
       }
       const sessionToken = (isTestEnv && parsed.sessionToken) ? String(parsed.sessionToken) : ('stk_' + crypto.randomBytes(32).toString('hex'));
       const displayName = String(parsed.name || parsed.displayName || handle.replace('@', '')).trim();
-      const securityPin = parsed.securityPin ? String(parsed.securityPin).trim() : (parsed.pin ? String(parsed.pin).trim() : '123456');
+      const securityPin = parsed.securityPin ? String(parsed.securityPin).trim() : (parsed.pin ? String(parsed.pin).trim() : undefined);
 
       // Enforce Cosmos PBFT hard monetary policy: cap registration grants within 100M SOV lifetime limit
       const requestedGrant = typeof parsed.balanceSov === 'number' ? parsed.balanceSov : (isTestEnv ? 500.0 : 100.0);
@@ -245,6 +245,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         ok: true,
         user: toPublicUserDTO(user),
         sessionToken: user.sessionToken,
+        token: user.sessionToken,
         recoveryPhrase: regResult.recoveryPhrase,
       }));
     } catch (err: any) {
@@ -308,6 +309,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         ok: true,
         user: toPublicUserDTO(loginRes.user),
         sessionToken: loginRes.sessionToken,
+        token: loginRes.sessionToken,
       }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -390,6 +392,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         ok: true,
         user: toPublicUserDTO(user),
         sessionToken,
+        token: sessionToken,
         isNewUser,
         credentialId: verifyRes.credential.id,
         message: isNewUser ? 'Sovereign account created via Biometrics!' : 'Biometric passkey linked successfully!'
@@ -456,6 +459,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         ok: true,
         user: toPublicUserDTO(user),
         sessionToken,
+        token: sessionToken,
         deviceToken: effectiveDeviceToken,
         isNewUser,
         message: isNewUser ? 'Sovereign mobile account created!' : 'Welcome back to Sovra!'
@@ -525,6 +529,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         ok: true,
         user: toPublicUserDTO(loginRes.user),
         sessionToken: loginRes.sessionToken,
+        token: loginRes.sessionToken,
         message: 'Biometric passkey verified!'
       }));
     } catch (err: any) {
@@ -762,6 +767,163 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     return true;
   }
 
+  // 13d. 2-of-3 Social Guardian Recovery
+  if (url.pathname === '/api/auth/recovery/initiate' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const targetDid = String(parsed.targetDid || '').trim();
+      const guardians = Array.isArray(parsed.guardians) ? parsed.guardians.map((g: any) => String(g).trim()) : [];
+      const recoveryId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+
+      if (!(sovraDb as any)._socialRecoverySessions) {
+        (sovraDb as any)._socialRecoverySessions = new Map<string, any>();
+      }
+      (sovraDb as any)._socialRecoverySessions.set(recoveryId, {
+        recoveryId,
+        targetDid,
+        guardians,
+        approvals: [],
+        status: 'PENDING',
+        createdAt: Date.now(),
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          recoveryId,
+          threshold: 2,
+          requiredApprovals: 2,
+          status: 'PENDING',
+          guardians,
+        }),
+      );
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  if (url.pathname === '/api/auth/recovery/status' && req.method === 'GET') {
+    const recoveryId = url.searchParams.get('recoveryId') || '';
+    const sessionsMap = (sovraDb as any)._socialRecoverySessions;
+    const session = sessionsMap ? sessionsMap.get(recoveryId) : null;
+    if (!session) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Recovery session not found' }));
+      return true;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        ok: true,
+        recoveryId,
+        approvalsCount: session.approvals.length,
+        isThresholdMet: session.approvals.length >= 2,
+        status: session.status,
+      }),
+    );
+    return true;
+  }
+
+  if (url.pathname === '/api/auth/recovery/approve' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const recoveryId = String(parsed.recoveryId || '').trim();
+      const guardianId = String(parsed.guardianId || '').trim();
+
+      const sessionsMap = (sovraDb as any)._socialRecoverySessions;
+      const session = sessionsMap ? sessionsMap.get(recoveryId) : null;
+      if (!session) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Recovery session not found' }));
+        return true;
+      }
+      if (session.status === 'FINALIZED') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Session is already finalized' }));
+        return true;
+      }
+      if (!session.guardians.includes(guardianId)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Guardian is not authorized for this recovery session' }));
+        return true;
+      }
+      if (!session.approvals.includes(guardianId)) {
+        session.approvals.push(guardianId);
+      }
+      const currentApprovals = session.approvals.length;
+      const isThresholdMet = currentApprovals >= 2;
+      if (isThresholdMet) {
+        session.status = 'APPROVED';
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          recoveryId: session.recoveryId,
+          currentApprovals,
+          isThresholdMet,
+          status: session.status,
+        }),
+      );
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  if (url.pathname === '/api/auth/recovery/finalize' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const recoveryId = String(parsed.recoveryId || '').trim();
+
+      const sessionsMap = (sovraDb as any)._socialRecoverySessions;
+      const session = sessionsMap ? sessionsMap.get(recoveryId) : null;
+      if (!session) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Recovery session not found' }));
+        return true;
+      }
+      if (session.status === 'FINALIZED') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Session is already finalized' }));
+        return true;
+      }
+      if (session.approvals.length < 2) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Quorum threshold not met: 2 guardian approvals required' }));
+        return true;
+      }
+      session.status = 'FINALIZED';
+      const restoreToken = 'sovra-restore-' + crypto.randomBytes(16).toString('hex');
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          status: 'FINALIZED',
+          restoreToken,
+          quorumApprovals: session.approvals.length,
+        }),
+      );
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
   // 14. User Logout
   if ((url.pathname === '/api/user/logout' || url.pathname === '/api/auth/logout') && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
@@ -774,8 +936,8 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         token = authHeader.substring(7).trim();
       } else if (req.headers['x-sovra-session-token']) {
         token = String(req.headers['x-sovra-session-token']).trim();
-      } else if (parsed.sessionToken) {
-        token = String(parsed.sessionToken).trim();
+      } else if (parsed.sessionToken || parsed.token || parsed.authToken) {
+        token = String(parsed.sessionToken || parsed.token || parsed.authToken).trim();
       }
       if (!token && req.headers.cookie) {
         const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);

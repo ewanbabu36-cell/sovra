@@ -6943,18 +6943,18 @@ export function renderAdminLoginHtml(): string {
 
           var actions = '';
           if (u.status !== 'BLOCKED') {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);" onclick="openModActionModal(\'BLOCK\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">⛔ Block</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);" onclick="openModActionModal(&apos;BLOCK&apos;, &apos;' + u.did + '&apos;, &apos;USER&apos;, &apos;' + u.status + '&apos;)">⛔ Block</button> ';
           }
           if (u.status !== 'SUSPENDED') {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="openModActionModal(\'SUSPEND\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">🚫 Suspend</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="openModActionModal(&apos;SUSPEND&apos;, &apos;' + u.did + '&apos;, &apos;USER&apos;, &apos;' + u.status + '&apos;)">🚫 Suspend</button> ';
           }
           if (u.status === 'BLOCKED' || u.status === 'SUSPENDED') {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'RESTORE\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">🕊️ Restore</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(&apos;RESTORE&apos;, &apos;' + u.did + '&apos;, &apos;USER&apos;, &apos;' + u.status + '&apos;)">🕊️ Restore</button> ';
           }
           if (!u.isShadowBanned) {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#8b5cf6; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.3);" onclick="openModActionModal(\'SHADOWBAN\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">👻 Shadowban</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#8b5cf6; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.3);" onclick="openModActionModal(&apos;SHADOWBAN&apos;, &apos;' + u.did + '&apos;, &apos;USER&apos;, &apos;' + u.status + '&apos;)">👻 Shadowban</button> ';
           } else {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'SHADOWBAN_REMOVE\', \'' + u.did + '\', \'USER\', \'' + u.status + '\')">🕊️ Unban</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(&apos;SHADOWBAN_REMOVE&apos;, &apos;' + u.did + '&apos;, &apos;USER&apos;, &apos;' + u.status + '&apos;)">🕊️ Unban</button> ';
           }
 
           return '<tr>' +
@@ -7000,15 +7000,15 @@ export function renderAdminLoginHtml(): string {
 
           var actions = '';
           if (c.status !== 'SUSPENDED') {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="openModActionModal(\'CREATOR_SUSPEND\', \'' + c.did + '\', \'CREATOR\', \'' + c.status + '\')">🚫 Suspend</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="openModActionModal(&apos;CREATOR_SUSPEND&apos;, &apos;' + c.did + '&apos;, &apos;CREATOR&apos;, &apos;' + c.status + '&apos;)">🚫 Suspend</button> ';
           } else {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'CREATOR_RESTORE\', \'' + c.did + '\', \'CREATOR\', \'' + c.status + '\')">🕊️ Restore</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(&apos;CREATOR_RESTORE&apos;, &apos;' + c.did + '&apos;, &apos;CREATOR&apos;, &apos;' + c.status + '&apos;)">🕊️ Restore</button> ';
           }
-          actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);" onclick="openModActionModal(\'MONETIZATION\', \'' + c.did + '\', \'CREATOR\', \'' + c.monetizationStatus + '\')">' + (c.monetizationStatus === 'RESTRICTED' ? '💳 Enable Monetization' : '⚠️ Restrict Monetization') + '</button> ';
+          actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);" onclick="openModActionModal(&apos;MONETIZATION&apos;, &apos;' + c.did + '&apos;, &apos;CREATOR&apos;, &apos;' + c.monetizationStatus + '&apos;)">' + (c.monetizationStatus === 'RESTRICTED' ? '💳 Enable Monetization' : '⚠️ Restrict Monetization') + '</button> ';
           if (!c.isShadowBanned) {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#8b5cf6; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.3);" onclick="openModActionModal(\'SHADOWBAN\', \'' + c.did + '\', \'CREATOR\', \'' + c.status + '\')">👻 Shadowban</button>';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#8b5cf6; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.3);" onclick="openModActionModal(&apos;SHADOWBAN&apos;, &apos;' + c.did + '&apos;, &apos;CREATOR&apos;, &apos;' + c.status + '&apos;)">👻 Shadowban</button>';
           } else {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'SHADOWBAN_REMOVE\', \'' + c.did + '\', \'CREATOR\', \'' + c.status + '\')">🕊️ Unban</button>';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(&apos;SHADOWBAN_REMOVE&apos;, &apos;' + c.did + '&apos;, &apos;CREATOR&apos;, &apos;' + c.status + '&apos;)">🕊️ Unban</button>';
           }
 
           return '<tr>' +
@@ -7056,12 +7056,12 @@ export function renderAdminLoginHtml(): string {
 
           var actions = '';
           if (!p.is_removed && p.moderation_state !== 'REMOVED') {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="openModActionModal(\'CONTENT_REMOVE\', \'' + p.id + '\', \'CONTENT\', \'' + p.moderation_state + '\')">🗑️ Remove</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="openModActionModal(&apos;CONTENT_REMOVE&apos;, &apos;' + p.id + '&apos;, &apos;CONTENT&apos;, &apos;' + p.moderation_state + '&apos;)">🗑️ Remove</button> ';
           } else {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(\'CONTENT_RESTORE\', \'' + p.id + '\', \'CONTENT\', \'' + p.moderation_state + '\')">🕊️ Restore</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="openModActionModal(&apos;CONTENT_RESTORE&apos;, &apos;' + p.id + '&apos;, &apos;CONTENT&apos;, &apos;' + p.moderation_state + '&apos;)">🕊️ Restore</button> ';
           }
           if (p.moderation_state !== 'RESTRICTED' && !p.is_removed) {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);" onclick="openModActionModal(\'CONTENT_RESTRICT\', \'' + p.id + '\', \'CONTENT\', \'' + p.moderation_state + '\')">⚠️ Restrict</button>';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);" onclick="openModActionModal(&apos;CONTENT_RESTRICT&apos;, &apos;' + p.id + '&apos;, &apos;CONTENT&apos;, &apos;' + p.moderation_state + '&apos;)">⚠️ Restrict</button>';
           }
 
           return '<tr>' +
@@ -7103,9 +7103,9 @@ export function renderAdminLoginHtml(): string {
           var dateStr = a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '';
           var actions = '';
           if (a.status === 'PENDING') {
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="reviewAppealDirect(\'' + a.id + '\', \'UPHELD\')">Uphold</button> ';
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="reviewAppealDirect(\'' + a.id + '\', \'REVERSED\')">Reverse</button> ';
-            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#38bdf8; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3);" onclick="reviewAppealDirect(\'' + a.id + '\', \'REDUCED\')">Reduce</button>';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#ef4444; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);" onclick="reviewAppealDirect(&apos;' + a.id + '&apos;, &apos;UPHELD&apos;)">Uphold</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);" onclick="reviewAppealDirect(&apos;' + a.id + '&apos;, &apos;REVERSED&apos;)">Reverse</button> ';
+            actions += '<button class="btn-ops" style="padding:4px 8px; font-size:0.72rem; color:#38bdf8; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3);" onclick="reviewAppealDirect(&apos;' + a.id + '&apos;, &apos;REDUCED&apos;)">Reduce</button>';
           } else {
             actions = '<span style="font-size:0.72rem; color:#64748b;">Resolved</span>';
           }

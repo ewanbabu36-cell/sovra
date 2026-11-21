@@ -270,6 +270,26 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
         createdAt: Date.now()
       });
 
+      if (!Array.isArray(dbAny.db.amm_pools)) {
+        dbAny.db.amm_pools = [];
+      }
+      dbAny.db.amm_pools.unshift({
+        tokenAddress: finalContractAddress,
+        tokenSymbol: symbol,
+        tokenName: name,
+        creatorDid,
+        creatorAddress,
+        poolAddress: 'pool_' + finalContractAddress.slice(0, 16),
+        reserveSov: '10000000', // 10 SOV
+        sovReserve: '10000000',
+        reserveToken: initialSupply,
+        tokenReserve: initialSupply,
+        creatorRoyaltyBps: 100, // 1%
+        feePercent: 1,
+        lpTokenSupply: initialSupply,
+        createdAt: Date.now(),
+      });
+
       if (typeof dbAny.save === 'function') {
         dbAny.save();
       }
@@ -621,9 +641,11 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
 
     let parsed: any = {};
     try {
-      parsed = JSON.parse(body);
+      parsed = body ? JSON.parse(body) : {};
     } catch (_) {
-      parsed = {};
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Malformed JSON payload' }));
+      return true;
     }
 
     const principal = ctx.enforceAuth(req, res, parsed);
@@ -934,9 +956,11 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
 
     let parsed: any = {};
     try {
-      parsed = JSON.parse(body);
+      parsed = body ? JSON.parse(body) : {};
     } catch (_) {
-      parsed = {};
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Malformed JSON payload' }));
+      return true;
     }
 
     const principal = ctx.enforceAuth(req, res, parsed);
@@ -974,9 +998,11 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
 
     let parsed: any = {};
     try {
-      parsed = JSON.parse(body);
+      parsed = body ? JSON.parse(body) : {};
     } catch (_) {
-      parsed = {};
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Malformed JSON payload' }));
+      return true;
     }
 
     const principal = ctx.enforceAuth(req, res, parsed);
@@ -1070,9 +1096,11 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
     if (!ok) return true;
     let parsed: any = {};
     try {
-      parsed = JSON.parse(body);
+      parsed = body ? JSON.parse(body) : {};
     } catch (_) {
-      parsed = {};
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Malformed JSON payload' }));
+      return true;
     }
     const principal = ctx.enforceAuth(req, res, parsed);
     if (!principal) return true;

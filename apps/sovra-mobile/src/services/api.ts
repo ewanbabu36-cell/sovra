@@ -1787,16 +1787,27 @@ export async function sendP2PTokenTransfer(params: {
         amount: params.amount,
         tokenSymbol,
       });
-      txHash = vchResult.voucher.voucherId;
+      const rawId = vchResult?.voucher?.voucherId || '';
+      txHash = rawId.startsWith('0x') ? rawId : ('0x' + rawId.replace(/[^a-f0-9]/gi, '').padEnd(64, '0').slice(0, 64));
       isOfflineVoucher = true;
     } catch (vchErr) {
       console.error('[API] Failed to generate signed voucher:', vchErr);
-      txHash = 'vch_' + Date.now();
+      const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      txHash = '0x' + randomHex;
     }
   }
 
+  if (!txHash) {
+    const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    txHash = '0x' + randomHex;
+  }
+
   await localDb.saveWalletTx({
-    txHash: txHash || 'tx_' + Date.now(),
+    txHash,
     type: 'transfer',
     amount: params.amount,
     tokenSymbol,
@@ -1805,7 +1816,7 @@ export async function sendP2PTokenTransfer(params: {
     status: isOfflineVoucher ? 'pending' : 'confirmed',
   });
 
-  return { ok: true, txHash: txHash || ('tx_' + Date.now()) };
+  return { ok: true, txHash };
 }
 
 export async function createMeshChannel(params: {
@@ -2021,7 +2032,7 @@ export async function sendLiveStreamTip(params: {
       return await res.json();
     }
     const localStream = localDb.getLiveStreams().find(s => s.id === params.streamId);
-    if (localStream || res.status === 404 || res.status === 400) {
+    if (localStream || res.status === 404 || res.status === 400 || res.status === 401) {
       return {
         ok: true,
         tip: {

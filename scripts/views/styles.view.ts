@@ -24,8 +24,17 @@ export function renderGlobalStyles(isCreatorModeActive: boolean = false): string
       cachedCss = '/* sovra.css loading */';
     }
   }
+  const osStyles = `
+/* Sovereign OS Runtime Modes */
+body.sovra-mode-home .app-layout { display: none !important; }
+body.sovra-mode-home .app-top-header { display: none !important; }
+body.sovra-mode-home .sovra-android-nav-bar { display: flex !important; }
+body.sovra-mode-app .sovra-home-screen-view { display: none !important; }
+body.sovra-mode-app .sovra-android-nav-bar { display: flex !important; }
+body.sovra-mode-app .app-layout { display: flex !important; }
+`;
   if (isCreatorModeActive) {
-    return cachedCss + '\nbody.creator-mode-active .creator-banner { display: block !important; }\n';
+    return cachedCss + osStyles + '\nbody.creator-mode-active .creator-banner { display: block !important; }\n';
   }
-  return cachedCss;
+  return cachedCss + osStyles;
 }
