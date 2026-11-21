@@ -9468,6 +9468,9 @@ async function startDevServer() {
           spaceType: parsed.spaceType ? String(parsed.spaceType) as any : undefined,
         });
 
+        dynamicSocialStore.posts = sovraDb.getAllPosts();
+        _cachedHtmlResponse = null;
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, ...actionRes }));
       } catch (err: any) {
