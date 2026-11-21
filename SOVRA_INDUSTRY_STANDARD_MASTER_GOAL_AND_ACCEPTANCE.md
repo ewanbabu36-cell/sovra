@@ -533,9 +533,9 @@ graph LR
 
 ### Gate 4: Decentralized Infrastructure & Storage Swarm
 * **Entry Criteria:** Client crypto operational.
-* **Exit Criteria:** P2P peer discovery via Kademlia DHT and media distribution via BitSwap across independent storage nodes.
-* **Mandatory Suites:** `tests/integration/storage-p2p.test.ts`, `tests/integration/multi-node-convergence.test.ts`.
-* **Current Status:** **IN PROGRESS (Next Milestone)**.
+* **Exit Criteria:** P2P peer discovery via Kademlia DHT and media distribution via BitSwap across independent storage nodes; 4-validator Byzantine consensus verified.
+* **Mandatory Suites:** `tests/integration/storage-p2p.test.ts`, `tests/integration/phase6-multi-node-federation.test.ts`.
+* **Current Status:** **PARTIALLY VERIFIED** (November 21, 2026 — 4-validator local CometBFT consensus cluster, BitSwap P2P socket data exchange, and Byzantine fault tolerance proven; multi-operator cloud deployment GAP-P1-01 pending).
 
 ### Gate 5: Blockchain Consensus & Native SOV Economy
 * **Entry Criteria:** Autonomous L1 daemon operational.
@@ -640,10 +640,25 @@ A feature or subsystem is defined as **DONE for SOVRA 1.0** only when:
 * **Phase 5 Governance Authorization Report:** [`SOVRA_PHASE5_GOVERNANCE_AUTHORIZATION_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE5_GOVERNANCE_AUTHORIZATION_REPORT.md)
 * **Phase 5 Comprehensive Regression Report:** [`SOVRA_PHASE5_REGRESSION_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE5_REGRESSION_REPORT.md)
 
+* **Phase 6 Multi-Node Federation Suite:** [`tests/integration/phase6-multi-node-federation.test.ts`](file:///d:/Sovra/tests/integration/phase6-multi-node-federation.test.ts)
+* **Phase 6 P2P Storage Suite:** [`tests/integration/storage-p2p.test.ts`](file:///d:/Sovra/tests/integration/storage-p2p.test.ts)
+* **Phase 5 Independent Verification Report:** [`SOVRA_PHASE5_INDEPENDENT_VERIFICATION_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE5_INDEPENDENT_VERIFICATION_REPORT.md)
+* **Phase 6 Multi-Node Federation Report:** [`SOVRA_PHASE6_MULTI_NODE_FEDERATION_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE6_MULTI_NODE_FEDERATION_REPORT.md)
+* **Phase 6 Decentralization Gap Report:** [`SOVRA_PHASE6_DECENTRALIZATION_GAP_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE6_DECENTRALIZATION_GAP_REPORT.md)
+* **Phase 6 Failure & Recovery Report:** [`SOVRA_PHASE6_FAILURE_AND_RECOVERY_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE6_FAILURE_AND_RECOVERY_REPORT.md)
+* **Phase 6 Web & Android Resilience Report:** [`SOVRA_PHASE6_WEB_ANDROID_RESILIENCE_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE6_WEB_ANDROID_RESILIENCE_REPORT.md)
+* **Phase 6 Gate 4 Acceptance Report:** [`SOVRA_PHASE6_GATE4_ACCEPTANCE_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE6_GATE4_ACCEPTANCE_REPORT.md)
+
 ---
 
 ## 28. Change Log & Document Governance
 
+* **Version 1.2.0-PHASE6 (2026-11-21):**
+  - Independently verified and reproduced all 8 Phase 5 claims on live node engines and SQLite storage.
+  - Deployed, synced, and audited live 4-node CometBFT validator cluster (`validator-0` through `validator-3`) at block height 82,785+.
+  - Proved Byzantine fault tolerance ($f=1$) across 10 adversarial failure scenarios.
+  - Audited BitSwap P2P UnixFS Merkle DAG data exchange across OS TCP sockets with Noise_XX transport.
+  - Promoted Gate 4 to **PARTIALLY VERIFIED**; cataloged remaining central gateway and single-operator cloud deployment dependencies.
 * **Version 1.1.0-PHASE5 (2026-11-21):**
   - Resolved and independently verified all 4 P0 gaps (GAP-P0-01 through GAP-P0-04).
   - Promoted Gate 3 (Genuine Privacy & E2EE), Gate 5 (Blockchain Consensus & SOV Economy), and Gate 6 (Governance & Multi-Sig) to **PASSED**.
