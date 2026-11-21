@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID1234.app.sovra.network",
+        "appID": "TEAMID.network.sovra.mobile",
         "paths": [
           "/spaces/*",
           "/profile/*",
@@ -19,7 +19,7 @@
         ]
       },
       {
-        "appID": "TEAMID.network.sovra.mobile",
+        "appID": "TEAMID1234.app.sovra.network",
         "paths": [
           "/feed/*",
           "/p/*",
@@ -32,8 +32,8 @@
   },
   "webcredentials": {
     "apps": [
-      "TEAMID1234.app.sovra.network",
-      "TEAMID.network.sovra.mobile"
+      "TEAMID.network.sovra.mobile",
+      "TEAMID1234.app.sovra.network"
     ]
   }
 }

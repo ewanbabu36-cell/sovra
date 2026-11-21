@@ -3182,7 +3182,7 @@ async function startDevServer() {
               relation: ['delegate_permission/common.handle_all_urls'],
               target: {
                 namespace: 'android_app',
-                package_name: 'app.sovra.network',
+                package_name: 'network.sovra.mobile',
                 sha256_cert_fingerprints: [
                   '14:6D:E9:7D:0F:52:AB:F5:B5:4F:86:4E:2F:E9:B5:A4:9E:6F:E1:94:7A:B4:42:07:98:8C:72:48:99:A5:1B:1A',
                   '5F:E9:60:5F:17:55:F2:0A:9E:6C:F9:55:9D:3A:DF:B2:EC:88:23:25:18:32:9C:45:57:E4:66:A6:33:D6:2B:1C',
@@ -9795,7 +9795,7 @@ async function startDevServer() {
             apps: [],
             details: [
               {
-                appID: 'TEAMID1234.app.sovra.network',
+                appID: 'TEAMID.network.sovra.mobile',
                 paths: ['/spaces/*', '/profile/*', '/channel/*', '/chat/*', '/watch/*', '/post/*', '/join/*', '/feed/*', '/p/*', '/u/*', '/call/*'],
               },
             ],
