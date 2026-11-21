@@ -1,7 +1,7 @@
 # SOVRA — INDUSTRY STANDARD MASTER GOAL & ACCEPTANCE SPECIFICATION
 **Document Identifier:** `SOVRA-MGA-2026.11-PROD`  
 **Classification:** Authoritative Project Standard, Architecture Baseline & Release Certification Framework  
-**Repository Version / Commit Hash:** `436fa2af25e482f2cedcd157343bc48e1d69b40c`  
+**Repository Version / Commit Hash:** `Version 1.7.0-PHASE11 / Baseline Commit fae9c45`  
 **Audit & Ratification Date:** November 21, 2026  
 **Auditor Authorities:** Independent Principal Software Architect, Blockchain Protocol Architect, Cybersecurity Auditor, Distributed Systems Engineer, Product Architect, and Release Certification Authority  
 **Target Release:** SOVRA 1.0 (Autonomous Sovereign Network)
@@ -692,6 +692,16 @@ A feature or subsystem is defined as **DONE for SOVRA 1.0** only when:
 
 ## 28. Change Log & Document Governance
 
+* **Version 1.7.0-PHASE11 (2026-11-21):**
+  - Conducted independent forensic evidence audit of Phase 10 artifacts, tests, and consensus configurations at baseline commit `fae9c45`.
+  - Formally categorized live validator decentralization as **Category A: Separate processes on one machine** running on Windows loopback (`127.0.0.1` ports 26657, 26667, 26677, 26687). Proved all 4 nodes synchronized in lockstep at height 89,611+ with $K_4$ complete mesh peering.
+  - Documented physical shared-host failure modes (shared power, CPU, RAM, disk, OS kernel, NIC); preserved `GAP-P1-01` as **OPEN / BLOCKED FOR MAINNET** without fabricating cloud credentials or deployments.
+  - Validated Multi-Cloud Infrastructure as Code (`deploy/terraform/`): verified syntax, variable types, and schema bindings for AWS, GCP, Azure, and Hetzner modules via `terraform fmt -check` and `terraform validate` (both exiting with 0 errors).
+  - Remediated critical HMAC replay attack vulnerability in `services/api/src/server.ts`: added in-memory TTL Nonce Replay Cache (`replayCache`), explicit `X-Sovra-Nonce` / `X-Request-Id` deduplication, strict future timestamp clock-skew rejection ($\le 30\text{s}$), and multi-secret verification via `SecretRotationManager.getValidSecrets()`. Verified via 13-test adversarial suite `tests/security/phase11-hmac-replay-security.test.ts` (100% pass).
+  - Resolved and reconciled historical financial discrepancy between Node 0 (`30,139,348,240,070 uSOV`) and Nodes 1-3 (`30,041,807,472,021 uSOV`): mathematically proved exact zero-delta conservation ($\Delta = 0\text{ uSOV}$) across all four validators at their respective heights, confirmed variance of $97,540,768,049\text{ uSOV}$ represents cumulative block reward issuance over intermediate ~81,800 blocks, and verified remaining 100M constitutional cap headroom of $69,860,651.759930\text{ SOV}$ ($69.86\%$).
+  - Evaluated adversarial disaster recovery: authored `tests/reliability/phase11-disaster-recovery-adversarial.test.ts` (6 tests) demonstrating online hot backup under write concurrency, corrupted image rejection, checksum parity, and post-restore financial consistency. Benchmarked full 11-step drill with backup in 89.59ms and restore in 24.48ms (`PRAGMA integrity_check = ok`).
+  - Executed full 17-suite master regression test battery (163 tests) with 100% pass rate (0 failures, 36.87s duration).
+  - Formal Release Gate Evaluation: SOVRA v1.0 Production Testnet **APPROVED FOR DEPLOYMENT**; Mainnet **CONDITIONAL HOLD** strictly pending physical multi-cloud deployment (`GAP-P1-01`).
 * **Version 1.6.0-PHASE10 (2026-11-21):**
   - Completed Phase 10 Real Production Testnet Deployment & Operational Certification across consensus, API horizontal scaling, financial reconciliation, and enterprise monitoring.
   - Initialized and validated full Terraform multi-cloud configuration (`hashicorp/aws` v5.100.0, `hashicorp/google` v5.45.2, `hashicorp/azurerm` v3.117.1, `hetznercloud/hcloud` v1.70.2) with `terraform validate` passing with zero errors.
