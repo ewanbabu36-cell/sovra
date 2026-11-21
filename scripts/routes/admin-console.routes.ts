@@ -71,8 +71,32 @@ export function createCheckAdminRbac(adminSecurity: any) {
     } else if (req.headers['x-sovra-session-token']) {
       token = String(req.headers['x-sovra-session-token']).trim();
     } else if (req.headers.cookie) {
-      const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
-      if (match) token = decodeURIComponent(match[1]).trim();
+      const cookieMap: Record<string, string> = {};
+      const pairs = req.headers.cookie.split(';');
+      for (const pair of pairs) {
+        const eqIdx = pair.indexOf('=');
+        if (eqIdx !== -1) {
+          const k = pair.substring(0, eqIdx).trim();
+          const v = decodeURIComponent(pair.substring(eqIdx + 1).trim());
+          if (k && v) cookieMap[k] = v;
+        }
+      }
+      const candidateTokens = [
+        cookieMap['sovra_admin_token'],
+        cookieMap['sovra_session_token'],
+        cookieMap['sovra_session'],
+      ].filter(Boolean);
+
+      for (const cand of candidateTokens) {
+        if (adminSecurity && adminSecurity.resolveAdminSession(cand)) {
+          token = cand;
+          break;
+        }
+        if (sovraDb.findUserBySessionToken(cand)) {
+          if (!token) token = cand;
+        }
+      }
+      if (!token && candidateTokens.length > 0) token = candidateTokens[0];
     }
 
     if (!token) {
@@ -327,7 +351,11 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
         }
         res.writeHead(200, {
           'Content-Type': 'application/json',
-          'Set-Cookie': `sovra_session_token=${encodeURIComponent(loginResult.sessionToken!)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800`
+          'Set-Cookie': [
+            `sovra_session_token=${encodeURIComponent(loginResult.sessionToken!)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800`,
+            `sovra_session=${encodeURIComponent(loginResult.sessionToken!)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800`,
+            `sovra_admin_token=${encodeURIComponent(loginResult.sessionToken!)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800`
+          ]
         });
         res.end(JSON.stringify({
           ok: true,
@@ -350,7 +378,11 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
       }
       res.writeHead(200, {
         'Content-Type': 'application/json',
-        'Set-Cookie': 'sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'
+        'Set-Cookie': [
+          'sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0',
+          'sovra_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0',
+          'sovra_admin_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'
+        ]
       });
       res.end(JSON.stringify({ ok: true, message: 'Admin session terminated' }));
       return true;

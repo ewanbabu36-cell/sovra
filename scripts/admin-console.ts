@@ -6667,7 +6667,10 @@ export function renderAdminLoginHtml(): string {
     <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
       <div class="form-group">
         <label for="adminKeyInput">Admin Secret Key</label>
-        <input type="password" id="adminKeyInput" placeholder="Enter ADMIN_SECRET_KEY" required autocomplete="current-password" autofocus />
+        <div style="position: relative;">
+          <input type="password" id="adminKeyInput" placeholder="Enter ADMIN_SECRET_KEY" value="${process.env.NODE_ENV === 'production' ? '' : 'sovra-test-admin-secret-key-32-chars-ok!'}" required autocomplete="current-password" autofocus style="padding-right: 2.75rem;" />
+          <button type="button" onclick="const f=document.getElementById('adminKeyInput');f.type=f.type==='password'?'text':'password';this.innerText=f.type==='password'?'👁️':'🔒'" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; font-size: 1rem; color: #94a3b8;" title="Toggle key visibility">👁️</button>
+        </div>
         <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 6px 10px; border-radius: 6px; border: 1px solid #1e293b;">
           <span>🔑 Dev Key: <code style="color: #38bdf8; font-family: monospace;">sovra-test-admin-secret-key-32-chars-ok!</code></span>
           <button type="button" onclick="document.getElementById('adminKeyInput').value='sovra-test-admin-secret-key-32-chars-ok!'" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 0.75rem; font-weight: 500;">Auto-Fill</button>
@@ -6712,9 +6715,16 @@ export function renderAdminLoginHtml(): string {
         });
         const data = await res.json();
         if (data.ok && data.sessionToken) {
-          try { localStorage.removeItem('sovra_admin_token'); } catch(e) {}
+          try {
+            localStorage.setItem('sovra_admin_token', data.sessionToken);
+            localStorage.setItem('sovra_session_token', data.sessionToken);
+            sessionStorage.setItem('sovra_ops_session', data.sessionToken);
+            sessionStorage.setItem('sovra_admin_token', data.sessionToken);
+          } catch(e) {}
           document.cookie = 'sovra_session_token=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; Max-Age=604800';
-          window.location.reload();
+          document.cookie = 'sovra_session=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; Max-Age=604800';
+          document.cookie = 'sovra_admin_token=' + encodeURIComponent(data.sessionToken) + '; Path=/; SameSite=Strict; Max-Age=604800';
+          window.location.href = '/admin';
         } else {
           errBox.textContent = data.error || 'Authentication failed. Please verify credentials.';
           errBox.style.display = 'block';
