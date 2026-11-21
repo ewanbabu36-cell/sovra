@@ -3583,7 +3583,10 @@ export class SovraDatabaseEngine {
     }
 
     const isTest = process.env.NODE_ENV !== 'production' || Boolean(process.env.VITEST);
-    const recordText = (isE2EE && !isTest) ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : (msg.text || (msg.attachment ? msg.attachment.name : ''));
+    const isClientE2EE = Boolean(msg.ciphertextHex || (isE2EE && !msg.text));
+    const recordText = isClientE2EE
+      ? '🔒 [End-to-End Encrypted: Double Ratchet]'
+      : ((isE2EE && !isTest) ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : (msg.text || (msg.attachment ? msg.attachment.name : '')));
     const record: ChatMessageRecord = {
       id: msg.id || 'msg_' + now + '_' + crypto.randomBytes(8).toString('hex'),
       threadId,
@@ -3591,7 +3594,7 @@ export class SovraDatabaseEngine {
       recipientDid: msg.recipientDid,
       senderName: msg.senderName || 'Peer',
       text: recordText,
-      rawText: msg.text,
+      rawText: isClientE2EE ? undefined : (isE2EE && !isTest ? undefined : msg.text),
       attachment: msg.attachment,
       isAudio: Boolean(msg.isAudio),
       audioDurationSec: msg.audioDurationSec || 0,

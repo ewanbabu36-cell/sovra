@@ -2604,7 +2604,10 @@ this.db.exec('COMMIT;');
         isE2EE = true;
       }
 
-      const safeText = isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : (msg.text || '');
+      const isClientDoubleRatchet = Boolean(msg.text && msg.text.includes('Double Ratchet'));
+      const safeText = isClientDoubleRatchet
+        ? '🔒 [End-to-End Encrypted: Double Ratchet]'
+        : (isE2EE ? (msg.text && msg.text.startsWith('🔒') ? msg.text : '🔒 [End-to-End Encrypted: AES-GCM-256]') : (msg.text || ''));
 
       this.db.prepare(`
         INSERT OR REPLACE INTO direct_messages (

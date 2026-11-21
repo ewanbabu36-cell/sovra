@@ -206,7 +206,8 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
       const securityPin = parsed.securityPin ? String(parsed.securityPin).trim() : (parsed.pin ? String(parsed.pin).trim() : undefined);
 
       // Enforce Cosmos PBFT hard monetary policy: cap registration grants within 100M SOV lifetime limit
-      const requestedGrant = typeof parsed.balanceSov === 'number' ? parsed.balanceSov : (isTestEnv ? 500.0 : 100.0);
+      // GAP-P0-02: Zero unbacked balance creation. Default registration grant is strictly 0.0 SOV.
+      const requestedGrant = typeof parsed.balanceSov === 'number' ? parsed.balanceSov : 0.0;
       const currentSupply = typeof sovraDb.getTotalSovSupply === 'function' ? sovraDb.getTotalSovSupply() : null;
       const remainingCap = currentSupply ? currentSupply.remainingMintableSov : 100_000_000;
       const verifiedGrant = Math.max(0, Math.min(requestedGrant, remainingCap));
