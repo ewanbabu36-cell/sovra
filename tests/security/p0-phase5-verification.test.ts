@@ -242,7 +242,7 @@ describe('SOVRA Phase 5: P0 Financial Integrity & E2EE Verification Gate', () =>
       expect(result.ok).toBe(true);
       expect(result.proposal).toBeDefined();
       expect(result.proposal?.status).toBe('PENDING');
-      expect(result.proposal?.requiredSignatures).toBe(2);
+      expect(result.proposal?.requiredSignatures).toBe(3);
       expect(result.proposal?.signatures.length).toBe(1);
     });
 
@@ -259,17 +259,29 @@ describe('SOVRA Phase 5: P0 Financial Integrity & E2EE Verification Gate', () =>
       );
       const proposalId = result.proposal!.id;
 
-      // Second signer (Treasury Officer) co-signs
+      // Second signer (Treasury Officer) co-signs (2/3 signatures - still pending)
       const signer2 = {
         did: 'did:sovra:treasury_signer_2',
         role: 'TREASURY_OFFICER' as const,
       };
-      const signRes = sovereignAdminSecurity.signProposal(proposalId, signer2, 'sig_2');
+      const signRes2 = sovereignAdminSecurity.signProposal(proposalId, signer2, 'sig_2');
 
-      expect(signRes.ok).toBe(true);
-      expect(signRes.executed).toBe(true);
-      expect(signRes.proposal?.status).toBe('EXECUTED');
-      expect(signRes.proposal?.signatures.length).toBe(2);
+      expect(signRes2.ok).toBe(true);
+      expect(signRes2.executed).toBe(false);
+      expect(signRes2.proposal?.status).toBe('PENDING');
+      expect(signRes2.proposal?.signatures.length).toBe(2);
+
+      // Third signer (Security Council Member) co-signs (3/3 signatures - quorum reached!)
+      const signer3 = {
+        did: 'did:sovra:council_signer_3',
+        role: 'SUPER_ADMIN' as const,
+      };
+      const signRes3 = sovereignAdminSecurity.signProposal(proposalId, signer3, 'sig_3');
+
+      expect(signRes3.ok).toBe(true);
+      expect(signRes3.executed).toBe(true);
+      expect(signRes3.proposal?.status).toBe('EXECUTED');
+      expect(signRes3.proposal?.signatures.length).toBe(3);
     });
 
     it('enforces constitutional 72-hour timelock on emergency circuit breakers', () => {

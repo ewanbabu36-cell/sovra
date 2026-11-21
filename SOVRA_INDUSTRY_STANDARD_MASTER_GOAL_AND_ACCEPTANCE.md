@@ -650,12 +650,15 @@ A feature or subsystem is defined as **DONE for SOVRA 1.0** only when:
 * **Phase 6 Gate 4 Acceptance Report:** [`SOVRA_PHASE6_GATE4_ACCEPTANCE_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE6_GATE4_ACCEPTANCE_REPORT.md)
 
 * **Phase 7 Multi-Cloud Federation Suite:** [`tests/integration/phase7-multi-cloud-federation.test.ts`](file:///d:/Sovra/tests/integration/phase7-multi-cloud-federation.test.ts)
-* **Phase 7 Multi-Cloud Architecture:** [`SOVRA_PHASE7_MULTI_CLOUD_ARCHITECTURE.md`](file:///d:/Sovra/SOVRA_PHASE7_MULTI_CLOUD_ARCHITECTURE.md)
-* **Phase 7 Validator Operator Verification:** [`SOVRA_PHASE7_VALIDATOR_OPERATOR_VERIFICATION.md`](file:///d:/Sovra/SOVRA_PHASE7_VALIDATOR_OPERATOR_VERIFICATION.md)
-* **Phase 7 Consensus Failure Report:** [`SOVRA_PHASE7_CONSENSUS_FAILURE_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE7_CONSENSUS_FAILURE_REPORT.md)
+* **Phase 7 Governance & E2EE Adversarial Suite:** [`tests/security/phase7-governance-e2ee-adversarial.test.ts`](file:///d:/Sovra/tests/security/phase7-governance-e2ee-adversarial.test.ts)
+* **Phase 7 Multi-Cloud Federation Report:** [`SOVRA_PHASE7_MULTI_CLOUD_FEDERATION_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE7_MULTI_CLOUD_FEDERATION_REPORT.md)
+* **Phase 7 Governance Constitutional Audit:** [`SOVRA_PHASE7_GOVERNANCE_CONSTITUTIONAL_AUDIT.md`](file:///d:/Sovra/SOVRA_PHASE7_GOVERNANCE_CONSTITUTIONAL_AUDIT.md)
 * **Phase 7 Financial Reconciliation Report:** [`SOVRA_PHASE7_FINANCIAL_RECONCILIATION_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE7_FINANCIAL_RECONCILIATION_REPORT.md)
-* **Phase 7 Central Dependency Audit:** [`SOVRA_PHASE7_CENTRAL_DEPENDENCY_AUDIT.md`](file:///d:/Sovra/SOVRA_PHASE7_CENTRAL_DEPENDENCY_AUDIT.md)
-* **Phase 7 Gate 4 Final Acceptance:** [`SOVRA_PHASE7_GATE4_FINAL_ACCEPTANCE.md`](file:///d:/Sovra/SOVRA_PHASE7_GATE4_FINAL_ACCEPTANCE.md)
+* **Phase 7 E2EE Independent Verification:** [`SOVRA_PHASE7_E2EE_INDEPENDENT_VERIFICATION.md`](file:///d:/Sovra/SOVRA_PHASE7_E2EE_INDEPENDENT_VERIFICATION.md)
+* **Phase 7 Single Point of Failure Audit:** [`SOVRA_PHASE7_SINGLE_POINT_OF_FAILURE_AUDIT.md`](file:///d:/Sovra/SOVRA_PHASE7_SINGLE_POINT_OF_FAILURE_AUDIT.md)
+* **Phase 7 Adversarial Test Report:** [`SOVRA_PHASE7_ADVERSARIAL_TEST_REPORT.md`](file:///d:/Sovra/SOVRA_PHASE7_ADVERSARIAL_TEST_REPORT.md)
+* **Phase 7 Deployment & Recovery Runbook:** [`SOVRA_PHASE7_DEPLOYMENT_AND_RECOVERY_RUNBOOK.md`](file:///d:/Sovra/SOVRA_PHASE7_DEPLOYMENT_AND_RECOVERY_RUNBOOK.md)
+* **Phase 7 Release Gate Assessment:** [`SOVRA_PHASE7_RELEASE_GATE_ASSESSMENT.md`](file:///d:/Sovra/SOVRA_PHASE7_RELEASE_GATE_ASSESSMENT.md)
 
 ---
 
@@ -664,9 +667,11 @@ A feature or subsystem is defined as **DONE for SOVRA 1.0** only when:
 * **Version 1.3.0-PHASE7 (2026-11-21):**
   - Architected production Sentry Node Topology with dual-ring DMZ and WireGuard private mesh for independent cloud operators.
   - Audited operator independence: verified 4 distinct validator daemons on localhost; documented single-operator workstation limitation without fabricating cloud deployment (GAP-P1-01).
+  - Investigated and remediated P0 governance vulnerability: eliminated threshold-2 execution in `admin-security.ts`, enforced constitutional 3-of-5 quorum with mandatory timelocks, and removed caller-controlled admin fallbacks in `admin-console.routes.ts`.
+  - Remediated E2EE potential leakage: ensured `safeText` is strictly marked encrypted and `rawText` is undefined during server envelope fallback.
   - Mathematically proved and tested 2/3 BFT quorum boundaries ($N=4$: $f=1$ tolerated at $75\% \ge 67\%$; $f=2$ drops to $50\%$ and safely halts consensus).
-  - Executed complete forensic balance sheet reconciliation: L1 total supply verified at `30,125,412.416063 SOV`, lifetime mint `30,125,422.416063 SOV`, lifetime burn `10.000000 SOV`, and 100M cap strictly respected.
-  - Conducted complete central dependency audit decomposing `dev-server.ts`, SQLite, signaling, and media storage with Phase A–D decoupling roadmaps.
+  - Executed complete forensic balance sheet reconciliation: resolved L1 total supply (`30,125,412.416063 SOV`) vs SQLite `totalSystemAccounting` (`923,611.5 SOV`), proving SQLite is an off-chain application cache and total supply equals lifetime mint minus burn.
+  - Conducted complete 5-tier single point of failure audit of all 8 core subsystems with Phase A–D decoupling roadmaps.
   - Formally evaluated Gate 4 and Gate 8: certified SOVRA v1.0-testnet as **APPROVED**; held Mainnet release pending physical multi-cloud deployment (GAP-P1-01).
 * **Version 1.2.0-PHASE6 (2026-11-21):**
   - Independently verified and reproduced all 8 Phase 5 claims on live node engines and SQLite storage.
