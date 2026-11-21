@@ -100,6 +100,23 @@ export class SecretRotationManager {
   }
 
   /**
+   * Retrieves all currently valid secrets (active primary + valid secondary in grace period)
+   */
+  public getValidSecrets(): string[] {
+    const now = Date.now();
+    const valid: string[] = [];
+    for (const v of this.versions) {
+      if (!v.active) continue;
+      if (v.expiresAt && now > v.expiresAt) {
+        v.active = false;
+        continue;
+      }
+      valid.push(v.secret);
+    }
+    return valid;
+  }
+
+  /**
    * Immediately revokes a retired or compromised secret version
    */
   public revokeVersion(versionNumber: number): boolean {

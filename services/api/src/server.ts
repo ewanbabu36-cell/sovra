@@ -44,6 +44,7 @@ export class DecoupledApiServer {
   private securityMiddleware: SecurityMiddleware;
   public readonly secretManager: SecretRotationManager;
   public readonly consensusMonitor: ConsensusMonitor;
+  private replayCache = new Map<string, { seenAt: number; expiresAt: number }>();
 
   constructor(options: ApiServerOptions = {}) {
     this.port = options.port !== undefined ? options.port : (Number(process.env.PORT) || 3001);
@@ -94,11 +95,31 @@ export class DecoupledApiServer {
   }
 
   /**
-   * Service-to-service authentication validator supporting rotation and replay prevention
+   * Prunes expired entries from the HMAC replay cache
+   */
+  private pruneReplayCache(now = Date.now()): void {
+    for (const [key, record] of this.replayCache.entries()) {
+      if (now > record.expiresAt) {
+        this.replayCache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Resets replay cache for test isolation
+   */
+  public clearReplayCache(): void {
+    this.replayCache.clear();
+  }
+
+  /**
+   * Service-to-service authentication validator supporting rotation, nonce caching, and replay prevention
    */
   public verifyServiceAuth(req: http.IncomingMessage): boolean {
     const authHeader = req.headers['x-sovra-internal-auth'];
     const timestampHeader = req.headers['x-sovra-timestamp'];
+    const nonceHeader = req.headers['x-sovra-nonce'] || req.headers['x-sovra-request-id'];
+    const bodyHashHeader = req.headers['x-sovra-body-hash'];
 
     if (!authHeader || typeof authHeader !== 'string') {
       securityEventCollector.recordEvent(
@@ -121,25 +142,90 @@ export class DecoupledApiServer {
     if (timestampHeader && typeof timestampHeader === 'string') {
       const now = Date.now();
       const ts = Number(timestampHeader);
-      // Replay prevention: reject timestamps older or ahead by > 5 minutes
-      if (isNaN(ts) || Math.abs(now - ts) > 300_000) {
+
+      // Replay prevention: reject timestamps older than 5 minutes
+      if (isNaN(ts) || ts < now - 300_000) {
         securityEventCollector.recordEvent(
           'WARN',
           'AUTH_FAILURE',
           'SERVICE_AUTH_EXPIRED_TIMESTAMP',
-          { ts, delta: Math.abs(now - ts) },
+          { ts, delta: now - ts },
           req.socket?.remoteAddress
         );
         return false;
       }
 
-      const activeSecret = this.secretManager.getCurrentSecret();
-      const expectedHmac = crypto
-        .createHmac('sha256', activeSecret)
-        .update(`${req.method}:${req.url}:${timestampHeader}`)
-        .digest('hex');
+      // Clock skew guard: reject future timestamps exceeding 30s tolerance
+      if (ts > now + 30_000) {
+        securityEventCollector.recordEvent(
+          'WARN',
+          'AUTH_FAILURE',
+          'SERVICE_AUTH_FUTURE_TIMESTAMP',
+          { ts, delta: ts - now },
+          req.socket?.remoteAddress
+        );
+        return false;
+      }
 
-      if (token.length === expectedHmac.length && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expectedHmac))) {
+      const nonceStr = nonceHeader ? String(nonceHeader) : undefined;
+      const replayKey = nonceStr ? `nonce:${nonceStr}` : `sig:${token}`;
+
+      // Check replay cache BEFORE accepting
+      const existing = this.replayCache.get(replayKey);
+      if (existing && now <= existing.expiresAt) {
+        securityEventCollector.recordEvent(
+          'WARN',
+          'AUTH_FAILURE',
+          'SERVICE_AUTH_REPLAY_DETECTED',
+          { path: req.url, replayKey, ts },
+          req.socket?.remoteAddress
+        );
+        return false;
+      }
+
+      // Check HMAC candidates against all valid secrets (supporting zero-downtime rotation)
+      const validSecrets = this.secretManager.getValidSecrets();
+      let signatureMatched = false;
+
+      // Construct possible HMAC signatures
+      const candidates: string[] = [
+        `${req.method}:${req.url}:${timestampHeader}`,
+      ];
+      if (nonceStr) {
+        candidates.push(`${req.method}:${req.url}:${timestampHeader}:${nonceStr}`);
+      }
+      if (bodyHashHeader) {
+        candidates.push(`${req.method}:${req.url}:${timestampHeader}:${bodyHashHeader}`);
+        if (nonceStr) {
+          candidates.push(`${req.method}:${req.url}:${timestampHeader}:${nonceStr}:${bodyHashHeader}`);
+        }
+      }
+
+      for (const secret of validSecrets) {
+        for (const candidate of candidates) {
+          const expectedHmac = crypto
+            .createHmac('sha256', secret)
+            .update(candidate)
+            .digest('hex');
+
+          if (
+            token.length === expectedHmac.length &&
+            crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expectedHmac))
+          ) {
+            signatureMatched = true;
+            break;
+          }
+        }
+        if (signatureMatched) break;
+      }
+
+      if (signatureMatched) {
+        // Atomic insertion into replay cache with 5-minute TTL
+        this.pruneReplayCache(now);
+        this.replayCache.set(replayKey, {
+          seenAt: now,
+          expiresAt: Math.max(ts + 300_000, now + 300_000),
+        });
         return true;
       }
     }

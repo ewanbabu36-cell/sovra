@@ -23,14 +23,16 @@ const DEFAULT_CONFIG: SecurityConfig = {
   rateLimitWindowMs: 60000,
 };
 
-// In-memory sliding window rate limiter
-const ipRequestBuckets = new Map<string, { count: number; resetAt: number }>();
-
 export class SecurityMiddleware {
   private config: SecurityConfig;
+  private ipRequestBuckets = new Map<string, { count: number; resetAt: number }>();
 
   constructor(config?: Partial<SecurityConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  public resetRateLimits(): void {
+    this.ipRequestBuckets.clear();
   }
 
   public applySecurityHeaders(req: IncomingMessage, res: ServerResponse): void {
@@ -74,10 +76,10 @@ export class SecurityMiddleware {
   public checkRateLimit(req: IncomingMessage): boolean {
     const ip = req.socket?.remoteAddress || '127.0.0.1';
     const now = Date.now();
-    const bucket = ipRequestBuckets.get(ip);
+    const bucket = this.ipRequestBuckets.get(ip);
 
     if (!bucket || now > bucket.resetAt) {
-      ipRequestBuckets.set(ip, {
+      this.ipRequestBuckets.set(ip, {
         count: 1,
         resetAt: now + this.config.rateLimitWindowMs,
       });
