@@ -1,0 +1,210 @@
+{
+  "timestamp": "2026-11-21T17:42:46.882Z",
+  "suitesCount": 20,
+  "grandTotal": 197,
+  "grandPassed": 197,
+  "grandFailed": 0,
+  "grandSkipped": 0,
+  "results": [
+    {
+      "index": 1,
+      "file": "tests/integration/phase10-consensus-operations.test.ts",
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 8544,
+      "status": "PASSED"
+    },
+    {
+      "index": 2,
+      "file": "tests/security/adversarial-remediation-gate.test.ts",
+      "total": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 10484,
+      "status": "PASSED"
+    },
+    {
+      "index": 3,
+      "file": "tests/security/p0-phase5-verification.test.ts",
+      "total": 11,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 15680,
+      "status": "PASSED"
+    },
+    {
+      "index": 4,
+      "file": "tests/security/phase9-security-isolation.test.ts",
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 4521,
+      "status": "PASSED"
+    },
+    {
+      "index": 5,
+      "file": "tests/security/phase7-governance-e2ee-adversarial.test.ts",
+      "total": 13,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 16874,
+      "status": "PASSED"
+    },
+    {
+      "index": 6,
+      "file": "tests/reliability/phase11-disaster-recovery-adversarial.test.ts",
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 24485,
+      "status": "PASSED"
+    },
+    {
+      "index": 7,
+      "file": "tests/security/phase10-financial-testnet.test.ts",
+      "total": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 15831,
+      "status": "PASSED"
+    },
+    {
+      "index": 8,
+      "file": "packages/identity/test/governance.test.ts",
+      "total": 23,
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 10334,
+      "status": "PASSED"
+    },
+    {
+      "index": 9,
+      "file": "tests/reliability/backup-restore-production-drill.test.ts",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 13574,
+      "status": "PASSED"
+    },
+    {
+      "index": 10,
+      "file": "tests/integration/phase10-api-production.test.ts",
+      "total": 9,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 10263,
+      "status": "PASSED"
+    },
+    {
+      "index": 11,
+      "file": "tests/security/phase11-hmac-replay-security.test.ts",
+      "total": 13,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 8608,
+      "status": "PASSED"
+    },
+    {
+      "index": 12,
+      "file": "tests/integration/phase9-api-decoupling-horizontal.test.ts",
+      "total": 12,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 7183,
+      "status": "PASSED"
+    },
+    {
+      "index": 13,
+      "file": "tests/integration/phase6-multi-node-federation.test.ts",
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 4603,
+      "status": "PASSED"
+    },
+    {
+      "index": 14,
+      "file": "tests/security/phase10-security-monitoring.test.ts",
+      "total": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 5736,
+      "status": "PASSED"
+    },
+    {
+      "index": 15,
+      "file": "tests/integration/phase7-multi-cloud-federation.test.ts",
+      "total": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 9251,
+      "status": "PASSED"
+    },
+    {
+      "index": 16,
+      "file": "tests/integration/phase9-multi-cloud-partition.test.ts",
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 3862,
+      "status": "PASSED"
+    },
+    {
+      "index": 17,
+      "file": "tests/security/phase9-financial-concurrency.test.ts",
+      "total": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 6017,
+      "status": "PASSED"
+    },
+    {
+      "index": 18,
+      "file": "tests/security/phase12-secret-and-auth-hardening.test.ts",
+      "total": 17,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 8636,
+      "status": "PASSED"
+    },
+    {
+      "index": 19,
+      "file": "tests/security/phase12-cors-validation.test.ts",
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 6287,
+      "status": "PASSED"
+    },
+    {
+      "index": 20,
+      "file": "tests/security/phase12-distributed-security-store.test.ts",
+      "total": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 3326,
+      "status": "PASSED"
+    }
+  ]
+}
