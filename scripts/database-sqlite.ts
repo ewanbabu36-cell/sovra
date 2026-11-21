@@ -3072,6 +3072,16 @@ this.db.exec('COMMIT;');
     } catch (_) {}
   }
 
+  public updatePostModerationState(postId: string, state: string, reason?: string): void {
+    try {
+      this.prepareCached('UPDATE posts SET moderation_state = ?, moderation_reason = ? WHERE id = ?').run(
+        state,
+        reason || null,
+        postId
+      );
+    } catch (_) {}
+  }
+
   public recordComment(comment: any, postId: string): void {
     try {
       this.prepareCached(`
