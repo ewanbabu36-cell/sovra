@@ -1129,7 +1129,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
       if (parsed.handle !== undefined) {
         const valRes = sovraDb.validateHandle(String(parsed.handle), targetDid);
         if (!valRes.valid) {
-          const status = (valRes.error?.includes('already in use') || valRes.error?.includes('already claimed')) ? 409 : 400;
+          const status = (valRes.error?.includes('already in use') || valRes.error?.includes('already claimed') || valRes.error?.includes('already taken') || valRes.error?.includes('in use')) ? 409 : 400;
           res.writeHead(status, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: valRes.error }));
           return true;

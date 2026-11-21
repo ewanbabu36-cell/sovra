@@ -1431,7 +1431,7 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
       else relationshipStatus = rel.status as any;
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, mutuals, count: mutuals.length, isFriend, relationshipStatus }));
+    res.end(JSON.stringify({ ok: true, mutuals, mutualFriends: mutuals, count: mutuals.length, isFriend, relationshipStatus }));
     return true;
   }
 
