@@ -563,13 +563,12 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
       if (!ok) return true;
       try {
         const parsed = JSON.parse(body);
-        const principal = resolvePrincipal(req, parsed) || {
-          did: parsed.proposerDid || 'did:sovra:admin_alpha',
-          handle: 'admin_alpha',
-          role: (parsed.role as any) || 'SUPER_ADMIN',
-          authMethod: 'PASSKEY_ED25519',
-          authenticatedAt: Date.now()
-        };
+        const principal = resolvePrincipal(req, parsed);
+        if (!principal) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Valid authenticated admin principal required' }));
+          return true;
+        }
         const result = sovereignAdminSecurity.createProposal(
           principal as any,
           parsed.action,
@@ -590,13 +589,12 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
       if (!ok) return true;
       try {
         const parsed = JSON.parse(body);
-        const principal = resolvePrincipal(req, parsed) || {
-          did: parsed.signerDid || 'did:sovra:treasury_officer_beta',
-          handle: 'treasury_beta',
-          role: (parsed.role as any) || 'TREASURY_OFFICER',
-          authMethod: 'PASSKEY_ED25519',
-          authenticatedAt: Date.now()
-        };
+        const principal = resolvePrincipal(req, parsed);
+        if (!principal) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Valid authenticated admin principal required' }));
+          return true;
+        }
         const result = sovereignAdminSecurity.signProposal(
           parsed.proposalId,
           principal as any,
@@ -622,13 +620,12 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
       if (!ok) return true;
       try {
         const parsed = JSON.parse(body);
-        const principal = resolvePrincipal(req, parsed) || {
-          did: parsed.triggeredByDid || 'did:sovra:admin_alpha',
-          handle: 'admin_alpha',
-          role: (parsed.role as any) || 'SUPER_ADMIN',
-          authMethod: 'PASSKEY_ED25519',
-          authenticatedAt: Date.now()
-        };
+        const principal = resolvePrincipal(req, parsed);
+        if (!principal) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Valid authenticated admin principal required' }));
+          return true;
+        }
         const updated = sovereignAdminSecurity.toggleCircuitBreaker(
           Boolean(parsed.active),
           parsed.scopes || ['ALL'],

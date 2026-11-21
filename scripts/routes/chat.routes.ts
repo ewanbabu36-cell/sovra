@@ -455,7 +455,9 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
 
       const safeText = isClientE2EE
         ? '🔒 [End-to-End Encrypted: Double Ratchet]'
-        : String(parsed.text || (isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : ''));
+        : (isE2EE
+          ? '🔒 [End-to-End Encrypted: AES-GCM-256]'
+          : String(parsed.text || ''));
       const isViewOnceMsg = Boolean(parsed.isViewOnce || (validAttachment && validAttachment.isViewOnce));
       const record = sovraDb.appendMessage({
         id: parsed.id,

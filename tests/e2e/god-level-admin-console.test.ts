@@ -278,12 +278,31 @@ describe('God-Level Sovereign Admin Console & Revenue Leakage Plug Suite', () =>
       expect(duplicateSign.ok).toBe(false);
       expect(duplicateSign.error).toContain('already signed');
 
-      // 3. Co-sign by Treasury Officer (2/2 threshold reached -> EXECUTED)
+      // 3. Co-sign by Treasury Officer (2/3 signatures - still pending)
       const coSignResult = sovereignAdminSecurity.signProposal(propId, treasuryOfficer, 'sig_bob_passkey_456');
       expect(coSignResult.ok).toBe(true);
-      expect(coSignResult.executed).toBe(true);
-      expect(coSignResult.proposal!.status).toBe('EXECUTED');
-      expect(coSignResult.proposal!.executedAt).toBeDefined();
+      expect(coSignResult.executed).toBe(false);
+      expect(coSignResult.proposal!.status).toBe('PENDING');
+
+      // 4. Co-sign by Council Member (3/3 constitutional threshold reached -> READY_TIMELOCKED)
+      const councilMember = {
+        did: 'did:sovra:council_member_carol',
+        handle: 'carol_council',
+        role: 'SUPER_ADMIN' as const,
+        authMethod: 'PASSKEY_ED25519' as const,
+        authenticatedAt: Date.now(),
+      };
+      const councilSignResult = sovereignAdminSecurity.signProposal(propId, councilMember, 'sig_carol_passkey_789');
+      expect(councilSignResult.ok).toBe(true);
+      expect(councilSignResult.proposal!.status).toBe('READY_TIMELOCKED');
+      expect(councilSignResult.proposal!.readyAt).toBeDefined();
+
+      // 5. Execution after constitutional timelock
+      councilSignResult.proposal!.timelockExpiresAt = Date.now() - 1000;
+      const execResult = sovereignAdminSecurity.executeProposal(propId, superAdmin);
+      expect(execResult.ok).toBe(true);
+      expect(execResult.proposal!.status).toBe('EXECUTED');
+      expect(execResult.proposal!.executedAt).toBeDefined();
     });
 
     it('should expose multi-sig endpoints in dev-server', () => {

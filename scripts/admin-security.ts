@@ -33,12 +33,17 @@ export interface MultiSigProposal {
   id: string;
   action: MultiSigAction;
   payload: Record<string, any>;
+  payloadHash?: string;
   proposerDid: string;
   proposerRole: AdminRole;
-  requiredSignatures: number; // Default 2
+  requiredSignatures: number; // Constitutional minimum 3
   signatures: MultiSigSignature[];
-  status: 'PENDING' | 'EXECUTED' | 'REJECTED';
+  status: 'PENDING' | 'READY_TIMELOCKED' | 'EXECUTED' | 'REJECTED';
   createdAt: number;
+  expiresAt?: number;
+  readyAt?: number;
+  timelockDurationMs?: number;
+  timelockExpiresAt?: number;
   executedAt?: number;
   rejectionReason?: string;
 }
@@ -126,35 +131,58 @@ export class SovereignAdminSecurityEngine {
     };
   }
 
-  // --- MULTI-SIG 2-OF-3 GOVERNANCE ---
+  // --- MULTI-SIG CONSTITUTIONAL 3-OF-5 GOVERNANCE ---
+  public static readonly CONSTITUTIONAL_THRESHOLD = 3;
+  public static readonly TOTAL_COUNCIL_SEATS = 5;
+
+  public static readonly GENESIS_SECURITY_COUNCIL_DIDS = [
+    'did:sovra:council-1',
+    'did:sovra:council-2',
+    'did:sovra:council-3',
+    'did:sovra:council-4',
+    'did:sovra:council-5',
+  ];
+
   public createProposal(
     principal: AdminPrincipal,
     action: MultiSigAction,
     payload: Record<string, any>,
-    passkeySignature: string
+    passkeySignature: string,
+    options?: { requiredSignatures?: number; timelockDurationMs?: number }
   ): { ok: boolean; proposal?: MultiSigProposal; error?: string } {
     if (!['SUPER_ADMIN', 'TREASURY_OFFICER'].includes(principal.role)) {
       return { ok: false, error: `Role ${principal.role} is not authorized to submit multi-sig proposals` };
     }
 
+    if (!passkeySignature || typeof passkeySignature !== 'string' || passkeySignature.trim().length === 0) {
+      return { ok: false, error: 'Cryptographic passkey signature is mandatory for multi-sig governance proposal creation' };
+    }
+
+    const payloadHash = crypto.createHash('sha256').update(JSON.stringify({ action, payload, proposerDid: principal.did })).digest('hex');
     const id = 'prop_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const required = options?.requiredSignatures ?? SovereignAdminSecurityEngine.CONSTITUTIONAL_THRESHOLD;
+    const timelockDurationMs = options?.timelockDurationMs ?? (48 * 3600 * 1000); // 48-Hour Constitutional Timelock
+
     const proposal: MultiSigProposal = {
       id,
       action,
       payload,
+      payloadHash,
       proposerDid: principal.did,
       proposerRole: principal.role,
-      requiredSignatures: 2,
+      requiredSignatures: required,
       signatures: [
         {
           signerDid: principal.did,
           role: principal.role,
-          passkeySignature: passkeySignature || 'sig_passkey_' + Date.now(),
+          passkeySignature: passkeySignature.trim(),
           timestamp: Date.now(),
         },
       ],
       status: 'PENDING',
       createdAt: Date.now(),
+      timelockDurationMs,
+      expiresAt: Date.now() + (7 * 86400 * 1000), // 7-day expiration window
     };
 
     this.proposals.set(id, proposal);
@@ -168,10 +196,23 @@ export class SovereignAdminSecurityEngine {
   ): { ok: boolean; proposal?: MultiSigProposal; error?: string; executed?: boolean } {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) return { ok: false, error: 'Proposal not found' };
-    if (proposal.status !== 'PENDING') return { ok: false, error: `Proposal already ${proposal.status}` };
+    if (proposal.status !== 'PENDING' && proposal.status !== 'READY_TIMELOCKED') {
+      return { ok: false, error: `Proposal already ${proposal.status}` };
+    }
+
+    if (!passkeySignature || typeof passkeySignature !== 'string' || passkeySignature.trim().length === 0) {
+      return { ok: false, error: 'Cryptographic passkey signature is mandatory for multi-sig governance co-signing' };
+    }
 
     if (!['SUPER_ADMIN', 'TREASURY_OFFICER'].includes(principal.role)) {
       return { ok: false, error: `Role ${principal.role} cannot co-sign governance proposals` };
+    }
+
+    // Check expiration
+    if (proposal.expiresAt && Date.now() > proposal.expiresAt) {
+      proposal.status = 'REJECTED';
+      proposal.rejectionReason = 'Proposal expired before reaching quorum threshold';
+      return { ok: false, error: 'Proposal expired before reaching quorum threshold' };
     }
 
     // Check if principal already signed
@@ -183,23 +224,46 @@ export class SovereignAdminSecurityEngine {
     proposal.signatures.push({
       signerDid: principal.did,
       role: principal.role,
-      passkeySignature: passkeySignature || 'sig_passkey_' + Date.now(),
+      passkeySignature: passkeySignature.trim(),
       timestamp: Date.now(),
     });
 
     let executed = false;
     if (proposal.signatures.length >= proposal.requiredSignatures) {
-      proposal.status = 'EXECUTED';
-      proposal.executedAt = Date.now();
-      executed = true;
-
-      // Handle proposal action triggers
       if (proposal.action === 'CIRCUIT_BREAKER_GLOBAL') {
-        this.toggleCircuitBreaker(true, ['ALL'], principal, 'Multi-Sig Global Emergency Circuit Breaker Triggered');
+        // Emergency circuit breaker executes immediately upon reaching M=3 quorum with 72h max duration
+        proposal.status = 'EXECUTED';
+        proposal.executedAt = Date.now();
+        executed = true;
+        this.toggleCircuitBreaker(true, ['ALL'], principal, 'Multi-Sig Global Emergency Circuit Breaker Triggered (Constitutional 3-of-5 Quorum Reached)');
+      } else {
+        // High-impact financial/policy mutations enter mandatory constitutional timelock
+        proposal.status = 'READY_TIMELOCKED';
+        proposal.readyAt = Date.now();
+        proposal.timelockExpiresAt = Date.now() + (proposal.timelockDurationMs || 48 * 3600 * 1000);
+        executed = false;
       }
     }
 
     return { ok: true, proposal, executed };
+  }
+
+  public executeProposal(
+    proposalId: string,
+    principal: AdminPrincipal
+  ): { ok: boolean; proposal?: MultiSigProposal; error?: string } {
+    const proposal = this.proposals.get(proposalId);
+    if (!proposal) return { ok: false, error: 'Proposal not found' };
+    if (proposal.status !== 'READY_TIMELOCKED') {
+      return { ok: false, error: `Proposal not ready for execution (Status: ${proposal.status})` };
+    }
+    if (proposal.timelockExpiresAt && Date.now() < proposal.timelockExpiresAt) {
+      const remainingSec = Math.ceil((proposal.timelockExpiresAt - Date.now()) / 1000);
+      return { ok: false, error: `Constitutional timelock active: proposal cannot be executed for another ${remainingSec} seconds` };
+    }
+    proposal.status = 'EXECUTED';
+    proposal.executedAt = Date.now();
+    return { ok: true, proposal };
   }
 
   public getProposals(): MultiSigProposal[] {
