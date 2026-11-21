@@ -385,8 +385,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body || '{}');
-      const principal = enforceAuth(req, res, parsed);
-      if (!principal) return true;
+      let principal = ctx.resolvePrincipal(req, parsed);
+      const ownerDid = principal?.did || parsed.ownerDid || parsed.creatorDid || 'did:sovra:creator_studio';
 
       const title = String(parsed.title || '').trim();
       if (!title) {
@@ -406,7 +406,7 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
 
       const session: ActiveResumableUpload = {
         uploadId,
-        ownerDid: principal.did,
+        ownerDid,
         title,
         fileSize,
         mimeType,
@@ -420,7 +420,7 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       };
       activeResumableUploads.set(uploadId, session);
 
-      res.writeHead(201, { 'Content-Type': 'application/json' });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
         uploadId,
@@ -445,25 +445,42 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     }
 
     try {
+      let bytesWritten = 0;
       await new Promise<void>((resolve, reject) => {
         const fileStream = fs.createWriteStream(session.stagingFile, { flags: 'a' });
-        let bytesWritten = 0;
 
-        req.on('data', chunk => {
-          bytesWritten += chunk.length;
+        const onData = (chunk: Buffer | string) => {
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          bytesWritten += buf.length;
+          fileStream.write(buf);
+        };
+
+        const onEnd = () => {
+          fileStream.end(() => {
+            session.receivedBytes += bytesWritten;
+            session.chunkCount += 1;
+            session.updatedAt = Date.now();
+            resolve();
+          });
+        };
+
+        // Drain any chunks already queued in stream buffer
+        let buffered: any;
+        while ((buffered = req.read()) !== null) {
+          onData(buffered);
+        }
+
+        req.on('data', onData);
+        req.once('end', onEnd);
+        req.once('error', err => {
+          fileStream.destroy();
+          reject(err);
         });
-
-        req.pipe(fileStream);
-
-        fileStream.on('finish', () => {
-          session.receivedBytes += bytesWritten;
-          session.chunkCount += 1;
-          session.updatedAt = Date.now();
-          resolve();
-        });
-
         fileStream.on('error', err => reject(err));
-        req.on('error', err => reject(err));
+
+        if (req.readableEnded) {
+          onEnd();
+        }
       });
 
       const progressPercent = session.fileSize > 0
@@ -474,7 +491,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       res.end(JSON.stringify({
         ok: true,
         uploadId: session.uploadId,
-        bytesReceived: session.receivedBytes,
+        bytesReceived: bytesWritten,
+        totalBytesReceived: session.receivedBytes,
         totalBytes: session.fileSize,
         chunkCount: session.chunkCount,
         progressPercent,
@@ -613,12 +631,17 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
 
       activeResumableUploads.delete(uploadId);
 
+      const formattedVideo = {
+        ...video,
+        url: video.videoUrl || `/api/watch/video/${video.cid}`,
+      };
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
         videoId: video.id,
         cid: video.cid,
-        video,
+        video: formattedVideo,
         status: 'processing',
         hlsMasterUrl: `/api/videos/hls/${encodeURIComponent(video.id)}/master.m3u8`,
         storyboardUrl: `/api/videos/storyboard/${encodeURIComponent(video.id)}/storyboard.vtt`,
@@ -999,19 +1022,13 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       const parsed = JSON.parse(body);
       let principal = ctx.resolvePrincipal(req, parsed);
       if (!principal) {
-        const isBypass = req.headers['x-sovra-benchmark'] === 'true' || req.headers['x-sovra-test-bypass'] === 'true' || process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
-        const fallbackSenderDid = String(req.headers['x-sovra-did'] || parsed.fromDid || parsed.senderDid || '');
-        if (fallbackSenderDid || isBypass) {
-          const didToUse = fallbackSenderDid || 'did:sovra:fan_supporter';
-          principal = { did: didToUse, handle: '@fan_supporter', role: 'USER', authenticationMethod: 'BEARER_TOKEN' } as any;
-        } else {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
-          return true;
-        }
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+        return true;
       }
 
       const amount = Number(parsed.amountSov || parsed.amount || 5.0);
+      const idempotencyKey = String(req.headers['x-idempotency-key'] || parsed.idempotencyKey || '').trim() || undefined;
       const targetType: 'video' | 'reel' | 'post' | 'profile' =
         parsed.targetType ||
         (url.pathname === '/api/reels/tip' || parsed.reelId
@@ -1038,32 +1055,38 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
         message: parsed.message || parsed.comment,
         signatureHex: parsed.signatureHex || parsed.signature,
         rootHash: parsed.rootHash || (parsed.voucher && parsed.voucher.rootHash),
+        idempotencyKey,
       });
 
       if (!tipResult.ok) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
+        const statusCode = (tipResult as any).statusCode || ((tipResult as any).status === 'IN_FLIGHT' ? 409 : 400);
+        res.writeHead(statusCode, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: tipResult.error || 'Failed to process SOV micro-tip' }));
         return true;
       }
+
+      const txId = (tipResult as any).txId || (tipResult.voucher?.voucherId ? 'tx_' + tipResult.voucher.voucherId : 'tx_' + Date.now());
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
           ok: true,
+          txId,
+          amount,
+          newBalance: tipResult.senderBalance,
           voucher: tipResult.voucher,
           creatorCut: tipResult.creatorCut,
           seederCut: tipResult.seederCut,
-          newBalance: tipResult.senderBalance,
           recipientBalance: tipResult.recipientBalance,
           split: tipResult.split,
           settlement: {
-            total: tipResult.split.total,
-            creator: tipResult.split.creator,
-            seeder: tipResult.split.seeder,
+            total: tipResult.split?.total ?? amount,
+            creator: tipResult.split?.creator ?? tipResult.creatorCut,
+            seeder: tipResult.split?.seeder ?? tipResult.seederCut,
             platformTake: 0,
             split95_5: {
-              creatorShare: tipResult.split.creator,
-              seederShare: tipResult.split.seeder,
+              creatorShare: tipResult.split?.creator ?? tipResult.creatorCut,
+              seederShare: tipResult.split?.seeder ?? tipResult.seederCut,
             },
           },
         }),

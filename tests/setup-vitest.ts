@@ -1,5 +1,13 @@
 import path from 'node:path';
 
+if (!process.env.SOVRA_BASE_URL) {
+  process.env.SOVRA_BASE_URL = 'http://127.0.0.1:3001';
+}
+
+if (!process.env.SOVRA_THROTTLE_SECRET) {
+  process.env.SOVRA_THROTTLE_SECRET = 'a_very_strong_test_throttle_secret_entropy_256_bits_1234';
+}
+
 function patchReactInstance(r: any) {
   if (!r) return;
   const dispatcher = {

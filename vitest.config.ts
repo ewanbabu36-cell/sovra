@@ -22,6 +22,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    env: {
+      SOVRA_BASE_URL: 'http://127.0.0.1:3001',
+    },
     setupFiles: [path.resolve(__dirname, 'tests/setup-vitest.ts')],
     fileParallelism: false,
     include: [
