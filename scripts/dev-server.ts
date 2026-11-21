@@ -2731,48 +2731,78 @@ async function startDevServer() {
       }
     }
 
-    // Candidate 4: Browser Cookie (sovra_session or sovra_session_token)
+    // Candidate 4: Browser Cookie (sovra_admin_token, sovra_session_token, sovra_session)
     if (req.headers.cookie) {
-      const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
-      if (match) {
-        const cookieCandidate = decodeURIComponent(match[1]).trim();
-        const princ = tryResolveToken(cookieCandidate);
-        if (princ) {
-          // SEC-07: CSRF Protection for Cookie-Authenticated Mutating Requests
-          const method = (req.method || 'GET').toUpperCase();
-          if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
-            const secFetchSite = req.headers['sec-fetch-site'];
-            const csrfHeader = req.headers['x-csrf-token'] || req.headers['x-sovra-csrf'] || req.headers['x-requested-with'];
-            const hasCustomAuthHeader = Boolean(req.headers['x-sovra-session-token'] || req.headers['x-sovra-nonce'] || req.headers['authorization']);
-            let isSameOriginOrTrusted = Boolean(
-              secFetchSite === 'same-origin' ||
-              secFetchSite === 'same-site' ||
-              secFetchSite === 'none' ||
-              csrfHeader ||
-              hasCustomAuthHeader
-            );
+      const cookieMap: Record<string, string> = {};
+      const pairs = req.headers.cookie.split(';');
+      for (const pair of pairs) {
+        const eqIdx = pair.indexOf('=');
+        if (eqIdx !== -1) {
+          const k = pair.substring(0, eqIdx).trim();
+          const v = decodeURIComponent(pair.substring(eqIdx + 1).trim());
+          if (k && v) cookieMap[k] = v;
+        }
+      }
 
-            if (!isSameOriginOrTrusted && req.headers.origin && req.headers.origin !== 'null') {
-              try {
-                const originUrl = new URL(String(req.headers.origin));
-                const hostHeader = String(req.headers['x-forwarded-host'] || req.headers.host || '');
-                if (
-                  originUrl.host === hostHeader ||
-                  originUrl.hostname === 'localhost' ||
-                  originUrl.hostname === '127.0.0.1' ||
-                  originUrl.hostname.endsWith('.trycloudflare.com') ||
-                  net.isIP(originUrl.hostname)
-                ) {
-                  isSameOriginOrTrusted = true;
-                }
-              } catch (_) {}
-            }
+      const isAdminContext = Boolean(req.url && (req.url.startsWith('/admin') || req.url.startsWith('/api/admin')));
+      const candidateNames = isAdminContext
+        ? ['sovra_admin_token', 'sovra_session_token', 'sovra_session']
+        : ['sovra_session_token', 'sovra_session', 'sovra_admin_token'];
 
-            if (!isSameOriginOrTrusted && secFetchSite === 'cross-site') {
-              return null; // CSRF blocked!
+      // If in admin context, prioritize an administrative session
+      if (isAdminContext) {
+        for (const name of candidateNames) {
+          const val = cookieMap[name];
+          if (val) {
+            const princ = tryResolveToken(val);
+            if (princ && ['SUPER_ADMIN', 'ADMIN', 'SECURITY_ADMIN', 'INFRA_OPERATOR', 'MODERATOR', 'SUPPORT', 'ANALYST'].includes(princ.role)) {
+              return princ;
             }
           }
-          return princ;
+        }
+      }
+
+      for (const name of candidateNames) {
+        const cookieCandidate = cookieMap[name];
+        if (cookieCandidate) {
+          const princ = tryResolveToken(cookieCandidate);
+          if (princ) {
+            // SEC-07: CSRF Protection for Cookie-Authenticated Mutating Requests
+            const method = (req.method || 'GET').toUpperCase();
+            if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+              const secFetchSite = req.headers['sec-fetch-site'];
+              const csrfHeader = req.headers['x-csrf-token'] || req.headers['x-sovra-csrf'] || req.headers['x-requested-with'];
+              const hasCustomAuthHeader = Boolean(req.headers['x-sovra-session-token'] || req.headers['x-sovra-nonce'] || req.headers['authorization']);
+              let isSameOriginOrTrusted = Boolean(
+                secFetchSite === 'same-origin' ||
+                secFetchSite === 'same-site' ||
+                secFetchSite === 'none' ||
+                csrfHeader ||
+                hasCustomAuthHeader
+              );
+
+              if (!isSameOriginOrTrusted && req.headers.origin && req.headers.origin !== 'null') {
+                try {
+                  const originUrl = new URL(String(req.headers.origin));
+                  const hostHeader = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+                  if (
+                    originUrl.host === hostHeader ||
+                    originUrl.hostname === 'localhost' ||
+                    originUrl.hostname === '127.0.0.1' ||
+                    originUrl.hostname.endsWith('.trycloudflare.com') ||
+                    net.isIP(originUrl.hostname)
+                  ) {
+                    isSameOriginOrTrusted = true;
+                  }
+                } catch (_) {}
+              }
+
+              if (!isSameOriginOrTrusted && secFetchSite === 'cross-site') {
+                return null; // CSRF blocked!
+              }
+            }
+            return princ;
+          }
         }
       }
     }
@@ -3406,14 +3436,23 @@ async function startDevServer() {
       const authHeader = req.headers.authorization;
       const headerBearer = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.substring(7).trim() : '';
       const customHeaderToken = String(req.headers['x-sovra-session-token'] || '').trim();
-      let cookieToken = '';
+      const cookieTokens: string[] = [];
       if (req.headers.cookie) {
-        const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
-        if (match) cookieToken = decodeURIComponent(match[1]).trim();
+        const pairs = req.headers.cookie.split(';');
+        for (const pair of pairs) {
+          const eqIdx = pair.indexOf('=');
+          if (eqIdx !== -1) {
+            const k = pair.substring(0, eqIdx).trim();
+            const v = decodeURIComponent(pair.substring(eqIdx + 1).trim());
+            if (['sovra_admin_token', 'sovra_session_token', 'sovra_session'].includes(k) && v) {
+              cookieTokens.push(v);
+            }
+          }
+        }
       }
 
       // Check candidate tokens: explicit query/bearer token first, then cookie
-      const candidateTokens = [queryToken, headerBearer, customHeaderToken, cookieToken].filter(Boolean);
+      const candidateTokens = [queryToken, headerBearer, customHeaderToken, ...cookieTokens].filter(Boolean);
       if (candidateTokens.length === 0) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Valid session token required for realtime stream' }));
