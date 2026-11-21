@@ -87,6 +87,18 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         if (balRes.ok) {
           const balData = await balRes.json();
           nativeBalance = String(balData.balance || '0');
+          // Authoritative L1 Synchronization: Ensure SQLite read-cache reflects Layer-1
+          const principal = ctx.resolvePrincipal(ctx.req);
+          const targetDid = ctx.url.searchParams.get('did') || (principal ? principal.did : null);
+          if (targetDid && balData.balance !== undefined) {
+            const l1SovNumeric = Number(balData.balance) / 1_000_000;
+            const rawDb = (sovraDb as any).getSqliteEngine?.()?.getRawDb?.();
+            if (rawDb) {
+              try {
+                rawDb.prepare('UPDATE users SET balance_sov = ?, updated_at = ? WHERE did = ?').run(l1SovNumeric, Date.now(), targetDid);
+              } catch (_) {}
+            }
+          }
         }
       } catch {
         // Fallback below
@@ -392,16 +404,11 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body || '{}');
-      let principal = ctx.resolvePrincipal(req, parsed);
+      const principal = ctx.resolvePrincipal(req, parsed);
       if (!principal) {
-        const candidateDid = String(req.headers['x-sovra-did'] || parsed.senderDid || parsed.did || parsed.userDid || '');
-        if (candidateDid.startsWith('did:key:') || candidateDid.startsWith('did:sovra:')) {
-          principal = { did: candidateDid, role: 'USER', handle: '@p2p_node' } as any;
-        } else {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
-          return true;
-        }
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+        return true;
       }
 
       const tokenAddress = String(parsed.tokenAddress || '').trim();
@@ -596,16 +603,11 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
     try {
       const parsed = JSON.parse(body || '{}');
-      let principal = ctx.resolvePrincipal(req, parsed);
+      const principal = ctx.resolvePrincipal(req, parsed);
       if (!principal) {
-        const candidateDid = String(req.headers['x-sovra-did'] || parsed.senderDid || parsed.did || parsed.userDid || '');
-        if (candidateDid.startsWith('did:key:') || candidateDid.startsWith('did:sovra:')) {
-          principal = { did: candidateDid, role: 'USER', handle: '@p2p_node' } as any;
-        } else {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
-          return true;
-        }
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+        return true;
       }
 
       const targetDid = parsed.did || parsed.userDid || principal.did;
@@ -697,16 +699,11 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
     try {
       const parsed = JSON.parse(body || '{}');
-      let principal = ctx.resolvePrincipal(req, parsed);
+      const principal = ctx.resolvePrincipal(req, parsed);
       if (!principal) {
-        const candidateDid = String(req.headers['x-sovra-did'] || parsed.senderDid || parsed.did || parsed.userDid || '');
-        if (candidateDid.startsWith('did:key:') || candidateDid.startsWith('did:sovra:')) {
-          principal = { did: candidateDid, role: 'USER', handle: '@p2p_node' } as any;
-        } else {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
-          return true;
-        }
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
+        return true;
       }
 
       let senderDid = principal.did;
@@ -833,6 +830,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         senderDid,
         recipientDid,
         amount: amountSov,
+        l1Settled: l1Committed,
         fromBalance: transferResult.fromBalance,
         toBalance: transferResult.toBalance,
         tokenSymbol,

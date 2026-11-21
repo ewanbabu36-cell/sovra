@@ -271,6 +271,15 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       );
     }
     const returnedMessages = messages.map(m => {
+      if (m.isE2EE && m.ciphertextHex && (!m.rawText || (m.text && m.text.includes('Double Ratchet')))) {
+        return {
+          ...m,
+          text: '🔒 [End-to-End Encrypted: Double Ratchet]',
+          ciphertextHex: m.ciphertextHex,
+          ivHex: m.ivHex,
+          tagHex: m.tagHex,
+        };
+      }
       if ((m.senderDid === userDid || m.recipientDid === userDid) && m.rawText) {
         return { ...m, text: m.rawText };
       }
@@ -354,9 +363,9 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         }
       }
 
-      if (!parsed.text && !parsed.isAudio && !parsed.attachment && !parsed.sharedPost) {
+      if (!parsed.text && !parsed.isAudio && !parsed.attachment && !parsed.sharedPost && !parsed.ciphertextHex) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Message text, audio, attachment, or shared post required' }));
+        res.end(JSON.stringify({ ok: false, error: 'Message text, audio, attachment, shared post, or client E2EE ciphertext required' }));
         return true;
       }
 
@@ -418,13 +427,17 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       }
 
       let ciphertextHex = String(parsed.ciphertextHex || '');
-      let ivHex = String(parsed.ivHex || '');
+      let ivHex = String(parsed.nonceHex || parsed.ivHex || '');
       let tagHex = String(parsed.tagHex || '');
-      let isE2EE = Boolean(parsed.isE2EE || ciphertextHex);
+      const isClientE2EE = Boolean(ciphertextHex);
+      let isE2EE = Boolean(parsed.isE2EE || isClientE2EE);
 
       // P0-01 ZERO-PLAINTEXT ENFORCEMENT:
-      // If client sent raw plaintext text, encrypt immediately into AES-256-GCM envelope
-      if (!ciphertextHex && parsed.text && !String(parsed.text).startsWith('🔒')) {
+      // If client sent client-side Double Ratchet ciphertext, use it directly (server NEVER decrypts or derives keys)
+      if (isClientE2EE) {
+        isE2EE = true;
+      } else if (parsed.text && !String(parsed.text).startsWith('🔒')) {
+        // Fallback for legacy clients without Double Ratchet
         const rawText = String(parsed.text);
         const recipientDid = String(parsed.recipientDid || parsed.recipient || 'channel:local_mesh');
         const peerPair = [principal.did, recipientDid].sort().join(':');
@@ -440,7 +453,9 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         isE2EE = true;
       }
 
-      const safeText = String(parsed.text || (isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : ''));
+      const safeText = isClientE2EE
+        ? '🔒 [End-to-End Encrypted: Double Ratchet]'
+        : String(parsed.text || (isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : ''));
       const isViewOnceMsg = Boolean(parsed.isViewOnce || (validAttachment && validAttachment.isViewOnce));
       const record = sovraDb.appendMessage({
         id: parsed.id,

@@ -52,7 +52,7 @@ export const MIGRATIONS: Migration[] = [
           device_type TEXT NOT NULL DEFAULT 'Desktop',
           public_key TEXT,
           session_token TEXT,
-          balance_sov REAL NOT NULL DEFAULT 500.0,
+          balance_sov REAL NOT NULL DEFAULT 0.0,
           privacy_settings_json TEXT,
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL

@@ -50,6 +50,7 @@ export interface CircuitBreakerState {
   triggeredByRole: AdminRole;
   reason: string;
   timestamp: number;
+  expiresAt?: number;
 }
 
 export class SovereignAdminSecurityEngine {
@@ -212,23 +213,36 @@ export class SovereignAdminSecurityEngine {
     principal: AdminPrincipal,
     reason: string
   ): CircuitBreakerState {
+    const now = Date.now();
     this.circuitBreaker = {
       active,
       pausedScopes: active ? (scopes.length > 0 ? scopes : ['ALL']) : [],
       triggeredByDid: principal.did,
       triggeredByRole: principal.role,
       reason: reason || (active ? 'Emergency audit halt triggered' : 'System resumed normal operations'),
-      timestamp: Date.now(),
+      timestamp: now,
+      expiresAt: active ? (now + (72 * 3600 * 1000)) : undefined, // 72-Hour Constitutional Timelock
     };
     return this.circuitBreaker;
   }
 
   public getCircuitBreaker(): CircuitBreakerState {
+    // Check automatic constitutional timelock expiration (max 72 hours)
+    if (this.circuitBreaker.active && this.circuitBreaker.expiresAt && Date.now() > this.circuitBreaker.expiresAt) {
+      this.circuitBreaker.active = false;
+      this.circuitBreaker.pausedScopes = [];
+    }
     return this.circuitBreaker;
   }
 
   public isScopePaused(scope: 'TIPPING' | 'PROMOTIONS' | 'WITHDRAWALS' | 'P2P_TRANSFER'): boolean {
     if (!this.circuitBreaker.active) return false;
+    // Automatic timelock expiration check
+    if (this.circuitBreaker.expiresAt && Date.now() > this.circuitBreaker.expiresAt) {
+      this.circuitBreaker.active = false;
+      this.circuitBreaker.pausedScopes = [];
+      return false;
+    }
     if (this.circuitBreaker.pausedScopes.includes('ALL')) return true;
     return this.circuitBreaker.pausedScopes.includes(scope);
   }

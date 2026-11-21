@@ -28,6 +28,7 @@ describe('Sovra Mobile Dynamic Data Layer & API Service', () => {
     const reg = await registerUserProfile({
       handle: `test_alice_${Date.now()}`,
       displayName: 'Alice Tester',
+      balanceSov: 50.0,
     });
     if (reg.sessionToken && reg.user) {
       setActiveSession(reg.sessionToken, reg.user.did);

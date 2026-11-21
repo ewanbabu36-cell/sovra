@@ -679,6 +679,7 @@ export async function registerUserProfile(user: {
   displayName: string;
   devicePublicKeyHex?: string;
   passkeyCredentialId?: string;
+  balanceSov?: number;
 }): Promise<{ ok: boolean; user?: any; sessionToken?: string; error?: string }> {
   const res = await apiFetch('/api/user/register', {
     method: 'POST',
