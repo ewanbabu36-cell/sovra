@@ -8514,7 +8514,7 @@ async function startDevServer() {
         const user = sovraDb.findUserByDid(principal.did);
         const session = sovraDb.createLiveSession({
           channelId: parsed.channelId,
-          creatorDid: creatorDid,
+          creatorDid: principal.did,
           creatorHandle: user?.handle || 'creator',
           creatorName: user?.displayName || 'Creator',
           creatorAvatar: user?.avatar || '🔴',
@@ -8947,7 +8947,8 @@ async function startDevServer() {
       // 1. Users (People) - strictly filter out blocked users and private profiles!
       let users: PublicUserDTO[] = [];
       if (scope === 'all' || scope === 'people') {
-        users = sovraDb.getAllUsers()
+        const allowTestUsers = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test' || isTestMode);
+        users = sovraDb.getAllUsers(allowTestUsers)
           .filter(u => {
             if ((u as any).isBanned || (u as any).moderationState === 'HIDDEN' || (u as any).moderationState === 'REMOVED') return false;
             if (viewerDid && sovraDb.isBlocked(u.did, viewerDid)) return false;

@@ -5812,7 +5812,7 @@ export class SovraDatabaseEngine {
       return { valid: false, error: `Username "${clean}" is a reserved system identifier` };
     }
     if (this.isHandleTaken(clean, excludeDid)) {
-      return { valid: false, error: `Username "${clean}" is already taken and in use by another peer` };
+      return { valid: false, error: `Username "${clean}" is already in use by another peer` };
     }
     return { valid: true, cleanHandle: clean };
   }

@@ -45861,16 +45861,15 @@ _scheduleTargetContext: 'workspace',
     function pollIncomingCalls() {
       var isAuth = Boolean(myProfile || localStorage.getItem('sovra_session_token') || (typeof isUserAuthenticated === 'function' && isUserAuthenticated()));
       if (!isAuth) return;
-      if (window._activeCallId && document.getElementById('e2eeCallModal') && document.getElementById('e2eeCallModal').style.display === 'flex') {
-        syncActiveCallSession();
-      }
-      // 🌐 Zero-Server P2P Optimization: If Realtime GossipSub SSE stream is active, skip redundant polling
-      if (_realtimeEventSource && _realtimeEventSource.readyState === 1 && !window._activeCallId) {
-        return;
-      }
       callFetch('/api/call/incoming')
         .then(function(r) { return r.json(); })
         .then(function(data) {
+          if (window._activeCallId && document.getElementById('e2eeCallModal') && document.getElementById('e2eeCallModal').style.display === 'flex') {
+            syncActiveCallSession();
+          }
+          if (_realtimeEventSource && _realtimeEventSource.readyState === 1 && !window._activeCallId) {
+            return;
+          }
           if (data && data.ok && data.incomingCall) {
             const inc = data.incomingCall;
             if (window._activeCallId === inc.callId || _isCallAnswered || _isCallAccepting) return;
@@ -56436,9 +56435,9 @@ _scheduleTargetContext: 'workspace',
         pill.style.display = 'flex';
         pill.style.background = 'linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(168, 85, 247, 0.95))';
         pill.style.border = '1px solid rgba(168, 85, 247, 0.6)';
-        pill.innerHTML = '<span>📡</span> <span>Offline Mesh Active — Bluetooth &amp; Offline Outbox Ready</span>';
+        pill.innerHTML = '<span>📡</span> <span>Offline Mesh Active — Bluetooth GATT &amp; DTN Outbox Ready</span>';
         if (typeof showAccountToast === 'function') {
-          showAccountToast('📡 Operating in Offline Mesh Mode (Messages will sync automatically)', 'info');
+          showAccountToast('📡 Operating in Offline Mesh Mode (Bluetooth GATT & DTN Store-and-Forward Active)', 'info');
         }
         if (window.SovraBleMeshRadar && typeof window.SovraBleMeshRadar.refreshScan === 'function') {
           window.SovraBleMeshRadar.refreshScan();
