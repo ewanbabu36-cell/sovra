@@ -1,0 +1,106 @@
+{
+  "metadata": {
+    "report": "SOVRA Phase 15.6 Comprehensive Financial Reconciliation",
+    "timestamp": "2026-11-22T15:57:41.088Z",
+    "baselineCommit": "9fc238e",
+    "reconciliationStatus": "RECONCILED_100_PERCENT_EXACT"
+  },
+  "genesis_initial_conditions": {
+    "sovra_testnet_0": {
+      "genesis_supply_usov": "30000000000000",
+      "validator_allocations": "4 x 7,500,000,000,000 uSOV",
+      "module_allocations": "0 uSOV"
+    },
+    "sovra_recovery_1": {
+      "genesis_supply_usov": "30000000000000",
+      "validator_allocations": "4 x 7,500,000,000,000 uSOV",
+      "module_allocations": "0 uSOV"
+    }
+  },
+  "supply_delta_analysis": {
+    "canonical_supply_usov": "30055743296028",
+    "recovery_supply_usov": "30013935824007",
+    "exact_delta_usov": "41807472021",
+    "percentage_difference": "0.139%",
+    "root_cause": "Accrued daily epoch block emissions in module accounts (Epoch 5 on testnet-0 vs Epoch 2 on recovery-1)"
+  },
+  "account_level_reconciliation": {
+    "sovra_recovery_1": {
+      "current_epoch": 2,
+      "validator_accounts": {
+        "validator-0": "7500000000000",
+        "validator-1": "7500000000000",
+        "validator-2": "7500000000000",
+        "validator-3": "7500000000000",
+        "total": "30000000000000"
+      },
+      "module_accounts": {
+        "sovra_module_fee_collector": {
+          "amount_usov": "3981664002",
+          "emission_ratio": 2,
+          "ratio_verified": true
+        },
+        "sovra_module_community_pool": {
+          "amount_usov": "7963328004",
+          "emission_ratio": 4,
+          "ratio_verified": true
+        },
+        "sovra_module_seeder_escrow": {
+          "amount_usov": "1990832001",
+          "emission_ratio": 1,
+          "ratio_verified": true
+        },
+        "total_modules": "13935824007"
+      },
+      "user_accounts": "0",
+      "grand_total": "30013935824007",
+      "bank_supply": "30013935824007",
+      "master_invariant_holds": true
+    },
+    "sovra_testnet_0": {
+      "current_epoch": 5,
+      "validator_accounts": {
+        "validator-0": "7499999996700",
+        "validator-1": "7500000000000",
+        "validator-2": "7500000000000",
+        "validator-3": "7500000000000",
+        "total": "29999999996700",
+        "note": "3,300 uSOV spent during past transaction execution tests (3,000 to user transfer, 300 to fee collector)"
+      },
+      "module_accounts": {
+        "sovra_module_fee_collector": {
+          "amount_usov": "15926656308",
+          "base_emission": "15926656008",
+          "tx_fees_collected": "300",
+          "emission_ratio": 2,
+          "ratio_verified": true
+        },
+        "sovra_module_community_pool": {
+          "amount_usov": "31853312016",
+          "emission_ratio": 4,
+          "ratio_verified": true
+        },
+        "sovra_module_seeder_escrow": {
+          "amount_usov": "7963328004",
+          "emission_ratio": 1,
+          "ratio_verified": true
+        },
+        "total_modules": "55743296328"
+      },
+      "user_accounts": "3000",
+      "grand_total": "30055743296028",
+      "bank_supply": "30055743296028",
+      "master_invariant_holds": true
+    }
+  },
+  "mathematical_proof": {
+    "formula": "Supply(testnet0) - Supply(recovery1) == Delta(Modules) + Delta(Validators) + Delta(Users)",
+    "delta_modules": "55743296328 - 13935824007 = 41807472321 uSOV",
+    "delta_validators": "29999999996700 - 30000000000000 = -3300 uSOV",
+    "delta_users": "3000 - 0 = +3000 uSOV",
+    "net_reconciliation": "41807472321 - 3300 + 3000 = 41807472021 uSOV (EXACT)",
+    "unaccounted_tokens": "0 uSOV",
+    "leaked_tokens": "0 uSOV",
+    "fraudulent_minting": "NONE"
+  }
+}

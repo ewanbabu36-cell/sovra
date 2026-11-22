@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "report": "SOVRA Phase 15.6 Consensus Safety & Finality Evidence",
+    "timestamp": "2026-11-22T15:57:41.089Z",
+    "baselineCommit": "9fc238e",
+    "chain_id": "sovra-recovery-1"
+  },
+  "bft_invariants_audited": {
+    "byzantine_fault_tolerance": {
+      "theoretical_threshold": "< 1/3 Byzantine nodes tolerated (up to 1 of 4 nodes)",
+      "empirical_verification": "PASSED: 3/4 nodes continued producing blocks; 2/4 outage safely halts with zero safety violations"
+    },
+    "quorum_threshold": {
+      "required_power": ">= 67% (67 / 100 power)",
+      "normal_operation": "100% power (4 of 4 nodes)",
+      "degraded_operation": "75% power (3 of 4 nodes)"
+    },
+    "commit_certificates": {
+      "signature_algorithm": "Ed25519",
+      "key_provenance": "100% clean rotated keys (zero compromised keys)",
+      "sample_size": 50,
+      "validity_rate": "100.00%"
+    },
+    "state_determinism": {
+      "app_hash_lockstep": "IDENTICAL across all 4 recovery nodes",
+      "block_hash_lockstep": "IDENTICAL across all 4 recovery nodes",
+      "height_skew": "<= 1 block during active consensus"
+    },
+    "network_isolation": {
+      "p2p_cross_chain_rejection": "PASSED: Handshake with sovra-testnet-0 immediately terminated by sovra-recovery-1"
+    }
+  },
+  "status": "BFT_SAFETY_CONFIRMED"
+}

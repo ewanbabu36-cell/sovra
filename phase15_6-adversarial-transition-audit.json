@@ -1,0 +1,83 @@
+{
+  "metadata": {
+    "report": "SOVRA Phase 15.6 Adversarial Transition Authorization Audit",
+    "timestamp": "2026-11-22T15:57:41.089Z",
+    "baselineCommit": "9fc238e",
+    "endpoint_audited": "POST /consensus/transition",
+    "code_reference": "chain/cmd/sovrad/main.go:1538-1670"
+  },
+  "security_architecture": {
+    "authentication_mechanisms": [
+      "Emergency Recovery Auth Token (constant-time subtle.ConstantTimeCompare)",
+      "2/3+ Active Validator Cryptographic Quorum Signatures (Ed25519 over ChainID:Height:Reason)"
+    ],
+    "fail_closed_design": "Requests without valid token or >= 2/3+ valid unique active signatures return HTTP 401"
+  },
+  "test_vectors": [
+    {
+      "vector": "VECTOR 1: Anonymous / Unauthenticated Transition",
+      "payload": {
+        "transition_height": 99999,
+        "reason": "ANONYMOUS_PROBE"
+      },
+      "expected_status": 401,
+      "actual_status": 401,
+      "result": "PASSED_REJECTED"
+    },
+    {
+      "vector": "VECTOR 2: Invalid / Forged Bearer Token",
+      "header": "Authorization: Bearer forged-token-adversary",
+      "expected_status": 401,
+      "actual_status": 401,
+      "result": "PASSED_REJECTED"
+    },
+    {
+      "vector": "VECTOR 3: Invalid Custom Header Token",
+      "header": "X-Sovra-Transition-Auth: fake-override-token",
+      "expected_status": 401,
+      "actual_status": 401,
+      "result": "PASSED_REJECTED"
+    },
+    {
+      "vector": "VECTOR 4: Cryptographic Signature Forgery (Unknown Keypair)",
+      "payload": "Ed25519 signature generated with random ephemeral attacker keypair",
+      "expected_status": 401,
+      "actual_status": 401,
+      "result": "PASSED_REJECTED"
+    },
+    {
+      "vector": "VECTOR 5: Compromised Genesis Validator Key Injection",
+      "payload": "Signatures using revoked genesis validator addresses (validator-0..3)",
+      "expected_status": 401,
+      "actual_status": 401,
+      "result": "PASSED_REJECTED (Accumulated Power: 0)"
+    },
+    {
+      "vector": "VECTOR 6: Insufficient Quorum Voting Power (< 67%)",
+      "payload": "Single rotated validator signature (25% voting power < 67% required)",
+      "expected_status": 401,
+      "actual_status": 401,
+      "result": "PASSED_REJECTED (Accumulated Power: 25 < Quorum: 67)"
+    },
+    {
+      "vector": "VECTOR 7: Duplicate Signature Replay Padding Attack",
+      "payload": "Same validator signature submitted 4 times to mimic 4 signers",
+      "expected_status": 401,
+      "actual_status": 401,
+      "result": "PASSED_REJECTED (Deduplicated to 25 power < 67)"
+    },
+    {
+      "vector": "VECTOR 8: Malformed JSON and Corrupted Payloads",
+      "payload": "{ invalid_syntax }",
+      "expected_status": 400,
+      "actual_status": 400,
+      "result": "PASSED_REJECTED"
+    },
+    {
+      "vector": "VECTOR 9: Timing Side-Channel Resistance",
+      "implementation": "crypto/subtle.ConstantTimeCompare in main.go:1578",
+      "result": "VERIFIED_CONSTANT_TIME"
+    }
+  ],
+  "audit_conclusion": "FAIL_CLOSED_GATE_VERIFIED_RIGOROUS"
+}

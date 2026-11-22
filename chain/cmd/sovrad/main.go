@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
@@ -1569,13 +1570,19 @@ func startNode(flags NodeFlags) {
 		}
 
 		// Security Authorization Gate:
-		// 1. Check for Emergency Recovery Auth Token
+		// 1. Check for Emergency Recovery Auth Token using constant-time comparison
 		recoveryToken := os.Getenv("SOVRA_RECOVERY_AUTH_TOKEN")
 		authHeader := r.Header.Get("Authorization")
 		customHeader := r.Header.Get("X-Sovra-Transition-Auth")
 		isTokenAuthorized := false
 		if recoveryToken != "" {
-			if authHeader == "Bearer "+recoveryToken || customHeader == recoveryToken {
+			bearerToken := ""
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				bearerToken = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+			matchBearer := subtle.ConstantTimeCompare([]byte(bearerToken), []byte(recoveryToken)) == 1
+			matchCustom := subtle.ConstantTimeCompare([]byte(customHeader), []byte(recoveryToken)) == 1
+			if matchBearer || matchCustom {
 				isTokenAuthorized = true
 			}
 		}

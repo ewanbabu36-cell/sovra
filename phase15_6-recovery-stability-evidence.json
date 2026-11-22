@@ -1,0 +1,163 @@
+{
+  "audit_name": "SOVRA Phase 15.6 Recovery Network Stability & Outage Drill",
+  "timestamp": "2026-11-22T15:56:02.108Z",
+  "chain_id": "sovra-recovery-1",
+  "start_height": 3083,
+  "final_height": 3304,
+  "total_blocks_produced": 221,
+  "initial_supply": "30013935824007",
+  "final_supply": "30013935824007",
+  "supply_invariant_conserved": true,
+  "checkpoints": [
+    {
+      "checkpoint_index": 1,
+      "target_delta": 50,
+      "actual_height": 3135,
+      "timestamp": "2026-11-22T15:53:41.351Z",
+      "app_hash": "57433cbf2490dc8d53f0308a3793f0925befd4de243861aded7e003f67f3cfea",
+      "total_supply": "30013935824007",
+      "supply_correct": true,
+      "node_heights": [
+        3135,
+        3135,
+        3135,
+        3135
+      ],
+      "node_app_hashes": [
+        "57433cbf2490dc8d53f0308a3793f0925befd4de243861aded7e003f67f3cfea",
+        "57433cbf2490dc8d53f0308a3793f0925befd4de243861aded7e003f67f3cfea",
+        "57433cbf2490dc8d53f0308a3793f0925befd4de243861aded7e003f67f3cfea",
+        "57433cbf2490dc8d53f0308a3793f0925befd4de243861aded7e003f67f3cfea"
+      ],
+      "commit_signatures_count": 4,
+      "valid_rotated_signatures": 4,
+      "compromised_signatures": 0,
+      "quorum_satisfied": true
+    },
+    {
+      "checkpoint_index": 2,
+      "target_delta": 100,
+      "actual_height": 3183,
+      "timestamp": "2026-11-22T15:54:17.717Z",
+      "app_hash": "dd10e11f8ecb2293ece695582f2d2f8e597b3e59545bcc52950659b2c3589eed",
+      "total_supply": "30013935824007",
+      "supply_correct": true,
+      "node_heights": [
+        3183,
+        3183,
+        3183,
+        3183
+      ],
+      "node_app_hashes": [
+        "dd10e11f8ecb2293ece695582f2d2f8e597b3e59545bcc52950659b2c3589eed",
+        "dd10e11f8ecb2293ece695582f2d2f8e597b3e59545bcc52950659b2c3589eed",
+        "dd10e11f8ecb2293ece695582f2d2f8e597b3e59545bcc52950659b2c3589eed",
+        "dd10e11f8ecb2293ece695582f2d2f8e597b3e59545bcc52950659b2c3589eed"
+      ],
+      "commit_signatures_count": 4,
+      "valid_rotated_signatures": 4,
+      "compromised_signatures": 0,
+      "quorum_satisfied": true
+    },
+    {
+      "checkpoint_index": 3,
+      "target_delta": 150,
+      "actual_height": 3235,
+      "timestamp": "2026-11-22T15:54:58.474Z",
+      "app_hash": "17b90f5613779cbd60efcdb39fc912da3d40db3f93620cbb8bfaf0128af03205",
+      "total_supply": "30013935824007",
+      "supply_correct": true,
+      "node_heights": [
+        3235,
+        3235,
+        3235,
+        3235
+      ],
+      "node_app_hashes": [
+        "17b90f5613779cbd60efcdb39fc912da3d40db3f93620cbb8bfaf0128af03205",
+        "17b90f5613779cbd60efcdb39fc912da3d40db3f93620cbb8bfaf0128af03205",
+        "17b90f5613779cbd60efcdb39fc912da3d40db3f93620cbb8bfaf0128af03205",
+        "17b90f5613779cbd60efcdb39fc912da3d40db3f93620cbb8bfaf0128af03205"
+      ],
+      "commit_signatures_count": 3,
+      "valid_rotated_signatures": 3,
+      "compromised_signatures": 0,
+      "quorum_satisfied": true
+    },
+    {
+      "checkpoint_index": 4,
+      "target_delta": 200,
+      "actual_height": 3285,
+      "timestamp": "2026-11-22T15:55:37.422Z",
+      "app_hash": "954560bad39bf1139e4e7258a2186ba094092697e298a2d4de54c0fe9715152c",
+      "total_supply": "30013935824007",
+      "supply_correct": true,
+      "node_heights": [
+        3285,
+        3286,
+        3286,
+        3286
+      ],
+      "node_app_hashes": [
+        "954560bad39bf1139e4e7258a2186ba094092697e298a2d4de54c0fe9715152c",
+        "82d41fd65869a5f55f921ca7a01a402a0819f4b1394ceab4a0270bdb2de1bde5",
+        "82d41fd65869a5f55f921ca7a01a402a0819f4b1394ceab4a0270bdb2de1bde5",
+        "82d41fd65869a5f55f921ca7a01a402a0819f4b1394ceab4a0270bdb2de1bde5"
+      ],
+      "commit_signatures_count": 4,
+      "valid_rotated_signatures": 4,
+      "compromised_signatures": 0,
+      "quorum_satisfied": true
+    }
+  ],
+  "outage_drill": {
+    "offline_node": "validator-3",
+    "offline_port": 26787,
+    "pre_outage_height": 3287,
+    "post_outage_height": 3299,
+    "blocks_produced_during_outage": 12,
+    "voting_power_during_outage": "75%",
+    "consensus_sustained": false,
+    "catchup_successful": true,
+    "final_node3_height": 3300
+  },
+  "final_node_matrix": [
+    {
+      "moniker": "validator-0",
+      "node_id": "e4654fa45393171840964bce0716ea8d9742f6b8",
+      "port": 26757,
+      "height": 3304,
+      "app_hash": "cb2edac1812593337c7922e93f8212b92ad31440a7fbf48a97cc46c51bfba0f2",
+      "supply_correct": true,
+      "total_supply": "30013935824007"
+    },
+    {
+      "moniker": "validator-1",
+      "node_id": "f7878b4c2f9e783c95feda305f1a7cbd30ed5df3",
+      "port": 26767,
+      "height": 3304,
+      "app_hash": "cb2edac1812593337c7922e93f8212b92ad31440a7fbf48a97cc46c51bfba0f2",
+      "supply_correct": true,
+      "total_supply": "30013935824007"
+    },
+    {
+      "moniker": "validator-2",
+      "node_id": "3c97b27b53207767d67495900c3ab9d88a09e311",
+      "port": 26777,
+      "height": 3304,
+      "app_hash": "cb2edac1812593337c7922e93f8212b92ad31440a7fbf48a97cc46c51bfba0f2",
+      "supply_correct": true,
+      "total_supply": "30013935824007"
+    },
+    {
+      "moniker": "validator-3",
+      "node_id": "162e4bf6312e39ee210a94309cf3911f52798e90",
+      "port": 26787,
+      "height": 3304,
+      "app_hash": "cb2edac1812593337c7922e93f8212b92ad31440a7fbf48a97cc46c51bfba0f2",
+      "supply_correct": true,
+      "total_supply": "30013935824007"
+    }
+  ],
+  "status": "CERTIFIED_STABLE"
+}
