@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"testing"
 	"time"
 
@@ -208,4 +209,94 @@ func TestVotePool_EquivocationDetection(t *testing.T) {
 	_, err = pool.AddVote(voteB)
 	require.Error(t, err, "equivocation on conflicting block hashes must trigger error")
 	require.Contains(t, err.Error(), "byzantine equivocation detected")
+}
+
+func TestValidatorSchedule_TransitionAndRevocation(t *testing.T) {
+	chainID := "sovra-testnet-0"
+	oldTestVals, oldValSet := setupTestValidators(t, 4)
+	newTestVals, newValSet := setupTestValidators(t, 4)
+
+	schedule := consensus.NewValidatorSchedule(chainID, oldValSet)
+	transitionHeight := int64(100)
+
+	var revokedAddrs []string
+	for _, tv := range oldTestVals {
+		revokedAddrs = append(revokedAddrs, tv.val.Address)
+	}
+
+	transition := consensus.ValidatorTransition{
+		TransitionHeight:   transitionHeight,
+		PreviousValidators: oldValSet.Validators,
+		NewValidators:      newValSet.Validators,
+		RevokedAddresses:   revokedAddrs,
+		Reason:             "PHASE_15_2_HISTORICAL_COMPROMISED_KEY_REVOCATION",
+		Timestamp:          time.Now().Unix(),
+	}
+
+	err := schedule.AddTransition(transition)
+	require.NoError(t, err)
+
+	blockHash := "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff"
+
+	// 1. Height 50 (< transitionHeight): Legitimate historical block signed by genesis validators
+	sig0 := signPrecommit(chainID, oldTestVals[0], 50, 0, blockHash, 0)
+	sig1 := signPrecommit(chainID, oldTestVals[1], 50, 0, blockHash, 1)
+	sig2 := signPrecommit(chainID, oldTestVals[2], 50, 0, blockHash, 2)
+
+	certH50 := &consensus.CommitCertificate{
+		Height:     50,
+		Round:      0,
+		BlockHash:  blockHash,
+		Signatures: []consensus.CommitSignature{sig0, sig1, sig2},
+	}
+	err = consensus.VerifyCommitCertificateWithSchedule(certH50, schedule, chainID)
+	require.NoError(t, err, "historical block before transition must verify against genesis set")
+
+	// 2. Height 100 (>= transitionHeight): Block signed by new rotated validators
+	newSig0 := signPrecommit(chainID, newTestVals[0], 100, 0, blockHash, 0)
+	newSig1 := signPrecommit(chainID, newTestVals[1], 100, 0, blockHash, 1)
+	newSig2 := signPrecommit(chainID, newTestVals[2], 100, 0, blockHash, 2)
+
+	certH100New := &consensus.CommitCertificate{
+		Height:     100,
+		Round:      0,
+		BlockHash:  blockHash,
+		Signatures: []consensus.CommitSignature{newSig0, newSig1, newSig2},
+	}
+	err = consensus.VerifyCommitCertificateWithSchedule(certH100New, schedule, chainID)
+	require.NoError(t, err, "block at transition height signed by new validators must succeed")
+
+	// 3. Height 100 (>= transitionHeight): Compromised old validator attempts to sign new block -> MUST BE REJECTED!
+	oldSigH100_0 := signPrecommit(chainID, oldTestVals[0], 100, 0, blockHash, 0)
+	oldSigH100_1 := signPrecommit(chainID, oldTestVals[1], 100, 0, blockHash, 1)
+	oldSigH100_2 := signPrecommit(chainID, oldTestVals[2], 100, 0, blockHash, 2)
+
+	certH100Old := &consensus.CommitCertificate{
+		Height:     100,
+		Round:      0,
+		BlockHash:  blockHash,
+		Signatures: []consensus.CommitSignature{oldSigH100_0, oldSigH100_1, oldSigH100_2},
+	}
+	err = consensus.VerifyCommitCertificateWithSchedule(certH100Old, schedule, chainID)
+	require.Error(t, err, "compromised genesis keys must be rejected at or above transition height")
+	require.True(t, errors.Is(err, consensus.ErrRevokedValidator) || errors.Is(err, consensus.ErrUnknownValidator))
+
+	// 4. VotePool rejection of revoked votes
+	activeSet, err := schedule.GetValidatorSetForHeight(100)
+	require.NoError(t, err)
+	pool := consensus.NewVotePool(chainID, activeSet)
+
+	voteRevoked := &privval.Vote{
+		Type:             privval.StepPrecommit,
+		Height:           100,
+		Round:            0,
+		BlockHash:        blockHash,
+		ValidatorAddress: oldTestVals[0].val.Address,
+		ValidatorIndex:   0,
+	}
+	canonRevoked := privval.FormatCanonicalVoteBytes(chainID, voteRevoked)
+	voteRevoked.SignatureHex = hex.EncodeToString(ed25519.Sign(oldTestVals[0].priv, canonRevoked))
+
+	_, err = pool.AddVote(voteRevoked)
+	require.Error(t, err, "vote from revoked validator must be rejected by vote pool")
 }

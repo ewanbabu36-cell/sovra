@@ -150,3 +150,49 @@ func TestCloudHSMBackend_SessionAndSigning(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ed25519.Verify(pub, testData, sig))
 }
+
+func TestPKCS11HardwareBackend_LifecycleAndAuditLogging(t *testing.T) {
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	backend := privval.NewPKCS11DevelopmentBackend("YubiHSM2_PKCS11", priv)
+	defer backend.Close()
+
+	require.Contains(t, backend.GetHSMType(), "[DEVELOPMENT_SIMULATION_ONLY]")
+
+	pub, err := backend.GetPublicKey()
+	require.NoError(t, err)
+	require.Equal(t, priv.Public().(ed25519.PublicKey), pub)
+
+	// 1. Sign consensus vote
+	chainID := "sovra-testnet-0"
+	vote := &privval.Vote{
+		Type:             privval.StepPrecommit,
+		Height:           10,
+		Round:            0,
+		BlockHash:        "blockhash001",
+		ValidatorAddress: "sovra1test",
+	}
+
+	sig, err := backend.SignConsensusVote(chainID, vote)
+	require.NoError(t, err)
+	require.NotEmpty(t, sig)
+
+	// 2. Double-signing prevention veto at same height/round/step with different hash
+	conflictingVote := &privval.Vote{
+		Type:             privval.StepPrecommit,
+		Height:           10,
+		Round:            0,
+		BlockHash:        "conflicting_hash_999",
+		ValidatorAddress: "sovra1test",
+	}
+
+	_, err = backend.SignConsensusVote(chainID, conflictingVote)
+	require.Error(t, err, "double signing at same height/round with different hash must be blocked by HSM backend")
+
+	// 3. Verify audit logger recorded entries
+	entries := backend.GetAuditLogger().GetEntries()
+	require.GreaterOrEqual(t, len(entries), 2)
+	require.Equal(t, "SUCCESS_MOCK", entries[0].Status)
+	require.Equal(t, "REJECTED_DOUBLE_SIGN", entries[1].Status)
+}

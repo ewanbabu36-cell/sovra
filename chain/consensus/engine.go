@@ -165,3 +165,62 @@ func (e *Engine) WaitForPrecommitQuorum(height, round int64, blockHash string, t
 	}
 	return nil, fmt.Errorf("timed out waiting for precommit quorum on H=%d R=%d", height, round)
 }
+
+// ApplyValidatorTransition applies an authorized on-chain validator set transition and revocations
+func (e *Engine) ApplyValidatorTransition(transition ValidatorTransition) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	newValSet, err := NewValidatorSet(transition.NewValidators)
+	if err != nil {
+		return fmt.Errorf("invalid new validator set in transition: %w", err)
+	}
+
+	// Carry over existing revocations
+	if e.valSet != nil {
+		for addr, h := range e.valSet.GetRevokedValidators() {
+			newValSet.RevokeValidator(addr, h)
+		}
+	}
+	// Apply new revocations
+	for _, addr := range transition.RevokedAddresses {
+		newValSet.RevokeValidator(addr, transition.TransitionHeight)
+	}
+
+	e.valSet = newValSet
+	e.votePool.UpdateValidatorSet(newValSet)
+
+	// Recheck our validator identity and role in the rotated validator set
+	e.myIndex = -1
+	if e.privVal != nil {
+		myAddr := e.privVal.GetAddress()
+		for i, v := range newValSet.Validators {
+			if v.Address == myAddr || v.Name == e.moniker {
+				e.myIndex = int32(i)
+				e.myAddr = v.Address
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// SetPrivVal updates the validator signing interface (e.g. after key rotation)
+func (e *Engine) SetPrivVal(privVal privval.PrivValidator) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.privVal = privVal
+	e.myIndex = -1
+	if privVal != nil && e.valSet != nil {
+		myAddr := privVal.GetAddress()
+		for i, v := range e.valSet.Validators {
+			if v.Address == myAddr || v.Name == e.moniker {
+				e.myIndex = int32(i)
+				e.myAddr = v.Address
+				break
+			}
+		}
+	}
+}

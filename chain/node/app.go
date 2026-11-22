@@ -27,8 +27,9 @@ var (
 	KeyPrefixGenesisTime = []byte{0x33}
 	KeyPrefixInitialized = []byte{0x34}
 	KeyPrefixBlock       = []byte{0x35}
-	KeyPrefixValidators  = []byte{0x36}
-	KeyPrefixDelegation  = []byte{0x40}
+	KeyPrefixValidators          = []byte{0x36}
+	KeyPrefixValidatorTransitions = []byte{0x37}
+	KeyPrefixDelegation          = []byte{0x40}
 	KeyPrefixSigningInfo = []byte{0x41}
 )
 
@@ -589,6 +590,55 @@ func (app *SovraApp) GetBlock(height int64) []byte {
 	app.mu.RLock()
 	defer app.mu.RUnlock()
 	return app.store.Get(BlockKey(height))
+}
+
+// GetValidators returns a copy of current active consensus validators
+func (app *SovraApp) GetValidators() []GenesisValidator {
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+	res := make([]GenesisValidator, len(app.validators))
+	copy(res, app.validators)
+	return res
+}
+
+// RecordValidatorTransition persists an authorized validator set transition
+func (app *SovraApp) RecordValidatorTransition(t ValidatorSetTransition) error {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+
+	app.validators = t.NewValidators
+	valBz, err := json.Marshal(app.validators)
+	if err != nil {
+		return fmt.Errorf("failed to marshal new validators: %w", err)
+	}
+	app.store.Set(KeyPrefixValidators, valBz)
+
+	var transitions []ValidatorSetTransition
+	transBz := app.store.Get(KeyPrefixValidatorTransitions)
+	if len(transBz) > 0 {
+		_ = json.Unmarshal(transBz, &transitions)
+	}
+	transitions = append(transitions, t)
+	newTransBz, err := json.Marshal(transitions)
+	if err != nil {
+		return fmt.Errorf("failed to marshal validator transitions: %w", err)
+	}
+	app.store.Set(KeyPrefixValidatorTransitions, newTransBz)
+	return nil
+}
+
+// GetValidatorTransitions returns all recorded validator transitions
+func (app *SovraApp) GetValidatorTransitions() []ValidatorSetTransition {
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+
+	transBz := app.store.Get(KeyPrefixValidatorTransitions)
+	if len(transBz) == 0 {
+		return nil
+	}
+	var transitions []ValidatorSetTransition
+	_ = json.Unmarshal(transBz, &transitions)
+	return transitions
 }
 
 // CosmWasm Queries

@@ -98,6 +98,16 @@ type GenesisValidator struct {
 	P2PAddr     string `json:"p2p_addr,omitempty"`
 }
 
+// ValidatorSetTransition records a formal on-chain validator rotation and revocation
+type ValidatorSetTransition struct {
+	TransitionHeight   int64              `json:"transition_height"`
+	PreviousValidators []GenesisValidator `json:"previous_validators"`
+	NewValidators      []GenesisValidator `json:"new_validators"`
+	RevokedAddresses   []string           `json:"revoked_addresses"`
+	Reason             string             `json:"reason"`
+	Timestamp          int64              `json:"timestamp"`
+}
+
 // KeyPair represents an ed25519 account keypair
 type KeyPair struct {
 	Name       string            `json:"name"`
