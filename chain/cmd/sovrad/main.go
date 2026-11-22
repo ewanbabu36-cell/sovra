@@ -903,6 +903,9 @@ func startNode(flags NodeFlags) {
 		fmt.Printf("Resumed chain from persistent store at block %d (AppHash: %x)\n", lastHeight, hashPrefix)
 	}
 
+	// CometBFT WebSocket Hub
+	hub := newWsHub()
+
 	// Setup CometBFT P2P Switch
 	swCallbacks := p2p.SwitchCallbacks{
 		GetLocalHeight: func() int64 {
@@ -932,10 +935,37 @@ func startNode(flags NodeFlags) {
 			for _, tx := range b.Txs {
 				_ = app.DeliverTx(tx)
 			}
-			_ = app.Commit()
+			newAppHash := app.Commit()
 			bBz, _ := json.Marshal(b)
 			app.SaveBlock(b.Height, bBz)
-			fmt.Printf("[P2P SYNC] Applied Block %04d | AppHash: %s | Txs: %d\n", b.Height, b.AppHash, b.TxCount)
+			fmt.Printf("[P2P CONSENSUS COMMITTED] H=%04d | Proposer: %s | AppHash: %s | Txs: %d\n", b.Height, b.Proposer, hex.EncodeToString(newAppHash), b.TxCount)
+
+			// Broadcast CometBFT NewBlock event to WebSocket subscribers
+			blockEvent := map[string]interface{}{
+				"jsonrpc": "2.0",
+				"id":      0,
+				"result": map[string]interface{}{
+					"query": "tm.event='NewBlock'",
+					"data": map[string]interface{}{
+						"type": "tendermint/event/NewBlock",
+						"value": map[string]interface{}{
+							"block": map[string]interface{}{
+								"header": map[string]interface{}{
+									"chain_id":         cfg.ChainID,
+									"height":           strconv.FormatInt(b.Height, 10),
+									"time":             time.Unix(b.Time, 0).UTC().Format(time.RFC3339Nano),
+									"app_hash":         b.AppHash,
+									"proposer_address": b.Proposer,
+								},
+								"data": map[string]interface{}{
+									"txs": []string{},
+								},
+							},
+						},
+					},
+				},
+			}
+			hub.broadcast("tm.event='NewBlock'", blockEvent)
 			return nil
 		},
 		OnReceiveTx: func(tx node.SignedTransaction) error {
@@ -976,83 +1006,155 @@ func startNode(flags NodeFlags) {
 	fmt.Printf("  Current Supply:       %s uSOV\n", app.QueryTotalSupply().String())
 	fmt.Printf("====================================================\n")
 
-	// CometBFT WebSocket Hub
-	hub := newWsHub()
+	// Helper for deterministic CometBFT round-robin proposer selection
+	isMyTurnToPropose := func(h int64, round int64) bool {
+		if len(gen.Validators) == 0 {
+			return true
+		}
+		idx := int((h - 1 + round) % int64(len(gen.Validators)))
+		if idx < 0 {
+			idx = 0
+		}
+		v := gen.Validators[idx]
+		return v.Address == nodeAddr || v.Name == cfg.Moniker || (len(pubKey) > 0 && v.PubKeyHex == hex.EncodeToString(pubKey))
+	}
 
 	// Block production loop (active consensus validators produce new blocks; non-validator or sync-only nodes follow P2P chain)
 	if isValidator {
 		go func() {
-			ticker := time.NewTicker(3 * time.Second)
+			ticker := time.NewTicker(1 * time.Second)
 			defer ticker.Stop()
-			height := app.GetHeight()
+			var currentRound int64 = 0
+			var lastSeenHeight int64 = app.GetHeight()
+			var lastHeightTime = time.Now()
+			var wasQuorumLost bool = false
 
 			for range ticker.C {
-				height++
-				now := time.Now().Unix()
-
-				_ = app.BeginBlock(height, now)
-				newAppHash := app.Commit()
-
-				blockData := p2p.BlockData{
-					Height:   height,
-					Time:     now,
-					AppHash:  hex.EncodeToString(newAppHash),
-					Proposer: cfg.Moniker,
-					TxCount:  0,
-					Txs:      []node.SignedTransaction{},
-				}
-
-				// Sign proposal block via PrivValidator interface (remote HSM or memory enclave)
-				if privVal != nil {
-					prop := &privval.Proposal{
-						Height:          height,
-						Round:           0,
-						BlockHash:       hex.EncodeToString(newAppHash),
-						ProposerAddress: nodeAddr,
-					}
-					sig, err := privVal.SignProposal(cfg.ChainID, prop)
-					if err != nil {
-						fmt.Printf("[VALIDATOR SIGNER] High-water mark error: %v\n", err)
-					} else {
-						_ = sig
+				// 1. Verify Byzantine Fault Tolerance (BFT) Supermajority Quorum (> 2/3 voting power)
+				var totalPower int64 = 0
+				var activePower int64 = 0
+				for _, v := range gen.Validators {
+					totalPower += v.VotingPower
+					if v.Address == nodeAddr || v.Name == cfg.Moniker || (len(pubKey) > 0 && v.PubKeyHex == hex.EncodeToString(pubKey)) {
+						activePower += v.VotingPower
 					}
 				}
 
-				bBz, _ := json.Marshal(blockData)
-				app.SaveBlock(height, bBz)
+				if totalPower > 0 && len(gen.Validators) > 1 {
+					peers := p2pSwitch.GetPeers()
+					for _, p := range peers {
+						for _, v := range gen.Validators {
+							if v.NodeID == p.ID || v.Name == p.Moniker {
+								activePower += v.VotingPower
+								break
+							}
+						}
+					}
 
-				// Gossip over P2P network
-				p2pSwitch.BroadcastNewBlock(blockData)
+					// CometBFT rule: block production requires strictly > 2/3 of total voting power
+					if activePower*3 <= totalPower*2 {
+						if !wasQuorumLost {
+							wasQuorumLost = true
+							fmt.Printf("[CONSENSUS QUORUM LOSS] Active voting power %d/%d (%.1f%%) <= 66.7%% supermajority. Halting block production.\n",
+								activePower, totalPower, float64(activePower)/float64(totalPower)*100)
+						}
+						lastHeightTime = time.Now()
+						continue
+					}
 
-				fmt.Printf("[BLOCK %04d] Produced | Time: %d | AppHash: %x | Supply: %s uSOV\n",
-					height, now, newAppHash[:8], app.QueryTotalSupply().String())
+					if wasQuorumLost {
+						wasQuorumLost = false
+						fmt.Printf("[CONSENSUS QUORUM RESTORED] Active voting power %d/%d (%.1f%%) > 66.7%% supermajority. Resuming consensus.\n",
+							activePower, totalPower, float64(activePower)/float64(totalPower)*100)
+						lastHeightTime = time.Now()
+					}
+				}
 
-				// Broadcast CometBFT NewBlock event to WebSocket subscribers
-				blockEvent := map[string]interface{}{
-					"jsonrpc": "2.0",
-					"id":      0,
-					"result": map[string]interface{}{
-						"query": "tm.event='NewBlock'",
-						"data": map[string]interface{}{
-							"type": "tendermint/event/NewBlock",
-							"value": map[string]interface{}{
-								"block": map[string]interface{}{
-									"header": map[string]interface{}{
-										"chain_id":         cfg.ChainID,
-										"height":           strconv.FormatInt(height, 10),
-										"time":             time.Unix(now, 0).UTC().Format(time.RFC3339Nano),
-										"app_hash":         hex.EncodeToString(newAppHash),
-										"proposer_address": cfg.Moniker,
-									},
-									"data": map[string]interface{}{
-										"txs": []string{},
+				currentHeight := app.GetHeight()
+				if currentHeight != lastSeenHeight {
+					lastSeenHeight = currentHeight
+					currentRound = 0
+					lastHeightTime = time.Now()
+				}
+
+				nextHeight := currentHeight + 1
+
+				// If timeout elapsed waiting for next block (4 seconds), advance round for fallback proposer
+				if time.Since(lastHeightTime) > 4*time.Second {
+					currentRound++
+					lastHeightTime = time.Now()
+					fmt.Printf("[CONSENSUS ROUND ADVANCE] H=%d advancing to round %d\n", nextHeight, currentRound)
+				}
+
+				if isMyTurnToPropose(nextHeight, currentRound) {
+					now := time.Now().Unix()
+					_ = app.BeginBlock(nextHeight, now)
+					newAppHash := app.Commit()
+					lastSeenHeight = nextHeight
+					lastHeightTime = time.Now()
+					currentRound = 0
+
+					blockData := p2p.BlockData{
+						Height:   nextHeight,
+						Time:     now,
+						AppHash:  hex.EncodeToString(newAppHash),
+						Proposer: cfg.Moniker,
+						TxCount:  0,
+						Txs:      []node.SignedTransaction{},
+					}
+
+					// Sign proposal block via PrivValidator interface (remote HSM or memory enclave)
+					if privVal != nil {
+						prop := &privval.Proposal{
+							Height:          nextHeight,
+							Round:           currentRound,
+							BlockHash:       hex.EncodeToString(newAppHash),
+							ProposerAddress: nodeAddr,
+						}
+						sig, err := privVal.SignProposal(cfg.ChainID, prop)
+						if err != nil {
+							fmt.Printf("[VALIDATOR SIGNER] High-water mark error: %v\n", err)
+						} else {
+							_ = sig
+						}
+					}
+
+					bBz, _ := json.Marshal(blockData)
+					app.SaveBlock(nextHeight, bBz)
+
+					// Gossip over P2P network
+					p2pSwitch.BroadcastNewBlock(blockData)
+
+					fmt.Printf("[BLOCK %04d PROPOSED] Proposer: %s | Time: %d | AppHash: %x | Supply: %s uSOV\n",
+						nextHeight, cfg.Moniker, now, newAppHash[:8], app.QueryTotalSupply().String())
+
+					// Broadcast CometBFT NewBlock event to WebSocket subscribers
+					blockEvent := map[string]interface{}{
+						"jsonrpc": "2.0",
+						"id":      0,
+						"result": map[string]interface{}{
+							"query": "tm.event='NewBlock'",
+							"data": map[string]interface{}{
+								"type": "tendermint/event/NewBlock",
+								"value": map[string]interface{}{
+									"block": map[string]interface{}{
+										"header": map[string]interface{}{
+											"chain_id":         cfg.ChainID,
+											"height":           strconv.FormatInt(nextHeight, 10),
+											"time":             time.Unix(now, 0).UTC().Format(time.RFC3339Nano),
+											"app_hash":         hex.EncodeToString(newAppHash),
+											"proposer_address": cfg.Moniker,
+										},
+										"data": map[string]interface{}{
+											"txs": []string{},
+										},
 									},
 								},
 							},
 						},
-					},
+					}
+					hub.broadcast("tm.event='NewBlock'", blockEvent)
 				}
-				hub.broadcast("tm.event='NewBlock'", blockEvent)
 			}
 		}()
 	}
@@ -1611,15 +1713,6 @@ func startNode(flags NodeFlags) {
 		}
 	}
 
-	// Autonomous Protocol Node Cockpit & Web PWA Server (Port 3001)
-	go func() {
-		webAddr := "127.0.0.1:3001"
-		webServer := &http.Server{
-			Addr:    webAddr,
-			Handler: mux,
-		}
-		_ = webServer.ListenAndServe()
-	}()
 
 	server := &http.Server{
 		Addr:    rpcAddr,

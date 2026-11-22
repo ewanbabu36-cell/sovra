@@ -83,6 +83,7 @@ local.properties
 
 
 # Chain testnet & mainnet node data
+backups/
 chain/mytestnet/**/data/
 chain/mytestnet/**/exported-genesis.json
 chain/mytestnet/**/priv_validator_state.json

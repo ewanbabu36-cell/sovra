@@ -46,6 +46,7 @@ export class L1ChainSupervisor {
   private passphrase: string;
   private mode: 'idle' | 'external' | 'native-daemon' | 'in-process-cometbft' = 'idle';
   private childProc: ChildProcess | null = null;
+  private peerProcs: Map<number, ChildProcess> = new Map();
   private inProcessServer: http.Server | null = null;
   private blockTimer: NodeJS.Timeout | null = null;
   private isStarting = false;
@@ -281,6 +282,50 @@ export class L1ChainSupervisor {
           );
         }
       });
+
+      // If node0 is started and peer nodes exist, supervise nodes 1, 2, 3 as unified cluster
+      const baseDir = path.dirname(path.resolve(this.homeDir));
+      if (path.basename(path.resolve(this.homeDir)) === 'node0') {
+        for (const idx of [1, 2, 3]) {
+          const peerHome = path.join(baseDir, `node${idx}`);
+          if (fs.existsSync(peerHome) && fs.existsSync(path.join(peerHome, 'config.json'))) {
+            try {
+              const peerChild = spawn(binaryPath, [
+                'start',
+                `--home=${peerHome}`,
+                `--passphrase=${this.passphrase}`,
+              ], {
+                cwd: process.cwd(),
+                stdio: ['ignore', 'pipe', 'pipe'],
+                detached: false,
+              });
+
+              peerChild.stdout?.on('data', (d) => {
+                const text = d.toString().trim();
+                if (text && (text.includes('[BLOCK') || text.includes('RPC Server') || text.includes('Unlocked'))) {
+                  console.log(`[SOVRAD L1 Node ${idx}] ${text}`);
+                }
+              });
+
+              peerChild.stderr?.on('data', (d) => {
+                const text = d.toString().trim();
+                if (text && !text.includes('WAL file')) {
+                  console.warn(`[SOVRAD L1 Node ${idx} WARN] ${text}`);
+                }
+              });
+
+              peerChild.on('exit', (code, signal) => {
+                console.warn(`[L1 SUPERVISOR] Node ${idx} daemon exited with code ${code} (signal: ${signal})`);
+                this.peerProcs.delete(idx);
+              });
+
+              this.peerProcs.set(idx, peerChild);
+            } catch (err) {
+              console.warn(`[L1 SUPERVISOR] Failed to spawn peer node ${idx}:`, err);
+            }
+          }
+        }
+      }
 
       // Poll until RPC responds (up to 7 seconds to allow scrypt key derivation)
       const startTime = Date.now();
@@ -925,6 +970,14 @@ export class L1ChainSupervisor {
       this.childProc = null;
     }
 
+    for (const [idx, proc] of this.peerProcs.entries()) {
+      console.log(`[L1 SUPERVISOR] Terminating peer node ${idx}...`);
+      try {
+        proc.kill('SIGTERM');
+      } catch (_) {}
+    }
+    this.peerProcs.clear();
+
     if (this.inProcessServer) {
       console.log('[L1 SUPERVISOR] Closing In-Process CometBFT server...');
       await new Promise<void>((res) => {
@@ -934,6 +987,55 @@ export class L1ChainSupervisor {
     }
 
     this.mode = 'idle';
+  }
+
+  /**
+   * Stops a specific node in the cluster for adversarial / fault-tolerance testing
+   */
+  public stopNode(idx: number): boolean {
+    if (idx === 0) {
+      if (this.childProc) {
+        this.childProc.kill('SIGTERM');
+        this.childProc = null;
+        return true;
+      }
+      return false;
+    }
+    const proc = this.peerProcs.get(idx);
+    if (proc) {
+      proc.kill('SIGTERM');
+      this.peerProcs.delete(idx);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Starts a specific node in the cluster for recovery testing
+   */
+  public async startNode(idx: number): Promise<boolean> {
+    const binaryPath = this.resolveSovradBinary();
+    if (!binaryPath) return false;
+    const baseDir = path.dirname(path.resolve(this.homeDir));
+    const nodeHome = path.join(baseDir, `node${idx}`);
+    if (!fs.existsSync(nodeHome)) return false;
+
+    const child = spawn(binaryPath, [
+      'start',
+      `--home=${nodeHome}`,
+      `--passphrase=${this.passphrase}`,
+    ], {
+      cwd: process.cwd(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false,
+    });
+
+    if (idx === 0) {
+      this.childProc = child;
+    } else {
+      this.peerProcs.set(idx, child);
+    }
+    return true;
   }
 
   private registerProcessHandlers() {
