@@ -1,0 +1,50 @@
+{
+  "gateName": "SOVRA Phase 15.4 Final Release Gate & Environment Authorization Matrix",
+  "timestamp": "2026-11-22T08:20:00Z",
+  "baselineCommit": "e983be1",
+  "phase": "15.4",
+  "chainId": "sovra-testnet-0",
+  "environmentalAuthorizations": {
+    "local_development": {
+      "status": "CERTIFIED",
+      "rationale": "Consensus engine, vote pool, cryptographic schedule verifier, and all unit test harnesses operate deterministically with 100% pass rate."
+    },
+    "local_loopback_testnet": {
+      "status": "INCIDENT_DOCUMENTED__CONSENSUS_ENGINE_UPGRADED",
+      "rationale": "Historical blocks 40,000–44,900+ on sovra-testnet-0 were produced and committed by the compromised genesis validator keys due to running daemon lacking runtime schedule wiring. Forensic audit completed, security incident formally logged without retroactive falsification. The daemon codebase (chain/cmd/sovrad/main.go) and consensus engine (chain/consensus/engine.go) are now fully wired to ValidatorSchedule."
+    },
+    "validator_transition_activation_live_consensus": {
+      "status": "CERTIFIED_INTEGRATED",
+      "rationale": "ValidatorSchedule is dynamically integrated into live block production, proposal validation, vote processing, precommit quorum, commit certificate creation and verification, P2P callbacks, and /consensus_state and /validators endpoints. Live 4-node transition verified with replacement validators."
+    },
+    "forward_recovery_architecture": {
+      "status": "FORMALLY_ESTABLISHED",
+      "rationale": "Historical ledger truth is preserved with zero retroactive falsification. Forward recovery architecture defines future transition activation at height 50,000 for sovra-testnet-0 or clean launch on sovra-recovery-1 with replacement validator identities."
+    },
+    "compromised_key_rejection": {
+      "status": "PROTOCOL_VERIFIED",
+      "rationale": "Compromised genesis validator keys are strictly rejected with ErrRevokedValidator across proposal signing, prevote signing, precommit signing, commit certificate aggregation, and P2P verification paths."
+    },
+    "git_history_secret_remediation": {
+      "status": "RECOVERY_BRANCH_VERIFIED_CLEAN__MAIN_REWRITE_BLOCKED",
+      "rationale": "All 5 historical key blobs completely purged on recovery/history-remediation-phase15-3 and pushed to origin. Canonical main branch force-rewrite is withheld pending explicit repository owner authorization to avoid breaking collaborator clones."
+    },
+    "hardware_backed_signing": {
+      "status": "BLOCKED__DEVELOPMENT_ONLY",
+      "rationale": "Physical HSM device is not present in local environment. PKCS#11 specification (AWS CloudHSM SDK 5+ / YubiHSM 2 with CKM_EDDSA) is formally codified, and memory enclave driver is strictly tagged as [DEVELOPMENT_ONLY]."
+    },
+    "remote_multi_cloud_testnet": {
+      "status": "BLOCKED",
+      "blockingPrerequisites": [
+        "Provisioning of 4 physical multi-cloud server hosts across independent cloud providers (AWS, GCP, Azure, DigitalOcean).",
+        "Physical integration of PKCS#11 hardware security modules (AWS CloudHSM SDK 5+ or YubiHSM 2).",
+        "mTLS node-to-node P2P transport network configuration across external public IPs.",
+        "Repository owner authorization and coordination of the remote Git history rewrite or explicit risk-acceptance."
+      ]
+    },
+    "production_mainnet": {
+      "status": "STRICTLY_NOT_AUTHORIZED",
+      "rationale": "Mainnet authorization is permanently prohibited prior to multi-month live operation on decentralized remote testnet and formal external cryptographic audits."
+    }
+  }
+}

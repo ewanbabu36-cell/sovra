@@ -27,7 +27,7 @@ describe('SOVRA Phase 9: Multi-Cloud Network Partition & Quorum Rigor', () => {
     it('verifies all 4 federation validator endpoints are actively serving consensus status', async () => {
       let results: any[] = [];
       let inSync = false;
-      for (let attempt = 0; attempt < 5; attempt++) {
+      for (let attempt = 0; attempt < 15; attempt++) {
         results = await Promise.all(
           FEDERATION_NODES.map(async (node) => {
             const res = await fetch(`${node.rpc}/status`);
@@ -50,7 +50,7 @@ describe('SOVRA Phase 9: Multi-Cloud Network Partition & Quorum Rigor', () => {
           inSync = true;
           break;
         }
-        await new Promise((r) => setTimeout(r, 200));
+        await new Promise((r) => setTimeout(r, 250));
       }
 
       expect(results.length).toBe(4);

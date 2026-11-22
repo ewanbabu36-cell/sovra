@@ -919,7 +919,49 @@ func startNode(flags NodeFlags) {
 	if valSetErr != nil {
 		fmt.Printf("Warning: failed to initialize canonical validator set: %v\n", valSetErr)
 	}
+
+	valSchedule := consensus.NewValidatorSchedule(cfg.ChainID, canonicalValSet)
+
+	// Load any on-chain recorded validator transitions into valSchedule
+	recordedTransitions := app.GetValidatorTransitions()
+	for _, rt := range recordedTransitions {
+		var prevVals []consensus.Validator
+		for _, pv := range rt.PreviousValidators {
+			prevVals = append(prevVals, consensus.Validator{
+				Name:        pv.Name,
+				Address:     pv.Address,
+				PubKeyHex:   pv.PubKeyHex,
+				VotingPower: pv.VotingPower,
+				NodeID:      pv.NodeID,
+			})
+		}
+		var newVals []consensus.Validator
+		for _, nv := range rt.NewValidators {
+			newVals = append(newVals, consensus.Validator{
+				Name:        nv.Name,
+				Address:     nv.Address,
+				PubKeyHex:   nv.PubKeyHex,
+				VotingPower: nv.VotingPower,
+				NodeID:      nv.NodeID,
+			})
+		}
+		cTrans := consensus.ValidatorTransition{
+			TransitionHeight:   rt.TransitionHeight,
+			PreviousValidators: prevVals,
+			NewValidators:      newVals,
+			RevokedAddresses:   rt.RevokedAddresses,
+			Reason:             rt.Reason,
+			Timestamp:          rt.Timestamp,
+		}
+		if err := valSchedule.AddTransition(cTrans); err != nil {
+			fmt.Printf("Warning: failed to load recorded transition at height %d: %v\n", rt.TransitionHeight, err)
+		} else {
+			fmt.Printf("[CONSENSUS SCHEDULE] Loaded recorded validator transition at H=%d (revoked: %v)\n", rt.TransitionHeight, rt.RevokedAddresses)
+		}
+	}
+
 	consensusEngine := consensus.NewEngine(cfg.ChainID, canonicalValSet, privVal, cfg.Moniker)
+	consensusEngine.SetValidatorSchedule(valSchedule)
 
 	// CometBFT WebSocket Hub
 	hub := newWsHub()
@@ -954,7 +996,7 @@ func startNode(flags NodeFlags) {
 
 			// If block has no CommitCertificate, treat as unfinalized proposal
 			if b.CommitCert == nil {
-				if consensusEngine.IsValidator() && b.Height == app.GetHeight()+1 {
+				if consensusEngine.IsValidatorAtHeight(b.Height) && b.Height == app.GetHeight()+1 {
 					// Sign precommit for the valid proposed block
 					precommit, err := consensusEngine.SignPrecommit(b.Height, 0, b.AppHash)
 					if err == nil && precommit != nil && p2pSwitch != nil {
@@ -965,8 +1007,8 @@ func startNode(flags NodeFlags) {
 				return nil
 			}
 
-			// Verify Cryptographic CommitCertificate
-			if err := consensus.VerifyCommitCertificate(b.CommitCert, canonicalValSet, cfg.ChainID); err != nil {
+			// Verify Cryptographic CommitCertificate with height-aware ValidatorSchedule
+			if err := consensus.VerifyCommitCertificateWithSchedule(b.CommitCert, valSchedule, cfg.ChainID); err != nil {
 				fmt.Printf("[CONSENSUS REJECT] Invalid CommitCertificate on H=%d from %s: %v\n", b.Height, b.Proposer, err)
 				return fmt.Errorf("invalid commit certificate: %w", err)
 			}
@@ -984,10 +1026,17 @@ func startNode(flags NodeFlags) {
 			newAppHash := app.Commit()
 			bBz, _ := json.Marshal(b)
 			app.SaveBlock(b.Height, bBz)
+
+			activeValSet, _ := valSchedule.GetValidatorSetForHeight(b.Height)
+			totalPow := canonicalValSet.TotalPower
+			if activeValSet != nil {
+				totalPow = activeValSet.TotalPower
+			}
+
 			fmt.Printf("[P2P CONSENSUS COMMITTED] H=%04d | Proposer: %s | AppHash: %s | Txs: %d | CertPower: %d/%d (%.1f%%)\n",
 				b.Height, b.Proposer, hex.EncodeToString(newAppHash), b.TxCount,
-				b.CommitCert.TotalVotingPower(), canonicalValSet.TotalPower,
-				float64(b.CommitCert.TotalVotingPower())/float64(canonicalValSet.TotalPower)*100)
+				b.CommitCert.TotalVotingPower(), totalPow,
+				float64(b.CommitCert.TotalVotingPower())/float64(totalPow)*100)
 
 			// Broadcast CometBFT NewBlock event to WebSocket subscribers
 			blockEvent := map[string]interface{}{
@@ -1029,7 +1078,7 @@ func startNode(flags NodeFlags) {
 			return err
 		},
 		OnReceiveCommitCert: func(cert consensus.CommitCertificate) error {
-			if err := consensus.VerifyCommitCertificate(&cert, canonicalValSet, cfg.ChainID); err != nil {
+			if err := consensus.VerifyCommitCertificateWithSchedule(&cert, valSchedule, cfg.ChainID); err != nil {
 				return err
 			}
 			return nil
@@ -1050,6 +1099,9 @@ func startNode(flags NodeFlags) {
 			break
 		}
 	}
+	if !isValidator && consensusEngine.IsValidator() {
+		isValidator = true
+	}
 
 	fmt.Printf("====================================================\n")
 	fmt.Printf("  SOVRA CONSENSUS NODE: %s\n", cfg.Moniker)
@@ -1066,16 +1118,23 @@ func startNode(flags NodeFlags) {
 	fmt.Printf("  Current Supply:       %s uSOV\n", app.QueryTotalSupply().String())
 	fmt.Printf("====================================================\n")
 
-	// Helper for deterministic CometBFT round-robin proposer selection
+	// Helper for deterministic CometBFT round-robin proposer selection with dynamic schedule support
 	isMyTurnToPropose := func(h int64, round int64) bool {
-		if len(gen.Validators) == 0 {
+		activeSet, err := valSchedule.GetValidatorSetForHeight(h)
+		if err != nil || activeSet == nil || len(activeSet.Validators) == 0 {
+			activeSet = canonicalValSet
+		}
+		if activeSet == nil || len(activeSet.Validators) == 0 {
 			return true
 		}
-		idx := int((h - 1 + round) % int64(len(gen.Validators)))
+		idx := int((h - 1 + round) % int64(len(activeSet.Validators)))
 		if idx < 0 {
 			idx = 0
 		}
-		v := gen.Validators[idx]
+		v := activeSet.Validators[idx]
+		if activeSet.IsRevokedAtHeight(v.Address, h) {
+			return false
+		}
 		return v.Address == nodeAddr || v.Name == cfg.Moniker || (len(pubKey) > 0 && v.PubKeyHex == hex.EncodeToString(pubKey))
 	}
 
@@ -1090,20 +1149,39 @@ func startNode(flags NodeFlags) {
 			var wasQuorumLost bool = false
 
 			for range ticker.C {
+				currentHeight := app.GetHeight()
+				nextHeight := currentHeight + 1
+
+				// Resolve active validator set for nextHeight
+				activeSet, err := valSchedule.GetValidatorSetForHeight(nextHeight)
+				if err != nil || activeSet == nil {
+					activeSet = canonicalValSet
+				}
+
+				// Check if this node is an active, unrevoked validator at nextHeight
+				if !consensusEngine.IsValidatorAtHeight(nextHeight) {
+					continue
+				}
+
 				// 1. Verify Byzantine Fault Tolerance (BFT) Supermajority Quorum (> 2/3 voting power)
-				var totalPower int64 = 0
+				var totalPower int64 = activeSet.TotalPower
 				var activePower int64 = 0
-				for _, v := range gen.Validators {
-					totalPower += v.VotingPower
+				for _, v := range activeSet.Validators {
+					if activeSet.IsRevokedAtHeight(v.Address, nextHeight) {
+						continue
+					}
 					if v.Address == nodeAddr || v.Name == cfg.Moniker || (len(pubKey) > 0 && v.PubKeyHex == hex.EncodeToString(pubKey)) {
 						activePower += v.VotingPower
 					}
 				}
 
-				if totalPower > 0 && len(gen.Validators) > 1 {
+				if totalPower > 0 && len(activeSet.Validators) > 1 {
 					peers := p2pSwitch.GetPeers()
 					for _, p := range peers {
-						for _, v := range gen.Validators {
+						for _, v := range activeSet.Validators {
+							if activeSet.IsRevokedAtHeight(v.Address, nextHeight) {
+								continue
+							}
 							if v.NodeID == p.ID || v.Name == p.Moniker {
 								activePower += v.VotingPower
 								break
@@ -1115,8 +1193,8 @@ func startNode(flags NodeFlags) {
 					if activePower*3 <= totalPower*2 {
 						if !wasQuorumLost {
 							wasQuorumLost = true
-							fmt.Printf("[CONSENSUS QUORUM LOSS] Active voting power %d/%d (%.1f%%) <= 66.7%% supermajority. Halting block production.\n",
-								activePower, totalPower, float64(activePower)/float64(totalPower)*100)
+							fmt.Printf("[CONSENSUS QUORUM LOSS] Active voting power %d/%d (%.1f%%) <= 66.7%% supermajority on H=%d. Halting block production.\n",
+								activePower, totalPower, float64(activePower)/float64(totalPower)*100, nextHeight)
 						}
 						lastHeightTime = time.Now()
 						continue
@@ -1124,20 +1202,17 @@ func startNode(flags NodeFlags) {
 
 					if wasQuorumLost {
 						wasQuorumLost = false
-						fmt.Printf("[CONSENSUS QUORUM RESTORED] Active voting power %d/%d (%.1f%%) > 66.7%% supermajority. Resuming consensus.\n",
-							activePower, totalPower, float64(activePower)/float64(totalPower)*100)
+						fmt.Printf("[CONSENSUS QUORUM RESTORED] Active voting power %d/%d (%.1f%%) > 66.7%% supermajority on H=%d. Resuming consensus.\n",
+							activePower, totalPower, float64(activePower)/float64(totalPower)*100, nextHeight)
 						lastHeightTime = time.Now()
 					}
 				}
 
-				currentHeight := app.GetHeight()
 				if currentHeight != lastSeenHeight {
 					lastSeenHeight = currentHeight
 					currentRound = 0
 					lastHeightTime = time.Now()
 				}
-
-				nextHeight := currentHeight + 1
 
 				// If timeout elapsed waiting for next block (4 seconds), advance round for fallback proposer
 				if time.Since(lastHeightTime) > 4*time.Second {
@@ -1177,7 +1252,7 @@ func startNode(flags NodeFlags) {
 
 					// 4. Wait for 2/3+ Precommit Quorum (or build immediately if single validator)
 					var cert *consensus.CommitCertificate
-					if len(gen.Validators) > 1 {
+					if len(activeSet.Validators) > 1 {
 						var err error
 						cert, err = consensusEngine.WaitForPrecommitQuorum(nextHeight, currentRound, candidateHash, 2*time.Second)
 						if err != nil || cert == nil {
@@ -1205,8 +1280,8 @@ func startNode(flags NodeFlags) {
 
 					fmt.Printf("[BLOCK %04d FINALIZED] Proposer: %s | Time: %d | AppHash: %x | CommitPower: %d/%d (%.1f%%) | Supply: %s uSOV\n",
 						nextHeight, cfg.Moniker, now, newAppHash[:8],
-						cert.TotalVotingPower(), canonicalValSet.TotalPower,
-						float64(cert.TotalVotingPower())/float64(canonicalValSet.TotalPower)*100,
+						cert.TotalVotingPower(), activeSet.TotalPower,
+						float64(cert.TotalVotingPower())/float64(activeSet.TotalPower)*100,
 						app.QueryTotalSupply().String())
 
 					// Broadcast CometBFT NewBlock event to WebSocket subscribers
@@ -1371,16 +1446,110 @@ func startNode(flags NodeFlags) {
 
 	mux.HandleFunc("/consensus_state", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		qHeight := app.GetHeight()
+		if hStr := r.URL.Query().Get("height"); hStr != "" {
+			if parsedH, err := strconv.ParseInt(hStr, 10, 64); err == nil && parsedH > 0 {
+				qHeight = parsedH
+			}
+		}
+		activeSet, err := valSchedule.GetValidatorSetForHeight(qHeight)
+		if err != nil || activeSet == nil {
+			activeSet = canonicalValSet
+		}
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"jsonrpc": "2.0",
 			"id":      -1,
 			"result": map[string]interface{}{
-				"height":             app.GetHeight(),
-				"validators":         canonicalValSet.Validators,
-				"total_voting_power": canonicalValSet.TotalPower,
-				"quorum_power":       canonicalValSet.QuorumPower,
-				"is_validator":       consensusEngine.IsValidator(),
+				"height":             qHeight,
+				"validators":         activeSet.Validators,
+				"total_voting_power": activeSet.TotalPower,
+				"quorum_power":       activeSet.QuorumPower,
+				"is_validator":       consensusEngine.IsValidatorAtHeight(qHeight),
 			},
+		})
+	})
+
+	mux.HandleFunc("/validators", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		qHeight := app.GetHeight()
+		if hStr := r.URL.Query().Get("height"); hStr != "" {
+			if parsedH, err := strconv.ParseInt(hStr, 10, 64); err == nil && parsedH > 0 {
+				qHeight = parsedH
+			}
+		}
+		activeSet, err := valSchedule.GetValidatorSetForHeight(qHeight)
+		if err != nil || activeSet == nil {
+			activeSet = canonicalValSet
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      -1,
+			"result": map[string]interface{}{
+				"block_height": strconv.FormatInt(qHeight, 10),
+				"validators":   activeSet.Validators,
+				"count":        len(activeSet.Validators),
+				"total":        len(activeSet.Validators),
+			},
+		})
+	})
+
+	mux.HandleFunc("/consensus/transition", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			TransitionHeight int64                   `json:"transition_height"`
+			NewValidators    []node.GenesisValidator `json:"new_validators"`
+			RevokedAddresses []string                `json:"revoked_addresses"`
+			Reason           string                  `json:"reason"`
+			QuorumSignatures []string                `json:"quorum_signatures"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid payload: %v", err), http.StatusBadRequest)
+			return
+		}
+		var prevVals []consensus.Validator
+		currSet, _ := valSchedule.GetValidatorSetForHeight(req.TransitionHeight - 1)
+		if currSet != nil {
+			prevVals = currSet.Validators
+		}
+		var newVals []consensus.Validator
+		for _, nv := range req.NewValidators {
+			newVals = append(newVals, consensus.Validator{
+				Name:        nv.Name,
+				Address:     nv.Address,
+				PubKeyHex:   nv.PubKeyHex,
+				VotingPower: nv.VotingPower,
+				NodeID:      nv.NodeID,
+			})
+		}
+		cTrans := consensus.ValidatorTransition{
+			TransitionHeight:   req.TransitionHeight,
+			PreviousValidators: prevVals,
+			NewValidators:      newVals,
+			RevokedAddresses:   req.RevokedAddresses,
+			Reason:             req.Reason,
+			Timestamp:          time.Now().Unix(),
+		}
+		if err := valSchedule.AddTransition(cTrans); err != nil {
+			http.Error(w, fmt.Sprintf("rejected transition: %v", err), http.StatusConflict)
+			return
+		}
+		_ = app.RecordValidatorTransition(node.ValidatorSetTransition{
+			TransitionHeight:   req.TransitionHeight,
+			PreviousValidators: req.NewValidators,
+			NewValidators:      req.NewValidators,
+			RevokedAddresses:   req.RevokedAddresses,
+			Reason:             req.Reason,
+			Timestamp:          time.Now().Unix(),
+		})
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":            "ACCEPTED",
+			"transition_height": req.TransitionHeight,
+			"active_validators": len(newVals),
+			"revoked_count":     len(req.RevokedAddresses),
 		})
 	})
 

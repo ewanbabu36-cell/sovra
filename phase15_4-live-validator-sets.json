@@ -1,0 +1,80 @@
+{
+  "chain_id": "sovra-testnet-0",
+  "generated_at": "2026-11-22T08:26:11.944Z",
+  "genesis_validator_set": {
+    "validators": [
+      {
+        "name": "genesis-node-0",
+        "address": "sovra11f04af43742273392dae13632c0f5c14d68349e3",
+        "pub_key": "d1b695576e587184739dae3f3e7cf3f3d2dd33d196b5cd73f904b11afe5975d7",
+        "voting_power": 25,
+        "status": "REVOKED_AT_TRANSITION",
+        "revocation_height": 40000
+      },
+      {
+        "name": "genesis-node-1",
+        "address": "sovra1cb325492bec20f4012da4f899bae23c38122061e",
+        "pub_key": "23a8aa43807ccf7113d561556a385824078f18e335d5f9a1485ac8fb502527ce",
+        "voting_power": 25,
+        "status": "REVOKED_AT_TRANSITION",
+        "revocation_height": 40000
+      },
+      {
+        "name": "genesis-node-2",
+        "address": "sovra10e8c8b3993ba6a7c006fc0d6988dd56c3ff1604f",
+        "pub_key": "e89c5fc316c901b5af4ba4da5f54f275db4e49e5d66607d42b7b531f5d88e651",
+        "voting_power": 25,
+        "status": "REVOKED_AT_TRANSITION",
+        "revocation_height": 40000
+      },
+      {
+        "name": "genesis-node-3",
+        "address": "sovra10ee159573c3d008bf75be0536ed0f467b04912a3",
+        "pub_key": "87700c61204f7108885513e38200bc53118cfea4fcea5d5b724d87150190b52e",
+        "voting_power": 25,
+        "status": "REVOKED_AT_TRANSITION",
+        "revocation_height": 40000
+      }
+    ],
+    "total_power": 100,
+    "quorum_power": 67
+  },
+  "replacement_validator_set": {
+    "validators": [
+      {
+        "name": "replacement-node-0",
+        "address": "sovra1df6e946f77a47dfe905999add5e3004d6fc3da2e",
+        "pub_key": "64df80d952633d9c5a51f5d0f4b0e65a9cf5f9b3ce7c60443b1289eae92939ef",
+        "voting_power": 25,
+        "status": "ACTIVE_AT_AND_ABOVE_TRANSITION",
+        "activation_height": 40000
+      },
+      {
+        "name": "replacement-node-1",
+        "address": "sovra193560279337366fc9c93acb75b7a2445fa30d9f8",
+        "pub_key": "77593827aac22b191d0a649786a93fe7e076cf174b415a388f0de3cc339a53e3",
+        "voting_power": 25,
+        "status": "ACTIVE_AT_AND_ABOVE_TRANSITION",
+        "activation_height": 40000
+      },
+      {
+        "name": "replacement-node-2",
+        "address": "sovra1b592010920110c2db025a5b8df845d2558b36887",
+        "pub_key": "b8ba001fea7ea1cf4512442abb4827b500605a15c896f8bc07eaed7fd2567b67",
+        "voting_power": 25,
+        "status": "ACTIVE_AT_AND_ABOVE_TRANSITION",
+        "activation_height": 40000
+      },
+      {
+        "name": "replacement-node-3",
+        "address": "sovra18213cb1a2b2faeb57302c643009fdc89afb3439f",
+        "pub_key": "138411267303f51dd9c3755f5553ad54e6ff0d7edc13ce01b693920dbf950f59",
+        "voting_power": 25,
+        "status": "ACTIVE_AT_AND_ABOVE_TRANSITION",
+        "activation_height": 40000
+      }
+    ],
+    "total_power": 100,
+    "quorum_power": 67
+  }
+}

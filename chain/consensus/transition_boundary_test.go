@@ -339,3 +339,107 @@ func TestBoundary_RestartAndPartitionResilience(t *testing.T) {
 		t.Fatalf("partition catch-up: malicious block 40000 from old keys must be rejected")
 	}
 }
+
+func TestEngine_ScheduleAwareSigning_RevocationEnforcement(t *testing.T) {
+	chainID := "sovra-testnet-0"
+
+	// 4 Genesis Validators
+	gVals := make([]Validator, 4)
+	gPrivs := make([]ed25519.PrivateKey, 4)
+	for i := 0; i < 4; i++ {
+		gVals[i], gPrivs[i] = generateTestValidator(fmt.Sprintf("genesis-val-%d", i), 25)
+	}
+	gSet, err := NewValidatorSet(gVals)
+	if err != nil {
+		t.Fatalf("failed to create genesis set: %v", err)
+	}
+
+	// 4 Rotated Validators
+	rVals := make([]Validator, 4)
+	rPrivs := make([]ed25519.PrivateKey, 4)
+	revAddrs := make([]string, 4)
+	for i := 0; i < 4; i++ {
+		rVals[i], rPrivs[i] = generateTestValidator(fmt.Sprintf("rotated-val-%d", i), 25)
+		revAddrs[i] = gVals[i].Address
+	}
+
+	schedule := NewValidatorSchedule(chainID, gSet)
+	_ = schedule.AddTransition(ValidatorTransition{
+		TransitionHeight:   40000,
+		PreviousValidators: gVals,
+		NewValidators:      rVals,
+		RevokedAddresses:   revAddrs,
+		Reason:             "SECURITY_KEY_ROTATION",
+	})
+
+	// Genesis Validator 0 engine
+	gPrivVal := privval.NewLocalPrivValidator(gPrivs[0])
+	engineGenesis := NewEngine(chainID, gSet, gPrivVal, gVals[0].Name)
+	engineGenesis.SetValidatorSchedule(schedule)
+
+	// Before transition (H=39999): Genesis validator 0 can sign proposal, prevote, precommit
+	prop39999, err := engineGenesis.SignProposal(39999, 0, "hash39999")
+	if err != nil || prop39999 == nil {
+		t.Fatalf("genesis val should be allowed to sign proposal at H=39999: %v", err)
+	}
+	prevote39999, err := engineGenesis.SignPrevote(39999, 0, "hash39999")
+	if err != nil || prevote39999 == nil {
+		t.Fatalf("genesis val should be allowed to sign prevote at H=39999: %v", err)
+	}
+	precommit39999, err := engineGenesis.SignPrecommit(39999, 0, "hash39999")
+	if err != nil || precommit39999 == nil {
+		t.Fatalf("genesis val should be allowed to sign precommit at H=39999: %v", err)
+	}
+
+	// At and after transition (H=40000): Genesis validator 0 MUST be rejected
+	_, errPropRevoked := engineGenesis.SignProposal(40000, 0, "hash40000")
+	if errPropRevoked == nil {
+		t.Fatalf("revoked genesis val must NOT be allowed to sign proposal at H=40000")
+	}
+	_, errPrevoteRevoked := engineGenesis.SignPrevote(40000, 0, "hash40000")
+	if errPrevoteRevoked == nil {
+		t.Fatalf("revoked genesis val must NOT be allowed to sign prevote at H=40000")
+	}
+	_, errPrecommitRevoked := engineGenesis.SignPrecommit(40000, 0, "hash40000")
+	if errPrecommitRevoked == nil {
+		t.Fatalf("revoked genesis val must NOT be allowed to sign precommit at H=40000")
+	}
+
+	// Rotated Validator 0 engine
+	rPrivVal := privval.NewLocalPrivValidator(rPrivs[0])
+	engineRotated := NewEngine(chainID, gSet, rPrivVal, rVals[0].Name)
+	engineRotated.SetValidatorSchedule(schedule)
+
+	// Rotated Validator 0 can sign at H=40000
+	prop40000, err := engineRotated.SignProposal(40000, 0, "hash40000")
+	if err != nil || prop40000 == nil {
+		t.Fatalf("rotated val should be allowed to sign proposal at H=40000: %v", err)
+	}
+	prevote40000, err := engineRotated.SignPrevote(40000, 0, "hash40000")
+	if err != nil || prevote40000 == nil {
+		t.Fatalf("rotated val should be allowed to sign prevote at H=40000: %v", err)
+	}
+	precommit40000, err := engineRotated.SignPrecommit(40000, 0, "hash40000")
+	if err != nil || precommit40000 == nil {
+		t.Fatalf("rotated val should be allowed to sign precommit at H=40000: %v", err)
+	}
+
+	// Verify proposal with schedule
+	if err := VerifyProposalWithSchedule(prop40000, schedule, chainID); err != nil {
+		t.Fatalf("rotated val proposal verification failed: %v", err)
+	}
+
+	// Proposal signed by old genesis key at H=40000 must fail verification
+	fakeOldProp := &privval.Proposal{
+		Height:          40000,
+		Round:           0,
+		POLRound:        -1,
+		BlockHash:       "hash40000",
+		ProposerAddress: gVals[0].Address,
+	}
+	sigBytes := ed25519.Sign(gPrivs[0], privval.FormatCanonicalProposalBytes(chainID, fakeOldProp))
+	fakeOldProp.SignatureHex = hex.EncodeToString(sigBytes)
+	if err := VerifyProposalWithSchedule(fakeOldProp, schedule, chainID); err == nil {
+		t.Fatalf("fake old proposal at H=40000 must be rejected by VerifyProposalWithSchedule")
+	}
+}

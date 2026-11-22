@@ -11,17 +11,18 @@ import (
 
 // Engine orchestrates two-phase BFT commit consensus and vote aggregation
 type Engine struct {
-	mu        sync.RWMutex
-	chainID   string
-	valSet    *ValidatorSet
-	votePool  *VotePool
-	privVal   privval.PrivValidator
-	myIndex   int32
-	myAddr    string
-	moniker   string
-	lockHeight int64
-	lockRound  int64
-	lockHash   string
+	mu          sync.RWMutex
+	chainID     string
+	valSet      *ValidatorSet
+	valSchedule *ValidatorSchedule
+	votePool    *VotePool
+	privVal     privval.PrivValidator
+	myIndex     int32
+	myAddr      string
+	moniker     string
+	lockHeight  int64
+	lockRound   int64
+	lockHash    string
 }
 
 // NewEngine constructs a new BFT consensus engine for a validator
@@ -64,8 +65,66 @@ func (e *Engine) VotePool() *VotePool {
 	return e.votePool
 }
 
+func (e *Engine) SetValidatorSchedule(schedule *ValidatorSchedule) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.valSchedule = schedule
+	if e.votePool != nil {
+		e.votePool.SetValidatorSchedule(schedule)
+	}
+}
+
+func (e *Engine) ValidatorSchedule() *ValidatorSchedule {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.valSchedule
+}
+
+func (e *Engine) GetValidatorSetForHeight(height int64) (*ValidatorSet, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.valSchedule != nil {
+		return e.valSchedule.GetValidatorSetForHeight(height)
+	}
+	if e.valSet != nil {
+		return e.valSet, nil
+	}
+	return nil, fmt.Errorf("no validator set configured")
+}
+
 func (e *Engine) IsValidator() bool {
 	return e.privVal != nil && e.myIndex >= 0
+}
+
+func (e *Engine) IsValidatorAtHeight(height int64) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.privVal == nil {
+		return false
+	}
+	addr := e.privVal.GetAddress()
+	var valSet *ValidatorSet
+	if e.valSchedule != nil {
+		sSet, err := e.valSchedule.GetValidatorSetForHeight(height)
+		if err == nil {
+			valSet = sSet
+		}
+	}
+	if valSet == nil {
+		valSet = e.valSet
+	}
+	if valSet == nil {
+		return false
+	}
+	for _, v := range valSet.Validators {
+		if v.Address == addr || v.PubKeyHex == addr || v.Name == e.moniker {
+			if valSet.IsRevokedAtHeight(v.Address, height) {
+				return false
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func (e *Engine) SignProposal(height, round int64, blockHash string) (*privval.Proposal, error) {
@@ -73,12 +132,27 @@ func (e *Engine) SignProposal(height, round int64, blockHash string) (*privval.P
 		return nil, fmt.Errorf("no privval configured for proposal signing")
 	}
 
+	myAddr := e.myAddr
+	activeSet, err := e.GetValidatorSetForHeight(height)
+	if err == nil && activeSet != nil {
+		pvAddr := e.privVal.GetAddress()
+		for _, v := range activeSet.Validators {
+			if v.Address == pvAddr || v.PubKeyHex == pvAddr || v.Name == e.moniker {
+				myAddr = v.Address
+				break
+			}
+		}
+		if activeSet.IsRevokedAtHeight(myAddr, height) {
+			return nil, fmt.Errorf("validator %s is revoked at height %d: %w", myAddr, height, ErrRevokedValidator)
+		}
+	}
+
 	prop := &privval.Proposal{
 		Height:          height,
 		Round:           round,
 		POLRound:        -1,
 		BlockHash:       blockHash,
-		ProposerAddress: e.myAddr,
+		ProposerAddress: myAddr,
 	}
 
 	sig, err := e.privVal.SignProposal(e.chainID, prop)
@@ -95,13 +169,30 @@ func (e *Engine) SignPrevote(height, round int64, blockHash string) (*privval.Vo
 		return nil, fmt.Errorf("no privval configured for prevote signing")
 	}
 
+	myAddr := e.myAddr
+	valIndex := e.myIndex
+	activeSet, err := e.GetValidatorSetForHeight(height)
+	if err == nil && activeSet != nil {
+		pvAddr := e.privVal.GetAddress()
+		for i, v := range activeSet.Validators {
+			if v.Address == pvAddr || v.PubKeyHex == pvAddr || v.Name == e.moniker {
+				myAddr = v.Address
+				valIndex = int32(i)
+				break
+			}
+		}
+		if activeSet.IsRevokedAtHeight(myAddr, height) {
+			return nil, fmt.Errorf("validator %s is revoked at height %d: %w", myAddr, height, ErrRevokedValidator)
+		}
+	}
+
 	vote := &privval.Vote{
 		Type:             privval.StepPrevote,
 		Height:           height,
 		Round:            round,
 		BlockHash:        blockHash,
-		ValidatorAddress: e.myAddr,
-		ValidatorIndex:   e.myIndex,
+		ValidatorAddress: myAddr,
+		ValidatorIndex:   valIndex,
 	}
 
 	sig, err := e.privVal.SignVote(e.chainID, vote)
@@ -119,6 +210,23 @@ func (e *Engine) SignPrecommit(height, round int64, blockHash string) (*privval.
 		return nil, fmt.Errorf("no privval configured for precommit signing")
 	}
 
+	myAddr := e.myAddr
+	valIndex := e.myIndex
+	activeSet, err := e.GetValidatorSetForHeight(height)
+	if err == nil && activeSet != nil {
+		pvAddr := e.privVal.GetAddress()
+		for i, v := range activeSet.Validators {
+			if v.Address == pvAddr || v.PubKeyHex == pvAddr || v.Name == e.moniker {
+				myAddr = v.Address
+				valIndex = int32(i)
+				break
+			}
+		}
+		if activeSet.IsRevokedAtHeight(myAddr, height) {
+			return nil, fmt.Errorf("validator %s is revoked at height %d: %w", myAddr, height, ErrRevokedValidator)
+		}
+	}
+
 	// Persistent locking: update lock on valid block
 	e.mu.Lock()
 	e.lockHeight = height
@@ -131,8 +239,8 @@ func (e *Engine) SignPrecommit(height, round int64, blockHash string) (*privval.
 		Height:           height,
 		Round:            round,
 		BlockHash:        blockHash,
-		ValidatorAddress: e.myAddr,
-		ValidatorIndex:   e.myIndex,
+		ValidatorAddress: myAddr,
+		ValidatorIndex:   valIndex,
 	}
 
 	sig, err := e.privVal.SignVote(e.chainID, vote)
@@ -170,6 +278,12 @@ func (e *Engine) WaitForPrecommitQuorum(height, round int64, blockHash string, t
 func (e *Engine) ApplyValidatorTransition(transition ValidatorTransition) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	if e.valSchedule != nil {
+		if err := e.valSchedule.AddTransition(transition); err != nil {
+			return fmt.Errorf("failed to register transition in schedule: %w", err)
+		}
+	}
 
 	newValSet, err := NewValidatorSet(transition.NewValidators)
 	if err != nil {

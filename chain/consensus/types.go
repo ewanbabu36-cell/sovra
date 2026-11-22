@@ -282,22 +282,38 @@ type EquivocationEvidence struct {
 
 // VotePool tracks prevotes and precommits across consensus heights and rounds
 type VotePool struct {
-	mu           sync.RWMutex
-	chainID      string
-	valSet       *ValidatorSet
-	prevotes     map[string]map[string]*privval.Vote // key: "H:R" -> valAddr -> Vote
-	precommits   map[string]map[string]*privval.Vote // key: "H:R" -> valAddr -> Vote
+	mu            sync.RWMutex
+	chainID       string
+	valSet        *ValidatorSet
+	valSchedule   *ValidatorSchedule
+	prevotes      map[string]map[string]*privval.Vote // key: "H:R" -> valAddr -> Vote
+	precommits    map[string]map[string]*privval.Vote // key: "H:R" -> valAddr -> Vote
 	equivocations []EquivocationEvidence
 }
 
 func NewVotePool(chainID string, valSet *ValidatorSet) *VotePool {
 	return &VotePool{
-		chainID:      chainID,
-		valSet:       valSet,
-		prevotes:     make(map[string]map[string]*privval.Vote),
-		precommits:   make(map[string]map[string]*privval.Vote),
+		chainID:       chainID,
+		valSet:        valSet,
+		prevotes:      make(map[string]map[string]*privval.Vote),
+		precommits:    make(map[string]map[string]*privval.Vote),
 		equivocations: make([]EquivocationEvidence, 0),
 	}
+}
+
+func (vp *VotePool) SetValidatorSchedule(schedule *ValidatorSchedule) {
+	vp.mu.Lock()
+	defer vp.mu.Unlock()
+	vp.valSchedule = schedule
+}
+
+func (vp *VotePool) getValSetForHeight(height int64) *ValidatorSet {
+	if vp.valSchedule != nil {
+		if sSet, err := vp.valSchedule.GetValidatorSetForHeight(height); err == nil && sSet != nil {
+			return sSet
+		}
+	}
+	return vp.valSet
 }
 
 // AddVote validates, records, and checks for equivocation on an incoming vote
@@ -309,12 +325,13 @@ func (vp *VotePool) AddVote(vote *privval.Vote) (bool, error) {
 		return false, fmt.Errorf("nil vote")
 	}
 
-	val := vp.valSet.GetByAddress(vote.ValidatorAddress)
+	activeValSet := vp.getValSetForHeight(vote.Height)
+	val := activeValSet.GetByAddress(vote.ValidatorAddress)
 	if val == nil {
 		return false, fmt.Errorf("vote from unknown validator: %s", vote.ValidatorAddress)
 	}
 
-	if vp.valSet.IsRevokedAtHeight(vote.ValidatorAddress, vote.Height) {
+	if activeValSet.IsRevokedAtHeight(vote.ValidatorAddress, vote.Height) {
 		return false, fmt.Errorf("vote from revoked validator %s at height %d: %w", vote.ValidatorAddress, vote.Height, ErrRevokedValidator)
 	}
 
@@ -383,12 +400,16 @@ func (vp *VotePool) GetPrecommitQuorum(height, round int64, blockHash string) (b
 		return false, 0, nil
 	}
 
+	activeValSet := vp.getValSetForHeight(height)
 	var accumulatedPower int64
 	var signatures []CommitSignature
 
 	for _, v := range votes {
 		if v.BlockHash == blockHash {
-			val := vp.valSet.GetByAddress(v.ValidatorAddress)
+			if activeValSet.IsRevokedAtHeight(v.ValidatorAddress, height) {
+				continue
+			}
+			val := activeValSet.GetByAddress(v.ValidatorAddress)
 			if val != nil {
 				accumulatedPower += val.VotingPower
 				signatures = append(signatures, CommitSignature{
@@ -402,15 +423,16 @@ func (vp *VotePool) GetPrecommitQuorum(height, round int64, blockHash string) (b
 		}
 	}
 
-	hasQuorum := accumulatedPower >= vp.valSet.QuorumPower
+	hasQuorum := accumulatedPower >= activeValSet.QuorumPower
 	return hasQuorum, accumulatedPower, signatures
 }
 
 // MakeCommitCertificate builds a verified CommitCertificate if quorum is satisfied
 func (vp *VotePool) MakeCommitCertificate(height, round int64, blockHash string) (*CommitCertificate, error) {
+	activeValSet := vp.getValSetForHeight(height)
 	hasQuorum, power, sigs := vp.GetPrecommitQuorum(height, round, blockHash)
 	if !hasQuorum {
-		return nil, fmt.Errorf("insufficient precommit voting power %d < quorum %d for block %s", power, vp.valSet.QuorumPower, blockHash)
+		return nil, fmt.Errorf("insufficient precommit voting power %d < quorum %d for block %s", power, activeValSet.QuorumPower, blockHash)
 	}
 
 	return &CommitCertificate{

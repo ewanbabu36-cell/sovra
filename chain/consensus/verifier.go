@@ -146,3 +146,21 @@ func VerifyCommitCertificateWithSchedule(cert *CommitCertificate, schedule *Vali
 	}
 	return VerifyCommitCertificate(cert, valSet, chainID)
 }
+
+// VerifyProposalWithSchedule validates the proposer's signature using the height-indexed validator schedule
+func VerifyProposalWithSchedule(prop *privval.Proposal, schedule *ValidatorSchedule, chainID string) error {
+	if prop == nil {
+		return errors.New("proposal is nil")
+	}
+	if schedule == nil {
+		return errors.New("validator schedule is nil")
+	}
+	valSet, err := schedule.GetValidatorSetForHeight(prop.Height)
+	if err != nil {
+		return fmt.Errorf("failed to get validator set for height %d: %w", prop.Height, err)
+	}
+	if valSet.IsRevokedAtHeight(prop.ProposerAddress, prop.Height) {
+		return fmt.Errorf("%w: proposer %s was revoked at or before height %d", ErrRevokedValidator, prop.ProposerAddress, prop.Height)
+	}
+	return VerifyProposal(prop, valSet, chainID)
+}
