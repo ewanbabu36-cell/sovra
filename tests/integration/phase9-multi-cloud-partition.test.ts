@@ -25,21 +25,36 @@ describe('SOVRA Phase 9: Multi-Cloud Network Partition & Quorum Rigor', () => {
   // =========================================================================
   describe('Workstream 1: 4-Node Multi-Cloud Consensus Mesh', () => {
     it('verifies all 4 federation validator endpoints are actively serving consensus status', async () => {
-      const results = await Promise.all(
-        FEDERATION_NODES.map(async (node) => {
-          const res = await fetch(`${node.rpc}/status`);
-          expect(res.status).toBe(200);
-          const data = await res.json();
-          return {
-            moniker: node.moniker,
-            height: Number(data.height || data.result?.sync_info?.latest_block_height),
-            chainId: data.chain_id || data.result?.node_info?.network,
-            supplyCorrect: data.supply_correct,
-          };
-        })
-      );
+      let results: any[] = [];
+      let inSync = false;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        results = await Promise.all(
+          FEDERATION_NODES.map(async (node) => {
+            const res = await fetch(`${node.rpc}/status`);
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            return {
+              moniker: node.moniker,
+              height: Number(data.height || data.result?.sync_info?.latest_block_height),
+              chainId: data.chain_id || data.result?.node_info?.network,
+              supplyCorrect: data.supply_correct,
+            };
+          })
+        );
+        if (
+          results.length === 4 &&
+          results[0].height === results[1].height &&
+          results[1].height === results[2].height &&
+          results[2].height === results[3].height
+        ) {
+          inSync = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
 
       expect(results.length).toBe(4);
+      expect(inSync).toBe(true);
       expect(results[0].height).toBe(results[1].height);
 
       // Verify each node is healthy and has committed consensus blocks

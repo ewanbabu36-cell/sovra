@@ -1,0 +1,20 @@
+{
+  "auditPhase": "Phase 15.1 Critical Verification 2 — Hardware Security Module (HSM) Implementation",
+  "timestamp": "2026-11-22T06:38:59.600Z",
+  "hsmSourceFile": "chain/privval/hsm.go",
+  "hsmSourceSha256": "fed7b7810d84ad16c26e26988f0c5e2a8c59d09a3b7ddde0255e851ea47e534e",
+  "classification": "SOFTWARE_SIMULATION_MOCK_DRIVER",
+  "analysis": {
+    "isHardwareBacked": false,
+    "isRealCloudHSM": false,
+    "isRealYubiHSM": false,
+    "keyNonExportableEnforced": false,
+    "driverType": "Software Go struct (MemoryEnclaveHSM & CloudHSMBackend)",
+    "privateKeyCustody": "Plaintext Go ed25519.PrivateKey slice in memory",
+    "pkcs11CgoBindings": "NOT_IMPLEMENTED",
+    "fips140_2Level3Certified": false,
+    "tamperResistantHardware": false,
+    "auditLogsInHardware": false
+  },
+  "releaseClassification": "FAILED_FOR_PRODUCTION_HSM (Software interface test only; real hardware HSM not deployed)"
+}

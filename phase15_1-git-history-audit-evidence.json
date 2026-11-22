@@ -1,0 +1,24 @@
+{
+  "auditPhase": "Phase 15.1 Critical Verification 1 — Git History & Secrets",
+  "timestamp": "2026-11-22T06:38:59.599Z",
+  "baselineCommit": "2f3e017",
+  "targetCommit": "c40011b",
+  "repository": "D:\\Sovra",
+  "branch": "main",
+  "findings": {
+    "activeWorkingTreePlaintextKeys": 0,
+    "activeWorkingTreePlaintextKeysStatus": "CLEAN_ON_HEAD",
+    "reachableHistoricalBlobsInGitHistory": true,
+    "historicalCommitsWithExposedKeys": [
+      "c40011b feat(security): Phase 15 - Remote testnet security, key isolation, adversarial & operational readiness certification",
+      "50b9c46 feat(phase-12): critical security remediation, distributed replay protection, CORS hardening, and consensus state reconciliation",
+      "9bc310b feat: complete Sovra consumer UI/UX overhaul, universal create engine, and super-app parity"
+    ],
+    "mainHistoryRewritten": false,
+    "isolatedBranchTestedForRewrite": "test-scrub-verification",
+    "blobHashNode0Key": "98a9f734a474c030915317d2b9fbe08b11f35497",
+    "securityAssessment": "HIGH_RISK_HISTORICAL_EXPOSURE",
+    "mandatoryRemediation": "All 4 historical genesis validator keys must be declared DIRTY and revoked prior to public remote testnet. Fresh non-exportable enclave keys must be generated."
+  },
+  "releaseClassification": "PARTIALLY_VERIFIED (HEAD is clean; historical DAG contains secrets; main not rewritten)"
+}
