@@ -1,0 +1,96 @@
+{
+  "testnet": "sovra-testnet-0",
+  "timestamp": "2026-11-22T02:09:28.917Z",
+  "suite": "BFT Consensus Adversarial Verification Suite",
+  "totalScenarios": 7,
+  "passedCount": 7,
+  "failedCount": 0,
+  "scenarios": [
+    {
+      "id": "ADV-3.1",
+      "name": "Byzantine Double-Propose Attack",
+      "category": "Adversarial",
+      "status": "PASSED",
+      "description": "Conflicting block proposals for the same height/round are flagged as equivocation and rejected by consensus engine.",
+      "evidence": {
+        "propA": "aa663fae9bcfdef0e275f27019bf0028fa97ef9ae84ff120a269d2d9e43054cf",
+        "propB": "20ab10e5e325b677e46eb2296627fc47d1d921a80a08ffced35c2f1d151daecf",
+        "equivocationDetected": true
+      }
+    },
+    {
+      "id": "ADV-3.2",
+      "name": "Byzantine Equivocation Votes Rejection",
+      "category": "Adversarial",
+      "status": "PASSED",
+      "description": "Validator attempting to broadcast multiple votes with different block hashes in the same round is rejected.",
+      "evidence": {
+        "voteMsgA": "SOVRA_CONSENSUS_VOTE:sovra-testnet-0:PRECOMMIT:32000:0:aa663fae9bcfdef0e275f27019bf0028fa97ef9ae84ff120a269d2d9e43054cf",
+        "voteMsgB": "SOVRA_CONSENSUS_VOTE:sovra-testnet-0:PRECOMMIT:32000:0:20ab10e5e325b677e46eb2296627fc47d1d921a80a08ffced35c2f1d151daecf",
+        "rejected": true
+      }
+    },
+    {
+      "id": "ADV-3.3",
+      "name": "Non-Contiguous Block Proposal Rejection",
+      "category": "Adversarial",
+      "status": "PASSED",
+      "description": "Blocks that do not sequentially extend chain tip (Height != Current + 1) are strictly rejected.",
+      "evidence": {
+        "currentHeight": 32175,
+        "rejectedHeight": 32177,
+        "contiguousEnforced": true
+      }
+    },
+    {
+      "id": "ADV-3.4",
+      "name": "Invalid AppHash Proposal Rejection",
+      "category": "Adversarial",
+      "status": "PASSED",
+      "description": "Proposals containing mismatched or forged AppHash fail verification during state transition calculation.",
+      "evidence": {
+        "forgedAppHash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "realAppHash": "2d511d5924d7569eb452f6c685b0e3f3d6f6030936424730f449b46b51da94fd",
+        "rejected": true
+      }
+    },
+    {
+      "id": "ADV-3.5",
+      "name": "Block Header Timestamp Manipulation Rejection",
+      "category": "Adversarial",
+      "status": "PASSED",
+      "description": "Block timestamps must be strictly monotonic and within acceptable BFT drift window.",
+      "evidence": {
+        "staleTimestamp": 1792060459,
+        "genesisTime": 1792061459,
+        "rejected": true
+      }
+    },
+    {
+      "id": "ADV-3.6",
+      "name": "Byzantine Sybil Peer Rejection",
+      "category": "Adversarial",
+      "status": "PASSED",
+      "description": "Commit certificates signed by unknown or sybil public keys not in genesis validator set are rejected.",
+      "evidence": {
+        "sybilPubKey": "1111111111111111111111111111111111111111111111111111111111111111",
+        "registeredInSet": false,
+        "rejected": true
+      }
+    },
+    {
+      "id": "ADV-3.7",
+      "name": "Commit Certificate Quorum & Cryptographic Authenticity",
+      "category": "Adversarial",
+      "status": "PASSED",
+      "description": "Commit certificates strictly require >2/3 total voting power with cryptographically valid Ed25519 signatures.",
+      "evidence": {
+        "height": 32175,
+        "signatures": 4,
+        "totalPowerSigned": 100,
+        "quorumSatisfied": true,
+        "forgedSignatureRejected": true
+      }
+    }
+  ]
+}

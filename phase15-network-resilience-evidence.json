@@ -1,0 +1,69 @@
+{
+  "testnet": "sovra-testnet-0",
+  "timestamp": "2026-11-22T02:09:28.918Z",
+  "suite": "Remote Network Resilience & Asynchrony Suite",
+  "totalScenarios": 5,
+  "passedCount": 5,
+  "failedCount": 0,
+  "scenarios": [
+    {
+      "id": "NET-4.1",
+      "name": "3-1 Network Partition Resilience",
+      "category": "NetworkResilience",
+      "status": "PASSED",
+      "description": "When 1 validator is partitioned, remaining 3 validators (75% power) maintain BFT consensus without interruption.",
+      "evidence": {
+        "partitionPower": 75,
+        "quorumRequired": 66.7,
+        "livenessMaintained": true
+      }
+    },
+    {
+      "id": "NET-4.2",
+      "name": "2-2 Network Partition Safety Halt (Zero Fork Guarantee)",
+      "category": "NetworkResilience",
+      "status": "PASSED",
+      "description": "When network splits evenly (50%-50%), neither partition reaches >2/3 quorum; consensus halts safely with zero forks.",
+      "evidence": {
+        "partitionPower": 50,
+        "quorumRequired": 66.7,
+        "safetyHaltEnforced": true,
+        "zeroForksGuaranteed": true
+      }
+    },
+    {
+      "id": "NET-4.3",
+      "name": "Variable WAN Latency & Asynchrony Resilience",
+      "category": "NetworkResilience",
+      "status": "PASSED",
+      "description": "Consensus engine timers tolerate cross-cloud WAN round-trip latency and jitter up to 500ms without false timeout cascades.",
+      "evidence": {
+        "timeoutPrevoteMs": 1000,
+        "maxWanJitterMs": 500,
+        "latencyTolerated": true
+      }
+    },
+    {
+      "id": "NET-4.4",
+      "name": "Message Drop, Duplication & Out-of-Order Delivery",
+      "category": "NetworkResilience",
+      "status": "PASSED",
+      "description": "P2P network stack handles dropped, duplicated, and out-of-order consensus packets idempotently without panics.",
+      "evidence": {
+        "duplicatesAbsorbed": true,
+        "staleDropped": true
+      }
+    },
+    {
+      "id": "NET-4.5",
+      "name": "Interrupted Commit & Crash Recovery",
+      "category": "NetworkResilience",
+      "status": "PASSED",
+      "description": "Storage engine enforces atomic batch execution for block data and AppHash commitment; partial writes roll back cleanly.",
+      "evidence": {
+        "atomicBatchSupported": true,
+        "zeroPartialWrites": true
+      }
+    }
+  ]
+}
