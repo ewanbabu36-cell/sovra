@@ -1,0 +1,132 @@
+{
+  "timestamp": "2026-11-21T18:34:46.422Z",
+  "scenarios": {
+    "scenario_0_baseline": {
+      "description": "All 4 nodes running in lockstep",
+      "nodes": [
+        {
+          "id": 0,
+          "moniker": "validator-0",
+          "height": 11121,
+          "appHash": "c74fa674994f63d70630ad70221e407bf01dc8d5a6b028bd69bdcdf74a3dc462",
+          "supply": "30041807472021"
+        },
+        {
+          "id": 1,
+          "moniker": "validator-1",
+          "height": 11121,
+          "appHash": "c74fa674994f63d70630ad70221e407bf01dc8d5a6b028bd69bdcdf74a3dc462",
+          "supply": "30041807472021"
+        },
+        {
+          "id": 2,
+          "moniker": "validator-2",
+          "height": 11121,
+          "appHash": "c74fa674994f63d70630ad70221e407bf01dc8d5a6b028bd69bdcdf74a3dc462",
+          "supply": "30041807472021"
+        },
+        {
+          "id": 3,
+          "moniker": "validator-3",
+          "height": 11121,
+          "appHash": "c74fa674994f63d70630ad70221e407bf01dc8d5a6b028bd69bdcdf74a3dc462",
+          "supply": "30041807472021"
+        }
+      ]
+    },
+    "scenario_1_single_node_failure": {
+      "terminated_node": 3,
+      "active_validators": 3,
+      "active_voting_power_percent": 75,
+      "quorum_required_percent": 66.7,
+      "quorum_satisfied": true,
+      "height_progressed": true,
+      "survivors_in_sync": true,
+      "surviving_height": 11124,
+      "dead_node_reachable": false,
+      "verdict": "PASSED"
+    },
+    "scenario_2_node_recovery": {
+      "recovered_node": 3,
+      "all_nodes_online": true,
+      "heights_synchronized": true,
+      "apphashes_synchronized": true,
+      "unified_height": 11134,
+      "unified_app_hash": "a6f13629be434664bffecb7301eba863855e83eacad2bb0248579eddc3cc6230",
+      "peer_counts": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "verdict": "PASSED"
+    },
+    "scenario_3_quorum_loss_safety": {
+      "terminated_nodes": [
+        2,
+        3
+      ],
+      "active_validators": 2,
+      "active_voting_power_percent": 50,
+      "quorum_required_percent": 66.7,
+      "quorum_satisfied": false,
+      "safety_halt_honored": true,
+      "no_split_brain": true,
+      "node0_height": 11134,
+      "node1_height": 11134,
+      "verdict": "PASSED"
+    },
+    "scenario_4_quorum_restoration": {
+      "restored_nodes": [
+        2,
+        3
+      ],
+      "active_validators": 4,
+      "active_voting_power_percent": 100,
+      "consensus_resumed": true,
+      "all_nodes_synchronized": true,
+      "unified_height": 11144,
+      "unified_app_hash": "90f4db1dbe9c80327fa0b2ae8c6b857a3ad3b22c69f7dd4f351779c2d6157d5f",
+      "verdict": "PASSED"
+    },
+    "scenario_5_adversarial_tx": {
+      "malformed_payload_rejected": true,
+      "verdict": "PASSED"
+    },
+    "scenario_6_financial_integrity": {
+      "canonical_total_supply": "30041807472021",
+      "zero_delta_proven": true,
+      "nodes": [
+        {
+          "id": 0,
+          "total_supply": "30041807472021",
+          "lifetime_mint": "30041807472021",
+          "lifetime_burn": "0",
+          "delta_usov": "0"
+        },
+        {
+          "id": 1,
+          "total_supply": "30041807472021",
+          "lifetime_mint": "30041807472021",
+          "lifetime_burn": "0",
+          "delta_usov": "0"
+        },
+        {
+          "id": 2,
+          "total_supply": "30041807472021",
+          "lifetime_mint": "30041807472021",
+          "lifetime_burn": "0",
+          "delta_usov": "0"
+        },
+        {
+          "id": 3,
+          "total_supply": "30041807472021",
+          "lifetime_mint": "30041807472021",
+          "lifetime_burn": "0",
+          "delta_usov": "0"
+        }
+      ],
+      "verdict": "PASSED"
+    }
+  }
+}

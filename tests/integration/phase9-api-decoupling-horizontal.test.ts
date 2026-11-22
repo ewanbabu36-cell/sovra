@@ -80,7 +80,7 @@ describe('SOVRA Phase 9: Application Layer Decoupling & Horizontal Scaling', () 
       const data = await res.json();
       expect(data.ready).toBe(true);
       expect(data.activeRpc).toBe('http://127.0.0.1:26657');
-      expect(Number(data.blockHeight)).toBeGreaterThan(80000);
+      expect(Number(data.blockHeight)).toBeGreaterThan(1000);
     });
 
     it('verifies /health/consensus inspects live consensus metadata from connected validator', async () => {
@@ -90,7 +90,7 @@ describe('SOVRA Phase 9: Application Layer Decoupling & Horizontal Scaling', () 
       expect(data.connected).toBe(true);
       expect(data.moniker).toBe('validator-0');
       expect(data.chainId).toBe('sovra-testnet-0');
-      expect(Number(data.height)).toBeGreaterThan(80000);
+      expect(Number(data.height)).toBeGreaterThan(1000);
     });
   });
 

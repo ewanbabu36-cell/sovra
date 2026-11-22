@@ -1,0 +1,137 @@
+{
+  "auditTimestamp": 1795284932309,
+  "auditDateIso": "2026-11-21T18:15:32.309Z",
+  "backupRoot": "D:\\Sovra\\backups\\phase13_pre_migration_backup",
+  "backupSummary": [
+    {
+      "node": 0,
+      "source": "D:\\Sovra\\chain\\mytestnet\\node0",
+      "destination": "D:\\Sovra\\backups\\phase13_pre_migration_backup\\node0",
+      "filesCount": 17,
+      "totalBytes": 10271277
+    },
+    {
+      "node": 1,
+      "source": "D:\\Sovra\\chain\\mytestnet\\node1",
+      "destination": "D:\\Sovra\\backups\\phase13_pre_migration_backup\\node1",
+      "filesCount": 12,
+      "totalBytes": 7729115
+    },
+    {
+      "node": 2,
+      "source": "D:\\Sovra\\chain\\mytestnet\\node2",
+      "destination": "D:\\Sovra\\backups\\phase13_pre_migration_backup\\node2",
+      "filesCount": 12,
+      "totalBytes": 8025134
+    },
+    {
+      "node": 3,
+      "source": "D:\\Sovra\\chain\\mytestnet\\node3",
+      "destination": "D:\\Sovra\\backups\\phase13_pre_migration_backup\\node3",
+      "filesCount": 13,
+      "totalBytes": 10625886
+    }
+  ],
+  "nodeTelemetry": [
+    {
+      "node": 0,
+      "port": 26657,
+      "moniker": "validator-0",
+      "nodeId": "2a806ca82d506a025d580d40600abc77a69e10e7",
+      "height": 92740,
+      "appHash": "7bf1b30c3d51598095a42231053ed5e2b0754e99ccbc54536c4d027230ae3621",
+      "totalSupplyUsov": "30139348240070",
+      "lifetimeMintUsov": "30139358240070",
+      "lifetimeBurnUsov": "10000000",
+      "conservationDeltaUsov": "0",
+      "conservationHolds": true,
+      "balances": {
+        "sovra12a806ca82d506a025d580d40600abc77a69e10e7": "7499961865100",
+        "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1": "7500000000000",
+        "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb": "7500000000000",
+        "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20": "7500000000000"
+      },
+      "latestBlock": {
+        "height": "92740",
+        "appHash": "7bf1b30c3d51598095a42231053ed5e2b0754e99ccbc54536c4d027230ae3621",
+        "proposer": "validator-0",
+        "txCount": 0
+      }
+    },
+    {
+      "node": 1,
+      "port": 26667,
+      "moniker": "validator-1",
+      "nodeId": "664a83c922035ce28bb723e4e92aed1e60e26ea1",
+      "height": 92740,
+      "appHash": "7edd1ce86000743bff8f9c9c2a6d806386921590fcdfd869165cbeb1820e8d5a",
+      "totalSupplyUsov": "30041807472021",
+      "lifetimeMintUsov": "30041807472021",
+      "lifetimeBurnUsov": "0",
+      "conservationDeltaUsov": "0",
+      "conservationHolds": true,
+      "balances": {
+        "sovra12a806ca82d506a025d580d40600abc77a69e10e7": "7499999996700",
+        "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1": "7500000000000",
+        "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb": "7500000000000",
+        "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20": "7500000000000"
+      },
+      "latestBlock": {
+        "height": "92740",
+        "appHash": "7bf1b30c3d51598095a42231053ed5e2b0754e99ccbc54536c4d027230ae3621",
+        "proposer": "validator-0",
+        "txCount": 0
+      }
+    },
+    {
+      "node": 2,
+      "port": 26677,
+      "moniker": "validator-2",
+      "nodeId": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+      "height": 92740,
+      "appHash": "7edd1ce86000743bff8f9c9c2a6d806386921590fcdfd869165cbeb1820e8d5a",
+      "totalSupplyUsov": "30041807472021",
+      "lifetimeMintUsov": "30041807472021",
+      "lifetimeBurnUsov": "0",
+      "conservationDeltaUsov": "0",
+      "conservationHolds": true,
+      "balances": {
+        "sovra12a806ca82d506a025d580d40600abc77a69e10e7": "7500000000000",
+        "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1": "7500000000000",
+        "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb": "7500000000000",
+        "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20": "7500000000000"
+      },
+      "latestBlock": {
+        "height": "92740",
+        "appHash": "7bf1b30c3d51598095a42231053ed5e2b0754e99ccbc54536c4d027230ae3621",
+        "proposer": "validator-0",
+        "txCount": 0
+      }
+    },
+    {
+      "node": 3,
+      "port": 26687,
+      "moniker": "validator-3",
+      "nodeId": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+      "height": 92740,
+      "appHash": "7edd1ce86000743bff8f9c9c2a6d806386921590fcdfd869165cbeb1820e8d5a",
+      "totalSupplyUsov": "30041807472021",
+      "lifetimeMintUsov": "30041807472021",
+      "lifetimeBurnUsov": "0",
+      "conservationDeltaUsov": "0",
+      "conservationHolds": true,
+      "balances": {
+        "sovra12a806ca82d506a025d580d40600abc77a69e10e7": "7500000000000",
+        "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1": "7500000000000",
+        "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb": "7500000000000",
+        "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20": "7500000000000"
+      },
+      "latestBlock": {
+        "height": "92740",
+        "appHash": "7bf1b30c3d51598095a42231053ed5e2b0754e99ccbc54536c4d027230ae3621",
+        "proposer": "validator-0",
+        "txCount": 0
+      }
+    }
+  ]
+}

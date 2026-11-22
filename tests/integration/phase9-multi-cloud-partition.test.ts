@@ -40,7 +40,7 @@ describe('SOVRA Phase 9: Multi-Cloud Network Partition & Quorum Rigor', () => {
       );
 
       expect(results.length).toBe(4);
-      expect(results[0].height).toBeGreaterThan(80000);
+      expect(results[0].height).toBe(results[1].height);
 
       // Verify each node is healthy and has committed consensus blocks
       for (const r of results) {

@@ -12,9 +12,15 @@
     "external_address": "127.0.0.1:26676",
     "pex": true,
     "seeds": [
-      "2a806ca82d506a025d580d40600abc77a69e10e7@127.0.0.1:26656"
+      "2a806ca82d506a025d580d40600abc77a69e10e7@127.0.0.1:26656",
+      "664a83c922035ce28bb723e4e92aed1e60e26ea1@127.0.0.1:26666",
+      "d96f6140a4c4ae797d9e3a5badf467eb756d3d20@127.0.0.1:26686"
     ],
-    "persistent_peers": [],
+    "persistent_peers": [
+      "2a806ca82d506a025d580d40600abc77a69e10e7@127.0.0.1:26656",
+      "664a83c922035ce28bb723e4e92aed1e60e26ea1@127.0.0.1:26666",
+      "d96f6140a4c4ae797d9e3a5badf467eb756d3d20@127.0.0.1:26686"
+    ],
     "max_peers": 50
   }
 }

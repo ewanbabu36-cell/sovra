@@ -11,8 +11,16 @@
     "laddr": "tcp://0.0.0.0:26656",
     "external_address": "127.0.0.1:26656",
     "pex": true,
-    "seeds": [],
-    "persistent_peers": [],
+    "seeds": [
+      "664a83c922035ce28bb723e4e92aed1e60e26ea1@127.0.0.1:26666",
+      "cb55be9a3d2afab1c9bcbffb88367bec797d11cb@127.0.0.1:26676",
+      "d96f6140a4c4ae797d9e3a5badf467eb756d3d20@127.0.0.1:26686"
+    ],
+    "persistent_peers": [
+      "664a83c922035ce28bb723e4e92aed1e60e26ea1@127.0.0.1:26666",
+      "cb55be9a3d2afab1c9bcbffb88367bec797d11cb@127.0.0.1:26676",
+      "d96f6140a4c4ae797d9e3a5badf467eb756d3d20@127.0.0.1:26686"
+    ],
     "max_peers": 50
   }
 }
