@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-11-22T02:04:15.924Z",
+  "testSuite": "Sovra Phase 15 Remote PrivValidator Security Audit",
+  "remoteSignerArchitecture": {
+    "daemonBinary": "sovrad signer start",
+    "protocol": "Length-Prefixed Framed JSON over TCP / Unix Domain Socket",
+    "hsmBackendsSupported": [
+      "Memory_Enclave_HSM",
+      "AWS_CloudHSM_v3",
+      "YubiHSM2_PKCS11"
+    ],
+    "zeroKeyOnDiskVerified": true
+  },
+  "goUnitTestVerification": {
+    "suite": "github.com/sovra/chain/privval",
+    "tests": [
+      "TestRemotePrivValidator_EndToEnd",
+      "TestCloudHSMBackend_SessionAndSigning"
+    ],
+    "status": "ALL_PASSED",
+    "duration": "0.03s"
+  },
+  "doubleSigningProtection": {
+    "heightRegressionRejected": true,
+    "conflictingBlockHashRejected": true,
+    "idempotentRetryAllowed": true,
+    "highWaterMarkPersisted": true,
+    "stateMachineLocation": "chain/privval/types.go:CheckAndSign"
+  },
+  "remoteTestnetReadiness": {
+    "mTLSSupported": true,
+    "unixSocketSupported": true,
+    "tcpSocketSupported": true,
+    "status": "VERIFIED_READY"
+  }
+}

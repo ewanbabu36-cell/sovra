@@ -17,7 +17,6 @@ out/
 *.pem
 *.key
 *.key.json
-!chain/mytestnet/node0/validator-0.key.json
 *.pkcs12
 *.pfx
 *.p12

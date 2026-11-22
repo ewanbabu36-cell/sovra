@@ -1,0 +1,65 @@
+{
+  "timestamp": "2026-11-22T02:12:12.914Z",
+  "testnet": "sovra-testnet-0",
+  "currentHeight": 32487,
+  "supplyConservationVerified": true,
+  "nodes": [
+    {
+      "node": "validator-0",
+      "rpcUrl": "http://127.0.0.1:26657",
+      "height": 32487,
+      "appHash": "63dabf78a269e1bced61cfb82914cfec19b085fa8fe741081ed780f5b05100a8",
+      "bankSupply": "30041807472021",
+      "lifetimeMinted": "30041807472021",
+      "lifetimeBurned": "0",
+      "masterInvariantHolds": true
+    },
+    {
+      "node": "validator-1",
+      "rpcUrl": "http://127.0.0.1:26667",
+      "height": 32487,
+      "appHash": "63dabf78a269e1bced61cfb82914cfec19b085fa8fe741081ed780f5b05100a8",
+      "bankSupply": "30041807472021",
+      "lifetimeMinted": "30041807472021",
+      "lifetimeBurned": "0",
+      "masterInvariantHolds": true
+    },
+    {
+      "node": "validator-2",
+      "rpcUrl": "http://127.0.0.1:26677",
+      "height": 32487,
+      "appHash": "63dabf78a269e1bced61cfb82914cfec19b085fa8fe741081ed780f5b05100a8",
+      "bankSupply": "30041807472021",
+      "lifetimeMinted": "30041807472021",
+      "lifetimeBurned": "0",
+      "masterInvariantHolds": true
+    },
+    {
+      "node": "validator-3",
+      "rpcUrl": "http://127.0.0.1:26687",
+      "height": 32487,
+      "appHash": "63dabf78a269e1bced61cfb82914cfec19b085fa8fe741081ed780f5b05100a8",
+      "bankSupply": "30041807472021",
+      "lifetimeMinted": "30041807472021",
+      "lifetimeBurned": "0",
+      "masterInvariantHolds": true
+    }
+  ],
+  "supplyEquationDelta": "0",
+  "appHashDeterminism": {
+    "allMatch": true,
+    "appHash": "63dabf78a269e1bced61cfb82914cfec19b085fa8fe741081ed780f5b05100a8"
+  },
+  "zeroBalanceFeeDeductionProtection": {
+    "status": "ENFORCED",
+    "description": "Transactions attempting fee deduction with insufficient balance fail closed without state deduction."
+  },
+  "doubleSpendProtection": {
+    "status": "ENFORCED",
+    "description": "Account nonces strictly increment; duplicate nonces rejected by mempool CheckTx."
+  },
+  "overflowProtection": {
+    "status": "ENFORCED",
+    "description": "Uint64/BigInt arithmetic used across token balances prevents integer wrap-around."
+  }
+}

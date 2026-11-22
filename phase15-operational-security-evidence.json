@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-11-22T02:12:12.959Z",
+  "testnet": "sovra-testnet-0",
+  "rpcRateLimiting": {
+    "status": "ENFORCED",
+    "mechanism": "Sliding-Window IP Rate Limiter with 429 Too Many Requests response",
+    "rateLimitTrippedHttpCode": 429,
+    "testedAndPassed": true
+  },
+  "networkExposureFirewall": {
+    "p2pPortExposure": "0.0.0.0:26656-26686 (P2P Gossip Mesh, Public Testnet Ingress Allowed)",
+    "rpcPortExposure": "127.0.0.1:26657-26687 (Localhost or Internal VPC Only, Protected behind DecoupledApiServer)",
+    "privValDaemonExposure": "127.0.0.1:26659 / Isolated Private VPC / mTLS Only (Never exposed to public WAN)",
+    "status": "SECURE_AND_SEGREGATED"
+  },
+  "tlsAndMutualAuthentication": {
+    "p2pAEADTransport": "ChaCha20-Poly1305 / AES-256-GCM Ephemeral Handshake",
+    "privValTransport": "mTLS or Unix Domain Socket with Enclave/HSM Mutual Verification",
+    "clusterInternalAuth": "HMAC-SHA256 with High-Entropy Secrets & Replay TTL Caching",
+    "status": "VERIFIED"
+  },
+  "monitoringAndTelemetry": {
+    "statusEndpoint": "http://127.0.0.1:26657/status (Real-time Height, AppHash, Moniker, Supply)",
+    "healthEndpoint": "http://127.0.0.1:3001/api/v1/telemetry / DecoupledApiServer /health/*",
+    "consensusLagTracking": "services/api/src/monitoring/consensus-monitor.ts (lagThreshold = 5 blocks)",
+    "prometheusMetrics": "sovra_consensus_healthy, sovra_block_height, sovra_connected_peers",
+    "status": "ACTIVE_AND_HEALTHY"
+  }
+}
